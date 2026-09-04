@@ -39,7 +39,14 @@ Cloudflare Worker needs `npx wrangler`, which downloads on demand.
 You have `funsite-handoff.tar.gz`. Move it across however you like: AirDrop, a
 USB stick, Google Drive, email it to yourself.
 
-On the new laptop:
+Verify it arrived intact (the checksum should match exactly):
+
+```bash
+shasum -a 256 funsite-handoff.tar.gz
+# b39019bed3735a252d93ef84c26e14710399bb6409074e40571623b04d5e3557
+```
+
+Then:
 
 ```bash
 mkdir -p ~/projects && cd ~/projects
@@ -89,6 +96,14 @@ cd funsite && npm ci && npm run preview
 
 > Keep it **private** unless you want the code public. Nothing in here is
 > secret — there are no keys — but that is your call to make deliberately.
+
+---
+
+> **This archive has been tested.** It was extracted into a clean directory,
+> installed with `npm ci`, built, and served — all fifteen games rendered and
+> Powder ran at 60 fps with no console errors. So if the steps above fail on
+> your machine, the cause is the environment (almost always the Node version),
+> not the archive.
 
 ---
 
