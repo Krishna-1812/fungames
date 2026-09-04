@@ -417,15 +417,37 @@ float hash31(vec3 p) {
   return float(n & 0x7fffffffU) / float(0x7fffffff);
 }
 
+/** A random unit-ish gradient per lattice point. */
+vec3 hash33(vec3 p) {
+  uvec3 q = uvec3(ivec3(p)) * uvec3(1597334673U, 3812015801U, 2798796415U);
+  q = (q.x ^ q.y ^ q.z) * uvec3(1597334673U, 3812015801U, 2798796415U);
+  return vec3(q) / float(0xffffffffU) * 2.0 - 1.0;
+}
+
+/**
+ * Gradient noise, not value noise.
+ *
+ * Value noise is cheaper, but its derivative is discontinuous across cell
+ * boundaries, and ridge3 — which folds the signal at its midpoint — turns
+ * that discontinuity into a visible rectangular lattice. Scale's nebulae came
+ * out looking like a grid of squares. Gradient noise is zero at every lattice
+ * point with a smooth gradient through it, so the cells stop being visible.
+ */
 float noise3(vec3 p) {
   vec3 i = floor(p), f = fract(p);
   vec3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-  return mix(
-    mix(mix(hash31(i + vec3(0, 0, 0)), hash31(i + vec3(1, 0, 0)), u.x),
-        mix(hash31(i + vec3(0, 1, 0)), hash31(i + vec3(1, 1, 0)), u.x), u.y),
-    mix(mix(hash31(i + vec3(0, 0, 1)), hash31(i + vec3(1, 0, 1)), u.x),
-        mix(hash31(i + vec3(0, 1, 1)), hash31(i + vec3(1, 1, 1)), u.x), u.y),
+  float n = mix(
+    mix(mix(dot(hash33(i + vec3(0, 0, 0)), f - vec3(0, 0, 0)),
+            dot(hash33(i + vec3(1, 0, 0)), f - vec3(1, 0, 0)), u.x),
+        mix(dot(hash33(i + vec3(0, 1, 0)), f - vec3(0, 1, 0)),
+            dot(hash33(i + vec3(1, 1, 0)), f - vec3(1, 1, 0)), u.x), u.y),
+    mix(mix(dot(hash33(i + vec3(0, 0, 1)), f - vec3(0, 0, 1)),
+            dot(hash33(i + vec3(1, 0, 1)), f - vec3(1, 0, 1)), u.x),
+        mix(dot(hash33(i + vec3(0, 1, 1)), f - vec3(0, 1, 1)),
+            dot(hash33(i + vec3(1, 1, 1)), f - vec3(1, 1, 1)), u.x), u.y),
     u.z);
+  // Callers all expect 0..1, as the value-noise version returned.
+  return clamp(n * 0.85 + 0.5, 0.0, 1.0);
 }
 
 float fbm3(vec3 p, int oct) {
@@ -433,7 +455,11 @@ float fbm3(vec3 p, int oct) {
   for (int i = 0; i < 8; i++) {
     if (i >= oct) break;
     v += a * noise3(p);
-    p *= 2.03;
+    // Swizzle and offset, not just scale. Scaling alone leaves every octave
+    // aligned to the same lattice, and the result is visibly blocky --
+    // rectangular filaments in anything ridged. The 2D fbm rotates for the
+    // same reason; this is the cheap 3D equivalent.
+    p = p.yzx * 2.03 + vec3(37.1, 11.7, 5.3);
     a *= 0.5;
   }
   return v;
@@ -447,7 +473,7 @@ float ridge3(vec3 p, int oct) {
     n *= n * prev;
     prev = n;
     v += a * n;
-    p *= 2.07;
+    p = p.zxy * 2.07 + vec3(19.3, 43.7, 7.9);
     a *= 0.5;
   }
   return v;

@@ -32,7 +32,7 @@ export const SCALE_FRAG = glsl(`
 uniform float u_exp;      // log10 of the screen's width in metres
 uniform vec2  u_centre;   // stage centre in 0..1 uv space
 uniform float u_objN;
-uniform float u_obj[${MAX_OBJECTS * 4}];    // radius (fraction of height), alpha, seed, spare
+uniform float u_obj[${MAX_OBJECTS * 4}];    // radius (fraction of height), alpha, seed, kind
 uniform float u_objCol[${MAX_OBJECTS * 3}];
 
 /* ---------------------------------------------------------------- regimes */
@@ -147,6 +147,7 @@ void main() {
     if (R <= 0.0 || alpha <= 0.001) continue;
     vec3 base = vec3(u_objCol[i * 3], u_objCol[i * 3 + 1], u_objCol[i * 3 + 2]);
 
+    float kind = u_obj[i * 4 + 3];
     float r = dist / R;
 
     // Outer glow. Reaches well past the body and is what stops an object
@@ -154,6 +155,81 @@ void main() {
     float glow = exp(-r * 2.6) * 0.22;
     col += base * glow * alpha;
 
+    /* ---- ring: an orbit or a distance. A radius drawn as a filled ball was
+       the most misleading thing on the page -- Neptune's orbit is not an
+       object, it is a circle, and the space inside it is mostly empty. */
+    if (kind > 0.5 && kind < 1.5) {
+      float w = max(0.006, 1.5 / R);          // stays ~1.5px however far out
+      float band = exp(-pow((r - 1.0) / w, 2.0));
+      // A brighter arc that creeps round, so the ring reads as a path rather
+      // than as a printed circle.
+      float a = atan(d.y, d.x);
+      float sweep = 0.55 + 0.45 * sin(a - u_time * 0.35 + seed * 6.283);
+      col += base * band * (1.1 + sweep * 1.6) * alpha;
+      continue;
+    }
+
+    /* ---- disc: a spiral galaxy, seen at a tilt. */
+    if (kind > 1.5 && kind < 2.5) {
+      // Squash and lean it over; a galaxy face-on is a much duller picture.
+      float ca = cos(0.42), sa = sin(0.42);
+      vec2 q = vec2(ca * d.x + sa * d.y, (-sa * d.x + ca * d.y) / 0.34);
+      float rr = length(q) / R;
+      if (rr < 1.6) {
+        float a = atan(q.y, q.x);
+        // Logarithmic spiral: the arm angle drifts with log(radius), which is
+        // the shape real arms actually take.
+        float arms = sin(a * 2.0 + log(max(rr, 0.02)) * 5.5 - u_time * 0.06);
+        float arm = pow(max(arms, 0.0), 2.2) * smoothstep(1.5, 0.25, rr);
+        float dust = fbm(q / R * 3.0 + seed * 20.0, 4);
+        float bulge = exp(-rr * rr * 7.0);
+        vec3 c = base * (arm * 1.5 * (0.55 + dust * 0.9));
+        c += mix(base, vec3(1.0, 0.92, 0.75), 0.6) * bulge * 2.2;
+        c *= smoothstep(1.55, 0.9, rr);
+        col += c * alpha;
+      }
+      continue;
+    }
+
+    /* ---- cloud: nebulae, clusters, an electron cloud. No surface to shade,
+       so this is density, not geometry. */
+    if (kind > 2.5 && kind < 3.5) {
+      if (r < 1.5) {
+        // Sampled against a radius bounded by the viewport. In pure object
+        // space a cloud several screens wide is one flat sample of very
+        // low-frequency noise, which paints the whole page a single colour —
+        // this keeps visible structure however far past the edges it runs.
+        float nR = min(R, min(u_res.x, u_res.y) * 0.55);
+        vec3 sp = vec3(d / nR, 0.0) + seed * 37.0;
+        float dens = fbm3(sp * 2.6 + vec3(0.0, u_time * 0.02, 0.0), 5);
+        // Ridged filaments on top: smooth fbm alone reads as fog, and a cloud
+        // wider than the screen is then just a flat colour across the page.
+        float fil = ridge3(sp * 5.2 + seed * 11.0, 4);
+        dens = dens * 0.65 + fil * 0.7;
+        dens *= smoothstep(1.3, 0.08, r);
+        // Once the cloud is far larger than the viewport you are inside it, and
+        // there is no core left to see — so the bright middle fades out.
+        float inside = smoothstep(1.8, 0.6, R / min(u_res.x, u_res.y));
+        float core = exp(-r * r * 3.2) * 0.42 * inside;
+        col += base * (pow(dens, 2.3) * 3.0 + core) * alpha;
+      }
+      continue;
+    }
+
+    /* ---- wave: a wavelength is a wave, not a ball. */
+    if (kind > 3.5) {
+      if (r < 1.4) {
+        // One full cycle across the radius, so the drawn spacing is the
+        // quantity being described.
+        float phase = r * TAU - u_time * 2.2 + seed * 6.283;
+        float w = sin(phase) * 0.5 + 0.5;
+        float env = smoothstep(1.35, 0.0, r) * smoothstep(0.0, 0.12, r);
+        col += base * pow(w, 3.0) * env * 2.0 * alpha;
+      }
+      continue;
+    }
+
+    /* ---- sphere: everything with an actual surface. */
     if (r < 1.0) {
       vec3 nrm = vec3(d / R, sqrt(max(0.0, 1.0 - r * r)));
       // Sampled in the object's own frame so the texture belongs to the sphere
