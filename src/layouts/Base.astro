@@ -1,0 +1,82 @@
+---
+import { SITE } from '../site.config'
+import '../styles/global.css'
+
+interface Props {
+  title: string
+  description?: string
+  image?: string
+  /** Emoji rendered as the favicon, so each game gets its own tab icon. */
+  glyph?: string
+  /** Games set this to lock page scroll. */
+  fixed?: boolean
+  themeColor?: string
+  /** Games with their own dark frame skip the paper background. */
+  bodyClass?: string
+}
+
+const {
+  title,
+  description = SITE.description,
+  image,
+  glyph = '🎲',
+  fixed = false,
+  themeColor = '#f6f5f1',
+  bodyClass = '',
+} = Astro.props
+
+const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
+const ogImage = image ? new URL(image, Astro.site ?? SITE.url).href : undefined
+
+// Kept as two flat statements: Astro's frontmatter scanner mis-parses *nested*
+// template literals containing raw markup.
+const faviconSvg =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="0.9em" font-size="90">${glyph}</text></svg>`
+const favicon = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content={themeColor} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={favicon} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap"
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    {ogImage && <meta name="twitter:image" content={ogImage} />}
+
+    {
+      SITE.plausibleDomain && (
+        <script is:inline defer data-domain={SITE.plausibleDomain} src="https://plausible.io/js/script.js"></script>
+      )
+    }
+    {
+      SITE.adsenseClient && (
+        <script is:inline async crossorigin="anonymous" src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${SITE.adsenseClient}`}></script>
+      )
+    }
+  </head>
+  <body class:list={[bodyClass, { 'is-fixed': fixed }]}>
+    <a class="skip" href="#main">Skip to content</a>
+    <slot />
+  </body>
+</html>

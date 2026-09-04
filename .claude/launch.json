@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "funsite",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "4321"],
+      "port": 4321
+    },
+    {
+      "name": "funsite-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4400"],
+      "port": 4400
+    }
+  ]
+}

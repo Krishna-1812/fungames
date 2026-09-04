@@ -1,0 +1,27 @@
+name = "fusion-api"
+main = "worker/fusion-worker.js"
+compatibility_date = "2026-09-01"
+
+# Serve the API from the same origin as the site, so the referer gate is simple
+# and the browser makes no cross-origin requests. Point this at your domain.
+routes = [
+  { pattern = "example.com/api/fusion/*", zone_name = "example.com" }
+]
+
+# Durable store of every pair ever resolved.
+# Create it once with:  npx wrangler kv namespace create FUSION
+[[kv_namespaces]]
+binding = "FUSION"
+id = "PUT_YOUR_KV_NAMESPACE_ID_HERE"
+
+# Cloudflare Workers AI. Remove this block to use an external
+# OpenAI-compatible endpoint instead (see vars below).
+[ai]
+binding = "AI"
+
+[vars]
+AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+# Only needed when not using the [ai] binding:
+# LLM_BASE_URL = "https://api.openai.com/v1"
+# LLM_MODEL = "gpt-4o-mini"
+# LLM_API_KEY is a secret:  npx wrangler secret put LLM_API_KEY

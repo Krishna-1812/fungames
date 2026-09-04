@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro'
+import { SITE } from '../site.config'
+---
+
+<Base title={`Lost — ${SITE.name}`} glyph="🧭">
+  <div class="lost">
+    <h1>Nothing here</h1>
+    <p>That page does not exist, or it was retired.</p>
+    <a href="/">Back to the games →</a>
+  </div>
+</Base>
+
+<style>
+  .lost { min-height: 100dvh; display: grid; place-content: center; text-align: center; gap: 8px; }
+  h1 { font-size: 48px; margin: 0; }
+  p { color: var(--ink-soft); margin: 0; }
+  a { margin-top: 16px; }
+</style>

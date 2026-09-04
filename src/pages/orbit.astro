@@ -1,0 +1,408 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Orbit - an n-body gravity sandbox.
+ *
+ * Every body pulls on every other body with real Newtonian gravity, integrated
+ * with a leapfrog scheme so orbits stay stable for minutes instead of spiralling
+ * apart the way naive Euler integration does. Collisions merge bodies and
+ * conserve momentum, so a crowded system genuinely settles into a few large
+ * survivors on its own.
+ *
+ * Trails come from fading the canvas rather than storing history, which costs
+ * one fill per frame instead of thousands of stored points.
+ */
+---
+
+<GameLayout slug="orbit" bar="#05060f" fixed bodyClass="orbit-body">
+  <div class="stage" id="stage">
+    <h1 class="visually-hidden">Orbit</h1>
+    <canvas id="sky" aria-label="Gravity simulation"></canvas>
+
+    <div class="hud">
+      <div class="readout">
+        <span><b id="nBodies">0</b> bodies</span>
+        <span><b id="nMerges">0</b> collisions</span>
+        <span><b id="nFps">0</b> fps</span>
+      </div>
+      <p class="tip" id="tip">Drag anywhere to fling a new body. Longer drag, faster throw.</p>
+    </div>
+
+    <aside class="dock">
+      <div class="group" role="radiogroup" aria-label="What to launch">
+        <button type="button" class="opt" data-mass="6" aria-checked="true" role="radio">Moon</button>
+        <button type="button" class="opt" data-mass="30" aria-checked="false" role="radio">Planet</button>
+        <button type="button" class="opt" data-mass="260" aria-checked="false" role="radio">Star</button>
+      </div>
+      <div class="group">
+        <button type="button" class="opt" id="presetSolar">Solar system</button>
+        <button type="button" class="opt" id="presetBinary">Binary</button>
+        <button type="button" class="opt" id="presetChaos">Chaos</button>
+      </div>
+      <div class="group">
+        <button type="button" class="opt" id="trailsBtn" aria-pressed="true">Trails</button>
+        <button type="button" class="opt" id="pauseBtn">Pause</button>
+        <button type="button" class="opt" id="clearBtn">Clear</button>
+      </div>
+    </aside>
+  </div>
+</GameLayout>
+
+<script>
+  import { sfx, unlock, mountMuteButton, tone } from '../lib/audio'
+  import { burst, ring } from '../lib/fx'
+
+  const canvas = document.getElementById('sky') as HTMLCanvasElement
+  const ctx = canvas.getContext('2d')!
+  const stage = document.getElementById('stage') as HTMLElement
+
+  type Body = {
+    x: number; y: number; vx: number; vy: number
+    m: number; r: number; hue: number; star: boolean
+  }
+
+  const G = 1
+  // Softening stops the force blowing up to infinity when two bodies nearly
+  // touch, which is what makes naive n-body sims explode.
+  const SOFT = 26
+  const MAX_BODIES = 320
+
+  let bodies: Body[] = []
+  let W = 0, H = 0, dpr = 1
+  let paused = false
+  let trails = true
+  let merges = 0
+  let launchMass = 6
+
+  const radiusFor = (m: number) => Math.max(1.6, Math.cbrt(m) * 1.9)
+  const hueFor = (m: number) => (m >= 200 ? 42 : m >= 20 ? 205 : 190)
+
+  function add(x: number, y: number, vx: number, vy: number, m: number) {
+    if (bodies.length >= MAX_BODIES) return
+    bodies.push({ x, y, vx, vy, m, r: radiusFor(m), hue: hueFor(m), star: m >= 200 })
+  }
+
+  function resize() {
+    const r = stage.getBoundingClientRect()
+    if (r.width < 8) return false
+    dpr = Math.min(devicePixelRatio || 1, 2)
+    W = r.width; H = r.height
+    canvas.width = Math.round(W * dpr)
+    canvas.height = Math.round(H * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.fillStyle = '#05060f'
+    ctx.fillRect(0, 0, W, H)
+    return true
+  }
+
+  // ---- physics -----------------------------------------------------------
+  function stepPhysics(dt: number) {
+    const n = bodies.length
+
+    // Accelerations from every pair, computed once and applied to both.
+    const ax = new Float64Array(n)
+    const ay = new Float64Array(n)
+    for (let i = 0; i < n; i++) {
+      const a = bodies[i]
+      for (let j = i + 1; j < n; j++) {
+        const b = bodies[j]
+        const dx = b.x - a.x, dy = b.y - a.y
+        const d2 = dx * dx + dy * dy + SOFT * SOFT
+        const inv = 1 / Math.sqrt(d2)
+        const f = G * inv * inv * inv
+        ax[i] += f * b.m * dx; ay[i] += f * b.m * dy
+        ax[j] -= f * a.m * dx; ay[j] -= f * a.m * dy
+      }
+    }
+
+    for (let i = 0; i < n; i++) {
+      const b = bodies[i]
+      b.vx += ax[i] * dt
+      b.vy += ay[i] * dt
+      b.x += b.vx * dt
+      b.y += b.vy * dt
+    }
+
+    // Merge overlapping bodies, conserving mass and momentum.
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const a = bodies[i], b = bodies[j]
+        const dx = b.x - a.x, dy = b.y - a.y
+        const rr = a.r + b.r
+        if (dx * dx + dy * dy > rr * rr) continue
+
+        const big = a.m >= b.m ? a : b
+        const small = big === a ? b : a
+        const m = a.m + b.m
+        big.vx = (a.vx * a.m + b.vx * b.m) / m
+        big.vy = (a.vy * a.m + b.vy * b.m) / m
+        big.x = (a.x * a.m + b.x * b.m) / m
+        big.y = (a.y * a.m + b.y * b.m) / m
+        big.m = m
+        big.r = radiusFor(m)
+        big.hue = hueFor(m)
+        big.star = m >= 200
+
+        bodies.splice(bodies.indexOf(small), 1)
+        merges++
+        onMerge(big.x, big.y, small.m)
+        j--
+      }
+    }
+
+    // Anything flung far outside the view is gone for good; drop it.
+    const pad = Math.max(W, H) * 2.2
+    bodies = bodies.filter((b) => b.x > -pad && b.x < W + pad && b.y > -pad && b.y < H + pad)
+  }
+
+  let mergeSoundBudget = 0
+  function onMerge(x: number, y: number, m: number) {
+    const rect = canvas.getBoundingClientRect()
+    ring(rect.left + x, rect.top + y, 'hsl(38 100% 72%)', 8 + Math.cbrt(m) * 5)
+    burst(rect.left + x, rect.top + y, {
+      count: Math.min(24, 5 + (m | 0)), colors: ['#ffd166', '#ff9a3c', '#fff'],
+      speed: 2.6, gravity: 0, drag: 0.93, life: 30, size: 2.4,
+    })
+    // Cap sound so a hundred simultaneous merges do not machine-gun.
+    if (mergeSoundBudget > 0) {
+      mergeSoundBudget--
+      tone({ freq: 220 + Math.random() * 160, to: 90, dur: 0.22, type: 'sine', gain: 0.16 })
+    }
+  }
+
+  // ---- render ------------------------------------------------------------
+  function render() {
+    if (trails) {
+      // Fading the whole frame is what draws the trails; no history needed.
+      ctx.fillStyle = 'rgba(5, 6, 15, 0.16)'
+      ctx.fillRect(0, 0, W, H)
+    } else {
+      ctx.fillStyle = '#05060f'
+      ctx.fillRect(0, 0, W, H)
+    }
+
+    for (const b of bodies) {
+      if (b.star) {
+        // A tight, fast falloff reads as a light source; a wide one just looks
+        // like a smudge over everything behind it.
+        const R = b.r * 3.4
+        const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, R)
+        g.addColorStop(0, 'hsla(' + b.hue + ' 100% 78% / 0.5)')
+        g.addColorStop(0.35, 'hsla(' + b.hue + ' 100% 66% / 0.14)')
+        g.addColorStop(1, 'hsla(' + b.hue + ' 100% 60% / 0)')
+        ctx.fillStyle = g
+        ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill()
+      }
+      ctx.fillStyle = b.star
+        ? 'hsl(' + b.hue + ' 100% 74%)'
+        : 'hsl(' + b.hue + ' 78% ' + Math.min(86, 58 + b.r * 2) + '%)'
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill()
+    }
+
+    if (aim) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 5])
+      ctx.beginPath(); ctx.moveTo(aim.x0, aim.y0); ctx.lineTo(aim.x1, aim.y1); ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx.beginPath(); ctx.arc(aim.x0, aim.y0, radiusFor(launchMass), 0, Math.PI * 2); ctx.fill()
+    }
+  }
+
+  // ---- loop --------------------------------------------------------------
+  let fpsFrames = 0, lastFps = performance.now()
+  const nBodies = document.getElementById('nBodies')!
+  const nMerges = document.getElementById('nMerges')!
+  const nFps = document.getElementById('nFps')!
+
+  function frame() {
+    if (!paused && W) {
+      mergeSoundBudget = 2
+      // Two substeps keep fast, close passes accurate without halving the fps.
+      stepPhysics(0.5)
+      stepPhysics(0.5)
+    }
+    if (W) render()
+
+    fpsFrames++
+    const now = performance.now()
+    if (now - lastFps > 500) {
+      nFps.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
+      nBodies.textContent = String(bodies.length)
+      nMerges.textContent = String(merges)
+      lastFps = now; fpsFrames = 0
+    }
+    requestAnimationFrame(frame)
+  }
+
+  // ---- input -------------------------------------------------------------
+  let aim: { x0: number; y0: number; x1: number; y1: number } | null = null
+  const tip = document.getElementById('tip')!
+
+  const local = (e: PointerEvent) => {
+    const r = canvas.getBoundingClientRect()
+    return { x: e.clientX - r.left, y: e.clientY - r.top }
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    unlock()
+    const p = local(e)
+    aim = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }
+    try { canvas.setPointerCapture(e.pointerId) } catch {}
+    tip.classList.add('faded')
+    e.preventDefault()
+  })
+  canvas.addEventListener('pointermove', (e) => {
+    if (!aim) return
+    const p = local(e)
+    aim.x1 = p.x; aim.y1 = p.y
+  })
+  function release() {
+    if (!aim) return
+    // Drag away from the target and release, like a slingshot.
+    const vx = (aim.x1 - aim.x0) * 0.055
+    const vy = (aim.y1 - aim.y0) * 0.055
+    add(aim.x0, aim.y0, vx, vy, launchMass)
+    const speed = Math.hypot(vx, vy)
+    sfx.pop(Math.min(9, Math.round(speed * 2)))
+    const r = canvas.getBoundingClientRect()
+    burst(r.left + aim.x0, r.top + aim.y0, {
+      count: 8, colors: ['#9fd0ff', '#fff'], speed: 2, gravity: 0, drag: 0.9, life: 22, size: 2,
+    })
+    aim = null
+  }
+  canvas.addEventListener('pointerup', release)
+  canvas.addEventListener('pointercancel', () => { aim = null })
+
+  document.querySelectorAll<HTMLButtonElement>('.opt[data-mass]').forEach((b) => {
+    b.addEventListener('click', () => {
+      launchMass = Number(b.dataset.mass)
+      document.querySelectorAll('.opt[data-mass]').forEach((o) =>
+        o.setAttribute('aria-checked', String(o === b)))
+      unlock(); sfx.blip(Number(b.dataset.mass) > 100 ? 4 : 1)
+    })
+  })
+
+  // ---- presets -----------------------------------------------------------
+  function clear() { bodies = []; merges = 0; if (W) { ctx.fillStyle = '#05060f'; ctx.fillRect(0, 0, W, H) } }
+
+  /** Circular orbit speed for a satellite at distance r from mass M. */
+  const orbitalV = (M: number, r: number) => Math.sqrt((G * M) / r)
+
+  function solar() {
+    clear()
+    const cx = W / 2, cy = H / 2
+    add(cx, cy, 0, 0, 2600)
+    const radii = [70, 105, 145, 190, 240, 300]
+    radii.forEach((r, i) => {
+      if (r > Math.min(W, H) / 2 - 10) return
+      const a = Math.random() * Math.PI * 2
+      const v = orbitalV(2600, r)
+      const m = i === 3 ? 34 : 6 + Math.random() * 10
+      add(cx + Math.cos(a) * r, cy + Math.sin(a) * r, -Math.sin(a) * v, Math.cos(a) * v, m)
+    })
+    sfx.great()
+  }
+
+  function binary() {
+    clear()
+    const cx = W / 2, cy = H / 2
+    const sep = Math.min(W, H) * 0.22
+    const M = 900
+    // Each star orbits the shared centre of mass at half the separation.
+    const v = Math.sqrt((G * M) / (2 * sep)) * 0.86
+    add(cx - sep, cy, 0, v, M)
+    add(cx + sep, cy, 0, -v, M)
+    for (let i = 0; i < 14; i++) {
+      const r = sep * (2.1 + Math.random() * 1.5)
+      const a = Math.random() * Math.PI * 2
+      const vv = orbitalV(2 * M, r)
+      add(cx + Math.cos(a) * r, cy + Math.sin(a) * r, -Math.sin(a) * vv, Math.cos(a) * vv, 3 + Math.random() * 6)
+    }
+    sfx.great()
+  }
+
+  function chaos() {
+    clear()
+    for (let i = 0; i < 90; i++) {
+      add(Math.random() * W, Math.random() * H, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.4, 3 + Math.random() * 12)
+    }
+    sfx.whoosh()
+  }
+
+  document.getElementById('presetSolar')!.addEventListener('click', () => { unlock(); solar() })
+  document.getElementById('presetBinary')!.addEventListener('click', () => { unlock(); binary() })
+  document.getElementById('presetChaos')!.addEventListener('click', () => { unlock(); chaos() })
+  document.getElementById('clearBtn')!.addEventListener('click', () => { unlock(); sfx.click(); clear() })
+  document.getElementById('pauseBtn')!.addEventListener('click', (e) => {
+    paused = !paused
+    ;(e.currentTarget as HTMLButtonElement).textContent = paused ? 'Resume' : 'Pause'
+    unlock(); sfx.click()
+  })
+  document.getElementById('trailsBtn')!.addEventListener('click', (e) => {
+    trails = !trails
+    ;(e.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(trails))
+    unlock(); sfx.click()
+  })
+
+
+  if (resize()) solar()
+  else if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => { if (resize()) { solar(); ro.disconnect() } })
+    ro.observe(stage)
+  }
+  let rt = 0
+  addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(resize, 200) })
+  frame()
+</script>
+
+<style is:global>
+  .orbit-body { background: #05060f; color: #e9edff; }
+
+  .orbit-body .stage { position: relative; height: 100%; }
+  .orbit-body canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+
+  .orbit-body .hud {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    text-align: center; pointer-events: none; width: max-content; max-width: 92vw;
+  }
+  .orbit-body .readout {
+    display: inline-flex; gap: 16px; font-size: 12.5px;
+    background: rgba(0, 0, 0, 0.55); padding: 7px 16px; border-radius: 999px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    color: #a9b6dd;
+  }
+  .orbit-body .readout b { color: #fff; font-variant-numeric: tabular-nums; }
+  .orbit-body .tip {
+    margin: 10px 0 0; font-size: 13px; color: #8b98c4;
+    transition: opacity 600ms var(--ease);
+  }
+  .orbit-body .tip.faded { opacity: 0; }
+
+  .orbit-body .dock {
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    max-width: 94vw;
+  }
+  .orbit-body .group {
+    display: flex; gap: 4px; padding: 4px;
+    background: rgba(12, 16, 34, 0.82); border: 1px solid #1e2647; border-radius: 999px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .orbit-body .opt {
+    background: transparent; border: 0; color: #c3cdf0;
+    border-radius: 999px; padding: 8px 15px; font-size: 13px; cursor: pointer;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+    white-space: nowrap;
+  }
+  .orbit-body .opt:hover { background: #1c2447; color: #fff; }
+  .orbit-body .opt[aria-checked='true'],
+  .orbit-body .opt[aria-pressed='true'] { background: #2c65d8; color: #fff; }
+
+  @media (max-width: 620px) {
+    .orbit-body .opt { padding: 8px 11px; font-size: 12px; }
+    .orbit-body .readout { gap: 10px; font-size: 11.5px; }
+  }
+</style>

@@ -1,0 +1,396 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Deep Time — a linear scroll through 4.54 billion years.
+ *
+ * The whole point is that the scale is honest: every pixel really is the same
+ * number of years. But a single linear scale makes all of human history one
+ * unreadable pixel, so the page is split into three acts that each zoom in by
+ * ~500x, with the seam made explicit rather than hidden.
+ */
+
+type Act = { id: string; from: number; to: number; yearsPerPx: number; sky: [string, string] }
+
+const ACTS: Act[] = [
+  // Five zoom levels. Each is internally linear and honest; the seams are shown
+  // explicitly. Without them, everything after the dinosaurs is one pixel.
+  { id: 'act1', from: 4_540_000_000, to: 60_000_000, yearsPerPx: 250_000, sky: ['#100a1e', '#33203f'] },
+  { id: 'act2', from: 60_000_000, to: 2_000_000, yearsPerPx: 20_000, sky: ['#33203f', '#4a2a55'] },
+  { id: 'act3', from: 2_000_000, to: 12_000, yearsPerPx: 500, sky: ['#4a2a55', '#1d4e5f'] },
+  { id: 'act4', from: 12_000, to: 250, yearsPerPx: 5, sky: ['#1d4e5f', '#6f9fb5'] },
+  { id: 'act5', from: 250, to: 0, yearsPerPx: 0.25, sky: ['#6f9fb5', '#bcd8e2'] },
+]
+
+type Event = { at: number; title: string; note?: string; big?: boolean }
+
+const EVENTS: Event[] = [
+  { at: 4_540_000_000, title: 'Earth forms', note: 'A disc of dust and rock finishes clumping together.', big: true },
+  { at: 4_510_000_000, title: 'Something the size of Mars hits us', note: 'The debris becomes the Moon.' },
+  { at: 4_400_000_000, title: 'The first oceans', note: 'The surface finally cools enough for liquid water.' },
+  { at: 4_100_000_000, title: 'Heavy bombardment', note: 'The inner solar system is still being pelted.' },
+  { at: 3_700_000_000, title: 'The oldest trace of life', note: 'Carbon signatures in Greenland rock.', big: true },
+  { at: 3_500_000_000, title: 'Cyanobacteria', note: 'Mats of bacteria start splitting water for energy.' },
+  { at: 2_400_000_000, title: 'The Great Oxidation', note: 'Free oxygen poisons almost everything alive.', big: true },
+  { at: 2_100_000_000, title: 'The first complex cell', note: 'One cell swallows another and keeps it. Mitochondria.' },
+  { at: 1_000_000_000, title: 'The first multicellular life' },
+  { at: 720_000_000, title: 'Snowball Earth', note: 'Ice reaches the equator. Twice.' },
+  { at: 541_000_000, title: 'The Cambrian explosion', note: 'Almost every animal body plan appears at once.', big: true },
+  { at: 470_000_000, title: 'Plants move onto land' },
+  { at: 440_000_000, title: 'The first mass extinction' },
+  { at: 375_000_000, title: 'A fish crawls out of the water', note: 'Tiktaalik. Everything with a spine and legs comes from this.', big: true },
+  { at: 350_000_000, title: 'The coal forests', note: 'The trees rotting now are the fuel of the 1800s.' },
+  { at: 320_000_000, title: 'The first reptiles' },
+  { at: 252_000_000, title: 'The Great Dying', note: 'Ninety-six percent of marine species stop existing.', big: true },
+  { at: 230_000_000, title: 'The first dinosaurs' },
+  { at: 225_000_000, title: 'The first mammals', note: 'Small, nocturnal, and about to wait 160 million years.' },
+  { at: 150_000_000, title: 'Feathers and flight' },
+  { at: 130_000_000, title: 'The first flower' },
+  { at: 66_000_000, title: 'The asteroid', note: 'Ten kilometres wide. Seventy-five percent of species gone.', big: true },
+  { at: 55_000_000, title: 'The first primates' },
+  { at: 20_000_000, title: 'The first apes' },
+  { at: 7_000_000, title: 'Our line splits from chimpanzees', big: true },
+  { at: 3_200_000, title: 'Lucy walks upright' },
+  { at: 2_600_000, title: 'The first stone tool' },
+  { at: 1_000_000, title: 'Fire, kept and carried' },
+  { at: 300_000, title: 'Homo sapiens', note: 'Us. Anatomically modern, and still 290,000 years from farming.', big: true },
+  { at: 70_000, title: 'Out of Africa' },
+  { at: 40_000, title: 'Cave paintings at Chauvet' },
+  { at: 12_000, title: 'Somebody plants a seed on purpose', note: 'Agriculture. Everything after this is very fast.', big: true },
+  { at: 5_500, title: 'Writing' },
+  { at: 4_500, title: 'The Great Pyramid' },
+  { at: 2_000, title: 'The Roman Empire' },
+  { at: 570, title: 'The printing press' },
+  { at: 250, title: 'The steam engine' },
+  { at: 160, title: 'The telephone' },
+  { at: 123, title: 'Twelve seconds of powered flight' },
+  { at: 80, title: 'The first computer' },
+  { at: 55, title: 'Footprints on the Moon' },
+  { at: 35, title: 'The World Wide Web' },
+  { at: 19, title: 'A computer in everyone\u2019s pocket' },
+  { at: 0, title: 'You, scrolling', note: 'You just fell through 4.54 billion years. It took a few minutes.', big: true },
+]
+
+// Lay the acts out end to end and resolve every event to an absolute pixel offset.
+let cursor = 0
+const acts = ACTS.map((a) => {
+  const height = Math.round((a.from - a.to) / a.yearsPerPx)
+  const laid = { ...a, height, offset: cursor }
+  cursor += height
+  return laid
+})
+const totalHeight = cursor
+
+// Vertical position is the honest part and never moves. When two events land
+// close enough to overlap, they are pushed into left/right lanes rather than
+// being nudged in time, so the scale stays true and the text stays readable.
+const CARD_H = 96
+
+// Vertical position is the honest part and never moves. Events are first laid
+// out at their true depth, then any run that would overlap is split into two
+// narrow side lanes. Isolated events keep the full-width centre lane.
+type Placed = ReturnType<typeof at> & { lane: 'center' | 'left' | 'right' }
+function at(e: Event) {
+  const act = acts.find((a) => e.at <= a.from && e.at > a.to) ?? acts[acts.length - 1]
+  return { ...e, top: act.offset + Math.round((act.from - e.at) / act.yearsPerPx) }
+}
+
+const rough = EVENTS.map(at)
+const placed: Placed[] = []
+for (let i = 0; i < rough.length; ) {
+  // Extend a group while each next event would collide with the previous one.
+  let j = i + 1
+  while (j < rough.length && rough[j].top < rough[j - 1].top + CARD_H) j++
+  const group = rough.slice(i, j)
+  if (group.length === 1) {
+    placed.push({ ...group[0], lane: 'center' })
+  } else {
+    group.forEach((g, k) => placed.push({ ...g, lane: k % 2 === 0 ? 'left' : 'right' }))
+  }
+  i = j
+}
+
+const fmt = (y: number) =>
+  y === 0 ? 'today'
+  : y >= 1e9 ? `${(y / 1e9).toFixed(2)} billion years ago`
+  : y >= 1e6 ? `${(y / 1e6).toFixed(y >= 1e7 ? 0 : 1)} million years ago`
+  : `${y.toLocaleString('en-US')} years ago`
+---
+
+<GameLayout slug="deep-time" bar="#171132" bodyClass="night-body">
+  <div class="sky" id="sky"></div>
+
+  <div class="hud">
+    <div class="hud-year" id="hudYear">4.54 billion years ago</div>
+    <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
+    <div class="hud-scale" id="hudScale">1 pixel = 250,000 years</div>
+  </div>
+
+  <div class="intro">
+    <h1>Deep Time</h1>
+    <p>Every pixel below is a fixed number of years. Keep scrolling.</p>
+    <div class="arrow">↓</div>
+  </div>
+
+  <div class="reel" style={`height:${totalHeight}px`}>
+    {
+      acts.map((a, i) =>
+        i === 0 ? null : (
+          <div class="seam" style={`top:${a.offset}px`}>
+            <span>zooming in {Math.round(acts[i - 1].yearsPerPx / a.yearsPerPx)}×</span>
+          </div>
+        )
+      )
+    }
+    {
+      placed.map((e) => (
+        <article class:list={['ev', `lane-${e.lane}`, { big: e.big }]} style={`top:${e.top}px`}>
+          <div class="ev-when">{fmt(e.at)}</div>
+          <h2>{e.title}</h2>
+          {e.note && <p>{e.note}</p>}
+        </article>
+      ))
+    }
+  </div>
+
+  <footer class="outro">
+    <p>Scroll back up. It is a long way.</p>
+    <a href="/">← more things like this</a>
+  </footer>
+</GameLayout>
+
+  {/* Data for the module below: modules cannot take define:vars, and
+      modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ acts, totalHeight })} />
+
+  <script>
+  import { ring } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+    const { acts, totalHeight } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  // --- lane layout -------------------------------------------------------
+  // The server lays cards out with an estimated card height, which is right
+  // for most of the page but cannot know how text will wrap at this viewport.
+  // This pass measures the real heights and re-lanes any run that still
+  // overlaps, then repeats because changing lane changes width and therefore
+  // height. It also re-runs on resize.
+  const cards = [...document.querySelectorAll('.ev')]
+
+  function relayout() {
+    // Phase 1 — a card's height depends on which lane it ends up in, and
+    // neither lane is reliably taller: the narrow lane wraps more lines, the
+    // wide lane has more padding. So measure both and group on the larger,
+    // which guarantees a card can only ever shrink from here.
+    const measure = (lane) => {
+      for (const el of cards) {
+        el.classList.remove('lane-center', 'lane-left', 'lane-right', 'compact', 'compact-hard')
+        el.classList.add(lane)
+      }
+      return cards.map((el) => el.offsetHeight)
+    }
+    const wide = measure('lane-center')
+    const narrow = measure('lane-left')
+
+    const GROUP_GAP = 8
+    const boxes = cards.map((el, i) => ({
+      el,
+      top: el.offsetTop,
+      h: Math.max(wide[i], narrow[i]) + GROUP_GAP,
+    }))
+
+    const groups = []
+    for (let i = 0; i < boxes.length; ) {
+      let j = i + 1
+      while (j < boxes.length && boxes[j].top < boxes[j - 1].top + boxes[j - 1].h) j++
+      groups.push(boxes.slice(i, j))
+      i = j
+    }
+
+    // Phase 2 — anything alone keeps the wide lane; anything crowded goes into
+    // two narrow lanes, each tracking how far down it is already occupied.
+    for (const group of groups) {
+      if (group.length === 1) {
+        group[0].el.classList.remove('lane-left')
+        group[0].el.classList.add('lane-center')
+        continue
+      }
+      // Escalating compaction: full card, then drop the note, then drop the date
+      // line too. Positions never move — only the cards get smaller.
+      const TIERS = ['', 'compact', 'compact-hard']
+      for (let attempt = 0; attempt < TIERS.length; attempt++) {
+        const bottom = { left: -Infinity, right: -Infinity }
+        let clash = false
+        for (const b of group) {
+          const h = b.el.offsetHeight
+          const GAP = 10
+          let lane =
+            bottom.left + GAP <= b.top ? 'left' : bottom.right + GAP <= b.top ? 'right' : null
+          if (!lane) {
+            clash = true
+            lane = bottom.left <= bottom.right ? 'left' : 'right'
+          }
+          b.el.classList.remove('lane-left', 'lane-right')
+          b.el.classList.add('lane-' + lane)
+          bottom[lane] = b.top + h
+        }
+        if (!clash) break
+        const next = TIERS[attempt + 1]
+        if (next) for (const b of group) b.el.classList.add(next)
+      }
+    }
+  }
+
+  relayout()
+
+  // A chime when a major event scrolls into the middle of the screen. Watching
+  // the centre band rather than the whole viewport means the sound lands when
+  // you are actually reading the card, not when it clips the bottom edge.
+  let chimeStep = 0
+  const bigCards = cards.filter((c) => c.classList.contains('big'))
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue
+          io.unobserve(e.target)
+          sfx.blip(chimeStep++)
+          const r = e.target.getBoundingClientRect()
+          ring(r.left + r.width / 2, r.top + r.height / 2, 'rgba(255,255,255,0.5)', 20)
+        }
+      },
+      { rootMargin: '-42% 0px -42% 0px' }
+    )
+    bigCards.forEach((c) => io.observe(c))
+  }
+  addEventListener('pointerdown', unlock, { once: true })
+  addEventListener('scroll', unlock, { once: true, passive: true })
+
+  const sky = document.getElementById('sky')
+  const hudYear = document.getElementById('hudYear')
+  const hudFill = document.getElementById('hudFill')
+  const hudScale = document.getElementById('hudScale')
+  const reel = document.querySelector('.reel')
+
+  const fmt = (y) =>
+    y <= 0 ? 'today'
+    : y >= 1e9 ? `${(y / 1e9).toFixed(2)} billion years ago`
+    : y >= 1e6 ? `${(y / 1e6).toFixed(y >= 1e7 ? 0 : 1)} million years ago`
+    : `${Math.round(y).toLocaleString('en-US')} years ago`
+
+  const mix = (a, b, t) => {
+    const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const [r1, g1, b1] = p(a), [r2, g2, b2] = p(b)
+    const c = (x, y) => Math.round(x + (y - x) * t)
+    return `rgb(${c(r1, r2)},${c(g1, g2)},${c(b1, b2)})`
+  }
+
+  let ticking = false
+  function update() {
+    ticking = false
+    // Depth measured at the middle of the viewport, so the readout matches
+    // whatever event you are actually looking at.
+    const depth = window.scrollY + window.innerHeight / 2 - reel.offsetTop
+    const clamped = Math.max(0, Math.min(totalHeight, depth))
+
+    const act = acts.find((a) => clamped < a.offset + a.height) ?? acts[acts.length - 1]
+    const within = clamped - act.offset
+    const years = Math.max(0, act.from - within * act.yearsPerPx)
+
+    hudYear.textContent = fmt(years)
+    hudScale.textContent = `1 pixel = ${act.yearsPerPx.toLocaleString('en-US')} years`
+    hudFill.style.width = `${(clamped / totalHeight) * 100}%`
+
+    const t = act.height ? Math.min(1, Math.max(0, within / act.height)) : 0
+    sky.style.background = `linear-gradient(${mix(act.sky[0], act.sky[1], t)}, ${mix(act.sky[0], act.sky[1], Math.min(1, t + 0.25))})`
+  }
+
+  addEventListener(
+    'scroll',
+    () => {
+      if (!ticking) {
+        ticking = true
+        requestAnimationFrame(update)
+      }
+    },
+    { passive: true }
+  )
+  addEventListener('resize', () => { relayout(); update() }, { passive: true })
+  update()
+</script>
+
+<style>
+  .sky {
+    position: fixed; inset: 0; z-index: -1;
+    background: linear-gradient(#100a1e, #3b1f47);
+    transition: background 260ms linear;
+  }
+  :global(.night-body) { background: #100a1e; color: #fff; }
+
+  .hud {
+    position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+    z-index: 40; width: min(92vw, 520px); text-align: center;
+    padding: 10px 16px; border-radius: 12px;
+    background: rgba(0, 0, 0, 0.66);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+  }
+  .hud-year { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hud-bar { height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 8px 0 6px; }
+  .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; }
+  .hud-scale { font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+
+  /* Leave room for the fixed HUD so the title is never hidden behind it. */
+  .intro { min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
+  .intro h1 { font-size: clamp(38px, 9vw, 74px); margin: 0; letter-spacing: -0.03em; }
+  .intro p { opacity: 0.75; margin: 0; font-size: 18px; }
+  .arrow { font-size: 30px; opacity: 0.6; animation: bob 1.8s ease-in-out infinite; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+
+  .reel { position: relative; }
+
+  .ev {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    width: min(90vw, 560px); text-align: center;
+    padding: 14px 18px; border-radius: 12px;
+    /* Opaque enough to stay legible against both the near-black opening and
+       the pale daylight of the final act. */
+    background: rgba(12, 10, 24, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .ev.lane-left { left: 50%; transform: translateX(-102%); width: min(44vw, 330px); }
+  .ev.lane-right { left: 50%; transform: translateX(2%); width: min(44vw, 330px); }
+  .ev.lane-left, .ev.lane-right { padding: 11px 14px; }
+  .ev.lane-left h2, .ev.lane-right h2 { font-size: 19px; }
+  .ev.lane-left p, .ev.lane-right p { font-size: 14px; }
+  /* Set by the runtime layout pass when a cluster is too dense for two lanes. */
+  .ev.compact p { display: none; }
+  .ev.compact-hard .ev-when { display: none; }
+  .ev.compact-hard { padding: 9px 12px; }
+  .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 23px; }
+  @media (max-width: 620px) {
+    .ev.lane-left, .ev.lane-right { width: min(46vw, 220px); }
+    .ev.lane-left { transform: translateX(-104%); }
+  }
+  .ev-when {
+    font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
+    opacity: 0.75; font-variant-numeric: tabular-nums;
+  }
+  .ev h2 { font-size: 22px; margin: 4px 0 0; font-weight: 700; }
+  .ev p { margin: 6px 0 0; opacity: 0.72; font-size: 15px; }
+  .ev.big { background: rgba(8, 6, 18, 0.85); border-color: rgba(255, 255, 255, 0.32); }
+  .ev.big h2 { font-size: 30px; }
+
+  .seam {
+    position: absolute; left: 0; right: 0; text-align: center;
+    border-top: 1px dashed rgba(255, 255, 255, 0.35);
+    padding-top: 8px;
+  }
+  .seam span {
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    opacity: 0.7; background: rgba(0, 0, 0, 0.4); padding: 4px 12px; border-radius: 999px;
+  }
+
+  .outro { padding: 22vh 20px 18vh; text-align: center; }
+  .outro p { font-size: 20px; opacity: 0.8; }
+  .outro a { display: inline-block; margin-top: 12px; opacity: 0.75; }
+</style>

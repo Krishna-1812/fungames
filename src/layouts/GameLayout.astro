@@ -1,0 +1,165 @@
+---
+import Base from './Base.astro'
+import { SITE } from '../site.config'
+import { gameBySlug } from '../data/games'
+
+interface Props {
+  slug: string
+  /** Games that own the whole viewport (canvas, locked scroll) pass true. */
+  fixed?: boolean
+  /** Colour behind the chrome bar; defaults to the game accent. */
+  bar?: string
+  /** Set false for games that draw their own branding. */
+  chrome?: boolean
+  bodyClass?: string
+}
+
+const { slug, fixed = false, bar, chrome = true, bodyClass = '' } = Astro.props
+const game = gameBySlug(slug)
+if (!game) throw new Error(`No registry entry for game "${slug}" — add it to src/data/games.ts`)
+
+const barColor = bar ?? game.accent
+---
+
+<Base
+  title={`${game.title} — ${SITE.name}`}
+  description={game.description}
+  glyph={game.glyph}
+  fixed={fixed}
+  themeColor={barColor}
+  bodyClass={bodyClass}
+>
+  {
+    chrome && (
+      <header class="chrome" style={`--bar:${barColor}`}>
+        <a class="chrome-home" href="/">
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>{SITE.name}</span>
+        </a>
+        <span class="chrome-title">{game.title}</span>
+        <button class="chrome-share" type="button" data-share data-title={game.title}>
+          Share
+        </button>
+      </header>
+    )
+  }
+
+  <main id="main" class:list={['game', { 'game-fixed': fixed, 'game-chromed': chrome }]}>
+    <slot />
+  </main>
+
+  {/* Data for the module script below. A module cannot take define:vars, and
+      modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="chrome-data" set:html={JSON.stringify({ blurb: game.blurb })} />
+
+  <script>
+    import { sfx, unlock, mountMuteButton } from '../lib/audio'
+
+    const { blurb } = JSON.parse(document.getElementById('chrome-data')!.textContent!)
+
+    // Every game gets the same speaker button, so the control is where players
+    // expect it rather than reinvented per page.
+    mountMuteButton(document.querySelector('.chrome'))
+
+    // The first gesture anywhere unlocks audio, so the first real sound in a
+    // game is never swallowed by the autoplay policy.
+    addEventListener('pointerdown', unlock, { once: true, capture: true })
+    addEventListener('keydown', unlock, { once: true, capture: true })
+
+    document.querySelectorAll<HTMLButtonElement>('[data-share]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        unlock()
+        sfx.click()
+        const data = { title: btn.dataset.title, text: blurb, url: location.href }
+        try {
+          if (navigator.share) return await navigator.share(data)
+          await navigator.clipboard.writeText(location.href)
+          const was = btn.textContent
+          btn.textContent = 'Copied'
+          sfx.good()
+          setTimeout(() => (btn.textContent = was), 1400)
+        } catch {
+          /* dismissed, or clipboard blocked — nothing useful to say */
+        }
+      })
+    })
+  </script>
+</Base>
+
+<style>
+  .chrome {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 60;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    background: var(--bar);
+    color: #fff;
+    font-size: 14px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .chrome-home {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    opacity: 0.92;
+    transition: opacity 140ms var(--ease), transform 140ms var(--ease);
+  }
+  .chrome-home:hover { opacity: 1; transform: translateX(-2px); }
+  .chrome-title {
+    margin-inline: auto;
+    opacity: 0.68;
+    font-weight: 500;
+    /* Long titles must never push the share button off a phone screen. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chrome-share {
+    flex: none;
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    border: 0;
+    border-radius: 999px;
+    padding: 7px 15px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 140ms var(--ease);
+  }
+  .chrome-share:hover { background: rgba(255, 255, 255, 0.3); }
+
+  .game-chromed { padding-top: 48px; }
+  .game-fixed { height: 100dvh; overflow: hidden; }
+  .game-fixed.game-chromed { height: calc(100dvh - 48px); }
+
+  /* The mute button is injected at runtime, so it cannot use scoped styles. */
+  :global(.sound-toggle) {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    cursor: pointer;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  :global(.sound-toggle:hover) { background: rgba(255, 255, 255, 0.32); }
+  :global(.sound-toggle.is-muted) { color: rgba(255, 255, 255, 0.55); }
+
+  @media (max-width: 460px) {
+    .chrome-title { display: none; }
+  }
+</style>

@@ -1,0 +1,539 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Overstimulated - a clicker whose upgrades all make the page worse.
+ *
+ * Every purchase adds a layer of noise: a bassline, a popup, a second cursor,
+ * a tilt. The joke only works if the escalation is real, so each layer is
+ * genuinely implemented rather than being a label on a counter, and they all
+ * run at once by the end.
+ *
+ * Two rules keep it from being hostile: the sound is off until you press a
+ * button, and "Make it stop" is always reachable.
+ */
+---
+
+<GameLayout slug="overstimulated" bar="#12021f" fixed bodyClass="over-body">
+  <div class="world" id="world">
+    <h1 class="visually-hidden">Overstimulated</h1>
+
+    <div class="core">
+      <div class="score">
+        <b id="attention">0</b>
+        <span>attention</span>
+        <em id="rate" hidden>+0 / sec</em>
+      </div>
+
+      <button type="button" class="big" id="bigBtn">
+        <span id="bigLabel">Click me</span>
+      </button>
+
+      <p class="sub" id="sub">That is the whole game. For now.</p>
+    </div>
+
+    <aside class="shop" id="shop" aria-label="Upgrades"></aside>
+
+    <button type="button" class="stop" id="stopBtn" hidden>Make it stop</button>
+
+    <div class="ending" id="ending" hidden>
+      <div class="ending-card">
+        <h2>Quiet.</h2>
+        <p id="endingStats"></p>
+        <p class="ending-note">That took a surprising amount of clicking.</p>
+        <div class="ending-actions">
+          <button type="button" data-share data-title="Overstimulated">Share</button>
+          <button type="button" id="againBtn" class="ghost">Do it again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</GameLayout>
+
+<script>
+  import { sfx, unlock, tone, hit, scaleFreq } from '../lib/audio'
+  import { burst, floatText, prefersReducedMotion } from '../lib/fx'
+
+  const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+  const world = el('world')
+  const shop = el('shop')
+
+  let attention = 0
+  let clicks = 0
+  let perSec = 0
+  let combo = 0
+  let comboAt = 0
+  const started = performance.now()
+  const timers: number[] = []
+  const owned = new Set<string>()
+
+  type Up = {
+    id: string
+    name: string
+    note: string
+    cost: number
+    /** Attention per second this adds. */
+    rate?: number
+    apply: () => void
+  }
+
+  // ---- the layers of noise ----------------------------------------------
+  const NOTIFS = [
+    'Someone liked your thing', 'Your streak is at risk', '3 people are typing',
+    'New feature you did not ask for', 'Your storage is almost full',
+    'A person you met once posted', 'Weekly report: down 4%',
+    'You have 1,204 unread', 'Rate your recent experience',
+    'Reminder about a thing from 2019', 'Trending in your area: nothing',
+  ]
+  const ACHIEVEMENTS = [
+    'First Click', 'Committed', 'Why Are You Still Here', 'Certified Clicker',
+    'Diminishing Returns', 'Peak Engagement', 'Beyond Help',
+  ]
+
+  function spawnNotification() {
+    const n = document.createElement('div')
+    n.className = 'notif'
+    n.innerHTML = '<b>' + NOTIFS[(Math.random() * NOTIFS.length) | 0] + '</b><span>now</span>'
+    world.appendChild(n)
+    tone({ freq: 880, to: 1320, dur: 0.1, type: 'sine', gain: 0.07 })
+    setTimeout(() => { n.classList.add('out'); setTimeout(() => n.remove(), 400) }, 3400)
+  }
+
+  function spawnAchievement() {
+    const a = document.createElement('div')
+    a.className = 'achv'
+    a.innerHTML = '<span>🏆</span><div><b>Achievement unlocked</b>' +
+      '<i>' + ACHIEVEMENTS[(Math.random() * ACHIEVEMENTS.length) | 0] + '</i></div>'
+    world.appendChild(a)
+    sfx.sparkle()
+    setTimeout(() => { a.classList.add('out'); setTimeout(() => a.remove(), 400) }, 2800)
+  }
+
+  function spawnPopup() {
+    if (world.querySelector('.popup')) return
+    const p = document.createElement('div')
+    p.className = 'popup'
+    p.innerHTML =
+      '<b>Before you go</b>' +
+      '<p>Get our newsletter. It is mostly this.</p>' +
+      '<div><button type="button" class="pop-yes">Yes obviously</button>' +
+      '<button type="button" class="pop-no">No thanks</button></div>'
+    world.appendChild(p)
+    hit({ dur: 0.09, gain: 0.16, freq: 900, q: 3 })
+    const close = () => { p.classList.add('out'); setTimeout(() => p.remove(), 300) }
+    p.querySelector('.pop-no')!.addEventListener('click', close)
+    p.querySelector('.pop-yes')!.addEventListener('click', () => { close(); spawnAchievement() })
+  }
+
+  let cursorEls: HTMLElement[] = []
+  const cursorPos = { x: innerWidth / 2, y: innerHeight / 2 }
+  function addCursors(n: number) {
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('div')
+      c.className = 'ghost-cursor'
+      c.textContent = '➤'
+      world.appendChild(c)
+      cursorEls.push(c)
+    }
+  }
+  addEventListener('pointermove', (e) => { cursorPos.x = e.clientX; cursorPos.y = e.clientY }, { passive: true })
+
+  function spawnRunner() {
+    const c = document.createElement('div')
+    c.className = 'runner'
+    c.textContent = ['🐈', '🦆', '🐌', '🦖', '🛴'][(Math.random() * 5) | 0]
+    c.style.top = 20 + Math.random() * 60 + '%'
+    c.style.animationDuration = 2.4 + Math.random() * 2 + 's'
+    world.appendChild(c)
+    setTimeout(() => c.remove(), 5000)
+  }
+
+  // A four-bar bassline, scheduled a beat ahead so it does not drift.
+  let musicTimer = 0
+  function startMusic() {
+    const PATTERN = [0, 0, 3, 0, 5, 3, 0, -2]
+    let beat = 0
+    musicTimer = window.setInterval(() => {
+      const step = PATTERN[beat % PATTERN.length]
+      tone({ freq: scaleFreq(step, 55), dur: 0.26, type: 'sawtooth', gain: 0.1, filter: 420 })
+      if (beat % 2 === 0) hit({ dur: 0.06, gain: 0.14, freq: 180, type: 'lowpass' })
+      if (beat % 4 === 2) hit({ dur: 0.05, gain: 0.07, freq: 6000, q: 1 })
+      beat++
+    }, 260)
+    timers.push(musicTimer)
+  }
+
+  const UPGRADES: Up[] = [
+    { id: 'bar', name: 'A progress bar', note: 'It does not measure anything', cost: 10,
+      apply: () => world.classList.add('has-bar') },
+    { id: 'auto', name: 'An autoclicker', note: '+2 attention every second', cost: 25, rate: 2,
+      apply: () => {} },
+    { id: 'notif', name: 'Notifications', note: 'From apps you do not have', cost: 45,
+      apply: () => timers.push(window.setInterval(spawnNotification, 2600)) },
+    { id: 'music', name: 'A backing track', note: 'It has one idea', cost: 80,
+      apply: startMusic },
+    { id: 'confetti', name: 'Confetti', note: 'For no particular reason', cost: 120,
+      apply: () => timers.push(window.setInterval(() => {
+        burst(Math.random() * innerWidth, -10, {
+          count: 10, colors: ['#ff5f9e', '#ffd166', '#63c9f0', '#8affc4'],
+          speed: 3, gravity: 0.22, spread: Math.PI, angle: Math.PI / 2, shape: 'square', size: 7, life: 90,
+        })
+      }, 900)) },
+    { id: 'ad', name: 'One tasteful ad', note: 'It is not tasteful', cost: 180, rate: 4,
+      apply: () => world.classList.add('has-ad') },
+    { id: 'cursor', name: 'A second cursor', note: 'It is slightly behind yours', cost: 260,
+      apply: () => { addCursors(1); world.classList.add('has-cursors') } },
+    { id: 'popup', name: 'A newsletter popup', note: 'Recurring, obviously', cost: 380,
+      apply: () => { spawnPopup(); timers.push(window.setInterval(spawnPopup, 9000)) } },
+    { id: 'achv', name: 'Achievements', note: 'For clicking', cost: 520, rate: 10,
+      apply: () => { spawnAchievement(); timers.push(window.setInterval(spawnAchievement, 6000)) } },
+    { id: 'shake', name: 'Screen shake', note: 'Constantly', cost: 700,
+      apply: () => world.classList.add('has-shake') },
+    { id: 'runner', name: 'Animals', note: 'Running across the screen', cost: 900,
+      apply: () => { spawnRunner(); timers.push(window.setInterval(spawnRunner, 2200)) } },
+    { id: 'rainbow', name: 'Colour', note: 'All of it', cost: 1200, rate: 25,
+      apply: () => world.classList.add('has-rainbow') },
+    { id: 'swarm', name: 'Nineteen more cursors', note: 'They are all slightly behind yours', cost: 1700,
+      apply: () => addCursors(19) },
+    { id: 'tilt', name: 'A slow rotation', note: 'Of the entire page', cost: 2400,
+      apply: () => world.classList.add('has-tilt') },
+    { id: 'everything', name: 'Everything, faster', note: 'You know what you are doing', cost: 3600, rate: 100,
+      apply: () => {
+        world.classList.add('has-everything')
+        timers.push(window.setInterval(spawnNotification, 900))
+        timers.push(window.setInterval(spawnRunner, 700))
+        timers.push(window.setInterval(() => burst(Math.random() * innerWidth, -10, {
+          count: 14, colors: ['#ff5f9e', '#ffd166', '#63c9f0'], speed: 4, gravity: 0.26,
+          spread: Math.PI, angle: Math.PI / 2, shape: 'square', size: 8, life: 90,
+        }), 400))
+      } },
+  ]
+
+  // ---- shop --------------------------------------------------------------
+  const cards = new Map<string, HTMLButtonElement>()
+  for (const up of UPGRADES) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'buy'
+    b.disabled = true
+    b.innerHTML =
+      '<span class="buy-name">' + up.name + '</span>' +
+      '<span class="buy-note">' + up.note + '</span>' +
+      '<span class="buy-cost">' + up.cost.toLocaleString('en-US') + '</span>'
+    b.addEventListener('click', () => purchase(up, b))
+    shop.appendChild(b)
+    cards.set(up.id, b)
+  }
+
+  function purchase(up: Up, b: HTMLButtonElement) {
+    if (owned.has(up.id) || attention < up.cost) return
+    attention -= up.cost
+    owned.add(up.id)
+    if (up.rate) perSec += up.rate
+    unlock()
+    sfx.great()
+    b.classList.add('owned')
+    b.disabled = true
+    b.querySelector('.buy-cost')!.textContent = 'on'
+    up.apply()
+
+    const r = b.getBoundingClientRect()
+    burst(r.left + r.width / 2, r.top + r.height / 2, {
+      count: 18, colors: ['#ff5f9e', '#ffd166', '#8affc4'], speed: 4, gravity: 0.1, life: 40, size: 4,
+    })
+
+    if (owned.size >= 4) el('rate').hidden = false
+    if (owned.size >= 3) el('stopBtn').hidden = false
+    if (owned.size === UPGRADES.length) {
+      el('sub').textContent = 'There is nothing left to buy. There is only this.'
+      el('stopBtn').classList.add('urgent')
+    }
+    paint()
+  }
+
+  // ---- clicking ----------------------------------------------------------
+  const LABELS = [
+    'Click me', 'Again', 'Keep going', 'More', 'Do not stop',
+    'You are doing great', 'Why', 'Yes', 'MORE',
+  ]
+
+  el('bigBtn').addEventListener('click', (e) => {
+    unlock()
+    clicks++
+    const now = performance.now()
+    combo = now - comboAt < 700 ? Math.min(combo + 1, 12) : 0
+    comboAt = now
+    const gain = 1 + Math.floor(combo / 3)
+    attention += gain
+
+    sfx.pop(combo)
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const px = r.left + r.width / 2 + (Math.random() - 0.5) * r.width * 0.5
+    const py = r.top + r.height / 2
+    floatText(px, py, '+' + gain, '#ffd166')
+    burst(px, py, {
+      count: 6 + combo, colors: ['#ff5f9e', '#ffd166', '#fff'],
+      speed: 3, gravity: 0.18, life: 30, size: 3,
+    })
+
+    el('bigLabel').textContent = LABELS[Math.min(LABELS.length - 1, Math.floor(clicks / 9))]
+    paint()
+  })
+
+  // ---- loop --------------------------------------------------------------
+  function paint() {
+    el('attention').textContent = Math.floor(attention).toLocaleString('en-US')
+    el('rate').textContent = '+' + perSec + ' / sec'
+    for (const up of UPGRADES) {
+      const b = cards.get(up.id)!
+      if (owned.has(up.id)) continue
+      b.disabled = attention < up.cost
+      b.classList.toggle('ready', attention >= up.cost)
+    }
+  }
+
+  let last = performance.now()
+  let shakeSeed = 0
+  function loop(now: number) {
+    const dt = Math.min(0.1, (now - last) / 1000)
+    last = now
+    if (perSec) { attention += perSec * dt; paint() }
+
+    // The constant shake is applied here rather than in CSS so it can stack
+    // with the tilt without the two animations fighting.
+    if (world.classList.contains('has-shake') && !prefersReducedMotion) {
+      shakeSeed += dt * 60
+      const k = world.classList.contains('has-everything') ? 5 : 2.2
+      world.style.setProperty('--sx', (Math.sin(shakeSeed * 1.7) * k).toFixed(2) + 'px')
+      world.style.setProperty('--sy', (Math.cos(shakeSeed * 2.3) * k).toFixed(2) + 'px')
+    }
+
+    // Ghost cursors chase the real one, each one lagging a little more.
+    cursorEls.forEach((c, i) => {
+      const lag = 0.16 - Math.min(0.14, i * 0.006)
+      const cx = Number(c.dataset.x || cursorPos.x)
+      const cy = Number(c.dataset.y || cursorPos.y)
+      const nx = cx + (cursorPos.x - cx) * lag
+      const ny = cy + (cursorPos.y - cy) * lag
+      c.dataset.x = String(nx); c.dataset.y = String(ny)
+      c.style.transform = 'translate(' + nx + 'px,' + ny + 'px)'
+    })
+
+    requestAnimationFrame(loop)
+  }
+
+  // ---- the off switch ----------------------------------------------------
+  el('stopBtn').addEventListener('click', () => {
+    for (const t of timers) clearInterval(t)
+    timers.length = 0
+    cursorEls.forEach((c) => c.remove())
+    cursorEls = []
+    world.querySelectorAll('.notif, .achv, .popup, .runner').forEach((n) => n.remove())
+    world.className = 'world calm'
+    world.style.removeProperty('--sx')
+    world.style.removeProperty('--sy')
+
+    const secs = Math.round((performance.now() - started) / 1000)
+    el('endingStats').textContent =
+      clicks.toLocaleString('en-US') + ' clicks, ' + owned.size + ' of ' + UPGRADES.length +
+      ' upgrades, ' + Math.floor(secs / 60) + 'm ' + (secs % 60) + 's.'
+    el('ending').hidden = false
+    sfx.good()
+  })
+
+  el('againBtn').addEventListener('click', () => location.reload())
+
+  paint()
+  requestAnimationFrame(loop)
+</script>
+
+<style is:global>
+  .over-body { background: #0b0114; color: #f3e9ff; overflow: hidden; }
+
+  .over-body .world {
+    position: relative; height: 100%; overflow: hidden;
+    transform: translate(var(--sx, 0), var(--sy, 0));
+  }
+  .over-body .world.has-tilt { animation: slowTilt 24s ease-in-out infinite; }
+  @keyframes slowTilt {
+    0%, 100% { rotate: -2.4deg; } 50% { rotate: 2.4deg; }
+  }
+  .over-body .world.has-rainbow { animation: hue 7s linear infinite; }
+  .over-body .world.has-tilt.has-rainbow { animation: slowTilt 24s ease-in-out infinite, hue 7s linear infinite; }
+  @keyframes hue { to { filter: hue-rotate(360deg); } }
+  .over-body .world.has-everything { animation-duration: 6s, 1.6s; }
+
+  .over-body .core {
+    position: absolute; inset: 0; display: grid; place-content: center;
+    justify-items: center; gap: 16px; padding: 20px; text-align: center;
+  }
+  .over-body .score { display: grid; justify-items: center; }
+  .over-body .score b {
+    font-family: var(--display); font-size: clamp(44px, 10vw, 84px);
+    font-weight: 800; letter-spacing: -0.04em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .over-body .score span { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: #b58fd6; }
+  .over-body .score em { font-style: normal; font-size: 13px; color: #7ce0b0; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  .over-body .big {
+    border: 0; border-radius: 999px; cursor: pointer;
+    padding: 22px 54px; font-size: clamp(18px, 3.4vw, 26px); font-weight: 700;
+    font-family: var(--display);
+    background: linear-gradient(140deg, #ff4d94, #a24cf0);
+    color: #fff; box-shadow: 0 10px 34px rgba(200, 60, 200, 0.34);
+    transition: transform 90ms var(--ease), box-shadow 160ms var(--ease);
+  }
+  .over-body .big:hover { transform: translateY(-2px) scale(1.02); }
+  .over-body .big:active { transform: scale(0.95); }
+  .over-body .sub { color: #a487c4; font-size: 14.5px; margin: 0; max-width: 34ch; }
+
+  .over-body .shop {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 230px;
+    padding: 12px; display: grid; gap: 6px; align-content: start;
+    overflow-y: auto; background: rgba(10, 1, 18, 0.7);
+    border-left: 1px solid #2a1140; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .over-body .buy {
+    display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; text-align: left;
+    background: #190628; border: 1px solid #2f1447; color: #f3e9ff;
+    border-radius: 11px; padding: 9px 11px; cursor: pointer;
+    transition: border-color 140ms var(--ease), background 140ms var(--ease), opacity 140ms var(--ease);
+  }
+  .over-body .buy:disabled { opacity: 0.45; cursor: default; }
+  .over-body .buy.ready { border-color: #ff4d94; background: #24092f; }
+  .over-body .buy.owned { opacity: 1; border-color: #3ec98d; background: #0f2b21; }
+  /* Explicit placement: without it the cost auto-places into column 1 and the
+     whole card reads back to front. */
+  .over-body .buy-name { grid-area: 1 / 1; font-size: 14px; font-weight: 600; }
+  .over-body .buy-note { grid-area: 2 / 1; font-size: 11.5px; color: #a487c4; }
+  .over-body .buy-cost {
+    grid-area: 1 / 2 / span 2 / 3; align-self: center; font-size: 13px; font-weight: 700;
+    color: #ffd166; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .over-body .buy.owned .buy-cost { color: #3ec98d; }
+
+  .over-body .stop {
+    position: absolute; left: 16px; bottom: 16px; z-index: 40;
+    background: rgba(255, 255, 255, 0.1); border: 1px solid #43215e; color: #f3e9ff;
+    border-radius: 999px; padding: 10px 20px; font-size: 13.5px; cursor: pointer;
+  }
+  .over-body .stop:hover { background: rgba(255, 255, 255, 0.2); }
+  .over-body .stop.urgent { border-color: #ff4d94; animation: pulseStop 1.4s ease-in-out infinite; }
+  @keyframes pulseStop { 50% { box-shadow: 0 0 0 8px rgba(255, 77, 148, 0.16); } }
+
+  /* --- the noise --- */
+  .over-body .world.has-bar::before {
+    content: ''; position: absolute; top: 0; left: 0; height: 4px; z-index: 30;
+    background: linear-gradient(90deg, #ff4d94, #ffd166);
+    animation: fakeLoad 5.5s ease-in-out infinite;
+  }
+  @keyframes fakeLoad { 0% { width: 0; } 70% { width: 92%; } 100% { width: 96%; } }
+
+  .over-body .world.has-ad::after {
+    content: 'ADVERTISEMENT'; position: absolute; left: 16px; top: 60px; z-index: 25;
+    width: 168px; height: 132px; display: grid; place-content: center;
+    font-size: 11px; letter-spacing: 0.18em; color: #7a5f92;
+    border: 2px dashed #43215e; border-radius: 12px;
+    background: repeating-linear-gradient(45deg, #16062350 0 10px, #24093020 10px 20px);
+    animation: adWobble 3.4s ease-in-out infinite;
+  }
+  @keyframes adWobble { 50% { transform: rotate(2.5deg) scale(1.04); } }
+
+  .over-body .notif {
+    position: absolute; right: 246px; top: 18px; z-index: 32;
+    display: grid; gap: 2px; width: 230px;
+    background: #1c0a2b; border: 1px solid #3a1a55; border-radius: 12px;
+    padding: 10px 13px; font-size: 13px;
+    animation: slideIn 320ms var(--ease);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  .over-body .notif span { font-size: 11px; color: #a487c4; }
+  .over-body .notif.out { animation: slideOut 380ms var(--ease) forwards; }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(28px); } }
+  @keyframes slideOut { to { opacity: 0; transform: translateX(28px); } }
+  /* Stack them so a burst does not become one illegible pile. */
+  .over-body .notif:nth-of-type(2n) { top: 88px; }
+  .over-body .notif:nth-of-type(3n) { top: 158px; }
+  .over-body .notif:nth-of-type(4n) { top: 228px; }
+
+  .over-body .achv {
+    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+    z-index: 33; display: flex; align-items: center; gap: 10px;
+    background: #1c0a2b; border: 1px solid #ffd16655; border-radius: 12px;
+    padding: 9px 16px; animation: popUp 320ms var(--ease);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  .over-body .achv span { font-size: 20px; }
+  .over-body .achv b { display: block; font-size: 11px; color: #ffd166; letter-spacing: 0.08em; text-transform: uppercase; }
+  .over-body .achv i { font-style: normal; font-size: 14px; }
+  .over-body .achv.out { animation: slideOut 380ms var(--ease) forwards; }
+  @keyframes popUp { from { opacity: 0; transform: translate(-50%, 16px); } }
+
+  .over-body .popup {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 45; width: min(320px, 84vw); text-align: center;
+    background: #1c0a2b; border: 1px solid #43215e; border-radius: 16px;
+    padding: 22px 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    animation: popIn 260ms var(--ease);
+  }
+  .over-body .popup b { font-size: 19px; font-family: var(--display); }
+  .over-body .popup p { color: #a487c4; font-size: 14px; margin: 8px 0 16px; }
+  .over-body .popup div { display: flex; gap: 8px; }
+  .over-body .popup button {
+    flex: 1; border: 0; border-radius: 999px; padding: 10px 0;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+  }
+  .over-body .pop-yes { background: #ff4d94; color: #fff; }
+  .over-body .pop-no { background: #2a1140; color: #a487c4; }
+  .over-body .popup.out { animation: popIn 240ms var(--ease) reverse forwards; }
+  @keyframes popIn { from { opacity: 0; transform: translate(-50%, -46%) scale(0.94); } }
+
+  .over-body .ghost-cursor {
+    position: fixed; left: 0; top: 0; z-index: 8500;
+    font-size: 17px; color: #fff; pointer-events: none;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    rotate: -35deg;
+  }
+
+  .over-body .runner {
+    position: absolute; left: -60px; z-index: 24; font-size: 34px;
+    animation: runAcross linear forwards;
+  }
+  @keyframes runAcross { to { transform: translateX(calc(100vw + 120px)); } }
+
+  .over-body .world.calm > *:not(.core):not(.ending) { display: none; }
+  .over-body .world.calm .core { opacity: 0.25; }
+
+  .over-body .ending {
+    position: absolute; inset: 0; z-index: 60; display: grid; place-content: center;
+    background: rgba(6, 0, 12, 0.86); padding: 20px;
+    animation: fadeUp 700ms var(--ease);
+  }
+  .over-body .ending[hidden] { display: none; }
+  @keyframes fadeUp { from { opacity: 0; } }
+  .over-body .ending-card { text-align: center; max-width: 420px; }
+  .over-body .ending-card h2 { font-size: clamp(38px, 8vw, 62px); }
+  .over-body .ending-card p { color: #b6a0cc; margin: 12px 0 0; font-variant-numeric: tabular-nums; }
+  .over-body .ending-note { font-size: 14px; color: #7a6790; }
+  .over-body .ending-actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; }
+  .over-body .ending-actions button {
+    border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600; cursor: pointer;
+    background: #ff4d94; color: #fff;
+  }
+  .over-body .ending-actions .ghost { background: transparent; border: 1px solid #43215e; color: #f3e9ff; }
+
+  @media (max-width: 760px) {
+    .over-body .shop { position: absolute; right: 0; left: 0; top: auto; bottom: 0; width: auto; height: 42%;
+      grid-template-columns: 1fr 1fr; border-left: 0; border-top: 1px solid #2a1140; }
+    .over-body .core { bottom: 42%; inset-block-end: 42%; }
+    .over-body .notif { right: 10px; width: min(230px, 62vw); }
+    .over-body .stop { bottom: calc(42% + 12px); }
+    .over-body .world.has-ad::after { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .over-body .world.has-tilt, .over-body .world.has-rainbow { animation: none; }
+    .over-body .runner { display: none; }
+  }
+</style>

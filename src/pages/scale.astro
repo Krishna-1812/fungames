@@ -1,0 +1,308 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Scale — a continuous logarithmic zoom from a proton to the observable
+ * universe, 42 orders of magnitude.
+ *
+ * The trick that makes it feel real: scroll position maps to how wide the
+ * *screen* is in metres. Every object is then drawn at its true size relative
+ * to that, so a thing grows from a speck, fills the view, and shrinks away
+ * again as you keep going. Nothing is faked — the only non-linearity is that
+ * the scroll axis itself is logarithmic, which is the honest way to cross
+ * this many decades.
+ */
+
+// Screen width in metres runs from 10^MIN to 10^MAX across the whole scroll.
+const MIN_EXP = -15.6
+const MAX_EXP = 27.6
+const PX_PER_DECADE = 720
+
+type Thing = { m: number; name: string; note?: string; color: string; glyph?: string }
+
+// `m` is the object's real size in metres (diameter or longest dimension).
+const THINGS: Thing[] = [
+  { m: 1.7e-15, name: 'Proton', note: 'A single one, at the centre of a hydrogen atom.', color: '#ff6b8a' },
+  { m: 5.0e-15, name: 'Carbon nucleus', color: '#ff8f6b' },
+  { m: 1.5e-14, name: 'Uranium nucleus', note: 'The heaviest nucleus that occurs naturally.', color: '#ffb36b' },
+  { m: 1.0e-12, name: 'Wavelength of a gamma ray', color: '#c6ff6b' },
+  { m: 1.0e-11, name: 'Wavelength of an X-ray', color: '#8affe0' },
+  { m: 1.0e-10, name: 'Hydrogen atom', note: 'Almost all of it is empty space.', color: '#7ec8ff' },
+  { m: 2.8e-10, name: 'Water molecule', color: '#6bb7ff' },
+  { m: 1.0e-9, name: 'Buckyball', note: 'Sixty carbon atoms in a football.', color: '#9d8bff' },
+  { m: 2.0e-9, name: 'DNA, across the helix', color: '#8affc4' },
+  { m: 9.0e-8, name: 'Influenza virus', color: '#c58aff' },
+  { m: 7.0e-7, name: 'Wavelength of red light', note: 'Anything smaller than this cannot be seen with light.', color: '#ff5f5f' },
+  { m: 2.0e-6, name: 'E. coli', color: '#a4e05a' },
+  { m: 8.0e-6, name: 'Red blood cell', color: '#ff4d5e' },
+  { m: 7.0e-5, name: 'Human hair, across', color: '#c9a06b' },
+  { m: 5.0e-4, name: 'Grain of sand', color: '#e8c88a' },
+  { m: 5.0e-3, name: 'Ant', color: '#8c5a3c' },
+  { m: 2.45e-2, name: 'A coin', color: '#d8d2c0' },
+  { m: 1.7, name: 'A person', note: 'You are here. Roughly the geometric middle of everything.', color: '#ffd08a' },
+  { m: 4.5, name: 'A car', color: '#7fb2ff' },
+  { m: 30, name: 'Blue whale', note: 'The largest animal that has ever lived.', color: '#5a8fd4' },
+  { m: 105, name: 'Football pitch', color: '#5fbf72' },
+  { m: 330, name: 'Eiffel Tower', color: '#b0a99a' },
+  { m: 828, name: 'Burj Khalifa', color: '#cfd6de' },
+  { m: 8849, name: 'Mount Everest', color: '#e6eef5' },
+  { m: 21000, name: 'Manhattan', color: '#9aa4b0' },
+  { m: 446000, name: 'The Grand Canyon', note: 'End to end.', color: '#c47a4a' },
+  { m: 3.474e6, name: 'The Moon', color: '#c8c4bb' },
+  { m: 1.2742e7, name: 'Earth', note: 'Everything that has ever happened to anyone.', color: '#4d90d9' },
+  { m: 1.3982e8, name: 'Jupiter', color: '#d9a06b' },
+  { m: 1.392e9, name: 'The Sun', note: 'You could fit 1.3 million Earths inside it.', color: '#ffcc33' },
+  { m: 2.99e11, name: "Earth's orbit", color: '#7ec8ff' },
+  { m: 9.0e12, name: "Neptune's orbit", note: 'The edge of the planets.', color: '#5f7fd4' },
+  { m: 2.4e13, name: "Voyager 1's distance", note: 'Launched in 1977 and still going.', color: '#9fb4ff' },
+  { m: 7.8e14, name: 'One light month', color: '#8f9fe8' },
+  { m: 9.461e15, name: 'One light year', color: '#a98aff' },
+  { m: 4.014e16, name: 'To Proxima Centauri', note: 'The nearest star. Four years at the speed of light.', color: '#ff8ac4' },
+  { m: 2.4e17, name: 'The Orion Nebula', color: '#ff6bb0' },
+  { m: 1.5e18, name: 'A globular cluster', note: 'A million stars packed into a ball.', color: '#ffd28a' },
+  { m: 2.47e20, name: 'To the centre of the galaxy', color: '#b58aff' },
+  { m: 9.5e20, name: 'The Milky Way', note: 'A hundred billion stars, and this is one galaxy.', color: '#cbb6ff' },
+  { m: 9.5e22, name: 'The Local Group', color: '#8ad4ff' },
+  { m: 5.0e24, name: 'Laniakea Supercluster', note: 'Our galaxy is a speck inside this.', color: '#7affd8' },
+  { m: 8.8e26, name: 'The observable universe', note: 'That is everything. There is no more scrolling.', color: '#ffffff' },
+]
+
+const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
+---
+
+<GameLayout slug="scale" bar="#04263f" bodyClass="night-body">
+  <div class="sky" id="sky"></div>
+
+  <div class="stage" id="stage" aria-hidden="true">
+    {
+      THINGS.map((t, i) => (
+        <div class="thing" data-m={t.m} data-i={i} style={`--c:${t.color}`}>
+          <div class="disc"></div>
+          <div class="label">
+            <span class="name">{t.name}</span>
+            <span class="size" data-size={t.m}></span>
+            {t.note && <span class="note">{t.note}</span>}
+          </div>
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="hud">
+    <div class="hud-label">the screen is</div>
+    <div class="hud-value" id="hudValue">—</div>
+    <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
+  </div>
+
+  <div class="intro">
+    <h1>Scale</h1>
+    <p>Keep scrolling. The screen gets ten times wider every few seconds.</p>
+    <div class="arrow" aria-hidden="true">↓</div>
+  </div>
+
+  <div class="reel" style={`height:${totalPx}px`}></div>
+
+  <footer class="outro">
+    <p>That was forty-two orders of magnitude.</p>
+    <a href="/">← more things like this</a>
+  </footer>
+
+  {/* Text alternative for anyone who cannot use the scroll interaction. */}
+  <ul class="visually-hidden">
+    {THINGS.map((t) => <li>{t.name} — {t.m} metres</li>)}
+  </ul>
+</GameLayout>
+
+  {/* Data for the module below: modules cannot take define:vars, and
+      modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ MIN_EXP, MAX_EXP, totalPx })} />
+
+  <script>
+  import { sfx, unlock } from '../lib/audio'
+    const { MIN_EXP, MAX_EXP, totalPx } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  const stage = document.getElementById('stage')
+  const sky = document.getElementById('sky')
+  const hudValue = document.getElementById('hudValue')
+  const hudFill = document.getElementById('hudFill')
+  const reel = document.querySelector('.reel')
+  const things = [...document.querySelectorAll('.thing')].map((el) => ({
+    el,
+    disc: el.querySelector('.disc'),
+    m: Number(el.dataset.m),
+    visible: false,
+  }))
+
+  /** Human-readable length across 42 decades. */
+  function fmt(m) {
+    const units = [
+      [1e-15, 'femtometres', 1e-15],
+      [1e-12, 'picometres', 1e-12],
+      [1e-9, 'nanometres', 1e-9],
+      [1e-6, 'micrometres', 1e-6],
+      [1e-3, 'millimetres', 1e-3],
+      [1, 'metres', 1],
+      [1e3, 'kilometres', 1e3],
+      [1.496e11, 'astronomical units', 1.496e11],
+      [9.461e15, 'light years', 9.461e15],
+      [9.461e21, 'million light years', 9.461e21],
+      [9.461e24, 'billion light years', 9.461e24],
+    ]
+    let pick = units[0]
+    for (const u of units) if (m >= u[0]) pick = u
+    const v = m / pick[2]
+    const shown =
+      v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)
+    return `${Number(shown).toLocaleString('en-US')} ${pick[1]} across`
+  }
+
+  // Background palette keyed to the exponent, so the journey reads as a
+  // sequence of worlds rather than one long gradient.
+  const STOPS = [
+    [-15, [16, 8, 26], [46, 14, 48]],
+    [-9, [10, 22, 52], [16, 52, 82]],
+    [-6, [8, 38, 44], [16, 70, 66]],
+    [-3, [30, 44, 26], [72, 92, 54]],
+    [0, [96, 138, 176], [186, 214, 232]],
+    [4, [58, 96, 140], [122, 168, 206]],
+    [7, [10, 22, 48], [30, 58, 102]],
+    [12, [6, 10, 30], [22, 20, 66]],
+    [18, [10, 4, 26], [46, 18, 74]],
+    [24, [2, 2, 8], [14, 10, 34]],
+  ]
+  function skyAt(exp) {
+    let a = STOPS[0], b = STOPS[STOPS.length - 1]
+    for (let i = 0; i < STOPS.length - 1; i++) {
+      if (exp >= STOPS[i][0] && exp <= STOPS[i + 1][0]) { a = STOPS[i]; b = STOPS[i + 1]; break }
+      if (exp > STOPS[STOPS.length - 1][0]) { a = b = STOPS[STOPS.length - 1] }
+    }
+    const span = b[0] - a[0] || 1
+    const t = Math.min(1, Math.max(0, (exp - a[0]) / span))
+    const mix = (p, q) => p.map((v, i) => Math.round(v + (q[i] - v) * t))
+    const top = mix(a[1], b[1])
+    const bot = mix(a[2], b[2])
+    return `linear-gradient(180deg, rgb(${top}) 0%, rgb(${bot}) 100%)`
+  }
+
+  let chime = 0
+  let lastAnnounced = 0
+  let ticking = false
+  function update() {
+    ticking = false
+    const depth = Math.min(totalPx, Math.max(0, window.scrollY + window.innerHeight / 2 - reel.offsetTop))
+    const t = depth / totalPx
+    const exp = MIN_EXP + t * (MAX_EXP - MIN_EXP)
+    const screenMetres = Math.pow(10, exp)
+
+    hudValue.textContent = fmt(screenMetres)
+    hudFill.style.width = `${t * 100}%`
+    sky.style.background = skyAt(exp)
+
+    // How many pixels one metre is worth right now.
+    const px = Math.min(window.innerWidth, window.innerHeight) / screenMetres
+
+    for (const th of things) {
+      const size = th.m * px
+      // Below 3px it is an invisible dot; above 3 screens it is just a wall.
+      const show = size > 3 && size < Math.max(window.innerWidth, window.innerHeight) * 3.2
+      if (show !== th.visible) {
+        th.el.classList.toggle('on', show)
+        // Chime only when something arrives, and only once it is big enough to
+        // read, so scrolling back and forth does not machine-gun.
+        if (show && th.m > lastAnnounced) { sfx.blip(chime++); lastAnnounced = th.m }
+        th.visible = show
+      }
+      if (!show) continue
+      th.disc.style.width = size + 'px'
+      th.disc.style.height = size + 'px'
+      // Fade in as it becomes legible and out as it engulfs the screen.
+      const grow = Math.min(1, (size - 3) / 40)
+      const shrink = Math.min(1, (Math.max(window.innerWidth, window.innerHeight) * 3.2 - size) / 400)
+      th.el.style.opacity = String(Math.min(grow, shrink))
+    }
+  }
+
+  addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update) }
+  }, { passive: true })
+  addEventListener('resize', update, { passive: true })
+  addEventListener('pointerdown', unlock, { once: true })
+  addEventListener('scroll', unlock, { once: true, passive: true })
+
+  // Fill in each label's real-world size once.
+  document.querySelectorAll('[data-size]').forEach((el) => {
+    el.textContent = fmt(Number(el.dataset.size)).replace(' across', '')
+  })
+  update()
+</script>
+
+<style>
+  .sky {
+    position: fixed; inset: 0; z-index: -2;
+    background: linear-gradient(180deg, #100a1e, #2e0e30);
+    transition: background 300ms linear;
+  }
+  :global(.night-body) { background: #100a1e; color: #fff; }
+
+  /* One fixed stage; everything inside is positioned relative to the centre. */
+  .stage { position: fixed; inset: 48px 0 0 0; z-index: -1; pointer-events: none; }
+
+  .thing {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    place-items: center;
+    opacity: 0;
+    transition: opacity 160ms linear;
+  }
+  .thing.on { display: grid; }
+
+  .disc {
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--c) 92%, #fff), var(--c) 62%, color-mix(in srgb, var(--c) 62%, #000));
+    box-shadow: 0 0 60px color-mix(in srgb, var(--c) 45%, transparent);
+    grid-area: 1 / 1;
+  }
+
+  .label {
+    grid-area: 1 / 1;
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    text-align: center;
+    padding: 10px 16px;
+    max-width: min(84vw, 460px);
+    background: rgba(8, 8, 14, 0.74);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 12px;
+  }
+  .name { font-family: var(--display); font-size: clamp(20px, 3.4vw, 30px); font-weight: 700; }
+  .size { font-size: 12.5px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+  .note { font-size: 14px; opacity: 0.78; margin-top: 4px; text-wrap: pretty; }
+
+  .hud {
+    position: fixed; top: 62px; left: 50%; transform: translateX(-50%);
+    z-index: 40; width: min(92vw, 460px); text-align: center;
+    padding: 10px 18px; border-radius: 14px;
+    background: rgba(0, 0, 0, 0.66);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    pointer-events: none;
+  }
+  .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
+  .hud-value { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .hud-bar { height: 3px; background: rgba(255, 255, 255, 0.18); border-radius: 2px; margin-top: 9px; }
+  .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; }
+
+  .intro { min-height: 86vh; display: grid; place-content: center; text-align: center; gap: 12px; padding: 160px 20px 0; }
+  .intro h1 { font-size: clamp(44px, 11vw, 90px); letter-spacing: -0.04em; }
+  .intro p { opacity: 0.72; margin: 0; font-size: 17px; max-width: 30ch; margin-inline: auto; }
+  .arrow { font-size: 28px; opacity: 0.55; animation: bob 1.9s ease-in-out infinite; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+
+  .outro { padding: 30vh 20px 20vh; text-align: center; }
+  .outro p { font-size: 20px; opacity: 0.82; }
+  .outro a { display: inline-block; margin-top: 12px; opacity: 0.75; }
+</style>

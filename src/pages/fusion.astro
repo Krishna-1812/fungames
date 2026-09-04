@@ -1,0 +1,349 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { SITE } from '../site.config'
+
+/**
+ * Fusion — the Infinite Craft archetype: two things in, one new thing out,
+ * with results shared globally and remembered forever.
+ *
+ * Architecture (mirrors what neal.fun actually does):
+ *   browser -> edge worker -> KV lookup -> LLM only on a genuine miss
+ * The response is cached hard at the edge, so the overwhelming majority of
+ * requests never reach the model. See worker/fusion-worker.js.
+ *
+ * It also ships a local recipe table so the page is fully playable before you
+ * deploy anything. Set SITE.fusionApi and the worker takes over automatically.
+ */
+const API = SITE.fusionApi
+---
+
+<GameLayout slug="fusion" bar="#241e4e" fixed>
+  <div class="stage">
+    <h1 class="visually-hidden">Fusion</h1>
+    <div class="board" id="board">
+      <p class="tip" id="tip">Drag one thing onto another.</p>
+    </div>
+
+    <aside class="tray">
+      <div class="tray-head">
+        <strong id="found">4</strong> discovered
+        <button type="button" id="reset" title="Start over">reset</button>
+      </div>
+      <input id="filter" type="search" placeholder="search…" aria-label="Filter elements" />
+      <div class="tray-list" id="tray"></div>
+    </aside>
+
+    <div class="toast" id="toast" hidden></div>
+  </div>
+</GameLayout>
+
+  {/* Data for the module below: modules cannot take define:vars, and
+      modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ API })} />
+
+  <script>
+  import { burst, ring, floatText } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+    const { API } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  const board = document.getElementById('board')
+  const tray = document.getElementById('tray')
+  const filter = document.getElementById('filter')
+  const foundEl = document.getElementById('found')
+  const toast = document.getElementById('toast')
+  const tip = document.getElementById('tip')
+  document.getElementById('reset').addEventListener('click', () => {
+    if (confirm('Throw away every discovery?')) { localStorage.removeItem(KEY); location.reload() }
+  })
+
+  const KEY = 'fusion:v1'
+  const SEED = [
+    { text: 'Water', emoji: '💧' },
+    { text: 'Fire', emoji: '🔥' },
+    { text: 'Earth', emoji: '🌍' },
+    { text: 'Wind', emoji: '🌬️' },
+  ]
+
+  // Offline recipe table. The worker supersedes this once it is deployed;
+  // until then it keeps the page a real game rather than a broken demo.
+  const LOCAL = {
+    'earth+water': ['Plant', '🌱'], 'fire+water': ['Steam', '💨'],
+    'earth+fire': ['Lava', '🌋'], 'earth+wind': ['Dust', '🌫️'],
+    'fire+wind': ['Smoke', '💨'], 'water+wind': ['Wave', '🌊'],
+    'lava+water': ['Stone', '🪨'], 'plant+water': ['Swamp', '🌿'],
+    'plant+fire': ['Ash', '🌑'], 'stone+wind': ['Sand', '🏖️'],
+    'fire+sand': ['Glass', '🪟'], 'plant+plant': ['Forest', '🌲'],
+    'lava+lava': ['Volcano', '🌋'], 'steam+earth': ['Geyser', '⛲'],
+    'swamp+fire': ['Alcohol', '🍺'], 'stone+stone': ['Mountain', '⛰️'],
+    'mountain+water': ['River', '🏞️'], 'sand+sand': ['Desert', '🏜️'],
+    'wave+wave': ['Tsunami', '🌊'], 'dust+water': ['Mud', '🟤'],
+    'mud+fire': ['Brick', '🧱'], 'brick+brick': ['Wall', '🧱'],
+    'wall+wall': ['House', '🏠'], 'forest+fire': ['Charcoal', '⚫'],
+    'glass+sand': ['Hourglass', '⏳'], 'stone+fire': ['Metal', '⚙️'],
+    'metal+fire': ['Blade', '🗡️'], 'house+house': ['Village', '🏘️'],
+    'village+village': ['City', '🏙️'], 'water+water': ['Lake', '🏞️'],
+    'earth+earth': ['Land', '🗺️'], 'wind+wind': ['Tornado', '🌪️'],
+    'fire+fire': ['Sun', '☀️'], 'sun+water': ['Rainbow', '🌈'],
+    'sun+plant': ['Sunflower', '🌻'], 'lake+fire': ['Steam', '💨'],
+  }
+
+  const norm = (a, b) => [a.toLowerCase(), b.toLowerCase()].sort().join('+')
+
+  let state = load()
+  function load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEY) || 'null')
+      if (raw && Array.isArray(raw.items)) return raw
+    } catch {}
+    return { items: [...SEED], recipes: {} }
+  }
+  const save = () => localStorage.setItem(KEY, JSON.stringify(state))
+
+  function show(msg) {
+    toast.textContent = msg
+    toast.hidden = false
+    clearTimeout(show.t)
+    show.t = setTimeout(() => (toast.hidden = true), 2200)
+  }
+
+  /** Resolve a pair: memory -> local table -> edge worker. */
+  async function combine(a, b) {
+    const key = norm(a.text, b.text)
+    if (state.recipes[key]) return state.recipes[key]
+    if (LOCAL[key]) {
+      const [text, emoji] = LOCAL[key]
+      return (state.recipes[key] = { text, emoji })
+    }
+    try {
+      const url = `${API}?first=${encodeURIComponent(a.text)}&second=${encodeURIComponent(b.text)}`
+      const r = await fetch(url)
+      if (!r.ok) throw new Error(String(r.status))
+      const j = await r.json()
+      if (!j || !j.result) throw new Error('empty')
+      return (state.recipes[key] = { text: j.result, emoji: j.emoji || '✨' })
+    } catch {
+      // No backend yet — say so plainly instead of inventing a result.
+      return null
+    }
+  }
+
+  // ---- board pieces -------------------------------------------------------
+  let dragging = null
+  let offset = { x: 0, y: 0 }
+
+  function spawn(item, x, y) {
+    const el = document.createElement('button')
+    el.type = 'button'
+    el.className = 'piece'
+    el.textContent = `${item.emoji} ${item.text}`
+    el.dataset.text = item.text
+    el.dataset.emoji = item.emoji
+    el.style.left = x + 'px'
+    el.style.top = y + 'px'
+    board.appendChild(el)
+    return el
+  }
+
+  board.addEventListener('pointerdown', (e) => {
+    const el = e.target.closest('.piece')
+    if (!el) return
+    unlock(); sfx.tick()
+    dragging = el
+    const r = el.getBoundingClientRect()
+    const b = board.getBoundingClientRect()
+    offset = { x: e.clientX - r.left, y: e.clientY - r.top }
+    el.setPointerCapture(e.pointerId)
+    el.classList.add('held')
+    // Raise it above its siblings while held.
+    board.appendChild(el)
+    tip.hidden = true
+    e.preventDefault()
+  })
+
+  board.addEventListener('pointermove', (e) => {
+    if (!dragging) return
+    const b = board.getBoundingClientRect()
+    const clamp = (v, max) => Math.max(0, Math.min(max, v))
+    dragging.style.left = clamp(e.clientX - b.left - offset.x, b.width - dragging.offsetWidth) + 'px'
+    dragging.style.top = clamp(e.clientY - b.top - offset.y, b.height - dragging.offsetHeight) + 'px'
+    // Highlight whatever we are hovering over.
+    const target = hitTest(dragging)
+    board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
+    if (target) target.classList.add('target')
+  })
+
+  function hitTest(el) {
+    const a = el.getBoundingClientRect()
+    for (const other of board.querySelectorAll('.piece')) {
+      if (other === el) continue
+      const b = other.getBoundingClientRect()
+      const overlap =
+        a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+      if (overlap) return other
+    }
+    return null
+  }
+
+  async function drop(e) {
+    if (!dragging) return
+    const el = dragging
+    dragging = null
+    el.classList.remove('held')
+    const target = hitTest(el)
+    board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
+    if (!target) return
+
+    const a = { text: el.dataset.text, emoji: el.dataset.emoji }
+    const b = { text: target.dataset.text, emoji: target.dataset.emoji }
+    const left = parseFloat(target.style.left)
+    const top = parseFloat(target.style.top)
+
+    target.classList.add('working')
+    const res = await combine(a, b)
+    target.classList.remove('working')
+
+    if (!res) {
+      sfx.bad()
+      show(`No recipe for ${a.text} + ${b.text} yet — deploy the worker to unlock the rest.`)
+      return
+    }
+
+    el.remove()
+    target.remove()
+    const made = spawn(res, left, top)
+    made.classList.add('pop')
+
+    const isNew = !state.items.some((i) => i.text.toLowerCase() === res.text.toLowerCase())
+    const br = made.getBoundingClientRect()
+    const cx = br.left + br.width / 2, cy = br.top + br.height / 2
+    if (isNew) {
+      sfx.great()
+      ring(cx, cy, '#ffd166', 22)
+      burst(cx, cy, { count: 26, colors: ['#ffd166', '#c04cfd', '#fff'], speed: 4.5, gravity: 0.1, life: 48, size: 4 })
+      floatText(cx, cy - 26, 'new!', '#ffd166')
+    } else {
+      sfx.pop(state.items.length % 10)
+      burst(cx, cy, { count: 10, colors: ['#c04cfd', '#fff'], speed: 3, gravity: 0.12, life: 28, size: 3 })
+    }
+    if (isNew) {
+      state.items.push(res)
+      show(`First time discovering ${res.emoji} ${res.text}`)
+      made.classList.add('fresh')
+    }
+    save()
+    renderTray()
+  }
+  board.addEventListener('pointerup', drop)
+  board.addEventListener('pointercancel', drop)
+
+  // ---- tray ---------------------------------------------------------------
+  function renderTray() {
+    const q = filter.value.trim().toLowerCase()
+    const items = state.items.filter((i) => !q || i.text.toLowerCase().includes(q))
+    tray.replaceChildren(
+      ...items.map((item) => {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.className = 'chip'
+        b.textContent = `${item.emoji} ${item.text}`
+        b.addEventListener('click', () => {
+          const r = board.getBoundingClientRect()
+          spawn(item, Math.random() * (r.width - 160) + 20, Math.random() * (r.height - 90) + 20)
+          tip.hidden = true
+        })
+        return b
+      })
+    )
+    foundEl.textContent = String(state.items.length)
+  }
+  filter.addEventListener('input', renderTray)
+
+  renderTray()
+  // Put the four starters on the board so the first move is obvious. Spread
+  // them across whatever width is actually available rather than a fixed pitch,
+  // which pushed the last one off-screen on narrow boards.
+  //
+  // This deliberately does not use requestAnimationFrame: rAF is paused in
+  // background tabs, so a page opened in one and switched to later would show
+  // an empty board. Seed immediately if the board has been laid out, and
+  // otherwise wait for the first resize that gives it a size.
+  function seedBoard() {
+    const r = board.getBoundingClientRect()
+    if (r.width < 40 || r.height < 40) return false
+    const PIECE_W = 96
+    const usable = Math.max(PIECE_W, r.width - PIECE_W - 24)
+    SEED.forEach((s, i) => {
+      const x = 12 + (usable * i) / Math.max(1, SEED.length - 1)
+      // Stagger vertically so a cramped board does not overlap the starters.
+      const y = r.height / 2 - 20 + (i % 2 ? 34 : -34)
+      spawn(s, x, Math.max(12, y))
+    })
+    return true
+  }
+
+  if (!seedBoard() && 'ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => { if (seedBoard()) ro.disconnect() })
+    ro.observe(board)
+  }
+</script>
+
+<!-- .piece / .chip are created in JS, and JS-created nodes do not get Astro's
+     scoped-style attribute, so these rules must be global. -->
+<style is:global>
+  .stage { position: relative; height: 100%; display: flex; background: #16122e; color: #fff; }
+
+  .board { position: relative; flex: 1; overflow: hidden; touch-action: none; }
+  .tip {
+    position: absolute; inset: auto 0 24px 0; text-align: center;
+    opacity: 0.62; font-size: 15px; margin: 0;
+  }
+
+  .piece {
+    position: absolute;
+    background: #efeafc; color: #1a1533;
+    border: 1px solid #cfc3f5; border-radius: 10px;
+    padding: 8px 14px; font-size: 15px; font-weight: 500;
+    cursor: grab; user-select: none; white-space: nowrap;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.18);
+  }
+  .piece.held { cursor: grabbing; transform: scale(1.05); box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4); }
+  .piece.target { outline: 2px solid #c04cfd; outline-offset: 2px; }
+  .piece.working { opacity: 0.55; }
+  .piece.fresh { background: #fff3c4; border-color: #e6c64d; }
+  .piece.pop { animation: pop 220ms ease-out; }
+  @keyframes pop { from { transform: scale(0.7); opacity: 0; } }
+
+  .tray {
+    width: 260px; flex: none; display: flex; flex-direction: column;
+    background: #1e1940; border-left: 1px solid #322a5e;
+  }
+  .tray-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; font-size: 13px; opacity: 0.85; border-bottom: 1px solid #322a5e;
+  }
+  .tray-head button {
+    background: none; border: 1px solid #4a3f80; color: inherit;
+    border-radius: 8px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+  }
+  #filter {
+    margin: 10px 12px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid #3b3270; background: #16122e; color: #fff; font: inherit; font-size: 14px;
+  }
+  .tray-list { flex: 1; overflow-y: auto; padding: 0 12px 16px; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+  .chip {
+    background: #2b2456; border: 1px solid #3d3470; color: #fff;
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+  }
+  .chip:hover { background: #3a3170; }
+
+  .toast {
+    position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75); padding: 10px 18px; border-radius: 999px;
+    font-size: 14px; max-width: 80vw; text-align: center;
+  }
+
+  @media (max-width: 760px) {
+    .stage { flex-direction: column; }
+    .tray { width: auto; height: 42%; border-left: 0; border-top: 1px solid #322a5e; }
+  }
+</style>

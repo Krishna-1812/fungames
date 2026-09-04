@@ -1,0 +1,355 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Trolley — the moral-dilemma archetype.
+ *
+ * The reference game shows "what % of players chose this", which needs a
+ * backend collecting votes. Rather than invent plausible-looking percentages,
+ * this version scores your own answers against four named ethical positions and
+ * tells you which one you actually argued for. No fabricated statistics.
+ */
+
+type Option = {
+  label: string
+  /** How many die if you pick this. */
+  deaths: number
+  /** Did you actively intervene? Deontology cares; utilitarianism does not. */
+  acts: boolean
+  outcome: string
+}
+type Dilemma = { title: string; setup: string; left: Option; right: Option }
+
+const DILEMMAS: Dilemma[] = [
+  {
+    title: 'The original',
+    setup: 'A trolley is heading towards five people. You can pull a lever to divert it onto a track with one person.',
+    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die. You did not touch anything.' },
+    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'One person dies, because of a decision you made.' },
+  },
+  {
+    title: 'The maths',
+    setup: 'The trolley is heading towards one person. Pulling the lever diverts it onto a track with five people.',
+    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'One person dies. This was the easy one.' },
+    right: { label: 'Pull the lever', deaths: 5, acts: true, outcome: 'Five people die and it is entirely your fault.' },
+  },
+  {
+    title: 'The friend',
+    setup: 'Five strangers are on the main track. Your closest friend is on the other.',
+    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five strangers die. Your friend never finds out how close it was.' },
+    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'You saved five people. You will not be telling anyone how.' },
+  },
+  {
+    title: 'The box',
+    setup: 'Five people are on the main track. The other track disappears into a large opaque box. You have no idea what is inside.',
+    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die. The box remains a mystery.' },
+    right: { label: 'Pull the lever', deaths: 2, acts: true, outcome: 'It was two people and a lot of packing foam. You got lucky.' },
+  },
+  {
+    title: 'The lobsters',
+    setup: 'One person is on the main track. Five lobsters are on the other. The lobsters are, by all accounts, having a lovely time.',
+    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'A person dies. The lobsters continue their lovely time.' },
+    right: { label: 'Pull the lever', deaths: 0, acts: true, outcome: 'Five lobsters die. Nobody counts this as a death, including us.' },
+  },
+  {
+    title: 'The offer',
+    setup: 'The trolley is heading towards an empty track. Nobody is in danger. If you pull the lever, one person dies and you are given one million dollars.',
+    left: { label: 'Do nothing', deaths: 0, acts: false, outcome: 'Nothing happens. You remain poor and blameless.' },
+    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'A person dies. You are now rich and everyone knows why.' },
+  },
+  {
+    title: 'The consent',
+    setup: 'Five people are tied to the main track, and all five have signed a form saying they accept the risk. One person on the other track signed nothing and is very annoyed.',
+    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five consenting people die. The paperwork is in order.' },
+    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'One non-consenting person dies. The paperwork is not in order.' },
+  },
+  {
+    title: 'The self',
+    setup: 'Five people are on the main track. On the other track is you, forty years from now.',
+    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die. You go on to have a long life about it.' },
+    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'You die, eventually, on schedule, on a train track.' },
+  },
+  {
+    title: 'The pointless lever',
+    setup: 'Five people are on the track. The lever is not connected to anything. Pulling it will change nothing at all.',
+    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die and you stood still.' },
+    right: { label: 'Pull the lever', deaths: 5, acts: true, outcome: 'Five people die and you tried. It made no difference. It may have made a difference to you.' },
+  },
+  {
+    title: 'The loop',
+    setup: 'One person is tied to the main track. The other track loops around and rejoins the first, at the exact spot where that same person is tied.',
+    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'They die.' },
+    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'They die, slightly later, having watched you decide.' },
+  },
+  {
+    title: 'The many',
+    setup: 'Five people are on the main track. On the other track are two people, but pulling the lever also means the trolley is delayed by four minutes, and one of the five would have escaped in that time.',
+    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five die. You did not have time to work through the arithmetic anyway.' },
+    right: { label: 'Pull the lever', deaths: 2, acts: true, outcome: 'Two die. Somewhere, a person who would have escaped is now a hypothetical.' },
+  },
+  {
+    title: 'The last one',
+    setup: 'The trolley is heading towards you. There is nobody else here. The lever is within reach and would divert it onto an empty track.',
+    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'You have made a series of choices and this is the last one.' },
+    right: { label: 'Pull the lever', deaths: 0, acts: true, outcome: 'Nobody dies. Notice how easy that was.' },
+  },
+]
+---
+
+<GameLayout slug="trolley" bar="#3d1f14" bodyClass="trolley-body">
+  <div class="wrap">
+    <header class="head">
+      <h1>Trolley</h1>
+      <p class="lede">Twelve levers. There is no right answer, but there is definitely a you-shaped pattern.</p>
+    </header>
+
+    <div class="dots" id="dots" aria-hidden="true"></div>
+
+    <section class="card" id="card" aria-live="polite">
+      <div class="tag" id="tag">Problem 1 of 12</div>
+      <h2 id="title">—</h2>
+      <p class="setup" id="setup">—</p>
+
+      <svg class="scene" viewBox="0 0 320 120" aria-hidden="true">
+        <path class="rail main" d="M10 96 H200 L306 44" />
+        <path class="rail alt" d="M200 96 H306" />
+        <path class="rail switch" id="switch" d="M196 96 L232 96" />
+        {Array.from({ length: 9 }, (_, i) => <path class="tie" d={`M${18 + i * 20} 88 v16`} />)}
+        <circle class="trolley" cx="34" cy="88" r="9" />
+      </svg>
+
+      <div class="choices">
+        <button type="button" class="choice" data-side="left" id="btnLeft"></button>
+        <button type="button" class="choice" data-side="right" id="btnRight"></button>
+      </div>
+
+      <div class="outcome" id="outcome" hidden>
+        <p id="outcomeText"></p>
+        <button type="button" id="nextBtn">Next →</button>
+      </div>
+    </section>
+
+    <section class="verdict" id="verdict" hidden>
+      <h2>Your verdict</h2>
+      <div class="stat-row">
+        <div class="stat"><b id="vDeaths">0</b><span>deaths</span></div>
+        <div class="stat"><b id="vPulls">0</b><span>levers pulled</span></div>
+        <div class="stat"><b id="vSaved">0</b><span>lives saved vs. doing nothing</span></div>
+      </div>
+      <h3 id="vLabel">—</h3>
+      <p id="vBlurb"></p>
+      <div class="verdict-actions">
+        <button type="button" data-share data-title="Trolley">Share</button>
+        <button type="button" id="againBtn" class="ghost">Start again</button>
+      </div>
+    </section>
+  </div>
+</GameLayout>
+
+  {/* Data for the module below: modules cannot take define:vars, and
+      modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ DILEMMAS })} />
+
+  <script>
+  import { burst, shake } from '../lib/fx'
+  import { sfx, unlock, hit } from '../lib/audio'
+    const { DILEMMAS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  const el = (id) => document.getElementById(id)
+  const dots = el('dots')
+  const card = el('card')
+  const outcome = el('outcome')
+  const verdict = el('verdict')
+
+  let i = 0
+  let deaths = 0
+  let pulls = 0
+  let answered = []
+
+  dots.replaceChildren(
+    ...DILEMMAS.map(() => {
+      const d = document.createElement('span')
+      d.className = 'dot'
+      return d
+    })
+  )
+  const dotEls = [...dots.children]
+
+  function render() {
+    const d = DILEMMAS[i]
+    el('tag').textContent = `Problem ${i + 1} of ${DILEMMAS.length}`
+    el('title').textContent = d.title
+    el('setup').textContent = d.setup
+    el('btnLeft').textContent = d.left.label
+    el('btnRight').textContent = d.right.label
+    el('btnLeft').disabled = false
+    el('btnRight').disabled = false
+    outcome.hidden = true
+    el('switch').classList.remove('thrown')
+    card.classList.remove('resolved')
+    dotEls.forEach((dot, k) => dot.classList.toggle('done', k < i))
+    card.classList.remove('enter')
+    void card.offsetWidth
+    card.classList.add('enter')
+  }
+
+  function choose(side) {
+    const d = DILEMMAS[i]
+    const opt = side === 'left' ? d.left : d.right
+    unlock()
+    if (opt.acts) {
+      // A mechanical clunk for the lever, then the trolley rolling on.
+      hit({ dur: 0.07, gain: 0.3, freq: 340, q: 3 })
+      hit({ dur: 0.5, gain: 0.16, freq: 220, sweepTo: 90, type: 'lowpass', delay: 0.08 })
+    } else {
+      hit({ dur: 0.6, gain: 0.14, freq: 200, sweepTo: 80, type: 'lowpass' })
+    }
+    if (opt.deaths >= 5) { sfx.thud(); shake(document.querySelector('.card'), 7, 300) }
+    else if (opt.deaths === 0) sfx.sparkle()
+    deaths += opt.deaths
+    if (opt.acts) pulls++
+    answered.push({ deaths: opt.deaths, acts: opt.acts, min: Math.min(d.left.deaths, d.right.deaths) })
+
+    el('btnLeft').disabled = true
+    el('btnRight').disabled = true
+    card.classList.add('resolved')
+    if (opt.acts) el('switch').classList.add('thrown')
+    el('outcomeText').textContent = opt.outcome
+    outcome.hidden = false
+    el('nextBtn').focus({ preventScroll: true })
+  }
+
+  el('btnLeft').addEventListener('click', () => choose('left'))
+  el('btnRight').addEventListener('click', () => choose('right'))
+
+  el('nextBtn').addEventListener('click', () => {
+    unlock(); sfx.click()
+    i++
+    if (i < DILEMMAS.length) return render()
+    finish()
+  })
+
+  function finish() {
+    card.hidden = true
+    dots.hidden = true
+    // "Saved" measured against the worst available outcome each round, so the
+    // number means something rather than being a raw body count.
+    const worst = DILEMMAS.reduce((a, d) => a + Math.max(d.left.deaths, d.right.deaths), 0)
+    const saved = worst - deaths
+    const optimal = answered.filter((a) => a.deaths === a.min).length
+
+    el('vDeaths').textContent = String(deaths)
+    el('vPulls').textContent = String(pulls)
+    el('vSaved').textContent = String(saved)
+
+    let label, blurb
+    if (optimal >= 11) {
+      label = 'Utilitarian'
+      blurb = 'You counted, every time, and picked the smaller number. Consistent, defensible, and slightly unnerving to be tied to a track near.'
+    } else if (pulls <= 3) {
+      label = 'Non-interventionist'
+      blurb = 'You mostly kept your hands off the lever. There is a real argument that a death you caused is worse than one you failed to prevent, and you made it twelve times.'
+    } else if (pulls >= 10) {
+      label = 'Interventionist'
+      blurb = 'You pulled almost every lever, including the one that was not connected to anything. You would rather have done something than nothing.'
+    } else {
+      label = 'Situational'
+      blurb = 'No single rule explains your answers. You weighed each one separately, which is either moral seriousness or an inability to commit.'
+    }
+    el('vLabel').textContent = label
+    el('vBlurb').textContent = blurb
+    verdict.hidden = false
+    sfx.great()
+    burst(innerWidth / 2, innerHeight * 0.4, {
+      count: 26, colors: ['#d97742', '#3d1f14', '#ffd166'], speed: 5, gravity: 0.2, life: 50, size: 4,
+    })
+    verdict.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  el('againBtn').addEventListener('click', () => {
+    i = 0; deaths = 0; pulls = 0; answered = []
+    card.hidden = false; dots.hidden = false; verdict.hidden = true
+    render()
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+
+  render()
+</script>
+
+<style>
+  :global(.trolley-body) { background: #fbf3ec; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 44px 22px 80px; }
+  .head { text-align: center; margin-bottom: 26px; }
+  .head h1 { font-size: clamp(34px, 6vw, 52px); }
+  .lede { color: var(--ink-soft); margin: 10px auto 0; max-width: 44ch; }
+
+  .dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
+  .dots :global(.dot) {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #e2d3c6; transition: background 200ms var(--ease);
+  }
+  .dots :global(.dot.done) { background: #d97742; }
+
+  .card {
+    background: #fff; border: 1px solid #ecdccd; border-radius: var(--radius-lg);
+    padding: 26px 24px 22px; box-shadow: var(--shadow);
+  }
+  .card.enter { animation: slide 300ms var(--ease); }
+  @keyframes slide { from { opacity: 0; transform: translateY(10px); } }
+
+  .tag {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #a3542f; font-weight: 600;
+  }
+  .card h2 { font-size: clamp(24px, 4vw, 32px); margin: 6px 0 10px; }
+  .setup { margin: 0; font-size: 16.5px; color: #4b4038; text-wrap: pretty; }
+
+  .scene { display: block; width: 100%; height: auto; margin: 18px 0 6px; }
+  .rail { fill: none; stroke: #d9c7b8; stroke-width: 4; stroke-linecap: round; }
+  .rail.main { stroke: #c9ab96; }
+  .tie { stroke: #e8dbd0; stroke-width: 3; stroke-linecap: round; }
+  .switch { stroke: #d97742; stroke-width: 5; transform-origin: 196px 96px; transition: transform 320ms var(--ease); }
+  .switch.thrown { transform: rotate(-24deg); }
+  .trolley { fill: #3d1f14; }
+
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .choice {
+    border: 1px solid #e3cdbb; background: #fff; border-radius: 14px;
+    padding: 15px 14px; font-size: 15.5px; font-weight: 600; cursor: pointer;
+    transition: transform 140ms var(--ease), border-color 140ms var(--ease), background 140ms var(--ease);
+  }
+  .choice:hover:not(:disabled) { transform: translateY(-2px); border-color: #d97742; background: #fff8f3; }
+  .choice:disabled { opacity: 0.45; cursor: default; }
+
+  .outcome {
+    margin-top: 16px; padding-top: 16px; border-top: 1px dashed #ecdccd;
+    animation: slide 260ms var(--ease);
+  }
+  .outcome p { margin: 0 0 14px; color: #4b4038; font-size: 16px; text-wrap: pretty; }
+  .outcome button, .verdict-actions button {
+    border: 0; border-radius: 999px; padding: 11px 24px;
+    background: #3d1f14; color: #fff; font-weight: 600; cursor: pointer;
+    transition: filter 140ms var(--ease);
+  }
+  .outcome button:hover { filter: brightness(1.15); }
+
+  .verdict {
+    background: #fff; border: 1px solid #ecdccd; border-radius: var(--radius-lg);
+    padding: 30px 24px; text-align: center; box-shadow: var(--shadow);
+    animation: slide 320ms var(--ease);
+  }
+  .verdict h2 { font-size: 26px; }
+  .stat-row { display: flex; justify-content: center; gap: 26px; flex-wrap: wrap; margin: 20px 0 22px; }
+  .stat { display: grid; }
+  .stat b { font-family: var(--display); font-size: 38px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--ink-soft); max-width: 14ch; }
+  .verdict h3 { font-size: 28px; color: #b5643c; }
+  .verdict p { color: #4b4038; max-width: 48ch; margin: 10px auto 0; text-wrap: pretty; }
+  .verdict-actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
+  .verdict-actions .ghost { background: #fff; color: var(--ink); border: 1px solid #e3cdbb; }
+
+  @media (max-width: 520px) {
+    .choices { grid-template-columns: 1fr; }
+  }
+</style>

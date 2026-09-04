@@ -1,0 +1,425 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Ambient Mix — a soundscape mixer with no audio files at all.
+ *
+ * Every layer is synthesised live in the Web Audio graph: filtered noise for
+ * the textures, scheduled bursts for the events. That means the page weighs a
+ * few kilobytes instead of a few megabytes, nothing has to be licensed, and
+ * the loops never repeat audibly because there is no loop.
+ */
+
+type Layer = { id: string; name: string; glyph: string; hint: string }
+
+const LAYERS: Layer[] = [
+  { id: 'rain', name: 'Rain', glyph: '🌧️', hint: 'Filtered white noise' },
+  { id: 'waves', name: 'Waves', glyph: '🌊', hint: 'Brown noise under a slow swell' },
+  { id: 'wind', name: 'Wind', glyph: '🌬️', hint: 'A drifting low-pass' },
+  { id: 'fire', name: 'Campfire', glyph: '🔥', hint: 'Rumble plus random crackle' },
+  { id: 'cafe', name: 'Coffee shop', glyph: '☕', hint: 'Murmur and occasional cups' },
+  { id: 'birds', name: 'Birds', glyph: '🐦', hint: 'Swept sine chirps' },
+  { id: 'crickets', name: 'Crickets', glyph: '🦗', hint: 'Rhythmic high bursts' },
+  { id: 'traffic', name: 'Highway', glyph: '🛣️', hint: 'Distant steady roar' },
+  { id: 'clock', name: 'Clock', glyph: '🕰️', hint: 'One click per second' },
+  { id: 'thunder', name: 'Thunder', glyph: '⛈️', hint: 'Rare, long, low' },
+  { id: 'mower', name: 'Lawnmower', glyph: '🚜', hint: 'A neighbour, at 8am' },
+  { id: 'dial', name: 'Dial-up modem', glyph: '📠', hint: 'Regrettable' },
+]
+---
+
+<GameLayout slug="ambient-mix" bar="#132a3f" bodyClass="mix-body">
+  <div class="wrap">
+    <header class="head">
+      <h1>Ambient Mix</h1>
+      <p class="lede">
+        Twelve layers, all generated live in your browser. Nothing here is a
+        recording. Start with rain and see how long you last.
+      </p>
+    </header>
+
+    <div class="bar">
+      <button type="button" id="masterBtn" class="primary">Turn the sound on</button>
+      <label class="master">
+        <span>Master</span>
+        <input type="range" id="master" min="0" max="100" value="70" aria-label="Master volume" />
+      </label>
+      <button type="button" id="clearBtn" class="ghost">Silence</button>
+    </div>
+
+    <ul class="grid" id="grid">
+      {
+        LAYERS.map((l) => (
+          <li class="layer" data-id={l.id}>
+            <button type="button" class="toggle" aria-pressed="false">
+              <span class="glyph" aria-hidden="true">{l.glyph}</span>
+              <span class="meta">
+                <span class="name">{l.name}</span>
+                <span class="hint">{l.hint}</span>
+              </span>
+              <span class="viz" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            </button>
+            <input
+              class="vol" type="range" min="0" max="100" value="45"
+              aria-label={`${l.name} volume`}
+            />
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="note" id="note">Click a card to bring that layer in. Drag its slider to set how much.</p>
+  </div>
+</GameLayout>
+
+<script>
+  const grid = document.getElementById('grid')
+  const masterBtn = document.getElementById('masterBtn')
+  const masterSlider = document.getElementById('master')
+  const note = document.getElementById('note')
+
+  let ctx = null
+  let masterGain = null
+  const layers = new Map()
+  let scheduler = null
+
+  // ---- noise -------------------------------------------------------------
+  const buffers = {}
+  function noiseBuffer(kind) {
+    if (buffers[kind]) return buffers[kind]
+    const len = ctx.sampleRate * 4
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    if (kind === 'white') {
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1
+    } else if (kind === 'pink') {
+      // Voss-McCartney approximation — cheap and close enough for texture.
+      let b0 = 0, b1 = 0, b2 = 0
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1
+        b0 = 0.99765 * b0 + w * 0.0990460
+        b1 = 0.96300 * b1 + w * 0.2965164
+        b2 = 0.57000 * b2 + w * 1.0526913
+        d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.22
+      }
+    } else {
+      let last = 0
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1
+        last = (last + 0.02 * w) / 1.02
+        d[i] = last * 3.2
+      }
+    }
+    buffers[kind] = buf
+    return buf
+  }
+
+  function noiseSource(kind) {
+    const src = ctx.createBufferSource()
+    src.buffer = noiseBuffer(kind)
+    src.loop = true
+    src.start()
+    return src
+  }
+
+  /** A slow sine that modulates `param` between lo and hi. */
+  function lfo(param, lo, hi, hz) {
+    const osc = ctx.createOscillator()
+    const amp = ctx.createGain()
+    osc.frequency.value = hz
+    amp.gain.value = (hi - lo) / 2
+    param.value = (hi + lo) / 2
+    osc.connect(amp).connect(param)
+    osc.start()
+    return osc
+  }
+
+  // ---- layer builders ----------------------------------------------------
+  const BUILD = {
+    rain(out) {
+      const f = ctx.createBiquadFilter()
+      f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.55
+      const hp = ctx.createBiquadFilter()
+      hp.type = 'highpass'; hp.frequency.value = 500
+      noiseSource('white').connect(f).connect(hp).connect(out)
+      lfo(f.frequency, 900, 1900, 0.07)
+    },
+    waves(out) {
+      const f = ctx.createBiquadFilter()
+      f.type = 'lowpass'; f.Q.value = 0.7
+      const swell = ctx.createGain()
+      swell.gain.value = 0.6
+      noiseSource('brown').connect(f).connect(swell).connect(out)
+      lfo(f.frequency, 180, 900, 0.06)
+      lfo(swell.gain, 0.18, 1.0, 0.06)
+    },
+    wind(out) {
+      const f = ctx.createBiquadFilter()
+      f.type = 'lowpass'; f.Q.value = 2.5
+      noiseSource('brown').connect(f).connect(out)
+      lfo(f.frequency, 180, 800, 0.045)
+    },
+    fire(out) {
+      const f = ctx.createBiquadFilter()
+      f.type = 'lowpass'; f.frequency.value = 700
+      const bed = ctx.createGain(); bed.gain.value = 0.55
+      noiseSource('brown').connect(f).connect(bed).connect(out)
+      return { crackle: true }
+    },
+    cafe(out) {
+      const f = ctx.createBiquadFilter()
+      f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.45
+      const bed = ctx.createGain(); bed.gain.value = 0.75
+      noiseSource('pink').connect(f).connect(bed).connect(out)
+      lfo(f.frequency, 380, 700, 0.11)
+      return { clink: true }
+    },
+    birds() { return { chirp: true } },
+    crickets() { return { cricket: true } },
+    traffic(out) {
+      const f = ctx.createBiquadFilter()
+      f.type = 'lowpass'; f.frequency.value = 320; f.Q.value = 0.6
+      noiseSource('brown').connect(f).connect(out)
+      lfo(f.frequency, 240, 420, 0.03)
+    },
+    clock() { return { tick: true } },
+    thunder() { return { boom: true } },
+    mower(out) {
+      const osc = ctx.createOscillator()
+      osc.type = 'sawtooth'; osc.frequency.value = 92
+      const osc2 = ctx.createOscillator()
+      osc2.type = 'sawtooth'; osc2.frequency.value = 94.5
+      const f = ctx.createBiquadFilter()
+      f.type = 'lowpass'; f.frequency.value = 620; f.Q.value = 3
+      const g = ctx.createGain(); g.gain.value = 0.16
+      osc.connect(f); osc2.connect(f)
+      const grit = ctx.createBiquadFilter()
+      grit.type = 'bandpass'; grit.frequency.value = 1100
+      const gg = ctx.createGain(); gg.gain.value = 0.1
+      noiseSource('white').connect(grit).connect(gg).connect(g)
+      f.connect(g).connect(out)
+      osc.start(); osc2.start()
+      lfo(f.frequency, 480, 760, 0.7)
+    },
+    dial() { return { modem: true } },
+  }
+
+  // ---- one-shot events ---------------------------------------------------
+  function burst(out, { freq, q, dur, peak, type = 'bandpass', kind = 'white' }, at) {
+    const src = ctx.createBufferSource()
+    src.buffer = noiseBuffer(kind)
+    src.loop = true
+    const f = ctx.createBiquadFilter()
+    f.type = type; f.frequency.value = freq; f.Q.value = q
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, at)
+    g.gain.exponentialRampToValueAtTime(peak, at + Math.min(0.02, dur / 4))
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur)
+    src.connect(f).connect(g).connect(out)
+    src.start(at)
+    src.stop(at + dur + 0.05)
+  }
+
+  function tone(out, { f0, f1, dur, peak, type = 'sine' }, at) {
+    const o = ctx.createOscillator()
+    o.type = type
+    o.frequency.setValueAtTime(f0, at)
+    o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), at + dur)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, at)
+    g.gain.exponentialRampToValueAtTime(peak, at + dur * 0.18)
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur)
+    o.connect(g).connect(out)
+    o.start(at)
+    o.stop(at + dur + 0.05)
+  }
+
+  // Event layers are driven by a lookahead scheduler so timing does not depend
+  // on how busy the main thread is.
+  const EVENTS = {
+    crackle: (L, t) => { if (Math.random() < 0.55) burst(L.out, { freq: 2200 + Math.random() * 2600, q: 3, dur: 0.05, peak: 0.5 }, t + Math.random() * 0.2) },
+    clink:   (L, t) => { if (Math.random() < 0.10) tone(L.out, { f0: 1800 + Math.random() * 1400, f1: 1400, dur: 0.28, peak: 0.09 }, t + Math.random() * 0.2) },
+    chirp:   (L, t) => {
+      if (Math.random() > 0.28) return
+      const base = 2400 + Math.random() * 1800
+      const n = 1 + Math.floor(Math.random() * 3)
+      for (let i = 0; i < n; i++) tone(L.out, { f0: base, f1: base * (1.4 + Math.random() * 0.6), dur: 0.07, peak: 0.16 }, t + i * 0.1 + Math.random() * 0.1)
+    },
+    cricket: (L, t) => { for (let i = 0; i < 3; i++) burst(L.out, { freq: 4600, q: 26, dur: 0.03, peak: 0.35 }, t + i * 0.055) },
+    tick:    (L, t) => { burst(L.out, { freq: 2600, q: 12, dur: 0.028, peak: 0.5 }, Math.ceil(t * 2) / 2) },
+    boom:    (L, t) => { if (Math.random() < 0.045) { burst(L.out, { freq: 90, q: 0.7, dur: 2.6, peak: 1.4, type: 'lowpass', kind: 'brown' }, t); burst(L.out, { freq: 300, q: 0.5, dur: 1.4, peak: 0.35, type: 'lowpass', kind: 'brown' }, t + 0.12) } },
+    modem:   (L, t) => {
+      // The handshake, roughly: two tones, a scramble, then carrier hiss.
+      if (Math.random() > 0.4) return
+      const pick = Math.random()
+      if (pick < 0.4) tone(L.out, { f0: 980 + Math.random() * 1400, f1: 980 + Math.random() * 1400, dur: 0.16, peak: 0.14, type: 'square' }, t)
+      else if (pick < 0.75) burst(L.out, { freq: 1600 + Math.random() * 900, q: 1.4, dur: 0.3, peak: 0.16 }, t)
+      else tone(L.out, { f0: 2100, f1: 1100, dur: 0.4, peak: 0.1 }, t)
+    },
+  }
+
+  // ---- wiring ------------------------------------------------------------
+  function ensureCtx() {
+    if (ctx) return
+    ctx = new (window.AudioContext || window.webkitAudioContext)()
+    masterGain = ctx.createGain()
+    masterGain.gain.value = Number(masterSlider.value) / 100
+    masterGain.connect(ctx.destination)
+
+    for (const li of grid.querySelectorAll('.layer')) {
+      const id = li.dataset.id
+      const out = ctx.createGain()
+      out.gain.value = 0
+      out.connect(masterGain)
+      const L = { id, li, out, on: false, vol: Number(li.querySelector('.vol').value) / 100, ev: null }
+      const res = BUILD[id] ? BUILD[id](out) : null
+      if (res) L.ev = Object.keys(res).find((k) => EVENTS[k])
+      layers.set(id, L)
+    }
+
+    // 200 ms lookahead: enough to stay ahead of jitter, short enough that
+    // turning a layer off feels immediate.
+    scheduler = setInterval(() => {
+      const t = ctx.currentTime + 0.12
+      for (const L of layers.values()) {
+        if (!L.on || !L.ev || L.vol === 0) continue
+        EVENTS[L.ev](L, t)
+      }
+    }, 200)
+  }
+
+  function setLayer(L, on) {
+    L.on = on
+    const target = on ? L.vol : 0
+    L.out.gain.cancelScheduledValues(ctx.currentTime)
+    L.out.gain.setTargetAtTime(target, ctx.currentTime, 0.12)
+    L.li.classList.toggle('on', on)
+    L.li.querySelector('.toggle').setAttribute('aria-pressed', String(on))
+  }
+
+  let running = false
+  async function start() {
+    ensureCtx()
+    if (ctx.state === 'suspended') await ctx.resume()
+    running = true
+    masterBtn.textContent = 'Sound is on'
+    masterBtn.classList.add('live')
+    note.textContent = 'Click a card to bring that layer in. Drag its slider to set how much.'
+  }
+
+  masterBtn.addEventListener('click', async () => {
+    if (!running) return start()
+    await ctx.suspend()
+    running = false
+    masterBtn.textContent = 'Turn the sound on'
+    masterBtn.classList.remove('live')
+  })
+
+  grid.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.toggle')
+    if (!btn) return
+    const li = btn.closest('.layer')
+    if (!running) await start()
+    const L = layers.get(li.dataset.id)
+    setLayer(L, !L.on)
+  })
+
+  grid.addEventListener('input', async (e) => {
+    if (!e.target.classList.contains('vol')) return
+    const li = e.target.closest('.layer')
+    if (!running) await start()
+    const L = layers.get(li.dataset.id)
+    L.vol = Number(e.target.value) / 100
+    if (!L.on) setLayer(L, true)
+    else L.out.gain.setTargetAtTime(L.vol, ctx.currentTime, 0.08)
+  })
+
+  masterSlider.addEventListener('input', () => {
+    if (masterGain) masterGain.gain.setTargetAtTime(Number(masterSlider.value) / 100, ctx.currentTime, 0.06)
+  })
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (!ctx) return
+    for (const L of layers.values()) setLayer(L, false)
+  })
+</script>
+
+<style>
+  :global(.mix-body) { background: #0e1b28; color: #eaf1f7; }
+
+  .wrap { max-width: 900px; margin: 0 auto; padding: 44px 22px 90px; }
+  .head { text-align: center; margin-bottom: 26px; }
+  .head h1 { font-size: clamp(34px, 6vw, 52px); }
+  .lede { color: #a8bccd; margin: 10px auto 0; max-width: 46ch; }
+
+  .bar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    justify-content: center; margin-bottom: 26px;
+    background: #16283a; border: 1px solid #24405a; border-radius: 999px;
+    padding: 10px 14px;
+  }
+  .primary {
+    border: 0; border-radius: 999px; padding: 10px 22px; font-weight: 600;
+    background: #5a9fd4; color: #06121c; cursor: pointer;
+    transition: filter 140ms var(--ease);
+  }
+  .primary.live { background: #7ad4a0; }
+  .primary:hover { filter: brightness(1.08); }
+  .ghost {
+    border: 1px solid #2f5474; background: transparent; color: #cfe0ee;
+    border-radius: 999px; padding: 9px 18px; cursor: pointer;
+  }
+  .master { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #a8bccd; }
+
+  input[type='range'] {
+    -webkit-appearance: none; appearance: none;
+    height: 4px; border-radius: 3px; background: #2b4a66; outline: none;
+    width: 120px;
+  }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; border-radius: 50%; background: #cfe0ee;
+    cursor: pointer; border: 0;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 15px; height: 15px; border-radius: 50%; background: #cfe0ee;
+    cursor: pointer; border: 0;
+  }
+
+  .grid {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  }
+  .layer {
+    background: #16283a; border: 1px solid #24405a; border-radius: var(--radius);
+    padding: 12px; transition: border-color 200ms var(--ease), background 200ms var(--ease);
+  }
+  .layer.on { border-color: #5a9fd4; background: #1b344c; }
+  .toggle {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit;
+  }
+  .glyph { font-size: 26px; line-height: 1; flex: none; }
+  .meta { display: grid; flex: 1; min-width: 0; }
+  .name { font-weight: 600; font-size: 15.5px; }
+  .hint { font-size: 12px; color: #7f99b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .viz { display: flex; align-items: flex-end; gap: 2px; height: 20px; flex: none; }
+  .viz :global(i) {
+    display: block; width: 3px; height: 4px; border-radius: 2px; background: #2f5474;
+    transition: background 200ms var(--ease);
+  }
+  .layer.on .viz :global(i) {
+    background: #7ad4a0;
+    animation: bounce 900ms ease-in-out infinite;
+  }
+  .layer.on .viz :global(i:nth-child(2)) { animation-delay: 120ms; }
+  .layer.on .viz :global(i:nth-child(3)) { animation-delay: 240ms; }
+  .layer.on .viz :global(i:nth-child(4)) { animation-delay: 360ms; }
+  @keyframes bounce { 0%, 100% { height: 4px; } 50% { height: 18px; } }
+
+  .vol { width: 100%; margin-top: 12px; }
+
+  .note { text-align: center; color: #7f99b0; font-size: 13.5px; margin-top: 26px; }
+</style>

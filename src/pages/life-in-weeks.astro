@@ -1,0 +1,274 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Life in Weeks — 90 years as 4,680 small squares.
+ *
+ * Everything is derived from one date the visitor types, entirely in the
+ * browser. The date is stored in localStorage and sent nowhere; the page has no
+ * backend and no analytics on the value.
+ */
+const YEARS = 90
+const WEEKS = 52
+---
+
+<GameLayout slug="life-in-weeks" bar="#1b1f2e" bodyClass="weeks-body">
+  <div class="wrap">
+    <header class="head">
+      <h1>Life in Weeks</h1>
+      <p class="lede">
+        Ninety years, one square per week. It fits on a single screen, which is
+        the entire point.
+      </p>
+    </header>
+
+    <form class="ask" id="ask">
+      <label for="dob">When were you born?</label>
+      <div class="ask-row">
+        <input type="date" id="dob" name="dob" required max="" />
+        <button type="submit" class="primary">Show me</button>
+      </div>
+      <p class="privacy">Stays in your browser. Nothing is sent anywhere.</p>
+    </form>
+
+    <section class="result" id="result" hidden>
+      <div class="stats" id="stats"></div>
+
+      <div class="chart">
+        <div class="legend">
+          <span><i class="k-lived"></i> lived</span>
+          <span><i class="k-now"></i> this week</span>
+          <span><i class="k-left"></i> if you reach 90</span>
+        </div>
+        <div class="grid-wrap">
+          <div class="decades" id="decades" aria-hidden="true"></div>
+          <div class="grid" id="grid" role="img" aria-label="Your life so far, as a grid of weeks"></div>
+        </div>
+        <p class="caption" id="caption"></p>
+      </div>
+
+      <div class="facts" id="facts"></div>
+
+      <div class="actions">
+        <button type="button" data-share data-title="Life in Weeks">Share</button>
+        <button type="button" id="changeBtn" class="ghost">Use a different date</button>
+      </div>
+    </section>
+  </div>
+</GameLayout>
+
+  {/* Data for the module below: modules cannot take define:vars, and
+      modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ YEARS, WEEKS })} />
+
+  <script>
+  import { burst } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+    const { YEARS, WEEKS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  const el = (id) => document.getElementById(id)
+  const KEY = 'life-in-weeks:dob'
+  const TOTAL = YEARS * WEEKS
+  const WEEK_MS = 604_800_000
+
+  el('dob').max = new Date().toISOString().slice(0, 10)
+
+  // Build the grid once — 4,680 nodes is fine, and reusing them keeps the
+  // recalculation on a new date to a class flip rather than a re-render.
+  const cells = []
+  const frag = document.createDocumentFragment()
+  for (let i = 0; i < TOTAL; i++) {
+    const s = document.createElement('i')
+    if (i % WEEKS === 0 && (i / WEEKS) % 10 === 0) s.classList.add('decade')
+    frag.appendChild(s)
+    cells.push(s)
+  }
+  el('grid').appendChild(frag)
+
+  const dec = document.createDocumentFragment()
+  for (let y = 0; y < YEARS; y += 10) {
+    const d = document.createElement('span')
+    d.textContent = String(y)
+    d.style.setProperty('--y', String(y))
+    dec.appendChild(d)
+  }
+  el('decades').appendChild(dec)
+
+  const nf = (n) => Math.round(n).toLocaleString('en-US')
+
+  function stat(value, label) {
+    return `<div class="stat"><b>${value}</b><span>${label}</span></div>`
+  }
+
+  function show(dobStr) {
+    const dob = new Date(dobStr + 'T00:00:00')
+    if (Number.isNaN(+dob)) return
+    const now = new Date()
+    const ms = +now - +dob
+    if (ms < 0) return
+
+    const weeks = Math.floor(ms / WEEK_MS)
+    const days = Math.floor(ms / 86_400_000)
+    const lived = Math.min(weeks, TOTAL)
+    const pct = (weeks / TOTAL) * 100
+
+    for (let i = 0; i < TOTAL; i++) {
+      const c = cells[i]
+      c.className = (i % WEEKS === 0 && (i / WEEKS) % 10 === 0 ? 'decade ' : '') +
+        (i < lived ? 'lived' : i === lived ? 'now' : '')
+    }
+
+    // Exact years, accounting for the actual calendar rather than 365.25.
+    let years = now.getFullYear() - dob.getFullYear()
+    const had = now.getMonth() > dob.getMonth() ||
+      (now.getMonth() === dob.getMonth() && now.getDate() >= dob.getDate())
+    if (!had) years--
+
+    el('stats').innerHTML =
+      stat(nf(weeks), 'weeks lived') +
+      stat(nf(Math.max(0, TOTAL - weeks)), 'weeks left, if you reach 90') +
+      stat(pct.toFixed(1) + '%', 'of a 90-year life') +
+      stat(nf(days), 'days')
+
+    el('caption').textContent =
+      weeks >= TOTAL
+        ? 'You are past the ninetieth row. The grid ran out before you did.'
+        : `You are in week ${nf(weeks + 1)} of ${nf(TOTAL)}. Each row is one year of your life.`
+
+    // Physiological figures are population averages, stated as such.
+    const heartbeats = days * 24 * 60 * 75
+    const breaths = days * 24 * 60 * 15
+    const sleepYears = (days * 8) / 24 / 365.2425
+    const moons = days / 29.530588853
+    el('facts').innerHTML =
+      `<h2>In that time</h2><ul>` +
+      `<li>Your heart has beaten about <b>${nf(heartbeats)}</b> times.</li>` +
+      `<li>You have taken roughly <b>${nf(breaths)}</b> breaths.</li>` +
+      `<li>You have slept for about <b>${sleepYears.toFixed(1)} years</b> of it.</li>` +
+      `<li>There have been <b>${nf(moons)}</b> full moons.</li>` +
+      `<li>The Earth has gone round the Sun <b>${years}</b> times with you on it.</li>` +
+      `</ul><p class="src">Heart rate and breathing use adult population averages, so treat them as an order of magnitude, not a measurement.</p>`
+
+    el('ask').hidden = true
+    el('result').hidden = false
+    unlock(); sfx.good()
+    // One rising note per decade lived, so the reveal has a shape.
+    const decades = Math.min(9, Math.floor(years / 10))
+    for (let k = 0; k <= decades; k++) setTimeout(() => sfx.blip(k), 90 + k * 85)
+    setTimeout(() => burst(innerWidth / 2, innerHeight * 0.36, {
+      count: 24, colors: ['#8fa2c4', '#ffd166', '#fff'], speed: 4, gravity: 0.12, life: 46, size: 3,
+    }), 120)
+    try { localStorage.setItem(KEY, dobStr) } catch {}
+  }
+
+  el('ask').addEventListener('submit', (e) => {
+    e.preventDefault()
+    if (el('dob').value) show(el('dob').value)
+  })
+
+  el('changeBtn').addEventListener('click', () => {
+    el('result').hidden = true
+    el('ask').hidden = false
+    el('dob').focus()
+  })
+
+  try {
+    const saved = localStorage.getItem(KEY)
+    if (saved) { el('dob').value = saved; show(saved) }
+  } catch {}
+</script>
+
+<style is:global>
+  /* Stats, facts and grid cells are all built at runtime. */
+  .weeks-body { background: #101320; color: #e8ecf5; }
+
+  .weeks-body .wrap { max-width: 860px; margin: 0 auto; padding: 46px 22px 80px; }
+  .weeks-body .head { text-align: center; margin-bottom: 28px; }
+  .weeks-body .head h1 { font-size: clamp(34px, 6vw, 52px); }
+  .weeks-body .lede { color: #9aa7c2; margin: 10px auto 0; max-width: 44ch; }
+
+  .weeks-body .ask {
+    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius-lg);
+    padding: 26px 22px; text-align: center; max-width: 460px; margin: 0 auto;
+  }
+  .weeks-body .ask label { display: block; font-weight: 600; margin-bottom: 12px; }
+  .weeks-body .ask-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .weeks-body input[type='date'] {
+    background: #0d1120; border: 1px solid #333c5c; color: #e8ecf5;
+    border-radius: 10px; padding: 10px 12px; font-size: 15px;
+    color-scheme: dark;
+  }
+  .weeks-body .primary {
+    background: #8fa2c4; color: #101320; border: 0; border-radius: 10px;
+    padding: 10px 22px; font-weight: 600; cursor: pointer;
+  }
+  .weeks-body .privacy { color: #99a5c0; font-size: 12.5px; margin: 12px 0 0; }
+
+  .weeks-body .stats {
+    display: grid; gap: 12px; margin-bottom: 26px;
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  }
+  .weeks-body .stat {
+    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius);
+    padding: 16px 14px; text-align: center;
+  }
+  .weeks-body .stat b {
+    display: block; font-family: var(--display); font-size: clamp(22px, 3.4vw, 30px);
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  }
+  .weeks-body .stat span { font-size: 12px; color: #8f9cb8; }
+
+  .weeks-body .chart {
+    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius-lg);
+    padding: 20px 18px;
+  }
+  .weeks-body .legend {
+    display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+    font-size: 12.5px; color: #9aa7c2; margin-bottom: 14px;
+  }
+  .weeks-body .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .weeks-body .legend i { width: 10px; height: 10px; border-radius: 2px; display: block; }
+  .weeks-body .k-lived { background: #8fa2c4; }
+  .weeks-body .k-now { background: #ffd166; }
+  .weeks-body .k-left { background: #2a3149; }
+
+  .weeks-body .grid-wrap { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
+  .weeks-body .decades { position: relative; font-size: 10px; color: #99a5c0; }
+  .weeks-body .decades span {
+    position: absolute; right: 0;
+    /* Row height is derived from the same fraction the grid uses. */
+    top: calc(var(--y) * (100% / 90));
+  }
+
+  .weeks-body .grid {
+    display: grid;
+    grid-template-columns: repeat(52, minmax(0, 1fr));
+    gap: 1.5px;
+  }
+  .weeks-body .grid i {
+    display: block; aspect-ratio: 1; border-radius: 1.5px;
+    background: #2a3149;
+    transition: background 260ms var(--ease);
+  }
+  .weeks-body .grid i.lived { background: #8fa2c4; }
+  .weeks-body .grid i.now { background: #ffd166; box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.35); }
+  .weeks-body .grid i.decade { box-shadow: inset -1px 0 0 rgba(255,255,255,0.14); }
+
+  .weeks-body .caption { text-align: center; color: #8f9cb8; font-size: 13px; margin: 14px 0 0; }
+
+  .weeks-body .facts {
+    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius-lg);
+    padding: 22px 20px; margin-top: 18px;
+  }
+  .weeks-body .facts h2 { font-size: 22px; margin-bottom: 12px; }
+  .weeks-body .facts ul { margin: 0; padding-left: 20px; display: grid; gap: 7px; color: #c3cde0; }
+  .weeks-body .facts b { color: #fff; font-variant-numeric: tabular-nums; }
+  .weeks-body .facts .src { color: #99a5c0; font-size: 12.5px; margin: 14px 0 0; }
+
+  .weeks-body .actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
+  .weeks-body .actions button {
+    border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600;
+    cursor: pointer; background: #8fa2c4; color: #101320;
+  }
+  .weeks-body .actions .ghost { background: transparent; border: 1px solid #333c5c; color: #e8ecf5; }
+</style>

@@ -1,0 +1,277 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Steady Hand — draw one unbroken stroke between two dots.
+ *
+ * Scoring is honest geometry, not vibes: every sampled point's perpendicular
+ * distance to the ideal segment is measured, averaged, and normalised by the
+ * segment length, so the difficulty does not change when the dots move.
+ */
+---
+
+<GameLayout slug="steady-hand" bar="#5b2333" fixed>
+  <div class="stage">
+    <h1 class="visually-hidden">Steady Hand</h1>
+    <canvas id="c"></canvas>
+
+    <div class="hud">
+      <div class="hint" id="hint">Press on the first dot and drag to the second. One stroke.</div>
+      <div class="scores">
+        <div><span class="k">Last</span><b id="last">—</b></div>
+        <div><span class="k">Best</span><b id="best">—</b></div>
+        <div><span class="k">Tries</span><b id="tries">0</b></div>
+      </div>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <div class="big" id="bigScore">0.0%</div>
+      <div class="verdict" id="verdict"></div>
+      <button type="button" id="again">Again</button>
+    </div>
+  </div>
+</GameLayout>
+
+<script>
+  import { burst, ring, floatText } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+  const canvas = document.getElementById('c')
+  const ctx = canvas.getContext('2d')
+  const hint = document.getElementById('hint')
+  const elLast = document.getElementById('last')
+  const elBest = document.getElementById('best')
+  const elTries = document.getElementById('tries')
+  const result = document.getElementById('result')
+  const bigScore = document.getElementById('bigScore')
+  const verdict = document.getElementById('verdict')
+  const again = document.getElementById('again')
+
+  const STORE = 'steady-hand:best'
+  const DOT_R = 14        // visual radius of a target dot
+  const SNAP = 46         // how close the stroke must start/end to a dot
+  // Average deviation of this fraction of the segment length scores zero.
+  const TOLERANCE = 0.06
+
+  let W = 0, H = 0, dpr = 1
+  let A = { x: 0, y: 0 }, B = { x: 0, y: 0 }
+  let stroke = []
+  let drawing = false
+  let locked = false
+  let tries = 0
+  let best = Number(localStorage.getItem(STORE) || 0) || 0
+  if (best) elBest.textContent = best.toFixed(1) + '%'
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    W = canvas.clientWidth
+    H = canvas.clientHeight
+    canvas.width = Math.round(W * dpr)
+    canvas.height = Math.round(H * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    place()
+  }
+
+  function place() {
+    // Keep the pair long enough to be a real test and inside a safe margin.
+    const m = 90
+    const minLen = Math.min(W, H) * 0.55
+    let guard = 0
+    do {
+      A = { x: m + Math.random() * (W - 2 * m), y: m + Math.random() * (H - 2 * m) }
+      B = { x: m + Math.random() * (W - 2 * m), y: m + Math.random() * (H - 2 * m) }
+    } while (Math.hypot(B.x - A.x, B.y - A.y) < minLen && ++guard < 200)
+    stroke = []
+    locked = false
+    render()
+  }
+
+  const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y)
+
+  /** Perpendicular distance from p to the infinite line through A and B. */
+  function deviation(p) {
+    const dx = B.x - A.x, dy = B.y - A.y
+    const len = Math.hypot(dx, dy) || 1
+    return Math.abs(dy * p.x - dx * p.y + B.x * A.y - B.y * A.x) / len
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H)
+
+    // Ideal line, shown only after the attempt so it cannot be traced.
+    if (locked) {
+      ctx.save()
+      ctx.setLineDash([6, 8])
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+      ctx.lineWidth = 2
+      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke()
+      ctx.restore()
+    }
+
+    // The stroke, coloured per segment by how far off the line it drifted.
+    if (stroke.length > 1) {
+      const len = dist(A, B) || 1
+      ctx.lineWidth = 4
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      for (let i = 1; i < stroke.length; i++) {
+        const off = deviation(stroke[i]) / len / TOLERANCE
+        const t = Math.min(1, off)
+        ctx.strokeStyle = `rgb(${Math.round(224 + t * 20)}, ${Math.round(164 - t * 110)}, ${Math.round(88 - t * 40)})`
+        ctx.beginPath()
+        ctx.moveTo(stroke[i - 1].x, stroke[i - 1].y)
+        ctx.lineTo(stroke[i].x, stroke[i].y)
+        ctx.stroke()
+      }
+    }
+
+    for (const [p, label] of [[A, 'A'], [B, 'B']]) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, DOT_R, 0, Math.PI * 2)
+      ctx.fillStyle = '#e0a458'; ctx.fill()
+      ctx.fillStyle = '#3a121d'
+      ctx.font = '600 13px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(label, p.x, p.y + 1)
+    }
+  }
+
+  function score() {
+    const len = dist(A, B) || 1
+    // Resample by arc length so a slow, dense stroke is not weighted differently
+    // from a fast, sparse one.
+    let total = 0, sum = 0
+    for (let i = 1; i < stroke.length; i++) {
+      const seg = dist(stroke[i - 1], stroke[i])
+      sum += ((deviation(stroke[i - 1]) + deviation(stroke[i])) / 2) * seg
+      total += seg
+    }
+    const avg = total ? sum / total : len
+    const raw = 1 - avg / len / TOLERANCE
+    // A stroke that wanders far past the dots should not score well either.
+    const overshoot = Math.max(0, total / len - 1.06)
+    return Math.max(0, Math.min(100, (raw - overshoot) * 100))
+  }
+
+  function pos(e) {
+    const r = canvas.getBoundingClientRect()
+    return { x: e.clientX - r.left, y: e.clientY - r.top }
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (locked) return
+    const p = pos(e)
+    if (dist(p, A) > SNAP) {
+      hint.textContent = 'Start on dot A.'
+      return
+    }
+    // Capture keeps the stroke alive if the pointer leaves the canvas; it is
+    // not available for synthetic events, so failing here must not break play.
+    try { canvas.setPointerCapture(e.pointerId) } catch {}
+    unlock(); sfx.click()
+    drawing = true
+    stroke = [p]
+    hint.textContent = 'Keep going to B. Do not lift.'
+    render()
+  })
+
+  let tickAt = 0
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drawing) return
+    stroke.push(pos(e))
+    // A quiet tick every few samples turns a silent drag into a felt one.
+    if (stroke.length - tickAt > 5) { tickAt = stroke.length; sfx.tick() }
+    render()
+  })
+
+  function finish() {
+    if (!drawing) return
+    drawing = false
+    const end = stroke[stroke.length - 1]
+    if (!end || dist(end, B) > SNAP) {
+      stroke = []
+      hint.textContent = 'You have to finish on dot B. Try again.'
+      render()
+      return
+    }
+    locked = true
+    tries++
+    elTries.textContent = tries
+    const s = score()
+    elLast.textContent = s.toFixed(1) + '%'
+    if (s > best) {
+      best = s
+      localStorage.setItem(STORE, String(best))
+      elBest.textContent = best.toFixed(1) + '%'
+    }
+    bigScore.textContent = s.toFixed(1) + '%'
+
+    const r = canvas.getBoundingClientRect()
+    const bx = r.left + B.x, by = r.top + B.y
+    if (s >= 95) {
+      sfx.great()
+      burst(bx, by, { count: 30, colors: ['#e8a75c', '#fff', '#ffd166'], speed: 5, gravity: 0.12, life: 46, size: 4 })
+      ring(bx, by, '#ffd166', 22)
+    } else if (s >= 70) {
+      sfx.good()
+      burst(bx, by, { count: 14, colors: ['#e8a75c', '#fff'], speed: 3.4, gravity: 0.16, life: 34, size: 3 })
+    } else {
+      sfx.bad()
+    }
+    floatText(bx, by - 26, s.toFixed(1) + '%', s >= 70 ? '#ffd166' : '#ff8f7a')
+
+    verdict.textContent =
+      s >= 99 ? 'Suspicious.' :
+      s >= 95 ? 'Genuinely steady.' :
+      s >= 85 ? 'Solid. Human.' :
+      s >= 70 ? 'A bit of a wobble.' :
+      s >= 40 ? 'That is a banana.' : 'That is not a line.'
+    result.hidden = false
+    hint.textContent = 'Press Again for a new pair.'
+    render()
+  }
+
+  canvas.addEventListener('pointerup', finish)
+  canvas.addEventListener('pointercancel', finish)
+  canvas.addEventListener('pointerleave', finish)
+
+  again.addEventListener('click', () => {
+    unlock(); sfx.whoosh()
+    result.hidden = true
+    hint.textContent = 'Press on the first dot and drag to the second. One stroke.'
+    place()
+  })
+
+  addEventListener('resize', resize)
+  resize()
+</script>
+
+<style>
+  .stage { position: relative; height: 100%; background: #3a121d; touch-action: none; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+  .hud {
+    position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    color: #fff; text-align: center; pointer-events: none; width: min(92vw, 560px);
+  }
+  .hint { font-size: 15px; opacity: 0.8; }
+  .scores {
+    display: flex; gap: 26px;
+    background: rgba(0,0,0,0.3); padding: 10px 22px; border-radius: 999px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .scores div { display: flex; flex-direction: column; align-items: center; }
+  .k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
+  .scores b { font-size: 17px; font-variant-numeric: tabular-nums; }
+
+  .result {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #fff; border-radius: 18px; padding: 26px 38px; text-align: center;
+  }
+  .big { font-size: 56px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .verdict { opacity: 0.8; margin-bottom: 16px; }
+  .result button {
+    background: #e0a458; color: #3a121d; border: 0; border-radius: 999px;
+    padding: 10px 26px; font-weight: 600; cursor: pointer;
+  }
+</style>

@@ -1,0 +1,186 @@
+/**
+ * The game registry — the single source of truth for the homepage grid, every
+ * <head>, and the sitemap. Adding a game means one entry here plus one file in
+ * src/pages/.
+ *
+ * `art` picks the tile illustration (see components/TileArt.astro), so a new
+ * game looks deliberate on the grid without opening a design tool.
+ */
+export type TileArt =
+  | 'strata'   // stacked geological bands
+  | 'checklist'// a list that will not end
+  | 'stroke'   // one wobbling hand-drawn line
+  | 'orbit'    // two bodies merging
+  | 'rings'    // concentric scale
+  | 'stacks'   // columns of money
+  | 'fold'     // paper folded on itself
+  | 'bars'     // progress meters
+  | 'waves'    // overlapping sound
+  | 'tracks'   // a fork in the rails
+  | 'sketch'   // a half-remembered scribble
+  | 'grid'     // a life, counted out
+  | 'powder'   // grains piling up
+  | 'orbit2'   // bodies on a trajectory
+  | 'chaos'    // everything at once
+
+export type Game = {
+  slug: string
+  title: string
+  /** Short line shown on the tile. */
+  blurb: string
+  /** Longer line for <meta name="description"> and share cards. */
+  description: string
+  accent: string
+  accent2: string
+  /** Ink colour used on the tile — set to dark for pale gradients. */
+  onAccent?: string
+  glyph: string
+  art: TileArt
+  /** Hidden from the grid but still routable, like neal.fun's archive pages. */
+  unlisted?: boolean
+  /** ISO date. Newest first controls grid order. */
+  added: string
+}
+
+export const GAMES: Game[] = [
+  {
+    slug: 'overstimulated',
+    title: 'Overstimulated',
+    blurb: 'Every upgrade makes it worse',
+    description:
+      'A clicker where the things you buy are a progress bar, a bassline, a popup, nineteen extra cursors and a slow rotation of the entire page. There is an off switch. You will want it.',
+    accent: '#1b0327', accent2: '#ff4d94', glyph: '🤯', art: 'chaos',
+    added: '2026-09-13',
+  },
+  {
+    slug: 'orbit',
+    title: 'Orbit',
+    blurb: 'Fling planets, watch them collide',
+    description:
+      'A real n-body gravity sandbox. Every body pulls on every other one, orbits stay stable for minutes, and collisions merge worlds while conserving momentum.',
+    accent: '#060a1e', accent2: '#4d7ce8', glyph: '🪐', art: 'orbit2',
+    added: '2026-09-14',
+  },
+  {
+    slug: 'powder',
+    title: 'Powder',
+    blurb: 'Sand, water, fire, lava, acid',
+    description:
+      'A falling-sand sandbox with real emergent chemistry. Oil floats on water. Lava turns sand into glass. Plants drink puddles and take over. Nothing is scripted.',
+    accent: '#1a120c', accent2: '#e8813c', glyph: '⏳', art: 'powder',
+    added: '2026-09-15',
+  },
+  {
+    slug: 'deep-time',
+    title: 'Deep Time',
+    blurb: 'Scroll through 4.5 billion years',
+    description:
+      'Every pixel you scroll is a fixed number of years. Fall through the entire history of Earth and find out how recently everything you have ever heard of happened.',
+    accent: '#171132', accent2: '#7d4a9e', glyph: '🌍', art: 'strata',
+    added: '2026-09-12',
+  },
+  {
+    slug: 'scale',
+    title: 'Scale',
+    blurb: 'From a quark to the whole universe',
+    description:
+      'Zoom out by powers of ten, from the smallest thing physics allows to the edge of the observable universe. Twenty-two thousand pixels of pure perspective.',
+    accent: '#04263f', accent2: '#2b9bb3', glyph: '🔭', art: 'rings',
+    added: '2026-09-11',
+  },
+  {
+    slug: 'rule-cascade',
+    title: 'Rule Cascade',
+    blurb: 'Pick a username. Good luck.',
+    description:
+      'It is just a username field. Then it wants a prime number. Then it wants the time. A game about requirements that refuse to stop arriving.',
+    accent: '#0d3b2b', accent2: '#5cb872', glyph: '📋', art: 'checklist',
+    added: '2026-09-10',
+  },
+  {
+    slug: 'spend-it',
+    title: 'Spend It',
+    blurb: 'You have 100 billion dollars',
+    description:
+      'Buy sandwiches, islands, aircraft carriers and small countries until the money is gone. It is harder than it sounds.',
+    accent: '#0f3d3e', accent2: '#63c9a4', glyph: '💸', art: 'stacks',
+    added: '2026-09-09',
+  },
+  {
+    slug: 'steady-hand',
+    title: 'Steady Hand',
+    blurb: 'How straight is your line, really?',
+    description:
+      'Draw one unbroken stroke between two dots. Every pixel of wobble is measured and scored. Nobody is as steady as they think.',
+    accent: '#4c1d2e', accent2: '#e8a75c', glyph: '✍️', art: 'stroke',
+    added: '2026-09-08',
+  },
+  {
+    slug: 'fusion',
+    title: 'Fusion',
+    blurb: 'Combine anything with anything',
+    description:
+      'Start with four things. Drag one onto another and get something new. Every combination anyone has ever made is remembered forever.',
+    accent: '#1e1a45', accent2: '#b44cf0', glyph: '⚗️', art: 'orbit',
+    added: '2026-09-07',
+  },
+  {
+    slug: 'trolley',
+    title: 'Trolley',
+    blurb: 'Increasingly unreasonable dilemmas',
+    description:
+      'A runaway trolley, a lever, and a series of choices that get less defensible every time. See how your answers compare.',
+    accent: '#3d1f14', accent2: '#d97742', glyph: '🚋', art: 'tracks',
+    added: '2026-09-06',
+  },
+  {
+    slug: 'paper-folds',
+    title: 'Paper Folds',
+    blurb: 'Fold it enough and it reaches the Moon',
+    description:
+      'A sheet of paper is a tenth of a millimetre thick. Fold it in half forty-two times and it reaches the Moon. Watch it happen.',
+    accent: '#43310f', accent2: '#c9a13f', glyph: '📄', art: 'fold',
+    added: '2026-09-05',
+  },
+  {
+    slug: 'ambient-mix',
+    title: 'Ambient Mix',
+    blurb: 'Build a soundscape, then ruin it',
+    description:
+      'Rain, waves, a coffee shop, a distant lawnmower. Layer them into something calming, or keep going until it is unbearable. Every sound is synthesised live.',
+    accent: '#132a3f', accent2: '#5a9fd4', glyph: '🎧', art: 'waves',
+    added: '2026-09-04',
+  },
+  {
+    slug: 'progress',
+    title: 'Progress',
+    blurb: 'Everything, ending, live',
+    description:
+      'How much of this minute, this year, this century is already gone. Updated every frame, which does not help.',
+    accent: '#2c1440', accent2: '#a86ede', glyph: '⏳', art: 'bars',
+    added: '2026-09-03',
+  },
+  {
+    // Deliberately not brand logos: reproducing trademarks is a bad default for
+    // a site anyone can clone, and everyday objects are a better test anyway.
+    slug: 'from-memory',
+    title: 'From Memory',
+    blurb: 'Draw things you have seen a thousand times',
+    description:
+      'You have looked at a bicycle every day of your life. Draw one without looking, then see the real thing. It goes badly for almost everyone.',
+    accent: '#3b1338', accent2: '#e0629b', glyph: '🎨', art: 'sketch',
+    added: '2026-09-02',
+  },
+  {
+    slug: 'life-in-weeks',
+    title: 'Life in Weeks',
+    blurb: 'Your whole life on one screen',
+    description:
+      'Every week you have lived, and every week you probably have left, as a single grid of small squares. It fits on one screen. That is the point.',
+    accent: '#1b1f2e', accent2: '#8fa2c4', glyph: '🗓️', art: 'grid',
+    added: '2026-09-01',
+  },
+]
+
+export const listedGames = () => GAMES.filter((g) => !g.unlisted)
+export const gameBySlug = (slug: string) => GAMES.find((g) => g.slug === slug)

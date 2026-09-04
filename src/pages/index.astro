@@ -1,0 +1,128 @@
+---
+import Base from '../layouts/Base.astro'
+import GameTile from '../components/GameTile.astro'
+import AdSlot from '../components/AdSlot.astro'
+import { SITE } from '../site.config'
+import { listedGames } from '../data/games'
+
+// Newest first, the same ordering neal.fun uses.
+const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
+---
+
+<Base title={SITE.name} description={SITE.description}>
+  <div class="wrap">
+    <header class="masthead">
+      <h1 class="wordmark">{SITE.name}</h1>
+      <p class="tagline">{SITE.tagline}</p>
+    </header>
+
+    <main id="main">
+      <h2 class="visually-hidden">All games</h2>
+      <div class="grid">
+        {games.map((game, i) => <GameTile game={game} index={i} />)}
+      </div>
+    </main>
+
+    <script>
+      import { sfx, unlock } from '../lib/audio'
+      // A soft blip on hover, pitched by position in the grid, so running the
+      // cursor across the page plays a little scale.
+      document.querySelectorAll<HTMLAnchorElement>('.tile').forEach((t, i) => {
+        t.addEventListener('pointerenter', () => sfx.blip(i % 10))
+        t.addEventListener('click', () => sfx.pop(i % 8))
+      })
+      addEventListener('pointerdown', unlock, { once: true, capture: true })
+      addEventListener('keydown', unlock, { once: true, capture: true })
+    </script>
+
+    <section class="about">
+      <p class="about-lead">Hi. This is where I make things for the web.</p>
+      <p class="about-sub">
+        Everything here is free, works without an account, and fits on one page.
+      </p>
+      <div class="links">
+        <button type="button" class="btn" id="lucky">Surprise me</button>
+        {SITE.social.twitter && <a class="btn" href={SITE.social.twitter}>Twitter</a>}
+        {SITE.social.instagram && <a class="btn" href={SITE.social.instagram}>Instagram</a>}
+        {SITE.social.newsletter && <a class="btn" href={SITE.social.newsletter}>Newsletter</a>}
+        <a class="btn" href={`mailto:${SITE.email}`}>Say hello</a>
+      </div>
+    </section>
+
+    <AdSlot slot="" />
+
+    <script>
+      // "Surprise me" is the neal.fun move: no menus, just take me somewhere.
+      const tiles = [...document.querySelectorAll<HTMLAnchorElement>('.tile')]
+      document.getElementById('lucky')?.addEventListener('click', () => {
+        const t = tiles[(Math.random() * tiles.length) | 0]
+        if (t) location.href = t.getAttribute('href')!
+      })
+    </script>
+
+    <footer class="foot">
+      <span>{games.length} things to play</span>
+      <span aria-hidden="true">·</span>
+      <span>Built to be beautiful and fast</span>
+    </footer>
+  </div>
+</Base>
+
+<style>
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 22px 72px; }
+
+  .masthead { text-align: center; margin-bottom: 46px; }
+  .wordmark {
+    font-size: clamp(38px, 7vw, 62px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin: 0;
+  }
+  .tagline {
+    font-size: clamp(15px, 2vw, 18px);
+    color: var(--ink-soft);
+    margin: 10px 0 0;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+  @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 660px) { .grid { grid-template-columns: 1fr; gap: 14px; } }
+
+  .about {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-top: 40px;
+    padding: 34px 24px 30px;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+  }
+  .about-lead { font-size: 21px; margin: 0; font-weight: 500; }
+  .about-sub { color: var(--ink-soft); margin: 8px 0 0; font-size: 15.5px; }
+
+  .links { display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  .btn {
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: 9px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    background: var(--card);
+    transition: transform 140ms var(--ease), box-shadow 140ms var(--ease), border-color 140ms var(--ease);
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+    border-color: var(--ink);
+  }
+
+  .foot {
+    display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 34px; color: var(--ink-faint); font-size: 13.5px;
+  }
+</style>

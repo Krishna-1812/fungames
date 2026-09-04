@@ -1,0 +1,576 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Powder - a falling-sand sandbox.
+ *
+ * A cellular automaton over typed arrays, rendered straight into an ImageData
+ * buffer. Nothing here is scripted: oil floats on water because it is lighter,
+ * fire makes steam because it met water, and glass appears because sand met
+ * lava. All of the interesting behaviour is emergent from about forty local
+ * rules, which is why it stays interesting after the novelty wears off.
+ */
+---
+
+<GameLayout slug="powder" bar="#12100f" fixed bodyClass="powder-body">
+  <div class="stage">
+    <h1 class="visually-hidden">Powder</h1>
+
+    <div class="canvas-wrap" id="wrap">
+      <canvas id="sim" aria-label="Falling sand simulation"></canvas>
+      <div class="hint" id="hint">Draw with the mouse. Try dropping lava on ice.</div>
+    </div>
+
+    <aside class="panel">
+      <div class="palette" id="palette" role="radiogroup" aria-label="Material"></div>
+      <div class="controls">
+        <label class="brush">
+          <span>Brush</span>
+          <input id="brush" type="range" min="1" max="18" value="5" aria-label="Brush size" />
+          <b id="brushVal">5</b>
+        </label>
+        <div class="btns">
+          <button type="button" id="pauseBtn" class="ctl">Pause</button>
+          <button type="button" id="clearBtn" class="ctl">Clear</button>
+        </div>
+        <div class="btns">
+          <button type="button" id="rainBtn" class="ctl">Rain</button>
+          <button type="button" id="quakeBtn" class="ctl">Meteor</button>
+        </div>
+        <p class="stat"><b id="count">0</b> particles &middot; <b id="fps">0</b> fps</p>
+      </div>
+    </aside>
+  </div>
+</GameLayout>
+
+<script>
+  import { sfx, unlock } from '../lib/audio'
+  import { burst, ring, shake } from '../lib/fx'
+
+  const EMPTY = 0, SAND = 1, WATER = 2, STONE = 3, WOOD = 4, FIRE = 5,
+        SMOKE = 6, STEAM = 7, OIL = 8, LAVA = 9, ICE = 10, PLANT = 11,
+        ACID = 12, POWDER = 13, GLASS = 14, EMBER = 15
+
+  type Def = {
+    id: number; name: string; type: number; density: number
+    rgb: [number, number, number]; vary: number
+    life?: number; flammable?: boolean; hint?: string
+  }
+
+  // type: 0 static, 1 powder, 2 liquid, 3 gas. Density decides who sinks.
+  const DEFS: Def[] = [
+    { id: SAND,   name: 'Sand',      type: 1, density: 6, rgb: [214, 180, 104], vary: 22 },
+    { id: WATER,  name: 'Water',     type: 2, density: 3, rgb: [58, 122, 214],  vary: 14 },
+    { id: STONE,  name: 'Stone',     type: 0, density: 9, rgb: [124, 124, 132], vary: 16 },
+    { id: WOOD,   name: 'Wood',      type: 0, density: 9, rgb: [128, 84, 48],   vary: 16, flammable: true },
+    { id: PLANT,  name: 'Plant',     type: 0, density: 9, rgb: [66, 168, 74],   vary: 22, flammable: true, hint: 'Drinks water and spreads' },
+    { id: OIL,    name: 'Oil',       type: 2, density: 2, rgb: [74, 58, 42],    vary: 12, flammable: true, hint: 'Floats on water, burns fast' },
+    { id: LAVA,   name: 'Lava',      type: 2, density: 7, rgb: [232, 96, 24],   vary: 26, hint: 'Melts ice, burns wood, turns sand to glass' },
+    { id: ICE,    name: 'Ice',       type: 0, density: 9, rgb: [168, 218, 240], vary: 14, hint: 'Slowly freezes water beside it' },
+    { id: ACID,   name: 'Acid',      type: 2, density: 3, rgb: [150, 232, 40],  vary: 18, hint: 'Dissolves nearly anything, and itself' },
+    { id: POWDER, name: 'Gunpowder', type: 1, density: 6, rgb: [64, 62, 68],    vary: 14, flammable: true, hint: 'Do not put this near fire' },
+    { id: FIRE,   name: 'Fire',      type: 3, density: 0, rgb: [255, 150, 40],  vary: 40, life: 46 },
+    { id: GLASS,  name: 'Glass',     type: 0, density: 9, rgb: [186, 226, 232], vary: 10 },
+  ]
+
+  // Materials you cannot draw - they only exist as the result of a reaction.
+  const EXTRA: Def[] = [
+    { id: SMOKE, name: 'Smoke', type: 3, density: 0, rgb: [110, 110, 116], vary: 18, life: 130 },
+    { id: STEAM, name: 'Steam', type: 3, density: 0, rgb: [198, 210, 222], vary: 14, life: 170 },
+    { id: EMBER, name: 'Ember', type: 1, density: 6, rgb: [226, 78, 30],   vary: 30, life: 120 },
+  ]
+
+  const TYPE = new Uint8Array(32)
+  const DENS = new Uint8Array(32)
+  const FLAM = new Uint8Array(32)
+  const LIFE0 = new Uint16Array(32)
+  const PAL = new Uint8Array(32 * 3)
+  const VARY = new Uint8Array(32)
+  for (const d of [...DEFS, ...EXTRA]) {
+    TYPE[d.id] = d.type
+    DENS[d.id] = d.density
+    FLAM[d.id] = d.flammable ? 1 : 0
+    LIFE0[d.id] = d.life ?? 0
+    PAL[d.id * 3] = d.rgb[0]; PAL[d.id * 3 + 1] = d.rgb[1]; PAL[d.id * 3 + 2] = d.rgb[2]
+    VARY[d.id] = d.vary
+  }
+  DENS[EMPTY] = 1
+  TYPE[EMPTY] = 3
+
+  const canvas = document.getElementById('sim') as HTMLCanvasElement
+  const ctx = canvas.getContext('2d', { alpha: false })!
+  const wrap = document.getElementById('wrap') as HTMLElement
+  const CELL = 4
+  let W = 0, H = 0
+  let grid = new Uint8Array(0), life = new Uint8Array(0)
+  let shade = new Uint8Array(0), moved = new Uint8Array(0)
+  let img: ImageData, buf32: Uint32Array
+
+  function build() {
+    const r = wrap.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8) return false
+    W = Math.max(80, Math.min(340, Math.floor(r.width / CELL)))
+    H = Math.max(60, Math.min(250, Math.floor(r.height / CELL)))
+    canvas.width = W
+    canvas.height = H
+    grid = new Uint8Array(W * H)
+    life = new Uint8Array(W * H)
+    shade = new Uint8Array(W * H)
+    moved = new Uint8Array(W * H)
+    img = ctx.createImageData(W, H)
+    buf32 = new Uint32Array(img.data.buffer)
+    ctx.imageSmoothingEnabled = false
+    return true
+  }
+
+  const idx = (x: number, y: number) => y * W + x
+  const inside = (x: number, y: number) => x >= 0 && x < W && y >= 0 && y < H
+
+  function put(x: number, y: number, el: number) {
+    if (!inside(x, y)) return
+    const i = idx(x, y)
+    grid[i] = el
+    life[i] = LIFE0[el] ? Math.min(255, LIFE0[el]) : 0
+    shade[i] = (Math.random() * 255) | 0
+  }
+
+  function swap(a: number, b: number) {
+    const g = grid[a]; grid[a] = grid[b]; grid[b] = g
+    const l = life[a]; life[a] = life[b]; life[b] = l
+    const s = shade[a]; shade[a] = shade[b]; shade[b] = s
+    moved[a] = 1; moved[b] = 1
+  }
+
+  const N4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+
+  function explode(x: number, y: number, r: number) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue
+        const nx = x + dx, ny = y + dy
+        if (!inside(nx, ny)) continue
+        const g = grid[idx(nx, ny)]
+        if (g === STONE || g === GLASS) { if (Math.random() < 0.5) put(nx, ny, EMPTY); continue }
+        put(nx, ny, Math.random() < 0.75 ? FIRE : SMOKE)
+      }
+    }
+  }
+
+  let bangs = 0
+
+  /** Returns true when the cell was consumed and must not also move. */
+  function react(x: number, y: number, i: number, el: number): boolean {
+    if (el === FIRE || el === EMBER) {
+      for (const [dx, dy] of N4) {
+        const nx = x + dx, ny = y + dy
+        if (!inside(nx, ny)) continue
+        const j = idx(nx, ny)
+        const n = grid[j]
+        if (n === WATER) { put(x, y, STEAM); return true }
+        if (n === POWDER) { bangs++; explode(nx, ny, 9); return true }
+        if (n === ICE) { put(nx, ny, WATER); continue }
+        if (FLAM[n] && Math.random() < (n === OIL ? 0.34 : 0.09)) put(nx, ny, n === WOOD ? EMBER : FIRE)
+      }
+      if (life[i] > 0) { life[i]--; return false }
+      put(x, y, Math.random() < 0.7 ? SMOKE : EMPTY)
+      return true
+    }
+
+    if (el === LAVA) {
+      for (const [dx, dy] of N4) {
+        const nx = x + dx, ny = y + dy
+        if (!inside(nx, ny)) continue
+        const n = grid[idx(nx, ny)]
+        if (n === WATER) {
+          put(nx, ny, STEAM)
+          // Quenched lava becomes rock - this is how islands form here.
+          if (Math.random() < 0.45) { put(x, y, STONE); return true }
+        } else if (n === ICE) put(nx, ny, WATER)
+        else if (n === SAND) { if (Math.random() < 0.12) put(nx, ny, GLASS) }
+        else if (n === POWDER) { bangs++; explode(nx, ny, 10); return true }
+        else if (FLAM[n] && Math.random() < 0.16) put(nx, ny, FIRE)
+      }
+      return false
+    }
+
+    if (el === WATER) {
+      for (const [dx, dy] of N4) {
+        const nx = x + dx, ny = y + dy
+        if (!inside(nx, ny)) continue
+        const n = grid[idx(nx, ny)]
+        // Plants drink, which is what turns a puddle into a thicket.
+        if (n === PLANT && Math.random() < 0.006) { put(x, y, PLANT); return true }
+        if (n === FIRE || n === EMBER) { put(x, y, STEAM); return true }
+        if (n === ICE && Math.random() < 0.0016) { put(x, y, ICE); return true }
+      }
+      return false
+    }
+
+    if (el === ICE) {
+      for (const [dx, dy] of N4) {
+        const nx = x + dx, ny = y + dy
+        if (!inside(nx, ny)) continue
+        const n = grid[idx(nx, ny)]
+        if (n === FIRE || n === LAVA || n === EMBER) { put(x, y, WATER); return true }
+      }
+      return false
+    }
+
+    if (el === ACID) {
+      for (const [dx, dy] of N4) {
+        const nx = x + dx, ny = y + dy
+        if (!inside(nx, ny)) continue
+        const n = grid[idx(nx, ny)]
+        if (n === EMPTY || n === ACID || n === SMOKE || n === STEAM) continue
+        if (Math.random() < 0.14) {
+          put(nx, ny, EMPTY)
+          // Acid is spent as it eats, so a splash cannot erase the whole world.
+          if (Math.random() < 0.35) { put(x, y, SMOKE); return true }
+        }
+      }
+      return false
+    }
+
+    if (el === POWDER) {
+      for (const [dx, dy] of N4) {
+        const nx = x + dx, ny = y + dy
+        if (!inside(nx, ny)) continue
+        const n = grid[idx(nx, ny)]
+        if (n === FIRE || n === LAVA || n === EMBER) { bangs++; explode(x, y, 9); return true }
+      }
+      return false
+    }
+
+    if (el === SMOKE || el === STEAM) {
+      if (life[i] > 0) { life[i]--; return false }
+      put(x, y, el === STEAM && Math.random() < 0.45 ? WATER : EMPTY)
+      return true
+    }
+
+    return false
+  }
+
+  let frame = 0
+
+  function step() {
+    moved.fill(0)
+    const leftFirst = (frame & 1) === 0
+
+    for (let y = H - 1; y >= 0; y--) {
+      for (let k = 0; k < W; k++) {
+        const x = leftFirst ? k : W - 1 - k
+        const i = idx(x, y)
+        const el = grid[i]
+        if (el === EMPTY || moved[i]) continue
+        if (react(x, y, i, el)) continue
+
+        const t = TYPE[el]
+        if (t === 0) continue
+
+        if (t === 3) {
+          const up = y - 1
+          if (up >= 0 && grid[idx(x, up)] === EMPTY) { swap(i, idx(x, up)); continue }
+          const d = Math.random() < 0.5 ? -1 : 1
+          if (inside(x + d, y - 1) && grid[idx(x + d, y - 1)] === EMPTY) { swap(i, idx(x + d, y - 1)); continue }
+          if (inside(x + d, y) && grid[idx(x + d, y)] === EMPTY) { swap(i, idx(x + d, y)) }
+          continue
+        }
+
+        // Powders and liquids sink through anything lighter than themselves.
+        const below = y + 1
+        if (below < H && DENS[grid[idx(x, below)]] < DENS[el]) { swap(i, idx(x, below)); continue }
+
+        const dir = Math.random() < 0.5 ? -1 : 1
+        let slid = false
+        for (const d of [dir, -dir]) {
+          const nx = x + d
+          if (below < H && inside(nx, below) && DENS[grid[idx(nx, below)]] < DENS[el]) {
+            swap(i, idx(nx, below)); slid = true; break
+          }
+        }
+        if (slid) continue
+
+        if (t === 2) {
+          // Sideways spread is what makes a liquid find its own level.
+          for (const d of [dir, -dir]) {
+            const nx = x + d
+            if (!inside(nx, y)) continue
+            const j = idx(nx, y)
+            if (grid[j] === EMPTY || DENS[grid[j]] < DENS[el] - 1) { swap(i, j); break }
+          }
+        }
+      }
+    }
+  }
+
+  function draw() {
+    let alive = 0
+    for (let i = 0; i < grid.length; i++) {
+      const el = grid[i]
+      if (el === EMPTY) { buf32[i] = 0xff0d0e10; continue }
+      alive++
+      const v = (shade[i] / 255 - 0.5) * VARY[el]
+      let r = PAL[el * 3] + v, g = PAL[el * 3 + 1] + v, b = PAL[el * 3 + 2] + v
+      if (el === FIRE || el === EMBER) {
+        // Flames visibly cool as they burn down.
+        const t = life[i] / (LIFE0[el] || 1)
+        g *= 0.35 + t * 0.65
+        b *= t * 0.6
+      }
+      buf32[i] = (255 << 24) |
+        (Math.max(0, Math.min(255, b | 0)) << 16) |
+        (Math.max(0, Math.min(255, g | 0)) << 8) |
+        Math.max(0, Math.min(255, r | 0))
+    }
+    ctx.putImageData(img, 0, 0)
+    return alive
+  }
+
+  let paused = false
+  let raining = false
+  let lastFps = performance.now()
+  let fpsFrames = 0
+  const countEl = document.getElementById('count')!
+  const fpsEl = document.getElementById('fps')!
+
+  function tick() {
+    if (!paused && W) {
+      if (raining) for (let n = 0; n < 3; n++) put((Math.random() * W) | 0, 0, WATER)
+      bangs = 0
+      step()
+      if (bangs > 0) {
+        // One sound per frame no matter how many cells detonated at once.
+        sfx.boom()
+        shake(document.body, Math.min(14, 4 + bangs), 320)
+        const r = canvas.getBoundingClientRect()
+        burst(r.left + r.width / 2, r.top + r.height / 2, {
+          count: 18, colors: ['#ff9a3c', '#ffd166'], speed: 6, gravity: 0.25, shape: 'streak', size: 3,
+        })
+      }
+      frame++
+    }
+    if (W) {
+      const alive = draw()
+      fpsFrames++
+      const now = performance.now()
+      if (now - lastFps > 500) {
+        fpsEl.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
+        countEl.textContent = alive.toLocaleString('en-US')
+        lastFps = now
+        fpsFrames = 0
+      }
+    }
+    requestAnimationFrame(tick)
+  }
+
+  let current = SAND
+  let brush = 5
+  let drawing = false
+  let lastCell: { x: number; y: number } | null = null
+  const hintEl = document.getElementById('hint')!
+
+  const palette = document.getElementById('palette')!
+  DEFS.forEach((d, n) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'mat'
+    b.dataset.id = String(d.id)
+    b.setAttribute('role', 'radio')
+    b.setAttribute('aria-checked', String(d.id === current))
+    b.title = d.hint || d.name
+    const sw = document.createElement('i')
+    sw.style.background = 'rgb(' + d.rgb.join(',') + ')'
+    const label = document.createElement('span')
+    label.textContent = d.name
+    b.append(sw, label)
+    b.addEventListener('click', () => {
+      current = d.id
+      unlock(); sfx.blip(n)
+      palette.querySelectorAll('.mat').forEach((m) =>
+        m.setAttribute('aria-checked', String(Number((m as HTMLElement).dataset.id) === current)))
+      hintEl.textContent = d.hint || ('Drawing ' + d.name.toLowerCase())
+      hintEl.classList.remove('faded')
+      clearTimeout(hintTimer)
+      hintTimer = window.setTimeout(() => hintEl.classList.add('faded'), 2600)
+    })
+    palette.appendChild(b)
+  })
+  let hintTimer = 0
+
+  function cellAt(e: PointerEvent) {
+    const r = canvas.getBoundingClientRect()
+    return {
+      x: Math.floor(((e.clientX - r.left) / r.width) * W),
+      y: Math.floor(((e.clientY - r.top) / r.height) * H),
+    }
+  }
+
+  function paint(cx: number, cy: number) {
+    const r = brush
+    const solid = current === STONE || current === WOOD || current === GLASS || current === ICE
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue
+        // Grains are sparse so pouring looks like pouring, not like stamping.
+        if (!solid && Math.random() < 0.3) continue
+        put(cx + dx, cy + dy, current)
+      }
+    }
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    unlock()
+    drawing = true
+    try { canvas.setPointerCapture(e.pointerId) } catch {}
+    const c = cellAt(e)
+    lastCell = c
+    paint(c.x, c.y)
+    hintEl.classList.add('faded')
+    e.preventDefault()
+  })
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drawing) return
+    const c = cellAt(e)
+    if (lastCell) {
+      // Interpolate, or a fast drag leaves a dotted line.
+      const steps = Math.max(Math.abs(c.x - lastCell.x), Math.abs(c.y - lastCell.y))
+      for (let s = 0; s <= steps; s++) {
+        const t = steps ? s / steps : 0
+        paint(Math.round(lastCell.x + (c.x - lastCell.x) * t), Math.round(lastCell.y + (c.y - lastCell.y) * t))
+      }
+    }
+    lastCell = c
+  })
+  const stop = () => { drawing = false; lastCell = null }
+  canvas.addEventListener('pointerup', stop)
+  canvas.addEventListener('pointercancel', stop)
+  canvas.addEventListener('pointerleave', stop)
+
+  const brushInput = document.getElementById('brush') as HTMLInputElement
+  brushInput.addEventListener('input', () => {
+    brush = Number(brushInput.value)
+    document.getElementById('brushVal')!.textContent = brushInput.value
+  })
+
+  document.getElementById('pauseBtn')!.addEventListener('click', (e) => {
+    paused = !paused
+    ;(e.currentTarget as HTMLButtonElement).textContent = paused ? 'Resume' : 'Pause'
+    unlock(); sfx.click()
+  })
+  document.getElementById('clearBtn')!.addEventListener('click', () => {
+    grid.fill(EMPTY); life.fill(0)
+    unlock(); sfx.whoosh()
+  })
+  document.getElementById('rainBtn')!.addEventListener('click', (e) => {
+    raining = !raining
+    ;(e.currentTarget as HTMLButtonElement).classList.toggle('on', raining)
+    unlock()
+    if (raining) sfx.fizz(); else sfx.click()
+  })
+  document.getElementById('quakeBtn')!.addEventListener('click', () => {
+    unlock(); sfx.boom(); shake(document.body, 12, 420)
+    const cx = ((0.25 + Math.random() * 0.5) * W) | 0
+    for (let i = 0; i < 26; i++) {
+      const x = cx + (((Math.random() - 0.5) * 20) | 0)
+      for (let y = 0; y < 8; y++) put(x, y, Math.random() < 0.6 ? LAVA : STONE)
+    }
+    const r = canvas.getBoundingClientRect()
+    const px = r.left + (cx / W) * r.width
+    burst(px, r.top + 20, { count: 40, colors: ['#ff9a3c', '#ffd166', '#e8501e'], speed: 7, gravity: 0.3, shape: 'streak', size: 3 })
+    ring(px, r.top + 20, '#ffb347', 26)
+  })
+
+  function seed() {
+    for (let x = 0; x < W; x++) {
+      const h = 4 + Math.round(3 * Math.sin(x / 9))
+      for (let y = H - h; y < H; y++) put(x, y, STONE)
+    }
+    for (let x = (W * 0.14) | 0; x < (W * 0.34) | 0; x++)
+      for (let y = H - 22; y < H - 8; y++) put(x, y, WATER)
+    for (let x = (W * 0.62) | 0; x < (W * 0.74) | 0; x++)
+      for (let y = H - 26; y < H - 8; y++) put(x, y, SAND)
+  }
+
+
+  // Lay out immediately where possible; rAF is paused in background tabs, so a
+  // ResizeObserver covers the case where the element has no size yet.
+  if (build()) seed()
+  else if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => { if (build()) { seed(); ro.disconnect() } })
+    ro.observe(wrap)
+  }
+  let resizeT = 0
+  addEventListener('resize', () => {
+    clearTimeout(resizeT)
+    resizeT = window.setTimeout(() => { if (build()) seed() }, 200)
+  })
+  tick()
+</script>
+
+<style is:global>
+  .powder-body { background: #0d0e10; color: #eee9e3; }
+
+  .powder-body .stage { display: flex; height: 100%; }
+  .powder-body .canvas-wrap { position: relative; flex: 1; min-width: 0; background: #0d0e10; }
+  .powder-body canvas {
+    width: 100%; height: 100%; display: block;
+    image-rendering: pixelated; touch-action: none; cursor: crosshair;
+  }
+  .powder-body .hint {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.72); padding: 7px 16px; border-radius: 999px;
+    font-size: 13px; pointer-events: none; transition: opacity 500ms var(--ease);
+    max-width: 90%; text-align: center;
+  }
+  .powder-body .hint.faded { opacity: 0; }
+
+  .powder-body .panel {
+    width: 218px; flex: none; display: flex; flex-direction: column;
+    background: #1a1715; border-left: 1px solid #2c2724; overflow-y: auto;
+  }
+  .powder-body .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 10px; }
+  .powder-body .mat {
+    display: flex; align-items: center; gap: 7px;
+    background: #241f1c; border: 1px solid #322c28; color: #eee9e3;
+    border-radius: 9px; padding: 7px 8px; font-size: 12.5px; cursor: pointer;
+    transition: border-color 140ms var(--ease), background 140ms var(--ease);
+    text-align: left;
+  }
+  .powder-body .mat:hover { background: #2e2723; }
+  .powder-body .mat[aria-checked='true'] { border-color: #e8a75c; background: #33291f; }
+  .powder-body .mat i { width: 13px; height: 13px; border-radius: 3px; flex: none; display: block; }
+
+  .powder-body .controls { padding: 4px 10px 14px; display: grid; gap: 9px; }
+  .powder-body .brush { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #bdb3ab; }
+  .powder-body .brush input { flex: 1; min-width: 0; }
+  .powder-body .brush b { font-variant-numeric: tabular-nums; width: 18px; text-align: right; }
+  .powder-body .btns { display: flex; gap: 6px; }
+  .powder-body .ctl {
+    flex: 1; background: #241f1c; border: 1px solid #322c28; color: #eee9e3;
+    border-radius: 9px; padding: 8px 6px; font-size: 12.5px; cursor: pointer;
+    transition: background 140ms var(--ease);
+  }
+  .powder-body .ctl:hover { background: #322b26; }
+  .powder-body .ctl.on { background: #33291f; border-color: #e8a75c; }
+  .powder-body .stat { font-size: 11.5px; color: #a1968e; margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+  .powder-body .stat b { color: #d3c8c0; }
+
+  .powder-body input[type='range'] {
+    -webkit-appearance: none; appearance: none; height: 4px;
+    border-radius: 3px; background: #3a322d; outline: none;
+  }
+  .powder-body input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: #e8a75c; cursor: pointer; border: 0;
+  }
+  .powder-body input[type='range']::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; background: #e8a75c; cursor: pointer; border: 0;
+  }
+
+
+  @media (max-width: 760px) {
+    .powder-body .stage { flex-direction: column; }
+    .powder-body .panel { width: auto; height: 44%; border-left: 0; border-top: 1px solid #2c2724; }
+    .powder-body .palette { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>

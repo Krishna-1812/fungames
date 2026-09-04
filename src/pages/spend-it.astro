@@ -1,0 +1,371 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Spend It — the resource-disposal archetype.
+ *
+ * The joke only lands if the numbers are real, so prices are researched
+ * ballpark figures rather than round invented ones, and the budget is large
+ * enough that buying every single item still leaves money behind. The player
+ * has to actively try to get to zero.
+ */
+
+type Item = { name: string; price: number; glyph: string }
+
+const ITEMS: Item[] = [
+  { name: 'Big Mac', price: 6, glyph: '🍔' },
+  { name: 'Latte', price: 5, glyph: '☕' },
+  { name: 'Cinema ticket', price: 15, glyph: '🎟️' },
+  { name: 'Hardback book', price: 25, glyph: '📚' },
+  { name: 'Video game', price: 70, glyph: '🎮' },
+  { name: 'Concert ticket', price: 180, glyph: '🎫' },
+  { name: 'Camera drone', price: 450, glyph: '🛸' },
+  { name: 'Smartphone', price: 1_000, glyph: '📱' },
+  { name: 'Laptop', price: 2_400, glyph: '💻' },
+  { name: 'Grand piano', price: 7_500, glyph: '🎹' },
+  { name: 'Motorcycle', price: 9_000, glyph: '🏍️' },
+  { name: 'Diamond ring', price: 18_000, glyph: '💍' },
+  { name: 'Electric car', price: 42_000, glyph: '🚗' },
+  { name: 'Sports car', price: 95_000, glyph: '🏎️' },
+  { name: 'Racehorse', price: 250_000, glyph: '🐎' },
+  { name: 'Family home', price: 400_000, glyph: '🏠' },
+  { name: 'Beach villa', price: 1_500_000, glyph: '🏖️' },
+  { name: 'Superyacht', price: 4_000_000, glyph: '🛥️' },
+  { name: 'Formula 1 car', price: 9_000_000, glyph: '🏁' },
+  { name: 'Private jet', price: 25_000_000, glyph: '🛩️' },
+  { name: 'A Van Gogh', price: 60_000_000, glyph: '🖼️' },
+  { name: 'Skyscraper', price: 120_000_000, glyph: '🏢' },
+  { name: 'Boeing 787', price: 250_000_000, glyph: '✈️' },
+  { name: 'Cruise ship', price: 600_000_000, glyph: '🛳️' },
+  { name: 'Football club', price: 1_000_000_000, glyph: '⚽' },
+  { name: 'Orbital rocket', price: 2_500_000_000, glyph: '🚀' },
+  { name: 'Nuclear submarine', price: 5_000_000_000, glyph: '⚓' },
+  { name: 'Aircraft carrier', price: 13_000_000_000, glyph: '🚢' },
+  { name: 'Mission to Mars', price: 20_000_000_000, glyph: '🪐' },
+  { name: 'A social network', price: 44_000_000_000, glyph: '🌐' },
+]
+
+const BUDGET = 100_000_000_000
+---
+
+<GameLayout slug="spend-it" bar="#0f3d3e" bodyClass="spend-body">
+  <div class="bar">
+    <div class="bar-inner">
+      <div class="money" id="money" aria-live="polite" aria-atomic="true">$100,000,000,000</div>
+      <div class="track"><div class="track-fill" id="trackFill"></div></div>
+      <div class="bar-actions">
+        <button type="button" id="receiptBtn" class="ghost">Receipt</button>
+        <button type="button" id="resetBtn" class="ghost">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <h1 class="title">Spend It</h1>
+    <p class="lede">
+      You have one hundred billion dollars. Buying one of everything costs about
+      ninety-seven billion, so getting to exactly zero is going to take some care.
+    </p>
+
+    <ul class="grid">
+      {
+        ITEMS.map((item, i) => (
+          <li class="item" data-price={item.price} data-name={item.name} data-i={i}>
+            <div class="glyph" aria-hidden="true">{item.glyph}</div>
+            <div class="name">{item.name}</div>
+            <div class="price">${item.price.toLocaleString('en-US')}</div>
+            <div class="controls">
+              <button type="button" class="sell" data-act="sell" aria-label={`Sell one ${item.name}`}>Sell</button>
+              <input
+                class="qty" type="text" inputmode="numeric" value="0"
+                aria-label={`Quantity of ${item.name}`}
+              />
+              <button type="button" class="buy" data-act="buy" aria-label={`Buy one ${item.name}`}>Buy</button>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+      <h2 id="receiptTitle">Your receipt</h2>
+      <ul class="lines" id="lines"></ul>
+      <div class="totals">
+        <span>Total spent</span>
+        <b id="spent">$0</b>
+      </div>
+      <div class="totals">
+        <span>Left over</span>
+        <b id="left">$100,000,000,000</b>
+      </div>
+      <div class="sheet-actions">
+        <button type="button" data-share data-title="Spend It">Share</button>
+        <button type="button" id="closeSheet" class="ghost">Keep spending</button>
+      </div>
+    </div>
+  </div>
+</GameLayout>
+
+  {/* Data for the module below: modules cannot take define:vars, and
+      modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ BUDGET })} />
+
+  <script>
+  import { burst, floatText } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+    const { BUDGET } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  const money = document.getElementById('money')
+  const trackFill = document.getElementById('trackFill')
+  const sheet = document.getElementById('sheet')
+  const lines = document.getElementById('lines')
+  const spentEl = document.getElementById('spent')
+  const leftEl = document.getElementById('left')
+  const items = [...document.querySelectorAll('.item')].map((el) => ({
+    el,
+    price: Number(el.dataset.price),
+    name: el.dataset.name,
+    input: el.querySelector('.qty'),
+    sell: el.querySelector('.sell'),
+    n: 0,
+  }))
+
+  const KEY = 'spend-it:v1'
+  const usd = (n) => '$' + Math.round(n).toLocaleString('en-US')
+
+  function balance() {
+    return BUDGET - items.reduce((a, it) => a + it.n * it.price, 0)
+  }
+
+  let flashTimer
+  function render(flash) {
+    const left = balance()
+    money.textContent = usd(left)
+    money.classList.toggle('low', left < BUDGET * 0.1)
+    trackFill.style.width = `${(1 - left / BUDGET) * 100}%`
+
+    for (const it of items) {
+      if (document.activeElement !== it.input) it.input.value = String(it.n)
+      it.el.classList.toggle('owned', it.n > 0)
+      it.sell.disabled = it.n === 0
+      // Grey out what can no longer be afforded, so the endgame is legible.
+      it.el.classList.toggle('unaffordable', it.price > left && it.n === 0)
+    }
+
+    if (flash) {
+      money.classList.remove('flash-buy', 'flash-sell')
+      void money.offsetWidth
+      money.classList.add(flash === 'buy' ? 'flash-buy' : 'flash-sell')
+      clearTimeout(flashTimer)
+      flashTimer = setTimeout(() => money.classList.remove('flash-buy', 'flash-sell'), 320)
+    }
+    save()
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(items.map((i) => i.n))) } catch {}
+  }
+  function load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEY) || 'null')
+      if (Array.isArray(raw) && raw.length === items.length) {
+        raw.forEach((n, i) => (items[i].n = Math.max(0, Math.floor(Number(n) || 0))))
+      }
+    } catch {}
+  }
+
+  let comboAt = 0
+  let combo = 0
+
+  function change(it, delta) {
+    if (delta > 0) {
+      // Never allow the balance to go negative, and buy as many as will fit.
+      const affordable = Math.floor(balance() / it.price)
+      if (affordable < 1) return render()
+      const got = Math.min(delta, affordable)
+      it.n += got
+      unlock()
+      // Rapid buying builds a rising run of notes instead of one flat click.
+      const now = performance.now()
+      combo = now - comboAt < 480 ? Math.min(combo + 1, 11) : 0
+      comboAt = now
+      sfx.pop(combo)
+      const r = it.el.getBoundingClientRect()
+      floatText(r.left + r.width / 2, r.top + 24, '-' + usd(got * it.price), '#0f3d3e')
+      burst(r.left + r.width / 2, r.top + 30, {
+        count: 8, colors: ['#63c9a4', '#0f3d3e'], speed: 2.6, gravity: 0.2, life: 26, size: 3,
+      })
+    } else {
+      it.n = Math.max(0, it.n + delta)
+      unlock(); sfx.blip(2)
+    }
+    render(delta > 0 ? 'buy' : 'sell')
+  }
+
+  for (const it of items) {
+    it.el.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-act]')
+      if (!btn) return
+      // Shift buys or sells ten at a time — the only way to finish this game.
+      const step = e.shiftKey ? 10 : 1
+      change(it, btn.dataset.act === 'buy' ? step : -step)
+    })
+    it.input.addEventListener('input', () => {
+      const want = Math.max(0, Math.floor(Number(it.input.value.replace(/\D/g, '')) || 0))
+      const others = BUDGET - balance() - it.n * it.price
+      const max = Math.floor((BUDGET - others) / it.price)
+      it.n = Math.min(want, max)
+      render()
+    })
+    it.input.addEventListener('blur', () => render())
+  }
+
+  document.getElementById('receiptBtn').addEventListener('click', () => {
+    unlock(); sfx.good()
+    const bought = items.filter((i) => i.n > 0)
+    lines.replaceChildren(
+      ...(bought.length
+        ? bought.map((i) => {
+            const li = document.createElement('li')
+            li.innerHTML =
+              `<span class="l-name">${i.name}</span>` +
+              `<span class="l-qty">×${i.n.toLocaleString('en-US')}</span>` +
+              `<span class="l-sum">${usd(i.n * i.price)}</span>`
+            return li
+          })
+        : [Object.assign(document.createElement('li'), { className: 'empty', textContent: 'You have not bought anything yet.' })])
+    )
+    spentEl.textContent = usd(BUDGET - balance())
+    leftEl.textContent = usd(balance())
+    sheet.hidden = false
+  })
+
+  const close = () => (sheet.hidden = true)
+  document.getElementById('closeSheet').addEventListener('click', close)
+  sheet.addEventListener('click', (e) => { if (e.target === sheet) close() })
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') close() })
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (!confirm('Give all of it back?')) return
+    items.forEach((i) => (i.n = 0))
+    render()
+  })
+
+  load()
+  render()
+</script>
+
+<style is:global>
+  /* Receipt lines are built at runtime, so these rules cannot be scoped. */
+  .spend-body { background: #f2f6f4; }
+
+  .bar {
+    position: sticky; top: 48px; z-index: 30;
+    background: rgba(242, 246, 244, 0.92);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .bar-inner {
+    max-width: 1120px; margin: 0 auto; padding: 12px 22px 14px;
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center;
+  }
+  .money {
+    font-family: var(--display);
+    font-size: clamp(24px, 4.4vw, 40px);
+    font-weight: 800; letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: #0f3d3e;
+    transition: color 160ms var(--ease);
+  }
+  .money.low { color: #b8442c; }
+  .money.flash-buy { animation: pulseDown 320ms var(--ease); }
+  .money.flash-sell { animation: pulseUp 320ms var(--ease); }
+  @keyframes pulseDown { 0% { transform: translateY(-4px); opacity: 0.55; } }
+  @keyframes pulseUp { 0% { transform: translateY(4px); opacity: 0.55; } }
+
+  .track { grid-column: 1 / -1; height: 4px; background: #d8e4df; border-radius: 3px; overflow: hidden; }
+  .track-fill { height: 100%; width: 0; background: linear-gradient(90deg, #63c9a4, #0f3d3e); transition: width 200ms var(--ease); }
+  .bar-actions { display: flex; gap: 8px; }
+  .ghost {
+    background: #fff; border: 1px solid var(--line-strong); border-radius: 999px;
+    padding: 7px 15px; font-size: 13.5px; cursor: pointer;
+    transition: border-color 140ms var(--ease), transform 140ms var(--ease);
+  }
+  .ghost:hover { border-color: #0f3d3e; transform: translateY(-1px); }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 30px 22px 90px; }
+  .title { font-size: clamp(30px, 5vw, 46px); }
+  .lede { color: var(--ink-soft); max-width: 56ch; margin: 10px 0 30px; }
+
+  .grid {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  }
+  .item {
+    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 14px 14px; text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease), opacity 160ms var(--ease);
+  }
+  .item.owned { border-color: #63c9a4; box-shadow: 0 0 0 3px rgba(99, 201, 164, 0.16); }
+  .item.unaffordable { opacity: 0.42; }
+  .glyph { font-size: 34px; line-height: 1; }
+  .item .name { font-weight: 600; margin-top: 8px; font-size: 15px; }
+  .item .price { color: var(--ink-soft); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+
+  .controls { display: flex; gap: 6px; margin-top: 12px; }
+  .controls button {
+    flex: 1; border: 0; border-radius: 8px; padding: 8px 0;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: filter 140ms var(--ease);
+  }
+  .controls button:hover:not(:disabled) { filter: brightness(1.08); }
+  .sell { background: #f0e2e2; color: #8d3a2a; }
+  .sell:disabled { background: #f1ecec; color: #6b6060; cursor: default; }
+  .buy { background: #0f3d3e; color: #fff; }
+  .qty {
+    width: 54px; text-align: center; border: 1px solid var(--line-strong);
+    border-radius: 8px; font-variant-numeric: tabular-nums; font-size: 14px; padding: 6px 2px;
+    background: #fff;
+  }
+
+  .sheet {
+    position: fixed; inset: 0; z-index: 80;
+    background: rgba(10, 24, 22, 0.5);
+    display: grid; place-items: center; padding: 20px;
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  }
+  .sheet[hidden] { display: none; }
+  .sheet-card {
+    background: #fff; border-radius: var(--radius-lg); padding: 26px 24px;
+    width: min(520px, 100%); max-height: 82vh; overflow: auto; box-shadow: var(--shadow-lg);
+  }
+  .sheet-card h2 { font-size: 26px; margin-bottom: 14px; }
+  .lines { list-style: none; margin: 0 0 16px; padding: 0; font-variant-numeric: tabular-nums; }
+  .lines li {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 12px;
+    padding: 7px 0; border-bottom: 1px dashed var(--line);
+    font-size: 14.5px;
+  }
+  .lines li.empty { display: block; color: var(--ink-soft); border: 0; }
+  .l-qty { color: var(--ink-soft); }
+  .l-sum { font-weight: 600; min-width: 96px; text-align: right; }
+  .totals {
+    display: flex; justify-content: space-between; padding: 8px 0;
+    font-variant-numeric: tabular-nums; border-top: 1px solid var(--line);
+  }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .sheet-actions button {
+    flex: 1; border: 0; border-radius: 999px; padding: 11px 0;
+    font-weight: 600; cursor: pointer; background: #0f3d3e; color: #fff;
+  }
+  .sheet-actions .ghost { background: #fff; color: var(--ink); border: 1px solid var(--line-strong); }
+
+  @media (max-width: 620px) {
+    .bar-inner { grid-template-columns: 1fr; }
+    .bar-actions { justify-content: flex-start; }
+  }
+</style>
