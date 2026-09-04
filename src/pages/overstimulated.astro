@@ -15,6 +15,12 @@ import GameLayout from '../layouts/GameLayout.astro'
 ---
 
 <GameLayout slug="overstimulated" bar="#12021f" fixed bodyClass="over-body">
+  {/* Deliberately a sibling of .world rather than a child. The world tilts and
+      shakes; a full-bleed element inside it would swing its own corners into
+      view. Keeping the room still while the furniture lurches is also the more
+      unpleasant of the two, which is the point. */}
+  <div class="oversky" id="oversky" aria-hidden="true"></div>
+
   <div class="world" id="world">
     <h1 class="visually-hidden">Overstimulated</h1>
 
@@ -53,6 +59,8 @@ import GameLayout from '../layouts/GameLayout.astro'
 <script>
   import { sfx, unlock, tone, hit, scaleFreq } from '../lib/audio'
   import { burst, floatText, prefersReducedMotion } from '../lib/fx'
+  import { ShaderSurface } from '../lib/gl'
+  import { OVER_FRAG } from '../lib/over-sky'
 
   const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
   const world = el('world')
@@ -66,6 +74,50 @@ import GameLayout from '../layouts/GameLayout.astro'
   const started = performance.now()
   const timers: number[] = []
   const owned = new Set<string>()
+
+  /* What the environment is driven by. 'load' chases the fraction owned rather
+     than snapping to it, so a purchase ramps the room up over a second or so
+     instead of switching a layer on. */
+  let load = 0
+  let beatAt = -10
+  let clickAt = -10
+  let rainbow = false
+  let calm = 0
+
+  /* Where the core column actually is, in the space centred() builds. Measured
+     from layout on resize rather than tracked per frame: the world shakes and
+     tilts, and a well that chased that would slosh about behind the text. */
+  let focus: [number, number] = [0, 0]
+  function measureFocus() {
+    const r = document.querySelector('.core')!.getBoundingClientRect()
+    const w = innerWidth, h = innerHeight, m = Math.min(w, h)
+    // Mirrors centredAt(): origin at the viewport centre, units of half the
+    // short axis, y upward.
+    focus = [(2 * (r.left + r.width / 2) - w) / m, (h - 2 * (r.top + r.height / 2)) / m]
+  }
+  measureFocus()
+  addEventListener('resize', measureFocus)
+
+  const sky = new ShaderSurface(document.getElementById('oversky')!, OVER_FRAG, {
+    // Every layer here is low frequency; three-quarter resolution costs nothing
+    // visible and leaves the frame budget to the DOM chaos on top.
+    scale: 0.75,
+    uniforms: () => ({
+      u_load: load,
+      u_click: prefersReducedMotion ? 0 : Math.max(0, 1 - (performance.now() - clickAt) / 260),
+      // Matched to the 7s hue-rotate the .has-rainbow class runs on .world, so
+      // the background and the foreground drift together rather than beating
+      // against each other.
+      // Driven by wall-clock rather than by u_time, so it needs its own guard:
+      // under reduced motion Colour still changes the palette, it just stops
+      // cycling through it.
+      u_hue: !rainbow ? 0 : prefersReducedMotion ? Math.PI * 0.55 : ((performance.now() / 7000) % 1) * Math.PI * 2,
+      u_calm: calm,
+      u_focus: focus,
+      u_motion: prefersReducedMotion ? 0 : 1,
+      u_beat: prefersReducedMotion ? 99 : (performance.now() - beatAt) / 1000,
+    }),
+  })
 
   type Up = {
     id: string
@@ -154,6 +206,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     const PATTERN = [0, 0, 3, 0, 5, 3, 0, -2]
     let beat = 0
     musicTimer = window.setInterval(() => {
+      beatAt = performance.now()
       const step = PATTERN[beat % PATTERN.length]
       tone({ freq: scaleFreq(step, 55), dur: 0.26, type: 'sawtooth', gain: 0.1, filter: 420 })
       if (beat % 2 === 0) hit({ dur: 0.06, gain: 0.14, freq: 180, type: 'lowpass' })
@@ -192,7 +245,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     { id: 'runner', name: 'Animals', note: 'Running across the screen', cost: 900,
       apply: () => { spawnRunner(); timers.push(window.setInterval(spawnRunner, 2200)) } },
     { id: 'rainbow', name: 'Colour', note: 'All of it', cost: 1200, rate: 25,
-      apply: () => world.classList.add('has-rainbow') },
+      apply: () => { world.classList.add('has-rainbow'); rainbow = true } },
     { id: 'swarm', name: 'Nineteen more cursors', note: 'They are all slightly behind yours', cost: 1700,
       apply: () => addCursors(19) },
     { id: 'tilt', name: 'A slow rotation', note: 'Of the entire page', cost: 2400,
@@ -263,6 +316,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     const now = performance.now()
     combo = now - comboAt < 700 ? Math.min(combo + 1, 12) : 0
     comboAt = now
+    clickAt = now
     const gain = 1 + Math.floor(combo / 3)
     attention += gain
 
@@ -293,11 +347,32 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   let last = performance.now()
+  let lastDrawn = -1
   let shakeSeed = 0
   function loop(now: number) {
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
     if (perSec) { attention += perSec * dt; paint() }
+
+    // Ease toward the target rather than stepping to it. Buying a layer should
+    // feel like a fader being pushed up, not like a switch.
+    const target = owned.size / UPGRADES.length
+    load += (target - load) * Math.min(1, dt * 1.6)
+    if (stopping) calm = Math.min(1, calm + dt * 1.1)
+
+    // Cools on its own once you stop, so the button is a readout of how hard
+    // you are currently going rather than a latch on your best run.
+    const hot = Math.max(0, 1 - (now - comboAt) / 900) * (combo / 12)
+    world.style.setProperty('--combo', hot.toFixed(3))
+
+    /* Under reduced motion the shared ticker never runs, so the surface has to
+       be asked for a frame. Only when something it depends on has actually
+       moved, though: redrawing every frame would just be animating it again by
+       the back door. */
+    if (prefersReducedMotion && Math.abs(load + calm - lastDrawn) > 0.004) {
+      lastDrawn = load + calm
+      sky.redraw()
+    }
 
     // The constant shake is applied here rather than in CSS so it can stack
     // with the tilt without the two animations fighting.
@@ -323,7 +398,13 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   // ---- the off switch ----------------------------------------------------
+  let stopping = false
+
   el('stopBtn').addEventListener('click', () => {
+    // The loop fades 'calm' in from here; the shader multiplies every layer out
+    // by it, so the room goes quiet over about a second instead of cutting.
+    stopping = true
+    rainbow = false
     for (const t of timers) clearInterval(t)
     timers.length = 0
     cursorEls.forEach((c) => c.remove())
@@ -350,8 +431,11 @@ import GameLayout from '../layouts/GameLayout.astro'
 <style is:global>
   .over-body { background: #0b0114; color: #f3e9ff; overflow: hidden; }
 
+  .oversky { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .oversky .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
   .over-body .world {
-    position: relative; height: 100%; overflow: hidden;
+    position: relative; z-index: 1; height: 100%; overflow: hidden;
     transform: translate(var(--sx, 0), var(--sy, 0));
   }
   .over-body .world.has-tilt { animation: slowTilt 24s ease-in-out infinite; }
@@ -377,13 +461,33 @@ import GameLayout from '../layouts/GameLayout.astro'
   .over-body .score em { font-style: normal; font-size: 13px; color: #7ce0b0; margin-top: 4px; font-variant-numeric: tabular-nums; }
 
   .over-body .big {
+    position: relative; overflow: hidden;
     border: 0; border-radius: 999px; cursor: pointer;
     padding: 22px 54px; font-size: clamp(18px, 3.4vw, 26px); font-weight: 700;
     font-family: var(--display);
-    background: linear-gradient(140deg, #ff4d94, #a24cf0);
-    color: #fff; box-shadow: 0 10px 34px rgba(200, 60, 200, 0.34);
-    transition: transform 90ms var(--ease), box-shadow 160ms var(--ease);
+    /* Highlight top-left, where a light would be, over the gradient. */
+    background:
+      radial-gradient(130% 150% at 26% -6%, rgba(255, 255, 255, 0.34), transparent 56%),
+      linear-gradient(140deg, #ff4d94, #a24cf0);
+    color: #fff;
+    /* --combo is driven from the loop and decays on its own, so the button
+       visibly runs hotter the faster you click and cools when you stop. It is
+       the smallest possible version of the argument the whole game is making. */
+    box-shadow:
+      0 10px 34px rgba(200, 60, 200, calc(0.30 + 0.40 * var(--combo, 0))),
+      0 0 0 calc(1px + 6px * var(--combo, 0)) rgba(255, 120, 190, calc(0.10 + 0.20 * var(--combo, 0))),
+      inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    transition: transform 90ms var(--ease), box-shadow 220ms var(--ease);
   }
+  /* A specular travelling across the face. Clipped to the pill by overflow. */
+  .over-body .big::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(102deg, transparent 40%, rgba(255, 255, 255, 0.30) 50%, transparent 60%);
+    animation: bigSweep calc(3.6s - 2.3s * var(--combo, 0)) var(--ease) infinite;
+  }
+  @keyframes bigSweep { from { transform: translateX(-105%); } to { transform: translateX(105%); } }
+  /* Above the sweep, or the highlight washes over the label. */
+  .over-body .big > span { position: relative; z-index: 1; }
   .over-body .big:hover { transform: translateY(-2px) scale(1.02); }
   .over-body .big:active { transform: scale(0.95); }
   .over-body .sub { color: #a487c4; font-size: 14.5px; margin: 0; max-width: 34ch; }
@@ -415,7 +519,11 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   .over-body .stop {
     position: absolute; left: 16px; bottom: 16px; z-index: 40;
-    background: rgba(255, 255, 255, 0.1); border: 1px solid #43215e; color: #f3e9ff;
+    /* Solid, not rgba(255,255,255,0.1). Over the lit background this is the
+       one control that must never become hard to read, and white-over-white was
+       heading for 3.4:1 at full load. */
+    background: rgba(14, 3, 24, 0.86); border: 1px solid #5b2c7d; color: #f3e9ff;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     border-radius: 999px; padding: 10px 20px; font-size: 13.5px; cursor: pointer;
   }
   .over-body .stop:hover { background: rgba(255, 255, 255, 0.2); }
@@ -433,9 +541,14 @@ import GameLayout from '../layouts/GameLayout.astro'
   .over-body .world.has-ad::after {
     content: 'ADVERTISEMENT'; position: absolute; left: 16px; top: 60px; z-index: 25;
     width: 168px; height: 132px; display: grid; place-content: center;
-    font-size: 11px; letter-spacing: 0.18em; color: #7a5f92;
-    border: 2px dashed #43215e; border-radius: 12px;
-    background: repeating-linear-gradient(45deg, #16062350 0 10px, #24093020 10px 20px);
+    font-size: 11px; letter-spacing: 0.18em; color: #b09ac6;
+    border: 2px dashed #5b2c7d; border-radius: 12px;
+    /* Opaque. It used to be a 30%-alpha gradient, which was fine over a flat
+       near-black page and is not fine over a lit one: 11px letter-spaced text
+       at about 1.5:1. Being opaque also makes it look more like a real ad slot. */
+    background:
+      repeating-linear-gradient(45deg, rgba(30, 10, 48, 0.55) 0 10px, transparent 10px 20px),
+      #150524;
     animation: adWobble 3.4s ease-in-out infinite;
   }
   @keyframes adWobble { 50% { transform: rotate(2.5deg) scale(1.04); } }
@@ -533,7 +646,15 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .over-body .world.has-tilt, .over-body .world.has-rainbow { animation: none; }
+    /* The combined .has-tilt.has-rainbow rule above is four classes and beat
+       these two three-class overrides, so once you owned both the tilt and the
+       colour the page carried on rotating and hue-cycling regardless of the
+       setting. Same for .has-everything, which only sets a duration. */
+    .over-body .world.has-tilt,
+    .over-body .world.has-rainbow,
+    .over-body .world.has-tilt.has-rainbow,
+    .over-body .world.has-everything { animation: none; }
     .over-body .runner { display: none; }
+    .over-body .big::after { animation: none; opacity: 0; }
   }
 </style>
