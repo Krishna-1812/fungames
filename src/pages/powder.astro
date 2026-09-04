@@ -46,6 +46,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 <script>
   import { sfx, unlock } from '../lib/audio'
   import { burst, ring, shake } from '../lib/fx'
+  import { createPowderRenderer } from '../lib/powder-render'
 
   const EMPTY = 0, SAND = 1, WATER = 2, STONE = 3, WOOD = 4, FIRE = 5,
         SMOKE = 6, STEAM = 7, OIL = 8, LAVA = 9, ICE = 10, PLANT = 11,
@@ -98,28 +99,28 @@ import GameLayout from '../layouts/GameLayout.astro'
   TYPE[EMPTY] = 3
 
   const canvas = document.getElementById('sim') as HTMLCanvasElement
-  const ctx = canvas.getContext('2d', { alpha: false })!
   const wrap = document.getElementById('wrap') as HTMLElement
   const CELL = 4
   let W = 0, H = 0
   let grid = new Uint8Array(0), life = new Uint8Array(0)
   let shade = new Uint8Array(0), moved = new Uint8Array(0)
-  let img: ImageData, buf32: Uint32Array
+
+  /* The simulation below is untouched. This only decides how the grid is
+     painted: a shaded, lit world on the GPU, or the original flat ImageData if
+     WebGL2 is missing. */
+  const renderer = createPowderRenderer(canvas, PAL, VARY, LIFE0)
+  if (renderer.gpu) canvas.classList.add('gl')
 
   function build() {
     const r = wrap.getBoundingClientRect()
     if (r.width < 8 || r.height < 8) return false
     W = Math.max(80, Math.min(340, Math.floor(r.width / CELL)))
     H = Math.max(60, Math.min(250, Math.floor(r.height / CELL)))
-    canvas.width = W
-    canvas.height = H
     grid = new Uint8Array(W * H)
     life = new Uint8Array(W * H)
     shade = new Uint8Array(W * H)
     moved = new Uint8Array(W * H)
-    img = ctx.createImageData(W, H)
-    buf32 = new Uint32Array(img.data.buffer)
-    ctx.imageSmoothingEnabled = false
+    renderer.resize(W, H)
     return true
   }
 
@@ -303,26 +304,12 @@ import GameLayout from '../layouts/GameLayout.astro'
     }
   }
 
-  function draw() {
+  /* Only needed for the readout, which updates twice a second, so this no
+     longer rides along with every frame the way it did when drawing and
+     counting were the same loop. */
+  function countAlive() {
     let alive = 0
-    for (let i = 0; i < grid.length; i++) {
-      const el = grid[i]
-      if (el === EMPTY) { buf32[i] = 0xff0d0e10; continue }
-      alive++
-      const v = (shade[i] / 255 - 0.5) * VARY[el]
-      let r = PAL[el * 3] + v, g = PAL[el * 3 + 1] + v, b = PAL[el * 3 + 2] + v
-      if (el === FIRE || el === EMBER) {
-        // Flames visibly cool as they burn down.
-        const t = life[i] / (LIFE0[el] || 1)
-        g *= 0.35 + t * 0.65
-        b *= t * 0.6
-      }
-      buf32[i] = (255 << 24) |
-        (Math.max(0, Math.min(255, b | 0)) << 16) |
-        (Math.max(0, Math.min(255, g | 0)) << 8) |
-        Math.max(0, Math.min(255, r | 0))
-    }
-    ctx.putImageData(img, 0, 0)
+    for (let i = 0; i < grid.length; i++) if (grid[i] !== EMPTY) alive++
     return alive
   }
 
@@ -350,12 +337,12 @@ import GameLayout from '../layouts/GameLayout.astro'
       frame++
     }
     if (W) {
-      const alive = draw()
+      renderer.draw(grid, life, shade, performance.now() / 1000)
       fpsFrames++
       const now = performance.now()
       if (now - lastFps > 500) {
         fpsEl.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
-        countEl.textContent = alive.toLocaleString('en-US')
+        countEl.textContent = countAlive().toLocaleString('en-US')
         lastFps = now
         fpsFrames = 0
       }
@@ -516,6 +503,9 @@ import GameLayout from '../layouts/GameLayout.astro'
     width: 100%; height: 100%; display: block;
     image-rendering: pixelated; touch-action: none; cursor: crosshair;
   }
+  /* The shaded renderer draws at display resolution and puts real detail
+     inside a cell, so nearest-neighbour upscaling would throw it away. */
+  .powder-body canvas.gl { image-rendering: auto; }
   .powder-body .hint {
     position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.72); padding: 7px 16px; border-radius: 999px;

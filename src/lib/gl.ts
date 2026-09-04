@@ -77,7 +77,7 @@ document.addEventListener('visibilitychange', () => {
  * covers every pixel with three vertices instead of six and avoids the diagonal
  * seam where two triangles meet, which shows up in derivative-based effects.
  */
-const VERT = `#version 300 es
+export const FULLSCREEN_VERT = `#version 300 es
 precision highp float;
 out vec2 vUv;
 void main() {
@@ -85,6 +85,8 @@ void main() {
   vUv = p;
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`
+
+const VERT = FULLSCREEN_VERT
 
 function shader(gl: WebGL2RenderingContext, type: number, src: string) {
   const s = gl.createShader(type)!
