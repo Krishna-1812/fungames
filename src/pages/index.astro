@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro'
+import Backdrop from '../components/Backdrop.astro'
 import GameTile from '../components/GameTile.astro'
 import AdSlot from '../components/AdSlot.astro'
 import { SITE } from '../site.config'
@@ -10,6 +11,7 @@ const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
 ---
 
 <Base title={SITE.name} description={SITE.description}>
+  <Backdrop variant="paper" />
   <div class="wrap">
     <header class="masthead">
       <h1 class="wordmark">{SITE.name}</h1>
@@ -25,6 +27,8 @@ const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
 
     <script>
       import { sfx, unlock } from '../lib/audio'
+      import { prefersReducedMotion } from '../lib/gl'
+
       // A soft blip on hover, pitched by position in the grid, so running the
       // cursor across the page plays a little scale.
       document.querySelectorAll<HTMLAnchorElement>('.tile').forEach((t, i) => {
@@ -33,6 +37,69 @@ const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
       })
       addEventListener('pointerdown', unlock, { once: true, capture: true })
       addEventListener('keydown', unlock, { once: true, capture: true })
+
+      /* Lighting and tilt for the whole grid from one delegated listener.
+         Fifteen per-tile listeners would each fire on every pointer move; this
+         fires once and only touches the tile actually under the cursor.
+
+         Writes are batched into a rAF so a fast sweep across the grid cannot
+         force more than one style recalculation per frame. */
+      const grid = document.querySelector<HTMLElement>('.grid')
+      if (grid) {
+        let pending: { el: HTMLElement; x: number; y: number } | null = null
+        let queued = false
+
+        const flush = () => {
+          queued = false
+          if (!pending) return
+          const { el, x, y } = pending
+          el.style.setProperty('--mx', `${x * 100}%`)
+          el.style.setProperty('--my', `${y * 100}%`)
+          // -1..1 from centre, used by the art parallax.
+          el.style.setProperty('--px', `${x * 2 - 1}`)
+          el.style.setProperty('--py', `${y * 2 - 1}`)
+          if (!prefersReducedMotion) {
+            // Small angles on purpose. Past about 6° the text edges alias and
+            // the card starts to read as a gimmick rather than as a surface.
+            const rx = (0.5 - y) * 7
+            const ry = (x - 0.5) * 7
+            el.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-5px) scale(1.01)`
+          }
+        }
+
+        grid.addEventListener(
+          'pointermove',
+          (e) => {
+            const el = (e.target as HTMLElement).closest<HTMLElement>('.tile')
+            if (!el) return
+            const r = el.getBoundingClientRect()
+            pending = { el, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }
+            if (!queued) { queued = true; requestAnimationFrame(flush) }
+          },
+          { passive: true },
+        )
+
+        grid.addEventListener(
+          'pointerleave',
+          () => {
+            pending = null
+            for (const el of grid.querySelectorAll<HTMLElement>('.tile')) el.style.transform = ''
+          },
+          { passive: true },
+        )
+
+        // A tile left tilted after the pointer jumps straight from one card to
+        // another would stay stuck, so reset on the way out of each.
+        grid.addEventListener(
+          'pointerout',
+          (e) => {
+            const el = (e.target as HTMLElement).closest<HTMLElement>('.tile')
+            const to = (e as PointerEvent).relatedTarget as HTMLElement | null
+            if (el && (!to || !el.contains(to))) el.style.transform = ''
+          },
+          { passive: true },
+        )
+      }
     </script>
 
     <section class="about">
@@ -88,18 +155,27 @@ const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
+    /* Shared perspective on the container rather than per-tile, so neighbouring
+       cards tilt as if lit and viewed from one camera instead of fifteen. */
+    perspective: 1400px;
   }
   @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 660px) { .grid { grid-template-columns: 1fr; gap: 14px; } }
 
   .about {
-    background: var(--card);
-    border: 1px solid var(--line);
+    /* Translucent rather than solid, so the backdrop's drifting light shows
+       through it. The blur is what keeps the text crisp over moving colour. */
+    background: color-mix(in srgb, var(--card) 72%, transparent);
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
     border-radius: var(--radius);
     margin-top: 40px;
     padding: 34px 24px 30px;
     text-align: center;
-    box-shadow: var(--shadow-sm);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      var(--shadow);
   }
   .about-lead { font-size: 21px; margin: 0; font-weight: 500; }
   .about-sub { color: var(--ink-soft); margin: 8px 0 0; font-size: 15.5px; }
@@ -112,7 +188,8 @@ const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
     font-size: 15px;
     font-weight: 500;
     text-decoration: none;
-    background: var(--card);
+    background: linear-gradient(180deg, #fff 0%, color-mix(in oklab, var(--card) 88%, var(--line)) 100%);
+    box-shadow: inset 0 1px 0 #fff, var(--shadow-sm);
     transition: transform 140ms var(--ease), box-shadow 140ms var(--ease), border-color 140ms var(--ease);
   }
   .btn:hover {
