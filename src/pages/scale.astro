@@ -72,6 +72,9 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
 <GameLayout slug="scale" bar="#04263f" bodyClass="night-body">
   <div class="sky" id="sky"></div>
+  {/* The GPU environment sits over the CSS gradient, which stays as the
+      fallback for anything without WebGL2. */}
+  <div class="skygl" id="skygl" aria-hidden="true"></div>
 
   <div class="stage" id="stage" aria-hidden="true">
     {
@@ -119,6 +122,8 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   <script>
   import { sfx, unlock } from '../lib/audio'
+  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { SCALE_FRAG, MAX_OBJECTS } from '../lib/scale-sky'
     const { MIN_EXP, MAX_EXP, totalPx } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const stage = document.getElementById('stage')
@@ -126,12 +131,51 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   const hudValue = document.getElementById('hudValue')
   const hudFill = document.getElementById('hudFill')
   const reel = document.querySelector('.reel')
-  const things = [...document.querySelectorAll('.thing')].map((el) => ({
+  /** '#rrggbb' -> linear RGB, because the shader works in linear light. */
+  function toLinear(hex) {
+    const n = parseInt(hex.trim().replace('#', ''), 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.pow(v / 255, 2.2))
+  }
+
+  const things = [...document.querySelectorAll('.thing')].map((el, i) => ({
     el,
     disc: el.querySelector('.disc'),
+    label: el.querySelector('.label'),
     m: Number(el.dataset.m),
+    rgb: toLinear(el.style.getPropertyValue('--c') || '#ffffff'),
+    // Stable per-object, so a surface belongs to a thing rather than shifting
+    // as it grows.
+    seed: (i * 0.1732) % 1,
     visible: false,
+    size: 0,
+    alpha: 0,
   }))
+
+  /* --- GPU environment ---------------------------------------------------
+     The CSS gradient sky and the CSS discs stay in place underneath; if the
+     surface fails to come up, the page renders exactly as it did before. */
+  const objData = new Float32Array(MAX_OBJECTS * 4)
+  const objCol = new Float32Array(MAX_OBJECTS * 3)
+  let objCount = 0
+  let curExp = MIN_EXP
+  const centreUv = [0.5, 0.5]
+
+  const surface = new ShaderSurface(document.getElementById('skygl'), SCALE_FRAG, {
+    // The regimes are all low frequency and the objects are antialiased against
+    // their own derivatives, so three-quarter resolution is free.
+    scale: 0.75,
+    uniforms: () => ({
+      u_exp: curExp,
+      u_centre: centreUv,
+      u_objN: objCount,
+      u_obj: objData,
+      u_objCol: objCol,
+    }),
+  })
+
+  // Only take the CSS discs away once the GPU path is actually live.
+  const glLive = surface.canvas.isConnected
+  if (glLive) document.body.classList.add('gl-on')
 
   /** Human-readable length across 42 decades. */
   function fmt(m) {
@@ -212,13 +256,90 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
         if (show && th.m > lastAnnounced) { sfx.blip(chime++); lastAnnounced = th.m }
         th.visible = show
       }
-      if (!show) continue
+      if (!show) { th.alpha = 0; continue }
       th.disc.style.width = size + 'px'
       th.disc.style.height = size + 'px'
       // Fade in as it becomes legible and out as it engulfs the screen.
       const grow = Math.min(1, (size - 3) / 40)
       const shrink = Math.min(1, (Math.max(window.innerWidth, window.innerHeight) * 3.2 - size) / 400)
-      th.el.style.opacity = String(Math.min(grow, shrink))
+      const alpha = Math.min(grow, shrink)
+      th.el.style.opacity = String(alpha)
+      th.size = size
+      th.alpha = alpha
+    }
+
+    /* Every object is centred on the same point, so whenever two are on screen
+       their labels printed straight on top of each other. Anything sized by a
+       clamp collides too, because both large objects hit the clamp. Distinct
+       slots is the only thing that actually separates them: the smallest sits
+       under its own body, and larger ones — which are the context, not the
+       subject — stack upwards. */
+    /* Labels are stacked against their measured heights rather than a fixed
+       step. A note wraps to four lines on a phone and to two on a desktop, so
+       any constant that clears one will collide on the other. */
+    const vis = things.filter((t) => t.alpha > 0.001).sort((a, b) => a.size - b.size)
+    // Past the third, a label is context nobody asked for. The body keeps
+    // rendering; only its caption goes.
+    vis.forEach((t, k) => t.el.style.setProperty('--labelShow', k < 3 ? '1' : '0'))
+
+    // Stack the context labels upwards from the centre.
+    let cursor = -(window.innerHeight * 0.12)
+    const placed = []
+    for (const t of vis.slice(1, 3)) {
+      const h = t.label.offsetHeight || 72
+      cursor -= h / 2
+      placed.push({ t, y: cursor, h })
+      cursor -= h / 2 + 12
+    }
+    // The chrome bar and the HUD own the top of the viewport, so if the stack
+    // reaches into them the whole thing slides down together — clamping labels
+    // individually would just push them back into each other.
+    const top = placed[placed.length - 1]
+    if (top) {
+      const centreY = 48 + (window.innerHeight - 48) / 2
+      const gap = 150 - (centreY + top.y - top.h / 2)
+      if (gap > 0) for (const p of placed) p.y += gap
+    }
+    for (const p of placed) p.t.el.style.setProperty('--labelY', `${p.y}px`)
+
+    // The subject's own label goes last, because the HUD shift above may have
+    // pushed the stack down into the space it wanted.
+    if (vis[0]) {
+      const h0 = vis[0].label.offsetHeight || 72
+      let y0 = Math.min(vis[0].size / 2 + 26, window.innerHeight * 0.26)
+      const lowest = placed[0]
+      if (lowest) y0 = Math.max(y0, lowest.y + lowest.h / 2 + h0 / 2 + 12)
+      vis[0].el.style.setProperty('--labelY', `${y0}px`)
+    }
+
+    if (glLive) {
+      curExp = exp
+      // The stage is inset below the chrome bar, so its centre is not the
+      // viewport's. The shader is told where in uv space to put the objects
+      // rather than being given pixels.
+      const top = 48
+      centreUv[0] = 0.5
+      centreUv[1] = 1 - (top + (window.innerHeight - top) / 2) / window.innerHeight
+
+      // Largest first: the shader composites in array order, so the small
+      // things in front land on top of the big ones behind them.
+      const shown = things.filter((t) => t.alpha > 0.001)
+        .sort((a, b) => b.size - a.size)
+        .slice(0, MAX_OBJECTS)
+      objCount = shown.length
+      for (let i = 0; i < shown.length; i++) {
+        const t = shown[i]
+        objData[i * 4] = t.size / 2 / window.innerHeight
+        objData[i * 4 + 1] = t.alpha
+        objData[i * 4 + 2] = t.seed
+        objCol[i * 3] = t.rgb[0]
+        objCol[i * 3 + 1] = t.rgb[1]
+        objCol[i * 3 + 2] = t.rgb[2]
+      }
+      // The environment is a function of scroll, not of time. Under reduced
+      // motion the shared ticker never runs, so the frame has to be asked for
+      // explicitly or the sky freezes while the page keeps scrolling.
+      if (prefersReducedMotion) surface.redraw()
     }
   }
 
@@ -238,10 +359,17 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
 <style>
   .sky {
-    position: fixed; inset: 0; z-index: -2;
+    position: fixed; inset: 0; z-index: -3;
     background: linear-gradient(180deg, #100a1e, #2e0e30);
     transition: background 300ms linear;
   }
+  .skygl { position: fixed; inset: 0; z-index: -2; pointer-events: none; }
+  /* Created at runtime, so this cannot be a scoped rule. */
+  .skygl :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* The GPU draws the bodies once it is live; the CSS disc stays in the layout
+     so the label keeps centring on it, but stops painting. */
+  :global(body.gl-on) .disc { opacity: 0; }
   :global(.night-body) { background: #100a1e; color: #fff; }
 
   /* One fixed stage; everything inside is positioned relative to the centre. */
@@ -268,6 +396,9 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   .label {
     grid-area: 1 / 1;
     position: relative;
+    transform: translateY(var(--labelY, 0px));
+    opacity: var(--labelShow, 1);
+    transition: opacity 200ms linear;
     display: grid;
     justify-items: center;
     gap: 2px;

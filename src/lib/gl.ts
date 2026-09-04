@@ -125,8 +125,11 @@ export function program(gl: WebGL2RenderingContext, frag: string, vert = VERT) {
 /* -------------------------------------------------------------------------- */
 
 export type SurfaceOpts = {
-  /** Extra uniforms, re-read every frame. Numbers, or 2–4 component arrays. */
-  uniforms?: () => Record<string, number | number[]>
+  /**
+   * Extra uniforms, re-read every frame. A number, a 2–4 element array for a
+   * vec, or a Float32Array for a GLSL array uniform (`uniform float x[N]`).
+   */
+  uniforms?: () => Record<string, number | number[] | Float32Array>
   /** Draw behind page content and ignore pointer events. Default true. */
   decorative?: boolean
   /** Render one frame and stop. Implied by prefers-reduced-motion. */
@@ -256,12 +259,15 @@ export class ShaderSurface {
     if (!this.running) this.render((performance.now() - this.t0) / 1000)
   }
 
-  private uniform(name: string, value: number | number[]) {
+  private uniform(name: string, value: number | number[] | Float32Array) {
     const gl = this.gl!
     if (!this.locs.has(name)) this.locs.set(name, gl.getUniformLocation(this.prog!, name))
     const loc = this.locs.get(name)
     if (!loc) return
     if (typeof value === 'number') gl.uniform1f(loc, value)
+    // A Float32Array means a GLSL array uniform, whatever its length — it is the
+    // only way to hand a shader a variable-length list without a texture.
+    else if (value instanceof Float32Array) gl.uniform1fv(loc, value)
     else if (value.length === 2) gl.uniform2f(loc, value[0], value[1])
     else if (value.length === 3) gl.uniform3f(loc, value[0], value[1], value[2])
     else if (value.length === 4) gl.uniform4f(loc, value[0], value[1], value[2], value[3])
@@ -286,6 +292,18 @@ export class ShaderSurface {
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+  }
+
+  /**
+   * Draw one frame now.
+   *
+   * Needed by surfaces driven by page state rather than by time — Scale's
+   * environment is a function of scroll position. Under reduced motion, or
+   * with `still`, the ticker never runs, so without this a scroll would leave
+   * the first frame frozen on screen while the page around it changed.
+   */
+  redraw() {
+    this.render((performance.now() - this.t0) / 1000)
   }
 
   start() {
