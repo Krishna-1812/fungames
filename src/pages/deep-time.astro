@@ -119,6 +119,9 @@ const fmt = (y: number) =>
 
 <GameLayout slug="deep-time" bar="#171132" bodyClass="night-body">
   <div class="sky" id="sky"></div>
+  {/* The rendered sky sits over the CSS gradient, which stays as the fallback
+      for anything without WebGL2. */}
+  <div class="skygl" id="skygl" aria-hidden="true"></div>
 
   <div class="hud">
     <div class="hud-year" id="hudYear">4.54 billion years ago</div>
@@ -166,6 +169,8 @@ const fmt = (y: number) =>
   <script>
   import { ring } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { TIME_FRAG } from '../lib/time-sky'
     const { acts, totalHeight } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   // --- lane layout -------------------------------------------------------
@@ -284,6 +289,16 @@ const fmt = (y: number) =>
     return `rgb(${c(r1, r2)},${c(g1, g2)},${c(b1, b2)})`
   }
 
+  /* The rendered sky. The CSS gradient underneath stays in place, so if the
+     surface never comes up the page looks exactly as it did before. */
+  let curL = Math.log10(4.54e9)
+  const surface = new ShaderSurface(document.getElementById('skygl'), TIME_FRAG, {
+    // Every regime here is low-frequency; there is nothing with an edge sharp
+    // enough for three-quarter resolution to show.
+    scale: 0.75,
+    uniforms: () => ({ u_L: curL }),
+  })
+
   let ticking = false
   function update() {
     ticking = false
@@ -302,6 +317,13 @@ const fmt = (y: number) =>
 
     const t = act.height ? Math.min(1, Math.max(0, within / act.height)) : 0
     sky.style.background = `linear-gradient(${mix(act.sky[0], act.sky[1], t)}, ${mix(act.sky[0], act.sky[1], Math.min(1, t + 0.25))})`
+
+    // The eras cross-fade against log(years), which is the axis the acts are
+    // already built on, so each change lands near the event that caused it.
+    curL = Math.log10(Math.max(years, 1))
+    // Driven by scroll, not by time: under reduced motion the shared ticker
+    // never runs, so the frame has to be asked for explicitly.
+    if (prefersReducedMotion) surface.redraw()
   }
 
   addEventListener(
@@ -319,8 +341,12 @@ const fmt = (y: number) =>
 </script>
 
 <style>
+  .skygl { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+  /* Created at runtime, so this cannot be a scoped rule. */
+  .skygl :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
   .sky {
-    position: fixed; inset: 0; z-index: -1;
+    position: fixed; inset: 0; z-index: -2;
     background: linear-gradient(#100a1e, #3b1f47);
     transition: background 260ms linear;
   }
