@@ -19,6 +19,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   <div class="stage" id="stage">
     <h1 class="visually-hidden">Orbit</h1>
     <canvas id="sky" aria-label="Gravity simulation"></canvas>
+    {/* The aim indicator is interface, not scene. Keeping it on its own 2D
+        layer means a crisp dashed line rather than one that picks up bloom and
+        the trail fade along with everything else. */}
+    <canvas id="aimLayer" aria-hidden="true"></canvas>
 
     <div class="hud">
       <div class="readout">
@@ -53,9 +57,13 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { sfx, unlock, mountMuteButton, tone } from '../lib/audio'
   import { burst, ring } from '../lib/fx'
 
+  import { createRenderer } from '../lib/orbit-render'
+
   const canvas = document.getElementById('sky') as HTMLCanvasElement
-  const ctx = canvas.getContext('2d')!
+  const aimCanvas = document.getElementById('aimLayer') as HTMLCanvasElement
+  const aimCtx = aimCanvas.getContext('2d')!
   const stage = document.getElementById('stage') as HTMLElement
+  const renderer = createRenderer(canvas)
 
   type Body = {
     x: number; y: number; vx: number; vy: number
@@ -88,11 +96,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (r.width < 8) return false
     dpr = Math.min(devicePixelRatio || 1, 2)
     W = r.width; H = r.height
-    canvas.width = Math.round(W * dpr)
-    canvas.height = Math.round(H * dpr)
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.fillStyle = '#05060f'
-    ctx.fillRect(0, 0, W, H)
+    renderer.resize(W, H, dpr)
+    aimCanvas.width = Math.round(W * dpr)
+    aimCanvas.height = Math.round(H * dpr)
+    aimCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
     return true
   }
 
@@ -173,41 +180,17 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   // ---- render ------------------------------------------------------------
   function render() {
-    if (trails) {
-      // Fading the whole frame is what draws the trails; no history needed.
-      ctx.fillStyle = 'rgba(5, 6, 15, 0.16)'
-      ctx.fillRect(0, 0, W, H)
-    } else {
-      ctx.fillStyle = '#05060f'
-      ctx.fillRect(0, 0, W, H)
-    }
+    renderer.draw(bodies, aim, trails, radiusFor(launchMass))
 
-    for (const b of bodies) {
-      if (b.star) {
-        // A tight, fast falloff reads as a light source; a wide one just looks
-        // like a smudge over everything behind it.
-        const R = b.r * 3.4
-        const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, R)
-        g.addColorStop(0, 'hsla(' + b.hue + ' 100% 78% / 0.5)')
-        g.addColorStop(0.35, 'hsla(' + b.hue + ' 100% 66% / 0.14)')
-        g.addColorStop(1, 'hsla(' + b.hue + ' 100% 60% / 0)')
-        ctx.fillStyle = g
-        ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill()
-      }
-      ctx.fillStyle = b.star
-        ? 'hsl(' + b.hue + ' 100% 74%)'
-        : 'hsl(' + b.hue + ' 78% ' + Math.min(86, 58 + b.r * 2) + '%)'
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill()
-    }
-
+    aimCtx.clearRect(0, 0, W, H)
     if (aim) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)'
-      ctx.lineWidth = 1.5
-      ctx.setLineDash([4, 5])
-      ctx.beginPath(); ctx.moveTo(aim.x0, aim.y0); ctx.lineTo(aim.x1, aim.y1); ctx.stroke()
-      ctx.setLineDash([])
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'
-      ctx.beginPath(); ctx.arc(aim.x0, aim.y0, radiusFor(launchMass), 0, Math.PI * 2); ctx.fill()
+      aimCtx.strokeStyle = 'rgba(255,255,255,0.5)'
+      aimCtx.lineWidth = 1.5
+      aimCtx.setLineDash([4, 5])
+      aimCtx.beginPath(); aimCtx.moveTo(aim.x0, aim.y0); aimCtx.lineTo(aim.x1, aim.y1); aimCtx.stroke()
+      aimCtx.setLineDash([])
+      aimCtx.fillStyle = 'rgba(255,255,255,0.85)'
+      aimCtx.beginPath(); aimCtx.arc(aim.x0, aim.y0, radiusFor(launchMass), 0, Math.PI * 2); aimCtx.fill()
     }
   }
 
@@ -286,7 +269,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   })
 
   // ---- presets -----------------------------------------------------------
-  function clear() { bodies = []; merges = 0; if (W) { ctx.fillStyle = '#05060f'; ctx.fillRect(0, 0, W, H) } }
+  function clear() { bodies = []; merges = 0; renderer.clear() }
 
   /** Circular orbit speed for a satellite at distance r from mass M. */
   const orbitalV = (M: number, r: number) => Math.sqrt((G * M) / r)
@@ -363,6 +346,9 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   .orbit-body .stage { position: relative; height: 100%; }
   .orbit-body canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  /* The aim layer sits above the scene but must never swallow the pointer —
+     every drag is captured by #sky underneath it. */
+  .orbit-body #aimLayer { pointer-events: none; z-index: 2; }
 
   .orbit-body .hud {
     position: absolute; top: 14px; left: 50%; transform: translateX(-50%);

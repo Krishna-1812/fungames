@@ -322,7 +322,7 @@ export class ShaderSurface {
  * noise in Powder's smoke and the noise in the homepage nebula are literally
  * the same function, which is a large part of why the pages read as one place.
  */
-export const GLSL = `#version 300 es
+export const GLSL_PRELUDE = `#version 300 es
 precision highp float;
 in vec2 vUv;
 out vec4 fragColor;
@@ -331,7 +331,14 @@ uniform float u_time;
 uniform vec2  u_res;
 uniform vec2  u_pointer;
 uniform float u_dpr;
+`
 
+/**
+ * The pure half: no uniforms, no in/out declarations. Shaders that are not
+ * fullscreen passes — Orbit's instanced sphere impostors, for one — need the
+ * noise and the tonemapper without inheriting a fullscreen pass's plumbing.
+ */
+export const GLSL_LIB = `
 #define PI  3.14159265359
 #define TAU 6.28318530718
 
@@ -383,6 +390,51 @@ float fbm(vec2 p, int oct) {
   return v;
 }
 
+/* 3D value noise. Needed the moment anything is textured on a sphere: sampling
+   2D noise by latitude/longitude pinches at the poles and shows a seam down
+   the back, which is exactly where a planet's terminator draws the eye. */
+float hash31(vec3 p) {
+  uvec3 q = uvec3(ivec3(p * 1000.0)) * uvec3(1597334673U, 3812015801U, 2798796415U);
+  uint n = (q.x ^ q.y ^ q.z) * 1597334673U;
+  return float(n & 0x7fffffffU) / float(0x7fffffff);
+}
+
+float noise3(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  vec3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  return mix(
+    mix(mix(hash31(i + vec3(0, 0, 0)), hash31(i + vec3(1, 0, 0)), u.x),
+        mix(hash31(i + vec3(0, 1, 0)), hash31(i + vec3(1, 1, 0)), u.x), u.y),
+    mix(mix(hash31(i + vec3(0, 0, 1)), hash31(i + vec3(1, 0, 1)), u.x),
+        mix(hash31(i + vec3(0, 1, 1)), hash31(i + vec3(1, 1, 1)), u.x), u.y),
+    u.z);
+}
+
+float fbm3(vec3 p, int oct) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 8; i++) {
+    if (i >= oct) break;
+    v += a * noise3(p);
+    p *= 2.03;
+    a *= 0.5;
+  }
+  return v;
+}
+
+float ridge3(vec3 p, int oct) {
+  float v = 0.0, a = 0.5, prev = 1.0;
+  for (int i = 0; i < 8; i++) {
+    if (i >= oct) break;
+    float n = 1.0 - abs(noise3(p) * 2.0 - 1.0);
+    n *= n * prev;
+    prev = n;
+    v += a * n;
+    p *= 2.07;
+    a *= 0.5;
+  }
+  return v;
+}
+
 // Ridged variant — the sharp filaments in nebulae, lava and smoke.
 float ridge(vec2 p, int oct) {
   float v = 0.0, a = 0.5, prev = 1.0;
@@ -412,15 +464,21 @@ vec3 toLinear(vec3 c) { return pow(max(c, 0.0), vec3(2.2)); }
 // Ordered dithering before quantisation to 8 bits. Without it, any smooth
 // gradient across a large dark area bands visibly — the single most common
 // reason a nice shader looks cheap on a real monitor.
-vec3 dither(vec3 c, vec2 px) {
-  float n = hash21(px + fract(u_time) * 17.0);
+vec3 ditherAt(vec3 c, vec2 px, float t) {
+  float n = hash21(px + fract(t) * 17.0);
   return c + (n - 0.5) / 255.0;
 }
 
 /** Pixel coords normalised to -1..1 on the short axis, origin centred. */
-vec2 centred(vec2 uv) {
-  return (uv * u_res * 2.0 - u_res) / min(u_res.x, u_res.y);
+vec2 centredAt(vec2 uv, vec2 res) {
+  return (uv * res * 2.0 - res) / min(res.x, res.y);
 }
+`
+
+/** Prelude, library, and the uniform-aware wrappers a fullscreen pass expects. */
+export const GLSL = GLSL_PRELUDE + GLSL_LIB + `
+vec3 dither(vec3 c, vec2 px) { return ditherAt(c, px, u_time); }
+vec2 centred(vec2 uv) { return centredAt(uv, u_res); }
 `
 
 /** Concatenate the shared library with a shader body. */
