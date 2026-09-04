@@ -106,8 +106,9 @@ Expect `17 page(s) built` and no errors.
 ls dist/*.html dist/*/index.html | wc -l
 ```
 
-Expect `16` — the homepage, fourteen game pages, and 404. (`sitemap.xml` and
-`robots.txt` sit alongside them.)
+Expect `17` — the homepage, 404, and fifteen game pages. (`sitemap.xml` and
+`robots.txt` sit alongside them, and the sitemap lists 16 URLs: the homepage
+plus the fifteen games.)
 
 Then `npm run preview`, open <http://localhost:4400>, and click into **Powder**.
 If sand falls and piles up, the whole toolchain is working.
