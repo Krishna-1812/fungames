@@ -39,12 +39,16 @@ Cloudflare Worker needs `npx wrangler`, which downloads on demand.
 You have `funsite-handoff.tar.gz`. Move it across however you like: AirDrop, a
 USB stick, Google Drive, email it to yourself.
 
-Verify it arrived intact (the checksum should match exactly):
+Verify it arrived intact. `funsite-handoff.sha256` sits next to the archive —
+copy both across, then from the folder containing them:
 
 ```bash
-shasum -a 256 funsite-handoff.tar.gz
-# b39019bed3735a252d93ef84c26e14710399bb6409074e40571623b04d5e3557
+shasum -a 256 -c funsite-handoff.sha256
+# funsite-handoff.tar.gz: OK
 ```
+
+(The checksum lives in its own file rather than in this one, because a file
+cannot contain a hash of an archive that contains that file.)
 
 Then:
 
