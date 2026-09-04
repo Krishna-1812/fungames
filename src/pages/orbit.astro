@@ -83,7 +83,14 @@ import GameLayout from '../layouts/GameLayout.astro'
   let merges = 0
   let launchMass = 6
 
-  const radiusFor = (m: number) => Math.max(1.6, Math.cbrt(m) * 1.9)
+  /**
+   * Bodies are drawn as lit spheres now, and below about 16px across there are
+   * not enough pixels for a terminator to read — they were landing as plain
+   * dots. This is the physical radius, not a render-only fudge: collisions use
+   * the same number, so a body that looks like it should touch actually does.
+   * The cost is a slightly livelier merge rate, which suits a sandbox.
+   */
+  const radiusFor = (m: number) => Math.max(2.8, Math.cbrt(m) * 2.6)
   const hueFor = (m: number) => (m >= 200 ? 42 : m >= 20 ? 205 : 190)
 
   function add(x: number, y: number, vx: number, vy: number, m: number) {
