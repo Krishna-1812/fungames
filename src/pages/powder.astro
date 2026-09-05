@@ -375,6 +375,9 @@ import GameLayout from '../layouts/GameLayout.astro'
       unlock(); sfx.blip(n)
       palette.querySelectorAll('.mat').forEach((m) =>
         m.setAttribute('aria-checked', String(Number((m as HTMLElement).dataset.id) === current)))
+      b.classList.remove('picked')
+      void b.offsetWidth // restart the animation even if it's already mid-way
+      b.classList.add('picked')
       hintEl.textContent = d.hint || ('Drawing ' + d.name.toLowerCase())
       hintEl.classList.remove('faded')
       clearTimeout(hintTimer)
@@ -523,12 +526,23 @@ import GameLayout from '../layouts/GameLayout.astro'
     display: flex; align-items: center; gap: 7px;
     background: #241f1c; border: 1px solid #322c28; color: #eee9e3;
     border-radius: 9px; padding: 7px 8px; font-size: 12.5px; cursor: pointer;
-    transition: border-color 140ms var(--ease), background 140ms var(--ease);
+    transition: border-color 140ms var(--ease), background 140ms var(--ease), transform 180ms var(--ease-bounce);
     text-align: left;
   }
-  .powder-body .mat:hover { background: #2e2723; }
+  .powder-body .mat:hover { background: #2e2723; transform: translateY(-1px) scale(1.03); }
+  .powder-body .mat:active { transform: scale(0.96); }
   .powder-body .mat[aria-checked='true'] { border-color: #e8a75c; background: #33291f; }
-  .powder-body .mat i { width: 13px; height: 13px; border-radius: 3px; flex: none; display: block; }
+  /* A one-shot bounce when a material is actually picked, not just hovered —
+     toggled by a class the click handler adds and removes, since a CSS
+     attribute selector alone can't tell "just changed" from "still true". */
+  .powder-body .mat.picked { animation: pop-mat 360ms var(--ease-bounce); }
+  @keyframes pop-mat { 40% { transform: scale(1.12); } }
+  /* A round swatch reads as a paint dab; the square it replaces read as a
+     form field. */
+  .powder-body .mat i {
+    width: 14px; height: 14px; border-radius: 50%; flex: none; display: block;
+    box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  }
 
   .powder-body .controls { padding: 4px 10px 14px; display: grid; gap: 9px; }
   .powder-body .brush { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #bdb3ab; }
@@ -538,9 +552,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   .powder-body .ctl {
     flex: 1; background: #241f1c; border: 1px solid #322c28; color: #eee9e3;
     border-radius: 9px; padding: 8px 6px; font-size: 12.5px; cursor: pointer;
-    transition: background 140ms var(--ease);
+    transition: background 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
-  .powder-body .ctl:hover { background: #322b26; }
+  .powder-body .ctl:hover { background: #322b26; transform: translateY(-1px) scale(1.03); }
+  .powder-body .ctl:active { transform: scale(0.95); }
   .powder-body .ctl.on { background: #33291f; border-color: #e8a75c; }
   .powder-body .stat { font-size: 11.5px; color: #a1968e; margin: 2px 0 0; font-variant-numeric: tabular-nums; }
   .powder-body .stat b { color: #d3c8c0; }

@@ -477,7 +477,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       0 10px 34px rgba(200, 60, 200, calc(0.30 + 0.40 * var(--combo, 0))),
       0 0 0 calc(1px + 6px * var(--combo, 0)) rgba(255, 120, 190, calc(0.10 + 0.20 * var(--combo, 0))),
       inset 0 1px 0 rgba(255, 255, 255, 0.42);
-    transition: transform 90ms var(--ease), box-shadow 220ms var(--ease);
+    transition: transform 160ms var(--ease-bounce), box-shadow 220ms var(--ease);
   }
   /* A specular travelling across the face. Clipped to the pill by overflow. */
   .over-body .big::after {
@@ -502,8 +502,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; text-align: left;
     background: #190628; border: 1px solid #2f1447; color: #f3e9ff;
     border-radius: 11px; padding: 9px 11px; cursor: pointer;
-    transition: border-color 140ms var(--ease), background 140ms var(--ease), opacity 140ms var(--ease);
+    transition: border-color 140ms var(--ease), background 140ms var(--ease), opacity 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
+  .over-body .buy:not(:disabled):hover { transform: translateX(-2px) scale(1.02); }
+  .over-body .buy:not(:disabled):active { transform: scale(0.97); }
   .over-body .buy:disabled { opacity: 0.45; cursor: default; }
   .over-body .buy.ready { border-color: #ff4d94; background: #24092f; }
   .over-body .buy.owned { opacity: 1; border-color: #3ec98d; background: #0f2b21; }
@@ -525,8 +527,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     background: rgba(14, 3, 24, 0.86); border: 1px solid #5b2c7d; color: #f3e9ff;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     border-radius: 999px; padding: 10px 20px; font-size: 13.5px; cursor: pointer;
+    transition: background 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
-  .over-body .stop:hover { background: rgba(255, 255, 255, 0.2); }
+  .over-body .stop:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.05); }
+  .over-body .stop:active { transform: scale(0.95); }
   .over-body .stop.urgent { border-color: #ff4d94; animation: pulseStop 1.4s ease-in-out infinite; }
   @keyframes pulseStop { 50% { box-shadow: 0 0 0 8px rgba(255, 77, 148, 0.16); } }
 
@@ -633,7 +637,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   .over-body .ending-actions button {
     border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600; cursor: pointer;
     background: #ff4d94; color: #fff;
+    transition: transform 180ms var(--ease-bounce);
   }
+  .over-body .ending-actions button:hover { transform: translateY(-2px) scale(1.04); }
+  .over-body .ending-actions button:active { transform: scale(0.95); }
   .over-body .ending-actions .ghost { background: transparent; border: 1px solid #43215e; color: #f3e9ff; }
 
   @media (max-width: 760px) {

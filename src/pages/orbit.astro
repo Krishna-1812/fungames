@@ -271,6 +271,9 @@ import GameLayout from '../layouts/GameLayout.astro'
       launchMass = Number(b.dataset.mass)
       document.querySelectorAll('.opt[data-mass]').forEach((o) =>
         o.setAttribute('aria-checked', String(o === b)))
+      b.classList.remove('picked')
+      void b.offsetWidth
+      b.classList.add('picked')
       unlock(); sfx.blip(Number(b.dataset.mass) > 100 ? 4 : 1)
     })
   })
@@ -387,12 +390,18 @@ import GameLayout from '../layouts/GameLayout.astro'
   .orbit-body .opt {
     background: transparent; border: 0; color: #c3cdf0;
     border-radius: 999px; padding: 8px 15px; font-size: 13px; cursor: pointer;
-    transition: background 140ms var(--ease), color 140ms var(--ease);
+    transition: background 140ms var(--ease), color 140ms var(--ease), transform 180ms var(--ease-bounce);
     white-space: nowrap;
   }
-  .orbit-body .opt:hover { background: #1c2447; color: #fff; }
+  .orbit-body .opt:hover { background: #1c2447; color: #fff; transform: translateY(-1px) scale(1.05); }
+  .orbit-body .opt:active { transform: scale(0.94); }
   .orbit-body .opt[aria-checked='true'],
   .orbit-body .opt[aria-pressed='true'] { background: #2c65d8; color: #fff; }
+  /* A one-shot bounce when a launch mass is actually picked — see Powder's
+     identical .picked pattern for why this needs a toggled class rather
+     than an attribute selector. */
+  .orbit-body .opt.picked { animation: pop-opt 360ms var(--ease-bounce); }
+  @keyframes pop-opt { 40% { transform: scale(1.14); } }
 
   @media (max-width: 620px) {
     .orbit-body .opt { padding: 8px 11px; font-size: 12px; }
