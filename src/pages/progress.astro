@@ -11,6 +11,8 @@ import GameLayout from '../layouts/GameLayout.astro'
 ---
 
 <GameLayout slug="progress" bar="#2c1440" bodyClass="progress-body">
+  <div class="shaft" id="shaft" aria-hidden="true"></div>
+
   <div class="wrap">
     <header class="head">
       <h1>Progress</h1>
@@ -20,13 +22,22 @@ import GameLayout from '../layouts/GameLayout.astro'
       <p class="now" id="now">—</p>
     </header>
 
-    <ul class="bars" id="bars"></ul>
+    <div class="bars-wrap">
+      <ul class="bars" id="bars"></ul>
+      <!-- Sits over the list, drawing every fill in one pass. See the note in
+           lib/progress-bars.ts for why it is not a canvas per row. -->
+      <div class="meters" id="meters" aria-hidden="true"></div>
+    </div>
 
     <p class="foot">Updates every frame. This does not help.</p>
   </div>
 </GameLayout>
 
 <script>
+  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { SHAFT_FRAG } from '../lib/progress-shaft'
+  import { BARS_FRAG, MAX_ROWS, rateOf } from '../lib/progress-bars'
+
   const list = document.getElementById('bars')
   const nowEl = document.getElementById('now')
 
@@ -35,19 +46,19 @@ import GameLayout from '../layouts/GameLayout.astro'
   /** Each entry returns [start, end] as epoch milliseconds for "right now". */
   const ROWS = [
     {
-      name: 'This minute', glyph: '⏱️',
+      name: 'This minute',
       span: (d) => { const s = new Date(d); s.setSeconds(0, 0); return [+s, +s + 60_000] },
     },
     {
-      name: 'This hour', glyph: '🕐',
+      name: 'This hour',
       span: (d) => { const s = new Date(d); s.setMinutes(0, 0, 0); return [+s, +s + 3_600_000] },
     },
     {
-      name: 'Today', glyph: '🌅',
+      name: 'Today',
       span: (d) => { const s = new Date(d); s.setHours(0, 0, 0, 0); const e = new Date(s); e.setDate(e.getDate() + 1); return [+s, +e] },
     },
     {
-      name: 'This week', glyph: '📅',
+      name: 'This week',
       span: (d) => {
         const s = new Date(d); s.setHours(0, 0, 0, 0)
         // Monday-first, matching most of the world.
@@ -57,7 +68,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       },
     },
     {
-      name: 'This month', glyph: '🗓️',
+      name: 'This month',
       span: (d) => {
         const s = new Date(d.getFullYear(), d.getMonth(), 1)
         const e = new Date(d.getFullYear(), d.getMonth() + 1, 1)
@@ -65,41 +76,53 @@ import GameLayout from '../layouts/GameLayout.astro'
       },
     },
     {
-      name: 'This year', glyph: '🎆',
+      name: 'This year',
       span: (d) => [+new Date(d.getFullYear(), 0, 1), +new Date(d.getFullYear() + 1, 0, 1)],
     },
     {
-      name: 'This decade', glyph: '🔟',
+      name: 'This decade',
       span: (d) => {
         const y = Math.floor(d.getFullYear() / 10) * 10
         return [+new Date(y, 0, 1), +new Date(y + 10, 0, 1)]
       },
     },
     {
-      name: 'This century', glyph: '🏛️',
+      name: 'This century',
       span: (d) => {
         const y = Math.floor(d.getFullYear() / 100) * 100
         return [+new Date(y, 0, 1), +new Date(y + 100, 0, 1)]
       },
     },
     {
-      name: 'This millennium', glyph: '🌍',
+      name: 'This millennium',
       span: (d) => {
         const y = Math.floor(d.getFullYear() / 1000) * 1000
         return [+new Date(y, 0, 1), +new Date(y + 1000, 0, 1)]
       },
     },
     {
-      name: 'Until the weekend', glyph: '🎉',
+      /*
+       * Two rows in one, because the old single version was dead for two days
+       * out of every seven. It ran Monday 00:00 to Saturday 00:00, so from the
+       * moment the weekend started until Monday it sat at 100.0000% with
+       * "0.0 seconds left" — the one row on the page you would look at on a
+       * Saturday, and the only one that had stopped telling the truth.
+       */
+      name: (d) => (isWeekend(d) ? 'The weekend itself' : 'Until the weekend'),
       span: (d) => {
         const s = new Date(d); s.setHours(0, 0, 0, 0)
-        s.setDate(s.getDate() - ((s.getDay() + 6) % 7))       // Monday
-        const e = new Date(s); e.setDate(e.getDate() + 5)      // Saturday 00:00
+        if (isWeekend(d)) {
+          s.setDate(s.getDate() - (d.getDay() === 0 ? 1 : 0))   // back to Saturday
+          const e = new Date(s); e.setDate(e.getDate() + 2)     // Monday 00:00
+          return [+s, +e]
+        }
+        s.setDate(s.getDate() - ((s.getDay() + 6) % 7))         // Monday
+        const e = new Date(s); e.setDate(e.getDate() + 5)       // Saturday 00:00
         return [+s, +e]
       },
     },
     {
-      name: 'The current lunar cycle', glyph: '🌔',
+      name: 'The current lunar cycle',
       span: (d) => {
         // Synodic month, anchored to a known new moon (2000-01-06 18:14 UTC).
         const SYN = 29.530588853 * DAY
@@ -109,17 +132,19 @@ import GameLayout from '../layouts/GameLayout.astro'
       },
     },
     {
-      name: 'Until 32-bit time runs out', glyph: '💾',
+      name: 'Until 32-bit time runs out',
       span: () => [+new Date(1970, 0, 1), 2_147_483_647_000],
       note: 'The Unix timestamp overflows on 19 January 2038.',
     },
     {
-      name: "The Sun's life", glyph: '☀️',
+      name: "The Sun's life",
       // Fixed astronomical figures: ~4.6 Gyr in, ~10 Gyr total.
       fixed: () => 4.6 / 10,
       note: 'It has about five billion years of hydrogen left.',
     },
   ]
+
+  const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6
 
   const pad = (n) => String(n).padStart(2, '0')
 
@@ -132,8 +157,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     const h = m / 60
     if (h < 24) return `${Math.floor(h)}h ${pad(Math.floor(m % 60))}m left`
     const d = h / 24
-    if (d < 31) return `${Math.floor(d)} days, ${Math.floor(h % 24)}h left`
-    if (d < 400) return `${Math.floor(d)} days left`
+    // Singular below two: the old version said "1 days, 9h left" every Saturday.
+    const dn = Math.floor(d)
+    if (d < 31) return `${dn} ${dn === 1 ? 'day' : 'days'}, ${Math.floor(h % 24)}h left`
+    if (d < 400) return `${dn} days left`
     const y = d / 365.2425
     if (y < 1000) return `${y.toFixed(1)} years left`
     if (y < 1e6) return `${Math.round(y).toLocaleString('en-US')} years left`
@@ -145,37 +172,165 @@ import GameLayout from '../layouts/GameLayout.astro'
     const li = document.createElement('li')
     li.className = 'row'
     li.innerHTML =
-      `<span class="r-glyph" aria-hidden="true">${r.glyph}</span>` +
-      `<span class="r-name">${r.name}${r.note ? `<em>${r.note}</em>` : ''}</span>` +
+      `<span class="r-name"><b></b>${r.note ? `<em>${r.note}</em>` : ''}</span>` +
       `<span class="r-track"><span class="r-fill"></span></span>` +
       `<span class="r-pct"></span><span class="r-left"></span>`
     list.appendChild(li)
-    return { r, fill: li.querySelector('.r-fill'), pct: li.querySelector('.r-pct'), left: li.querySelector('.r-left') }
+    return {
+      r,
+      title: li.querySelector('b'),
+      track: li.querySelector('.r-track'),
+      fill: li.querySelector('.r-fill'),
+      pct: li.querySelector('.r-pct'),
+      left: li.querySelector('.r-left'),
+      // Last values written, so a frame that changes nothing touches no DOM.
+      // "973.3 years left" was being rewritten sixty times a second.
+      lastPct: '', lastLeft: '', lastName: '', lastW: -1,
+    }
   })
+
+  /* ------------------------------------------------------------------------
+     The meters.
+
+     Thirteen fills, one surface. The CSS fill underneath stays exactly as it
+     was and is what a browser without WebGL2 shows; when the shader is up the
+     list gets a class that hides it, so the two are never both on screen.
+     ------------------------------------------------------------------------ */
+
+  const fracs = new Float32Array(MAX_ROWS)
+  const rates = new Float32Array(MAX_ROWS)
+  const ys = new Float32Array(MAX_ROWS)
+  let x0 = 0, x1 = 1, thX = 0.01, thY = 0.01
+
+  const metersHost = document.getElementById('meters')
+
+  function measure() {
+    const hb = metersHost.getBoundingClientRect()
+    // A zero box means the element is not laid out yet; the observers below
+    // will call back the moment it is.
+    if (hb.width < 1 || hb.height < 1) return
+    const t0 = nodes[0].track.getBoundingClientRect()
+    x0 = (t0.left - hb.left) / hb.width
+    x1 = (t0.right - hb.left) / hb.width
+    thX = t0.height / 2 / hb.width
+    thY = t0.height / 2 / hb.height
+    for (let i = 0; i < nodes.length; i++) {
+      const t = nodes[i].track.getBoundingClientRect()
+      // Canvas y runs bottom-up; CSS y runs top-down.
+      ys[i] = 1 - ((t.top + t.bottom) / 2 - hb.top) / hb.height
+    }
+  }
+
+  measure()
+
+  const meters = new ShaderSurface(metersHost, BARS_FRAG, {
+    uniforms: () => ({
+      u_n: nodes.length,
+      u_y: ys,
+      u_frac: fracs,
+      u_rate: rates,
+      u_x0: x0,
+      u_x1: x1,
+      u_thX: thX,
+      u_thY: thY,
+      u_motion: prefersReducedMotion ? 0 : 1,
+    }),
+  })
+
+  const glOn = !!meters.canvas.isConnected
+  if (glOn) list.classList.add('gl')
+
+  // Row geometry is read off the real elements, so anything that reflows them
+  // — a resize, a font landing late, the notes wrapping — has to re-measure.
+  const ro = new ResizeObserver(() => { measure(); if (prefersReducedMotion) meters.redraw() })
+  ro.observe(metersHost)
+  for (const n of nodes) ro.observe(n.track)
+
+  /* ------------------------------------------------------------------------
+     The shaft behind everything. Fixed to the viewport and told where the page
+     has been scrolled to, rather than being a very tall canvas.
+     ------------------------------------------------------------------------ */
+
+  let scroll = 0
+  const shaft = new ShaderSurface(document.getElementById('shaft'), SHAFT_FRAG, {
+    scale: 0.75,
+    uniforms: () => ({ u_scroll: scroll, u_motion: prefersReducedMotion ? 0 : 1 }),
+  })
+
+  function readScroll() {
+    const max = document.documentElement.scrollHeight - innerHeight
+    scroll = max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0
+  }
+  readScroll()
+  addEventListener('scroll', () => {
+    readScroll()
+    // The ticker is parked under reduced motion, so the shaft needs asking.
+    if (prefersReducedMotion) shaft.redraw()
+  }, { passive: true })
+
+  /* ------------------------------------------------------------------------
+     The clock
+     ------------------------------------------------------------------------ */
+
+  // Built once. Constructing an Intl.DateTimeFormat is expensive, and
+  // toLocaleString builds one every call — this ran sixty times a second to
+  // produce a string that changes once a second.
+  const fmt = new Intl.DateTimeFormat(undefined, {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+  let lastSecond = -1
+  /* Under reduced motion the shared ticker never runs, so the meters have to
+     be asked to redraw — but only when a fill has actually moved. A bar
+     advancing is the page working, not decoration, so it is not something to
+     suppress; redrawing sixty times a second to show a change that happens
+     seventeen times a second is. */
+  let dirty = false
 
   function tick() {
     const d = new Date()
-    nowEl.textContent = d.toLocaleString(undefined, {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    })
 
-    for (const n of nodes) {
-      let frac, remaining
+    const sec = Math.floor(+d / 1000)
+    if (sec !== lastSecond) {
+      lastSecond = sec
+      nowEl.textContent = fmt.format(d)
+    }
+
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]
+      let frac, remaining, rate
       if (n.r.fixed) {
         frac = n.r.fixed()
         remaining = null
+        // Not slow: stopped. It has read 46% since before there were eyes.
+        rate = 0
       } else {
         const [s, e] = n.r.span(d)
         frac = Math.min(1, Math.max(0, (+d - s) / (e - s)))
         remaining = e - +d
+        rate = rateOf((e - s) / 1000)
       }
-      n.fill.style.width = (frac * 100).toFixed(4) + '%'
+      fracs[i] = frac
+      rates[i] = rate
+
+      const name = typeof n.r.name === 'function' ? n.r.name(d) : n.r.name
+      if (name !== n.lastName) { n.lastName = name; n.title.textContent = name }
+
+      // Rounded to a tenth of a percent of the bar's width: below that nothing
+      // moves on screen, and a style write per row per frame is not free.
+      const w = Math.round(frac * 1000)
+      if (w !== n.lastW) { n.lastW = w; dirty = true; n.fill.style.width = (w / 10).toFixed(1) + '%' }
+
       // More decimals where a whole percent would take years to move.
-      const dp = frac > 0.9999 ? 4 : n.r.fixed ? 1 : remaining > 86_400_000 * 200 ? 4 : 2
-      n.pct.textContent = (frac * 100).toFixed(dp) + '%'
-      n.left.textContent = remaining === null ? 'about 5 billion years left' : human(remaining)
+      const dp = frac > 0.9999 ? 4 : n.r.fixed ? 1 : remaining > DAY * 200 ? 4 : 2
+      const pct = (frac * 100).toFixed(dp) + '%'
+      if (pct !== n.lastPct) { n.lastPct = pct; n.pct.textContent = pct }
+
+      const left = remaining === null ? 'about 5 billion years left' : human(remaining)
+      if (left !== n.lastLeft) { n.lastLeft = left; n.left.textContent = left }
     }
+
+    if (glOn && prefersReducedMotion && dirty) { dirty = false; meters.redraw() }
     requestAnimationFrame(tick)
   }
   tick()
@@ -185,20 +340,45 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* Rows are built at runtime, so these cannot be scoped. */
   .progress-body { background: #14091f; color: #f1eaf8; }
 
-  .progress-body .wrap { max-width: 780px; margin: 0 auto; padding: 46px 22px 80px; }
+  .progress-body .shaft {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    /* The still fallback, roughly what the shader settles to: without WebGL2
+       this is the page's own background and nothing looks missing. */
+    background:
+      radial-gradient(120% 60% at 50% 0%, #241040 0%, transparent 62%),
+      linear-gradient(180deg, #180b25, #120817 62%, #0e0613);
+  }
+  .progress-body .shaft .gl-surface {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  }
+
+  .progress-body .wrap {
+    position: relative; z-index: 1;
+    max-width: 780px; margin: 0 auto; padding: 46px 22px 80px;
+  }
   .progress-body .head { text-align: center; margin-bottom: 30px; }
   .progress-body .head h1 { font-size: clamp(34px, 6vw, 52px); }
   .progress-body .lede { color: #b3a1c9; margin: 10px auto 0; max-width: 42ch; }
   .progress-body .now {
-    font-variant-numeric: tabular-nums; font-size: 13.5px; color: #8f7bab;
+    font-variant-numeric: tabular-nums; font-size: 13.5px; color: #a08cbb;
     margin-top: 14px; letter-spacing: 0.01em;
   }
 
+  .progress-body .bars-wrap { position: relative; }
   .progress-body .bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .progress-body .meters {
+    position: absolute; inset: 0; pointer-events: none;
+    /* Above the grooves, below nothing: the rows underneath still take hover. */
+    z-index: 2;
+  }
+  .progress-body .meters .gl-surface {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  }
+
   .progress-body .row {
     display: grid;
-    grid-template-columns: 26px minmax(0, 1fr) 2.2fr 66px;
-    grid-template-areas: 'g n t p' '. . l l';
+    grid-template-columns: minmax(0, 1fr) 2.2fr 66px;
+    grid-template-areas: 'n t p' '. l l';
     align-items: center;
     gap: 4px 12px;
     padding: 11px 14px;
@@ -207,36 +387,41 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   .progress-body .row:hover { background: #1f1030; }
 
-  .progress-body .r-glyph { grid-area: g; font-size: 18px; line-height: 1; }
   .progress-body .r-name { grid-area: n; font-weight: 600; font-size: 15px; }
+  .progress-body .r-name b { font-weight: inherit; }
   .progress-body .r-name em {
     display: block; font-style: normal; font-weight: 400;
-    font-size: 12px; color: #8f7bab; margin-top: 1px;
+    font-size: 12px; color: #a08cbb; margin-top: 1px;
   }
   .progress-body .r-track {
     grid-area: t; height: 8px; border-radius: 5px;
     background: #2a1740; overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
   }
   .progress-body .r-fill {
     display: block; height: 100%; width: 0;
     background: linear-gradient(90deg, #a86ede, #f0a8ff);
     border-radius: 5px;
   }
+  /* The shader draws every fill once it is up. The CSS one stays in the markup
+     as the fallback and is simply not shown. */
+  .progress-body .bars.gl .r-fill { display: none; }
+
   .progress-body .r-pct {
     grid-area: p; text-align: right;
     font-variant-numeric: tabular-nums; font-size: 13.5px; font-weight: 600;
   }
   .progress-body .r-left {
     grid-area: l; font-variant-numeric: tabular-nums;
-    font-size: 12px; color: #8f7bab;
+    font-size: 12px; color: #a08cbb;
   }
 
-  .progress-body .foot { text-align: center; color: #9081ab; font-size: 13.5px; margin-top: 30px; }
+  .progress-body .foot { text-align: center; color: #a08cbb; font-size: 13.5px; margin-top: 30px; }
 
   @media (max-width: 620px) {
     .progress-body .row {
-      grid-template-columns: 26px minmax(0, 1fr) 62px;
-      grid-template-areas: 'g n p' '. t t' '. l l';
+      grid-template-columns: minmax(0, 1fr) 62px;
+      grid-template-areas: 'n p' 't t' 'l l';
     }
   }
 </style>
