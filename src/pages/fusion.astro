@@ -449,8 +449,8 @@ const API = SITE.fusionApi
       0 7px 16px rgba(5, 2, 20, 0.34),
       0 0 26px rgba(255, 209, 102, 0.45);
   }
-  .piece.pop { animation: pop 220ms ease-out; }
-  @keyframes pop { from { transform: scale(0.7); opacity: 0; } }
+  .piece.pop { animation: pop 380ms var(--ease-bounce); }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } }
 
   .tray {
     width: 260px; flex: none; display: flex; flex-direction: column;
@@ -463,7 +463,10 @@ const API = SITE.fusionApi
   .tray-head button {
     background: none; border: 1px solid #4a3f80; color: inherit;
     border-radius: 8px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+    transition: transform 180ms var(--ease-bounce), background 140ms var(--ease);
   }
+  .tray-head button:hover { transform: scale(1.06); background: #322a5e; }
+  .tray-head button:active { transform: scale(0.94); }
   #filter {
     margin: 10px 12px; padding: 8px 10px; border-radius: 8px;
     border: 1px solid #3b3270; background: #16122e; color: #fff; font: inherit; font-size: 14px;
@@ -472,8 +475,10 @@ const API = SITE.fusionApi
   .chip {
     background: #2b2456; border: 1px solid #3d3470; color: #fff;
     border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+    transition: background 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
-  .chip:hover { background: #3a3170; }
+  .chip:hover { background: #3a3170; transform: translateY(-1px) scale(1.05); }
+  .chip:active { transform: scale(0.95); }
 
   .toast {
     position: absolute; left: 50%; top: 18px; transform: translateX(-50%);

@@ -420,7 +420,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   .result button {
     background: #e0a458; color: #3a121d; border: 0; border-radius: 999px;
     padding: 10px 26px; font-weight: 600; cursor: pointer;
+    transition: transform 180ms var(--ease-bounce);
   }
+  .result button:hover { transform: translateY(-2px) scale(1.05); }
+  .result button:active { transform: scale(0.95); }
 
   @media (prefers-reduced-motion: reduce) {
     .result { transition: none; }
