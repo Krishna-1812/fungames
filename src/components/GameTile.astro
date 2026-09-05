@@ -5,12 +5,16 @@ import type { Game } from '../data/games'
 interface Props { game: Game; index?: number }
 const { game, index = 0 } = Astro.props
 const ink = game.onAccent ?? '#ffffff'
+// Deterministic pseudo-random toss, like a sticker pressed on at a slight
+// angle — same seed shape as the homepage confetti, a different multiplier
+// so the two don't visibly correlate.
+const rot = ((index * 31) % 9) - 4
 ---
 
 <a
   class="tile"
   href={`/${game.slug}/`}
-  style={`--a:${game.accent}; --b:${game.accent2}; --ink:${ink}; --i:${index}`}
+  style={`--a:${game.accent}; --b:${game.accent2}; --ink:${ink}; --i:${index}; --rot:${rot}deg`}
 >
   <span class="art-wrap" aria-hidden="true"><TileArt art={game.art} seed={index + 1} /></span>
   <span class="gloss" aria-hidden="true"></span>
@@ -35,6 +39,13 @@ const ink = game.onAccent ?? '#ffffff'
     text-decoration: none;
     isolation: isolate;
     transform-style: preserve-3d;
+    /* Tossed on at a small angle, like a sticker rather than a laid-out grid
+       cell. The pointer-tilt script below sets its own inline transform on
+       hover and clears it on the way out, which naturally restores this. */
+    transform: rotate(var(--rot, 0deg));
+    /* A die-cut white edge, the classic sticker-sheet tell — it reads against
+       every accent colour in the registry, unlike a single fixed ink border. */
+    border: 3px solid var(--card);
 
     /* Three stops rather than two. A gradient between two colours travels in a
        straight line through colour space and goes muddy in the middle; bending
@@ -49,21 +60,24 @@ const ink = game.onAccent ?? '#ffffff'
       radial-gradient(52% 78% at 88% 4%, color-mix(in oklab, var(--b) 20%, white) 0%, transparent 64%),
       linear-gradient(142deg, var(--a) 0%, color-mix(in oklab, var(--a) 64%, var(--b)) 62%, var(--b) 100%);
 
-    /* Shadow tinted with the tile's own accent. A neutral grey shadow under a
-       saturated card is the single clearest tell of an untouched default. */
+    /* A hard sticker shadow first, then the same tinted glow as before —
+       shadow tinted with the tile's own accent is what keeps a saturated
+       card from casting the neutral grey shadow that is the clearest tell
+       of an untouched default. */
     box-shadow:
-      0 1px 2px rgba(18, 16, 24, 0.16),
+      var(--sticker-shadow),
       0 8px 20px -6px color-mix(in oklab, var(--a) 55%, transparent),
       0 24px 48px -18px color-mix(in oklab, var(--a) 70%, transparent);
 
     transition:
-      transform 260ms var(--ease),
-      box-shadow 260ms var(--ease);
-    animation: rise 520ms var(--ease) backwards;
+      transform 300ms var(--ease-bounce),
+      box-shadow 300ms var(--ease-bounce);
+    animation: rise 520ms var(--ease-bounce) backwards;
     animation-delay: calc(min(var(--i), 11) * 45ms);
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(14px); }
+    from { opacity: 0; transform: translateY(16px) rotate(var(--rot, 0deg)) scale(0.94); }
+    to { opacity: 1; transform: rotate(var(--rot, 0deg)); }
   }
 
   /* A soft vignette keeps text readable over the brighter end of the gradient. */
@@ -133,7 +147,7 @@ const ink = game.onAccent ?? '#ffffff'
   .tile:hover,
   .tile:focus-visible {
     box-shadow:
-      0 2px 4px rgba(18, 16, 24, 0.18),
+      var(--sticker-shadow-hover),
       0 14px 30px -8px color-mix(in oklab, var(--a) 62%, transparent),
       0 40px 70px -22px color-mix(in oklab, var(--a) 78%, transparent);
   }

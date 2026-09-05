@@ -25,6 +25,30 @@
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Overshoots past its target before settling — the difference between a UI
+     element "moving" and one that feels like it has a little weight to it.
+     Reserved for playful chrome (stickers, doodles); the tile lighting and
+     game HUDs keep the plain ease above, which is what makes it read as
+     material rather than as a toy. */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* A hard-edged, unblurred offset shadow — a paper cutout stuck slightly
+     off the surface, not a soft drop shadow — is what makes the sticker
+     motif read as playful rather than just "a card with a shadow". */
+  --sticker-shadow: 3px 4px 0 rgba(22, 21, 26, 0.18);
+  --sticker-shadow-hover: 5px 7px 0 rgba(22, 21, 26, 0.20);
+  --sticker-border: 2.5px solid var(--ink);
+}
+
+/* Shared motion for scattered decorative shapes (confetti, doodles) —
+   defined once here rather than per component, since Astro does not scope
+   @keyframes names and a second copy would just be dead weight. */
+@keyframes bob {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-7px) rotate(var(--r, 0deg)); }
+}
+@keyframes wiggle-in {
+  from { opacity: 0; transform: scale(0.4) rotate(var(--r, 0deg)); }
 }
 
 *,

@@ -152,7 +152,7 @@ const videoGameLd = {
     opacity: 0.92;
     transition: opacity 140ms var(--ease), transform 140ms var(--ease);
   }
-  .chrome-home:hover { opacity: 1; transform: translateX(-2px); }
+  .chrome-home:hover { opacity: 1; transform: translateX(-2px) rotate(-3deg); }
   .chrome-title {
     margin-inline: auto;
     opacity: 0.68;
@@ -170,11 +170,12 @@ const videoGameLd = {
     border-radius: 999px;
     padding: 7px 15px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 140ms var(--ease);
+    transition: background 140ms var(--ease), transform 220ms var(--ease-bounce);
   }
-  .chrome-share:hover { background: rgba(255, 255, 255, 0.3); }
+  .chrome-share:hover { background: rgba(255, 255, 255, 0.3); transform: scale(1.08) rotate(-2deg); }
+  .chrome-share:active { transform: scale(0.96) rotate(0deg); }
 
   .game-chromed { padding-top: 48px; }
   .game-fixed { height: 100dvh; overflow: hidden; }
