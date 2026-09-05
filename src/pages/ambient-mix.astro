@@ -344,6 +344,12 @@ const LAYERS: Layer[] = [
     L.out.gain.setTargetAtTime(target, ctx.currentTime, 0.12)
     L.li.classList.toggle('on', on)
     L.li.querySelector('.toggle').setAttribute('aria-pressed', String(on))
+    if (on) {
+      const glyph = L.li.querySelector('.glyph')
+      glyph.classList.remove('jump')
+      void glyph.offsetWidth
+      glyph.classList.add('jump')
+    }
   }
 
   /* One loop for every meter on the page, started with the audio and stopped
@@ -452,14 +458,18 @@ const LAYERS: Layer[] = [
   .primary {
     border: 0; border-radius: 999px; padding: 10px 22px; font-weight: 600;
     background: #5a9fd4; color: #06121c; cursor: pointer;
-    transition: filter 140ms var(--ease);
+    transition: filter 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
   .primary.live { background: #7ad4a0; }
-  .primary:hover { filter: brightness(1.08); }
+  .primary:hover { filter: brightness(1.08); transform: translateY(-2px) scale(1.03); }
+  .primary:active { transform: scale(0.96); }
   .ghost {
     border: 1px solid #2f5474; background: transparent; color: #cfe0ee;
     border-radius: 999px; padding: 9px 18px; cursor: pointer;
+    transition: transform 180ms var(--ease-bounce), background 140ms var(--ease);
   }
+  .ghost:hover { background: rgba(255, 255, 255, 0.06); transform: scale(1.04); }
+  .ghost:active { transform: scale(0.95); }
   .master { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #a8bccd; }
 
   input[type='range'] {
@@ -495,14 +505,20 @@ const LAYERS: Layer[] = [
   }
   .layer {
     background: #16283a; border: 1px solid #24405a; border-radius: var(--radius);
-    padding: 12px; transition: border-color 200ms var(--ease), background 200ms var(--ease);
+    padding: 12px; transition: border-color 200ms var(--ease), background 200ms var(--ease), transform 180ms var(--ease-bounce);
   }
   .layer.on { border-color: #5a9fd4; background: #1b344c; }
+  .layer:hover { transform: translateY(-2px); }
   .toggle {
     display: flex; align-items: center; gap: 12px; width: 100%;
     background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit;
   }
-  .glyph { font-size: 26px; line-height: 1; flex: none; }
+  .glyph { font-size: 26px; line-height: 1; flex: none; display: inline-block; }
+  /* A little jump the moment a layer actually switches on — see Spend It's
+     identical .jump for why this needs a toggled class rather than tying
+     straight to .on, which stays applied and would only fire once. */
+  .glyph.jump { animation: jump-glyph 380ms var(--ease-bounce); }
+  @keyframes jump-glyph { 40% { transform: translateY(-5px) scale(1.2); } }
   .meta { display: grid; flex: 1; min-width: 0; }
   .name { font-weight: 600; font-size: 15.5px; }
   .hint { font-size: 12px; color: #7f99b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
