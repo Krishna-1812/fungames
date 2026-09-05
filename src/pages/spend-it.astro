@@ -132,6 +132,7 @@ const BUDGET = 100_000_000_000
     input: el.querySelector('.qty'),
     sell: el.querySelector('.sell'),
     buy: el.querySelector('.buy'),
+    glyph: el.querySelector('.glyph'),
     n: 0,
   }))
 
@@ -221,6 +222,9 @@ const BUDGET = 100_000_000_000
   let combo = 0
 
   function change(it, delta) {
+    it.glyph.classList.remove('jump')
+    void it.glyph.offsetWidth
+    it.glyph.classList.add('jump')
     if (delta > 0) {
       // Never allow the balance to go negative, and buy as many as will fit.
       const affordable = Math.floor(balance() / it.price)
@@ -342,9 +346,10 @@ const BUDGET = 100_000_000_000
   .ghost {
     background: #fff; border: 1px solid var(--line-strong); border-radius: 999px;
     padding: 7px 15px; font-size: 13.5px; cursor: pointer;
-    transition: border-color 140ms var(--ease), transform 140ms var(--ease);
+    transition: border-color 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
-  .ghost:hover { border-color: #0f3d3e; transform: translateY(-1px); }
+  .ghost:hover { border-color: #0f3d3e; transform: translateY(-2px) scale(1.04); }
+  .ghost:active { transform: scale(0.95); }
 
   .wrap { max-width: 1120px; margin: 0 auto; padding: 30px 22px 90px; }
   .title { font-size: clamp(30px, 5vw, 46px); }
@@ -390,7 +395,13 @@ const BUDGET = 100_000_000_000
   }
   .item.unaffordable .glyph { filter: saturate(0.2) opacity(0.75); }
   .item.unaffordable .name { color: var(--ink-soft); }
-  .glyph { font-size: 34px; line-height: 1; transition: filter 160ms var(--ease); }
+  .glyph { font-size: 34px; line-height: 1; transition: filter 160ms var(--ease); display: inline-block; }
+  /* A one-shot jump on the glyph itself when it's actually bought or sold —
+     the burst of confetti already says "something happened"; this says
+     "to this specific thing". Toggled by class, not tied to .owned, since
+     .owned stays applied between purchases and would only fire once. */
+  .glyph.jump { animation: jump-glyph 340ms var(--ease-bounce); }
+  @keyframes jump-glyph { 40% { transform: translateY(-6px) scale(1.14); } }
   .item .name { font-weight: 600; margin-top: 8px; font-size: 15px; }
   .item .price { color: var(--ink-soft); font-size: 13.5px; font-variant-numeric: tabular-nums; }
 
