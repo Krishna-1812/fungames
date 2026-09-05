@@ -191,10 +191,22 @@ export function crater(input: ImpactInput): Crater {
     ? (1.17 * transient ** 1.13) / SIMPLE_COMPLEX_D ** 0.13
     : 1.25 * transient
 
+  /* Depth.
+   *
+   * Collins eq. 28 for complex craters is written in kilometres — d = 0.4 D^0.3
+   * with both sides in km. Feeding it metres is dimensionally meaningless and
+   * silently returns a plausible-looking small number: Chicxulub came out as a
+   * 129 km crater 14 m deep, which is a scratch, not a basin. Converted here.
+   *
+   * Simple craters use the observed depth-to-diameter ratio of about 1:5 for
+   * fresh terrestrial bowls rather than the transient-cavity depth, because by
+   * the time anyone measures a crater the breccia lens has already partly
+   * filled it back in. Meteor Crater is 1.19 km across and was roughly 230 m
+   * deep before 50,000 years of infill.
+   */
   const depth = complex
-    // Collins eq. 28: complex craters are strikingly shallow for their width.
-    ? 0.4 * final ** 0.3
-    : transient / 2.828
+    ? 0.4 * (final / 1000) ** 0.3 * 1000
+    : 0.2 * final
 
   return { transient, final, depth, complex }
 }

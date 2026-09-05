@@ -1,0 +1,694 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Asteroid Launcher — choose a rock, choose somewhere to put it.
+ *
+ * All of the substance lives in lib/impact.ts (the Collins, Melosh & Marcus
+ * scaling relations, checked against four real impacts) and lib/casualties.ts.
+ * This page is the instrument panel around them: pick the thing, pick the
+ * target, and read what the model says happens.
+ *
+ * The map is Natural Earth's 1:110m coastline in an equirectangular projection,
+ * which means a circle on the ground is an ellipse on screen — wider the further
+ * you get from the equator, by 1/cos(latitude). The rings are drawn as ellipses
+ * for exactly that reason, which is why a strike on Svalbard looks stretched and
+ * a strike on Ecuador does not.
+ */
+---
+
+<GameLayout slug="asteroid" bar="#2a0d08" bodyClass="rock-body">
+  <div class="wrap">
+    <header class="head">
+      <h1>Asteroid Launcher</h1>
+      <p class="lede">
+        Build a rock, drop it anywhere, and find out what it does. The numbers
+        are from the impact model planetary scientists actually use.
+      </p>
+    </header>
+
+    <div class="lab">
+      <section class="panel build" aria-labelledby="buildH">
+        <h2 id="buildH">The rock</h2>
+
+        <div class="presets" id="presets">
+          <button type="button" data-preset="chelyabinsk">Chelyabinsk</button>
+          <button type="button" data-preset="tunguska">Tunguska</button>
+          <button type="button" data-preset="barringer">Meteor Crater</button>
+          <button type="button" data-preset="chicxulub">Dinosaur killer</button>
+        </div>
+
+        <label class="ctl">
+          <span class="ctl-label">Diameter</span>
+          <input id="diameter" type="range" min="0" max="1000" value="420" />
+          <output id="diameterOut">50 m</output>
+        </label>
+
+        <fieldset class="comp">
+          <legend>Made of</legend>
+          <div class="comp-row" id="comp">
+            <button type="button" data-comp="ice" aria-pressed="false">Comet ice</button>
+            <button type="button" data-comp="porous" aria-pressed="false">Porous rock</button>
+            <button type="button" data-comp="rock" aria-pressed="true">Dense rock</button>
+            <button type="button" data-comp="iron" aria-pressed="false">Iron</button>
+            <button type="button" data-comp="gold" aria-pressed="false">Solid gold</button>
+          </div>
+        </fieldset>
+
+        <label class="ctl">
+          <span class="ctl-label">Speed</span>
+          <input id="velocity" type="range" min="11" max="72" value="17" />
+          <output id="velocityOut">17 km/s</output>
+        </label>
+
+        <label class="ctl">
+          <span class="ctl-label">Angle</span>
+          <input id="angle" type="range" min="5" max="90" value="45" />
+          <output id="angleOut">45°</output>
+        </label>
+
+        <p class="mass" id="massOut"></p>
+      </section>
+
+      <section class="panel aim" aria-labelledby="aimH">
+        <h2 id="aimH">The target</h2>
+
+        <div class="search">
+          <input
+            id="cityInput" type="search" autocomplete="off" spellcheck="false"
+            placeholder="Search a city, or click the map" aria-label="Search for a city"
+          />
+          <ul class="hits" id="hits" hidden></ul>
+        </div>
+
+        <div class="mapwrap">
+          <svg id="map" viewBox="0 0 2000 1000" role="img"
+               aria-label="World map. Click to choose an impact site.">
+            <rect class="sea" x="0" y="0" width="2000" height="1000" />
+            <path class="land" id="land" />
+            <g id="marker" hidden>
+              <circle class="mk-ring" r="26" />
+              <circle class="mk-dot" r="7" />
+            </g>
+          </svg>
+        </div>
+
+        <p class="target" id="targetOut">Nowhere selected yet.</p>
+        <button type="button" class="fire" id="fire" disabled>Launch</button>
+      </section>
+    </div>
+
+    <section class="result" id="result" hidden aria-live="polite">
+      <div class="verdict">
+        <p class="energy" id="energyOut"></p>
+        <p class="compare" id="compareOut"></p>
+      </div>
+
+      <div class="zoomwrap">
+        <svg id="zoom" role="img" aria-label="Damage rings around the impact site">
+          <rect class="sea" id="zoomSea" />
+          <path class="land" id="zoomLand" />
+          <g id="rings"></g>
+          <g id="places"></g>
+        </svg>
+        <p class="scalebar"><span id="scaleLine"></span><b id="scaleText"></b></p>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="cols">
+        <div>
+          <h3>What it does</h3>
+          <ul class="rings-list" id="ringsList"></ul>
+        </div>
+        <div>
+          <h3>Who it reaches</h3>
+          <p class="toll" id="tollOut"></p>
+          <ul class="cities-list" id="citiesList"></ul>
+        </div>
+      </div>
+
+      <details class="method">
+        <summary>How these numbers are worked out</summary>
+        <p>
+          Crater, fireball, blast and seismic figures come from Collins, Melosh &amp;
+          Marcus (2005), the peer-reviewed model behind the Imperial College and
+          Purdue impact calculator. The implementation is checked against four
+          impacts with measured answers — Chelyabinsk, Tunguska, Meteor Crater and
+          Chicxulub — and reproduces all four.
+        </p>
+        <p>
+          Casualties are a much rougher thing and should be read as an order of
+          magnitude. Each of the 1,200 largest cities on Earth is treated as an
+          evenly-populated disc, and anyone living outside those cities is not
+          counted at all — which is about right for an ocean strike and badly
+          wrong for a densely-populated countryside. The fatality rates per blast
+          band are anchored on Hiroshima; the mildest band is anchored on
+          Chelyabinsk, where a 2 kPa wave over 1.1 million people injured about
+          1,500 and killed nobody.
+        </p>
+        <p>Tsunami, ejecta and the global climate effects of the very largest impacts are not modelled.</p>
+      </details>
+    </section>
+  </div>
+</GameLayout>
+
+<script>
+  import { simulate, DENSITIES, type Composition } from '../lib/impact'
+  import { estimateCasualties, cityRadius } from '../lib/casualties'
+  import { CITIES, LAND_PATH, MAP_W, MAP_H, isLand, type City } from '../data/world'
+  import { sfx, unlock } from '../lib/audio'
+  import { burst, shake } from '../lib/fx'
+
+  const el = <T extends HTMLElement = HTMLElement>(id: string) =>
+    document.getElementById(id) as T
+
+  /** Metres of ground per map unit along a meridian. Constant everywhere. */
+  const M_PER_UNIT_Y = (180 / MAP_H) * 111_320
+
+  const nf = (n: number, d = 0) =>
+    n.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d })
+
+  /** Distances read very differently across nine orders of magnitude. */
+  function dist(m: number): string {
+    if (m < 1000) return `${nf(m)} m`
+    if (m < 100_000) return `${nf(m / 1000, 1)} km`
+    return `${nf(m / 1000)} km`
+  }
+
+  function bigNumber(n: number): string {
+    if (n >= 1e9) return `${nf(n / 1e9, 1)} billion`
+    if (n >= 1e6) return `${nf(n / 1e6, 1)} million`
+    return nf(n)
+  }
+
+  /* ---------------------------------------------------------------- state */
+
+  let composition: Composition = 'rock'
+  let target: { lat: number; lon: number; name: string } | null = null
+
+  /** Slider 0–1000 maps logarithmically onto 1 m … 20 km. */
+  const sliderToDiameter = (v: number) => Math.round(Math.exp(Math.log(1) + (v / 1000) * Math.log(20_000)))
+  const diameterToSlider = (d: number) => Math.round((Math.log(d) / Math.log(20_000)) * 1000)
+
+  const inputs = {
+    diameter: el<HTMLInputElement>('diameter'),
+    velocity: el<HTMLInputElement>('velocity'),
+    angle: el<HTMLInputElement>('angle'),
+  }
+
+  function currentInput() {
+    return {
+      diameter: sliderToDiameter(Number(inputs.diameter.value)),
+      composition,
+      velocity: Number(inputs.velocity.value) * 1000,
+      angle: Number(inputs.angle.value),
+    }
+  }
+
+  function syncReadouts() {
+    const i = currentInput()
+    el('diameterOut').textContent = dist(i.diameter)
+    el('velocityOut').textContent = `${nf(i.velocity / 1000)} km/s`
+    el('angleOut').textContent = `${i.angle}°`
+    const kg = (Math.PI / 6) * DENSITIES[composition] * i.diameter ** 3
+    el('massOut').textContent =
+      kg >= 1e12
+        ? `Weighs about ${bigNumber(kg / 1e9)} tonnes.`
+        : `Weighs about ${bigNumber(Math.round(kg / 1000))} tonnes.`
+  }
+
+  for (const input of Object.values(inputs)) {
+    input.addEventListener('input', syncReadouts)
+  }
+
+  el('comp').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-comp]')
+    if (!btn) return
+    composition = btn.dataset.comp as Composition
+    el('comp')
+      .querySelectorAll<HTMLButtonElement>('[data-comp]')
+      .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
+    unlock(); sfx.blip(2)
+    syncReadouts()
+  })
+
+  /* ----------------------------------------------------------- the map */
+
+  el('land').setAttribute('d', LAND_PATH)
+  el('zoomLand').setAttribute('d', LAND_PATH)
+
+  const lonToX = (lon: number) => ((lon + 180) / 360) * MAP_W
+  const latToY = (lat: number) => ((90 - lat) / 180) * MAP_H
+
+  function setTarget(lat: number, lon: number, name?: string) {
+    const label =
+      name ??
+      (isLand(lat, lon)
+        ? `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`
+        : 'Open ocean')
+    target = { lat, lon, name: label }
+
+    const marker = el('marker')
+    marker.hidden = false
+    for (const c of marker.querySelectorAll('circle')) {
+      c.setAttribute('cx', String(lonToX(lon)))
+      c.setAttribute('cy', String(latToY(lat)))
+    }
+    el('targetOut').textContent = isLand(lat, lon)
+      ? `Target: ${label}`
+      : `Target: ${label} — nothing but water for a long way.`
+    el<HTMLButtonElement>('fire').disabled = false
+  }
+
+  el('map').addEventListener('click', (e) => {
+    const svg = el<SVGSVGElement & HTMLElement>('map') as unknown as SVGSVGElement
+    const r = (svg as unknown as HTMLElement).getBoundingClientRect()
+    // The SVG is letterboxed by preserveAspectRatio, so map through the rendered
+    // box rather than assuming it fills the element.
+    const scale = Math.min(r.width / MAP_W, r.height / MAP_H)
+    const offX = (r.width - MAP_W * scale) / 2
+    const offY = (r.height - MAP_H * scale) / 2
+    const x = (e.clientX - r.left - offX) / scale
+    const y = (e.clientY - r.top - offY) / scale
+    if (x < 0 || x > MAP_W || y < 0 || y > MAP_H) return
+    setTarget(90 - (y / MAP_H) * 180, (x / MAP_W) * 360 - 180)
+    unlock(); sfx.click()
+  })
+
+  /* -------------------------------------------------------- city search */
+
+  const hits = el<HTMLUListElement>('hits')
+  const cityInput = el<HTMLInputElement>('cityInput')
+
+  cityInput.addEventListener('input', () => {
+    const q = cityInput.value.trim().toLowerCase()
+    if (q.length < 2) { hits.hidden = true; hits.innerHTML = ''; return }
+    const found = CITIES.filter((c) => c.n.toLowerCase().startsWith(q)).slice(0, 8)
+    hits.innerHTML = found
+      .map(
+        (c, i) =>
+          `<li><button type="button" data-i="${i}">${c.n}<span>${c.c} · ${bigNumber(c.p)}</span></button></li>`,
+      )
+      .join('')
+    hits.dataset.found = JSON.stringify(found.map((c) => [c.lat, c.lon, c.n, c.c]))
+    hits.hidden = found.length === 0
+  })
+
+  hits.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-i]')
+    if (!btn) return
+    const found = JSON.parse(hits.dataset.found ?? '[]') as [number, number, string, string][]
+    const pick = found[Number(btn.dataset.i)]
+    if (!pick) return
+    setTarget(pick[0], pick[1], `${pick[2]}, ${pick[3]}`)
+    cityInput.value = pick[2]
+    hits.hidden = true
+    unlock(); sfx.click()
+  })
+
+  /* ------------------------------------------------------------ presets */
+
+  const PRESETS: Record<string, { d: number; c: Composition; v: number; a: number; at?: [number, number, string] }> = {
+    chelyabinsk: { d: 19, c: 'rock', v: 19, a: 18, at: [55.15, 61.43, 'Chelyabinsk, Russia'] },
+    tunguska: { d: 55, c: 'rock', v: 17, a: 45, at: [60.89, 101.9, 'Tunguska, Siberia'] },
+    barringer: { d: 50, c: 'iron', v: 13, a: 45, at: [35.03, -111.02, 'Winslow, Arizona'] },
+    chicxulub: { d: 10_000, c: 'rock', v: 20, a: 60, at: [21.4, -89.51, 'Chicxulub, Mexico'] },
+  }
+
+  el('presets').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-preset]')
+    if (!btn) return
+    const p = PRESETS[btn.dataset.preset!]
+    if (!p) return
+    inputs.diameter.value = String(diameterToSlider(p.d))
+    inputs.velocity.value = String(p.v)
+    inputs.angle.value = String(p.a)
+    composition = p.c
+    el('comp')
+      .querySelectorAll<HTMLButtonElement>('[data-comp]')
+      .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.comp === p.c)))
+    if (p.at) setTarget(p.at[0], p.at[1], p.at[2])
+    syncReadouts()
+    unlock(); sfx.good()
+  })
+
+  /* ------------------------------------------------------------- launch */
+
+  const RING_COLOURS = ['#fff1c9', '#ffd166', '#ff9a3c', '#ff5f2e', '#e0341c', '#8d1f12']
+
+  el('fire').addEventListener('click', () => {
+    if (!target) return
+    const result = simulate(currentInput())
+    const casualties = estimateCasualties(result, target.lat, target.lon)
+    render(result, casualties)
+    unlock()
+    sfx.boom()
+    shake(document.body, 10, 420)
+    const r = el('zoom').getBoundingClientRect()
+    burst(r.left + r.width / 2, r.top + r.height / 2, {
+      count: 30, colors: ['#ffd166', '#ff7a33', '#fff'], speed: 6,
+      gravity: 0.18, shape: 'streak', size: 3,
+    })
+    el('result').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+
+  function render(r: ReturnType<typeof simulate>, cas: ReturnType<typeof estimateCasualties>) {
+    el('result').hidden = false
+
+    /* headline ------------------------------------------------------- */
+    const mt = r.energyMt
+    el('energyOut').textContent =
+      mt >= 1
+        ? `${bigNumber(Math.round(mt))} megatonnes of TNT`
+        : `${nf(mt * 1000, 1)} kilotonnes of TNT`
+
+    // Hiroshima was 15 kt; Tsar Bomba, the largest device ever detonated, 50 Mt.
+    const hiroshimas = (mt * 1000) / 15
+    el('compareOut').textContent =
+      hiroshimas < 1
+        ? `About ${nf(hiroshimas, 2)} times the Hiroshima bomb.`
+        : mt < 50
+          ? `About ${bigNumber(Math.round(hiroshimas))} Hiroshima bombs.`
+          : `About ${bigNumber(Math.round(mt / 50))} times the largest bomb ever tested.`
+
+    /* stats ---------------------------------------------------------- */
+    const stat = (v: string, l: string) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`
+    const rec = r.recurrenceYears
+    el('stats').innerHTML =
+      (r.crater
+        ? stat(dist(r.crater.final), 'crater across') + stat(dist(r.crater.depth), 'crater deep')
+        : stat(dist(r.entry.burstAltitude), 'burst altitude') + stat('none', 'crater')) +
+      stat(dist(r.fireball), 'fireball radius') +
+      stat(`M${r.magnitude.toFixed(1)}`, 'earthquake') +
+      stat(
+        rec >= 1e6 ? `${nf(rec / 1e6, 1)} Myr` : rec >= 1000 ? `${nf(rec / 1000)} kyr` : `${nf(rec)} yr`,
+        'happens about every',
+      )
+
+    /* what it does --------------------------------------------------- */
+    const burns = r.thermal.find((t) => t.effect === 'thirdDegreeBurns')
+    const rows: string[] = []
+    if (!r.crater) {
+      rows.push(
+        `<li><b>It never reaches the ground.</b><span>The air tears it apart at ${dist(
+          r.entry.burstAltitude,
+        )} and it detonates there. No crater — this is what Tunguska did.</span></li>`,
+      )
+    }
+    if (burns) {
+      rows.push(
+        `<li><b>Third-degree burns to ${dist(burns.radius)}</b><span>Anyone outdoors and facing it inside that circle.</span></li>`,
+      )
+    }
+    for (const b of r.blast) {
+      rows.push(
+        `<li><b>${b.label} to ${dist(b.radius)}</b><span>${b.note}. Peak wind ${nf(
+          b.wind * 3.6,
+        )} km/h.</span></li>`,
+      )
+    }
+    el('ringsList').innerHTML = rows.join('')
+
+    /* casualties ----------------------------------------------------- */
+    if (cas.dead === 0 && cas.injured === 0) {
+      el('tollOut').textContent = isLand(target!.lat, target!.lon)
+        ? 'No city in the dataset is close enough to be hurt. Empty land absorbs it.'
+        : 'Open water. Nobody is under it — though a strike this size in the sea would raise waves this model does not attempt.'
+      el('citiesList').innerHTML = ''
+    } else {
+      el('tollOut').innerHTML =
+        `<strong>${bigNumber(cas.dead)}</strong> dead, ` +
+        `<strong>${bigNumber(cas.injured)}</strong> injured.`
+      el('citiesList').innerHTML = cas.cities
+        .slice(0, 8)
+        .map(
+          (c) =>
+            `<li><b>${c.city.n}</b><span>${bigNumber(Math.round(c.dead))} dead · ${dist(
+              c.distance,
+            )} away</span></li>`,
+        )
+        .join('')
+    }
+
+    drawZoom(r)
+  }
+
+  /* --------------------------------------------------------- zoom view */
+
+  function drawZoom(r: ReturnType<typeof simulate>) {
+    const svg = el('zoom') as unknown as SVGSVGElement
+    const box = (svg as unknown as HTMLElement).getBoundingClientRect()
+    const aspect = box.width / Math.max(box.height, 1)
+
+    const lat = target!.lat
+    const cx = lonToX(target!.lon)
+    const cy = latToY(lat)
+    // Longitude compresses toward the poles, so a circle on the ground is this
+    // much wider than it is tall in map units.
+    const stretch = 1 / Math.max(Math.cos((lat * Math.PI) / 180), 0.05)
+
+    const pad = 1.35
+    let hy = (r.maxRadius / M_PER_UNIT_Y) * pad
+    let hx = hy * stretch
+    // Grow whichever axis is short so the viewBox matches the element's shape
+    // and the ellipses keep their true proportions.
+    if (hx / hy < aspect) hx = hy * aspect
+    else hy = hx / aspect
+
+    svg.setAttribute('viewBox', `${cx - hx} ${cy - hy} ${hx * 2} ${hy * 2}`)
+    for (const id of ['zoomSea']) {
+      const n = el(id)
+      n.setAttribute('x', String(cx - hx))
+      n.setAttribute('y', String(cy - hy))
+      n.setAttribute('width', String(hx * 2))
+      n.setAttribute('height', String(hy * 2))
+    }
+    // Strokes are in user units, which the zoom scales — keep them hairline.
+    svg.style.setProperty('--u', String((hy * 2) / Math.max(box.height, 1)))
+
+    const toUnitsY = (m: number) => m / M_PER_UNIT_Y
+    const ring = (m: number, colour: string, i: number, dashed = false) =>
+      `<ellipse cx="${cx}" cy="${cy}" rx="${toUnitsY(m) * stretch}" ry="${toUnitsY(m)}" ` +
+      `fill="${colour}" fill-opacity="0.13" stroke="${colour}" ` +
+      `stroke-opacity="0.85" ${dashed ? 'stroke-dasharray="6 5"' : ''} ` +
+      `style="--i:${i}" />`
+
+    const parts: string[] = []
+    // Largest first so the small, hot rings paint on top.
+    const ordered = [...r.blast].sort((a, b) => b.radius - a.radius)
+    ordered.forEach((b, i) => parts.push(ring(b.radius, RING_COLOURS[Math.min(i, 5)], i)))
+    const burns = r.thermal.find((t) => t.effect === 'thirdDegreeBurns')
+    if (burns) parts.push(ring(burns.radius, '#ffd166', ordered.length, true))
+    if (r.crater) parts.push(ring(r.crater.final / 2, '#2b0b06', ordered.length + 1))
+    parts.push(ring(r.fireball, '#fff4d6', ordered.length + 2))
+    el('rings').innerHTML = parts.join('')
+
+    // Nearby cities, so the rings have something to be next to.
+    const near = CITIES.filter((c) => {
+      const dx = (lonToX(c.lon) - cx) / stretch
+      const dy = latToY(c.lat) - cy
+      return Math.hypot(dx, dy) < hy * 1.1
+    })
+      .sort((a, b) => b.p - a.p)
+      .slice(0, 12)
+    el('places').innerHTML = near
+      .map(
+        (c) =>
+          `<g class="place"><circle cx="${lonToX(c.lon)}" cy="${latToY(c.lat)}" r="${hy * 0.012}" />` +
+          `<text x="${lonToX(c.lon) + hy * 0.02}" y="${latToY(c.lat) - hy * 0.02}" ` +
+          `font-size="${hy * 0.055}">${c.n}</text></g>`,
+      )
+      .join('')
+
+    // Scale bar: a round number of kilometres, sized to about a quarter of the view.
+    const targetM = ((hy * 2) / 4) * M_PER_UNIT_Y
+    const pow = 10 ** Math.floor(Math.log10(targetM))
+    const niceM = [1, 2, 5, 10].map((k) => k * pow).reduce((a, b) =>
+      Math.abs(b - targetM) < Math.abs(a - targetM) ? b : a,
+    )
+    // A scale bar measures horizontally, and horizontal units are compressed by
+    // the projection — so it is the stretched width over the viewBox width, not
+    // the vertical extent. The bar's container spans the map for the percentage
+    // to mean anything.
+    el('scaleLine').style.width = `${((toUnitsY(niceM) * stretch) / (hx * 2)) * 100}%`
+    el('scaleText').textContent = dist(niceM)
+  }
+
+  /* --------------------------------------------------------------- boot */
+
+  syncReadouts()
+  setTarget(51.507, -0.128, 'London, United Kingdom')
+</script>
+
+<style is:global>
+  .rock-body { background: #140705; color: #f6e9e2; }
+
+  .rock-body .wrap { max-width: 1140px; margin: 0 auto; padding: 40px 20px 90px; }
+  .rock-body .head { text-align: center; margin-bottom: 30px; }
+  .rock-body .head h1 { font-size: clamp(34px, 6vw, 56px); }
+  .rock-body .lede { color: #c7a99c; margin: 10px auto 0; max-width: 52ch; }
+
+  .rock-body .lab { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .rock-body .lab { grid-template-columns: 1fr; } }
+
+  .rock-body .panel {
+    background: #21100c; border: 1px solid #3d1f16; border-radius: var(--radius-lg);
+    padding: 18px 18px 20px;
+  }
+  .rock-body .panel h2 {
+    font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #c98b6b; margin: 0 0 14px;
+  }
+
+  .rock-body .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .rock-body .presets button {
+    background: #2f1710; border: 1px solid #4d2619; color: #f0d9cd;
+    border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer;
+    transition: background 140ms var(--ease), transform 180ms var(--ease-bounce);
+  }
+  .rock-body .presets button:hover { background: #402016; transform: translateY(-1px) scale(1.03); }
+  .rock-body .presets button:active { transform: scale(0.95); }
+
+  .rock-body .ctl { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin-bottom: 16px; }
+  .rock-body .ctl-label { font-size: 13px; color: #c7a99c; }
+  .rock-body .ctl output { font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .rock-body .ctl input { grid-column: 1 / -1; }
+
+  .rock-body input[type='range'] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+    border-radius: 3px; background: #4a2418; outline: none;
+  }
+  .rock-body input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 17px; height: 17px;
+    border-radius: 50%; background: #ff7a33; cursor: pointer; border: 0;
+  }
+  .rock-body input[type='range']::-moz-range-thumb {
+    width: 17px; height: 17px; border-radius: 50%; background: #ff7a33;
+    cursor: pointer; border: 0;
+  }
+
+  .rock-body .comp { border: 0; padding: 0; margin: 0 0 14px; }
+  .rock-body .comp legend { font-size: 13px; color: #c7a99c; padding: 0; margin-bottom: 6px; }
+  .rock-body .comp-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rock-body .comp-row button {
+    background: #2f1710; border: 1px solid #4d2619; color: #e8cfc2;
+    border-radius: 8px; padding: 7px 11px; font-size: 12.5px; cursor: pointer;
+    transition: background 140ms var(--ease), border-color 140ms var(--ease),
+      transform 180ms var(--ease-bounce);
+  }
+  .rock-body .comp-row button:hover { transform: translateY(-1px) scale(1.03); }
+  .rock-body .comp-row button[aria-pressed='true'] {
+    background: #5a2a17; border-color: #ff7a33; color: #fff;
+  }
+  .rock-body .mass { font-size: 12.5px; color: #b1897b; margin: 4px 0 0; }
+
+  .rock-body .search { position: relative; margin-bottom: 12px; }
+  .rock-body .search input {
+    width: 100%; background: #170a07; border: 1px solid #4d2619; color: #f6e9e2;
+    border-radius: 10px; padding: 10px 12px; font-size: 14.5px;
+  }
+  .rock-body .hits {
+    position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px);
+    list-style: none; margin: 0; padding: 4px; background: #241009;
+    border: 1px solid #4d2619; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    max-height: 260px; overflow-y: auto;
+  }
+  .rock-body .hits button {
+    display: flex; justify-content: space-between; gap: 10px; width: 100%;
+    background: none; border: 0; color: #f6e9e2; text-align: left;
+    padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 14px;
+  }
+  .rock-body .hits button:hover { background: #3a1a11; }
+  .rock-body .hits span { color: #b1897b; font-size: 12.5px; white-space: nowrap; }
+
+  .rock-body .mapwrap { border-radius: var(--radius); overflow: hidden; background: #0b1522; }
+  .rock-body #map { width: 100%; height: auto; display: block; cursor: crosshair; }
+  .rock-body .sea { fill: #0d1a2b; }
+  .rock-body .land { fill: #33241c; stroke: #5c3f2e; stroke-width: 1; }
+  .rock-body .mk-ring { fill: none; stroke: #ff7a33; stroke-width: 5; opacity: 0.75; }
+  .rock-body .mk-dot { fill: #ff7a33; }
+
+  .rock-body .target { font-size: 13.5px; color: #c7a99c; margin: 12px 0 14px; min-height: 1.4em; }
+  .rock-body .fire {
+    width: 100%; border: 0; border-radius: 12px; padding: 14px;
+    background: linear-gradient(180deg, #ff8f4a, #e0451c); color: #fff;
+    font-size: 17px; font-weight: 700; font-family: var(--display); cursor: pointer;
+    transition: transform 180ms var(--ease-bounce), filter 140ms var(--ease);
+  }
+  .rock-body .fire:hover:not(:disabled) { transform: translateY(-2px) scale(1.02); filter: brightness(1.07); }
+  .rock-body .fire:active:not(:disabled) { transform: scale(0.97); }
+  .rock-body .fire:disabled { background: #4a2418; color: #a5806f; cursor: default; }
+
+  /* results ---------------------------------------------------------- */
+  .rock-body .result { margin-top: 26px; }
+  .rock-body .verdict { text-align: center; margin-bottom: 18px; }
+  .rock-body .energy {
+    font-family: var(--display); font-size: clamp(28px, 5.6vw, 46px);
+    font-weight: 800; margin: 0; letter-spacing: -0.02em; color: #ffb066;
+  }
+  .rock-body .compare { color: #c7a99c; margin: 6px 0 0; }
+
+  .rock-body .zoomwrap {
+    background: #0b1522; border: 1px solid #3d1f16; border-radius: var(--radius-lg);
+    overflow: hidden; position: relative;
+  }
+  .rock-body #zoom { width: 100%; height: min(56vh, 460px); display: block; }
+  /* Natural Earth's 1:110m outline has vertices kilometres apart, so at a
+     50 km view the coast is visibly a polygon. Held at low contrast against the
+     water so it reads as context rather than as the subject — the rings and the
+     place names are what this picture is actually about. */
+  .rock-body #zoom .sea { fill: #141d28; }
+  .rock-body #zoom .land { fill: #241c17; stroke: #3a2c22; stroke-width: calc(var(--u, 1) * 1px); }
+  .rock-body #zoom ellipse {
+    stroke-width: calc(var(--u, 1) * 1.5px);
+    transform-box: fill-box; transform-origin: center;
+    animation: ringOut 520ms var(--ease) backwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+  @keyframes ringOut { from { transform: scale(0.2); opacity: 0; } }
+  .rock-body #zoom .place circle { fill: #9fd0ff; }
+  .rock-body #zoom .place text { fill: #cfe4f7; font-family: var(--font); }
+
+  /* Spans the map so the bar's width percentage is a percentage of the view. */
+  .rock-body .scalebar {
+    position: absolute; left: 14px; right: 14px; bottom: 12px; margin: 0;
+    display: flex; align-items: center; gap: 8px; font-size: 12px; color: #cfe4f7;
+    white-space: nowrap; pointer-events: none;
+  }
+  .rock-body .scalebar span {
+    display: block; height: 7px; flex: none;
+    border: 1px solid #cfe4f7; border-top: 0;
+  }
+
+  .rock-body .stats {
+    display: grid; gap: 10px; margin: 16px 0;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+  .rock-body .stat {
+    background: #21100c; border: 1px solid #3d1f16; border-radius: var(--radius);
+    padding: 14px 12px; text-align: center;
+  }
+  .rock-body .stat b {
+    display: block; font-family: var(--display); font-size: 22px;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  }
+  .rock-body .stat span { font-size: 11.5px; color: #b1897b; }
+
+  .rock-body .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .rock-body .cols { grid-template-columns: 1fr; } }
+  .rock-body .cols h3 { font-size: 17px; margin: 0 0 10px; }
+  .rock-body .rings-list, .rock-body .cities-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .rock-body .rings-list li, .rock-body .cities-list li {
+    background: #21100c; border-left: 3px solid #ff7a33; border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .rock-body .rings-list b, .rock-body .cities-list b { display: block; font-size: 14.5px; }
+  .rock-body .rings-list span, .rock-body .cities-list span { font-size: 12.5px; color: #b1897b; }
+  .rock-body .toll { font-size: 17px; margin: 0 0 12px; }
+  .rock-body .toll strong { color: #ff8f4a; font-variant-numeric: tabular-nums; }
+
+  .rock-body .method { margin-top: 22px; color: #b1897b; font-size: 13.5px; }
+  .rock-body .method summary { cursor: pointer; color: #c98b6b; }
+  .rock-body .method p { max-width: 78ch; }
+</style>

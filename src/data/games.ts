@@ -22,6 +22,7 @@ export type TileArt =
   | 'powder'   // grains piling up
   | 'orbit2'   // bodies on a trajectory
   | 'chaos'    // everything at once
+  | 'impact'   // concentric damage rings
 
 export type Game = {
   slug: string
@@ -43,6 +44,15 @@ export type Game = {
 }
 
 export const GAMES: Game[] = [
+  {
+    slug: 'asteroid',
+    title: 'Asteroid Launcher',
+    blurb: 'Drop a rock on your own city',
+    description:
+      'Pick a size, a speed and a target, then watch the crater, the fireball and the blast rings land on a real map. The physics is the peer-reviewed impact model, checked against Chelyabinsk, Tunguska and Chicxulub.',
+    accent: '#2a0d08', accent2: '#ff7a33', glyph: '☄️', art: 'impact',
+    added: '2026-09-16',
+  },
   {
     slug: 'overstimulated',
     title: 'Overstimulated',

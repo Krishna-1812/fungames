@@ -14,7 +14,7 @@
  */
 import { writeFileSync } from 'fs'
 
-const CITY_COUNT = 1200
+const CITY_COUNT = 6000
 const MAP_W = 2000 // SVG user units for the full 360° of longitude
 const MAP_H = 1000
 
@@ -55,11 +55,25 @@ function ringPoints(ring, arcs) {
   return pts
 }
 
-const pointsToPath = (pts) =>
-  pts
-    .map(project)
-    .map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`)
-    .join('') + 'Z'
+/**
+ * Project a ring to SVG, breaking it wherever it crosses the antimeridian.
+ *
+ * Chukotka, Fiji and Antarctica all straddle ±180°, and in an equirectangular
+ * projection a segment from +179.9° to −179.9° is a hair's width of real
+ * coastline that draws as a line straight across the entire map. Any step wider
+ * than half the world is that, not geography, so the path restarts there.
+ */
+function pointsToPath(pts) {
+  const projected = pts.map(project)
+  let d = ''
+  let prevX = null
+  for (const [x, y] of projected) {
+    const wrapped = prevX !== null && Math.abs(x - prevX) > MAP_W / 2
+    d += `${d === '' || wrapped ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`
+    prevX = x
+  }
+  return d + 'Z'
+}
 
 async function buildCoastline() {
   const topo = await (
@@ -180,7 +194,41 @@ async function buildCities() {
     process.stdout.write(`\r  cities: ${out.length}`)
   }
   process.stdout.write('\n')
-  return out
+  return dedupe(out)
+}
+
+/**
+ * Drop settlements that are really districts of a larger one already in the list.
+ *
+ * GeoNames lists Brent and Islington as their own populated places, a few km
+ * from a London entry that already counts all nine million of them. Left alone,
+ * every blast over a big city double-counts its own boroughs and the death toll
+ * comes out far too high.
+ *
+ * The test is the same disc the casualty model uses: walking down from the
+ * largest, if a place falls inside the footprint of one already kept, it is part
+ * of that place rather than a neighbour of it.
+ */
+function dedupe(cities) {
+  const radiusKm = (pop) => Math.sqrt(pop / 5000 / Math.PI)
+  const kept = []
+  let dropped = 0
+
+  for (const c of [...cities].sort((a, b) => b.p - a.p)) {
+    const swallowed = kept.some((k) => {
+      const r = radiusKm(k.p)
+      // Cheap latitude gate before the real distance, which is the expensive bit.
+      if (Math.abs(k.lat - c.lat) > r / 111 + 0.02) return false
+      const dx = (c.lon - k.lon) * 111.32 * Math.cos((c.lat * Math.PI) / 180)
+      const dy = (c.lat - k.lat) * 110.57
+      return Math.hypot(dx, dy) < r
+    })
+    if (swallowed) dropped++
+    else kept.push(c)
+  }
+
+  console.log(`  deduped: dropped ${dropped} districts of larger cities`)
+  return kept
 }
 
 /* -------------------------------------------------------------------------- */

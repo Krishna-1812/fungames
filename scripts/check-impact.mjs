@@ -55,6 +55,8 @@ const CASES = [
       // survive entry, which is exactly why this one left a hole.
       airburst: [0, 0],
       craterKm: [0.8, 1.8],
+      // ~230 m before infill, 170 m today.
+      craterDepthM: [150, 450],
     },
     note: 'The textbook simple crater. Still 170 m deep after 50,000 years.',
   },
@@ -70,6 +72,9 @@ const CASES = [
       // literature spread, not a loosened bound.
       magnitude: [9, 12],
       airburst: [0, 0],
+      // A basin this wide is kilometres deep, not metres. Guards the unit bug
+      // that had it at 14 m.
+      craterDepthM: [700, 4_000],
     },
     note: 'Ended the Cretaceous. Our model should land in the right order of magnitude.',
   },
@@ -87,6 +92,7 @@ for (const c of CASES) {
   const actual = {
     energyMt: r.energyMt,
     craterKm: r.crater ? r.crater.final / KM : null,
+    craterDepthM: r.crater ? r.crater.depth : null,
     crater: r.crater ? 1 : 0,
     magnitude: r.magnitude,
     airburst: r.entry.airburst ? 1 : 0,

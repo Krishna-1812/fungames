@@ -239,6 +239,34 @@ const scribble = range(30)
     )
   }
 
+  {/* Damage rings spreading from an impact point, with the incoming trajectory
+      streaking in from the top right. */}
+  {
+    art === 'impact' && (
+      <g>
+        {range(5).map((i) => (
+          <ellipse
+            cx={92} cy={104} rx={16 + i * 27} ry={7 + i * 12}
+            fill="none" stroke="#fff"
+            stroke-width={1.6 - i * 0.2}
+            opacity={0.5 - i * 0.075}
+          />
+        ))}
+        <ellipse cx={92} cy={104} rx={13} ry={6} fill="#fff" opacity={0.85} />
+        <path
+          d="M212 14 L108 92" stroke="#fff" stroke-width="2.4"
+          stroke-linecap="round" opacity="0.75"
+        />
+        {range(7).map((i) => (
+          <circle
+            cx={206 - i * 15 + rand(i) * 6} cy={20 + i * 11 + rand(i + 9) * 5}
+            r={2.6 - i * 0.28} fill="#fff" opacity={0.7 - i * 0.08}
+          />
+        ))}
+      </g>
+    )
+  }
+
   {
     art === 'grid' && (
       <g fill="#fff">
