@@ -1,8 +1,9 @@
 import { defineConfig } from 'astro/config'
 
 export default defineConfig({
-  // Change to your real domain — used for canonical URLs, sitemap and OG tags.
-  site: 'https://example.com',
+  // Placeholder — must match `url` in src/site.config.ts exactly. Used for
+  // canonical URLs, the sitemap and OG tags; change both together.
+  site: 'https://yoursite.com',
   // Trailing slashes match neal.fun's /game-name/ URL shape.
   trailingSlash: 'always',
   build: { format: 'directory' },

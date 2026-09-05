@@ -1,7 +1,8 @@
 # funsite
 
-A neal.fun-style site: one lean homepage, twelve self-contained interactive
-pages, zero JavaScript bundles.
+A neal.fun-style site: one lean homepage and fifteen self-contained
+interactive pages, each rendered with its own WebGL shader or 2D canvas and
+shipping only the script that page actually needs.
 
 Built after taking neal.fun apart game by game. The teardown is in
 [`docs/neal-fun-research.md`](docs/neal-fun-research.md) — every figure in it is
@@ -71,8 +72,14 @@ both ways.
 JavaScript by default**, so a page only carries what it actually uses. Nuxt 2,
 what neal.fun runs, is end-of-life.
 
-Game logic lives in module scripts that Astro bundles per page, with two shared
-chunks — `lib/audio.ts` and `lib/fx.ts` — cached across the whole site.
+Game logic lives in module scripts that Astro bundles per page. Three chunks
+are shared across every page that uses them — `lib/audio.ts` (the
+synthesiser), `lib/fx.ts` (particles, screen shake, floating text) and
+`lib/gl.ts` (the WebGL runtime: one shared frame loop across every shader on a
+page, context-loss handling, the common GLSL noise/tonemap library). Each
+game's actual visual — the shader or canvas work that makes it look like that
+specific game rather than a template — lives in its own small file beside
+those three, one per game, not one shared renderer.
 
 ```
 src/
@@ -88,6 +95,8 @@ src/
   lib/
     audio.ts            the synthesiser: every sound on the site, no audio files
     fx.ts               particles, screen shake, floating text
+    gl.ts               the WebGL runtime: shared frame loop, GLSL noise/tonemap library
+    <game>-*.ts         one small rendering module per game (e.g. powder-render.ts, orbit-render.ts)
   pages/                one file per game, plus index, 404, sitemap, robots
 worker/
   fusion-worker.js      Cloudflare Worker: referer gate, KV, edge cache, LLM
@@ -97,24 +106,35 @@ docs/
 
 ### Measured output
 
+Gzipped weight of each page: its HTML plus the full transitive import graph of
+its own script — the shared `lib/audio.ts`/`lib/fx.ts`/`gl.ts` chunks counted
+once each, not per page. Measured from a real `npm run build`, gzip level 9,
+fonts excluded (loaded once, cached site-wide, not part of any single page's
+cost).
+
 | Page | gzipped |
 |---|---|
-| `/` | 6.9 KB |
-| `/progress/` | 5.0 KB |
-| `/paper-folds/` | 5.3 KB |
-| `/rule-cascade/` | 5.3 KB |
-| `/steady-hand/` | 5.4 KB |
-| `/life-in-weeks/` | 5.4 KB |
-| `/trolley/` | 5.8 KB |
-| `/from-memory/` | 6.5 KB |
-| `/fusion/` | 6.6 KB |
-| `/ambient-mix/` | 7.2 KB |
-| `/spend-it/` | 7.2 KB |
-| `/deep-time/` | 7.4 KB |
-| `/scale/` | 7.4 KB |
+| `/paper-folds/` | 9.4 KB |
+| `/trolley/` | 11.8 KB |
+| `/steady-hand/` | 14.4 KB |
+| `/ambient-mix/` | 14.5 KB |
+| `/life-in-weeks/` | 14.7 KB |
+| `/progress/` | 15.3 KB |
+| `/rule-cascade/` | 15.3 KB |
+| `/deep-time/` | 16.1 KB |
+| `/fusion/` | 16.1 KB |
+| `/spend-it/` | 16.6 KB |
+| `/from-memory/` | 16.9 KB |
+| `/scale/` | 17.9 KB |
+| `/overstimulated/` | 19.8 KB |
+| `/powder/` | 22.6 KB |
+| `/orbit/` | **142.6 KB** |
 
-**0 JavaScript bundles.** One 1 KB shared CSS file. No images, no audio files,
-no fonts beyond Google Fonts.
+Orbit is the one outlier: its WebGL renderer is built on three.js, and that
+library alone accounts for essentially all of the difference. Every other page
+stays under 23 KB total. No images, no audio files, no fonts beyond Google
+Fonts — every sound on the site is synthesised, and every visual is either
+drawn or is one of a handful of small hand-written shaders.
 
 ---
 
@@ -235,7 +255,8 @@ and start it again.
 
 ## Adding a game
 
-1. Add an entry to `src/data/games.ts` (pick one of the twelve `art` values).
+1. Add an entry to `src/data/games.ts` (pick one of the `TileArt` values, or
+   add a new one to both the type and `TileArt.astro`).
 2. Create `src/pages/<slug>.astro` wrapped in `<GameLayout slug="<slug>">`.
 
 Tile, `<head>`, favicon, share button and sitemap entry all follow. Pass `fixed`
