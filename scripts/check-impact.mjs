@@ -6,7 +6,12 @@
  *
  *   node scripts/check-impact.mjs
  */
+import { register } from 'node:module'
 import { simulate } from '../src/lib/impact.ts'
+
+// Lets the dynamic import of casualties.ts below resolve its own extensionless
+// import of the city data the way Vite would.
+register('./resolve-ts.mjs', import.meta.url)
 
 const KM = 1000
 
@@ -113,9 +118,78 @@ for (const c of CASES) {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Casualty model                                                             */
+/* -------------------------------------------------------------------------- */
+
+const { estimateCasualties, cityRadius } = await import('../src/lib/casualties.ts')
+
+console.log('\n--- casualty model ---')
+
+// City footprints. Greater London is ~1,570 km² (r ≈ 22 km); the built-up area
+// of Tokyo is larger still. Anything in the tens of km is the right shape.
+for (const [label, pop, expectKm] of [
+  ['London 8.96M', 8_962_000, [15, 35]],
+  ['a 500k city', 500_000, [4, 10]],
+]) {
+  const r = cityRadius(pop) / KM
+  const ok = r >= expectKm[0] && r <= expectKm[1]
+  if (!ok) failures++
+  console.log(
+    `  ${ok ? 'ok  ' : 'FAIL'} radius, ${label}: ${r.toFixed(1)} km ` +
+      `(expected ${expectKm[0]}–${expectKm[1]})`,
+  )
+}
+
+const CASUALTY_CASES = [
+  {
+    name: 'Chelyabinsk airburst, over Chelyabinsk',
+    input: { diameter: 19, composition: 'rock', velocity: 19_160, angle: 18 },
+    at: [55.15, 61.43],
+    // Reality: 0 dead, ~1,500 injured. An order-of-magnitude model should put
+    // deaths at zero and injuries in the thousands, not the hundreds of
+    // thousands and not zero.
+    expect: { dead: [0, 50], injured: [100, 40_000] },
+  },
+  {
+    name: 'Tunguska-scale airburst, over London',
+    input: { diameter: 55, composition: 'rock', velocity: 17_000, angle: 45 },
+    at: [51.51, -0.13],
+    // The 1908 event flattened 2,000 km² of empty forest. Over a city of nine
+    // million that has to be a major disaster, but not an extinction event.
+    expect: { dead: [1_000, 3_000_000], injured: [10_000, 9_000_000] },
+  },
+  {
+    name: 'Same rock, middle of the Pacific',
+    input: { diameter: 55, composition: 'rock', velocity: 17_000, angle: 45 },
+    at: [0, -140],
+    expect: { dead: [0, 0], injured: [0, 0] },
+  },
+]
+
+for (const c of CASUALTY_CASES) {
+  const r = simulate(c.input)
+  const cas = estimateCasualties(r, c.at[0], c.at[1])
+  console.log(`\n  ${c.name}`)
+  console.log(
+    `    dead ${cas.dead.toLocaleString('en-US')}` +
+      `  ·  injured ${cas.injured.toLocaleString('en-US')}` +
+      `  ·  ${cas.cities.length} cities affected`,
+  )
+  for (const [key, [lo, hi]] of Object.entries(c.expect)) {
+    const got = cas[key]
+    const ok = got >= lo && got <= hi
+    if (!ok) failures++
+    console.log(
+      `    ${ok ? 'ok  ' : 'FAIL'} ${key}: ${got.toLocaleString('en-US')} ` +
+        `(expected ${lo.toLocaleString('en-US')}–${hi.toLocaleString('en-US')})`,
+    )
+  }
+}
+
 console.log(
   failures === 0
-    ? '\nAll four historical impacts reproduced within published ranges.\n'
+    ? '\nAll checks passed.\n'
     : `\n${failures} check(s) failed.\n`,
 )
 process.exit(failures === 0 ? 0 : 1)

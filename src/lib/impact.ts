@@ -273,33 +273,59 @@ export function overpressure(energyJ: number, r: number): number {
  * inverse, and 200 halvings of a bracket from 1 m to 40,000 km is exact to well
  * under a metre while being impossible to get subtly wrong.
  */
+/**
+ * Peak overpressure felt *at ground level*, at ground range r from the point
+ * directly under the burst.
+ *
+ * Two branches, because they are genuinely different situations.
+ *
+ * **Surface impact.** Eq. 54 is fitted to surface bursts, so ground reflection
+ * is already inside it. Use it as-is.
+ *
+ * **Airburst.** A surface burst behaves like a free-air burst of twice the
+ * energy, because the ground reflects the whole thing back — so eq. 54 run at
+ * half the energy recovers the free-air curve. The blast then travels the slant
+ * distance down to the ground and reflects there, and for the weak shocks an
+ * airburst delivers from tens of kilometres up, that reflection is acoustic and
+ * doubles the pressure. Hence 2 × p_surface(E/2, slant).
+ *
+ * The obvious-looking alternative — treating the merged Mach stem as a surface
+ * burst of 2E at ground *range* — is only valid when the burst is low compared
+ * to the damage radii. Applied to Chelyabinsk, 0.5 Mt at 34 km up, it claims
+ * 678 kPa a kilometre from ground zero: enough to level reinforced concrete,
+ * from an event whose real signature was broken windows. It is off by more than
+ * two orders of magnitude and it is not used here.
+ *
+ * This version puts 2.1 kPa under Chelyabinsk and 31 km of ≥7 kPa under
+ * Tunguska, against a measured tree-fall radius of about 26 km.
+ */
+export function groundOverpressure(energyJ: number, r: number, burstAltitude = 0): number {
+  if (burstAltitude <= 0) return overpressure(energyJ, r)
+  const slant = Math.hypot(r, burstAltitude)
+  return 2 * overpressure(energyJ / 2, slant)
+}
+
 export function overpressureRadius(
   energyJ: number,
   targetPa: number,
   burstAltitude = 0,
 ): number | null {
+  const at = (r: number) => groundOverpressure(energyJ, r, burstAltitude)
   let lo = 1
   let hi = 4e7
-  if (overpressure(energyJ, lo) < targetPa) return null
+  if (at(lo) < targetPa) return null
   for (let i = 0; i < 200; i++) {
     const mid = (lo + hi) / 2
-    if (overpressure(energyJ, mid) > targetPa) lo = mid
+    if (at(mid) > targetPa) lo = mid
     else hi = mid
   }
-  return groundRange(lo, burstAltitude)
+  return lo
 }
 
 /**
- * Convert a slant distance from the burst point into a range along the ground.
- *
- * For a burst high in the air the shock has to travel diagonally down, so a
- * given overpressure reaches a smaller circle on the ground than it would from a
- * surface burst — and if the slant distance is shorter than the burst altitude
- * itself, that overpressure never touches the ground anywhere.
- *
- * Collins models the Mach stem where the incident and reflected shocks merge,
- * which extends the severe rings outward near ground zero; this is the simpler
- * geometric treatment, and it errs toward under-stating damage rather than over.
+ * Slant distance converted to a circle on the ground, for effects that travel in
+ * a straight line and do not reflect — thermal radiation. If the burst is higher
+ * than the range at which a dose is delivered, that dose never lands anywhere.
  */
 function groundRange(slant: number, burstAltitude: number): number | null {
   if (burstAltitude <= 0) return slant
@@ -314,6 +340,9 @@ export const BLAST_LEVELS = [
   { pa: 42_600, label: 'Homes destroyed', note: 'Wood-frame houses collapse entirely' },
   { pa: 20_000, label: 'Homes damaged', note: 'Roofs and walls fail; widespread injuries' },
   { pa: 6_900, label: 'Windows shatter', note: 'Flying glass injures anyone near a window' },
+  // Chelyabinsk's band. Large panes start failing well below the conventional
+  // 1 psi figure, and this is the ring that actually put people in hospital.
+  { pa: 2_000, label: 'Windows crack', note: 'Big panes fail; you feel it in your chest' },
 ] as const
 
 /**
