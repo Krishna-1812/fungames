@@ -52,7 +52,7 @@ const BUDGET = 100_000_000_000
   <div class="bar">
     <div class="bar-inner">
       <div class="money" id="money" aria-live="polite" aria-atomic="true">$100,000,000,000</div>
-      <div class="track"><div class="track-fill" id="trackFill"></div></div>
+      <div class="track" id="track" aria-hidden="true"><div class="track-fill" id="trackFill"></div></div>
       <div class="bar-actions">
         <button type="button" id="receiptBtn" class="ghost">Receipt</button>
         <button type="button" id="resetBtn" class="ghost">Reset</button>
@@ -113,8 +113,10 @@ const BUDGET = 100_000_000_000
   <script type="application/json" id="game-data" set:html={JSON.stringify({ BUDGET })} />
 
   <script>
-  import { burst, floatText } from '../lib/fx'
+  import { burst, floatText, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { ShaderSurface } from '../lib/gl'
+  import { VAULT_FRAG } from '../lib/spend-vault'
     const { BUDGET } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const money = document.getElementById('money')
@@ -129,11 +131,42 @@ const BUDGET = 100_000_000_000
     name: el.dataset.name,
     input: el.querySelector('.qty'),
     sell: el.querySelector('.sell'),
+    buy: el.querySelector('.buy'),
     n: 0,
   }))
 
   const KEY = 'spend-it:v1'
   const usd = (n) => '$' + Math.round(n).toLocaleString('en-US')
+
+  /* The balance strip. 'level' eases toward the true figure rather than
+     snapping, so spending reads as a level dropping instead of a value
+     changing. */
+  let level = 1, levelTarget = 1
+  let splashAt = -1e6
+  const vault = new ShaderSurface(document.getElementById('track'), VAULT_FRAG, {
+    scale: 1,
+    uniforms: () => ({
+      u_level: level,
+      u_splash: Math.max(0, 1 - (performance.now() - splashAt) / 620),
+      u_motion: prefersReducedMotion ? 0 : 1,
+    }),
+  })
+
+  /* Driven by the balance, not by time, so under reduced motion — where the
+     shared ticker never runs — it has to be asked for each frame of the ease. */
+  let easing = 0
+  function easeLevel() {
+    cancelAnimationFrame(easing)
+    const step = () => {
+      const d = levelTarget - level
+      level += d * 0.18
+      if (Math.abs(d) < 0.0004) level = levelTarget
+      if (prefersReducedMotion) vault.redraw()
+      if (level !== levelTarget) easing = requestAnimationFrame(step)
+    }
+    if (prefersReducedMotion) { level = levelTarget; vault.redraw() }
+    else easing = requestAnimationFrame(step)
+  }
 
   function balance() {
     return BUDGET - items.reduce((a, it) => a + it.n * it.price, 0)
@@ -144,13 +177,21 @@ const BUDGET = 100_000_000_000
     const left = balance()
     money.textContent = usd(left)
     money.classList.toggle('low', left < BUDGET * 0.1)
+    // The CSS fallback keeps the original fill-as-you-spend direction; the
+    // strip itself drains, matching the figure above it.
     trackFill.style.width = `${(1 - left / BUDGET) * 100}%`
+    levelTarget = Math.max(0, Math.min(1, left / BUDGET))
+    easeLevel()
 
     for (const it of items) {
       if (document.activeElement !== it.input) it.input.value = String(it.n)
       it.el.classList.toggle('owned', it.n > 0)
       it.sell.disabled = it.n === 0
-      // Grey out what can no longer be afforded, so the endgame is legible.
+      // Mark what can no longer be afforded, so the endgame is legible. The
+      // button is genuinely disabled rather than merely styled: clicking it was
+      // already a silent no-op, and saying so is both more honest and what
+      // assistive technology needs to hear.
+      it.buy.disabled = it.price > left
       it.el.classList.toggle('unaffordable', it.price > left && it.n === 0)
     }
 
@@ -192,6 +233,7 @@ const BUDGET = 100_000_000_000
       combo = now - comboAt < 480 ? Math.min(combo + 1, 11) : 0
       comboAt = now
       sfx.pop(combo)
+      splashAt = performance.now()
       const r = it.el.getBoundingClientRect()
       floatText(r.left + r.width / 2, r.top + 24, '-' + usd(got * it.price), '#0f3d3e')
       burst(r.left + r.width / 2, r.top + 30, {
@@ -285,7 +327,16 @@ const BUDGET = 100_000_000_000
   @keyframes pulseDown { 0% { transform: translateY(-4px); opacity: 0.55; } }
   @keyframes pulseUp { 0% { transform: translateY(4px); opacity: 0.55; } }
 
-  .track { grid-column: 1 / -1; height: 4px; background: #d8e4df; border-radius: 3px; overflow: hidden; }
+  /* A channel with something in it, rather than a 4px progress rule. The
+     inner shadow is what makes it read as cut into the bar. */
+  .track {
+    grid-column: 1 / -1; position: relative; height: 13px;
+    background: #d8e4df; border-radius: 7px; overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(15, 61, 62, 0.22);
+  }
+  .track .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* The still fallback for anything without WebGL2, which keeps the original
+     fill-as-you-spend direction it was written for. */
   .track-fill { height: 100%; width: 0; background: linear-gradient(90deg, #63c9a4, #0f3d3e); transition: width 200ms var(--ease); }
   .bar-actions { display: flex; gap: 8px; }
   .ghost {
@@ -305,14 +356,41 @@ const BUDGET = 100_000_000_000
     grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
   }
   .item {
-    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    background: linear-gradient(178deg, #ffffff, #fbfcfb);
+    border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px 14px 14px; text-align: center;
-    box-shadow: var(--shadow-sm);
-    transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease), opacity 160ms var(--ease);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 1px 2px rgba(15, 40, 38, 0.05),
+      0 7px 18px rgba(15, 40, 38, 0.055);
+    transition:
+      border-color 160ms var(--ease), box-shadow 160ms var(--ease),
+      transform 160ms var(--ease), background 160ms var(--ease);
   }
-  .item.owned { border-color: #63c9a4; box-shadow: 0 0 0 3px rgba(99, 201, 164, 0.16); }
-  .item.unaffordable { opacity: 0.42; }
-  .glyph { font-size: 34px; line-height: 1; }
+  .item.owned {
+    border-color: #63c9a4;
+    background: linear-gradient(178deg, #ffffff, #f2fbf7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 0 0 3px rgba(99, 201, 164, 0.18),
+      0 8px 20px rgba(15, 61, 62, 0.09);
+  }
+  /* Deliberately not 'opacity'.
+
+     That is what this used to be, and it faded the white card along with its
+     contents: measured against the page it left the item name at 2.77:1, the
+     price at 1.93:1 and the Buy label at 2.37:1, all well under the 4.5 AA
+     needs -- on the state whose entire job is to keep the endgame legible.
+     Desaturating the glyph and quietening the border says the same thing while
+     the card stays opaque and every figure stays readable. */
+  .item.unaffordable {
+    background: linear-gradient(178deg, #fbfbfa, #f5f6f5);
+    border-color: #e7e9e6;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(15, 40, 38, 0.04);
+  }
+  .item.unaffordable .glyph { filter: saturate(0.2) opacity(0.75); }
+  .item.unaffordable .name { color: var(--ink-soft); }
+  .glyph { font-size: 34px; line-height: 1; transition: filter 160ms var(--ease); }
   .item .name { font-weight: 600; margin-top: 8px; font-size: 15px; }
   .item .price { color: var(--ink-soft); font-size: 13.5px; font-variant-numeric: tabular-nums; }
 
@@ -322,10 +400,14 @@ const BUDGET = 100_000_000_000
     font-size: 13px; font-weight: 600; cursor: pointer;
     transition: filter 140ms var(--ease);
   }
-  .controls button:hover:not(:disabled) { filter: brightness(1.08); }
+  .controls button:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+  .controls button { transition: filter 140ms var(--ease), transform 140ms var(--ease); }
   .sell { background: #f0e2e2; color: #8d3a2a; }
   .sell:disabled { background: #f1ecec; color: #6b6060; cursor: default; }
   .buy { background: #0f3d3e; color: #fff; }
+  /* An inactive control, so 1.4.3 does not apply to it -- but it is kept well
+     clear of the threshold anyway rather than relying on that. */
+  .buy:disabled { background: #dfe5e2; color: #55605c; cursor: default; }
   .qty {
     width: 54px; text-align: center; border: 1px solid var(--line-strong);
     border-radius: 8px; font-variant-numeric: tabular-nums; font-size: 14px; padding: 6px 2px;
@@ -363,6 +445,10 @@ const BUDGET = 100_000_000_000
     font-weight: 600; cursor: pointer; background: #0f3d3e; color: #fff;
   }
   .sheet-actions .ghost { background: #fff; color: var(--ink); border: 1px solid var(--line-strong); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .item, .controls button, .track-fill { transition: none; }
+  }
 
   @media (max-width: 620px) {
     .bar-inner { grid-template-columns: 1fr; }
