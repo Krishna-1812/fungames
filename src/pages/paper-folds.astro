@@ -52,7 +52,7 @@ const MARKS: Mark[] = [
       <div class="layers"><span id="layers">1</span> layers of paper</div>
     </section>
 
-    <div class="stack" id="stack" aria-hidden="true"></div>
+    <svg class="scale" id="scale" viewBox="0 0 300 190" aria-hidden="true"></svg>
 
     <p class="mark" id="mark"><span class="mark-glyph" id="markGlyph">📄</span><span id="markText">A single sheet of paper.</span></p>
 
@@ -69,12 +69,11 @@ const MARKS: Mark[] = [
   <script type="application/json" id="game-data" set:html={JSON.stringify({ START_MM, MAX_FOLDS, MARKS })} />
 
   <script>
-  import { burst, floatText } from '../lib/fx'
+  import { burst, floatText, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock, tone } from '../lib/audio'
     const { START_MM, MAX_FOLDS, MARKS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const el = (id) => document.getElementById(id)
-  const stack = el('stack')
   let n = 0
 
   /** Pick a sensible unit across 30 orders of magnitude. */
@@ -109,6 +108,121 @@ const MARKS: Mark[] = [
     return m
   }
 
+  /* ----------------------------------------------------------------------
+     The scale.
+
+     What used to be here was a stack of bars that doubled until it hit
+     sixty-four and then stopped changing -- which is fold six. The other
+     ninety-seven folds, the ones that go past the Moon and out of the galaxy,
+     had no picture at all, which is a strange thing for a game about a number
+     you cannot picture.
+
+     A logarithmic axis fixes it, and it fixes it in the way the subject wants:
+     because every fold doubles, every fold is the SAME distance up this ruler.
+     Constant effort, constant ratio, and the labels beside it going from a
+     credit card to the observable universe. That is the whole argument of the
+     game, drawn.
+     ---------------------------------------------------------------------- */
+
+  const SCALE = el('scale')
+  const TOP = 12, BOT = 178
+  const COL_X = 26, COL_W = 46
+
+  /** Folds map linearly onto the axis, because log2 of a doubling is 1. */
+  const yOf = (folds) => BOT - (folds / MAX_FOLDS) * (BOT - TOP)
+
+  /* Anchors, chosen for even spacing rather than for every milestone: the
+     marks all get a tick, but a label every few pixels is a wall of text. */
+  const ANCHORS = [
+    [0, 'a sheet of paper'],
+    [16, 'a house'],
+    [30, 'space begins'],
+    [42, 'the Moon'],
+    [69, 'the nearest star'],
+    [83, 'the Milky Way'],
+    [103, 'the observable universe'],
+  ]
+
+  function buildScale() {
+    // The gradient lives inside the SVG because buildScale replaces its whole
+    // contents, so a defs block in the template would be wiped on first paint.
+    let out = '<defs><linearGradient id="foldGrad" x1="0" y1="0" x2="1" y2="0">' +
+      '<stop offset="0" stop-color="#f0e0ab"/>' +
+      '<stop offset="0.5" stop-color="#d8b558"/>' +
+      '<stop offset="1" stop-color="#b98f2f"/>' +
+      '</linearGradient></defs>'
+    // The empty channel the paper climbs.
+    out += '<rect class="chan" x="' + COL_X + '" y="' + TOP + '" width="' + COL_W +
+           '" height="' + (BOT - TOP) + '" rx="4"/>'
+    // A tick for every comparison in the list, labelled or not.
+    for (const mk of MARKS) {
+      const y = yOf(mk.at)
+      out += '<path class="tick" d="M' + (COL_X + COL_W + 3) + ' ' + y + ' h6"/>'
+    }
+    for (const [at, label] of ANCHORS) {
+      const y = yOf(at)
+      out += '<path class="tick big" d="M' + (COL_X + COL_W + 3) + ' ' + y + ' h11"/>'
+      out += '<text class="axis" x="' + (COL_X + COL_W + 18) + '" y="' + (y + 3.4) + '">' + label + '</text>'
+    }
+    // The paper itself, and the marker riding its top edge.
+    out += '<g id="paperCol"><rect class="paper" x="' + COL_X + '" width="' + COL_W + '" rx="3"/>' +
+           '<g id="grain"></g></g>'
+    out += '<g id="head"><path class="edge" d="M' + (COL_X - 6) + ' 0 h' + (COL_W + 12) + '"/></g>'
+    SCALE.innerHTML = out
+  }
+
+  /* One striation per fold, so the column is literally made of the folds you
+     have done.
+
+     Note the spacing is CONSTANT, not a function of the count: the axis is
+     linear in folds, so each fold always adds the same height and therefore
+     the same one line. It works out at about 1.6px, which is a fine lamination
+     rather than something you could count -- which is the right impression for
+     a stack whose layer count has thirty-one digits. */
+  function grainFor(folds, topY) {
+    const step = (BOT - topY) / Math.max(1, folds)
+    if (folds < 2 || step < 1.1) return ''
+    let out = ''
+    for (let k = 1; k < folds; k++) {
+      const y = BOT - k * step
+      out += '<path d="M' + (COL_X + 3) + ' ' + y + ' h' + (COL_W - 6) + '"/>'
+    }
+    return out
+  }
+
+  let anim = 0
+  let shownFolds = 0
+  function paintCol(folds) {
+    const topY = yOf(folds)
+    const rect = SCALE.querySelector('.paper')
+    if (!rect) return
+    rect.setAttribute('y', String(topY))
+    rect.setAttribute('height', String(Math.max(0, BOT - topY)))
+    SCALE.querySelector('#grain').innerHTML = grainFor(folds, topY)
+    const head = SCALE.querySelector('#head')
+    head.setAttribute('transform', 'translate(0,' + topY + ')')
+    head.style.opacity = folds > 0 ? '1' : '0.35'
+  }
+
+  function drawScale(target) {
+    cancelAnimationFrame(anim)
+    if (prefersReducedMotion) { shownFolds = target; paintCol(target); return }
+    const from = shownFolds
+    const t0 = performance.now()
+    const DUR = 260
+    const step = (now) => {
+      const u = Math.min(1, (now - t0) / DUR)
+      const e = u * u * (3 - 2 * u)
+      shownFolds = from + (target - from) * e
+      paintCol(shownFolds)
+      if (u < 1) anim = requestAnimationFrame(step)
+      else { shownFolds = target; paintCol(target) }
+    }
+    anim = requestAnimationFrame(step)
+  }
+
+  buildScale()
+
   function render(dir) {
     el('folds').textContent = String(n)
     el('thick').textContent = fmt(START_MM * Math.pow(2, n))
@@ -118,17 +232,7 @@ const MARKS: Mark[] = [
     el('markGlyph').textContent = mk.glyph
     el('markText').textContent = mk.text
 
-    // The stack is illustrative: layers double until they stop being drawable,
-    // then it just reads as "solid", which is the honest picture anyway.
-    const shown = Math.min(Math.pow(2, n), 64)
-    const kids = []
-    for (let i = 0; i < shown; i++) {
-      const d = document.createElement('i')
-      d.style.setProperty('--k', String(i))
-      kids.push(d)
-    }
-    stack.replaceChildren(...kids)
-    stack.classList.toggle('dense', n > 6)
+    drawScale(n)
 
     el('foldBtn').disabled = n >= MAX_FOLDS
     el('unfoldBtn').disabled = n === 0
@@ -179,13 +283,13 @@ const MARKS: Mark[] = [
 <style>
   :global(.fold-body) { background: #faf6ea; }
 
-  .wrap { max-width: 620px; margin: 0 auto; padding: 48px 22px 90px; text-align: center; }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 30px 22px 80px; text-align: center; }
   .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .lede { color: var(--ink-soft); margin: 10px auto 30px; max-width: 40ch; }
+  .lede { color: var(--ink-soft); margin: 10px auto 20px; max-width: 40ch; }
 
   .readout {
     background: #fff; border: 1px solid #ece0c4; border-radius: var(--radius-lg);
-    padding: 24px 20px; box-shadow: var(--shadow-sm);
+    padding: 18px 20px; box-shadow: var(--shadow-sm);
   }
   .fold-count {
     font-family: var(--display); font-size: 15px; color: #8a6f2e;
@@ -204,24 +308,27 @@ const MARKS: Mark[] = [
   @keyframes bump { 0% { transform: scale(0.94); opacity: 0.5; } }
   .layers { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; word-break: break-all; }
 
-  .stack {
-    display: flex; flex-direction: column-reverse; align-items: center;
-    gap: 2px; margin: 24px 0 16px; min-height: 92px; justify-content: flex-start;
+  .scale {
+    display: block; width: min(310px, 100%); height: auto;
+    margin: 12px auto 6px;
   }
-  .stack.dense { gap: 0; }
-  .stack :global(i) {
-    display: block; width: min(230px, 62vw); height: 5px; border-radius: 2px;
-    background: linear-gradient(90deg, #e8d59a, #c9a13f);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-    animation: drop 240ms var(--ease) backwards;
-    animation-delay: calc(min(var(--k), 24) * 8ms);
-  }
-  .stack.dense :global(i) { height: 2px; }
-  @keyframes drop { from { opacity: 0; transform: translateY(-6px) scaleX(0.9); } }
+  /* Everything inside is built at runtime, and runtime nodes do not carry
+     Astro's scoped-style attribute -- without :global these match nothing and
+     the SVG falls back to fill:black. */
+  .scale :global(.chan) { fill: #f1e8d0; stroke: #e3d5ae; stroke-width: 1; }
+  /* Darker than they look like they need to be: the milestone ticks carry
+     position information the labels do not repeat, so they are held to the 3:1
+     non-text threshold. At #cbbb90 they measured 1.76:1 on this page. */
+  .scale :global(.tick) { stroke: #93804a; stroke-width: 1.5; stroke-linecap: round; }
+  .scale :global(.tick.big) { stroke: #6f5c28; stroke-width: 2; }
+  .scale :global(.axis) { fill: #6a5828; font-size: 9px; letter-spacing: 0.01em; }
+  .scale :global(.paper) { fill: url(#foldGrad); }
+  .scale :global(#grain path) { stroke: rgba(96, 70, 18, 0.30); stroke-width: 0.6; }
+  .scale :global(.edge) { stroke: #43310f; stroke-width: 2.5; stroke-linecap: round; }
 
   .mark {
     display: flex; align-items: center; justify-content: center; gap: 10px;
-    font-size: 17px; color: #4a3d1c; min-height: 52px; margin: 0 auto 22px;
+    font-size: 17px; color: #4a3d1c; min-height: 44px; margin: 0 auto 16px;
     max-width: 34ch; text-wrap: pretty;
   }
   .mark-glyph { font-size: 26px; }
