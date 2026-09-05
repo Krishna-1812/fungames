@@ -13,6 +13,10 @@ import GameLayout from '../layouts/GameLayout.astro'
 ---
 
 <GameLayout slug="rule-cascade" bar="#0f3d2e">
+  {/* The sheet this is all printed on. A real gradient stays behind it for
+      anything without WebGL2. */}
+  <div class="paper" id="paper" aria-hidden="true"></div>
+
   <div class="stage">
     <header class="head">
       <h1>Choose a username</h1>
@@ -34,7 +38,11 @@ import GameLayout from '../layouts/GameLayout.astro'
       </div>
     </div>
 
-    <ol class="rules" id="rules" aria-live="polite"></ol>
+    <ol class="rules" id="rules"></ol>
+
+    {/* Changes only, and debounced. Putting aria-live on the list itself meant
+        re-announcing every rule on every keystroke, which is unusable. */}
+    <p class="visually-hidden" id="announce" role="status" aria-live="polite"></p>
 
     <div class="win" id="win" hidden>
       <h2>Fine. That is a username.</h2>
@@ -46,8 +54,10 @@ import GameLayout from '../layouts/GameLayout.astro'
 </GameLayout>
 
 <script>
-  import { burst } from '../lib/fx'
+  import { burst, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { ShaderSurface } from '../lib/gl'
+  import { PAPER_FRAG } from '../lib/cascade-paper'
   const input = document.getElementById('input')
   const list = document.getElementById('rules')
   const count = document.getElementById('count')
@@ -99,6 +109,59 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   let unlocked = 1
   let won = false
+
+  /* The sheet. Its wear is a function of how many rules are live, so the paper
+     picks up a crease for each one and the page you are reading gets very
+     slightly more tired as the form drags on. */
+  const paper = new ShaderSurface(document.getElementById('paper'), PAPER_FRAG, {
+    // Nothing here has an edge; three-quarter resolution is free.
+    scale: 0.75,
+    uniforms: () => ({
+      u_tension: unlocked / RULES.length,
+      u_motion: prefersReducedMotion ? 0 : 1,
+    }),
+  })
+  let paperDrawnAt = -1
+
+  /* One node per rule, kept for the life of the page.
+
+     It used to rebuild every <li> on every render. That replayed the entry
+     animation on all of them for each character typed, and made the reordering
+     a teleport rather than a move. Reconciling instead is what lets the cards
+     animate to their new positions below. */
+  const nodes = new Map()
+  function nodeFor(r) {
+    let li = nodes.get(r.id)
+    if (li) return li
+    li = document.createElement('li')
+    li.dataset.id = String(r.id)
+    li.innerHTML =
+      '<span class="mark" aria-hidden="true">' +
+        '<svg class="glyph" viewBox="0 0 16 16">' +
+          '<path class="tick" d="M3.2 8.4 L6.6 11.8 L12.8 4.6"/>' +
+          '<path class="cross" d="M4.4 4.4 L11.6 11.6 M11.6 4.4 L4.4 11.6"/>' +
+        '</svg>' +
+      '</span>' +
+      '<span class="body"><b>Rule ' + r.id + '</b>' +
+        '<span class="visually-hidden state"></span><br>' +
+        '<span class="text"></span></span>'
+    nodes.set(r.id, li)
+    return li
+  }
+
+  /* Announcements are batched: typing a username is a keystroke every 150ms or
+     so, and a live region that fires on each one is noise, not help. */
+  const announcer = document.getElementById('announce')
+  const pending = []
+  let announceT = 0
+  function announce(msg) {
+    pending.push(msg)
+    clearTimeout(announceT)
+    announceT = window.setTimeout(() => {
+      announcer.textContent = pending.join(' ')
+      pending.length = 0
+    }, 700)
+  }
   // Remembering which rules passed last frame is what lets us make a sound
   // only on the transition rather than on every keystroke.
   let passedBefore = new Set<number>()
@@ -117,27 +180,61 @@ import GameLayout from '../layouts/GameLayout.astro'
     const passingSet = new Set(active.filter((r) => r.ok(v)).map((r) => r.id))
     const passing = passingSet.size
 
-    if (unlocked > before) sfx.blip(Math.min(9, unlocked))
+    if (unlocked > before) {
+      sfx.blip(Math.min(9, unlocked))
+      for (let i = before; i < unlocked; i++) announce('New rule ' + RULES[i].id + '. ' + RULES[i].text())
+    }
     for (const r of active) {
-      if (passingSet.has(r.id) && !passedBefore.has(r.id)) sfx.good()
-      else if (!passingSet.has(r.id) && passedBefore.has(r.id)) sfx.bad()
+      if (passingSet.has(r.id) && !passedBefore.has(r.id)) { sfx.good(); announce('Rule ' + r.id + ' met.') }
+      else if (!passingSet.has(r.id) && passedBefore.has(r.id)) { sfx.bad(); announce('Rule ' + r.id + ' no longer met.') }
     }
     passedBefore = passingSet
 
-    list.replaceChildren(
-      ...active
-        .map((r) => {
-          const done = r.ok(v)
-          const li = document.createElement('li')
-          li.className = 'rule ' + (done ? 'ok' : 'bad')
-          li.innerHTML =
-            `<span class="mark">${done ? '✓' : '✕'}</span>` +
-            `<span><b>Rule ${r.id}</b><br>${r.text()}</span>`
-          return li
-        })
-        // Unmet rules first: the thing you have to fix should be at the top.
-        .sort((a, b) => (a.className.includes('bad') ? -1 : 1))
-    )
+    // FLIP, part one: where every card sits before the DOM is touched.
+    const firstTop = new Map()
+    if (!prefersReducedMotion)
+      for (const [id, li] of nodes) if (li.isConnected) firstTop.set(id, li.getBoundingClientRect().top)
+
+    // Unmet rules first: the thing you have to fix should be at the top. Ties
+    // break by id so the order is stable and cards do not swap for no reason.
+    const order = active.slice().sort((a, b) =>
+      (passingSet.has(a.id) ? 1 : 0) - (passingSet.has(b.id) ? 1 : 0) || a.id - b.id)
+
+    for (const r of order) {
+      const li = nodeFor(r)
+      const done = passingSet.has(r.id)
+      if (!li.isConnected) li.classList.add('enter')
+      // Only assigned when it changes, so the tick redraws on a real transition
+      // rather than on every keystroke.
+      const cls = 'rule ' + (done ? 'ok' : 'bad') + (li.classList.contains('enter') ? ' enter' : '')
+      if (li.className !== cls) li.className = cls
+      const txt = r.text()
+      const textEl = li.querySelector('.text')
+      if (textEl.textContent !== txt) textEl.textContent = txt
+      // The glyph is decorative, so the state needs saying somewhere real.
+      const stateEl = li.querySelector('.state')
+      const stateTxt = done ? ', met. ' : ', not met. '
+      if (stateEl.textContent !== stateTxt) stateEl.textContent = stateTxt
+      list.appendChild(li)   // appending a node already in the list moves it
+    }
+
+    /* FLIP, part two: measure where they landed, snap them back to where they
+       were, then let CSS carry them across. A card that changes state travels
+       to its new place instead of vanishing and reappearing somewhere else. */
+    if (!prefersReducedMotion) {
+      for (const [id, li] of nodes) {
+        if (!li.isConnected) continue
+        const was = firstTop.get(id)
+        if (was === undefined) continue
+        const dy = was - li.getBoundingClientRect().top
+        if (Math.abs(dy) < 1) continue
+        li.style.transition = 'none'
+        li.style.transform = 'translateY(' + dy + 'px)'
+        void li.offsetHeight        // flush, or the browser skips the invert
+        li.style.transition = ''
+        li.style.transform = ''
+      }
+    }
 
     count.textContent = `${chars(v).length} character${chars(v).length === 1 ? '' : 's'}`
     score.textContent = `${passing} / ${RULES.length} rules`
@@ -161,17 +258,34 @@ import GameLayout from '../layouts/GameLayout.astro'
     }
   }
 
-  input.addEventListener('input', () => { unlock(); keystrokes++; render() })
+  // The sheet only changes when a rule unlocks, and under reduced motion the
+  // shared ticker never runs, so it has to be asked for that one frame.
+  function repaintPaper() {
+    if (!prefersReducedMotion || paperDrawnAt === unlocked) return
+    paperDrawnAt = unlocked
+    paper.redraw()
+  }
+
+  input.addEventListener('input', () => { unlock(); keystrokes++; render(); repaintPaper() })
   // Rule 10 is live, so keep re-checking even when nobody is typing.
   setInterval(render, 5000)
   render()
+  repaintPaper()
   input.focus()
 </script>
 
 <!-- .rule list items are created in JS, and JS-created nodes do not get Astro's
      scoped-style attribute, so these rules must be global. -->
 <style is:global>
+  /* The still fallback, and what the shader is a small deviation from. */
   :global(body) { background: #f2f6f3; }
+  .paper {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(120% 90% at 18% 2%, #fbfdfa 0%, transparent 58%),
+      #f2f6f3;
+  }
+  .paper .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .stage { max-width: 640px; margin: 0 auto; padding: 42px 20px 96px; }
   .head { text-align: center; margin-bottom: 22px; }
   .head h1 { font-size: 34px; margin: 0; letter-spacing: -0.02em; }
@@ -197,16 +311,53 @@ import GameLayout from '../layouts/GameLayout.astro'
   .rules { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; }
   .rule {
     display: flex; gap: 12px; align-items: flex-start;
-    background: var(--card); border-radius: 12px; padding: 14px 16px;
-    border-left: 4px solid; box-shadow: var(--shadow); font-size: 16px;
-    animation: slide 200ms ease-out;
+    background: linear-gradient(178deg, #ffffff, #fbfbf9);
+    border-radius: 12px; padding: 14px 16px;
+    border-left: 4px solid; font-size: 16px;
+    /* Layered rather than one blur: a tight contact shadow to sit the card on
+       the page, and a wide soft one to lift it off. */
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 1px 2px rgba(20, 18, 28, 0.05),
+      0 8px 20px rgba(20, 18, 28, 0.06);
+    transition:
+      transform 280ms var(--ease), opacity 240ms var(--ease),
+      box-shadow 240ms var(--ease), border-color 240ms var(--ease);
   }
-  @keyframes slide { from { opacity: 0; transform: translateY(-6px); } }
-  .rule.ok { border-color: #3f9e63; opacity: 0.55; }
-  .rule.bad { border-color: #d0402f; }
-  .mark { font-weight: 700; line-height: 1.45; }
-  .rule.ok .mark { color: #3f9e63; }
-  .rule.bad .mark { color: #d0402f; }
+  /* Only on a card that has genuinely just appeared. It used to run on every
+     card on every keystroke, because every card was rebuilt every keystroke. */
+  .rule.enter { animation: slide 240ms var(--ease); }
+  @keyframes slide { from { opacity: 0; transform: translateY(-8px); } }
+  /* A met rule sinks back toward the page: lower elevation, cooler card,
+     quieter text.
+
+     Deliberately not 'opacity'. That is what the page used to do, and it fades
+     the white card along with the text -- which measured 4.12:1 against the
+     4.5 AA needs, and, now that the sheet underneath has creases in it, let
+     them show straight through the card. Muting the ink instead keeps the card
+     opaque and lands at 6.44:1. */
+  .rule.ok {
+    border-color: #2f8a55;
+    background: linear-gradient(178deg, #fcfcfb, #f7f7f5);
+    box-shadow: 0 1px 2px rgba(20, 18, 28, 0.045);
+  }
+  .rule.ok .text { color: var(--ink-soft); }
+  .rule.bad { border-color: #c2392a; }
+
+  .mark { flex: none; line-height: 0; margin-top: 3px; }
+  .glyph { width: 17px; height: 17px; display: block; }
+  .glyph path { fill: none; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+  .rule.ok .cross, .rule.bad .tick { display: none; }
+  .rule.bad .cross { stroke: #c2392a; }
+  /* The tick draws itself, once, when the rule is actually satisfied. */
+  .rule.ok .tick { stroke: #2f8a55; stroke-dasharray: 17; animation: draw 280ms var(--ease) both; }
+  @keyframes draw { from { stroke-dashoffset: 17; } to { stroke-dashoffset: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rule { transition: none; }
+    .rule.enter { animation: none; }
+    .rule.ok .tick { animation: none; stroke-dasharray: none; }
+  }
   .rule b { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
 
   .win {
