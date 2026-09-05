@@ -23,6 +23,7 @@ export type TileArt =
   | 'orbit2'   // bodies on a trajectory
   | 'chaos'    // everything at once
   | 'impact'   // concentric damage rings
+  | 'verify'   // a checkbox grid, half ticked
 
 export type Game = {
   slug: string
@@ -44,6 +45,15 @@ export type Game = {
 }
 
 export const GAMES: Game[] = [
+  {
+    slug: 'not-a-robot',
+    title: "I'm Not a Robot",
+    blurb: 'Twelve checks. It gets personal.',
+    description:
+      'Prove you are human through twelve escalating checks, while the page quietly measures your tremor, your click rhythm, your typing rhythm and the roundness of your circle. The measurements are real. The verdict is not.',
+    accent: '#101a33', accent2: '#5b8def', glyph: '🤖', art: 'verify',
+    added: '2026-09-17',
+  },
   {
     slug: 'asteroid',
     title: 'Asteroid Launcher',

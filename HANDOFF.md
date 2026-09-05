@@ -77,11 +77,12 @@ fungames/
 └── src/                     see README.md for the full breakdown
 ```
 
-### The fifteen games
+### The seventeen games
 
-`overstimulated` · `orbit` · `powder` · `deep-time` · `scale` · `rule-cascade`
-· `spend-it` · `steady-hand` · `fusion` · `trolley` · `paper-folds` ·
-`ambient-mix` · `progress` · `from-memory` · `life-in-weeks`
+`not-a-robot` · `asteroid` · `overstimulated` · `orbit` · `powder` ·
+`deep-time` · `scale` · `rule-cascade` · `spend-it` · `steady-hand` · `fusion`
+· `trolley` · `paper-folds` · `ambient-mix` · `progress` · `from-memory` ·
+`life-in-weeks`
 
 ---
 
@@ -102,7 +103,7 @@ deployed**. `README.md`'s "Deploying" section has the steps if you want it.
 ## Everything else
 
 `README.md` has the full picture: what this repo is and why Astro over Nuxt,
-the architecture, a rundown of all fifteen games, the accessibility and
+the architecture, a rundown of all seventeen games, the accessibility and
 performance bar it's held to, adding a new game, rebranding
 (`src/site.config.ts` and `astro.config.mjs`'s `site` — the two must match),
 and deploying.

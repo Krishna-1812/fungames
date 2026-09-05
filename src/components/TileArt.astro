@@ -267,6 +267,38 @@ const scribble = range(30)
     )
   }
 
+  {/* A verification grid mid-answer, with the pointer that is being watched. */}
+  {
+    art === 'verify' && (
+      <g>
+        {range(9).map((i) => {
+          const col = i % 3
+          const row = Math.floor(i / 3)
+          const ticked = i === 1 || i === 4 || i === 6
+          return (
+            <g>
+              <rect
+                x={62 + col * 38} y={16 + row * 38} width="32" height="32" rx="5"
+                fill="#fff" opacity={ticked ? 0.9 : 0.2}
+              />
+              {ticked && (
+                <path
+                  d={`M${70 + col * 38} ${32 + row * 38} l5 5 l10 -12`}
+                  fill="none" stroke="#1b2440" stroke-width="3"
+                  stroke-linecap="round" stroke-linejoin="round"
+                />
+              )}
+            </g>
+          )
+        })}
+        <path
+          d="M164 96 L164 132 L173 124 L179 137 L186 133 L180 121 L191 120 Z"
+          fill="#fff" stroke="#1b2440" stroke-width="2.5" stroke-linejoin="round"
+        />
+      </g>
+    )
+  }
+
   {
     art === 'grid' && (
       <g fill="#fff">

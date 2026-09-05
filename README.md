@@ -1,6 +1,6 @@
 # funsite
 
-A neal.fun-style site: one lean homepage and fifteen self-contained
+A neal.fun-style site: one lean homepage and seventeen self-contained
 interactive pages, each rendered with its own WebGL shader or 2D canvas and
 shipping only the script that page actually needs.
 
@@ -90,7 +90,7 @@ src/
     GameLayout.astro    game chrome: home link, title, share button
   components/
     GameTile.astro      homepage tile
-    TileArt.astro       fifteen distinct generated tile illustrations
+    TileArt.astro       seventeen distinct generated tile illustrations
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
     audio.ts            the synthesiser: every sound on the site, no audio files
@@ -138,11 +138,20 @@ drawn or is one of a handful of small hand-written shaders.
 
 ---
 
-## The fifteen games
+## The seventeen games
 
-Three of them carry the site. The rest are one good idea each.
+Four of them carry the site. The rest are one good idea each.
 
-### The big three
+### The big four
+
+**Asteroid Launcher** — pick a rock between 1 m and 20 km, a composition, a
+speed and an entry angle, then drop it on any of 4,926 real cities. The model is
+Collins, Melosh & Marcus (2005): atmospheric entry with breakup and pancake
+dispersion, pi-group crater scaling, fireball radius, blast overpressure, seismic
+magnitude and recurrence interval, with casualties from city footprints and a
+lethality ladder calibrated on Hiroshima and Chelyabinsk. *`scripts/check-impact.mjs`
+reproduces Chelyabinsk, Tunguska, Meteor Crater and Chicxulub — the entry model,
+the airburst reflection and a crater-depth unit bug were all caught by it.*
 
 **Powder** — a falling-sand sandbox: a cellular automaton over typed arrays,
 rendered straight into an `ImageData` buffer. Twelve materials and about forty
@@ -208,6 +217,15 @@ logos.
 
 **Life in Weeks** — ninety years as 4,680 squares from one typed date.
 
+**I'm Not a Robot** — twelve checks that start like a CAPTCHA and end somewhere
+else, over a behavioural profiler that measures the same channels real bot
+detection does: pointer straightness, tremor, velocity profile, click and
+keystroke rhythm, hand drift while holding still, and the isoperimetric quotient
+of a freehand circle. The report card reads your own numbers back. *The
+thresholds are invented for the joke and the page says so; the maths is checked
+by `scripts/check-telemetry.mjs` against a ruler-straight path, a unit zigzag, a
+square and a 64-gon, all with answers worked out by hand.*
+
 ---
 
 ## Sound
@@ -225,8 +243,10 @@ preference, and every game gets the same speaker button in its chrome.
 
 Checked against the **production build**, not the dev server:
 
-- **Accessibility** — 0 colour-contrast failures on any of the 16 pages (WCAG
-  AA, measured by compositing every text node against its real background);
+- **Accessibility** — 0 colour-contrast failures on any of the 19 pages (WCAG
+  AA, every text node measured against the background actually painted behind
+  it; the homepage tile text sits on a gradient, so it is checked against both
+  gradient endpoints instead);
   every page exactly one `<h1>`; every control named; every image has `alt`;
   skip link; visible focus ring; `prefers-reduced-motion` honoured throughout,
   including the particle system and Overstimulated's tilt. Disabled controls
@@ -247,6 +267,20 @@ npm run dev       # http://localhost:4321
 npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
+
+Two games do enough real physics that the maths is checked separately, against
+answers from the literature or worked out by hand:
+
+```bash
+node scripts/check-impact.mjs      # Asteroid Launcher, vs four real impacts
+node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
+```
+
+Both exit non-zero on failure. Neither needs a browser — the analysis in
+`lib/impact.ts`, `lib/casualties.ts` and `lib/telemetry.ts` is deliberately pure
+functions over plain arrays so it can be run this way. `scripts/build-world-data.mjs`
+regenerates `src/data/world.ts` (coastline and cities) and only needs running if
+those sources change.
 
 QA against `npm run preview`. Astro's dev server caches component CSS
 aggressively and will happily serve you a stale stylesheet after an edit; if

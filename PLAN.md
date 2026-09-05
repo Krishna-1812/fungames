@@ -166,8 +166,12 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
 
 ### Build order
 
-1. **Asteroid Launcher** — flagship. Hardest, best, most obviously professional.
-2. **I'm Not a Robot** — cheap, funny, the tonal opposite. Proves range.
+1. ~~**Asteroid Launcher**~~ — **done.** Collins/Melosh/Marcus, 4,926 cities,
+   checked against four real impacts by `scripts/check-impact.mjs`.
+2. ~~**I'm Not a Robot**~~ — **done.** Twelve checks over a real behavioural
+   profiler; maths checked by `scripts/check-telemetry.mjs`. It turned out not to
+   be cheap: the writing was, but the measurement underneath it was not, and the
+   measurement is the only reason the joke has anything to stand on.
 3. **The Auction Game** — a real game loop, which the site currently lacks entirely.
 4. Then reassess against the depth work in Phases 1–2 above.
 

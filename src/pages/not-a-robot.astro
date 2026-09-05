@@ -1,0 +1,1394 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * I'm Not a Robot — twelve checks that start like a CAPTCHA and end somewhere
+ * else.
+ *
+ * The joke only works because the measuring is real. Every number the report
+ * card reads back is computed in src/lib/telemetry.ts from your own pointer,
+ * clicks, keystrokes, tremor and freehand circle, and that maths is checked
+ * against known answers by scripts/check-telemetry.mjs.
+ *
+ * Nothing leaves the tab. There is no server on this site at all.
+ */
+---
+
+<GameLayout slug="not-a-robot" bar="#101a33" bodyClass="robot-body">
+  <div class="wrap">
+    <section class="box" id="box" data-heat="0">
+      <header class="boxhead">
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22">
+            <path d="M12 2.6 20 5.4v6.1c0 4.7-3.2 8.3-8 9.9-4.8-1.6-8-5.2-8-9.9V5.4z"
+              fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" />
+            <path d="M8.2 12.1 11 14.9l5-5.4" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <div class="titles">
+          <h1>I'm Not a Robot</h1>
+          <p class="subtitle" id="subtitle">Routine security check</p>
+        </div>
+        <p class="stepline" id="stepline">1 / 12</p>
+      </header>
+
+      <div class="rail" aria-hidden="true"><i id="bar"></i></div>
+
+      <div class="boxbody">
+        <h2 class="prompt" id="prompt">Select all squares with a traffic light.</h2>
+        <p class="hint" id="hint"></p>
+        <div class="slot" id="slot"></div>
+      </div>
+
+      <footer class="boxfoot">
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <button class="optout" type="button" id="skip" hidden>Can't do this one</button>
+        <button class="go" type="button" id="action">Verify</button>
+      </footer>
+
+      {/* The banner a real CAPTCHA shows for half a second before it moves on. */}
+      <div class="flash" id="flash" hidden aria-hidden="true">Verified</div>
+    </section>
+
+    {/* The readout is the whole conceit: while you answer the questions, the
+        page is measuring you, and it shows its working the entire time. */}
+    <aside class="signal" aria-label="Live behavioural signal">
+      <h2>Signal</h2>
+      <dl id="signal">
+        <div><dt>Pointer samples</dt><dd id="s-samples">0</dd></div>
+        <div><dt>Straightness</dt><dd id="s-straight">—</dd></div>
+        <div><dt>Tremor</dt><dd id="s-jitter">—</dd></div>
+        <div><dt>Click rhythm</dt><dd id="s-clicks">—</dd></div>
+        <div><dt>Typing rhythm</dt><dd id="s-keys">—</dd></div>
+      </dl>
+      <p class="note">Measured in this tab. Never sent anywhere.</p>
+    </aside>
+  </div>
+
+  {/* Written into the served HTML rather than built in JavaScript. It is a
+      document nobody reads, and clause 4 is the page's real privacy statement,
+      which ought to be findable without running any script to get at it. */}
+  <template id="terms-src">
+    <h3>1. Definitions</h3>
+    <p>
+      "You" means the entity currently operating the pointer, whether or not
+      that entity is you. "We" means this verification service, which has no
+      staff, no address, and no legal existence in your jurisdiction or in any
+      other. "Human" means whatever we decide it means on the day, and we
+      reserve the right to decide differently tomorrow, retroactively.
+    </p>
+
+    <h3>2. Grant of suspicion</h3>
+    <p>
+      By continuing you grant us a perpetual, irrevocable, worldwide, royalty-free
+      licence to doubt you. This licence survives termination of these terms, the
+      closing of this tab, and you.
+    </p>
+
+    <h3>3. The checks</h3>
+    <p>
+      We may ask you to identify a traffic light, a hand, or a feeling. We may
+      ask twice. If you answer correctly we will assume you have seen the
+      question before. If you answer incorrectly we will assume you are a
+      machine that has not been trained well enough yet. There is no third
+      possibility and we are not accepting submissions of one.
+    </p>
+
+    <h3>4. What we measured, and where it went</h3>
+    <p>
+      We recorded the path your pointer took across this page, the gaps between
+      your clicks, the gaps between your keystrokes, how far your hand drifted
+      while you held it still, and the roundness of the circle you drew. All of
+      it stayed inside this browser tab. None of it was sent anywhere, stored,
+      or shown to anyone but you. This is the only clause in this document that
+      is entirely true, which is why it is buried here in the middle.
+    </p>
+
+    <h3>5. Appeals</h3>
+    <p>
+      If you are found not to be human you may appeal. Write your appeal on
+      paper. Fold it. Put it in a drawer. We will not collect it, but the act of
+      writing it is the part that helps.
+    </p>
+
+    <h3>6. Sincerity</h3>
+    <p>
+      You warrant that you have completed each check sincerely and in a spirit
+      of good faith. Completing a check while thinking about something else is
+      permitted, provided the something else is also sincere.
+    </p>
+
+    <h3>7. Force majeure</h3>
+    <p>
+      Neither party is liable for failure to perform due to flood, fire, war,
+      civil unrest, a cat on the keyboard, a hand cramp, someone entering the
+      room, or the sudden and total loss of interest in proving anything to
+      anyone.
+    </p>
+
+    <h3>8. Assignment</h3>
+    <p>
+      We may assign these terms to any successor entity. You may not assign
+      them, delegate them, or ask a friend to do the checks for you, although we
+      both know that you could and that we would never find out.
+    </p>
+
+    <h3>9. Severability</h3>
+    <p>
+      If any clause of these terms is found to be unenforceable, that clause
+      shall be struck out and the remaining clauses shall become slightly more
+      demanding to compensate.
+    </p>
+
+    <h3>10. Acknowledgement</h3>
+    <p>
+      By reading this far you acknowledge that you have read this far. By
+      scrolling past it without reading you acknowledge the same thing, and we
+      have timed how long it took you, and we are going to tell you.
+    </p>
+
+    <h3>11. Governing law</h3>
+    <p>
+      These terms are governed by the law of the jurisdiction in which this
+      sentence was rendered, at the moment it was rendered, which has now
+      passed.
+    </p>
+
+    <h3>12. Duration</h3>
+    <p>
+      Verification, once granted, expires. Everything does. We simply put a
+      number on it.
+    </p>
+
+    <h3>13. There is no clause 14</h3>
+    <p>You may now tick the box.</p>
+  </template>
+
+  <section class="verdict" id="verdict" hidden>
+    <p class="stamp" id="stamp">Human</p>
+    <p class="score"><b id="pct">100</b><span>% human on the channels we could read</span></p>
+    <p class="detail" id="detail"></p>
+
+    <table class="card">
+      <caption>Report card</caption>
+      <thead>
+        <tr><th scope="col">Channel</th><th scope="col">You</th><th scope="col">A person</th><th scope="col">Verdict</th></tr>
+      </thead>
+      <tbody id="card"></tbody>
+    </table>
+
+    <ul class="extras" id="extras"></ul>
+
+    <div class="acts">
+      <button type="button" data-share data-title="I'm Not a Robot">Share this</button>
+      <button type="button" id="again">Run it again</button>
+      <a href="/">try something else →</a>
+    </div>
+
+    <details class="how">
+      <summary>How this actually works</summary>
+      <p>
+        Every figure above is measured from your own input while you played:
+        where your pointer went between clicks, the gaps between your clicks and
+        your keystrokes, how far your hand drifted while you held still, and the
+        isoperimetric quotient of the circle you drew.
+      </p>
+      <p>
+        <b>The measurements are real. The thresholds are not.</b> Genuine bot
+        detection uses these same channels, but the bands that decide "human"
+        here were picked so the joke lands, not from any published study. Nobody
+        should be refused anything on the strength of this page.
+      </p>
+      <p>
+        None of it is transmitted. This site is static files; there is no server
+        to send it to, and nothing is written to storage.
+      </p>
+      <p>Related: <a href="/steady-hand/">Steady Hand</a> measures a single stroke properly, and <a href="/from-memory/">From Memory</a> is the other game here that grades your drawing.</p>
+    </details>
+  </section>
+</GameLayout>
+
+<script>
+  import { burst, shake, prefersReducedMotion } from '../lib/fx'
+  import { sfx, tone, unlock, isMuted } from '../lib/audio'
+  import { Profiler, circleStats, variation, gaps, report } from '../lib/telemetry'
+
+  const $ = (id: string) => document.getElementById(id)!
+  const box = $('box'), slot = $('slot'), promptEl = $('prompt'), hintEl = $('hint')
+  const statusEl = $('status'), actionBtn = $('action') as HTMLButtonElement
+  const skipBtn = $('skip') as HTMLButtonElement
+  const flash = $('flash'), bar = $('bar'), stepline = $('stepline'), subtitle = $('subtitle')
+  const TERMS = ($('terms-src') as HTMLTemplateElement).innerHTML
+
+  /* ------------------------------------------------------------------ */
+  /* Evidence                                                            */
+  /* ------------------------------------------------------------------ */
+
+  const prof = new Profiler()
+  prof.attach(document)
+
+  const ev = {
+    drift: null as number | null,
+    roundness: null as number | null,
+    /** The circle you actually drew, kept so the last grid can show it back. */
+    circle: null as { x: number; y: number }[] | null,
+    // Not scored — reported at the end because they are funnier than the scored
+    // ones and they are still genuinely things you did.
+    suffering: null as number | null,
+    cents: null as number | null,
+    wpm: null as number | null,
+    mine: null as { got: number; of: number; invented: number } | null,
+    dodges: 0,
+    retries: 0,
+  }
+  const started = Date.now()
+
+  /* ------------------------------------------------------------------ */
+  /* Shared drawing                                                      */
+  /* ------------------------------------------------------------------ */
+
+  /* One street, reused. The second time you are asked about it the question is
+     different, and the fact that the picture has not changed is the point. */
+  const STREET = `
+    <rect width="300" height="300" fill="#a9c7de"/>
+    <rect x="0" y="58" width="66" height="127" fill="#7d8a99"/>
+    <rect x="54" y="96" width="46" height="89" fill="#6c7a8b"/>
+    <rect x="208" y="38" width="60" height="147" fill="#727f8f"/>
+    <rect x="256" y="86" width="44" height="99" fill="#62707f"/>
+    ${Array.from({ length: 22 }, (_, i) => {
+      const col = i % 4, row = (i / 4) | 0
+      return `<rect x="${8 + col * 14 + (i > 11 ? 208 : 0)}" y="${
+        (i > 11 ? 50 : 70) + row * 18
+      }" width="9" height="11" fill="#c9d6e0" opacity="${0.3 + ((i * 7) % 5) * 0.13}"/>`
+    }).join('')}
+    <rect x="0" y="185" width="300" height="115" fill="#4b4c54"/>
+    <rect x="0" y="185" width="300" height="6" fill="#8d9099"/>
+    ${Array.from({ length: 5 }, (_, i) => `<rect x="${8 + i * 62}" y="248" width="30" height="6" rx="3" fill="#d9d5c6"/>`).join('')}
+    <rect x="52" y="120" width="7" height="65" fill="#4a4b53"/>
+    <circle cx="55.5" cy="112" r="17" fill="#2f5fa8" stroke="#e9eef4" stroke-width="4"/>
+    <rect x="143" y="96" width="9" height="104" fill="#33343c"/>
+    <rect x="124" y="26" width="44" height="72" rx="10" fill="#25262d"/>
+    <circle cx="146" cy="44" r="11" fill="#d8483c"/>
+    <circle cx="146" cy="62" r="11" fill="#3a3b44"/>
+    <circle cx="146" cy="80" r="11" fill="#3a3b44"/>
+    <g fill="#c1553f">
+      <rect x="196" y="212" width="88" height="26" rx="9"/>
+      <path d="M212 212 l12-16 h40 l12 16 z"/>
+    </g>
+    <circle cx="216" cy="240" r="9" fill="#26262c"/>
+    <circle cx="266" cy="240" r="9" fill="#26262c"/>
+  `
+  /** Cells 1 and 4 — the light head, and the pole below it. */
+  const STREET_ANSWER = new Set([1, 4])
+
+  /* The cells sit flush against each other and the dividing lines are drawn
+     inside the picture. With a CSS gap the buttons would each cover a slightly
+     different region of the image than the third of the viewBox the answer is
+     defined against, and "the square with the traffic light in it" would stop
+     meaning exactly one thing. */
+  const GRID_LINES =
+    '<path d="M100 0V300M200 0V300M0 100H300M0 200H300" fill="none" stroke="#eef1f7" stroke-width="3"/>'
+
+  function gridMarkup(scene: string) {
+    return `<div class="grid" role="group">
+      <svg class="scene" viewBox="0 0 300 300" aria-hidden="true">${scene}${GRID_LINES}</svg>
+      ${Array.from({ length: 9 }, (_, i) =>
+        `<button type="button" class="cell" data-i="${i}" aria-pressed="false">
+           <span class="visually-hidden">Square ${i + 1}</span>
+           <span class="tickbox" aria-hidden="true"></span>
+         </button>`).join('')}
+    </div>`
+  }
+
+  function wireGrid(host: HTMLElement, onChange?: (n: number) => void) {
+    const chosen = new Set<number>()
+    host.querySelectorAll<HTMLButtonElement>('.cell').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.i)
+        if (chosen.has(i)) { chosen.delete(i); btn.setAttribute('aria-pressed', 'false') }
+        else { chosen.add(i); btn.setAttribute('aria-pressed', 'true') }
+        btn.classList.toggle('on', chosen.has(i))
+        sfx.tick()
+        onChange?.(chosen.size)
+      })
+    })
+    return chosen
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* The checks                                                          */
+  /* ------------------------------------------------------------------ */
+
+  type Api = {
+    pass: (note?: string) => void
+    reject: (msg: string) => void
+    say: (msg: string) => void
+    action: (label: string | null, fn?: () => void) => void
+    skip: (label: string, fn: () => void) => void
+  }
+  type Check = {
+    prompt: string
+    hint?: string
+    subtitle: string
+    mount: (host: HTMLElement, api: Api) => void
+  }
+
+  const rand = (n: number) => Math.floor(Math.random() * n)
+  const pick = <T,>(a: T[]) => a[rand(a.length)]
+  const cents = (v: number) => {
+    const n = Math.round(Math.abs(v))
+    return `${n} cent${n === 1 ? '' : 's'}`
+  }
+
+  const CHECKS: Check[] = [
+    /* 1 ------------------------------------------------------------- */
+    {
+      prompt: 'Select all squares with a traffic light.',
+      hint: 'If there are none, click Verify.',
+      subtitle: 'Routine security check',
+      mount(host, api) {
+        host.innerHTML = gridMarkup(STREET)
+        const chosen = wireGrid(host)
+        api.action('Verify', () => {
+          const same =
+            chosen.size === STREET_ANSWER.size && [...chosen].every((i) => STREET_ANSWER.has(i))
+          if (same) api.pass('Two squares. Correct.')
+          else api.reject('Please try again.')
+        })
+      },
+    },
+
+    /* 2 ------------------------------------------------------------- */
+    {
+      prompt: 'Tick the box.',
+      hint: 'The box would rather you did not.',
+      subtitle: 'Routine security check',
+      mount(host, api) {
+        host.innerHTML =
+          `<div class="stage" id="stage">
+             <button type="button" class="tickbtn" id="tick">
+               <span class="tickbox" aria-hidden="true"></span> I'm not a robot
+             </button>
+           </div>`
+        const stage = host.querySelector('#stage') as HTMLElement
+        const btn = host.querySelector('#tick') as HTMLButtonElement
+        let dodges = 0
+        const LIMIT = 5
+
+        /* Nine places it could stand; it takes whichever is furthest from your
+           pointer. Moving it to the far side of where it currently *is* was the
+           obvious rule and it is the wrong one — it does not know where you
+           are, so half the time it hops straight into your hand. */
+        const flee = (px: number, py: number) => {
+          dodges++
+          ev.dodges = dodges
+          sfx.whoosh()
+          const w = Math.max(0, stage.clientWidth - btn.offsetWidth)
+          const h = Math.max(0, stage.clientHeight - btn.offsetHeight)
+          const r = stage.getBoundingClientRect()
+          let best = { x: 0, y: 0 }
+          let bestD = -1
+          for (let gx = 0; gx <= 2; gx++)
+            for (let gy = 0; gy <= 2; gy++) {
+              const x = (gx / 2) * w
+              const y = (gy / 2) * h
+              const d = Math.hypot(
+                r.left + x + btn.offsetWidth / 2 - px,
+                r.top + y + btn.offsetHeight / 2 - py,
+              )
+              if (d > bestD) { bestD = d; best = { x, y } }
+            }
+          btn.style.left = `${best.x}px`
+          btn.style.top = `${best.y}px`
+          if (dodges >= LIMIT) {
+            api.say('Fine.')
+            btn.classList.add('caught')
+          }
+        }
+
+        // Both halves matter: a mouse gets chased, a finger gets dodged out
+        // from under the tap. Neither device should have an easier time.
+        stage.addEventListener('pointermove', (e) => {
+          if (dodges >= LIMIT) return
+          const r = btn.getBoundingClientRect()
+          const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2))
+          if (d < 105) flee(e.clientX, e.clientY)
+        })
+        // A finger never hovers, so on touch the dodge has to happen under the
+        // tap itself or the box would simply be tickable first time.
+        btn.addEventListener('pointerdown', (e) => {
+          if (dodges >= LIMIT) return
+          e.preventDefault()
+          flee(e.clientX, e.clientY)
+        })
+        btn.addEventListener('click', (e) => {
+          // A click with no pointer behind it came from Enter or Space. There is
+          // nothing for the box to dodge, and refusing it would leave a
+          // keyboard-only player stuck on step two forever.
+          if (dodges < LIMIT && e.detail === 0) {
+            btn.classList.add('ticked')
+            return api.pass('Tabbed to it and pressed Enter. That is cheating, and it worked.')
+          }
+          if (dodges < LIMIT) return
+          btn.classList.add('ticked')
+          api.pass(`It got away ${dodges} times.`)
+        })
+        api.action(null)
+      },
+    },
+
+    /* 3 ------------------------------------------------------------- */
+    {
+      prompt: 'Type the characters you see.',
+      subtitle: 'Standard verification',
+      mount(host, api) {
+        const ALPHABET = 'ABCDEFGHJKLMNPQRTUVWXYZ2346789'
+        let code = ''
+        const draw = () => {
+          code = Array.from({ length: 5 }, () => ALPHABET[rand(ALPHABET.length)]).join('')
+          const glyphs = Array.from(code, (ch, i) => {
+            const x = 34 + i * 44
+            const rot = (Math.random() - 0.5) * 46
+            const dy = (Math.random() - 0.5) * 16
+            const skew = (Math.random() - 0.5) * 26
+            return `<text x="${x}" y="${62 + dy}" font-size="46" font-family="ui-monospace, monospace"
+                      fill="#1d2437" transform="rotate(${rot} ${x} ${62 + dy}) skewX(${skew})">${ch}</text>`
+          }).join('')
+          const noise = Array.from({ length: 4 }, () => {
+            const y = 18 + Math.random() * 70
+            const d = Array.from({ length: 9 }, (_, k) =>
+              `${k ? 'L' : 'M'}${k * 32} ${(y + Math.sin(k + Math.random() * 3) * 15).toFixed(1)}`).join(' ')
+            return `<path d="${d}" fill="none" stroke="#1d2437" stroke-width="1.6" opacity="0.35"/>`
+          }).join('')
+          host.querySelector('.captcha')!.innerHTML =
+            `<svg viewBox="0 0 256 96" aria-hidden="true">
+               <rect width="256" height="96" fill="#e6e9f0"/>${noise}${glyphs}
+             </svg>`
+        }
+        host.innerHTML =
+          `<div class="captcha"></div>
+           <input class="text" id="code" type="text" inputmode="text" autocomplete="off"
+             autocapitalize="characters" spellcheck="false" maxlength="8" aria-label="The characters shown"
+             placeholder="five characters">`
+        draw()
+        const input = host.querySelector('#code') as HTMLInputElement
+        input.focus()
+        api.action('Verify', () => {
+          if (input.value.trim().toUpperCase() === code) api.pass('Legible after all.')
+          else {
+            api.reject('That was not it. Here is another.')
+            draw()
+            input.value = ''
+            input.focus()
+          }
+        })
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') actionBtn.click() })
+      },
+    },
+
+    /* 4 ------------------------------------------------------------- */
+    {
+      prompt: 'How many tones do you hear?',
+      hint: 'Each tone also flashes, so this works with the sound off.',
+      subtitle: 'Standard verification',
+      mount(host, api) {
+        const n = 4 + rand(4)
+        host.innerHTML =
+          `<div class="audio">
+             <div class="lamp" id="lamp" aria-hidden="true"></div>
+             <button type="button" class="ghost" id="play">Play</button>
+             <div class="choices" id="choices" role="group" aria-label="How many tones">
+               ${[3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="chip" data-n="${k}">${k}</button>`).join('')}
+             </div>
+           </div>`
+        const lamp = host.querySelector('#lamp') as HTMLElement
+        let playing = false
+        const play = () => {
+          if (playing) return
+          playing = true
+          unlock()
+          let at = 0
+          for (let i = 0; i < n; i++) {
+            at += 340 + Math.random() * 320
+            setTimeout(() => {
+              tone({ freq: 520 + Math.random() * 260, dur: 0.16, type: 'sine', gain: 0.22 })
+              lamp.classList.remove('lit')
+              void lamp.offsetWidth   // restart the one-shot flash
+              lamp.classList.add('lit')
+              if (i === n - 1) setTimeout(() => (playing = false), 240)
+            }, at)
+          }
+        }
+        host.querySelector('#play')!.addEventListener('click', play)
+        let chosen: number | null = null
+        host.querySelectorAll<HTMLButtonElement>('.chip').forEach((c) =>
+          c.addEventListener('click', () => {
+            chosen = Number(c.dataset.n)
+            host.querySelectorAll('.chip').forEach((o) => o.classList.remove('on'))
+            c.classList.add('on')
+            sfx.tick()
+          }))
+        setTimeout(play, 420)
+        api.action('Verify', () => {
+          if (chosen === null) return api.say('Pick a number first.')
+          if (chosen === n) api.pass(`${n} tones. Correct.`)
+          else { api.reject(`There were ${n}. Here is a new set.`); setTimeout(play, 500) }
+        })
+        if (isMuted()) api.say('Sound is muted — watch the lamp instead.')
+      },
+    },
+
+    /* 5 ------------------------------------------------------------- */
+    {
+      prompt: 'Hold still on the target for three seconds.',
+      hint: 'Press and hold. Do not move.',
+      subtitle: 'Additional verification required',
+      mount(host, api) {
+        host.innerHTML =
+          `<div class="hold">
+             <button type="button" class="target" id="target" aria-label="Press and hold here">
+               <svg viewBox="0 0 120 120" aria-hidden="true">
+                 <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="2" opacity="0.35"/>
+                 <circle class="ringfill" cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="6"
+                   stroke-linecap="round" transform="rotate(-90 60 60)"/>
+                 <circle cx="60" cy="60" r="11" fill="currentColor"/>
+               </svg>
+             </button>
+             <p class="readout" id="readout">—</p>
+           </div>`
+        const target = host.querySelector('#target') as HTMLButtonElement
+        const ringfill = host.querySelector('.ringfill') as SVGCircleElement
+        const readout = host.querySelector('#readout') as HTMLElement
+        const CIRC = 2 * Math.PI * 52
+        ringfill.style.strokeDasharray = String(CIRC)
+        ringfill.style.strokeDashoffset = String(CIRC)
+
+        const HOLD_MS = 3000
+        let holding = false, anchor = { x: 0, y: 0 }, worst = 0, t0 = 0, raf = 0
+        let attempt = 0
+
+        const finish = (completed: boolean) => {
+          holding = false
+          cancelAnimationFrame(raf)
+          ringfill.style.strokeDashoffset = String(CIRC)
+          target.classList.remove('holding')
+          if (!completed) return api.say('Keep holding until the ring closes.')
+          attempt++
+          ev.drift = worst
+          readout.textContent = `${worst.toFixed(1)} px of drift`
+          if (worst < 0.4 && attempt < 2) {
+            api.reject('Nothing alive is that steady. Once more.')
+          } else if (worst > 90 && attempt < 2) {
+            api.reject('You left the target. Once more.')
+          } else {
+            api.pass(`${worst.toFixed(1)} px of drift over three seconds.`)
+          }
+        }
+
+        target.addEventListener('pointerdown', (e) => {
+          // Capture keeps a wobbling hand attached to this button, but it
+          // throws for a pointer id the browser is not currently tracking and
+          // that must not take the whole hold down with it.
+          try { target.setPointerCapture(e.pointerId) } catch { /* not fatal */ }
+          holding = true
+          worst = 0
+          anchor = { x: e.clientX, y: e.clientY }
+          t0 = performance.now()
+          target.classList.add('holding')
+          const step = () => {
+            if (!holding) return
+            const p = Math.min(1, (performance.now() - t0) / HOLD_MS)
+            ringfill.style.strokeDashoffset = String(CIRC * (1 - p))
+            readout.textContent = `${worst.toFixed(1)} px`
+            if (p >= 1) return finish(true)
+            raf = requestAnimationFrame(step)
+          }
+          raf = requestAnimationFrame(step)
+        })
+        target.addEventListener('pointermove', (e) => {
+          if (!holding) return
+          worst = Math.max(worst, Math.hypot(e.clientX - anchor.x, e.clientY - anchor.y))
+        })
+        // Deliberately not pointerleave: the pointer is captured, so a hand that
+        // wobbles a few pixels off the button still belongs to this hold, and
+        // ending on leave would fail exactly the people with the shakiest hands.
+        for (const end of ['pointerup', 'pointercancel'])
+          target.addEventListener(end, () => { if (holding) finish(false) })
+
+        api.action(null)
+        api.skip('No pointer on this device', () => { ev.drift = null; api.pass('Not measured.') })
+      },
+    },
+
+    /* 6 ------------------------------------------------------------- */
+    {
+      prompt: 'Match the tone.',
+      hint: 'Drag the slider until your wave matches the one above it.',
+      subtitle: 'Additional verification required',
+      mount(host, api) {
+        const LO = 180, HI = 900
+        const target = 250 + Math.random() * 420
+        let mine = LO * Math.pow(HI / LO, 0.5)
+        const wave = (f: number, y: number, cls: string) => {
+          const k = f / 120
+          const d = Array.from({ length: 121 }, (_, i) => {
+            const x = i * 2.5
+            return `${i ? 'L' : 'M'}${x} ${(y + Math.sin((i / 120) * Math.PI * 2 * k) * 22).toFixed(1)}`
+          }).join(' ')
+          return `<path class="${cls}" d="${d}" fill="none" stroke-width="2.6" stroke-linecap="round"/>`
+        }
+        host.innerHTML =
+          `<div class="tonebox">
+             <svg viewBox="0 0 300 130" aria-hidden="true">
+               <rect width="300" height="130" rx="10" fill="#0d1730"/>
+               <g id="waves"></g>
+             </svg>
+             <input class="slider" id="freq" type="range" min="0" max="1000" value="500"
+               aria-label="Your tone, low to high">
+             <div class="tonebtns">
+               <button type="button" class="ghost" id="playRef">Play theirs</button>
+               <button type="button" class="ghost" id="playMine">Play mine</button>
+             </div>
+           </div>`
+        const waves = host.querySelector('#waves') as SVGGElement
+        const slider = host.querySelector('#freq') as HTMLInputElement
+        const redraw = () => {
+          waves.innerHTML = wave(target, 42, 'w-ref') + wave(mine, 94, 'w-mine')
+        }
+        const setFromSlider = () => {
+          mine = LO * Math.pow(HI / LO, Number(slider.value) / 1000)
+          redraw()
+        }
+        slider.addEventListener('input', setFromSlider)
+        // Drop the tone the moment you stop dragging, not on every pixel.
+        let debounce = 0
+        slider.addEventListener('input', () => {
+          clearTimeout(debounce)
+          debounce = window.setTimeout(() => tone({ freq: mine, dur: 0.16, type: 'sine', gain: 0.16 }), 140)
+        })
+        host.querySelector('#playRef')!.addEventListener('click', () =>
+          tone({ freq: target, dur: 0.5, type: 'sine', gain: 0.2 }))
+        host.querySelector('#playMine')!.addEventListener('click', () =>
+          tone({ freq: mine, dur: 0.5, type: 'sine', gain: 0.2 }))
+        setFromSlider()
+        setTimeout(() => tone({ freq: target, dur: 0.5, type: 'sine', gain: 0.2 }), 400)
+
+        api.action('Verify', () => {
+          const off = 1200 * Math.log2(mine / target)
+          ev.cents = off
+          if (Math.abs(off) <= 70) api.pass(`${cents(off)} out. Close enough.`)
+          else api.reject(`${cents(off)} too ${off > 0 ? 'high' : 'low'}.`)
+        })
+      },
+    },
+
+    /* 7 ------------------------------------------------------------- */
+    {
+      prompt: 'Select all squares that contain suffering.',
+      hint: 'Same street.',
+      subtitle: 'Enhanced verification',
+      mount(host, api) {
+        host.innerHTML = gridMarkup(STREET)
+        const chosen = wireGrid(host)
+        api.action('Verify', () => {
+          if (!chosen.size) return api.say('At least one.')
+          ev.suffering = chosen.size
+          api.pass(`Suffering in ${chosen.size} of 9 squares. Recorded.`)
+        })
+      },
+    },
+
+    /* 8 ------------------------------------------------------------- */
+    {
+      prompt: 'Which of these is a human hand?',
+      subtitle: 'Enhanced verification',
+      mount(host, api) {
+        // Palm plus digits. The wrong ones are wrong in the specific ways a
+        // picture of a hand goes wrong when nobody counted.
+        const hand = (fingers: number, thumbs: 1 | 2) => {
+          const span = Math.max(56, fingers * 15)
+          const x0 = 60 - span / 2
+          const digits = Array.from({ length: fingers }, (_, i) => {
+            const x = x0 + i * (span / fingers) + 2
+            const h = 34 + Math.sin((i / Math.max(1, fingers - 1)) * Math.PI) * 16
+            return `<rect x="${x.toFixed(1)}" y="${(78 - h).toFixed(1)}" width="${(span / fingers - 5).toFixed(1)}"
+                      height="${(h + 14).toFixed(1)}" rx="6" fill="#e5b48f" stroke="#b0805c" stroke-width="2"/>`
+          }).join('')
+          const thumb = (side: -1 | 1) =>
+            `<rect x="${side < 0 ? x0 - 17 : x0 + span - 4}" y="80" width="20" height="34" rx="10"
+               fill="#e5b48f" stroke="#b0805c" stroke-width="2"
+               transform="rotate(${side * -28} ${side < 0 ? x0 - 7 : x0 + span + 6} 92)"/>`
+          return `<svg viewBox="0 0 120 150" aria-hidden="true">
+            ${digits}
+            <rect x="${x0 - 4}" y="74" width="${span + 8}" height="54" rx="16" fill="#e9bd98" stroke="#b0805c" stroke-width="2"/>
+            ${thumb(-1)}${thumbs === 2 ? thumb(1) : ''}
+            <rect x="${x0 + 6}" y="124" width="${span - 12}" height="20" rx="7" fill="#dcae88" stroke="#b0805c" stroke-width="2"/>
+          </svg>`
+        }
+        const OPTIONS = [
+          { svg: hand(4, 1), ok: true, why: '' },
+          { svg: hand(5, 1), ok: false, why: 'Six digits.' },
+          { svg: hand(3, 1), ok: false, why: 'Four digits.' },
+          { svg: hand(4, 2), ok: false, why: 'Two thumbs.' },
+        ].sort(() => Math.random() - 0.5)
+
+        host.innerHTML = `<div class="hands">${OPTIONS.map((o, i) =>
+          `<button type="button" class="handbtn" data-i="${i}">
+             ${o.svg}<span class="visually-hidden">Hand ${i + 1}</span>
+           </button>`).join('')}</div>`
+        host.querySelectorAll<HTMLButtonElement>('.handbtn').forEach((b) =>
+          b.addEventListener('click', () => {
+            const o = OPTIONS[Number(b.dataset.i)]
+            if (o.ok) { b.classList.add('right'); api.pass('That one had five.') }
+            else { b.classList.add('wrong'); api.reject(o.why + ' Try again.') }
+          }))
+        api.action(null)
+      },
+    },
+
+    /* 9 ------------------------------------------------------------- */
+    {
+      prompt: 'Type this sentence exactly.',
+      hint: 'We are not reading the words. We are timing the gaps between them.',
+      subtitle: 'Manual review',
+      mount(host, api) {
+        const LINE = pick([
+          'i have a body and it needs things from me',
+          'i did not choose to be here but here i am',
+          'my hands are older than the rest of me',
+        ])
+        host.innerHTML =
+          `<p class="copyline">${LINE}</p>
+           <textarea class="text" id="typed" rows="2" spellcheck="false" autocomplete="off"
+             autocapitalize="off" aria-label="Type the sentence above"></textarea>`
+        const ta = host.querySelector('#typed') as HTMLTextAreaElement
+        ta.focus()
+        // Scoped to this challenge: the global keystroke channel includes the
+        // CAPTCHA box and the number entry, which are a different kind of typing.
+        const times: number[] = []
+        ta.addEventListener('keydown', (e) => {
+          if (e.key.length === 1) times.push(performance.now())
+        })
+        api.action('Verify', () => {
+          if (ta.value.trim().toLowerCase() !== LINE) return api.reject('Not quite the same sentence.')
+          const v = variation(gaps(times))
+          api.pass(v ? `Your keystrokes varied by ${(v.cv * 100).toFixed(0)}%.` : 'Typed.')
+        })
+      },
+    },
+
+    /* 10 ------------------------------------------------------------ */
+    {
+      prompt: 'Draw a circle.',
+      hint: 'One stroke, freehand. It will be measured.',
+      subtitle: 'Manual review',
+      mount(host, api) {
+        host.innerHTML =
+          `<div class="pad">
+             <svg id="pad" viewBox="0 0 320 260" aria-hidden="true">
+               <path id="ink" fill="none" stroke="currentColor" stroke-width="3.4"
+                 stroke-linecap="round" stroke-linejoin="round"/>
+             </svg>
+             <p class="readout" id="readout">draw here</p>
+           </div>`
+        const pad = host.querySelector('#pad') as SVGSVGElement
+        const ink = host.querySelector('#ink') as SVGPathElement
+        const readout = host.querySelector('#readout') as HTMLElement
+        let pts: { x: number; y: number }[] = []
+        let drawing = false
+        let attempt = 0
+
+        const at = (e: PointerEvent) => {
+          const r = pad.getBoundingClientRect()
+          return { x: ((e.clientX - r.left) / r.width) * 320, y: ((e.clientY - r.top) / r.height) * 260 }
+        }
+        const paint = () => {
+          ink.setAttribute('d', pts.map((p, i) =>
+            `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' '))
+        }
+        pad.addEventListener('pointerdown', (e) => {
+          try { pad.setPointerCapture(e.pointerId) } catch { /* not fatal */ }
+          drawing = true
+          pts = [at(e)]
+          paint()
+        })
+        pad.addEventListener('pointermove', (e) => { if (drawing) { pts.push(at(e)); paint() } })
+        const end = () => {
+          if (!drawing) return
+          drawing = false
+          const s = circleStats(pts)
+          if (!s || s.diameter < 70) return void (readout.textContent = 'Bigger than that.')
+          readout.textContent = `${(s.roundness * 100).toFixed(1)}% round, ends ${(s.gap * 100).toFixed(0)}% apart`
+          attempt++
+          if (s.gap > 0.35 && attempt < 3) return api.reject('Close the loop.')
+          ev.roundness = s.roundness
+          ev.circle = pts.slice()
+          if (s.roundness > 0.988 && attempt < 3) api.reject('That is a perfect circle. Do it worse.')
+          else if (s.roundness < 0.5 && attempt < 3) api.reject('That is not a circle.')
+          else api.pass(`${(s.roundness * 100).toFixed(1)}% round.`)
+        }
+        pad.addEventListener('pointerup', end)
+        pad.addEventListener('pointercancel', end)
+        api.action(null)
+        api.skip('No pointer on this device', () => { ev.roundness = null; api.pass('Not measured.') })
+      },
+    },
+
+    /* 11 ------------------------------------------------------------ */
+    {
+      prompt: 'Read and accept the terms.',
+      subtitle: 'Escalated review',
+      mount(host, api) {
+        host.innerHTML =
+          `<div class="terms" id="terms" tabindex="0" role="region" aria-label="Terms of engagement">
+             ${TERMS}
+           </div>
+           <label class="agree"><input type="checkbox" id="agree"> I have read and understood all of it.</label>`
+        const terms = host.querySelector('#terms') as HTMLElement
+        const agree = host.querySelector('#agree') as HTMLInputElement
+        // Counted off the rendered text, not guessed, so the reading speed we
+        // throw back at you is arithmetic rather than a punchline.
+        const words = (terms.textContent || '').trim().split(/\s+/).length
+        const t0 = performance.now()
+        let bottom = false
+        const check = () => {
+          if (terms.scrollTop + terms.clientHeight >= terms.scrollHeight - 8 && !bottom) {
+            bottom = true
+            // Floored, so a viewport tall enough to show the lot at once reports
+            // a fast reader rather than an infinite one.
+            const secs = Math.max(0.2, (performance.now() - t0) / 1000)
+            ev.wpm = words / (secs / 60)
+            api.say(`${words} words in ${secs.toFixed(1)} seconds.`)
+            sfx.blip(4)
+          }
+        }
+        terms.addEventListener('scroll', check)
+        check()   // a short viewport may already be at the bottom
+        api.action('Accept', () => {
+          if (!bottom) return api.say('Scroll to the end first.')
+          if (!agree.checked) return api.say('Tick the box.')
+          api.pass(ev.wpm ? `${Math.round(ev.wpm).toLocaleString('en-US')} words per minute.` : 'Accepted.')
+        })
+      },
+    },
+
+    /* 12 ------------------------------------------------------------ */
+    {
+      prompt: 'Select all squares that contain you.',
+      hint: 'Seven of these are traces of what you just did. Two are not.',
+      subtitle: 'Final determination',
+      mount(host, api) {
+        const cells = youGrid()
+        host.innerHTML =
+          `<div class="grid mine">
+             ${cells.map((c, i) =>
+               `<button type="button" class="cell trace" data-i="${i}" aria-pressed="false">
+                  <svg viewBox="0 0 100 100" aria-hidden="true">${c.svg}</svg>
+                  <span class="visually-hidden">${c.label}</span>
+                  <span class="tickbox" aria-hidden="true"></span>
+                </button>`).join('')}
+           </div>`
+        const chosen = new Set<number>()
+        host.querySelectorAll<HTMLButtonElement>('.cell').forEach((btn) =>
+          btn.addEventListener('click', () => {
+            const i = Number(btn.dataset.i)
+            if (chosen.has(i)) chosen.delete(i)
+            else chosen.add(i)
+            btn.classList.toggle('on', chosen.has(i))
+            btn.setAttribute('aria-pressed', String(chosen.has(i)))
+            sfx.tick()
+          }))
+        api.action('Finish', () => {
+          if (!chosen.size) return api.say('At least one.')
+          const real = cells.filter((c) => c.mine).length
+          ev.mine = {
+            got: [...chosen].filter((i) => cells[i].mine).length,
+            of: real,
+            invented: [...chosen].filter((i) => !cells[i].mine).length,
+          }
+          api.pass('Determination complete.')
+        })
+      },
+    },
+  ]
+
+  /* ------------------------------------------------------------------ */
+  /* The final grid, drawn from what you actually did                    */
+  /* ------------------------------------------------------------------ */
+
+  /* A channel with nothing in it says so. An empty tile just looks broken, and
+     "not measured" is the honest word for it anyway — it is what the report
+     card says a few seconds later about the same channel. */
+  const nothingYet =
+    '<text x="50" y="54" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.6">not measured</text>'
+
+  const polyline = (pts: { x: number; y: number }[], w = 2) => {
+    if (pts.length < 2) return nothingYet
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (const p of pts) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x)
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y)
+    }
+    const s = 80 / Math.max(1, maxX - minX, maxY - minY)
+    const d = pts.map((p, i) =>
+      `${i ? 'L' : 'M'}${(10 + (p.x - minX) * s).toFixed(1)} ${(10 + (p.y - minY) * s).toFixed(1)}`).join(' ')
+    return `<path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`
+  }
+  const bars = (vals: number[]) => {
+    if (!vals.length) return nothingYet
+    const max = Math.max(...vals)
+    const w = 84 / vals.length
+    return vals.map((v, i) =>
+      `<rect x="${(8 + i * w).toFixed(1)}" y="${(90 - (v / max) * 78).toFixed(1)}"
+         width="${Math.max(1.5, w - 2).toFixed(1)}" height="${((v / max) * 78).toFixed(1)}"
+         fill="currentColor" rx="1"/>`).join('')
+  }
+
+  /** Nine tiles. Seven are your own data; two were generated. */
+  function youGrid() {
+    const path = prof.samples.slice(-260)
+    const clickGaps = gaps(prof.clickTimes).filter((d) => d > 0 && d < 5000).slice(-14)
+    const keyGaps = gaps(prof.keyTimes).filter((d) => d > 0 && d < 5000).slice(-16)
+    const speeds: number[] = []
+    for (let i = 1; i < path.length; i++) {
+      const dt = (path[i].t - path[i - 1].t) / 1000
+      speeds.push(dt > 0 ? Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y) / dt : 0)
+    }
+
+    const cells = [
+      { label: 'Your pointer path', mine: true, svg: polyline(path, 1.4) },
+      { label: 'Your click rhythm', mine: true, svg: bars(clickGaps) },
+      { label: 'Your typing rhythm', mine: true, svg: bars(keyGaps) },
+      { label: 'Your pointer speed', mine: true, svg: bars(speeds.slice(-40)) },
+      {
+        label: 'Your hand drift',
+        mine: true,
+        svg: ev.drift === null
+          ? nothingYet
+          : `<circle cx="50" cy="50" r="3" fill="currentColor"/>
+             <circle cx="50" cy="50" r="${Math.min(40, Math.max(3, ev.drift)).toFixed(1)}"
+               fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.75"/>`,
+      },
+      {
+        label: 'Your circle',
+        mine: true,
+        // The stroke itself, not a stand-in derived from its score. Sitting a
+        // few squares from the perfect one is the entire point of the tile.
+        svg: ev.circle
+          ? polyline(ev.circle, 1.8)
+          : nothingYet,
+      },
+      {
+        label: 'Squares where you found suffering',
+        mine: true,
+        svg: Array.from({ length: 9 }, (_, i) =>
+          `<rect x="${16 + (i % 3) * 24}" y="${16 + ((i / 3) | 0) * 24}" width="20" height="20" rx="3"
+             fill="currentColor" opacity="${i < (ev.suffering ?? 0) ? 0.85 : 0.15}"/>`).join(''),
+      },
+      // The two that are not you.
+      { label: 'A straight line', mine: false, svg: `<path d="M10 50 L90 50" stroke="currentColor" stroke-width="2" fill="none"/>` },
+      { label: 'A perfect circle', mine: false, svg: `<circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" stroke-width="2"/>` },
+    ]
+    // Shuffled, so the two impostors are not always in the same corner.
+    return cells.sort(() => Math.random() - 0.5)
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Runner                                                              */
+  /* ------------------------------------------------------------------ */
+
+  let idx = 0
+  let actionFn: (() => void) | null = null
+
+  actionBtn.addEventListener('click', () => { unlock(); sfx.click(); actionFn?.() })
+
+  const api: Api = {
+    pass(note) {
+      statusEl.textContent = note ?? ''
+      sfx.good()
+      flash.hidden = false
+      flash.classList.remove('in')
+      void flash.offsetWidth
+      flash.classList.add('in')
+      actionBtn.disabled = true
+      setTimeout(() => { flash.hidden = true; actionBtn.disabled = false; show(idx + 1) },
+        prefersReducedMotion ? 260 : 620)
+    },
+    reject(msg) {
+      ev.retries++
+      statusEl.textContent = msg
+      sfx.bad()
+      shake(box, 7, 300)
+    },
+    say(msg) { statusEl.textContent = msg },
+    action(label, fn) {
+      actionFn = fn ?? null
+      actionBtn.hidden = label === null
+      if (label) actionBtn.textContent = label
+    },
+    skip(label, fn) {
+      skipBtn.hidden = false
+      skipBtn.textContent = label
+      skipBtn.onclick = () => { sfx.click(); fn() }
+    },
+  }
+
+  function show(i: number) {
+    if (i >= CHECKS.length) return finish()
+    idx = i
+    const c = CHECKS[i]
+    promptEl.textContent = c.prompt
+    hintEl.textContent = c.hint ?? ''
+    hintEl.hidden = !c.hint
+    statusEl.textContent = ''
+    stepline.textContent = `${i + 1} / ${CHECKS.length}`
+    subtitle.textContent = c.subtitle
+    bar.style.width = `${(i / CHECKS.length) * 100}%`
+    box.dataset.heat = String(i)
+    skipBtn.hidden = true
+    skipBtn.onclick = null
+    slot.innerHTML = ''
+    api.action('Verify')
+    c.mount(slot, api)
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Verdict                                                             */
+  /* ------------------------------------------------------------------ */
+
+  function finish() {
+    const r = report({
+      path: prof.path(),
+      clicks: prof.clicks(),
+      keys: prof.keys(),
+      drift: ev.drift,
+      roundness: ev.roundness,
+    })
+
+    $('stamp').textContent = r.verdict
+    $('stamp').dataset.tone = r.humanity === 100 ? 'good' : r.humanity >= 50 ? 'mid' : 'bad'
+    $('pct').textContent = String(r.humanity)
+    $('detail').textContent = r.detail
+    $('card').innerHTML = r.metrics.map((m) =>
+      `<tr class="${m.ok === null ? 'na' : m.ok ? 'yes' : 'no'}">
+         <th scope="row">${m.label}</th>
+         <td>${m.display ?? '<span class="na">not measured</span>'}</td>
+         <td>${m.expected}</td>
+         <td>${m.ok === null ? '—' : m.ok ? 'human' : 'flagged'}</td>
+       </tr>`).join('')
+
+    const secs = Math.round((Date.now() - started) / 1000)
+    const extras: string[] = []
+    if (ev.mine) extras.push(
+      `You recognised ${ev.mine.got} of the ${ev.mine.of} traces that were genuinely yours` +
+      (ev.mine.invented
+        ? `, and claimed ${ev.mine.invented} that ${ev.mine.invented === 1 ? 'was' : 'were'} not.`
+        : '.'))
+    if (ev.suffering !== null) extras.push(`You found suffering in ${ev.suffering} of 9 squares of an empty street.`)
+    if (ev.wpm) extras.push(`You read the terms at ${Math.round(ev.wpm).toLocaleString('en-US')} words per minute.`)
+    if (ev.cents !== null) extras.push(`Your ear was ${cents(ev.cents)} off the reference tone.`)
+    if (ev.dodges) extras.push(`The checkbox got away from you ${ev.dodges} times.`)
+    extras.push(`Twelve checks, ${ev.retries} rejection${ev.retries === 1 ? '' : 's'}, ${Math.floor(secs / 60)}m ${secs % 60}s.`)
+    $('extras').innerHTML = extras.map((e) => `<li>${e}</li>`).join('')
+
+    $('verdict').hidden = false
+    box.classList.add('done')
+    sfx.great()
+    if (r.humanity === 100)
+      for (let k = 0; k < 4; k++)
+        setTimeout(() => burst(innerWidth * (0.25 + Math.random() * 0.5), innerHeight * 0.35, {
+          count: 16, colors: ['#5b8def', '#9dd6ff', '#fff'], speed: 6, gravity: 0.2, life: 58, size: 5, shape: 'square',
+        }), k * 120)
+    $('verdict').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  $('again').addEventListener('click', () => location.reload())
+
+  /* ------------------------------------------------------------------ */
+  /* Live readout                                                        */
+  /* ------------------------------------------------------------------ */
+
+  const dash = '—'
+  setInterval(() => {
+    const p = prof.path(), c = prof.clicks(), k = prof.keys()
+    $('s-samples').textContent = String(prof.samples.length)
+    $('s-straight').textContent = p ? p.straightness.toFixed(3) : dash
+    $('s-jitter').textContent = p ? p.jitter.toFixed(2) + ' px' : dash
+    $('s-clicks').textContent = c ? c.cv.toFixed(2) : dash
+    $('s-keys').textContent = k ? k.cv.toFixed(2) : dash
+  }, 500)
+
+  show(0)
+</script>
+
+<style is:global>
+  /* A class, not a bare `body`: global.css already sets the site's paper
+     background on the element selector, and two rules of equal specificity are
+     settled by order, which is not something a page should be relying on. */
+  .robot-body { background: #0b1224; color: #e8ecf6; }
+
+  .wrap {
+    max-width: 1020px; margin: 0 auto; padding: 30px 18px 40px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 20px; align-items: start;
+  }
+
+  /* --- the dialog ---------------------------------------------------- */
+  .box {
+    background: #f4f6fb; color: #16192a;
+    border-radius: 14px; overflow: hidden; position: relative;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 26px 60px rgba(0, 0, 0, 0.45);
+    /* The frame heats up as the checks get less reasonable, driven off the step
+       index rather than a timer so it tracks how far in you are. It runs the
+       long way round the wheel — blue, violet, magenta, red — because the short
+       way passes through green, and a green banner reads as reassurance. */
+    border-top: 5px solid hsl(calc(218 + var(--heat, 0) * 13) 62% 52%);
+    transition: border-color 500ms var(--ease);
+  }
+  .box[data-heat="6"], .box[data-heat="7"] { --heat: 4; }
+  .box[data-heat="8"], .box[data-heat="9"] { --heat: 7; }
+  .box[data-heat="10"] { --heat: 9; }
+  .box[data-heat="11"] { --heat: 11; }
+
+  .boxhead { display: flex; align-items: center; gap: 11px; padding: 14px 16px 12px; }
+  .mark { color: #2b56c4; display: grid; place-items: center; flex: none; }
+  .titles { min-width: 0; }
+  .box h1 { font-size: 16px; letter-spacing: -0.01em; margin: 0; }
+  .subtitle { margin: 1px 0 0; font-size: 12px; color: #5c627a; letter-spacing: 0.02em; }
+  .stepline {
+    margin: 0 0 0 auto; flex: none; font: 600 12px/1 var(--mono);
+    color: #5c627a; font-variant-numeric: tabular-nums;
+  }
+
+  .rail { height: 3px; background: #dfe3ee; }
+  .rail i { display: block; height: 100%; width: 0; background: #2b56c4; transition: width 420ms var(--ease); }
+
+  .boxbody { padding: 18px 16px 6px; }
+  .prompt { font-size: 21px; line-height: 1.25; margin: 0; }
+  .hint { margin: 6px 0 0; font-size: 13px; color: #5c627a; }
+  .slot { margin-top: 16px; }
+
+  .boxfoot {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px; border-top: 1px solid #e2e6f0; margin-top: 16px;
+  }
+  .status { margin: 0; font-size: 13px; color: #5c627a; min-height: 1.2em; flex: 1; }
+  .go {
+    flex: none; background: #2b56c4; color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 20px; font-weight: 600; cursor: pointer;
+    transition: transform 200ms var(--ease-bounce), background 140ms var(--ease);
+  }
+  .go:hover { background: #1e45ab; transform: translateY(-1px); }
+  .go:active { transform: scale(0.96); }
+  .go:disabled { opacity: 0.5; cursor: default; transform: none; }
+  .optout {
+    flex: none; background: none; border: 0; color: #5c627a;
+    font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px;
+  }
+
+  .flash {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: rgba(31, 122, 74, 0.94); color: #fff;
+    font: 700 26px/1 var(--display); letter-spacing: -0.02em; z-index: 5;
+  }
+  /* An author `display` beats the user-agent rule for [hidden], so the banner
+     needs telling explicitly or it never goes away. */
+  .flash[hidden] { display: none; }
+  .flash.in { animation: flashin 620ms var(--ease); }
+  @keyframes flashin { from { opacity: 0; } 80% { opacity: 1; } to { opacity: 0.96; } }
+
+  /* --- the signal panel ---------------------------------------------- */
+  .signal {
+    background: #131c36; border: 1px solid #24304f; border-radius: 12px;
+    padding: 14px; position: sticky; top: 62px;
+  }
+  .signal h2 {
+    font: 600 11px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: #7f8db3; margin: 0 0 10px;
+  }
+  .signal dl { margin: 0; display: grid; gap: 8px; }
+  .signal div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .signal dt { font-size: 12px; color: #98a4c6; }
+  .signal dd {
+    margin: 0; font: 600 13px/1 var(--mono); color: #cfe0ff;
+    font-variant-numeric: tabular-nums;
+  }
+  .signal .note { margin: 12px 0 0; font-size: 11px; color: #7a87ac; line-height: 1.4; }
+
+  /* --- the 3x3 grid -------------------------------------------------- */
+  .grid {
+    position: relative; display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 0; width: min(340px, 100%); margin: 0 auto; background: #cdd4e4;
+    border: 1px solid #cdd4e4; border-radius: 8px; overflow: hidden;
+  }
+  .scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .cell {
+    position: relative; aspect-ratio: 1; border: 0; padding: 0; cursor: pointer;
+    background: transparent; overflow: hidden;
+    transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+  }
+  .cell:hover { box-shadow: inset 0 0 0 3px rgba(43, 86, 196, 0.55); }
+  .cell.on { transform: scale(0.86); box-shadow: inset 0 0 0 3px #2b56c4; border-radius: 4px; }
+  .cell .tickbox {
+    position: absolute; top: 5px; left: 5px; width: 19px; height: 19px;
+    border-radius: 5px; background: #2b56c4; opacity: 0; transform: scale(0.4);
+    transition: opacity 150ms var(--ease), transform 220ms var(--ease-bounce);
+  }
+  .cell .tickbox::after {
+    content: ''; position: absolute; inset: 0;
+    background: no-repeat center/12px
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.4 8.5 6.6 11.7 12.6 4.9' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  .cell.on .tickbox { opacity: 1; transform: scale(1); }
+
+  /* The final grid draws data, not a photograph, so it needs its own ground. */
+  .grid.mine { background: #1a2340; border-color: #2a3757; gap: 3px; }
+  .cell.trace { background: #121a33; color: #8fb6ff; display: grid; place-items: center; }
+  .cell.trace svg { width: 100%; height: 100%; }
+
+  /* --- the fleeing checkbox ------------------------------------------ */
+  .stage { position: relative; height: 220px; border: 1px dashed #c6cde0; border-radius: 10px; }
+  .tickbtn {
+    position: absolute; left: 12px; top: 84px;
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #fff; border: 1px solid #c6cde0; border-radius: 8px;
+    padding: 12px 16px; font-size: 15px; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(20, 25, 45, 0.14);
+    transition: left 260ms var(--ease-bounce), top 260ms var(--ease-bounce);
+  }
+  .tickbtn .tickbox {
+    width: 20px; height: 20px; border: 2px solid #9aa3bd; border-radius: 4px;
+    position: static; opacity: 1; transform: none; background: transparent;
+  }
+  .tickbtn.caught { border-color: #2b56c4; }
+  .tickbtn.ticked .tickbox { background: #2b56c4; border-color: #2b56c4; opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .tickbtn { transition: none; } }
+
+  /* --- text entry ----------------------------------------------------- */
+  .captcha svg { width: min(256px, 100%); display: block; margin: 0 auto; border-radius: 8px; }
+  .text {
+    display: block; width: 100%; margin-top: 14px; padding: 11px 13px;
+    border: 1px solid #c6cde0; border-radius: 8px; background: #fff;
+    font-family: var(--mono); font-size: 17px; letter-spacing: 0.06em;
+  }
+  textarea.text { letter-spacing: 0; font-size: 15px; resize: none; }
+  .copyline {
+    margin: 0; padding: 12px 14px; background: #e9edf6; border-radius: 8px;
+    font-family: var(--mono); font-size: 15px; line-height: 1.5; user-select: none;
+  }
+
+  /* --- audio ---------------------------------------------------------- */
+  .audio { display: grid; gap: 14px; justify-items: center; }
+  .lamp { width: 54px; height: 54px; border-radius: 50%; background: #d8dded; }
+  .lamp.lit { animation: lit 260ms var(--ease); }
+  @keyframes lit { from { background: #ffd166; box-shadow: 0 0 0 12px rgba(255, 209, 102, 0.35); } }
+  .choices { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .chip, .ghost {
+    background: #fff; border: 1px solid #c6cde0; border-radius: 8px;
+    padding: 9px 16px; font-weight: 600; cursor: pointer;
+    transition: transform 180ms var(--ease-bounce), border-color 140ms var(--ease);
+  }
+  .chip:hover, .ghost:hover { border-color: #2b56c4; transform: translateY(-1px); }
+  .chip.on { background: #2b56c4; border-color: #2b56c4; color: #fff; }
+
+  /* --- hold still ------------------------------------------------------ */
+  .hold { display: grid; justify-items: center; gap: 10px; }
+  .target {
+    width: 140px; height: 140px; border: 0; background: none; padding: 0;
+    color: #2b56c4; cursor: pointer; touch-action: none;
+  }
+  .target svg { width: 100%; height: 100%; }
+  .target.holding { color: #1f7a4a; }
+  .readout { margin: 0; font: 600 13px/1 var(--mono); color: #5c627a; }
+
+  /* --- tone matching --------------------------------------------------- */
+  .tonebox { display: grid; gap: 12px; justify-items: center; }
+  .tonebox svg { width: min(300px, 100%); }
+  .w-ref { stroke: #6f8dff; }
+  .w-mine { stroke: #ffd166; }
+  .slider { width: min(300px, 100%); accent-color: #2b56c4; }
+  .tonebtns { display: flex; gap: 8px; }
+
+  /* --- hands ------------------------------------------------------------ */
+  .hands { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .handbtn {
+    background: #fff; border: 1px solid #c6cde0; border-radius: 10px; padding: 6px;
+    cursor: pointer; transition: transform 180ms var(--ease-bounce), border-color 140ms var(--ease);
+  }
+  .handbtn svg { width: 100%; height: auto; display: block; }
+  .handbtn:hover { border-color: #2b56c4; transform: translateY(-2px); }
+  .handbtn.right { border-color: #1f7a4a; box-shadow: 0 0 0 3px rgba(31, 122, 74, 0.25); }
+  .handbtn.wrong { border-color: #b93a2c; }
+
+  /* --- drawing pad ------------------------------------------------------ */
+  .pad { display: grid; justify-items: center; gap: 8px; }
+  .pad svg {
+    width: 100%; max-width: 340px; aspect-ratio: 320 / 260;
+    background: #fff; border: 1px solid #c6cde0; border-radius: 10px;
+    color: #16192a; touch-action: none; cursor: crosshair;
+  }
+
+  /* --- terms ------------------------------------------------------------ */
+  .terms {
+    height: 210px; overflow-y: auto; background: #fff; border: 1px solid #c6cde0;
+    border-radius: 8px; padding: 14px 16px; font-size: 13px; line-height: 1.6;
+  }
+  .terms h3 { font-size: 13px; margin: 14px 0 4px; font-family: var(--font); }
+  .terms h3:first-child { margin-top: 0; }
+  .terms p { margin: 0 0 8px; }
+  .agree { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; font-size: 14px; }
+
+  /* --- verdict ---------------------------------------------------------- */
+  .verdict { max-width: 720px; margin: 0 auto; padding: 0 18px 90px; }
+  .stamp {
+    display: inline-block; margin: 0 0 10px; padding: 8px 18px;
+    border: 3px solid currentColor; border-radius: 8px; transform: rotate(-2.5deg);
+    font: 700 24px/1 var(--display); letter-spacing: -0.02em; text-transform: uppercase;
+  }
+  .stamp[data-tone="good"] { color: #6fe0a4; }
+  .stamp[data-tone="mid"] { color: #ffd166; }
+  .stamp[data-tone="bad"] { color: #ff8778; }
+  .score { margin: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
+  .score b { font: 700 44px/1 var(--display); }
+  .score span { color: #9aa6c8; font-size: 14px; }
+  .detail { margin: 0 0 22px; color: #c3cce5; max-width: 54ch; }
+
+  .card { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .card caption {
+    text-align: left; font: 600 11px/1 var(--mono); letter-spacing: 0.14em;
+    text-transform: uppercase; color: #7f8db3; padding-bottom: 8px;
+  }
+  .card th, .card td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #24304f; }
+  .card thead th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #7f8db3; font-weight: 600; }
+  .card tbody th { font-weight: 500; }
+  .card td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: #cfe0ff; }
+  .card tr.yes td:last-child { color: #6fe0a4; }
+  .card tr.no td:last-child { color: #ff8778; }
+  .card .na { color: #7a87ac; font-family: var(--font); }
+
+  .extras { margin: 22px 0 0; padding-left: 20px; color: #c3cce5; font-size: 14px; line-height: 1.7; }
+  .acts { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 26px; }
+  .acts button {
+    background: #2b56c4; color: #fff; border: 0; border-radius: 999px;
+    padding: 10px 22px; font-weight: 600; cursor: pointer;
+    transition: transform 200ms var(--ease-bounce);
+  }
+  .acts button:hover { transform: translateY(-2px) scale(1.03); }
+  .acts button:nth-of-type(2) { background: #24304f; }
+  .acts a { color: #9aa6c8; font-size: 15px; }
+
+  .how { margin-top: 30px; border-top: 1px solid #24304f; padding-top: 16px; color: #9aa6c8; font-size: 14px; }
+  .how summary { cursor: pointer; color: #cfe0ff; font-weight: 600; }
+  .how p { max-width: 62ch; line-height: 1.65; }
+  .how b { color: #cfe0ff; }
+
+  @media (max-width: 820px) {
+    .wrap { grid-template-columns: minmax(0, 1fr); }
+    .signal { position: static; order: 2; }
+  }
+  @media (max-width: 460px) {
+    .prompt { font-size: 18px; }
+    .hands { gap: 5px; }
+    .boxfoot { flex-wrap: wrap; }
+  }
+</style>
