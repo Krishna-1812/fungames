@@ -47,6 +47,8 @@ const LAYERS: Layer[] = [
       <button type="button" id="clearBtn" class="ghost">Silence</button>
     </div>
 
+    <div class="field" id="field" aria-hidden="true"></div>
+
     <ul class="grid" id="grid">
       {
         LAYERS.map((l) => (
@@ -73,6 +75,9 @@ const LAYERS: Layer[] = [
 </GameLayout>
 
 <script>
+  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { MIX_FRAG } from '../lib/mix-field'
+
   const grid = document.getElementById('grid')
   const masterBtn = document.getElementById('masterBtn')
   const masterSlider = document.getElementById('master')
@@ -82,6 +87,34 @@ const LAYERS: Layer[] = [
   let masterGain = null
   const layers = new Map()
   let scheduler = null
+
+  /* ---- what the picture is actually made of ------------------------------
+     Everything below reads real AnalyserNode data. The cards used to bounce on
+     a CSS keyframe that moved identically for rain and for thunder, and at any
+     volume including none. */
+  /* Declared here rather than beside start(): ShaderSurface renders one frame
+     synchronously in its constructor, and that closure reads this, so leaving it
+     further down the file put it in the temporal dead zone on first paint. */
+  let running = false
+  let masterAnalyser = null
+  let masterBins = null
+  const spec = new Float32Array(32)     // smoothed, handed to the shader
+  let level = 0
+
+  const field = new ShaderSurface(document.getElementById('field'), MIX_FRAG, {
+    scale: 0.8,
+    uniforms: () => ({
+      u_spec: spec,
+      u_level: level,
+      u_live: running ? 1 : 0,
+      /* Under reduced motion the autonomous drift stops, but the response to
+         the audio does not: this is a visualiser, and a visualiser that will
+         not visualise is just a box. The motion that remains is caused by
+         sound the visitor deliberately switched on, and the Silence button and
+         the master toggle both stop it. */
+      u_motion: prefersReducedMotion ? 0 : 1,
+    }),
+  })
 
   // ---- noise -------------------------------------------------------------
   const buffers = {}
@@ -266,12 +299,28 @@ const LAYERS: Layer[] = [
     masterGain.gain.value = Number(masterSlider.value) / 100
     masterGain.connect(ctx.destination)
 
+    // A tap, not a link in the chain: an analyser with nothing connected to its
+    // output passes the signal through untouched.
+    masterAnalyser = ctx.createAnalyser()
+    masterAnalyser.fftSize = 128
+    masterAnalyser.smoothingTimeConstant = 0.75
+    masterBins = new Uint8Array(masterAnalyser.frequencyBinCount)
+    masterGain.connect(masterAnalyser)
+
     for (const li of grid.querySelectorAll('.layer')) {
       const id = li.dataset.id
       const out = ctx.createGain()
       out.gain.value = 0
       out.connect(masterGain)
-      const L = { id, li, out, on: false, vol: Number(li.querySelector('.vol').value) / 100, ev: null }
+      const an = ctx.createAnalyser()
+      an.fftSize = 64
+      an.smoothingTimeConstant = 0.7
+      out.connect(an)
+      const L = {
+        id, li, out, on: false, vol: Number(li.querySelector('.vol').value) / 100, ev: null,
+        an, bins: new Uint8Array(an.frequencyBinCount),
+        bars: [...li.querySelectorAll('.viz i')],
+      }
       const res = BUILD[id] ? BUILD[id](out) : null
       if (res) L.ev = Object.keys(res).find((k) => EVENTS[k])
       layers.set(id, L)
@@ -297,11 +346,47 @@ const LAYERS: Layer[] = [
     L.li.querySelector('.toggle').setAttribute('aria-pressed', String(on))
   }
 
-  let running = false
+  /* One loop for every meter on the page, started with the audio and stopped
+     with it, so a silent page costs nothing. */
+  let meterRaf = 0
+  function meters() {
+    meterRaf = requestAnimationFrame(meters)
+    if (!masterAnalyser) return
+
+    masterAnalyser.getByteFrequencyData(masterBins)
+    // 64 bins into 32, and the top octave of an FFT is mostly empty, so the
+    // useful range is the lower three quarters.
+    let sum = 0
+    for (let i = 0; i < 32; i++) {
+      const a = masterBins[Math.min(masterBins.length - 1, Math.floor(i * 1.5))] / 255
+      spec[i] += (a - spec[i]) * 0.25
+      sum += spec[i]
+    }
+    level += (Math.min(1, sum / 32 * 2.6) - level) * 0.12
+
+    for (const L of layers.values()) {
+      if (!L.bars.length) continue
+      L.an.getByteFrequencyData(L.bins)
+      const per = Math.max(1, Math.floor(L.bins.length / 4))
+      for (let b = 0; b < L.bars.length; b++) {
+        let acc = 0
+        for (let k = 0; k < per; k++) acc += L.bins[b * per + k] || 0
+        const v = Math.min(1, acc / per / 190)
+        // scaleY rather than height: it keeps the meters off the layout path.
+        L.bars[b].style.setProperty('--v', (0.12 + v * 0.88).toFixed(3))
+      }
+    }
+
+    // The ticker is parked under reduced motion, so the field needs asking.
+    if (prefersReducedMotion) field.redraw()
+  }
+
   async function start() {
     ensureCtx()
     if (ctx.state === 'suspended') await ctx.resume()
     running = true
+    cancelAnimationFrame(meterRaf)
+    meters()
     masterBtn.textContent = 'Sound is on'
     masterBtn.classList.add('live')
     note.textContent = 'Click a card to bring that layer in. Drag its slider to set how much.'
@@ -311,6 +396,12 @@ const LAYERS: Layer[] = [
     if (!running) return start()
     await ctx.suspend()
     running = false
+    cancelAnimationFrame(meterRaf)
+    // Settle everything to rest rather than freezing mid-reading.
+    spec.fill(0)
+    level = 0
+    for (const L of layers.values()) for (const b of L.bars || []) b.style.setProperty('--v', '0.12')
+    if (prefersReducedMotion) field.redraw()
     masterBtn.textContent = 'Turn the sound on'
     masterBtn.classList.remove('live')
   })
@@ -386,6 +477,17 @@ const LAYERS: Layer[] = [
     cursor: pointer; border: 0;
   }
 
+  .field {
+    position: relative; height: 132px; border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 22px;
+    border: 1px solid #24405a;
+    /* The still fallback: roughly what the shader settles to in silence. */
+    background:
+      radial-gradient(120% 90% at 50% 108%, #16344c 0%, transparent 62%),
+      linear-gradient(180deg, #0d1a27, #112536);
+  }
+  .field :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
   .grid {
     list-style: none; margin: 0; padding: 0;
     display: grid; gap: 12px;
@@ -406,18 +508,18 @@ const LAYERS: Layer[] = [
   .hint { font-size: 12px; color: #7f99b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .viz { display: flex; align-items: flex-end; gap: 2px; height: 20px; flex: none; }
+  /* --v is set from real per-band analyser data every frame. scaleY keeps it
+     off the layout path; animating height would reflow the card. */
   .viz :global(i) {
-    display: block; width: 3px; height: 4px; border-radius: 2px; background: #2f5474;
+    /* #2f5474, as this was, measured 1.89:1 on the card. The bars are a real
+       meter now rather than decoration, so the resting state is held to the 3:1
+       non-text threshold -- still clearly quieter than the live green at
+       7.16:1, which is what carries the on/off read. */
+    display: block; width: 3px; height: 20px; border-radius: 2px; background: #4e7ca8;
+    transform: scaleY(var(--v, 0.12)); transform-origin: bottom;
     transition: background 200ms var(--ease);
   }
-  .layer.on .viz :global(i) {
-    background: #7ad4a0;
-    animation: bounce 900ms ease-in-out infinite;
-  }
-  .layer.on .viz :global(i:nth-child(2)) { animation-delay: 120ms; }
-  .layer.on .viz :global(i:nth-child(3)) { animation-delay: 240ms; }
-  .layer.on .viz :global(i:nth-child(4)) { animation-delay: 360ms; }
-  @keyframes bounce { 0%, 100% { height: 4px; } 50% { height: 18px; } }
+  .layer.on .viz :global(i) { background: #7ad4a0; }
 
   .vol { width: 100%; margin-top: 12px; }
 
