@@ -139,7 +139,13 @@ const barColor = bar ?? game.accent
 
   .game-chromed { padding-top: 48px; }
   .game-fixed { height: 100dvh; overflow: hidden; }
-  .game-fixed.game-chromed { height: calc(100dvh - 48px); }
+  /* Not calc(100dvh - 48px). box-sizing is border-box site-wide and
+     .game-chromed already adds 48px of padding-top for the fixed header, so
+     subtracting the header again took another 48px off the content box. Every
+     fixed game was that much shorter than the viewport and left a strip of bare
+     page background along the bottom -- invisible on the ones that paint the
+     body dark, plainly visible on Fusion, which does not. */
+  .game-fixed.game-chromed { height: 100dvh; }
 
   /* The mute button is injected at runtime, so it cannot use scoped styles. */
   :global(.sound-toggle) {

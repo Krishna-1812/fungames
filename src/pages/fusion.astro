@@ -21,6 +21,8 @@ const API = SITE.fusionApi
   <div class="stage">
     <h1 class="visually-hidden">Fusion</h1>
     <div class="board" id="board">
+      {/* First child, so every piece appended later paints over it. */}
+      <div class="field" id="field" aria-hidden="true"></div>
       <p class="tip" id="tip">Drag one thing onto another.</p>
     </div>
 
@@ -42,8 +44,10 @@ const API = SITE.fusionApi
   <script type="application/json" id="game-data" set:html={JSON.stringify({ API })} />
 
   <script>
-  import { burst, ring, floatText } from '../lib/fx'
+  import { burst, ring, floatText, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { ShaderSurface } from '../lib/gl'
+  import { FIELD_FRAG } from '../lib/fusion-field'
     const { API } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const board = document.getElementById('board')
@@ -127,6 +131,70 @@ const API = SITE.fusionApi
     }
   }
 
+  // ---- the field ----------------------------------------------------------
+
+  /* Board-space coordinates, matching what centred() builds in the shader:
+     origin at the board's centre, units of half its short axis, y upward. */
+  function fieldPos(el) {
+    const b = board.getBoundingClientRect()
+    const r = el.getBoundingClientRect()
+    const m = Math.min(b.width, b.height) || 1
+    return [
+      (2 * (r.left + r.width / 2 - b.left) - b.width) / m,
+      (b.height - 2 * (r.top + r.height / 2 - b.top)) / m,
+    ]
+  }
+
+  let dragPos = [0, 0], dragOn = 0
+  let bondPos = [0, 0], bondOn = 0
+
+  /* The nearest other piece, and how strongly the filament should pull toward
+     it.
+
+     Deliberately proximity rather than overlap. The hit test only fires once
+     two pieces are already touching, so a filament keyed to it could never be
+     longer than it was wide -- it drew a blob, not a line. Keying it to
+     distance means the link forms as you approach and goes taut as you arrive,
+     which tells you which piece you are about to land on while you can still
+     change your mind. */
+  function bondTo(el) {
+    const r = el.getBoundingClientRect()
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2
+    let best = null, bestD = Infinity
+    for (const other of board.querySelectorAll('.piece')) {
+      if (other === el) continue
+      const o = other.getBoundingClientRect()
+      const d = Math.hypot(o.left + o.width / 2 - cx, o.top + o.height / 2 - cy)
+      if (d < bestD) { bestD = d; best = other }
+    }
+    if (!best) return { on: 0, pos: [0, 0] }
+    // Fades in over roughly one piece-width of approach.
+    const k = Math.max(0, Math.min(1, (230 - bestD) / 130))
+    return { on: k * k * (3 - 2 * k), pos: fieldPos(best) }
+  }
+  let flashPos = [0, 0], flashAt = -1e6, flashNew = 0
+
+  const field = new ShaderSurface(document.getElementById('field'), FIELD_FRAG, {
+    // The nebula is the expensive layer and has no edges worth resolving.
+    scale: 0.7,
+    uniforms: () => ({
+      u_drag: dragPos,
+      u_dragOn: dragOn,
+      u_bond: bondPos,
+      u_bondOn: bondOn,
+      u_flash: flashPos,
+      u_flashT: (performance.now() - flashAt) / 1000,
+      u_flashNew: flashNew,
+      // Four starters is an empty board; forty-odd things is a world.
+      u_rich: Math.min(1, Math.max(0, (state.items.length - SEED.length) / 40)),
+      u_motion: prefersReducedMotion ? 0 : 1,
+    }),
+  })
+
+  /* Under reduced motion the shared ticker never runs, so the field has to be
+     asked for the frames that matter: a drag moving, and a merge landing. */
+  function nudgeField() { if (prefersReducedMotion) field.redraw() }
+
   // ---- board pieces -------------------------------------------------------
   let dragging = null
   let offset = { x: 0, y: 0 }
@@ -152,8 +220,16 @@ const API = SITE.fusionApi
     const r = el.getBoundingClientRect()
     const b = board.getBoundingClientRect()
     offset = { x: e.clientX - r.left, y: e.clientY - r.top }
-    el.setPointerCapture(e.pointerId)
+    // Can throw if the pointer is already gone by the time this runs, which
+    // takes the whole drag down with it. Powder already guards the same call.
+    try { el.setPointerCapture(e.pointerId) } catch {}
     el.classList.add('held')
+    dragOn = 1
+    dragPos = fieldPos(el)
+    const b0 = bondTo(el)
+    bondOn = b0.on
+    bondPos = b0.pos
+    nudgeField()
     // Raise it above its siblings while held.
     board.appendChild(el)
     tip.hidden = true
@@ -170,6 +246,12 @@ const API = SITE.fusionApi
     const target = hitTest(dragging)
     board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
     if (target) target.classList.add('target')
+
+    dragPos = fieldPos(dragging)
+    const bond = bondTo(dragging)
+    bondOn = bond.on
+    bondPos = bond.pos
+    nudgeField()
   })
 
   function hitTest(el) {
@@ -189,6 +271,9 @@ const API = SITE.fusionApi
     const el = dragging
     dragging = null
     el.classList.remove('held')
+    dragOn = 0
+    bondOn = 0
+    nudgeField()
     const target = hitTest(el)
     board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
     if (!target) return
@@ -216,6 +301,12 @@ const API = SITE.fusionApi
     const isNew = !state.items.some((i) => i.text.toLowerCase() === res.text.toLowerCase())
     const br = made.getBoundingClientRect()
     const cx = br.left + br.width / 2, cy = br.top + br.height / 2
+
+    // The shockwave goes off where the two things actually met.
+    flashPos = fieldPos(made)
+    flashNew = isNew ? 1 : 0
+    flashAt = performance.now()
+    nudgeField()
     if (isNew) {
       sfx.great()
       ring(cx, cy, '#ffd166', 22)
@@ -293,6 +384,14 @@ const API = SITE.fusionApi
   .stage { position: relative; height: 100%; display: flex; background: #16122e; color: #fff; }
 
   .board { position: relative; flex: 1; overflow: hidden; touch-action: none; }
+  /* The still fallback, for anything without WebGL2. */
+  .field {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(120% 80% at 50% 100%, #241a4c 0%, transparent 62%),
+      #16122e;
+  }
+  .field .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .tip {
     position: absolute; inset: auto 0 24px 0; text-align: center;
     opacity: 0.62; font-size: 15px; margin: 0;
@@ -300,16 +399,56 @@ const API = SITE.fusionApi
 
   .piece {
     position: absolute;
-    background: #efeafc; color: #1a1533;
-    border: 1px solid #cfc3f5; border-radius: 10px;
+    /* A tile with a top face, rather than a rectangle with a border. */
+    background: linear-gradient(180deg, #fcfaff 0%, #e4ddf8 100%);
+    color: #1a1533;
+    border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 11px;
     padding: 8px 14px; font-size: 15px; font-weight: 500;
     cursor: grab; user-select: none; white-space: nowrap;
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 0 rgba(80, 60, 140, 0.20),
+      0 1px 2px rgba(5, 2, 20, 0.55),
+      0 7px 16px rgba(5, 2, 20, 0.34);
+    transition: transform 140ms var(--ease), box-shadow 180ms var(--ease);
   }
-  .piece.held { cursor: grabbing; transform: scale(1.05); box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4); }
-  .piece.target { outline: 2px solid #c04cfd; outline-offset: 2px; }
-  .piece.working { opacity: 0.55; }
-  .piece.fresh { background: #fff3c4; border-color: #e6c64d; }
+  .piece.held {
+    cursor: grabbing; z-index: 5;
+    transform: scale(1.06) rotate(-0.7deg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 18px 34px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(192, 76, 253, 0.55);
+  }
+  /* A ring and a glow rather than a 2px outline: it has to read at a glance,
+     mid-drag, while the filament in the field is already pointing at it. */
+  .piece.target {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 2px 6px rgba(5, 2, 20, 0.5),
+      0 0 0 2px #c04cfd,
+      0 0 24px rgba(192, 76, 253, 0.8);
+  }
+  /* A sweep, not opacity. Fading a light tile toward a dark board takes its
+     text down with it, and this state is on screen while a request is in
+     flight -- exactly when it should still be readable. */
+  .piece.working {
+    background:
+      linear-gradient(100deg, transparent 36%, rgba(192, 76, 253, 0.35) 50%, transparent 64%),
+      linear-gradient(180deg, #fcfaff 0%, #e4ddf8 100%);
+    background-size: 300% 100%, 100% 100%;
+    animation: workSweep 900ms linear infinite;
+  }
+  @keyframes workSweep { from { background-position: 150% 0, 0 0; } to { background-position: -150% 0, 0 0; } }
+  .piece.fresh {
+    background: linear-gradient(180deg, #fff8db 0%, #f7e6a4 100%);
+    border-color: rgba(255, 240, 190, 0.8);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 1px 2px rgba(5, 2, 20, 0.55),
+      0 7px 16px rgba(5, 2, 20, 0.34),
+      0 0 26px rgba(255, 209, 102, 0.45);
+  }
   .piece.pop { animation: pop 220ms ease-out; }
   @keyframes pop { from { transform: scale(0.7); opacity: 0; } }
 
@@ -340,6 +479,12 @@ const API = SITE.fusionApi
     position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.75); padding: 10px 18px; border-radius: 999px;
     font-size: 14px; max-width: 80vw; text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .piece { transition: none; }
+    .piece.working { animation: none; }
+    .piece.pop { animation: none; }
   }
 
   @media (max-width: 760px) {
