@@ -10,7 +10,7 @@ import { listedGames } from '../data/games'
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
 ---
 
-<Base title={SITE.name} description={SITE.description}>
+<Base title={SITE.name} description={SITE.description} image="/og-home.png">
   <Backdrop variant="paper" />
   <div class="wrap">
     <header class="masthead">

@@ -26,7 +26,38 @@
  * with the same interface if it cannot get a context, so the page keeps working
  * on machines that have no GPU to give it.
  */
-import * as THREE from 'three'
+/*
+ * Named imports, not `import * as THREE`. three.js is a large library — loaders,
+ * controls, dozens of materials and geometries this game never touches — and a
+ * namespace import defeats Rollup's tree-shaking because the bundler can no
+ * longer prove which properties of the namespace object are actually read.
+ * Twenty-one symbols cover everything this file uses.
+ */
+import {
+  AdditiveBlending,
+  BufferGeometry,
+  Camera,
+  Color,
+  DoubleSide,
+  Float32BufferAttribute,
+  GLSL3,
+  HalfFloatType,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  LinearFilter,
+  LinearSRGBColorSpace,
+  Mesh,
+  NormalBlending,
+  RawShaderMaterial,
+  RGBAFormat,
+  Scene,
+  Sphere,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
+  WebGLRenderTarget,
+} from 'three'
+import type { IUniform } from 'three'
 import { GLSL, GLSL_LIB } from './gl'
 
 /** Body shaders are not fullscreen passes, so they take the library only. */
@@ -406,35 +437,35 @@ const BLOOM_LEVELS = 4
 
 class GLRenderer implements Renderer {
   readonly hdr = true
-  private renderer: THREE.WebGLRenderer
-  private cam = new THREE.Camera()
+  private renderer: WebGLRenderer
+  private cam = new Camera()
   private w = 0
   private h = 0
   private dpr = 1
 
-  private scene = new THREE.Scene()
-  private planetMesh!: THREE.Mesh
-  private starMesh!: THREE.Mesh
-  private planetMat!: THREE.RawShaderMaterial
-  private starMat!: THREE.RawShaderMaterial
-  private planetGeo!: THREE.InstancedBufferGeometry
-  private starGeo!: THREE.InstancedBufferGeometry
+  private scene = new Scene()
+  private planetMesh!: Mesh
+  private starMesh!: Mesh
+  private planetMat!: RawShaderMaterial
+  private starMat!: RawShaderMaterial
+  private planetGeo!: InstancedBufferGeometry
+  private starGeo!: InstancedBufferGeometry
 
-  private sceneRT!: THREE.WebGLRenderTarget
-  private accum: THREE.WebGLRenderTarget[] = []
-  private skyRT!: THREE.WebGLRenderTarget
-  private bloomRT: THREE.WebGLRenderTarget[] = []
+  private sceneRT!: WebGLRenderTarget
+  private accum: WebGLRenderTarget[] = []
+  private skyRT!: WebGLRenderTarget
+  private bloomRT: WebGLRenderTarget[] = []
   private cur = 0
 
-  private fsScene = new THREE.Scene()
-  private fsQuad: THREE.Mesh
-  private passes: Record<string, THREE.RawShaderMaterial> = {}
+  private fsScene = new Scene()
+  private fsQuad: Mesh
+  private passes: Record<string, RawShaderMaterial> = {}
 
   private cap = 512
   private t0 = performance.now()
 
   constructor(private canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({
+    this.renderer = new WebGLRenderer({
       canvas,
       antialias: false,
       alpha: false,
@@ -444,15 +475,15 @@ class GLRenderer implements Renderer {
     })
     // Everything is tonemapped by hand in the composite pass, so three must not
     // also convert on the way out.
-    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+    this.renderer.outputColorSpace = LinearSRGBColorSpace
     this.renderer.autoClear = false
 
     // The fullscreen pass builds its triangle from gl_VertexID, so the contents
     // of this attribute are never read — but three sizes the draw call from
     // `position`, so three vertices of it have to exist.
-    const fsGeo = new THREE.BufferGeometry()
-    fsGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3))
-    this.fsQuad = new THREE.Mesh(fsGeo)
+    const fsGeo = new BufferGeometry()
+    fsGeo.setAttribute('position', new Float32BufferAttribute(new Float32Array(9), 3))
+    this.fsQuad = new Mesh(fsGeo)
     this.fsQuad.frustumCulled = false
     this.fsScene.add(this.fsQuad)
 
@@ -460,12 +491,12 @@ class GLRenderer implements Renderer {
     this.buildBodies()
   }
 
-  private pass(frag: string, uniforms: Record<string, THREE.IUniform>) {
-    return new THREE.RawShaderMaterial({
+  private pass(frag: string, uniforms: Record<string, IUniform>) {
+    return new RawShaderMaterial({
       vertexShader: noVersion(FS_VERT),
       fragmentShader: noVersion(frag),
       uniforms,
-      glslVersion: THREE.GLSL3,
+      glslVersion: GLSL3,
       depthTest: false,
       depthWrite: false,
     })
@@ -473,8 +504,8 @@ class GLRenderer implements Renderer {
 
   private buildPasses() {
     this.passes.sky = this.pass(SKY_FRAG, {
-      u_time: { value: 0 }, u_res: { value: new THREE.Vector2() },
-      u_pointer: { value: new THREE.Vector2(0.5, 0.5) }, u_dpr: { value: 1 },
+      u_time: { value: 0 }, u_res: { value: new Vector2() },
+      u_pointer: { value: new Vector2(0.5, 0.5) }, u_dpr: { value: 1 },
     })
     this.passes.accum = this.pass(ACCUM_FRAG, {
       u_scene: { value: null }, u_prev: { value: null }, u_fade: { value: 0.86 },
@@ -483,42 +514,42 @@ class GLRenderer implements Renderer {
       u_src: { value: null }, u_threshold: { value: 1.05 },
     })
     this.passes.down = this.pass(DOWN_FRAG, {
-      u_src: { value: null }, u_texel: { value: new THREE.Vector2() },
+      u_src: { value: null }, u_texel: { value: new Vector2() },
     })
     this.passes.up = this.pass(UP_FRAG, {
-      u_src: { value: null }, u_texel: { value: new THREE.Vector2() }, u_radius: { value: 1.0 },
+      u_src: { value: null }, u_texel: { value: new Vector2() }, u_radius: { value: 1.0 },
     })
     this.passes.composite = this.pass(COMPOSITE_FRAG, {
       u_scene: { value: null }, u_bloom: { value: null }, u_sky: { value: null },
-      u_res: { value: new THREE.Vector2() }, u_bloomStrength: { value: 0.34 },
+      u_res: { value: new Vector2() }, u_bloomStrength: { value: 0.34 },
       u_time: { value: 0 },
     })
   }
 
   private makeGeo(cap: number) {
-    const g = new THREE.InstancedBufferGeometry()
+    const g = new InstancedBufferGeometry()
     // itemSize 3, not 2: three reads x/y/z when it computes bounds and a
   // 2-component attribute gives it a NaN radius on every geometry.
-  g.setAttribute('position', new THREE.Float32BufferAttribute(
+  g.setAttribute('position', new Float32BufferAttribute(
       [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0], 3))
-    g.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2))
-    g.setAttribute('iRadius', new THREE.InstancedBufferAttribute(new Float32Array(cap), 1))
-    g.setAttribute('iColor', new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3))
-    g.setAttribute('iSeed', new THREE.InstancedBufferAttribute(new Float32Array(cap), 1))
-    g.setAttribute('iSpin', new THREE.InstancedBufferAttribute(new Float32Array(cap), 1))
+    g.setAttribute('iPos', new InstancedBufferAttribute(new Float32Array(cap * 2), 2))
+    g.setAttribute('iRadius', new InstancedBufferAttribute(new Float32Array(cap), 1))
+    g.setAttribute('iColor', new InstancedBufferAttribute(new Float32Array(cap * 3), 3))
+    g.setAttribute('iSeed', new InstancedBufferAttribute(new Float32Array(cap), 1))
+    g.setAttribute('iSpin', new InstancedBufferAttribute(new Float32Array(cap), 1))
     g.instanceCount = 0
-    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6)
+    g.boundingSphere = new Sphere(new Vector3(), 1e6)
     return g
   }
 
   private bodyUniforms() {
     return {
-      u_res: { value: new THREE.Vector2() },
+      u_res: { value: new Vector2() },
       u_pad: { value: 1.0 },
       u_time: { value: 0 },
       u_lightCount: { value: 0 },
-      u_lightPos: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector2()) },
-      u_lightCol: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector3()) },
+      u_lightPos: { value: Array.from({ length: MAX_LIGHTS }, () => new Vector2()) },
+      u_lightCol: { value: Array.from({ length: MAX_LIGHTS }, () => new Vector3()) },
     }
   }
 
@@ -526,43 +557,43 @@ class GLRenderer implements Renderer {
     this.planetGeo = this.makeGeo(this.cap)
     this.starGeo = this.makeGeo(this.cap)
 
-    this.planetMat = new THREE.RawShaderMaterial({
+    this.planetMat = new RawShaderMaterial({
       vertexShader: noVersion(BODY_VERT),
       fragmentShader: noVersion(PLANET_FRAG),
       uniforms: this.bodyUniforms(),
-      glslVersion: THREE.GLSL3,
+      glslVersion: GLSL3,
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      blending: THREE.NormalBlending,
+      blending: NormalBlending,
       // DoubleSide is load-bearing. The vertex shader flips Y to convert
       // screen space (Y down) to clip space (Y up), and that negation reverses
       // every triangle's winding -- so with the default FrontSide every body
       // quad is back-facing and silently culled. Nothing errors; they simply
       // never appear.
-      side: THREE.DoubleSide,
+      side: DoubleSide,
     })
-    this.starMat = new THREE.RawShaderMaterial({
+    this.starMat = new RawShaderMaterial({
       vertexShader: noVersion(BODY_VERT),
       fragmentShader: noVersion(STAR_FRAG),
       uniforms: this.bodyUniforms(),
-      glslVersion: THREE.GLSL3,
+      glslVersion: GLSL3,
       transparent: true,
       depthTest: false,
       depthWrite: false,
       // Stars and their coronae add light to whatever is behind them; they never
       // occlude it.
-      blending: THREE.AdditiveBlending,
+      blending: AdditiveBlending,
       // DoubleSide is load-bearing. The vertex shader flips Y to convert
       // screen space (Y down) to clip space (Y up), and that negation reverses
       // every triangle's winding -- so with the default FrontSide every body
       // quad is back-facing and silently culled. Nothing errors; they simply
       // never appear.
-      side: THREE.DoubleSide,
+      side: DoubleSide,
     })
 
-    this.planetMesh = new THREE.Mesh(this.planetGeo, this.planetMat)
-    this.starMesh = new THREE.Mesh(this.starGeo, this.starMat)
+    this.planetMesh = new Mesh(this.planetGeo, this.planetMat)
+    this.starMesh = new Mesh(this.starGeo, this.starMat)
     this.planetMesh.frustumCulled = false
     this.starMesh.frustumCulled = false
     this.scene.add(this.planetMesh, this.starMesh)
@@ -579,10 +610,10 @@ class GLRenderer implements Renderer {
     this.renderer.setSize(w, h, false)
 
     const opts = {
-      type: THREE.HalfFloatType,
-      format: THREE.RGBAFormat,
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
+      type: HalfFloatType,
+      format: RGBAFormat,
+      minFilter: LinearFilter,
+      magFilter: LinearFilter,
       depthBuffer: false,
       stencilBuffer: false,
     } as const
@@ -591,16 +622,16 @@ class GLRenderer implements Renderer {
     this.accum = []
     this.bloomRT = []
 
-    this.sceneRT = new THREE.WebGLRenderTarget(this.w, this.h, opts)
-    this.skyRT = new THREE.WebGLRenderTarget(this.w, this.h, opts)
+    this.sceneRT = new WebGLRenderTarget(this.w, this.h, opts)
+    this.skyRT = new WebGLRenderTarget(this.w, this.h, opts)
     this.accum = [
-      new THREE.WebGLRenderTarget(this.w, this.h, opts),
-      new THREE.WebGLRenderTarget(this.w, this.h, opts),
+      new WebGLRenderTarget(this.w, this.h, opts),
+      new WebGLRenderTarget(this.w, this.h, opts),
     ]
     let bw = this.w, bh = this.h
     for (let i = 0; i < BLOOM_LEVELS; i++) {
       bw = Math.max(1, bw >> 1); bh = Math.max(1, bh >> 1)
-      this.bloomRT.push(new THREE.WebGLRenderTarget(bw, bh, opts))
+      this.bloomRT.push(new WebGLRenderTarget(bw, bh, opts))
     }
 
     for (const m of [this.planetMat, this.starMat]) m.uniforms.u_res.value.set(this.w, this.h)
@@ -618,7 +649,7 @@ class GLRenderer implements Renderer {
     this.renderer.setRenderTarget(null)
   }
 
-  private blit(mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) {
+  private blit(mat: RawShaderMaterial, target: WebGLRenderTarget | null) {
     this.fsQuad.material = mat
     this.renderer.setRenderTarget(target)
     this.renderer.render(this.fsScene, this.cam)
@@ -646,18 +677,18 @@ class GLRenderer implements Renderer {
        each can use the blend mode it needs. */
     let np = 0, ns = 0
     const pg = this.planetGeo, sg = this.starGeo
-    const pPos = pg.getAttribute('iPos') as THREE.InstancedBufferAttribute
-    const pRad = pg.getAttribute('iRadius') as THREE.InstancedBufferAttribute
-    const pCol = pg.getAttribute('iColor') as THREE.InstancedBufferAttribute
-    const pSeed = pg.getAttribute('iSeed') as THREE.InstancedBufferAttribute
-    const pSpin = pg.getAttribute('iSpin') as THREE.InstancedBufferAttribute
-    const sPos = sg.getAttribute('iPos') as THREE.InstancedBufferAttribute
-    const sRad = sg.getAttribute('iRadius') as THREE.InstancedBufferAttribute
-    const sCol = sg.getAttribute('iColor') as THREE.InstancedBufferAttribute
-    const sSeed = sg.getAttribute('iSeed') as THREE.InstancedBufferAttribute
-    const sSpin = sg.getAttribute('iSpin') as THREE.InstancedBufferAttribute
+    const pPos = pg.getAttribute('iPos') as InstancedBufferAttribute
+    const pRad = pg.getAttribute('iRadius') as InstancedBufferAttribute
+    const pCol = pg.getAttribute('iColor') as InstancedBufferAttribute
+    const pSeed = pg.getAttribute('iSeed') as InstancedBufferAttribute
+    const pSpin = pg.getAttribute('iSpin') as InstancedBufferAttribute
+    const sPos = sg.getAttribute('iPos') as InstancedBufferAttribute
+    const sRad = sg.getAttribute('iRadius') as InstancedBufferAttribute
+    const sCol = sg.getAttribute('iColor') as InstancedBufferAttribute
+    const sSeed = sg.getAttribute('iSeed') as InstancedBufferAttribute
+    const sSpin = sg.getAttribute('iSpin') as InstancedBufferAttribute
 
-    const lights: { x: number; y: number; c: THREE.Vector3 }[] = []
+    const lights: { x: number; y: number; c: Vector3 }[] = []
 
     for (let i = 0; i < bodies.length; i++) {
       const b = bodies[i]
@@ -689,7 +720,7 @@ class GLRenderer implements Renderer {
     // With no star in the system the planets would be lit by nothing at all, so
     // a dim fill sits off-screen to keep shapes readable.
     if (!lights.length) {
-      lights.push({ x: this.w * 0.5, y: -this.h * 0.6, c: new THREE.Vector3(0.5, 0.55, 0.7) })
+      lights.push({ x: this.w * 0.5, y: -this.h * 0.6, c: new Vector3(0.5, 0.55, 0.7) })
     }
 
     for (const a of [pPos, pRad, pCol, pSeed, pSpin]) a.needsUpdate = true
@@ -740,10 +771,10 @@ class GLRenderer implements Renderer {
       this.passes.up.uniforms.u_texel.value.set(1 / src.width, 1 / src.height)
       // Additive so each level layers onto the one below it, which is what
       // gives the glow its long tail.
-      this.passes.up.blending = THREE.AdditiveBlending
+      this.passes.up.blending = AdditiveBlending
       this.blit(this.passes.up, this.bloomRT[i - 1])
     }
-    this.passes.up.blending = THREE.NormalBlending
+    this.passes.up.blending = NormalBlending
 
     // 4. composite to screen
     this.passes.composite.uniforms.u_scene.value = next.texture
@@ -775,10 +806,10 @@ class GLRenderer implements Renderer {
 
 /** Body hue -> linear HDR colour. Stars are emitted well above 1. */
 function hueToLinear(hue: number, star: boolean) {
-  const c = new THREE.Color()
+  const c = new Color()
   c.setHSL(hue / 360, star ? 0.55 : 0.62, star ? 0.72 : 0.55)
   // setHSL gives sRGB; the pipeline is linear throughout.
-  return new THREE.Vector3(
+  return new Vector3(
     Math.pow(c.r, 2.2) * (star ? 1.6 : 1.0),
     Math.pow(c.g, 2.2) * (star ? 1.6 : 1.0),
     Math.pow(c.b, 2.2) * (star ? 1.6 : 1.0),

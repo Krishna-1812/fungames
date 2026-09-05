@@ -19,26 +19,60 @@ const game = gameBySlug(slug)
 if (!game) throw new Error(`No registry entry for game "${slug}" — add it to src/data/games.ts`)
 
 const barColor = bar ?? game.accent
+
+// Same URL-resolution Base.astro uses for its canonical tag, so these agree
+// with it exactly regardless of trailing-slash config.
+const homeUrl = new URL('/', Astro.site ?? SITE.url).href
+const gameUrl = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
+const imageUrl = new URL(`/og/${game.slug}.png`, Astro.site ?? SITE.url).href
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: SITE.name, item: homeUrl },
+    { '@type': 'ListItem', position: 2, name: game.title, item: gameUrl },
+  ],
+}
+const videoGameLd = {
+  '@context': 'https://schema.org',
+  '@type': 'VideoGame',
+  name: game.title,
+  description: game.description,
+  url: gameUrl,
+  image: imageUrl,
+  gamePlatform: 'Web browser',
+  isAccessibleForFree: true,
+  datePublished: game.added,
+}
 ---
 
 <Base
   title={`${game.title} — ${SITE.name}`}
   description={game.description}
+  image={`/og/${game.slug}.png`}
   glyph={game.glyph}
   fixed={fixed}
   themeColor={barColor}
   bodyClass={bodyClass}
+  structuredData={[breadcrumbLd, videoGameLd]}
 >
   {
     chrome && (
       <header class="chrome" style={`--bar:${barColor}`}>
-        <a class="chrome-home" href="/">
-          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-            <path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-          <span>{SITE.name}</span>
-        </a>
-        <span class="chrome-title">{game.title}</span>
+        <nav class="crumbs" aria-label="Breadcrumb">
+          <ol>
+            <li>
+              <a class="chrome-home" href="/">
+                <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{SITE.name}</span>
+              </a>
+            </li>
+            <li class="chrome-title" aria-current="page">{game.title}</li>
+          </ol>
+        </nav>
         <button class="chrome-share" type="button" data-share data-title={game.title}>
           Share
         </button>
@@ -103,6 +137,11 @@ const barColor = bar ?? game.accent
     font-size: 14px;
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
   }
+  /* Semantic breadcrumb wrapper around the same two elements the chrome bar
+     already showed — `display: contents` keeps .chrome-home and .chrome-title
+     direct flex children of .chrome, so nothing about the layout changes. */
+  :where(.crumbs, .crumbs ol, .crumbs li) { display: contents; }
+
   .chrome-home {
     display: inline-flex;
     align-items: center;

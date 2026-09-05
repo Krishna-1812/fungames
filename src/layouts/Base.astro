@@ -13,6 +13,10 @@ interface Props {
   themeColor?: string
   /** Games with their own dark frame skip the paper background. */
   bodyClass?: string
+  /** The 404 page sets this — a static host may still answer with 200. */
+  noindex?: boolean
+  /** Extra JSON-LD objects (breadcrumbs, VideoGame) a page wants alongside the sitewide WebSite one. */
+  structuredData?: Record<string, unknown>[]
 }
 
 const {
@@ -23,7 +27,17 @@ const {
   fixed = false,
   themeColor = '#f6f5f1',
   bodyClass = '',
+  noindex = false,
+  structuredData = [],
 } = Astro.props
+
+const websiteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE.name,
+  url: SITE.url,
+  description: SITE.description,
+}
 
 const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
 const ogImage = image ? new URL(image, Astro.site ?? SITE.url).href : undefined
@@ -43,6 +57,7 @@ const favicon = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content={themeColor} />
+    {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" href={favicon} />
 
@@ -58,11 +73,26 @@ const favicon = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    {ogImage && <meta property="og:image" content={ogImage} />}
+    {
+      ogImage && (
+        <>
+          <meta property="og:image" content={ogImage} />
+          <meta property="og:image:width" content="1200" />
+          <meta property="og:image:height" content="630" />
+        </>
+      )
+    }
     <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     {ogImage && <meta name="twitter:image" content={ogImage} />}
+
+    <script type="application/ld+json" set:html={JSON.stringify(websiteLd)} />
+    {
+      structuredData.map((obj) => (
+        <script type="application/ld+json" set:html={JSON.stringify(obj)} />
+      ))
+    }
 
     {
       SITE.plausibleDomain && (
