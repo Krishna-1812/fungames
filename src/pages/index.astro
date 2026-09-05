@@ -16,6 +16,11 @@ const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
     <header class="masthead">
       <h1 class="wordmark">{SITE.name}</h1>
       <p class="tagline">{SITE.tagline}</p>
+      {/* A colour per game, borrowed straight from its own tile — a preview of
+          the variety below rather than a generic decoration. */}
+      <div class="confetti" aria-hidden="true">
+        {games.map((g, i) => <span style={`--c:${g.accent2}; --i:${i}`} />)}
+      </div>
     </header>
 
     <main id="main">
@@ -144,12 +149,36 @@ const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
     font-weight: 800;
     letter-spacing: -0.04em;
     margin: 0;
+    animation: rise-in 620ms var(--ease) backwards;
   }
   .tagline {
     font-size: clamp(15px, 2vw, 18px);
     color: var(--ink-soft);
     margin: 10px 0 0;
+    animation: rise-in 620ms var(--ease) 70ms backwards;
   }
+
+  /* One dot per game, in that game's own colour — the confetti is a preview
+     of the grid, not decoration for its own sake. */
+  .confetti {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 24px;
+    padding: 0 20px;
+  }
+  .confetti span {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--c);
+    box-shadow: 0 3px 8px color-mix(in oklab, var(--c) 55%, transparent);
+    animation: pop-in 420ms var(--ease) backwards;
+    animation-delay: calc(220ms + var(--i) * 26ms);
+  }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes pop-in { from { opacity: 0; transform: scale(0.3); } }
 
   .grid {
     display: grid;

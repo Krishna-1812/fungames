@@ -1,19 +1,54 @@
 ---
 import Base from '../layouts/Base.astro'
+import Backdrop from '../components/Backdrop.astro'
 import { SITE } from '../site.config'
 ---
 
 <Base title={`Lost — ${SITE.name}`} glyph="🧭" noindex>
+  <Backdrop variant="paper" />
   <div class="lost">
+    <span class="glyph" aria-hidden="true">🧭</span>
     <h1>Nothing here</h1>
     <p>That page does not exist, or it was retired.</p>
-    <a href="/">Back to the games →</a>
+    <a class="btn" href="/">Back to the games →</a>
   </div>
 </Base>
 
 <style>
-  .lost { min-height: 100dvh; display: grid; place-content: center; text-align: center; gap: 8px; }
+  .lost {
+    min-height: 100dvh;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 24px;
+    animation: rise-in 480ms var(--ease) backwards;
+  }
+  .glyph {
+    font-size: 40px;
+    margin-bottom: 6px;
+    filter: drop-shadow(0 8px 18px rgba(20, 18, 28, 0.14));
+  }
   h1 { font-size: 48px; margin: 0; }
   p { color: var(--ink-soft); margin: 0; }
-  a { margin-top: 16px; }
+  .btn {
+    margin-top: 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: 10px 22px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--ink);
+    background: linear-gradient(180deg, #fff 0%, color-mix(in oklab, var(--card) 88%, var(--line)) 100%);
+    box-shadow: inset 0 1px 0 #fff, var(--shadow-sm);
+    transition: transform 140ms var(--ease), box-shadow 140ms var(--ease), border-color 140ms var(--ease);
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+    border-color: var(--ink);
+  }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
 </style>
