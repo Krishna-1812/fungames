@@ -13,6 +13,8 @@ import GameLayout from '../layouts/GameLayout.astro'
 <GameLayout slug="steady-hand" bar="#5b2333" fixed>
   <div class="stage">
     <h1 class="visually-hidden">Steady Hand</h1>
+    {/* Behind the canvas, which clears to transparent. */}
+    <div class="felt" id="felt" aria-hidden="true"></div>
     <canvas id="c"></canvas>
 
     <div class="hud">
@@ -33,8 +35,10 @@ import GameLayout from '../layouts/GameLayout.astro'
 </GameLayout>
 
 <script>
-  import { burst, ring, floatText } from '../lib/fx'
+  import { burst, ring, floatText, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { ShaderSurface } from '../lib/gl'
+  import { FELT_FRAG } from '../lib/steady-felt'
   const canvas = document.getElementById('c')
   const ctx = canvas.getContext('2d')
   const hint = document.getElementById('hint')
@@ -61,6 +65,30 @@ import GameLayout from '../layouts/GameLayout.astro'
   let best = Number(localStorage.getItem(STORE) || 0) || 0
   if (best) elBest.textContent = best.toFixed(1) + '%'
 
+  /* Canvas CSS pixels to the space centred() builds: origin at the middle,
+     units of half the short axis, y upward. */
+  function toField(q) {
+    const m = Math.min(W, H) || 1
+    return [(2 * q.x - W) / m, (H - 2 * q.y) / m]
+  }
+
+  let pen = { x: 0, y: 0 }
+  const felt = new ShaderSurface(document.getElementById('felt'), FELT_FRAG, {
+    // Every layer is low frequency by design; see the note in steady-felt.ts.
+    scale: 0.7,
+    uniforms: () => ({
+      u_a: toField(A),
+      u_b: toField(B),
+      u_pen: toField(pen),
+      u_penOn: drawing ? 1 : 0,
+      u_locked: locked ? 1 : 0,
+      u_motion: prefersReducedMotion ? 0 : 1,
+    }),
+  })
+  // Under reduced motion the shared ticker never runs, so the surface has to be
+  // asked for the frames that matter.
+  function nudge() { if (prefersReducedMotion) felt.redraw() }
+
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2)
     W = canvas.clientWidth
@@ -72,13 +100,19 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   function place() {
-    // Keep the pair long enough to be a real test and inside a safe margin.
+    /* Keep the pair long enough to be a real test and inside a safe margin.
+       The bottom margin is larger than the rest because the hint and the score
+       pills live down there: a dot placed under them is sitting behind text you
+       cannot click through, which made it needlessly hard to start a stroke. */
     const m = 90
+    const bottom = 150
+    const usableH = Math.max(m + 40, H - m - bottom)
     const minLen = Math.min(W, H) * 0.55
     let guard = 0
+    const pick = () => ({ x: m + Math.random() * (W - 2 * m), y: m + Math.random() * (usableH - m) })
     do {
-      A = { x: m + Math.random() * (W - 2 * m), y: m + Math.random() * (H - 2 * m) }
-      B = { x: m + Math.random() * (W - 2 * m), y: m + Math.random() * (H - 2 * m) }
+      A = pick()
+      B = pick()
     } while (Math.hypot(B.x - A.x, B.y - A.y) < minLen && ++guard < 200)
     stroke = []
     locked = false
@@ -94,44 +128,137 @@ import GameLayout from '../layouts/GameLayout.astro'
     return Math.abs(dy * p.x - dx * p.y + B.x * A.y - B.y * A.x) / len
   }
 
-  function render() {
-    ctx.clearRect(0, 0, W, H)
+  /** On the line to badly off it. */
+  function strokeColour(t) {
+    return [
+      Math.round(255 - t * 15),
+      Math.round(214 - t * 136),
+      Math.round(150 - t * 90),
+    ].join(',')
+  }
 
-    // Ideal line, shown only after the attempt so it cannot be traced.
-    if (locked) {
-      ctx.save()
-      ctx.setLineDash([6, 8])
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)'
-      ctx.lineWidth = 2
-      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke()
-      ctx.restore()
+  function drawReveal() {
+    const len = dist(A, B) || 1
+    /* The band whose *average* deviation scores exactly zero. Drawing it is
+       what turns a percentage into something you can learn from: you can see
+       how far off you were relative to what the scoring actually cares about,
+       instead of being told a number. */
+    const band = TOLERANCE * len
+    const nx = -(B.y - A.y) / len, ny = (B.x - A.x) / len
+    ctx.save()
+    ctx.fillStyle = 'rgba(255, 232, 205, 0.055)'
+    ctx.beginPath()
+    ctx.moveTo(A.x + nx * band, A.y + ny * band)
+    ctx.lineTo(B.x + nx * band, B.y + ny * band)
+    ctx.lineTo(B.x - nx * band, B.y - ny * band)
+    ctx.lineTo(A.x - nx * band, A.y - ny * band)
+    ctx.closePath()
+    ctx.fill()
+
+    // The ideal line itself, still dashed so it never reads as your stroke.
+    ctx.setLineDash([7, 9])
+    ctx.strokeStyle = 'rgba(255, 242, 228, 0.5)'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke()
+    ctx.restore()
+  }
+
+  function drawStroke() {
+    if (stroke.length < 2) return
+    const len = dist(A, B) || 1
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    /* The glow is one path and one stroke, not one per segment. Stroking each
+       segment separately at low alpha makes overlapping round caps accumulate,
+       and the line comes out beaded rather than glowing. */
+    ctx.save()
+    ctx.globalAlpha = 0.18
+    ctx.strokeStyle = '#ff9d55'
+    ctx.lineWidth = 14
+    ctx.beginPath()
+    ctx.moveTo(stroke[0].x, stroke[0].y)
+    for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y)
+    ctx.stroke()
+    ctx.restore()
+
+    /* The line itself: quadratics through the midpoints, which smooths the
+       raw pointer samples without moving them, and a width that thins as you
+       speed up the way a real pen does. Colour still says how far off the
+       ideal each part of the stroke drifted. */
+    for (let i = 1; i < stroke.length - 1; i++) {
+      const p0 = stroke[i - 1], p1 = stroke[i], p2 = stroke[i + 1]
+      const t = Math.min(1, deviation(p1) / len / TOLERANCE)
+      const sp = Math.min(1, dist(p0, p1) / 20)
+      ctx.strokeStyle = 'rgb(' + strokeColour(t) + ')'
+      ctx.lineWidth = 6.0 - sp * 3.0
+      ctx.beginPath()
+      ctx.moveTo((p0.x + p1.x) / 2, (p0.y + p1.y) / 2)
+      ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2)
+      ctx.stroke()
     }
+  }
 
-    // The stroke, coloured per segment by how far off the line it drifted.
-    if (stroke.length > 1) {
-      const len = dist(A, B) || 1
-      ctx.lineWidth = 4
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      for (let i = 1; i < stroke.length; i++) {
-        const off = deviation(stroke[i]) / len / TOLERANCE
-        const t = Math.min(1, off)
-        ctx.strokeStyle = `rgb(${Math.round(224 + t * 20)}, ${Math.round(164 - t * 110)}, ${Math.round(88 - t * 40)})`
-        ctx.beginPath()
-        ctx.moveTo(stroke[i - 1].x, stroke[i - 1].y)
-        ctx.lineTo(stroke[i].x, stroke[i].y)
-        ctx.stroke()
-      }
-    }
-
-    for (const [p, label] of [[A, 'A'], [B, 'B']]) {
-      ctx.beginPath(); ctx.arc(p.x, p.y, DOT_R, 0, Math.PI * 2)
-      ctx.fillStyle = '#e0a458'; ctx.fill()
+  function drawDots() {
+    for (const [q, label] of [[A, 'A'], [B, 'B']]) {
+      // A ring standing off the body, so the target has a footprint.
+      ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R + 7, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(255, 196, 128, 0.28)'; ctx.lineWidth = 1.5; ctx.stroke()
+      // Lit from the same direction as the surface behind it, which is what
+      // stops it reading as a circle printed on a flat colour.
+      const g = ctx.createRadialGradient(q.x - 4, q.y - 5, 1, q.x, q.y, DOT_R)
+      g.addColorStop(0, '#ffdcaa')
+      g.addColorStop(1, '#d08f42')
+      ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R, 0, Math.PI * 2)
+      ctx.fillStyle = g; ctx.fill()
+      ctx.strokeStyle = 'rgba(70, 30, 14, 0.42)'; ctx.lineWidth = 1; ctx.stroke()
       ctx.fillStyle = '#3a121d'
       ctx.font = '600 13px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(label, p.x, p.y + 1)
+      ctx.fillText(label, q.x, q.y + 1)
     }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H)
+    // Shown only after the attempt, so it cannot be traced.
+    if (locked) drawReveal()
+    drawStroke()
+    drawDots()
+  }
+
+  /**
+   * Put the score card where it does not cover the line it is scoring.
+   *
+   * It used to sit dead centre, which hid dot B and most of the stroke behind
+   * the number describing them. Of the four corners, the one furthest from the
+   * A-B segment wins.
+   */
+  function placeResult() {
+    const pad = 18
+    const w = result.offsetWidth || 250
+    const h = result.offsetHeight || 200
+    const hud = 110                     // the score pills live along the bottom
+    const seg = (q) => {
+      const dx = B.x - A.x, dy = B.y - A.y
+      const L2 = dx * dx + dy * dy || 1
+      const u = Math.max(0, Math.min(1, ((q.x - A.x) * dx + (q.y - A.y) * dy) / L2))
+      return Math.hypot(q.x - (A.x + dx * u), q.y - (A.y + dy * u))
+    }
+    const cx = [pad + w / 2, W - pad - w / 2]
+    const cy = [pad + h / 2, H - pad - h / 2 - hud]
+    let best = null, bestD = -1
+    for (const x of cx) for (const y of cy) {
+      // A board too small for a corner falls back to the middle rather than
+      // pushing the card off the edge.
+      const q = { x: Math.max(w / 2, Math.min(W - w / 2, x)),
+                  y: Math.max(h / 2, Math.min(H - h / 2, y)) }
+      const d = seg(q)
+      if (d > bestD) { bestD = d; best = q }
+    }
+    result.style.left = best.x + 'px'
+    result.style.top = best.y + 'px'
   }
 
   function score() {
@@ -169,17 +296,22 @@ import GameLayout from '../layouts/GameLayout.astro'
     unlock(); sfx.click()
     drawing = true
     stroke = [p]
+    pen = p
     hint.textContent = 'Keep going to B. Do not lift.'
     render()
+    nudge()
   })
 
   let tickAt = 0
   canvas.addEventListener('pointermove', (e) => {
     if (!drawing) return
-    stroke.push(pos(e))
+    const q = pos(e)
+    stroke.push(q)
+    pen = q
     // A quiet tick every few samples turns a silent drag into a felt one.
     if (stroke.length - tickAt > 5) { tickAt = stroke.length; sfx.tick() }
     render()
+    nudge()
   })
 
   function finish() {
@@ -225,8 +357,11 @@ import GameLayout from '../layouts/GameLayout.astro'
       s >= 70 ? 'A bit of a wobble.' :
       s >= 40 ? 'That is a banana.' : 'That is not a line.'
     result.hidden = false
+    // Measurable only once it is laid out, so this has to follow the unhide.
+    placeResult()
     hint.textContent = 'Press Again for a new pair.'
     render()
+    nudge()
   }
 
   canvas.addEventListener('pointerup', finish)
@@ -238,6 +373,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     result.hidden = true
     hint.textContent = 'Press on the first dot and drag to the second. One stroke.'
     place()
+    nudge()
   })
 
   addEventListener('resize', resize)
@@ -246,6 +382,14 @@ import GameLayout from '../layouts/GameLayout.astro'
 
 <style>
   .stage { position: relative; height: 100%; background: #3a121d; touch-action: none; }
+  /* The still fallback, for anything without WebGL2. */
+  .felt {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(90% 70% at 34% 4%, #4a1826 0%, transparent 62%),
+      #3a121d;
+  }
+  .felt :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
 
   .hud {
@@ -264,7 +408,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   .scores b { font-size: 17px; font-variant-numeric: tabular-nums; }
 
   .result {
+    /* left/top are set from placeResult(); these are only the pre-layout
+       defaults for the first frame before it runs. */
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    transition: left 260ms var(--ease), top 260ms var(--ease);
     background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     color: #fff; border-radius: 18px; padding: 26px 38px; text-align: center;
   }
@@ -273,5 +420,9 @@ import GameLayout from '../layouts/GameLayout.astro'
   .result button {
     background: #e0a458; color: #3a121d; border: 0; border-radius: 999px;
     padding: 10px 26px; font-weight: 600; cursor: pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .result { transition: none; }
   }
 </style>
