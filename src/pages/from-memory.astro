@@ -416,9 +416,10 @@ const ITEMS: Item[] = [
   .tools { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   .tools button {
     border-radius: 999px; padding: 10px 20px; font-weight: 600; font-size: 14.5px;
-    cursor: pointer; border: 0; transition: filter 140ms var(--ease), transform 140ms var(--ease);
+    cursor: pointer; border: 0; transition: filter 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
-  .tools button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); }
+  .tools button:hover:not(:disabled) { transform: translateY(-2px) scale(1.04); filter: brightness(1.05); }
+  .tools button:active:not(:disabled) { transform: scale(0.95); }
   .tools button:disabled { cursor: default; }
   .ghost:disabled { color: #6f6b78; border-color: #f5e3ed !important; }
   .primary { background: #3b1338; color: #fff; margin-left: auto; }
@@ -463,6 +464,9 @@ const ITEMS: Item[] = [
   .gallery-actions button {
     border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600;
     cursor: pointer; background: #3b1338; color: #fff;
+    transition: transform 180ms var(--ease-bounce);
   }
+  .gallery-actions button:hover { transform: translateY(-2px) scale(1.04); }
+  .gallery-actions button:active { transform: scale(0.95); }
   .gallery-actions .ghost { background: #fff; border: 1px solid #edcfe0 !important; color: var(--ink); }
 </style>
