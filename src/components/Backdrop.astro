@@ -78,17 +78,40 @@ const vb = hexToVec(b)
         float d2 = 1.0 - smoothstep(0.0, 1.1, length(p - l2));
 
         // Warm highlight, cool shadow — the oldest trick in painting and the
-        // reason flat grey gradients read as cheap.
-        vec3 warm = vec3(1.000, 0.968, 0.906);
-        vec3 cool = vec3(0.878, 0.890, 0.925);
+        // reason flat grey gradients read as cheap. Pushed further apart than
+        // the first pass, which kept them close enough to white that the
+        // whole page read as flat off-white rather than as lit paper.
+        vec3 warm = vec3(1.000, 0.940, 0.824);
+        vec3 cool = vec3(0.765, 0.815, 0.905);
 
         float lum = f * 0.55 + d1 * 0.30 + d2 * 0.26;
         vec3 col = mix(cool, warm, clamp(lum, 0.0, 1.0));
 
-        // Held to a few percent so every contrast measurement on top still passes.
-        float amp = 0.055;
+        float k = 0.62;
         vec3 base = vec3(0.965, 0.961, 0.945);
-        col = base + (col - base) * amp * 3.2;
+        col = base + (col - base) * k;
+
+        /* A measured floor, not a hoped-for one. This shader has no toLinear/
+           toSRGB pipeline elsewhere — col is already the displayed sRGB value
+           — so the WCAG curve is applied here directly rather than assuming
+           the pow(2.2) shortcut the rest of the site uses, which the site's
+           own notes already flag as diverging from the real curve. That
+           divergence matters most in deep shadow; up here at L ~0.8 the two
+           curves agree closely, but this is the one number on the page a
+           mistake would actually break, so it gets the real formula anyway.
+           --ink-soft (#605d68) is L 0.112 by that formula; 4.5:1 against it
+           needs background L >= 0.68. Floored well above that. The push-
+           toward-white below is a linear mix, not a true inverse of the WCAG
+           curve, so it lands close to FLOOR rather than exactly on it —
+           confirmed against the framebuffer, not just this arithmetic. */
+        vec3 lc = vec3(
+          col.r <= 0.03928 ? col.r / 12.92 : pow((col.r + 0.055) / 1.055, 2.4),
+          col.g <= 0.03928 ? col.g / 12.92 : pow((col.g + 0.055) / 1.055, 2.4),
+          col.b <= 0.03928 ? col.b / 12.92 : pow((col.b + 0.055) / 1.055, 2.4)
+        );
+        float relLum = dot(lc, vec3(0.2126, 0.7152, 0.0722));
+        const float FLOOR = 0.83;
+        if (relLum < FLOOR) col = mix(col, vec3(1.0), (FLOOR - relLum) / max(1.0 - relLum, 1e-4));
 
         // Paper tooth. Slightly coloured rather than grey, so it reads as fibre.
         vec2 px = uv * u_res;
