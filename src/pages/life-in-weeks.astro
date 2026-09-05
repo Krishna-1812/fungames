@@ -225,7 +225,10 @@ const WEEKS = 52
   .weeks-body .primary {
     background: #8fa2c4; color: #101320; border: 0; border-radius: 10px;
     padding: 10px 22px; font-weight: 600; cursor: pointer;
+    transition: transform 180ms var(--ease-bounce);
   }
+  .weeks-body .primary:hover { transform: translateY(-2px) scale(1.03); }
+  .weeks-body .primary:active { transform: scale(0.96); }
   .weeks-body .privacy { color: #99a5c0; font-size: 12.5px; margin: 12px 0 0; }
 
   .weeks-body .stats {
@@ -298,6 +301,9 @@ const WEEKS = 52
   .weeks-body .actions button {
     border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600;
     cursor: pointer; background: #8fa2c4; color: #101320;
+    transition: transform 180ms var(--ease-bounce);
   }
+  .weeks-body .actions button:hover { transform: translateY(-2px) scale(1.04); }
+  .weeks-body .actions button:active { transform: scale(0.95); }
   .weeks-body .actions .ghost { background: transparent; border: 1px solid #333c5c; color: #e8ecf5; }
 </style>
