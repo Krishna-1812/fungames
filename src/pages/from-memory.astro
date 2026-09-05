@@ -111,7 +111,8 @@ const ITEMS: Item[] = [
       <h2 id="prompt">—</h2>
 
       <div class="pad">
-        <canvas id="pad" width="800" height="560" aria-label="Drawing area"></canvas>
+        <div class="sheet" id="sheet" aria-hidden="true"></div>
+        <canvas id="pad" aria-label="Drawing area"></canvas>
         <svg
           class="ref" id="ref" viewBox="0 0 200 140" aria-hidden="true" hidden
         ></svg>
@@ -145,88 +146,131 @@ const ITEMS: Item[] = [
   <script>
   import { burst } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { PAPER_FRAG } from '../lib/memo-paper'
+  import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
+  import { Reveal } from '../lib/memo-reveal'
     const { ITEMS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const el = (id) => document.getElementById(id)
   const pad = el('pad')
-  const ctx = pad.getContext('2d')
   const ref = el('ref')
   const dots = el('dots')
 
   let i = 0
-  let strokes = []       // array of arrays of {x,y} in canvas space
+  /* Strokes are lists of {x, y, w} in the 200x140 reference space the answers
+     are drawn in, not in canvas pixels. That is what lets the same stroke be
+     re-rendered into the pad at whatever size the layout gives it and into the
+     gallery at thumbnail size, both sharp. */
+  let strokes = []
   let drawing = null
   let revealed = false
   const saved = []       // data URLs, one per item
+
+  const ink = new InkSurface(pad)
+  const reveal = new Reveal(ref)
+
+  // Paper. Never animates: still: true is one frame on mount and one per
+  // resize. A drawing surface that shimmers would be intolerable.
+  new ShaderSurface(document.getElementById('sheet'), PAPER_FRAG, { still: true })
 
   dots.replaceChildren(...ITEMS.map(() => {
     const d = document.createElement('span'); d.className = 'dot'; return d
   }))
   const dotEls = [...dots.children]
 
-  function fit() {
-    // Backing store is fixed at 800×560 (the 200×140 reference, ×4), so the
-    // overlay always lines up no matter how the canvas is displayed.
-    const r = pad.getBoundingClientRect()
-    pad.dataset.sx = String(800 / r.width)
-    pad.dataset.sy = String(560 / r.height)
+  /** Rebuild the whole sheet. Only for undo, clear and resize. */
+  function rebuild() {
+    ink.replay(strokes)
+    ink.blit()
   }
 
-  function redraw() {
-    ctx.clearRect(0, 0, 800, 560)
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = 5
-    ctx.strokeStyle = '#2a1026'
-    for (const s of strokes) {
-      if (s.length < 2) {
-        if (s.length === 1) {
-          ctx.beginPath(); ctx.arc(s[0].x, s[0].y, 2.5, 0, Math.PI * 2)
-          ctx.fillStyle = '#2a1026'; ctx.fill()
-        }
-        continue
-      }
-      ctx.beginPath()
-      ctx.moveTo(s[0].x, s[0].y)
-      for (let k = 1; k < s.length; k++) ctx.lineTo(s[k].x, s[k].y)
-      ctx.stroke()
+  /** Pointer position in reference units. */
+  function pos(e) {
+    const r = pad.getBoundingClientRect()
+    return {
+      x: ((e.clientX - r.left) / r.width) * REF_W,
+      y: ((e.clientY - r.top) / r.height) * REF_H,
     }
   }
 
-  function pos(e) {
-    const r = pad.getBoundingClientRect()
-    return { x: (e.clientX - r.left) * (800 / r.width), y: (e.clientY - r.top) * (560 / r.height) }
+  let nib = null
+  let lastT = 0
+  let lastW = 0
+
+  /** One pointer sample: work out the nib width, hand it to the pen. */
+  function extend(e, at) {
+    const q = pos(e)
+    const prev = drawing[drawing.length - 1]
+    const dist = Math.hypot(q.x - prev.x, q.y - prev.y)
+    // Samples that land on top of each other carry no shape and only cost fill.
+    // A resting hand produces a lot of them.
+    if (dist < 0.12) return
+    const w = nibWidth(dist, at - lastT, lastW, e.pressure)
+    lastT = at
+    lastW = w
+    const pt = { x: q.x, y: q.y, w }
+    drawing.push(pt)
+    nib.push(pt)
   }
 
   pad.addEventListener('pointerdown', (e) => {
     if (revealed) return
     try { pad.setPointerCapture(e.pointerId) } catch {}
     unlock(); sfx.tick()
-    drawing = [pos(e)]
+    const q = pos(e)
+    lastT = e.timeStamp
+    const pt = { x: q.x, y: q.y, w: nibWidth(0, 0, 0, e.pressure) }
+    lastW = pt.w
+    drawing = [pt]
     strokes.push(drawing)
-    redraw()
+    nib = new Nib(ink)
+    nib.push(pt)
+    ink.blit()
     e.preventDefault()
   })
+
   pad.addEventListener('pointermove', (e) => {
     if (!drawing) return
-    drawing.push(pos(e))
-    redraw()
+    /* Coalesced events are the samples the browser collected since the last
+       frame and would otherwise throw away. A pen reports far faster than the
+       display refreshes, and taking only the delivered event throws most of a
+       stylus stroke on the floor. */
+    const raw = e.getCoalescedEvents ? e.getCoalescedEvents() : []
+    if (raw.length) for (const c of raw) extend(c, c.timeStamp)
+    else extend(e, e.timeStamp)
+    ink.blit()
   })
-  const end = () => { drawing = null }
+
+  /* No pointerleave here on purpose. The pointer is captured, so up and cancel
+     still arrive when the hand goes outside the pad — and the old listener
+     meant that drawing off the edge of the paper and back cut the stroke in
+     two, which is not what happens with a pen. */
+  const end = () => {
+    if (!drawing) return
+    drawing = null
+    nib.end()
+    nib = null
+    ink.commit()
+    ink.blit()
+  }
   pad.addEventListener('pointerup', end)
   pad.addEventListener('pointercancel', end)
-  pad.addEventListener('pointerleave', end)
 
-  el('undoBtn').addEventListener('click', () => { strokes.pop(); redraw() })
-  el('clearBtn').addEventListener('click', () => { strokes = []; redraw() })
+  el('undoBtn').addEventListener('click', () => { strokes.pop(); rebuild() })
+  el('clearBtn').addEventListener('click', () => { strokes = []; rebuild() })
 
   function render() {
     const it = ITEMS[i]
     el('tag').textContent = `${i + 1} of ${ITEMS.length}`
     el('prompt').textContent = it.prompt
     strokes = []
+    drawing = null
+    nib = null
     revealed = false
-    redraw()
+    ink.resize()
+    rebuild()
+    reveal.stop()
     ref.hidden = true
     ref.innerHTML = ''
     el('fact').hidden = true
@@ -235,7 +279,6 @@ const ITEMS: Item[] = [
     el('undoBtn').disabled = false
     el('clearBtn').disabled = false
     dotEls.forEach((d, k) => d.classList.toggle('done', k < i))
-    fit()
   }
 
   el('revealBtn').addEventListener('click', (e) => {
@@ -246,9 +289,12 @@ const ITEMS: Item[] = [
     })
     const it = ITEMS[i]
     revealed = true
-    saved[i] = pad.toDataURL('image/png')
-    ref.innerHTML = it.svg
+    end()
+    // Rendered from the stroke list rather than grabbed off the pad, so the
+    // gallery is sharp whatever size the pad happened to be.
+    saved[i] = renderStrokes(strokes, 300).toDataURL('image/png')
     ref.hidden = false
+    reveal.play(it.svg, prefersReducedMotion)
     el('fact').textContent = it.fact
     el('fact').hidden = false
     el('revealBtn').hidden = true
@@ -273,12 +319,23 @@ const ITEMS: Item[] = [
       ...ITEMS.map((it, k) => {
         const fig = document.createElement('figure')
         fig.className = 'shot'
+        /* Both layers, the way the pad showed them. The shelf used to be eight
+           pictures of your own wrong drawings with nothing to compare them to,
+           which threw away the only thing the game had told you. */
+        const box = document.createElement('div')
+        box.className = 'shot-pad'
         const img = document.createElement('img')
         img.src = saved[k] || ''
         img.alt = `Your drawing of ${it.prompt.toLowerCase()}`
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg.setAttribute('viewBox', '0 0 200 140')
+        svg.setAttribute('aria-hidden', 'true')
+        svg.setAttribute('class', 'shot-ref')
+        svg.innerHTML = it.svg
+        box.append(img, svg)
         const cap = document.createElement('figcaption')
         cap.textContent = it.reveal
-        fig.append(img, cap)
+        fig.append(box, cap)
         return fig
       })
     )
@@ -295,7 +352,11 @@ const ITEMS: Item[] = [
     el('card').scrollIntoView({ behavior: 'smooth', block: 'center' })
   })
 
-  addEventListener('resize', fit)
+  // The backing store follows the element's real size, so a reflow — a
+  // rotation, a font landing, the card growing when the fact appears — has to
+  // resize and replay. Assigning canvas.width is what clears it.
+  new ResizeObserver(() => { if (ink.resize()) rebuild() }).observe(pad)
+
   render()
 </script>
 
@@ -320,19 +381,35 @@ const ITEMS: Item[] = [
 
   .pad {
     position: relative; aspect-ratio: 200 / 140;
-    border: 2px dashed #f0d5e3; border-radius: 14px; overflow: hidden;
+    border: 1px solid #f0d5e3; border-radius: 14px; overflow: hidden;
+    /* A sheet resting on the card rather than an empty slot cut into it. The
+       dashed outline it had reads as a dropzone waiting for a file. */
+    box-shadow: 0 1px 0 #fff inset, 0 2px 6px rgba(59, 19, 56, 0.06);
+    /* The fallback when there is no WebGL2, and the ruling the page has always
+       had in its stylesheet and never once shown: the layer order was wrong,
+       and in CSS the first background layer paints on top.
+       Eight lines, as a proportion of the height, so the fallback and the
+       shader rule the sheet identically at every size. */
     background:
-      linear-gradient(#fdf7fa 0 0) padding-box,
-      repeating-linear-gradient(0deg, transparent 0 23px, #fbeaf2 23px 24px);
+      repeating-linear-gradient(0deg,
+        transparent 0 calc(12.5% - 1px), #fbeaf2 calc(12.5% - 1px) 12.5%),
+      #fdf7fa;
   }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  .sheet { position: absolute; inset: 0; z-index: 0; }
+  .sheet :global(.gl-surface) {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  }
+  canvas {
+    position: absolute; inset: 0; z-index: 1;
+    width: 100%; height: 100%; touch-action: none; cursor: crosshair;
+  }
   .ref {
-    position: absolute; inset: 0; width: 100%; height: 100%;
+    position: absolute; inset: 0; z-index: 2;
+    width: 100%; height: 100%;
     pointer-events: none;
-    fill: none; stroke: #e0629b; stroke-width: 2.4;
+    fill: none; stroke: #c9346f; stroke-width: 2.4;
     stroke-linecap: round; stroke-linejoin: round;
-    color: #e0629b;
-    animation: fadeIn 380ms var(--ease);
+    color: #c9346f;
   }
   @keyframes fadeIn { from { opacity: 0; } }
 
@@ -363,9 +440,23 @@ const ITEMS: Item[] = [
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
   .shelf :global(.shot) { margin: 0; }
-  .shelf :global(img) {
-    display: block; width: 100%; aspect-ratio: 200/140;
-    border: 1px solid #f2d9e6; border-radius: 10px; background: #fdf7fa;
+  /* The paper, the attempt and the answer, stacked as they were on the pad. */
+  .shelf :global(.shot-pad) {
+    position: relative; aspect-ratio: 200/140; overflow: hidden;
+    border: 1px solid #f2d9e6; border-radius: 10px;
+    background:
+      repeating-linear-gradient(0deg,
+        transparent 0 calc(12.5% - 1px), #fbeaf2 calc(12.5% - 1px) 12.5%),
+      #fdf7fa;
+  }
+  .shelf :global(.shot-pad img) {
+    display: block; position: absolute; inset: 0; width: 100%; height: 100%;
+  }
+  .shelf :global(.shot-ref) {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    fill: none; stroke: #c9346f; stroke-width: 2.4;
+    stroke-linecap: round; stroke-linejoin: round;
+    color: #c9346f;
   }
   .shelf :global(figcaption) { font-size: 12.5px; color: var(--ink-soft); margin-top: 5px; text-align: center; }
   .gallery-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
