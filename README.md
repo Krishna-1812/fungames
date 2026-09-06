@@ -90,9 +90,10 @@ src/
     GameLayout.astro    game chrome: home link, title, share button
   components/
     GameTile.astro      homepage tile
-    TileArt.astro       eighteen distinct generated tile illustrations
+    TileArt.astro       places one drawing on a tile, per lib/tile-art.ts
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
+    tile-art.ts         eighteen bespoke tile drawings, one per game slug
     audio.ts            the synthesiser: every sound on the site, no audio files
     fx.ts               particles, screen shake, floating text
     gl.ts               the WebGL runtime: shared frame loop, GLSL noise/tonemap library
@@ -334,14 +335,34 @@ node scripts/check-memory.mjs      # From Memory, do the references fit the box
 node scripts/check-orbit.mjs       # Orbit, the integrator and all eight challenges
 node scripts/check-mix.mjs         # Ambient Mix, do shared links survive
 node scripts/check-steady.mjs      # Steady Hand, is the scoring fair
+node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 ```
 
-All ten exit non-zero on failure. None needs a browser — the analysis in
+All eleven exit non-zero on failure. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts`,
 `lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts`,
 `data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,
-`lib/powder-goals.ts`, `lib/mix-code.ts` and `lib/steady-shapes.ts` is
-deliberately pure functions over plain data so it can be run this way. The
+`lib/powder-goals.ts`, `lib/mix-code.ts`, `lib/steady-shapes.ts` and
+`lib/tile-art.ts` is deliberately pure functions over plain data so it can be
+run this way.
+
+`check-art.mjs` is the odd one out and worth explaining, because illustration
+is the one thing here with no formula to check against. It rasterises every
+tile with resvg exactly as the page composites it — same gradient, same
+vignette, same slot geometry, same left-hand fade — and then measures the
+result: is the drawing visible at all, does white text still clear WCAG on the
+background *under its own letters*, and are the eighteen drawings actually
+different from each other. It renders the title and blurb too, so contrast is
+judged where the type lands rather than over a rectangle that is mostly empty.
+Run it with `--sheet out.png` to get a contact sheet of all eighteen tiles
+from the same compositor.
+
+It has earned its keep. It caught a "puzzle" whose illustration was invisible
+over its own card, three pairs of tiles that were the same colour as each
+other, an illustration that took its title's contrast from 8:1 to 2.2:1, and
+twenty-four stars Orbit was drawing entirely outside its own frame — which were
+not only invisible on every page load but enough to make resvg abort outright
+at one card width. The
 auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck
 the game. `scripts/build-world-data.mjs`
@@ -355,15 +376,23 @@ and start it again.
 
 ## Adding a game
 
-1. Add an entry to `src/data/games.ts` (pick one of the `TileArt` values, or
-   add a new one to both the type and `TileArt.astro`).
-2. Create `src/pages/<slug>.astro` wrapped in `<GameLayout slug="<slug>">`.
+1. Add an entry to `src/data/games.ts`.
+2. Add a drawing to `src/lib/tile-art.ts` under the same slug — pick a `slot`
+   that is not already used three times, and give every gradient id inside it
+   the slug as a prefix.
+3. Create `src/pages/<slug>.astro` wrapped in `<GameLayout slug="<slug>">`.
+4. Run `node scripts/check-art.mjs`. It fails if the game has no drawing, if
+   the drawing is invisible on its own card, if it sits on the title, or if
+   another tile is already that colour.
 
 Tile, `<head>`, favicon, share button and sitemap entry all follow. Pass `fixed`
 for games that own the viewport, `bodyClass` for a different page background.
 
 ### Two traps worth knowing
 
+- **Content passed with `set:html` does not get Astro's scoped-style
+  attribute either** — same trap as below, different door. The tile drawings
+  carry their own fills for exactly this reason.
 - **Runtime-created elements do not get Astro's scoped-style attribute.**
   Anything you build with `document.createElement` needs its rules in a
   `<style is:global>` block or they silently do nothing.
@@ -403,9 +432,12 @@ until those are filled in.
 
 ## What neal.fun has that this does not
 
-- Hand-drawn tile art. Tiles here are generated so a new game looks deliberate
-  immediately; swap `TileArt.astro` for `<img src="/tiles/<slug>.svg">` when you
-  draw real ones.
+- Hand-drawn tile art. Every tile here has its own illustration rather than a
+  shape from a shared pool, and none of them is an emoji, but they are
+  geometric line-and-fill drawings — good ones, checked for legibility, but not
+  somebody's hand. Swap the entries in `lib/tile-art.ts` for real drawings when
+  you have them; the slot, palette and fade machinery does not care where the
+  markup comes from.
 - Multiplayer. Internet Roadtrip is a websocket server on separate infra with
   Turnstile and a WASM anti-cheat in front of it.
 - Commissioned illustration. Size of Life credits a named palaeoartist.

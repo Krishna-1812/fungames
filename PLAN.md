@@ -208,8 +208,47 @@ No new rendering. Just far more, far better *stuff*.
 The credibility fix. This is genuinely laborious, and honest about limits: I can
 produce good geometric/line-art SVG, not Neal's hand-drawn charm.
 
-- **15 bespoke tile illustrations** — each with its own composition and its own
-  lettering treatment. No shared template.
+- ~~**18 bespoke tile illustrations**~~ **done.** One drawing per game, keyed on
+  the slug so two games sharing one is structurally impossible, and no emoji
+  anywhere on the grid.
+
+  The old `art` field named a shape from a shared pool, which is how eighteen
+  tiles ended up looking like one template with the silhouette swapped — same
+  white ink, same opacity ramp, same corner, every time. Now each drawing
+  declares its own composition (seven slots, none used more than three times),
+  its own palette, and its own authoring size.
+
+  The interesting part is `scripts/check-art.mjs`, because illustration is the
+  one thing on this site with no formula to check against. It rasterises every
+  tile with resvg exactly as the page composites it and measures the result,
+  and it found more than eyeballing did: Scale's drawing was invisible over its
+  own card, Steady Hand took its title from 8:1 to 2.2:1, three pairs of tiles
+  were the same colour as each other, and Orbit was drawing twenty-four stars
+  outside its own frame — invisible on every page load, and enough to make
+  resvg abort at one card width.
+
+  Two measurements were worth more than the assertions they support. Judging
+  contrast over the text *box* failed Spend It for banknotes its two-word blurb
+  never reaches while missing Overstimulated, whose popup really was under the
+  last four letters of its own title; rendering the actual strings and
+  measuring under the glyphs fixed both. And judging visibility on mean ink
+  rewards solid blobs and punishes line work, which would have pushed all
+  eighteen drawings towards the same heavy style — the template problem coming
+  back in through a badly chosen metric.
+
+  One change fell out of it that is not about art at all: between roughly 620
+  and 660px of viewport the grid is one column, so a tile is 615×150 and the
+  blurb was a 420px line running across the middle of the illustration. The
+  text column is now capped in pixels as well as percent.
+
+  Deferred, and honest about it: the palette is crowded. The closest two
+  gradients are 0.221 apart in oklab against a median of 0.65, and separating
+  the remaining near-neighbours would mean re-picking accents across the whole
+  registry rather than the three this touched.
+
+- **Still to do here**: lettering treatments per tile were in the original plan
+  and are deliberately not done. Eighteen differently-set titles on one grid
+  reads as chaos, not craft; the variety belongs in the drawings.
 - **Drawn icons replacing emoji** in Spend It (30 items), Ambient Mix (12 layers),
   Paper Folds (19 milestones).
 - **Illustrated scenes for Trolley** — the tracks, the trolley, the people, drawn

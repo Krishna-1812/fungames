@@ -16,7 +16,7 @@ const rot = ((index * 31) % 9) - 4
   href={`/${game.slug}/`}
   style={`--a:${game.accent}; --b:${game.accent2}; --ink:${ink}; --i:${index}; --rot:${rot}deg`}
 >
-  <span class="art-wrap" aria-hidden="true"><TileArt art={game.art} seed={index + 1} /></span>
+  <span class="art-wrap" aria-hidden="true"><TileArt slug={game.slug} seed={index + 1} /></span>
   <span class="gloss" aria-hidden="true"></span>
   <span class="grain" aria-hidden="true"></span>
   <span class="rim" aria-hidden="true"></span>
@@ -24,7 +24,6 @@ const rot = ((index * 31) % 9) - 4
     <h2>{game.title}</h2>
     <p>{game.blurb}</p>
   </div>
-  <span class="glyph" aria-hidden="true">{game.glyph}</span>
 </a>
 
 <style>
@@ -51,7 +50,7 @@ const rot = ((index * 31) % 9) - 4
        straight line through colour space and goes muddy in the middle; bending
        it through a lighter, more saturated midpoint is what makes it look lit
        rather than blended. */
-    /* The highlight sits top-RIGHT, over the art and the glyph. Putting it
+    /* The highlight sits top-RIGHT, over the illustration. Putting it
        top-left — the natural instinct, and where the light in the backdrop
        comes from — lands it directly under the white title and quietly costs
        three or four tiles their contrast rating. The art side is the only
@@ -182,7 +181,14 @@ const rot = ((index * 31) % 9) - 4
     transform: translate3d(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -8px), 0) scale(1.07);
   }
 
-  .body { position: relative; max-width: 62%; z-index: 2; }
+  /* A percentage alone is the wrong rule here. Between roughly 620 and 660px
+     of viewport the grid is one column, so a tile is 615px wide and 150 tall,
+     and 68% of that is a 420px line of 14.5px text — both a poor measure and,
+     more concretely, a blurb running out across the middle of the
+     illustration. Capping it in pixels keeps the line readable and keeps the
+     right of every card free for the drawing at every width. check-art applies
+     the same cap. */
+  .body { position: relative; max-width: min(62%, 268px); z-index: 2; }
 
   h2 {
     font-size: clamp(22px, 2.3vw, 29px);
@@ -200,21 +206,9 @@ const rot = ((index * 31) % 9) - 4
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
   }
 
-  .glyph {
-    position: absolute;
-    top: 18px;
-    right: 20px;
-    font-size: 22px;
-    line-height: 1;
-    z-index: 2;
-    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
-    transition: transform 420ms var(--ease);
-  }
-  .tile:hover .glyph { transform: translateY(-2px) rotate(-6deg) scale(1.08); }
-
   @media (max-width: 700px) {
     .tile { min-height: 148px; padding: 18px 20px; }
-    .body { max-width: 68%; }
+    .body { max-width: min(68%, 268px); }
     /* Invisible at phone pixel density, and it costs a full-tile composite. */
     .grain { display: none; }
   }
@@ -225,6 +219,5 @@ const rot = ((index * 31) % 9) - 4
     .art-wrap { transition: none; }
     .tile:hover .art-wrap,
     .tile:focus-visible .art-wrap { transform: none; }
-    .tile:hover .glyph { transform: none; }
   }
 </style>
