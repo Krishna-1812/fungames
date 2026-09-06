@@ -2,18 +2,8 @@
 import GameLayout from '../layouts/GameLayout.astro'
 import { SITE } from '../site.config'
 
-/**
- * Fusion — the Infinite Craft archetype: two things in, one new thing out,
- * with results shared globally and remembered forever.
- *
- * Architecture (mirrors what neal.fun actually does):
- *   browser -> edge worker -> KV lookup -> LLM only on a genuine miss
- * The response is cached hard at the edge, so the overwhelming majority of
- * requests never reach the model. See worker/fusion-worker.js.
- *
- * It also ships a local recipe table so the page is fully playable before you
- * deploy anything. Set SITE.fusionApi and the worker takes over automatically.
- */
+/** Fusion resolves pairs from saved recipes, then the built-in table, then
+ * the optional API. Personal discoveries stay on this device. */
 const API = SITE.fusionApi
 ---
 
@@ -35,7 +25,7 @@ const API = SITE.fusionApi
       <div class="tray-list" id="tray"></div>
     </aside>
 
-    <div class="toast" id="toast" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   </div>
 </GameLayout>
 
@@ -47,6 +37,9 @@ const API = SITE.fusionApi
   import { burst, ring, floatText, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
+  import { pairKey as norm } from '../lib/fusion-pair.js'
+  import { LOCAL } from '../lib/fusion-recipes.js'
+  import { KEY, SEED, loadState, saveState, restoreState } from '../lib/fusion-state.js'
   import { FIELD_FRAG } from '../lib/fusion-field'
     const { API } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
@@ -57,51 +50,19 @@ const API = SITE.fusionApi
   const toast = document.getElementById('toast')
   const tip = document.getElementById('tip')
   document.getElementById('reset').addEventListener('click', () => {
-    if (confirm('Throw away every discovery?')) { localStorage.removeItem(KEY); location.reload() }
+    if (confirm('Throw away every discovery?')) {
+      try { localStorage.removeItem(KEY); location.reload() }
+      catch { show('Could not reset saved discoveries on this device.') }
+    }
   })
 
-  const KEY = 'fusion:v1'
-  const SEED = [
-    { text: 'Water', emoji: '💧' },
-    { text: 'Fire', emoji: '🔥' },
-    { text: 'Earth', emoji: '🌍' },
-    { text: 'Wind', emoji: '🌬️' },
-  ]
-
-  // Offline recipe table. The worker supersedes this once it is deployed;
-  // until then it keeps the page a real game rather than a broken demo.
-  const LOCAL = {
-    'earth+water': ['Plant', '🌱'], 'fire+water': ['Steam', '💨'],
-    'earth+fire': ['Lava', '🌋'], 'earth+wind': ['Dust', '🌫️'],
-    'fire+wind': ['Smoke', '💨'], 'water+wind': ['Wave', '🌊'],
-    'lava+water': ['Stone', '🪨'], 'plant+water': ['Swamp', '🌿'],
-    'plant+fire': ['Ash', '🌑'], 'stone+wind': ['Sand', '🏖️'],
-    'fire+sand': ['Glass', '🪟'], 'plant+plant': ['Forest', '🌲'],
-    'lava+lava': ['Volcano', '🌋'], 'steam+earth': ['Geyser', '⛲'],
-    'swamp+fire': ['Alcohol', '🍺'], 'stone+stone': ['Mountain', '⛰️'],
-    'mountain+water': ['River', '🏞️'], 'sand+sand': ['Desert', '🏜️'],
-    'wave+wave': ['Tsunami', '🌊'], 'dust+water': ['Mud', '🟤'],
-    'mud+fire': ['Brick', '🧱'], 'brick+brick': ['Wall', '🧱'],
-    'wall+wall': ['House', '🏠'], 'forest+fire': ['Charcoal', '⚫'],
-    'glass+sand': ['Hourglass', '⏳'], 'stone+fire': ['Metal', '⚙️'],
-    'metal+fire': ['Blade', '🗡️'], 'house+house': ['Village', '🏘️'],
-    'village+village': ['City', '🏙️'], 'water+water': ['Lake', '🏞️'],
-    'earth+earth': ['Land', '🗺️'], 'wind+wind': ['Tornado', '🌪️'],
-    'fire+fire': ['Sun', '☀️'], 'sun+water': ['Rainbow', '🌈'],
-    'sun+plant': ['Sunflower', '🌻'], 'lake+fire': ['Steam', '💨'],
+  let state
+  // Accessing window.localStorage itself may throw in restricted contexts.
+  try { state = loadState(localStorage) } catch { state = restoreState(null) }
+  const save = () => {
+    try { if (saveState(localStorage, state)) return } catch {}
+    show('Your discoveries are safe for this session, but could not be saved on this device.')
   }
-
-  const norm = (a, b) => [a.toLowerCase(), b.toLowerCase()].sort().join('+')
-
-  let state = load()
-  function load() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(KEY) || 'null')
-      if (raw && Array.isArray(raw.items)) return raw
-    } catch {}
-    return { items: [...SEED], recipes: {} }
-  }
-  const save = () => localStorage.setItem(KEY, JSON.stringify(state))
 
   function show(msg) {
     toast.textContent = msg
@@ -113,17 +74,17 @@ const API = SITE.fusionApi
   /** Resolve a pair: memory -> local table -> edge worker. */
   async function combine(a, b) {
     const key = norm(a.text, b.text)
-    if (state.recipes[key]) return state.recipes[key]
+    if (state.recipes[key] && typeof state.recipes[key].text === 'string' && typeof state.recipes[key].emoji === 'string') return state.recipes[key]
     if (LOCAL[key]) {
-      const [text, emoji] = LOCAL[key]
-      return (state.recipes[key] = { text, emoji })
+      return (state.recipes[key] = LOCAL[key])
     }
+    if (!API) return null
     try {
       const url = `${API}?first=${encodeURIComponent(a.text)}&second=${encodeURIComponent(b.text)}`
-      const r = await fetch(url)
+      const r = await fetch(url, { signal: AbortSignal.timeout(10_000) })
       if (!r.ok) throw new Error(String(r.status))
       const j = await r.json()
-      if (!j || !j.result) throw new Error('empty')
+      if (!j || typeof j.result !== 'string' || !j.result.trim() || j.result.length > 60 || (j.emoji != null && typeof j.emoji !== 'string')) throw new Error('invalid recipe')
       return (state.recipes[key] = { text: j.result, emoji: j.emoji || '✨' })
     } catch {
       // No backend yet — say so plainly instead of inventing a result.
@@ -162,7 +123,7 @@ const API = SITE.fusionApi
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2
     let best = null, bestD = Infinity
     for (const other of board.querySelectorAll('.piece')) {
-      if (other === el) continue
+      if (other === el || other.disabled) continue
       const o = other.getBoundingClientRect()
       const d = Math.hypot(o.left + o.width / 2 - cx, o.top + o.height / 2 - cy)
       if (d < bestD) { bestD = d; best = other }
@@ -214,7 +175,7 @@ const API = SITE.fusionApi
 
   board.addEventListener('pointerdown', (e) => {
     const el = e.target.closest('.piece')
-    if (!el) return
+    if (!el || el.disabled) return
     unlock(); sfx.tick()
     dragging = el
     const r = el.getBoundingClientRect()
@@ -257,7 +218,7 @@ const API = SITE.fusionApi
   function hitTest(el) {
     const a = el.getBoundingClientRect()
     for (const other of board.querySelectorAll('.piece')) {
-      if (other === el) continue
+      if (other === el || other.disabled) continue
       const b = other.getBoundingClientRect()
       const overlap =
         a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
@@ -283,13 +244,15 @@ const API = SITE.fusionApi
     const left = parseFloat(target.style.left)
     const top = parseFloat(target.style.top)
 
+    el.disabled = target.disabled = true
     target.classList.add('working')
     const res = await combine(a, b)
     target.classList.remove('working')
+    el.disabled = target.disabled = false
 
     if (!res) {
       sfx.bad()
-      show(`No recipe for ${a.text} + ${b.text} yet — deploy the worker to unlock the rest.`)
+      show(`No recipe for ${a.text} + ${b.text} yet. Try a different pair.`)
       return
     }
 
@@ -325,7 +288,13 @@ const API = SITE.fusionApi
     renderTray()
   }
   board.addEventListener('pointerup', drop)
-  board.addEventListener('pointercancel', drop)
+  board.addEventListener('pointercancel', () => {
+    dragging?.classList.remove('held')
+    dragging = null
+    dragOn = bondOn = 0
+    board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
+    nudgeField()
+  })
 
   // ---- tray ---------------------------------------------------------------
   function renderTray() {

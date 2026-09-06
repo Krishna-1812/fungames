@@ -418,6 +418,21 @@ for games that own the viewport, `bodyClass` for a different page background.
 
 ## Deploying
 
+Run `npm run check` before release (Node 24). `npm test` discovers and runs all
+`scripts/check-*.mjs` suites; `npm run check` also builds the static site.
+The GitHub Actions workflow runs the same command on pushes and pull requests.
+
+Fusion uses versioned, unambiguous pair keys. Existing browser discoveries are
+preserved; legacy recipe caches are rebuilt as pairs are tried again. The
+worker's v2 KV namespace prefix intentionally does not read old ambiguous keys.
+Its response contains `result` and `emoji`; discovery celebrations are personal
+to the browser, not a claim to be the first player globally.
+
+KV is eventually consistent: concurrent misses may generate more than once.
+Exact-origin checks are browser hotlink protection, not authentication or a
+spending limit. Configure rate limits and a model budget before enabling the
+optional API for a public audience.
+
 Static output — any host. `netlify.toml` and `public/_headers` are included;
 Cloudflare Pages reads both.
 
@@ -429,7 +444,7 @@ npx wrangler deploy
 ```
 
 Then set `fusionApi` in `src/site.config.ts`, and update `ALLOWED_ORIGINS` in
-`worker/fusion-worker.js` and the route in `wrangler.toml` to your domain. It
+`wrangler.toml` and the route in `wrangler.toml` to your domain. It
 uses Cloudflare Workers AI by default; delete the `[ai]` block and set
 `LLM_BASE_URL`, `LLM_MODEL` and the `LLM_API_KEY` secret to use any
 OpenAI-compatible endpoint instead.

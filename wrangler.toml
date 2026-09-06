@@ -20,6 +20,8 @@ id = "PUT_YOUR_KV_NAMESPACE_ID_HERE"
 binding = "AI"
 
 [vars]
+# Comma-separated exact origins. Replace with your deployed site before launch.
+ALLOWED_ORIGINS = "http://localhost:4321"
 AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
 # Only needed when not using the [ai] binding:
 # LLM_BASE_URL = "https://api.openai.com/v1"

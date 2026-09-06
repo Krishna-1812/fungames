@@ -8,7 +8,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "worker:dev": "wrangler dev worker/fusion-worker.js",
-    "worker:deploy": "wrangler deploy"
+    "worker:deploy": "wrangler deploy",
+    "test": "node scripts/check-all.mjs",
+    "check": "npm test && npm run build"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",

@@ -98,6 +98,7 @@ import { GOALS } from '../lib/orbit-goals'
   import { sfx, unlock, tone } from '../lib/audio'
   import { burst, ring } from '../lib/fx'
 
+  import { FixedClock } from '../lib/fixed-clock'
   import { createRenderer } from '../lib/orbit-render'
   import {
     type Body, type StepEvents,
@@ -249,26 +250,30 @@ import { GOALS } from '../lib/orbit-goals'
   const nMerges = document.getElementById('nMerges')!
   const nFps = document.getElementById('nFps')!
 
-  function frame() {
-    if (!paused && W) {
-      mergeSoundBudget = 2
-      // Two substeps keep fast, close passes accurate without halving the fps.
-      const ev: StepEvents = { merges: [], escaped: [] }
-      for (let s = 0; s < 2; s++) {
-        const r = step(bodies, 0.5, W, H)
-        bodies = r.bodies
-        ev.merges.push(...r.events.merges)
-        ev.escaped.push(...r.events.escaped)
-      }
-      for (const m of ev.merges) { merges++; onMerge(m.x, m.y, m.m) }
+  const clock = new FixedClock()
+  document.addEventListener('visibilitychange', () => clock.reset())
 
-      const won = tracker.observe(bodies, ev)
-      if (won.length) celebrate(won)
-    }
+  function frame(now = performance.now()) {
+    mergeSoundBudget = 2
+    if (!paused && W && !document.hidden) {
+      clock.advance(now, () => {
+        // Two half-steps per 60 Hz simulation tick preserve the tuned physics.
+        const ev: StepEvents = { merges: [], escaped: [] }
+        for (let s = 0; s < 2; s++) {
+          const r = step(bodies, 0.5, W, H)
+          bodies = r.bodies
+          ev.merges.push(...r.events.merges)
+          ev.escaped.push(...r.events.escaped)
+        }
+        for (const m of ev.merges) { merges++; onMerge(m.x, m.y, m.m) }
+
+        const won = tracker.observe(bodies, ev)
+        if (won.length) celebrate(won)
+      })
+    } else clock.reset()
     if (W) render()
 
     fpsFrames++
-    const now = performance.now()
     if (now - lastFps > 500) {
       nFps.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
       nBodies.textContent = String(bodies.length)
@@ -438,6 +443,7 @@ import { GOALS } from '../lib/orbit-goals'
   document.getElementById('clearBtn')!.addEventListener('click', () => { unlock(); sfx.click(); clear() })
   document.getElementById('pauseBtn')!.addEventListener('click', (e) => {
     paused = !paused
+    clock.reset()
     ;(e.currentTarget as HTMLButtonElement).textContent = paused ? 'Resume' : 'Pause'
     unlock(); sfx.click()
   })
