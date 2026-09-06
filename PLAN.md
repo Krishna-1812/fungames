@@ -113,7 +113,7 @@ No new rendering. Just far more, far better *stuff*.
 - **Fusion → a much larger local recipe tree** so it's playable without the worker,
   plus discovery milestones. **Still outstanding** — the only Phase 1 item not done.
 
-### Phase 2 — Goals for the sandboxes — **one of four done**
+### Phase 2 — Goals for the sandboxes — **two of four done**
 
 - ~~**Orbit: challenge mode.**~~ **done.** Eight challenges, a persistent best
   lap count, and `scripts/check-orbit.mjs` behind them.
@@ -145,10 +145,30 @@ No new rendering. Just far more, far better *stuff*.
   gaps shrank from 4.3 to 1.7 going outwards, and it lost a planet within
   seconds, every time. Spacing geometrically holds the separation constant and
   it now runs clean indefinitely.
-- **Powder: scenario challenges** on top of the discovery log. Worth checking
-  first whether the automaton supports goals as cleanly as the n-body did —
-  Orbit's challenges all reduce to statements about one trajectory, and
-  Powder's may not.
+- ~~**Powder: scenario challenges**~~ **done.** Eight, each with a set grid, a
+  cut-down palette and a budget of paint.
+
+  The worry above was right, and it shaped the design. Orbit's challenges are
+  statements about one trajectory; a grid has none, and almost every
+  interesting sentence about one ("you built a dam") is not decidable. So the
+  scenarios do not try: the puzzle lives in the setup and the restriction, and
+  the goal is a number a census can answer. One of them needed more than a
+  census — "keep the acid in the tank" is false of a global count, because acid
+  that has eaten through the floor and run across the world is still acid — so
+  goals can also count inside a rectangle.
+
+  The budget is the part that turned chores into puzzles, and the checker is
+  why it exists: the first draft of "turn the sand into glass" was solved at
+  frame eight, because paint was free and the answer was to scribble lava
+  everywhere. The checker now also proves technique matters — the same lava
+  spread across the bed makes twice the glass it does in a heap.
+
+  Two real bugs came out of it. Lava was autocatalytic: lava+sand→glass and
+  lava+glass→lava together *make* lava, and eighty cells became eighteen
+  hundred while eating an entire sand bed. Melting now costs the lava its heat,
+  so the count is conserved. And water could not put out embers at all, which
+  is wrong — flames are the easy part of a fire — so there is a forty-eighth
+  reaction.
 - **Ambient Mix: presets** ("Thunderstorm", "3am office", "Unbearable") and a
   shareable mix code in the URL.
 - **Steady Hand → a suite**: straight line, perfect circle, square, spiral, with a

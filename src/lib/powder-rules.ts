@@ -110,7 +110,7 @@ export type Reaction = {
 }
 
 /**
- * The forty-seven.
+ * The forty-eight.
  *
  * Ordered roughly by how likely you are to stumble into them, because the log
  * shows them in this order and the first few should feel findable.
@@ -136,9 +136,15 @@ export const REACTIONS: Reaction[] = [
   { id: 'fire-fungus', a: FIRE, b: FUNGUS, b2: FIRE, p: 0.14, note: 'Dry fungus goes up quickly.' },
   { id: 'fire-seed', a: FIRE, b: SEED, b2: FIRE, p: 0.1, note: 'Nothing grows after this.' },
   { id: 'ember-wood', a: EMBER, b: WOOD, b2: EMBER, p: 0.06, note: 'Embers spread through timber without ever making a flame.' },
+  { id: 'ember-water', a: EMBER, b: WATER, a2: ASH, b2: STEAM, p: 0.5, note: 'Water kills an ember properly. Flames are the easy part of a fire.' },
   { id: 'lava-wood', a: LAVA, b: WOOD, b2: FIRE, p: 0.16, note: 'Lava does not need an introduction.' },
   { id: 'lava-metal', a: LAVA, b: METAL, b2: LAVA, p: 0.02, note: 'Given long enough, lava melts metal into more lava.' },
-  { id: 'lava-glass', a: LAVA, b: GLASS, b2: LAVA, p: 0.03, note: 'Glass softens well below the temperature of lava, so it just joins in.' },
+  // The lava cools as it does this, which is not decoration. Without the
+  // `a2` the pair lava+sand→glass and lava+glass→lava is a loop that *makes*
+  // lava: eighty cells of it became eighteen hundred and ate a whole sand bed
+  // in three hundred frames. Melting something takes heat out of the lava, so
+  // now the count is conserved and the heat merely travels.
+  { id: 'lava-glass', a: LAVA, b: GLASS, a2: STONE, b2: LAVA, p: 0.03, note: 'Glass softens well below the temperature of lava, so it joins in — and the lava gives up enough heat doing it to set.' },
 
   // --- bangs ---------------------------------------------------------------
   { id: 'fire-powder', a: FIRE, b: POWDER, p: 1, boom: 9, note: 'Yes. This is the one everybody tries first.' },

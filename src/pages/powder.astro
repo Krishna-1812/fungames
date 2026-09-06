@@ -19,6 +19,18 @@ import GameLayout from '../layouts/GameLayout.astro'
     <div class="canvas-wrap" id="wrap">
       <canvas id="sim" aria-label="Falling sand simulation"></canvas>
       <div class="hint" id="hint">Draw with the mouse. Try dropping lava on ice.</div>
+
+      <div class="scbar" id="scBar" hidden>
+        <div class="scbar-main">
+          <b id="scName"></b>
+          <span id="scBrief"></span>
+        </div>
+        <p class="scbar-live"><span id="scProgress"></span> <b id="scPaint"></b></p>
+        <div class="scbar-acts">
+          <button type="button" id="scRetry">Restart</button>
+          <button type="button" id="scExit">Leave</button>
+        </div>
+      </div>
     </div>
 
     <aside class="panel">
@@ -49,7 +61,29 @@ import GameLayout from '../layouts/GameLayout.astro'
             stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </button>
+
+      {/* Somewhere to point the sandbox. Eight set problems, each with the
+          palette cut down to what the problem actually needs. */}
+      <button type="button" class="found scenarios" id="scBtn" aria-expanded="false" aria-controls="scPanel">
+        <span><b id="scCount">0/0</b> scenarios solved</span>
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
     </aside>
+
+    <div class="logwrap" id="scPanel" hidden>
+      <div class="loghead">
+        <h2>Scenarios</h2>
+        <button type="button" id="scClose" aria-label="Close the scenario list">Close</button>
+      </div>
+      <ul class="log sclist" id="scList"></ul>
+      <p class="lognote">
+        Each one hands you a grid and takes away most of the palette. Solved
+        ones keep their explanation. Saved in this browser only.
+      </p>
+    </div>
 
     <div class="logwrap" id="logPanel" hidden>
       <div class="loghead">
@@ -73,31 +107,22 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { burst, ring, shake } from '../lib/fx'
   import { createPowderRenderer } from '../lib/powder-render'
   import {
-    MATERIALS, REACTIONS, buildLookup, describe, SLOTS,
-    EMPTY, SAND, WATER, STONE, WOOD, FIRE, SMOKE, STEAM, OIL, LAVA, ICE,
-    PLANT, ACID, POWDER, GLASS, EMBER, ASH, CLOUD, SPARK, METAL, BRINE,
+    MATERIALS, REACTIONS, buildLookup, describe,
+    SAND, WATER, STONE, WOOD, GLASS, ICE, LAVA,
   } from '../lib/powder-rules'
+  import {
+    type World, createWorld, clearWorld, step, put, census, countAlive,
+    PAL, VARY, LIFE0,
+  } from '../lib/powder-sim'
+  import {
+    SCENARIOS, type Scenario, type Stats,
+    begin, tickStats, foldCensus, paintCell, budgetLeft,
+  } from '../lib/powder-goals'
 
-  /* Materials and reactions live in lib/powder-rules.ts. They used to be an
-     if-chain here, which worked but meant nothing could count them — and the
-     discovery log below is only possible because they are a table. */
-  const TYPE = new Uint8Array(SLOTS)
-  const DENS = new Uint8Array(SLOTS)
-  const FLAM = new Uint8Array(SLOTS)
-  const LIFE0 = new Uint16Array(SLOTS)
-  const PAL = new Uint8Array(SLOTS * 3)
-  const VARY = new Uint8Array(SLOTS)
-  for (const d of MATERIALS) {
-    TYPE[d.id] = d.type
-    DENS[d.id] = d.density
-    FLAM[d.id] = d.flammable ? 1 : 0
-    LIFE0[d.id] = d.life ?? 0
-    PAL[d.id * 3] = d.rgb[0]; PAL[d.id * 3 + 1] = d.rgb[1]; PAL[d.id * 3 + 2] = d.rgb[2]
-    VARY[d.id] = d.vary
-  }
-  DENS[EMPTY] = 1
-  TYPE[EMPTY] = 3
-
+  /* Materials and reactions live in lib/powder-rules.ts, and the automaton
+     itself in lib/powder-sim.ts. Both used to be inline here, which worked but
+     meant nothing could be counted or run without a browser — the reaction log
+     below needed the first move and the scenarios needed the second. */
   const DRAWABLE = MATERIALS.filter((m) => m.draw)
   const RX = buildLookup()
 
@@ -105,12 +130,11 @@ import GameLayout from '../layouts/GameLayout.astro'
   const wrap = document.getElementById('wrap') as HTMLElement
   const CELL = 4
   let W = 0, H = 0
-  let grid = new Uint8Array(0), life = new Uint8Array(0)
-  let shade = new Uint8Array(0), moved = new Uint8Array(0)
+  let world: World = createWorld(1, 1)
 
-  /* The simulation below is untouched. This only decides how the grid is
-     painted: a shaded, lit world on the GPU, or the original flat ImageData if
-     WebGL2 is missing. */
+  /* The simulation is untouched. This only decides how the grid is painted: a
+     shaded, lit world on the GPU, or the original flat ImageData if WebGL2 is
+     missing. */
   const renderer = createPowderRenderer(canvas, PAL, VARY, LIFE0)
   if (renderer.gpu) canvas.classList.add('gl')
 
@@ -119,48 +143,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (r.width < 8 || r.height < 8) return false
     W = Math.max(80, Math.min(340, Math.floor(r.width / CELL)))
     H = Math.max(60, Math.min(250, Math.floor(r.height / CELL)))
-    grid = new Uint8Array(W * H)
-    life = new Uint8Array(W * H)
-    shade = new Uint8Array(W * H)
-    moved = new Uint8Array(W * H)
+    world = createWorld(W, H)
     renderer.resize(W, H)
     return true
   }
-
-  const idx = (x: number, y: number) => y * W + x
-  const inside = (x: number, y: number) => x >= 0 && x < W && y >= 0 && y < H
-
-  function put(x: number, y: number, el: number) {
-    if (!inside(x, y)) return
-    const i = idx(x, y)
-    grid[i] = el
-    life[i] = LIFE0[el] ? Math.min(255, LIFE0[el]) : 0
-    shade[i] = (Math.random() * 255) | 0
-  }
-
-  function swap(a: number, b: number) {
-    const g = grid[a]; grid[a] = grid[b]; grid[b] = g
-    const l = life[a]; life[a] = life[b]; life[b] = l
-    const s = shade[a]; shade[a] = shade[b]; shade[b] = s
-    moved[a] = 1; moved[b] = 1
-  }
-
-  const N4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
-
-  function explode(x: number, y: number, r: number) {
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (dx * dx + dy * dy > r * r) continue
-        const nx = x + dx, ny = y + dy
-        if (!inside(nx, ny)) continue
-        const g = grid[idx(nx, ny)]
-        if (g === STONE || g === GLASS) { if (Math.random() < 0.5) put(nx, ny, EMPTY); continue }
-        put(nx, ny, Math.random() < 0.75 ? FIRE : SMOKE)
-      }
-    }
-  }
-
-  let bangs = 0
 
   /* --------------------------------------------------------------------
      Discovery.
@@ -177,162 +163,180 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (raw) for (const id of JSON.parse(raw)) found.add(id)
   } catch { /* private mode, or a cleared profile. Start fresh. */ }
 
-  let onDiscovery: ((r: (typeof REACTIONS)[number]) => void) | null = null
-
-  function discover(r: (typeof REACTIONS)[number]) {
-    if (found.has(r.id)) return
-    found.add(r.id)
+  function discover(id: string) {
+    if (found.has(id)) return
+    const r = REACTIONS.find((x) => x.id === id)
+    if (!r) return
+    found.add(id)
     try { localStorage.setItem(SAVE, JSON.stringify([...found])) } catch { /* not worth breaking the sim over */ }
-    onDiscovery?.(r)
+    announce(r)
   }
 
-  /**
-   * Returns true when the cell was consumed and must not also move.
+  /* --------------------------------------------------------------------
+     Scenarios.
+     -------------------------------------------------------------------- */
+
+  const SC_SAVE = 'powder.scenarios.v1'
+  const beaten = new Set<string>()
+  try {
+    const raw = localStorage.getItem(SC_SAVE)
+    if (raw) for (const id of JSON.parse(raw)) beaten.add(id)
+  } catch { /* fine */ }
+
+  let active: Scenario | null = null
+  let stats: Stats | null = null
+  let solved = false
+  const censusBuf = new Uint32Array(48)
+
+  const scBtn = document.getElementById('scBtn') as HTMLButtonElement
+  const scPanel = document.getElementById('scPanel') as HTMLElement
+  const scList = document.getElementById('scList')!
+  const scCount = document.getElementById('scCount')!
+  const bar = document.getElementById('scBar') as HTMLElement
+  const barName = document.getElementById('scName')!
+  const barBrief = document.getElementById('scBrief')!
+  const barProgress = document.getElementById('scProgress')!
+  const barPaint = document.getElementById('scPaint')!
+
+  function saveScenarios() {
+    try { localStorage.setItem(SC_SAVE, JSON.stringify([...beaten])) } catch { /* fine */ }
+  }
+
+  function paintScenarioList() {
+    scCount.textContent = `${beaten.size}/${SCENARIOS.length}`
+    scList.innerHTML = SCENARIOS.map((s) => {
+      const got = beaten.has(s.id)
+      return `<li class="sc ${got ? 'got' : ''}" data-sc="${s.id}">
+        <button type="button" data-sc="${s.id}">
+          <b>${s.name}<span class="visually-hidden">${got ? ', done' : ', not yet done'}</span></b>
+          <span class="scbrief">${s.brief}</span>
+          ${got ? `<span class="scnote">${s.note}</span>` : ''}
+        </button>
+      </li>`
+    }).join('')
+  }
+
+  /** Narrow the palette to what this scenario hands you, or open it all up. */
+  function paintPalette() {
+    const allowed = active ? new Set(active.palette) : null
+    let firstAllowed = -1
+    palette.querySelectorAll<HTMLElement>('.mat').forEach((m) => {
+      const id = Number(m.dataset.id)
+      const ok = !allowed || allowed.has(id)
+      m.hidden = !ok
+      if (ok && firstAllowed < 0) firstAllowed = id
+    })
+    if (allowed && !allowed.has(current) && firstAllowed >= 0) pick(firstAllowed)
+  }
+
+  function loadScenario(sc: Scenario) {
+    if (!W && !build()) return
+    clearWorld(world)
+    active = sc
+    stats = begin(world, sc)
+    solved = false
+    raining = false
+    document.getElementById('rainBtn')!.classList.remove('on')
+    bar.hidden = false
+    barName.textContent = sc.name
+    barBrief.textContent = sc.brief
+    paintPalette()
+    // A narrow brush, because these are measured out. One full-width drag at
+    // the sandbox default costs about two and a half thousand cells, which is
+    // more than most of these scenarios hand you in total — so the default
+    // there would spend the whole budget before you had finished the stroke.
+    setBrush(3)
+    wrap.classList.toggle('masked', sc.drawTo !== undefined)
+    if (sc.drawTo !== undefined) {
+      wrap.style.setProperty('--reach', `${sc.drawTo * 100}%`)
+    }
+    scPanel.hidden = true
+    scBtn.setAttribute('aria-expanded', 'false')
+    census(world, censusBuf)
+    updatePaint()
+    updateProgress()
+    unlock(); sfx.click()
+  }
+
+  function endScenario() {
+    active = null
+    stats = null
+    solved = false
+    bar.hidden = true
+    wrap.classList.remove('masked')
+    paintPalette()
+    clearWorld(world)
+    seed()
+  }
+
+  /*
+   * Split in two on purpose. The paint counter changes on every cell you draw
+   * and costs nothing to redraw; the progress line needs a census, which is
+   * twenty thousand reads. Drawing one drag calls the first forty times.
    *
-   * Pairwise reactions come from the table. Everything below them is something
-   * a single cell does on its own, which is why it is not in the table and not
-   * something the log asks you to find.
+   * Keeping them together also showed the line before any census had run, so
+   * a freshly loaded scenario announced "0 plants left" — which reads as
+   * solved. The census in `loadScenario` is there for the same reason.
    */
-  function react(x: number, y: number, i: number, el: number): boolean {
-    for (const [dx, dy] of N4) {
-      const nx = x + dx, ny = y + dy
-      if (!inside(nx, ny)) continue
-      const j = idx(nx, ny)
-      const n = grid[j]
-      const r = RX[el * SLOTS + n]
-      if (!r || Math.random() >= r.p) continue
-
-      // The table stores each pair once, so work out which side we are on.
-      const forward = r.a === el
-      const selfTo = forward ? r.a2 : r.b2
-      const otherTo = forward ? r.b2 : r.a2
-      discover(r)
-
-      if (r.boom) { bangs++; explode(nx, ny, r.boom); return true }
-      if (otherTo !== undefined) put(nx, ny, otherTo)
-      if (selfTo !== undefined) { put(x, y, selfTo); return true }
-    }
-
-    /* --- things a cell does by itself ----------------------------------- */
-
-    if (el === FIRE || el === EMBER) {
-      // Anything flammable without a named reaction of its own still catches.
-      for (const [dx, dy] of N4) {
-        const nx = x + dx, ny = y + dy
-        if (!inside(nx, ny)) continue
-        const n = grid[idx(nx, ny)]
-        if (FLAM[n] && Math.random() < 0.07) put(nx, ny, n === WOOD ? EMBER : FIRE)
-      }
-      if (life[i] > 0) { life[i]--; return false }
-      // An ember does not go out so much as go to ash.
-      put(x, y, el === EMBER ? ASH : Math.random() < 0.7 ? SMOKE : EMPTY)
-      return true
-    }
-
-    if (el === ACID) {
-      for (const [dx, dy] of N4) {
-        const nx = x + dx, ny = y + dy
-        if (!inside(nx, ny)) continue
-        const n = grid[idx(nx, ny)]
-        // Glass is the one thing it cannot touch, which is the reason real
-        // acid is sold in it.
-        if (n === EMPTY || n === ACID || n === SMOKE || n === STEAM || n === GLASS) continue
-        if (Math.random() < 0.14) {
-          put(nx, ny, EMPTY)
-          // Acid is spent as it eats, so a splash cannot erase the whole world.
-          if (Math.random() < 0.35) { put(x, y, SMOKE); return true }
-        }
-      }
-      return false
-    }
-
-    if (el === CLOUD) {
-      // A cloud is a rain machine rather than a reagent.
-      if (Math.random() < 0.004) {
-        const ny = y + 1
-        if (inside(x, ny) && grid[idx(x, ny)] === EMPTY) put(x, ny, WATER)
-      }
-      return false
-    }
-
-    if (el === SMOKE || el === STEAM) {
-      if (life[i] > 0) { life[i]--; return false }
-      put(x, y, el === STEAM && Math.random() < 0.45 ? WATER : EMPTY)
-      return true
-    }
-
-    if (el === SPARK) {
-      // A spark is only ever passing through.
-      if (life[i] > 0) { life[i]--; return false }
-      put(x, y, EMPTY)
-      return true
-    }
-
-    return false
+  function updatePaint() {
+    if (!active || !stats) return
+    const left = budgetLeft(active, stats)
+    barPaint.textContent = `${left} paint left`
+    barPaint.classList.toggle('out', left === 0)
   }
 
-
-  let frame = 0
-
-  function step() {
-    moved.fill(0)
-    const leftFirst = (frame & 1) === 0
-
-    for (let y = H - 1; y >= 0; y--) {
-      for (let k = 0; k < W; k++) {
-        const x = leftFirst ? k : W - 1 - k
-        const i = idx(x, y)
-        const el = grid[i]
-        if (el === EMPTY || moved[i]) continue
-        if (react(x, y, i, el)) continue
-
-        const t = TYPE[el]
-        if (t === 0) continue
-
-        if (t === 3) {
-          const up = y - 1
-          if (up >= 0 && grid[idx(x, up)] === EMPTY) { swap(i, idx(x, up)); continue }
-          const d = Math.random() < 0.5 ? -1 : 1
-          if (inside(x + d, y - 1) && grid[idx(x + d, y - 1)] === EMPTY) { swap(i, idx(x + d, y - 1)); continue }
-          if (inside(x + d, y) && grid[idx(x + d, y)] === EMPTY) { swap(i, idx(x + d, y)) }
-          continue
-        }
-
-        // Powders and liquids sink through anything lighter than themselves.
-        const below = y + 1
-        if (below < H && DENS[grid[idx(x, below)]] < DENS[el]) { swap(i, idx(x, below)); continue }
-
-        const dir = Math.random() < 0.5 ? -1 : 1
-        let slid = false
-        for (const d of [dir, -dir]) {
-          const nx = x + d
-          if (below < H && inside(nx, below) && DENS[grid[idx(nx, below)]] < DENS[el]) {
-            swap(i, idx(nx, below)); slid = true; break
-          }
-        }
-        if (slid) continue
-
-        if (t === 2) {
-          // Sideways spread is what makes a liquid find its own level.
-          for (const d of [dir, -dir]) {
-            const nx = x + d
-            if (!inside(nx, y)) continue
-            const j = idx(nx, y)
-            if (grid[j] === EMPTY || DENS[grid[j]] < DENS[el] - 1) { swap(i, j); break }
-          }
-        }
-      }
-    }
+  function updateProgress() {
+    if (!active || !stats || solved) return
+    barProgress.textContent = active.progress(censusBuf, stats, world)
   }
 
-  /* Only needed for the readout, which updates twice a second, so this no
-     longer rides along with every frame the way it did when drawing and
-     counting were the same loop. */
-  function countAlive() {
-    let alive = 0
-    for (let i = 0; i < grid.length; i++) if (grid[i] !== EMPTY) alive++
-    return alive
+  function scenarioSolved() {
+    if (!active || solved) return
+    solved = true
+    const wasNew = !beaten.has(active.id)
+    beaten.add(active.id)
+    saveScenarios()
+    paintScenarioList()
+    scCount.textContent = `${beaten.size}/${SCENARIOS.length}`
+    barProgress.textContent = 'Solved. ' + active.note
+    bar.classList.add('won')
+    setTimeout(() => bar.classList.remove('won'), 2400)
+    sfx.great()
+    const r = canvas.getBoundingClientRect()
+    burst(r.left + r.width / 2, r.top + r.height / 2, {
+      count: 30, colors: ['#7fd6a0', '#d6f2e0', '#fff'], speed: 5, gravity: 0.1, size: 3,
+    })
+    if (wasNew) toastText('Solved — ' + active.name)
   }
+
+  scBtn.addEventListener('click', () => {
+    const open = scPanel.hidden
+    scPanel.hidden = !open
+    scBtn.setAttribute('aria-expanded', String(open))
+    if (open) { paintScenarioList(); logPanel.hidden = true }
+    unlock(); sfx.click()
+  })
+  document.getElementById('scClose')!.addEventListener('click', () => {
+    scPanel.hidden = true
+    scBtn.setAttribute('aria-expanded', 'false')
+    scBtn.focus()
+  })
+  scList.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button[data-sc]') as HTMLElement | null
+    if (!b) return
+    const sc = SCENARIOS.find((s) => s.id === b.dataset.sc)
+    if (sc) loadScenario(sc)
+  })
+  document.getElementById('scRetry')!.addEventListener('click', () => {
+    if (active) loadScenario(active)
+  })
+  document.getElementById('scExit')!.addEventListener('click', () => {
+    unlock(); sfx.click(); endScenario()
+  })
+
+  /* --------------------------------------------------------------------
+     The loop.
+     -------------------------------------------------------------------- */
 
   let paused = false
   let raining = false
@@ -343,27 +347,38 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   function tick() {
     if (!paused && W) {
-      if (raining) for (let n = 0; n < 3; n++) put((Math.random() * W) | 0, 0, WATER)
-      bangs = 0
-      step()
-      if (bangs > 0) {
+      if (raining) for (let n = 0; n < 3; n++) put(world, (Math.random() * W) | 0, 0, WATER)
+      step(world, RX)
+      for (const id of world.justFired) discover(id)
+      if (world.bangs > 0) {
         // One sound per frame no matter how many cells detonated at once.
         sfx.boom()
-        shake(document.body, Math.min(14, 4 + bangs), 320)
+        shake(document.body, Math.min(14, 4 + world.bangs), 320)
         const r = canvas.getBoundingClientRect()
         burst(r.left + r.width / 2, r.top + r.height / 2, {
           count: 18, colors: ['#ff9a3c', '#ffd166'], speed: 6, gravity: 0.25, shape: 'streak', size: 3,
         })
       }
-      frame++
+      if (active && stats) {
+        tickStats(world, stats)
+        // The census is the expensive part, so it runs a few times a second
+        // rather than every frame. `tickStats` above is the cheap half and has
+        // to be every frame, because `justFired` is emptied by the next step.
+        if (world.frame % 6 === 0) {
+          census(world, censusBuf)
+          foldCensus(stats, censusBuf)
+          if (!solved && active.done(censusBuf, stats, world)) scenarioSolved()
+          updateProgress()
+        }
+      }
     }
     if (W) {
-      renderer.draw(grid, life, shade, performance.now() / 1000)
+      renderer.draw(world.grid, world.life, world.shade, performance.now() / 1000)
       fpsFrames++
       const now = performance.now()
       if (now - lastFps > 500) {
         fpsEl.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
-        countEl.textContent = countAlive().toLocaleString('en-US')
+        countEl.textContent = countAlive(world).toLocaleString('en-US')
         lastFps = now
         fpsFrames = 0
       }
@@ -378,6 +393,20 @@ import GameLayout from '../layouts/GameLayout.astro'
   const hintEl = document.getElementById('hint')!
 
   const palette = document.getElementById('palette')!
+  let hintTimer = 0
+
+  function pick(id: number) {
+    const d = MATERIALS.find((m) => m.id === id)
+    if (!d) return
+    current = id
+    palette.querySelectorAll('.mat').forEach((m) =>
+      m.setAttribute('aria-checked', String(Number((m as HTMLElement).dataset.id) === current)))
+    hintEl.textContent = d.hint || ('Drawing ' + d.name.toLowerCase())
+    hintEl.classList.remove('faded')
+    clearTimeout(hintTimer)
+    hintTimer = window.setTimeout(() => hintEl.classList.add('faded'), 2600)
+  }
+
   DRAWABLE.forEach((d, n) => {
     const b = document.createElement('button')
     b.type = 'button'
@@ -392,21 +421,14 @@ import GameLayout from '../layouts/GameLayout.astro'
     label.textContent = d.name
     b.append(sw, label)
     b.addEventListener('click', () => {
-      current = d.id
       unlock(); sfx.blip(n)
-      palette.querySelectorAll('.mat').forEach((m) =>
-        m.setAttribute('aria-checked', String(Number((m as HTMLElement).dataset.id) === current)))
+      pick(d.id)
       b.classList.remove('picked')
       void b.offsetWidth // restart the animation even if it's already mid-way
       b.classList.add('picked')
-      hintEl.textContent = d.hint || ('Drawing ' + d.name.toLowerCase())
-      hintEl.classList.remove('faded')
-      clearTimeout(hintTimer)
-      hintTimer = window.setTimeout(() => hintEl.classList.add('faded'), 2600)
     })
     palette.appendChild(b)
   })
-  let hintTimer = 0
 
   /* ----------------------------------------------------------------------
      The log.
@@ -434,21 +456,25 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   let toastTimer = 0
-  onDiscovery = (r) => {
-    paintCount()
-    if (!logPanel.hidden) paintLog()
-    sfx.sparkle()
-    toast.textContent = 'New reaction — ' + describe(r)
+  function toastText(text: string) {
+    toast.textContent = text
     toast.classList.add('show')
     clearTimeout(toastTimer)
     toastTimer = window.setTimeout(() => toast.classList.remove('show'), 3200)
+  }
+
+  function announce(r: (typeof REACTIONS)[number]) {
+    paintCount()
+    if (!logPanel.hidden) paintLog()
+    sfx.sparkle()
+    toastText('New reaction — ' + describe(r))
   }
 
   foundBtn.addEventListener('click', () => {
     const open = logPanel.hidden
     logPanel.hidden = !open
     foundBtn.setAttribute('aria-expanded', String(open))
-    if (open) paintLog()
+    if (open) { paintLog(); scPanel.hidden = true; scBtn.setAttribute('aria-expanded', 'false') }
     unlock(); sfx.click()
   })
   document.getElementById('logClose')!.addEventListener('click', () => {
@@ -457,12 +483,23 @@ import GameLayout from '../layouts/GameLayout.astro'
     foundBtn.focus()
   })
   addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !logPanel.hidden) {
+    if (e.key !== 'Escape') return
+    if (!logPanel.hidden) {
       logPanel.hidden = true
       foundBtn.setAttribute('aria-expanded', 'false')
+    } else if (!scPanel.hidden) {
+      scPanel.hidden = true
+      scBtn.setAttribute('aria-expanded', 'false')
     }
   })
   paintCount()
+  paintScenarioList()
+
+  function setBrush(n: number) {
+    brush = n
+    brushInput.value = String(n)
+    document.getElementById('brushVal')!.textContent = String(n)
+  }
 
   function cellAt(e: PointerEvent) {
     const r = canvas.getBoundingClientRect()
@@ -480,9 +517,10 @@ import GameLayout from '../layouts/GameLayout.astro'
         if (dx * dx + dy * dy > r * r) continue
         // Grains are sparse so pouring looks like pouring, not like stamping.
         if (!solid && Math.random() < 0.3) continue
-        put(cx + dx, cy + dy, current)
+        paintCell(world, stats, active, cx + dx, cy + dy, current)
       }
     }
+    if (active && stats) updatePaint()
   }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -514,10 +552,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   canvas.addEventListener('pointerleave', stop)
 
   const brushInput = document.getElementById('brush') as HTMLInputElement
-  brushInput.addEventListener('input', () => {
-    brush = Number(brushInput.value)
-    document.getElementById('brushVal')!.textContent = brushInput.value
-  })
+  brushInput.addEventListener('input', () => setBrush(Number(brushInput.value)))
 
   document.getElementById('pauseBtn')!.addEventListener('click', (e) => {
     paused = !paused
@@ -525,7 +560,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     unlock(); sfx.click()
   })
   document.getElementById('clearBtn')!.addEventListener('click', () => {
-    grid.fill(EMPTY); life.fill(0)
+    // Inside a scenario this is a restart, because clearing the grid would
+    // throw away the thing you were given to work on.
+    if (active) { loadScenario(active); return }
+    clearWorld(world)
     unlock(); sfx.whoosh()
   })
   document.getElementById('rainBtn')!.addEventListener('click', (e) => {
@@ -539,7 +577,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     const cx = ((0.25 + Math.random() * 0.5) * W) | 0
     for (let i = 0; i < 26; i++) {
       const x = cx + (((Math.random() - 0.5) * 20) | 0)
-      for (let y = 0; y < 8; y++) put(x, y, Math.random() < 0.6 ? LAVA : STONE)
+      for (let y = 0; y < 8; y++) put(world, x, y, Math.random() < 0.6 ? LAVA : STONE)
     }
     const r = canvas.getBoundingClientRect()
     const px = r.left + (cx / W) * r.width
@@ -550,14 +588,20 @@ import GameLayout from '../layouts/GameLayout.astro'
   function seed() {
     for (let x = 0; x < W; x++) {
       const h = 4 + Math.round(3 * Math.sin(x / 9))
-      for (let y = H - h; y < H; y++) put(x, y, STONE)
+      for (let y = H - h; y < H; y++) put(world, x, y, STONE)
     }
     for (let x = (W * 0.14) | 0; x < (W * 0.34) | 0; x++)
-      for (let y = H - 22; y < H - 8; y++) put(x, y, WATER)
+      for (let y = H - 22; y < H - 8; y++) put(world, x, y, WATER)
     for (let x = (W * 0.62) | 0; x < (W * 0.74) | 0; x++)
-      for (let y = H - 26; y < H - 8; y++) put(x, y, SAND)
+      for (let y = H - 26; y < H - 8; y++) put(world, x, y, SAND)
   }
 
+  /** Rebuild after a resize, keeping whatever was on screen conceptually. */
+  function rebuild() {
+    if (!build()) return
+    if (active) loadScenario(active)
+    else seed()
+  }
 
   // Lay out immediately where possible; rAF is paused in background tabs, so a
   // ResizeObserver covers the case where the element has no size yet.
@@ -569,7 +613,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   let resizeT = 0
   addEventListener('resize', () => {
     clearTimeout(resizeT)
-    resizeT = window.setTimeout(() => { if (build()) seed() }, 200)
+    resizeT = window.setTimeout(rebuild, 200)
   })
   tick()
 </script>
@@ -706,4 +750,57 @@ import GameLayout from '../layouts/GameLayout.astro'
     .powder-body .panel { width: auto; height: 44%; border-left: 0; border-top: 1px solid #2c2724; }
     .powder-body .palette { grid-template-columns: repeat(3, 1fr); }
   }
+
+  /* ---- scenarios ------------------------------------------------------- */
+  /* .mat carries its own display, which beats the user-agent [hidden] rule,
+     so narrowing the palette to a scenario's materials needs this said out
+     loud. Third time this has caught something on this site. */
+  .powder-body .mat[hidden] { display: none; }
+
+  .powder-body .found.scenarios { margin-top: 6px; }
+  .powder-body .found.scenarios b { color: #9fd0ff; }
+
+  .powder-body .scbar {
+    position: absolute; left: 12px; right: 12px; top: 12px; z-index: 4;
+    background: rgba(16, 14, 13, 0.92); border: 1px solid #3a322d; border-radius: 12px;
+    padding: 10px 13px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: grid; gap: 5px;
+  }
+  /* An author `display` beats the user-agent [hidden] rule. */
+  .powder-body .scbar[hidden] { display: none; }
+  .powder-body .scbar.won { border-color: #7fd6a0; }
+  .powder-body .scbar-main { display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap; }
+  .powder-body .scbar-main b { font-size: 14px; color: #f2ece6; }
+  .powder-body .scbar-main span { font-size: 12.5px; color: #a99e96; }
+  .powder-body .scbar-live { margin: 0; font-size: 12.5px; color: #d3c8c0; }
+  .powder-body .scbar-live b { color: #9fd0ff; font-variant-numeric: tabular-nums; margin-left: 8px; }
+  .powder-body .scbar-live b.out { color: #e8875c; }
+  .powder-body .scbar-acts { display: flex; gap: 6px; }
+  .powder-body .scbar-acts button {
+    background: none; border: 1px solid #3a322d; color: #d3c8c0; border-radius: 7px;
+    padding: 4px 11px; font-size: 12px; cursor: pointer;
+  }
+  .powder-body .scbar-acts button:hover { border-color: #e8a75c; color: #fff; }
+
+  /* The region a masked scenario will not let you draw in. */
+  .powder-body .canvas-wrap.masked::after {
+    content: ''; position: absolute; inset: 0 0 0 var(--reach, 100%);
+    pointer-events: none; z-index: 3;
+    background: repeating-linear-gradient(
+      -45deg, rgba(0, 0, 0, 0.36) 0 6px, rgba(0, 0, 0, 0.16) 6px 12px);
+    border-left: 1px dashed rgba(255, 255, 255, 0.34);
+  }
+
+  .powder-body .sclist li { padding: 0; background: none; }
+  .powder-body .sclist button {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: #221d1a; border: 1px solid transparent; border-radius: 8px;
+    padding: 9px 11px; color: inherit; font: inherit;
+  }
+  .powder-body .sclist button:hover { border-color: #e8a75c; }
+  .powder-body .sclist b { display: block; font-size: 13.5px; color: #f2ece6; }
+  .powder-body .sclist .scbrief { display: block; font-size: 12.5px; color: #a99e96; margin-top: 3px; line-height: 1.5; }
+  .powder-body .sclist .scnote { display: block; font-size: 12.5px; color: #8fc9a6; margin-top: 6px; line-height: 1.55; }
+  .powder-body .sclist li.got button { background: #182420; }
+  .powder-body .sclist li.got b { color: #7fd6a0; }
 </style>

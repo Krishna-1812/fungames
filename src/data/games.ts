@@ -94,9 +94,9 @@ export const GAMES: Game[] = [
   {
     slug: 'powder',
     title: 'Powder',
-    blurb: 'Thirty-one materials, forty-seven reactions',
+    blurb: 'Thirty-one materials, and eight problems to solve',
     description:
-      'A falling-sand sandbox with real emergent chemistry. Oil floats on water. Lava turns sand into glass. Salt kills plants, a spark runs through metal, and thermite burns through everything. Forty-seven reactions to find, and a log that remembers which ones you have.',
+      'A falling-sand sandbox with real emergent chemistry. Oil floats on water. Lava turns sand into glass. Salt kills plants, a spark runs through metal, and thermite burns through everything. Forty-eight reactions to find, and eight scenarios that hand you a grid, take away most of the palette and set you a problem.',
     accent: '#1a120c', accent2: '#e8813c', glyph: '⏳', art: 'powder',
     added: '2026-09-15',
   },

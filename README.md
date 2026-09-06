@@ -155,12 +155,17 @@ the airburst reflection and a crater-depth unit bug were all caught by it.*
 
 **Powder** — a falling-sand sandbox: a cellular automaton over typed arrays,
 rendered straight into an `ImageData` buffer. Thirty-one materials and
-forty-seven named reactions, and everything interesting is emergent. Oil floats on water because
-it is lighter. Lava quenched by water becomes stone; lava touching sand becomes
-glass; plants drink puddles and take over. Every reaction is a thing to find,
-and the log tells you how many are left. *`scripts/check-powder.mjs` runs all
-forty-seven from both sides and checks each does what its name says — it caught
-a material you could draw with that took part in nothing at all.*
+forty-eight named reactions, and everything interesting is emergent. Oil floats
+on water because it is lighter. Lava quenched by water becomes stone; lava
+touching sand becomes glass; plants drink puddles and take over. Every reaction
+is a thing to find, and the log tells you how many are left. On top of that,
+eight **scenarios**: a set grid, most of the palette taken away, a budget of
+paint, and one number to reach. *`scripts/check-powder.mjs` runs all
+forty-eight reactions from both sides, then plays every scenario to completion
+headlessly and checks none of them can be passed by waiting. It caught a
+material you could draw with that took part in nothing at all, and later that
+lava was quietly autocatalytic — eighty cells of it became eighteen hundred and
+ate a whole sand bed.*
 
 **Orbit** — an n-body gravity sandbox with softened Newtonian forces and a
 symplectic integrator, so orbits stay stable for minutes instead of spiralling
@@ -310,7 +315,7 @@ node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
 node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots
 node scripts/check-cascade.mjs     # Rule Cascade, is it still finishable
 node scripts/check-trolley.mjs     # Trolley, are the four positions distinct
-node scripts/check-powder.mjs      # Powder, does every reaction do what it says
+node scripts/check-powder.mjs      # Powder, every reaction and every scenario
 node scripts/check-memory.mjs      # From Memory, do the references fit the box
 node scripts/check-orbit.mjs       # Orbit, the integrator and all eight challenges
 ```
