@@ -55,6 +55,54 @@ function luminance(hex: string): number {
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
 }
 
+/** sRGB mix, which is what a plain `linearGradient` interpolates in. */
+function mixHex(a: string, b: string, t: number): [number, number, number] {
+  const ch = (h: string) => {
+    const n = parseInt(h.slice(1), 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  }
+  const [x, y] = [ch(a), ch(b)]
+  return [x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t] as [
+    number,
+    number,
+    number,
+  ]
+}
+
+const lumRgb = (r: number, g: number, b: number) => {
+  const f = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
+  return 0.2126 * f(r / 255) + 0.7152 * f(g / 255) + 0.0722 * f(b / 255)
+}
+const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+
+/**
+ * Which ink to write on this card.
+ *
+ * Both cards paint a diagonal gradient from `accent` to `accent2` and write
+ * on the left. The first version of this chose the ink from the luminance of
+ * `accent2` alone — the colour at the corner *furthest* from the text. Eight
+ * of the site's games have a near-black `accent` and a light `accent2`, so
+ * eight share images went out with dark text on a near-black ground: 1.9:1 on
+ * Asteroid Launcher. `check-result-card.mjs` measures under the glyphs and
+ * found all eight.
+ *
+ * The text band spans roughly `tFrom`..`tTo` along the gradient, so this picks
+ * whichever ink has the better *worst* contrast across that band.
+ */
+export function pickInk(accent: string, accent2: string, tFrom = 0.13, tTo = 0.5) {
+  const worst = (ink: [number, number, number]) =>
+    Math.min(
+      ...[tFrom, (tFrom + tTo) / 2, tTo].map((t) =>
+        ratio(lumRgb(...ink), lumRgb(...mixHex(accent, accent2, t))),
+      ),
+    )
+  const dark: [number, number, number] = [20, 18, 26]
+  const light: [number, number, number] = [255, 255, 255]
+  return worst(light) >= worst(dark)
+    ? { ink: '#ffffff', soft: 'rgba(255,255,255,0.80)', chip: 'rgba(255,255,255,0.14)', light: false }
+    : { ink: '#14121a', soft: 'rgba(20,18,26,0.74)', chip: 'rgba(20,18,26,0.10)', light: true }
+}
+
 export type CardInput = {
   title: string
   blurb: string
@@ -65,8 +113,7 @@ export type CardInput = {
 
 /** The card shared for a single game: title, blurb, and that game's own colours. */
 export function gameCardSvg({ title, blurb, accent, accent2, siteName }: CardInput): string {
-  const ink = luminance(accent2) > 0.35 ? '#14121a' : '#ffffff'
-  const inkSoft = luminance(accent2) > 0.35 ? 'rgba(20,18,26,0.72)' : 'rgba(255,255,255,0.78)'
+  const { ink, soft: inkSoft } = pickInk(accent, accent2, 0.22, 0.49)
   const titleLines = wrap(title, 16).slice(0, 2)
   const blurbLines = wrap(blurb, 40).slice(0, 2)
   const titleY = 300 - (titleLines.length - 1) * 34
