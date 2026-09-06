@@ -56,6 +56,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       <p id="vBlurb"></p>
       <ul class="positions" id="vBars"></ul>
       <p class="repeat" id="vRepeat"></p>
+      <p class="repeat" id="vPlays"></p>
       <div class="verdict-actions">
         <button type="button" data-share data-title="Trolley">Share</button>
         <button type="button" id="againBtn" class="ghost">Start again</button>
@@ -66,10 +67,13 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   <script>
   import { burst, shake, prefersReducedMotion } from '../lib/fx'
+  import { recordPlay, readGame } from '../lib/stats'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { sfx, unlock, hit } from '../lib/audio'
   import { sceneSvg, GEO } from '../lib/trolley-scene'
   import { DILEMMAS, POSITIONS, scoreAnswers, REPEAT_OF_FIRST } from '../data/dilemmas'
 
+  const LAYOUT = JSON.parse(document.getElementById('chrome-data').textContent)
   const el = (id) => document.getElementById(id)
   const dots = el('dots')
   const card = el('card')
@@ -240,6 +244,35 @@ import GameLayout from '../layouts/GameLayout.astro'
       ? 'Problem 25 was problem 1, word for word. You answered it differently the second time.'
       : 'Problem 25 was problem 1, word for word. You gave the same answer both times.'
 
+    /* The result, kept and shareable.
+       `saved` is measured against the worst available outcome each round, so
+       it is the number worth a best-of; the position is a label, not a score,
+       and a "best position" would be a category error. */
+    const stat = recordPlay(
+      'trolley',
+      { position: top.name, pulls, saved, deaths },
+      { saved: 'high' },
+    )
+    el('vPlays').textContent =
+      stat.plays === 1
+        ? 'First time through.'
+        : `Run ${stat.plays}. Your best rescue so far is ${stat.bests.saved.value}.`
+
+    shareCard = {
+      slug: 'trolley',
+      siteName: LAYOUT.siteName,
+      headline: top.name,
+      sub:
+        top.pct === runner.pct
+          ? `An even split with ${runner.name.toLowerCase()}, at ${top.pct}% each.`
+          : `You argued for it ${top.pct}% of the time, over twenty-six levers.`,
+      stats: [
+        { label: 'Pulled', value: `${pulls} / 26` },
+        { label: 'Saved', value: String(saved) },
+        { label: 'Runner-up', value: runner.name },
+      ],
+    }
+
     verdict.hidden = false
     sfx.great()
     burst(innerWidth / 2, innerHeight * 0.4, {
@@ -248,8 +281,29 @@ import GameLayout from '../layouts/GameLayout.astro'
     verdict.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
+  /* Once there is a verdict, sharing means the verdict — a picture of what
+     you actually argued for, rather than a link to the game. Before that, the
+     chrome button keeps its default behaviour. */
+  let shareCard = null
+  document.addEventListener('game:share', (event) => {
+    if (!shareCard) return
+    event.preventDefault()
+    const btn = event.target
+    shareResult(shareCard, {
+      title: 'Trolley',
+      text: `I came out ${shareCard.headline.toLowerCase()}.`,
+      url: location.href,
+    }).then((outcome) => {
+      if (!(btn instanceof HTMLElement)) return
+      const was = btn.textContent
+      btn.textContent = outcomeLabel[outcome]
+      setTimeout(() => (btn.textContent = was), 1600)
+    })
+  })
+
   el('againBtn').addEventListener('click', () => {
     i = 0; deaths = 0; pulls = 0; answered = []; picks = []
+    shareCard = null
     card.hidden = false; dots.hidden = false; verdict.hidden = true
     render()
     card.scrollIntoView({ behavior: 'smooth', block: 'center' })

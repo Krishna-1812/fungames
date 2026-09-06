@@ -14,18 +14,17 @@
  *      missing from either would throw at the worst possible moment.
  *   2. Does the text stay in its column, and out of the other blocks? The
  *      right of the card belongs to the illustration, and a two-line headline
- *      has to not print through the line under it. The first version of this
- *      file measured only the first of those.
- *
- *      Also: the right of the card belongs to the
- *      illustration. This measures the *painted* extent of the ink, which is
- *      the point: the layout picks its font size from an estimate of how wide
- *      a string will set, and the estimate is the thing under test.
+ *      must not print through the line under it. The first version of this
+ *      file measured only the first of those. Both are measured on the
+ *      *painted* extent of the ink, which is the point: the layout picks its
+ *      font size from an estimate of how wide a string will set, and that
+ *      estimate is the thing under test.
  *   3. Is the text readable on the accent it landed on? Measured under the
  *      glyphs, not over the box they sit in — the mistake three checkers on
  *      this site have now made, so it is not made a fourth time.
- *   4. Does a stat row that does not fit get refused? A card that silently
- *      slides a stat under the illustration looks like a rendering bug.
+ *   4. Does a stat row that does not fit get caught? The card drops the chip
+ *      rather than throwing, because throwing in a browser kills the share; so
+ *      catching it is this file's job.
  *   5. Are the ids all prefixed? A card is rasterised alone most of the time
  *      but is also previewed inside a live page, next to tile art with ids of
  *      its own.
@@ -84,13 +83,29 @@ const SAMPLES = [
   ] },
 ]
 
-function render(card, scale = 1) {
+/* Half size. Every threshold in this file is in card units and every
+   measurement is converted back, so the numbers do not move — and a quarter of
+   the pixels is the difference between finishing inside the suite's budget and
+   being killed by it. */
+const SCALE = 0.5
+const cache = new Map()
+
+function render(card) {
+  const key = JSON.stringify(card)
+  const hit = cache.get(key)
+  if (hit) return hit
   const img = new Resvg(resultCardSvg(card), {
-    fitTo: { mode: 'width', value: Math.round(CARD.W * scale) },
+    fitTo: { mode: 'width', value: Math.round(CARD.W * SCALE) },
   }).render()
   // `.pixels` allocates a fresh buffer on every read.
-  return { px: img.pixels, W: img.width, H: img.height }
+  const out = { px: img.pixels, W: img.width, H: img.height }
+  cache.set(key, out)
+  return out
 }
+
+/** Pixel column to card unit, and back. */
+const toCard = (px) => px / SCALE
+const toPx = (u) => u * SCALE
 
 const games = listedGames()
 
@@ -141,9 +156,10 @@ console.log('\ntext stays out of the illustration')
             Math.abs(full.px[i + 2] - bare.px[i + 2])
           if (d > 40 && x > maxX) maxX = x
         }
-      if (maxX > worst.x) worst = { x: maxX, who: `${g.slug} / ${s.headline.slice(0, 16)}` }
-      if (maxX > CARD.TEXT_RIGHT) {
-        fail(`${g.slug} / "${s.headline.slice(0, 22)}": ink reaches x=${maxX}, past ${CARD.TEXT_RIGHT}`)
+      const maxU = Math.round(toCard(maxX))
+      if (maxU > worst.x) worst = { x: maxU, who: `${g.slug} / ${s.headline.slice(0, 16)}` }
+      if (maxU > CARD.TEXT_RIGHT) {
+        fail(`${g.slug} / "${s.headline.slice(0, 22)}": ink reaches x=${maxU}, past ${CARD.TEXT_RIGHT}`)
         bad++
       }
     }
@@ -194,10 +210,16 @@ console.log('\nheadline, sub and stats keep to their own boxes')
         { name: 'footer', x: 84, y: CARD.H - 70, w: AVAIL, h: 40 },
       ]
       const inside = (x, y) =>
-        allowed.some((b) => x >= b.x - 3 && x <= b.x + b.w + 3 && y >= b.y - 3 && y <= b.y + b.h + 3)
+        allowed.some(
+          (b) =>
+            x >= toPx(b.x - 3) &&
+            x <= toPx(b.x + b.w + 3) &&
+            y >= toPx(b.y - 3) &&
+            y <= toPx(b.y + b.h + 3),
+        )
       let stray = 0
       for (let y = 0; y < full.H; y++)
-        for (let x = 0; x < CARD.TEXT_RIGHT; x++) {
+        for (let x = 0; x < toPx(CARD.TEXT_RIGHT); x++) {
           const i = (y * full.W + x) * 4
           const d =
             Math.abs(full.px[i] - bare.px[i]) +
@@ -205,7 +227,8 @@ console.log('\nheadline, sub and stats keep to their own boxes')
             Math.abs(full.px[i + 2] - bare.px[i + 2])
           if (d > 60 && !inside(x, y)) stray++
         }
-      if (stray > 60) {
+      // A quarter of the pixels, so a quarter of the tolerance.
+      if (stray > 15) {
         fail(`${g.slug} / "${s.headline.slice(0, 20)}": ${stray} ink pixels outside every declared box`)
         bad++
       }
@@ -232,7 +255,7 @@ console.log('\nreadable on whatever accent the registry hands it')
     let n = 0
     let low = 99
     for (let y = 0; y < full.H; y++)
-      for (let x = 0; x < CARD.TEXT_RIGHT; x++) {
+      for (let x = 0; x < toPx(CARD.TEXT_RIGHT); x++) {
         const i = (y * full.W + x) * 4
         const d =
           Math.abs(full.px[i] - bare.px[i]) +
@@ -257,7 +280,7 @@ console.log('\nreadable on whatever accent the registry hands it')
         n++
         if (c < low) low = c
       }
-    if (n < 200) {
+    if (n < 50) {
       fail(`${g.slug}: only ${n} solid text pixels — nothing is being written`)
       bad++
       continue
@@ -273,43 +296,50 @@ console.log('\nreadable on whatever accent the registry hands it')
   ok(`weakest is ${worst.who} at ${worst.r.toFixed(1)}:1`)
 }
 
-/* ---- 4. a stat row that does not fit is refused -------------------------- */
+/* ---- 4. an over-long stat row --------------------------------------------- */
 
-console.log('\nan over-long stat row is refused, not hidden')
+/* The card drops what does not fit rather than throwing. Throwing was right
+   while this was only ever rendered here, and wrong the moment a browser used
+   it: the first game wired up passed "Contractualist" as a runner-up — a real
+   name out of its own data — and the exception killed the share silently at
+   exactly the moment somebody wanted it. So the card degrades, and refusing an
+   over-long row is this file's job instead. */
+console.log('\nan over-long stat row is dropped, and that is a failure here')
 {
-  let threw = false
-  try {
-    resultCardSvg({
-      slug: games[0].slug,
-      siteName: SITE,
-      headline: 'x',
-      stats: [
-        { label: 'Closest rival', value: 'Contractualist' },
-        { label: 'Second closest', value: 'Utilitarian' },
-        { label: 'Third', value: 'Virtue ethics' },
-      ],
-    })
-  } catch {
-    threw = true
-  }
-  check(threw, 'a stat row wider than the column throws rather than sliding under the art')
-  // …and the bar is one real results can clear.
-  let fits = true
-  try {
-    resultCardSvg({
-      slug: games[0].slug,
-      siteName: SITE,
-      headline: 'x',
-      stats: [
-        { label: 'Lever', value: '21 / 26' },
-        { label: 'Saved', value: '104' },
-        { label: 'Runner-up', value: 'Kantian' },
-      ],
-    })
-  } catch {
-    fits = false
-  }
-  check(fits, 'three ordinary stats still fit — the bar is not simply "no stats"')
+  const over = layout({
+    slug: games[0].slug,
+    siteName: SITE,
+    headline: 'x',
+    stats: [
+      { label: 'Closest rival', value: 'Contractualist' },
+      { label: 'Second closest', value: 'Utilitarian' },
+      { label: 'Third', value: 'Virtue ethics' },
+    ],
+  })
+  check(over.dropped > 0, 'a row wider than the column loses chips rather than overflowing')
+
+  const fine = layout({
+    slug: games[0].slug,
+    siteName: SITE,
+    headline: 'x',
+    stats: [
+      { label: 'Lever', value: '21 / 26' },
+      { label: 'Saved', value: '104' },
+      { label: 'Runs', value: '3' },
+    ],
+  })
+  check(fine.dropped === 0, 'three ordinary stats still fit — the bar is not simply "no stats"')
+
+  let bad = 0
+  for (const g of games)
+    for (const s of SAMPLES) {
+      const L = layout({ slug: g.slug, siteName: SITE, ...s })
+      if (L.dropped) {
+        fail(`${g.slug} / "${s.headline.slice(0, 20)}": ${L.dropped} stat(s) would not fit`)
+        bad++
+      }
+    }
+  check(bad === 0, 'and nothing a game actually passes gets dropped')
 }
 
 /* ---- 5. ids --------------------------------------------------------------- */

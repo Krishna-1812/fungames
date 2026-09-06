@@ -86,7 +86,7 @@ const videoGameLd = {
 
   {/* Data for the module script below. A module cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
-  <script type="application/json" id="chrome-data" set:html={JSON.stringify({ blurb: game.blurb })} />
+  <script type="application/json" id="chrome-data" set:html={JSON.stringify({ blurb: game.blurb, slug, title: game.title, siteName: SITE.name })} />
 
   <script>
     import { sfx, unlock, mountMuteButton } from '../lib/audio'

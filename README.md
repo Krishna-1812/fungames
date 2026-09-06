@@ -99,6 +99,9 @@ src/
     time-events.ts      Deep Time's forty-four events and when they happened
     time-art.ts         a scene for each, flat colour on one palette
     trolley-scene.ts    the field, the track, the tram and whoever is on it
+    result-card.ts      the 1200x630 card for a *result*, not for a game
+    share-card.ts       rasterising it in the browser, and sharing the file
+    stats.ts            one key, one version, one shape, for what you finished
     icons.ts            sixty-five drawn icons, shared across the games
     icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
@@ -347,6 +350,8 @@ node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
 node scripts/check-time-art.mjs    # Deep Time's scenes, at the card's own widths
 node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
+node scripts/check-result-card.mjs # the share card, at every game and result shape
+node scripts/check-stats.mjs       # what the site remembers, against a hostile store
 ```
 
 `npm test` runs all of them and reports which suites failed; `npm run check`

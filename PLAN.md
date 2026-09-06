@@ -405,12 +405,59 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
 
   Trolley's scenes are the one thing left in this phase.
 
-### Phase 4 — Endings, scores and sharing
+### Phase 4 — Endings, scores and sharing — **started**
 
-- Every game ends in something worth screenshotting.
-- Extend the existing OG-image generator into **per-result share cards** (we already
-  render PNGs at build time; the same code can render a result).
-- Persistent per-game stats.
+- ~~**Per-result share cards**~~ **the machinery is done.** `lib/result-card.ts`
+  builds a 1200×630 card for a *result*; `lib/share-card.ts` rasterises it in
+  the browser and offers `navigator.share` with the file, then a download,
+  then the link.
+
+  The plan said "the same code can render a result", which turned out to be
+  half right. The card cannot be built at build time — a static site has no
+  server to render a result on request, and no URL that could point at one — so
+  the same *job* runs in the browser instead. What is genuinely reused is the
+  game's accent pair from the registry and the game's own tile illustration
+  from `tile-art.ts`, so the picture on your result is the picture on the
+  homepage.
+
+  It found a live bug in the cards already shipping. Both cards paint a
+  diagonal gradient from `accent` to `accent2` and write on the left, and both
+  chose their ink from the luminance of `accent2` alone — the corner furthest
+  from the text. Eight games have a near-black `accent` and a light
+  `accent2`, so eight OG images were going out with dark text on a near-black
+  ground: 1.9:1 on Asteroid Launcher.
+
+  The checker's own history is the part worth keeping. It measured how far
+  right the ink reached and nothing about how far down, and passed a card whose
+  two-line headline printed through the line beneath it. Rendering each block
+  alone and comparing boxes does not fix that either — removing the headline
+  moves everything under it — so the card now *declares* its layout and the
+  checker holds it to it: declared boxes must not overlap, and every pixel of
+  ink must land inside their union.
+
+  And one decision reversed on contact with a browser: an over-long stat row
+  used to throw. That is right in a checker and wrong in a page — the first
+  game wired up passed "Contractualist" as a runner-up, out of its own data,
+  and the exception killed the share at the one moment somebody wanted it. The
+  card drops the chip now, and `check-result-card.mjs` is what refuses it.
+
+- ~~**Persistent per-game stats**~~ **done.** `lib/stats.ts`: one key, one
+  version, one shape. Six games each had their own key and their own format
+  before this, which is fine until a question crosses games.
+
+  Written on the assumption that storage is hostile, because it is:
+  `localStorage` throws on *access* in Safari's private mode, is absent in a
+  sandboxed iframe, fills up, and holds whatever a previous version or another
+  script on the origin left there. The store is an argument rather than an
+  assumption, and `check-stats.mjs` runs the real module against six of them —
+  working, throws-on-read, throws-on-write, full, full of junk, and absent.
+
+- **Every game ends in something worth screenshotting** — **Trolley done**, and
+  it is the pattern for the rest: record the play, build the card, intercept
+  the chrome Share button through the `game:share` hook that was already there.
+  The remaining games with a real ending are Steady Hand, Spend It, The Auction
+  Game, From Memory, I'm Not a Robot, Asteroid Launcher, Rule Cascade and
+  Overstimulated.
 
 ### Phase 5 — Deal with the weak three
 

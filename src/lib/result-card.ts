@@ -172,7 +172,25 @@ export function layout(r: ResultCard) {
   // An empty headline still occupies its line. Letting it collapse to zero
   // made `headLines.length - 1` negative and pushed the sub-line *upwards*.
   const headLines = head.lines.length ? head.lines : ['']
-  const stats = (r.stats ?? []).slice(0, 4)
+  /* Keep as many stats as fit the column, and say how many were dropped.
+   *
+   * This used to throw, which was right in a checker and wrong in a browser:
+   * the first game wired to it passed "Contractualist" as a runner-up — a real
+   * name from its own data — and the exception killed the share silently at the
+   * one moment somebody was trying to use it. Dropping the last chip is a
+   * smaller loss than no card. `dropped` is what `check-result-card.mjs`
+   * refuses on, so an over-long stat is still a build failure and not a
+   * surprise. */
+  const wanted = (r.stats ?? []).slice(0, 4)
+  const stats: Stat[] = []
+  let used = 0
+  for (const st of wanted) {
+    const w = chipWidth(st)
+    if (used + w > AVAIL) break
+    stats.push(st)
+    used += w + 16
+  }
+  const dropped = wanted.length - stats.length
   const sub = r.sub ? fit(r.sub, 32, 22, 2) : null
 
   const size = head.size
@@ -207,7 +225,7 @@ export function layout(r: ResultCard) {
   for (const s of stats) w += chipWidth(s) + 16
   if (stats.length) boxes.push({ name: 'stats', x: 84, y: chipY, w: w - 16, h: 94 })
 
-  return { head, headLines, sub, stats, size, headTop, subTop, chipY, boxes }
+  return { head, headLines, sub, stats, dropped, size, headTop, subTop, chipY, boxes }
 }
 
 export function resultCardSvg(r: ResultCard): string {
@@ -240,16 +258,6 @@ export function resultCardSvg(r: ResultCard): string {
       )
     })
     .join('')
-
-  if (cx - 16 > CARD.TEXT_RIGHT) {
-    // Loud rather than silent: a stat row that does not fit used to slide
-    // under the illustration, which looks like a rendering bug rather than
-    // like a caller writing "Closest rival: Contractualist" on a card.
-    throw new Error(
-      `result-card: ${r.slug} stat row is ${Math.round(cx - 16 - 84)} wide, ` +
-        `${CARD.TEXT_RIGHT - 84} available — shorten a label or a value`,
-    )
-  }
 
   return (
     `<svg width="${CARD.W}" height="${CARD.H}" viewBox="0 0 ${CARD.W} ${CARD.H}" ` +
