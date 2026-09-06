@@ -1,6 +1,6 @@
 # funsite
 
-A neal.fun-style site: one lean homepage and seventeen self-contained
+A neal.fun-style site: one lean homepage and eighteen self-contained
 interactive pages, each rendered with its own WebGL shader or 2D canvas and
 shipping only the script that page actually needs.
 
@@ -90,7 +90,7 @@ src/
     GameLayout.astro    game chrome: home link, title, share button
   components/
     GameTile.astro      homepage tile
-    TileArt.astro       seventeen distinct generated tile illustrations
+    TileArt.astro       eighteen distinct generated tile illustrations
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
     audio.ts            the synthesiser: every sound on the site, no audio files
@@ -138,7 +138,7 @@ drawn or is one of a handful of small hand-written shaders.
 
 ---
 
-## The seventeen games
+## The eighteen games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -217,6 +217,17 @@ logos.
 
 **Life in Weeks** — ninety years as 4,680 squares from one typed date.
 
+**The Auction Game** — fourteen lots, five rivals with their own money and their
+own bad habits, and £12,000. Real bidding increments, a real 25% buyer's premium,
+a secret reserve, and bids the auctioneer takes off the wall below it. At the end
+it names the four mechanisms that separated you from your money and puts your
+own number against each. *The winner's curse is not scripted: every bidder values
+a lot as the truth times their own taste, so the winner is disproportionately
+whoever most overrated it. `scripts/check-auction.mjs` runs 28,000 lots and
+measures that winners really do pay about 31% over the appraisal — and it caught
+a premium/affordability pair that was not an exact inverse, and a room where one
+rival won 70% of everything.*
+
 **I'm Not a Robot** — twelve checks that start like a CAPTCHA and end somewhere
 else, over a behavioural profiler that measures the same channels real bot
 detection does: pointer straightness, tremor, velocity profile, click and
@@ -243,7 +254,7 @@ preference, and every game gets the same speaker button in its chrome.
 
 Checked against the **production build**, not the dev server:
 
-- **Accessibility** — 0 colour-contrast failures on any of the 19 pages (WCAG
+- **Accessibility** — 0 colour-contrast failures on any of the 20 pages (WCAG
   AA, every text node measured against the background actually painted behind
   it; the homepage tile text sits on a gradient, so it is checked against both
   gradient endpoints instead);
@@ -268,17 +279,22 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Two games do enough real physics that the maths is checked separately, against
-answers from the literature or worked out by hand:
+Three games carry enough real modelling that the maths is checked separately,
+against answers from the literature, worked out by hand, or measured over a
+simulation:
 
 ```bash
 node scripts/check-impact.mjs      # Asteroid Launcher, vs four real impacts
 node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
+node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots
 ```
 
-Both exit non-zero on failure. Neither needs a browser — the analysis in
-`lib/impact.ts`, `lib/casualties.ts` and `lib/telemetry.ts` is deliberately pure
-functions over plain arrays so it can be run this way. `scripts/build-world-data.mjs`
+All three exit non-zero on failure. None needs a browser — the analysis in
+`lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts` and `lib/auction.ts` is
+deliberately pure functions over plain data so it can be run this way. The
+auction checker also guards the *balance*: it fails if any one rival wins more
+than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck
+the game. `scripts/build-world-data.mjs`
 regenerates `src/data/world.ts` (coastline and cities) and only needs running if
 those sources change.
 

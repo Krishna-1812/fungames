@@ -267,6 +267,25 @@ const scribble = range(30)
     )
   }
 
+  {/* A price climbing the ladder, and the hammer arriving on top of it. */}
+  {
+    art === 'gavel' && (
+      <g>
+        {range(7).map((i) => (
+          <rect
+            x={26 + i * 17} y={122 - (10 + i * i * 2.1)} width="11"
+            height={10 + i * i * 2.1} rx="2" fill="#fff" opacity={0.22 + i * 0.06}
+          />
+        ))}
+        <g transform="rotate(-28 176 52)">
+          <rect x="150" y="34" width="52" height="26" rx="7" fill="#fff" opacity="0.95" />
+          <rect x="172" y="58" width="9" height="46" rx="4" fill="#fff" opacity="0.78" />
+        </g>
+        <rect x="140" y="118" width="74" height="9" rx="4" fill="#fff" opacity="0.6" />
+      </g>
+    )
+  }
+
   {/* A verification grid mid-answer, with the pointer that is being watched. */}
   {
     art === 'verify' && (

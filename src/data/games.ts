@@ -24,6 +24,7 @@ export type TileArt =
   | 'chaos'    // everything at once
   | 'impact'   // concentric damage rings
   | 'verify'   // a checkbox grid, half ticked
+  | 'gavel'    // a hammer coming down on a rising price
 
 export type Game = {
   slug: string
@@ -45,6 +46,15 @@ export type Game = {
 }
 
 export const GAMES: Game[] = [
+  {
+    slug: 'auction',
+    title: 'The Auction Game',
+    blurb: 'Fourteen lots. You will overpay.',
+    description:
+      'Bid against five rivals with their own money and their own bad habits. Real bidding increments, a real 25% buyer’s premium, a secret reserve, and bids the auctioneer takes off the wall. At the end it shows you exactly how you were parted from your money.',
+    accent: '#2b1418', accent2: '#c8894a', glyph: '🔨', art: 'gavel',
+    added: '2026-09-18',
+  },
   {
     slug: 'not-a-robot',
     title: "I'm Not a Robot",

@@ -1,0 +1,676 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * The Auction Game — fourteen lots, five rivals, twelve thousand pounds.
+ *
+ * The engine is src/lib/auction.ts and it runs headless, so the bidding ladder,
+ * the buyer's premium, the reserve, the chandelier bids and the winner's curse
+ * are all checked by scripts/check-auction.mjs over two thousand simulated
+ * sales rather than eyeballed once.
+ *
+ * Everything is client-side. There is no server and nothing is stored.
+ */
+---
+
+<GameLayout slug="auction" bar="#2b1418" bodyClass="saleroom">
+  <div class="wrap">
+    <header class="tote">
+      <div class="cash">
+        <span class="lbl">Your funds</span>
+        <b id="funds">£12,000</b>
+      </div>
+      <div class="pace">
+        <span class="lbl">Lot</span>
+        <b id="lotNo">1 / 14</b>
+      </div>
+      <div class="haul">
+        <span class="lbl">Bought</span>
+        <b id="bought">0</b>
+      </div>
+    </header>
+
+    <div class="floor">
+      <section class="rostrum">
+        {/* Before the first lot this card is the game's own title page, so the
+            catalogue furniture is hidden rather than showing a category and an
+            estimate that belong to nothing. */}
+        <article class="catalogue is-intro" id="card">
+          <p class="cat" id="cat">Curiosities</p>
+          <h1 class="lotTitle" id="title">The Auction Game</h1>
+          <p class="blurb" id="blurb">
+            Fourteen lots. Five rivals with their own money and their own bad
+            habits. The hammer price is not what you pay.
+          </p>
+          <p class="est">
+            <span class="lbl">Estimate</span>
+            <b id="est">£300 – £500</b>
+          </p>
+        </article>
+
+        <div class="block" id="block" hidden>
+          <div class="price">
+            <span class="lbl" id="priceLbl">Current bid</span>
+            <b id="price">£180</b>
+            <span class="holder" id="holder">no bids yet</span>
+          </div>
+          <p class="calls" id="calls" aria-live="polite"></p>
+          <div class="acts">
+            <button class="bid" type="button" id="bid">
+              <span id="bidAmt">Bid £200</span>
+              <small id="bidCost">costs you £250</small>
+            </button>
+            <button class="ghost" type="button" id="letgo">Let it go</button>
+          </div>
+        </div>
+
+        <div class="acts open" id="openActs">
+          <button class="bid" type="button" id="start">Start the sale</button>
+        </div>
+
+        <ol class="log" id="log" aria-label="The auctioneer"></ol>
+      </section>
+
+      <aside class="room" aria-label="The room">
+        <h2>The room</h2>
+        <ul id="rivals"></ul>
+        <p class="note">
+          Their money runs out too. The two with the worst discipline have the
+          least of it.
+        </p>
+      </aside>
+    </div>
+  </div>
+
+  <section class="reckoning" id="reckoning" hidden>
+    <p class="stamp" id="stamp">Down £1,200</p>
+    <p class="lede" id="lede"></p>
+
+    <table class="sheet">
+      <caption>What you bought</caption>
+      <thead>
+        <tr>
+          <th scope="col">Lot</th>
+          <th scope="col">Hammer</th>
+          <th scope="col">Premium</th>
+          <th scope="col">You paid</th>
+          <th scope="col">Worth</th>
+        </tr>
+      </thead>
+      <tbody id="sheet"></tbody>
+    </table>
+
+    <h2 class="sub">How they got you</h2>
+    <ul class="mechs" id="mechs"></ul>
+
+    <h2 class="sub">The room</h2>
+    <table class="sheet">
+      <tbody id="board"></tbody>
+    </table>
+
+    <div class="acts">
+      <button type="button" data-share data-title="The Auction Game">Share this</button>
+      <button type="button" id="again">New sale</button>
+      <a href="/">try something else →</a>
+    </div>
+
+    <details class="how">
+      <summary>Which of this is real</summary>
+      <p>
+        <b>All of it.</b> The buyer's premium is how auction houses actually make
+        their money — 25% here, and real houses charge about that on the first
+        slice, on top of what the seller pays them. It is added to the hammer
+        price, so the number you shout is never the number you owe.
+      </p>
+      <p>
+        <b>Chandelier bidding</b> is the practice of an auctioneer taking bids
+        that do not exist — "off the wall", "off the chandelier" — against a real
+        bidder, to lift the price up to the seller's secret reserve. It is legal
+        in the UK and in most US states so long as it stops at the reserve, and
+        it is the part most people do not know about. This sale tells you every
+        time it happened to you.
+      </p>
+      <p>
+        <b>The winner's curse</b> is not scripted here. Every bidder in the room
+        values a lot as what it is really worth times their own taste, so the one
+        who wins is disproportionately the one who most overrated it. Across two
+        thousand simulated sales, winners pay about 31% more than the appraisal —
+        and that emerges from the model rather than being written into it.
+        <code>scripts/check-auction.mjs</code> measures it.
+      </p>
+      <p>
+        The estimates are deliberately soft, because printed estimates are. The
+        appraisal is drawn log-normally around the mid-estimate, so bidding to
+        the top of the range is a real gamble rather than a safe move.
+      </p>
+      <p>
+        Related: <a href="/spend-it/">Spend It</a> is the other game here about
+        money going somewhere, and <a href="/asteroid/">Asteroid Launcher</a> is
+        the other one built on a model with a checker behind it.
+      </p>
+    </details>
+  </section>
+</GameLayout>
+
+<script>
+  import { burst, shake, prefersReducedMotion } from '../lib/fx'
+  import { sfx, unlock, tone } from '../lib/audio'
+  import { dealLots } from '../data/lots'
+  import {
+    PREMIUM, makeRivals, mulberry32, openLot, step, placeBid, commit,
+    askingPrice, withPremium, affordableHammer, nextBid,
+  } from '../lib/auction'
+  import type { Bidder, LotState, LotOutcome } from '../lib/auction'
+  import type { Lot } from '../data/lots'
+
+  const $ = (id: string) => document.getElementById(id)!
+  const money = (n: number) => '£' + Math.round(n).toLocaleString('en-GB')
+
+  const START_FUNDS = 12_000
+  /** One action per beat. Slow enough to read, fast enough to feel pressed. */
+  const BEAT = 950
+
+  const rng = mulberry32((Date.now() ^ (Math.random() * 2 ** 32)) >>> 0)
+  const lots: Lot[] = dealLots(rng)
+  const rivals: Bidder[] = makeRivals()
+  const you: Bidder = {
+    id: 'you', name: 'You', note: '', budget: START_FUNDS,
+    taste: {}, style: 'grinder', ignoresPremium: false, won: [],
+  }
+  const everyone = [...rivals, you]
+  const outcomes: LotOutcome[] = []
+
+  let idx = -1
+  let state: LotState | null = null
+  let timer = 0
+  let fast = false
+
+  /* ------------------------------------------------------------------ */
+  /* The room                                                            */
+  /* ------------------------------------------------------------------ */
+
+  $('rivals').innerHTML = rivals.map((b) =>
+    `<li class="rival" data-id="${b.id}">
+       <div class="who"><b>${b.name}</b><span class="chip" data-chip="${b.id}"></span></div>
+       <p class="hab">${b.note}</p>
+       <div class="purse"><i data-purse="${b.id}"></i></div>
+     </li>`).join('')
+
+  function paintRoom() {
+    const ask = state && !state.over ? askingPrice(state) : 0
+    for (const b of rivals) {
+      const bar = document.querySelector(`[data-purse="${b.id}"]`) as HTMLElement
+      const chip = document.querySelector(`[data-chip="${b.id}"]`) as HTMLElement
+      const li = document.querySelector(`.rival[data-id="${b.id}"]`) as HTMLElement
+      bar.style.width = `${Math.max(0, (b.budget / 15_000) * 100)}%`
+      const broke = affordableHammer(b.budget) < ask
+      const leading = state?.leader === b.id
+      chip.textContent = leading ? 'holding' : broke && ask ? 'out' : money(b.budget)
+      chip.className = 'chip' + (leading ? ' is-leading' : broke && ask ? ' is-out' : '')
+      li.classList.toggle('is-leading', leading)
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* The log                                                             */
+  /* ------------------------------------------------------------------ */
+
+  const nameOf = (id?: string | null) =>
+    id === 'you' ? 'You' : rivals.find((b) => b.id === id)?.name ?? 'the auctioneer'
+
+  function say(text: string, cls = '') {
+    const li = document.createElement('li')
+    li.className = cls
+    li.textContent = text
+    $('log').prepend(li)
+    while ($('log').children.length > 40) $('log').lastElementChild!.remove()
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* A lot                                                               */
+  /* ------------------------------------------------------------------ */
+
+  function showCard(lot: Lot) {
+    $('cat').textContent = lot.category
+    $('title').textContent = lot.title
+    $('blurb').textContent = lot.blurb
+    $('est').textContent = `${money(lot.low)} – ${money(lot.high)}`
+    $('lotNo').textContent = `${idx + 1} / ${lots.length}`
+  }
+
+  function nextLot() {
+    // Any beat still pending belongs to the lot that just finished.
+    clearTimeout(timer)
+    idx++
+    if (idx >= lots.length) return finish()
+    const lot = lots[idx]
+    $('card').classList.remove('is-intro')
+    showCard(lot)
+    $('log').innerHTML = ''
+    state = openLot(lot, rivals, rng)
+    fast = false
+    $('block').hidden = false
+    $('openActs').hidden = true
+    $('calls').textContent = ''
+    say(`Lot ${idx + 1}. ${lot.title}. I have ${money(state.current)} to start.`, 'auctioneer')
+    paintPrice()
+    paintRoom()
+    tick()
+  }
+
+  function paintPrice() {
+    if (!state) return
+    const ask = askingPrice(state)
+    const opening = state.leader === null && state.events.length === 1
+    $('priceLbl').textContent = opening ? 'Opening at' : 'Current bid'
+    $('price').textContent = money(state.current)
+    $('holder').textContent =
+      state.leader === 'you' ? 'yours' :
+      state.leader ? `with ${nameOf(state.leader)}` :
+      opening ? 'no bids yet' : 'off the wall'
+    $('holder').className = 'holder' + (state.leader === 'you' ? ' is-yours' : '')
+
+    const cost = withPremium(ask)
+    const canAfford = ask <= affordableHammer(you.budget)
+    const btn = $('bid') as HTMLButtonElement
+    btn.disabled = state.leader === 'you' || !canAfford || state.over
+    $('bidAmt').textContent = state.leader === 'you' ? 'You hold the bid' : `Bid ${money(ask)}`
+    // The whole game in one line: the number you shout and the number you owe.
+    $('bidCost').textContent =
+      state.leader === 'you' ? `${money(withPremium(state.current))} with premium`
+      : !canAfford ? 'more than you have'
+      : `costs you ${money(cost)}`
+  }
+
+  function tick() {
+    clearTimeout(timer)
+    if (!state || state.over) return
+    timer = window.setTimeout(() => {
+      const ev = step(state!, rivals, rng)
+      if (ev) narrate(ev)
+      paintPrice()
+      paintRoom()
+      if (state!.over) return endLot()
+      tick()
+    }, fast ? 90 : BEAT)
+  }
+
+  function narrate(ev: ReturnType<typeof step>) {
+    if (!ev || !state) return
+    switch (ev.kind) {
+      case 'bid':
+        say(`${nameOf(ev.by)} bids ${money(ev.amount!)}.`)
+        if (!fast) sfx.tick()
+        break
+      case 'jump':
+        say(`${nameOf(ev.by)} jumps straight to ${money(ev.amount!)}.`, 'jump')
+        if (!fast) sfx.blip(5)
+        break
+      case 'chandelier':
+        // Named plainly. Hiding it would be the one dishonest thing this page
+        // could do, and the reveal is better than the trick.
+        say(`The auctioneer takes ${money(ev.amount!)} off the wall.`, 'wall')
+        if (!fast) sfx.drip()
+        break
+      case 'call':
+        $('calls').textContent = ev.call === 1 ? 'Going once…' : 'Going twice…'
+        say(ev.call === 1 ? 'Going once.' : 'Going twice.', 'auctioneer')
+        if (!fast) tone({ freq: ev.call === 1 ? 420 : 340, dur: 0.16, type: 'triangle', gain: 0.14 })
+        break
+    }
+  }
+
+  function endLot() {
+    if (!state) return
+    $('calls').textContent = ''
+    const wasYours = state.sold && state.leader === 'you'
+    const out = commit(state, everyone)
+    outcomes.push(out)
+
+    if (!out.sold) {
+      say(`Not sold. It did not reach the reserve.`, 'auctioneer')
+      sfx.bad()
+    } else if (wasYours) {
+      say(`Sold to you at ${money(out.hammer)} — ${money(withPremium(out.hammer))} with the premium.`, 'won')
+      sfx.great()
+      if (!prefersReducedMotion)
+        burst(innerWidth * 0.4, innerHeight * 0.4, {
+          count: 16, colors: ['#c8894a', '#f0d3a8', '#fff'], speed: 5,
+          gravity: 0.2, life: 52, size: 4, shape: 'square',
+        })
+    } else {
+      say(`Sold to ${nameOf(out.winner)} at ${money(out.hammer)}.`, 'auctioneer')
+      sfx.thud()
+      shake($('card'), 5, 240)
+    }
+
+    $('funds').textContent = money(you.budget)
+    $('bought').textContent = String(you.won.length)
+    paintRoom()
+
+    $('block').hidden = true
+    $('openActs').hidden = false
+    const btn = $('start') as HTMLButtonElement
+    btn.textContent = idx + 1 >= lots.length ? 'See the ledger' : 'Next lot'
+    state = null
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Controls                                                            */
+  /* ------------------------------------------------------------------ */
+
+  $('bid').addEventListener('click', () => {
+    if (!state || state.over) return
+    unlock()
+    const ask = askingPrice(state)
+    if (ask > affordableHammer(you.budget)) return
+    if (placeBid(state, 'you', ask)) {
+      say(`You bid ${money(ask)}.`, 'you')
+      sfx.pop(3)
+      paintPrice()
+      paintRoom()
+      tick()
+    }
+  })
+
+  // Not a pass — the bidding still happens, you just stop watching it unfold.
+  $('letgo').addEventListener('click', () => {
+    fast = true
+    sfx.whoosh()
+    tick()
+  })
+
+  // The button is hidden while a lot is live, but hidden buttons still take
+  // clicks — a stray Enter on a focused element would otherwise start the next
+  // lot on top of the running one and strand it mid-bidding.
+  $('start').addEventListener('click', () => {
+    if (state && !state.over) return
+    unlock()
+    sfx.click()
+    nextLot()
+  })
+  $('again').addEventListener('click', () => location.reload())
+
+  /* ------------------------------------------------------------------ */
+  /* The ledger                                                          */
+  /* ------------------------------------------------------------------ */
+
+  function finish() {
+    const byId = new Map(lots.map((l) => [l.id, l]))
+    const mine = outcomes.filter((o) => o.winner === 'you')
+
+    let hammer = 0, worth = 0, cursed = 0, wall = 0
+    const rows = mine.map((o) => {
+      const lot = byId.get(o.lotId)!
+      hammer += o.hammer
+      worth += lot.value
+      if (o.hammer > lot.value) cursed++
+      if (o.chandelier > 0) wall++
+      const paid = withPremium(o.hammer)
+      return `<tr class="${paid > lot.value ? 'down' : 'up'}">
+        <th scope="row">${lot.title}</th>
+        <td>${money(o.hammer)}</td>
+        <td>${money(paid - o.hammer)}</td>
+        <td>${money(paid)}</td>
+        <td>${money(lot.value)}</td>
+      </tr>`
+    })
+    const paid = START_FUNDS - you.budget
+    const net = worth - paid
+
+    $('sheet').innerHTML = rows.length
+      ? rows.join('') +
+        `<tr class="tot"><th scope="row">Total</th><td>${money(hammer)}</td>
+          <td>${money(paid - hammer)}</td><td>${money(paid)}</td><td>${money(worth)}</td></tr>`
+      : `<tr><td colspan="5" class="empty">You bought nothing. That is, technically, the winning strategy.</td></tr>`
+
+    // "Up £0" is a strange thing to tell someone who never raised their hand.
+    $('stamp').textContent = !mine.length
+      ? 'Bought nothing'
+      : net >= 0 ? `Up ${money(net)}` : `Down ${money(-net)}`
+    $('stamp').dataset.tone = !mine.length ? 'mid' : net >= 0 ? 'good' : net > -1_500 ? 'mid' : 'bad'
+    $('lede').textContent = !mine.length
+      ? 'Fourteen lots went past you and you kept every penny. The room thinks less of you and your accountant does not.'
+      : net >= 0
+        ? `You spent ${money(paid)} on ${mine.length} lot${mine.length === 1 ? '' : 's'} appraised at ${money(worth)}. Almost nobody comes out of a saleroom ahead.`
+        : `You spent ${money(paid)} on ${mine.length} lot${mine.length === 1 ? '' : 's'} appraised at ${money(worth)}. That is the normal outcome, and here is exactly where it went.`
+
+    const mechs: string[] = []
+    if (paid > hammer)
+      mechs.push(`<b>The buyer's premium.</b> ${money(paid - hammer)} of what you spent was the house's 25%, on top of every hammer price. It is ${Math.round(((paid - hammer) / paid) * 100)}% of your total outlay and you never bid it.`)
+    if (cursed)
+      mechs.push(`<b>The winner's curse.</b> On ${cursed} of your ${mine.length} lots the hammer alone was more than the thing turned out to be worth — before the premium. You won those precisely because you were the one who overrated them.`)
+    if (wall)
+      mechs.push(`<b>Chandelier bidding.</b> On ${wall} of your lots the auctioneer took a bid off the wall — from nobody — to lift the price toward the reserve, and you bid over it. This is legal.`)
+    const bigStep = mine.filter((o) => o.hammer >= 2_000).length
+    if (bigStep)
+      mechs.push(`<b>The ladder.</b> ${bigStep} of your lots went above ${money(2_000)}, where one more bid stops costing ${money(100)} and starts costing ${money(200)} or more. Bidding "just once more" is not a fixed price.`)
+    if (!mechs.length)
+      mechs.push('<b>Nothing got you.</b> You did not buy enough for any of it to matter.')
+    $('mechs').innerHTML = mechs.map((m) => `<li>${m}</li>`).join('')
+
+    const board = everyone
+      .map((b) => {
+        const theirs = outcomes.filter((o) => o.winner === b.id)
+        const w = theirs.reduce((n, o) => n + byId.get(o.lotId)!.value, 0)
+        const spent = theirs.reduce((n, o) => n + withPremium(o.hammer), 0)
+        return { b, lots: theirs.length, net: w - spent }
+      })
+      // Sitting the whole sale out nets exactly nothing, which ties with anyone
+      // who broke even. Between the two, the one who actually bought something
+      // and came out level did the harder thing.
+      .sort((x, y) => y.net - x.net || y.lots - x.lots)
+    $('board').innerHTML = board.map(({ b, lots: n, net: v }) =>
+      `<tr class="${b.id === 'you' ? 'me' : ''} ${v >= 0 ? 'up' : 'down'}">
+         <th scope="row">${b.name}</th>
+         <td>${n} lot${n === 1 ? '' : 's'}</td>
+         <td>${v >= 0 ? '+' : '−'}${money(Math.abs(v))}</td>
+       </tr>`).join('')
+
+    $('reckoning').hidden = false
+    document.querySelector('.floor')!.classList.add('done')
+    $('openActs').hidden = true
+    if (net >= 0 && !prefersReducedMotion)
+      for (let k = 0; k < 4; k++)
+        setTimeout(() => burst(innerWidth * (0.3 + Math.random() * 0.4), innerHeight * 0.3, {
+          count: 18, colors: ['#c8894a', '#f0d3a8', '#fff'], speed: 6,
+          gravity: 0.2, life: 60, size: 5, shape: 'square',
+        }), k * 120)
+    $('reckoning').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  paintRoom()
+</script>
+
+<style is:global>
+  .saleroom { background: #1b0f11; color: #f2e7dd; }
+
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 22px 18px 40px; }
+
+  /* --- the running total ------------------------------------------- */
+  .tote {
+    display: flex; gap: 10px; margin-bottom: 16px;
+  }
+  .tote > div {
+    flex: 1; background: #2b1a1c; border: 1px solid #4a3134;
+    border-radius: 10px; padding: 10px 14px;
+  }
+  .lbl {
+    display: block; font: 600 10px/1 var(--mono); letter-spacing: 0.14em;
+    text-transform: uppercase; color: #c0a08f;
+  }
+  .tote b {
+    font: 700 22px/1.2 var(--display); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; color: #fff;
+  }
+
+  .floor { display: grid; grid-template-columns: minmax(0, 1fr) 268px; gap: 18px; align-items: start; }
+  .floor.done { opacity: 0.42; pointer-events: none; }
+
+  /* --- the lot ------------------------------------------------------ */
+  .catalogue {
+    background: #f6f0e6; color: #241a16; border-radius: 12px;
+    padding: 22px 24px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  }
+  .catalogue.is-intro .cat,
+  .catalogue.is-intro .est { display: none; }
+
+  .cat {
+    margin: 0 0 6px; font: 600 10px/1 var(--mono); letter-spacing: 0.18em;
+    text-transform: uppercase; color: #7e5f48;
+  }
+  .lotTitle { font-size: 25px; margin: 0; letter-spacing: -0.02em; line-height: 1.2; }
+  .blurb { margin: 10px 0 0; font-size: 15px; line-height: 1.6; color: #4a3a32; max-width: 56ch; }
+  .est { margin: 16px 0 0; display: flex; align-items: baseline; gap: 10px; }
+  .est .lbl { color: #7e5f48; display: inline; }
+  .est b { font: 700 17px/1 var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* --- the block ---------------------------------------------------- */
+  .block {
+    margin-top: 14px; background: #2b1a1c; border: 1px solid #4a3134;
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .price { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .price b {
+    font: 700 40px/1 var(--display); letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums; color: #fff;
+  }
+  .price .lbl { flex-basis: 100%; }
+  .holder { font-size: 14px; color: #c0a08f; }
+  .holder.is-yours { color: #7fd6a0; font-weight: 600; }
+  .calls {
+    margin: 8px 0 0; min-height: 1.4em; font: 600 15px/1.4 var(--display);
+    letter-spacing: 0.01em; color: #e8b98a;
+  }
+
+  .acts { display: flex; gap: 10px; align-items: stretch; margin-top: 14px; flex-wrap: wrap; }
+  /* An author `display` outranks the user-agent rule for [hidden], so without
+     this the "next lot" button sits under the live bidding the whole time. */
+  .acts[hidden] { display: none; }
+  .acts.open { margin-top: 14px; }
+  .bid {
+    flex: 1 1 auto; min-width: 190px; display: grid; gap: 2px; text-align: left;
+    background: #c8894a; color: #241109; border: 0; border-radius: 10px;
+    padding: 11px 18px; cursor: pointer; font-weight: 700; font-size: 17px;
+    transition: transform 200ms var(--ease-bounce), background 140ms var(--ease);
+  }
+  .bid small { font-weight: 500; font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+  .bid:hover:not(:disabled) { background: #dc9a58; transform: translateY(-1px); }
+  .bid:active:not(:disabled) { transform: scale(0.98); }
+  .bid:disabled { background: #4a3134; color: #b39c92; cursor: default; }
+  .ghost {
+    flex: none; background: transparent; color: #e5d6ca; border: 1px solid #5c3f42;
+    border-radius: 10px; padding: 11px 18px; cursor: pointer; font-size: 14px;
+    transition: border-color 140ms var(--ease), color 140ms var(--ease);
+  }
+  .ghost:hover { border-color: #c8894a; color: #fff; }
+
+  /* --- the auctioneer ----------------------------------------------- */
+  .log {
+    list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 5px;
+    max-height: 210px; overflow-y: auto; font-size: 14px;
+  }
+  .log li {
+    padding: 6px 11px; border-radius: 7px; background: #261618; color: #d9c7bb;
+    animation: slidein 220ms var(--ease);
+  }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-5px); } }
+  .log li.auctioneer { color: #c0a08f; background: transparent; padding-left: 0; font-style: italic; }
+  .log li.you { background: #17351f; color: #a7e6bf; font-weight: 600; }
+  .log li.won { background: #1d4a2b; color: #d6f5e0; font-weight: 700; }
+  .log li.jump { background: #3d2216; color: #f0c49a; }
+  .log li.wall { background: #37202f; color: #e2b3d4; }
+
+  /* --- the room ----------------------------------------------------- */
+  .room {
+    background: #241416; border: 1px solid #43292c; border-radius: 12px;
+    padding: 14px; position: sticky; top: 62px;
+  }
+  .room h2 {
+    font: 600 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+    color: #c0a08f; margin: 0 0 10px;
+  }
+  .room ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+  .rival {
+    padding: 9px 10px; border-radius: 9px; background: #2c191c;
+    border: 1px solid transparent; transition: border-color 180ms var(--ease);
+  }
+  .rival.is-leading { border-color: #c8894a; }
+  .who { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .who b { font-size: 14px; color: #fff; }
+  .chip {
+    font: 600 11px/1 var(--mono); color: #c0a08f; font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .chip.is-leading { color: #f0b87e; }
+  .chip.is-out { color: #a4787c; }
+  .hab { margin: 5px 0 7px; font-size: 11.5px; line-height: 1.45; color: #bfa79c; }
+  .purse { height: 4px; border-radius: 2px; background: #402328; overflow: hidden; }
+  .purse i { display: block; height: 100%; background: #8e6a4a; transition: width 420ms var(--ease); }
+  .room .note { margin: 12px 0 0; font-size: 11px; line-height: 1.45; color: #ac9187; }
+
+  /* --- the ledger ---------------------------------------------------- */
+  .reckoning { max-width: 780px; margin: 0 auto; padding: 30px 18px 90px; }
+  .stamp {
+    display: inline-block; margin: 0 0 12px; padding: 8px 18px;
+    border: 3px solid currentColor; border-radius: 8px; transform: rotate(-2deg);
+    font: 700 26px/1 var(--display); letter-spacing: -0.02em; text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+  .stamp[data-tone="good"] { color: #7fd6a0; }
+  .stamp[data-tone="mid"] { color: #f0b87e; }
+  .stamp[data-tone="bad"] { color: #f0928c; }
+  .lede { margin: 0 0 24px; color: #e2d2c6; max-width: 58ch; line-height: 1.65; }
+
+  .sheet { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 26px; }
+  .sheet caption {
+    text-align: left; font: 600 10px/1 var(--mono); letter-spacing: 0.16em;
+    text-transform: uppercase; color: #c0a08f; padding-bottom: 8px;
+  }
+  .sheet th, .sheet td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #43292c; }
+  .sheet thead th {
+    font: 600 10px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+    color: #c0a08f;
+  }
+  .sheet tbody th { font-weight: 500; color: #f2e7dd; }
+  .sheet td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: #ecdccf; }
+  .sheet tr.tot th, .sheet tr.tot td { font-weight: 700; color: #fff; border-top: 2px solid #5c3f42; }
+  .sheet tr.up td:last-child { color: #7fd6a0; }
+  .sheet tr.down td:last-child { color: #f0928c; }
+  .sheet tr.me th { color: #f0b87e; }
+  .sheet .empty { color: #c0a08f; font-family: var(--font); }
+
+  .sub {
+    font: 600 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+    color: #c0a08f; margin: 0 0 10px;
+  }
+  .mechs { margin: 0 0 26px; padding-left: 20px; color: #e2d2c6; line-height: 1.7; }
+  .mechs li { margin-bottom: 10px; max-width: 62ch; }
+  .mechs b { color: #fff; }
+
+  .reckoning .acts button {
+    background: #c8894a; color: #241109; border: 0; border-radius: 999px;
+    padding: 10px 22px; font-weight: 600; cursor: pointer; font-size: 15px;
+    transition: transform 200ms var(--ease-bounce);
+  }
+  .reckoning .acts button:hover { transform: translateY(-2px) scale(1.03); }
+  .reckoning .acts button:nth-of-type(2) { background: #43292c; color: #f2e7dd; }
+  .reckoning .acts a { color: #c0a08f; font-size: 15px; }
+
+  .how { margin-top: 30px; border-top: 1px solid #43292c; padding-top: 16px; color: #cdb8ac; font-size: 14px; }
+  .how summary { cursor: pointer; color: #f0d3a8; font-weight: 600; }
+  .how p { max-width: 62ch; line-height: 1.65; }
+  .how b { color: #fff; }
+  .how code { font-size: 12.5px; background: #2c191c; padding: 1px 5px; border-radius: 4px; }
+
+  @media (max-width: 860px) {
+    .floor { grid-template-columns: minmax(0, 1fr); }
+    .room { position: static; order: 2; }
+  }
+  @media (max-width: 460px) {
+    .lotTitle { font-size: 20px; }
+    .price b { font-size: 32px; }
+    .tote b { font-size: 17px; }
+    .bid { min-width: 0; }
+  }
+</style>

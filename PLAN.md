@@ -172,8 +172,24 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    profiler; maths checked by `scripts/check-telemetry.mjs`. It turned out not to
    be cheap: the writing was, but the measurement underneath it was not, and the
    measurement is the only reason the joke has anything to stand on.
-3. **The Auction Game** — a real game loop, which the site currently lacks entirely.
+3. ~~**The Auction Game**~~ — **done.** Fourteen lots, five rivals, real
+   increments, a real buyer's premium, a reserve and chandelier bidding. The
+   site now has a game loop. `scripts/check-auction.mjs` measures the winner's
+   curse emerging from the model over 28,000 lots, and guards the balance.
 4. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Three new games, three checkers. The pattern that
+worked all three times: build the model as pure functions over plain data, run
+it headlessly against answers somebody else already knows, and let the page be a
+thin layer on top. Every serious bug in all three — the entry model, the
+Mach-stem approximation, the crater-depth unit, the dodging checkbox, the
+premium inverse, the one rival winning 70% of the room — was found by running
+the thing and reading the output, not by re-reading the code.
+
+Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade
+12 → 30 rules, Trolley 12 → 26 dilemmas, Powder 12 → 30 elements with a
+discovery log, From Memory 8 → 16 prompts. No new engines, a great deal of
+writing.
 
 The rule for all of them: **one built properly beats five built quickly.** That is
 the entire lesson of the diagnosis and it applies to new games hardest of all.
