@@ -94,6 +94,8 @@ src/
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
     tile-art.ts         eighteen bespoke tile drawings, one per game slug
+    scale-things.ts     what Scale draws, how big it is, and the sky behind it
+    scale-art.ts        twenty-six of those drawn, with both their real axes
     icons.ts            sixty-five drawn icons, shared across the games
     icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
@@ -339,15 +341,17 @@ node scripts/check-mix.mjs         # Ambient Mix, do shared links survive
 node scripts/check-steady.mjs      # Steady Hand, is the scoring fair
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
+node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
 ```
 
-All twelve exit non-zero on failure. None needs a browser — the analysis in
+`npm test` runs all of them and reports which suites failed; `npm run check`
+adds the production build. Each exits non-zero on its own. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts`,
 `lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts`,
 `data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,
-`lib/powder-goals.ts`, `lib/mix-code.ts`, `lib/steady-shapes.ts` and
-`lib/tile-art.ts` is deliberately pure functions over plain data so it can be
-run this way.
+`lib/powder-goals.ts`, `lib/mix-code.ts`, `lib/steady-shapes.ts`,
+`lib/tile-art.ts`, `lib/icons.ts` and `lib/scale-art.ts` is deliberately pure
+functions over plain data so it can be run this way.
 
 `check-art.mjs` is the odd one out and worth explaining, because illustration
 is the one thing here with no formula to check against. It rasterises every
@@ -366,6 +370,31 @@ nearly black in two, so it renders each one at the size and on the background
 it actually appears on. `--sheet out.png` writes the whole set on both a cream
 and a near-black ground, which is the only way to see the constraint they are
 drawn under.
+
+`check-scale-art.mjs` is the third of these, and the one whose central question
+is the hardest to write down: **is this a picture of the thing, or a coloured
+ball?** Every other test a drawing can pass — it has ink, it has contrast, it
+is inside its frame — a lit sphere passes too, which is how Scale spent a year
+rendering a proton, a whale and the Eiffel Tower as the same shape in different
+colours. The measure that separates them is *internal structure*: what fraction
+of the object's own pixels sit on a step in luminance rather than on a smooth
+ramp. A shaded sphere scores about 1% however strong its shading, because a
+gradient is not an edge, and the file renders exactly that sphere as a control
+so the floor is known to be a bar something can fail.
+
+Two of its other tests were wrong before they were right, and both are on
+record in the file. Judging "can you see it" with a WCAG luminance ratio failed
+the football pitch at 9% — a green pitch on a pale blue sky, which is about as
+visible as two things get — because mid-green and mid-blue sit at similar
+lightness; it uses oklab distance now. And measuring over each object's
+bounding box rather than its own ink failed the Eiffel Tower for being a
+lattice. That is the same mistake `check-art.mjs` made about a text container
+and `check-icons.mjs` made about a glyph, which is three times, so it is
+written down here rather than in a commit message.
+
+`--sheet out.png` lays all twenty-six out on the sky each one appears over;
+`--dbg "name,name" dir` renders single objects nearly full-frame, for the part
+no measurement covers, which is whether it looks like the thing.
 
 It has earned its keep. It caught a "puzzle" whose illustration was invisible
 over its own card, three pairs of tiles that were the same colour as each

@@ -60,11 +60,11 @@ Ruthless, because that's what was asked for.
 | **Overstimulated** | Good joke, real escalation, but ends too early and the upgrades aren't absurd enough. Neal's version has a hamster wheel and a live video. | **High** |
 | **From Memory** | Genuinely strong concept and the best "oh no" moment on the site. Only 8 prompts. | **High** |
 | **Trolley** | 12 dilemmas vs Neal's 28, and his are hand-drawn per scenario. Ours is an abstract track diagram. | **Medium-high** |
-| **Fusion** | Effectively dead without the Cloudflare worker deployed — the local recipe tree is tiny and runs out in a minute. | **Medium (blocked)** |
+| **Fusion** | ~~Effectively dead without the Cloudflare worker.~~ Thirty-six local recipes, reachable from four seeds, checked in both orders. | **Medium — playable offline** |
 | **Spend It** | Competent clone. Emoji instead of product images is the main tell. Receipt endgame is good. | **Medium** |
 | **Steady Hand** | ~~A 20-second toy with one challenge.~~ Four shapes and a combined rating. | **Medium — done** |
-| **Scale** | Draws *circles* for a proton, a whale and a galaxy. The whole genre depends on illustration; without it the page means nothing. | **Medium (art-gated)** |
-| **Deep Time** | Same problem. Currently a Wikipedia list on a gradient. The events deserve pictures. | **Medium (art-gated)** |
+| **Scale** | ~~Draws *circles* for a proton, a whale and a galaxy.~~ Twenty-six drawn objects, sized on both axes, and the shader keeps the seventeen things that really are spheres and rings. | **Medium — done** |
+| **Deep Time** | Still the problem Scale had. Forty-four events, a Wikipedia list on a gradient. The events deserve pictures. | **Medium (art-gated)** |
 | **Ambient Mix** | Quietly the most *finished* thing here. Twelve real synthesised layers. Just needs presets and a shareable mix. | **Medium** |
 | **Paper Folds** | A fact, not a game. You press one button 42 times. | **Low** |
 | **Progress** | A widget. Look once, feel briefly bad, leave. That's the whole design and it's fine. | **Low (fine as-is)** |
@@ -76,12 +76,12 @@ Ruthless, because that's what was asked for.
 
 Ordered by value per hour, not by what's most fun to build.
 
-### Phase 1 — Content depth (the actual problem) — **four of five done**
+### Phase 1 — Content depth (the actual problem) — **done**
 
-Rule Cascade, Trolley, Powder and From Memory are done, each with a checker
-behind it. **Fusion is not**, and is still blocked on the same thing it was
-blocked on before: the local recipe tree is the fallback for a Cloudflare Worker
-that is not deployed, so the work is worth doing but it is a different job.
+All five, each with a checker behind it. Fusion was the last one and it stayed
+open longest because the honest version of it needed a Cloudflare Worker that
+is not deployed; what closed it was accepting that and building the local tree
+as a real game rather than as a stub to fall back to.
 
 What the checkers caught is the argument for writing them: Rule Cascade was
 unwinnable for three hours of every day, Powder had a material you could draw
@@ -110,8 +110,11 @@ No new rendering. Just far more, far better *stuff*.
   an if-chain and became a table.
 - ~~**From Memory → 16 prompts.**~~ **done.** A pool of sixteen, ten a sitting,
   bicycle always first, so a second go is a different set.
-- **Fusion → a much larger local recipe tree** so it's playable without the worker,
-  plus discovery milestones. **Still outstanding** — the only Phase 1 item not done.
+- ~~**Fusion → a much larger local recipe tree**~~ **done**, in `dd4ef82`.
+  Thirty-six local recipes on ingredient tuples behind a canonical pair
+  function, so the game is playable without the worker;
+  `scripts/check-fusion.mjs` tries every recipe in both orders and proves the
+  whole tree is reachable from the four seeds. That closes Phase 1.
 
 ### Phase 2 — Goals for the sandboxes — **done**
 
@@ -288,8 +291,47 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   character that is not one.
 - **Illustrated scenes for Trolley** — the tracks, the trolley, the people, drawn
   with actual character.
-- **Illustrated objects for Scale and Deep Time** — this is what unlocks both of
-  those games' entire ceiling.
+- ~~**Illustrated objects for Scale**~~ **done.** Twenty-six drawings in
+  `lib/scale-art.ts`, and the page keeps its shader for the seventeen entries
+  that genuinely are lit spheres, rings, nebulae and a wave.
+
+  The change that turned out to matter most is not an illustration at all. A
+  drawing knows an object's width *and* its height; the registry's `m` is only
+  one of them, and the old square disc silently treated it as the width — so
+  the Eiffel Tower, quoted at 330 metres of *height*, was being drawn 330
+  metres wide, nearly three times its real footprint. Every entry now declares
+  which axis `m` measures, and the checker compares that against the registry
+  rather than trusting the comment. Two objects proved a single field could not
+  carry it: Everest is quoted by height and is nearly twice as wide as it is
+  tall, and Manhattan is quoted by a length that runs down the drawing.
+
+  The metric worth keeping is **structure**: what fraction of an object's own
+  pixels sit on a step rather than on a smooth ramp. It is the only one of
+  these tests a lit sphere fails, and the file renders one as a control to
+  prove it — 1.1% against a 3% floor. It found three drawings that were
+  gradients pretending to be pictures.
+
+  Two of the tests were wrong first. Grading visibility with a WCAG luminance
+  ratio failed the football pitch at 9%, because a green pitch and a pale blue
+  sky sit at similar lightness — right about the lightness, useless about
+  whether you can see a pitch; it is oklab distance now. And measuring over an
+  object's bounding box rather than its own ink failed the Eiffel Tower for
+  being a lattice, which is the third time on this site that a metric has been
+  caught measuring the container instead of the content.
+
+  What the checker could not see, and the eye could: a whale that was a
+  mackerel, a grain of sand that was a bread roll, a canyon that was a plank
+  with weeds on it — and, most usefully, an entire polygon that was **never
+  drawn at all**, because the loop building the canyon rim took its direction
+  from which side of the centreline it was on rather than from the sign of its
+  step. Every measurement was green. Two things also only appear once the page
+  is running: with real drawings the DOM paints them in registry order, which
+  is ascending size, so a football pitch covered the whale standing in front of
+  it until they were given a depth order; and a caption clamped to 26% of the
+  viewport was fine over a plain ball and lands in the middle of a picture.
+
+- **Illustrated objects for Deep Time** — still to do, and the same shape of
+  job: forty-four events, each currently a title and a note on a gradient.
 
 ### Phase 4 — Endings, scores and sharing
 

@@ -1,5 +1,7 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { THINGS } from '../lib/scale-things'
+import { SCALE_ART, artSvg } from '../lib/scale-art'
 
 /**
  * Scale — a continuous logarithmic zoom from a proton to the observable
@@ -11,6 +13,10 @@ import GameLayout from '../layouts/GameLayout.astro'
  * again as you keep going. Nothing is faked — the only non-linearity is that
  * the scroll axis itself is logarithmic, which is the honest way to cross
  * this many decades.
+ *
+ * What the objects are is in `lib/scale-things.ts`; what they look like is in
+ * `lib/scale-art.ts`. Both are out here rather than inline because
+ * `scripts/check-scale-art.mjs` renders them against this page's own sky.
  */
 
 // Screen width in metres runs from 10^MIN to 10^MAX across the whole scroll.
@@ -19,63 +25,17 @@ const MAX_EXP = 27.6
 const PX_PER_DECADE = 720
 
 /**
- * `kind` decides how a thing is drawn. Most are bodies and a lit sphere is
- * right, but several entries are not objects at all:
- *  - the orbits and the "distance to X" entries are radii, so a ring is
- *    literally the correct shape and a filled ball was misleading;
- *  - a galaxy is a flat spiral seen at a tilt, not a ball;
- *  - nebulae, clusters and an electron cloud have no surface to shade;
- *  - a wavelength is a wave.
+ * Each thing's real footprint, in metres, on both axes.
+ *
+ * A drawing knows the object's width *and* height; the registry's `m` is only
+ * one of them. That distinction was invisible while everything was a square
+ * disc, and wrong: `m` for the Eiffel Tower is 330 metres of height, so the
+ * old square drew it 330 metres wide — nearly three times its real footprint.
  */
-type Kind = 'sphere' | 'ring' | 'disc' | 'cloud' | 'wave'
-type Thing = { m: number; name: string; note?: string; color: string; kind?: Kind; glyph?: string }
-
-// `m` is the object's real size in metres (diameter or longest dimension).
-const THINGS: Thing[] = [
-  { m: 1.7e-15, name: 'Proton', note: 'A single one, at the centre of a hydrogen atom.', color: '#ff6b8a' },
-  { m: 5.0e-15, name: 'Carbon nucleus', color: '#ff8f6b' },
-  { m: 1.5e-14, name: 'Uranium nucleus', note: 'The heaviest nucleus that occurs naturally.', color: '#ffb36b' },
-  { m: 1.0e-12, name: 'Wavelength of a gamma ray', kind: 'wave', color: '#c6ff6b' },
-  { m: 1.0e-11, name: 'Wavelength of an X-ray', kind: 'wave', color: '#8affe0' },
-  { m: 1.0e-10, name: 'Hydrogen atom', kind: 'cloud', note: 'Almost all of it is empty space.', color: '#7ec8ff' },
-  { m: 2.8e-10, name: 'Water molecule', color: '#6bb7ff' },
-  { m: 1.0e-9, name: 'Buckyball', note: 'Sixty carbon atoms in a football.', color: '#9d8bff' },
-  { m: 2.0e-9, name: 'DNA, across the helix', color: '#8affc4' },
-  { m: 9.0e-8, name: 'Influenza virus', color: '#c58aff' },
-  { m: 7.0e-7, name: 'Wavelength of red light', kind: 'wave', note: 'Anything smaller than this cannot be seen with light.', color: '#ff5f5f' },
-  { m: 2.0e-6, name: 'E. coli', color: '#a4e05a' },
-  { m: 8.0e-6, name: 'Red blood cell', color: '#ff4d5e' },
-  { m: 7.0e-5, name: 'Human hair, across', color: '#c9a06b' },
-  { m: 5.0e-4, name: 'Grain of sand', color: '#e8c88a' },
-  { m: 5.0e-3, name: 'Ant', color: '#8c5a3c' },
-  { m: 2.45e-2, name: 'A coin', color: '#d8d2c0' },
-  { m: 1.7, name: 'A person', note: 'You are here. Roughly the geometric middle of everything.', color: '#ffd08a' },
-  { m: 4.5, name: 'A car', color: '#7fb2ff' },
-  { m: 30, name: 'Blue whale', note: 'The largest animal that has ever lived.', color: '#5a8fd4' },
-  { m: 105, name: 'Football pitch', color: '#5fbf72' },
-  { m: 330, name: 'Eiffel Tower', color: '#b0a99a' },
-  { m: 828, name: 'Burj Khalifa', color: '#cfd6de' },
-  { m: 8849, name: 'Mount Everest', color: '#e6eef5' },
-  { m: 21000, name: 'Manhattan', color: '#9aa4b0' },
-  { m: 446000, name: 'The Grand Canyon', note: 'End to end.', color: '#c47a4a' },
-  { m: 3.474e6, name: 'The Moon', color: '#c8c4bb' },
-  { m: 1.2742e7, name: 'Earth', note: 'Everything that has ever happened to anyone.', color: '#4d90d9' },
-  { m: 1.3982e8, name: 'Jupiter', color: '#d9a06b' },
-  { m: 1.392e9, name: 'The Sun', note: 'You could fit 1.3 million Earths inside it.', color: '#ffcc33' },
-  { m: 2.99e11, name: "Earth's orbit", kind: 'ring', color: '#7ec8ff' },
-  { m: 9.0e12, name: "Neptune's orbit", kind: 'ring', note: 'The edge of the planets.', color: '#5f7fd4' },
-  { m: 2.4e13, name: "Voyager 1's distance", kind: 'ring', note: 'Launched in 1977 and still going.', color: '#9fb4ff' },
-  { m: 7.8e14, name: 'One light month', kind: 'ring', color: '#8f9fe8' },
-  { m: 9.461e15, name: 'One light year', kind: 'ring', color: '#a98aff' },
-  { m: 4.014e16, name: 'To Proxima Centauri', kind: 'ring', note: 'The nearest star. Four years at the speed of light.', color: '#ff8ac4' },
-  { m: 2.4e17, name: 'The Orion Nebula', kind: 'cloud', color: '#ff6bb0' },
-  { m: 1.5e18, name: 'A globular cluster', kind: 'cloud', note: 'A million stars packed into a ball.', color: '#ffd28a' },
-  { m: 2.47e20, name: 'To the centre of the galaxy', kind: 'ring', color: '#b58aff' },
-  { m: 9.5e20, name: 'The Milky Way', kind: 'disc', note: 'A hundred billion stars, and this is one galaxy.', color: '#cbb6ff' },
-  { m: 9.5e22, name: 'The Local Group', kind: 'cloud', color: '#8ad4ff' },
-  { m: 5.0e24, name: 'Laniakea Supercluster', kind: 'cloud', note: 'Our galaxy is a speck inside this.', color: '#7affd8' },
-  { m: 8.8e26, name: 'The observable universe', kind: 'cloud', note: 'That is everything. There is no more scrolling.', color: '#ffffff' },
-]
+function extent(t: (typeof THINGS)[number]) {
+  const art = SCALE_ART[t.name]
+  return art ? { w: art.wm, h: art.hm, dim: art.word } : { w: t.m, h: t.m, dim: 'across' }
+}
 
 const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 ---
@@ -88,16 +48,29 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   <div class="stage" id="stage" aria-hidden="true">
     {
-      THINGS.map((t, i) => (
-        <div class="thing" data-m={t.m} data-i={i} data-kind={t.kind ?? 'sphere'} style={`--c:${t.color}`}>
-          <div class="disc"></div>
-          <div class="label">
-            <span class="name">{t.name}</span>
-            <span class="size" data-size={t.m}></span>
-            {t.note && <span class="note">{t.note}</span>}
+      THINGS.map((t, i) => {
+        const e = extent(t)
+        const art = SCALE_ART[t.name]
+        return (
+          <div
+            class="thing"
+            data-m={t.m}
+            data-wm={e.w}
+            data-hm={e.h}
+            data-i={i}
+            data-art={art ? '1' : null}
+            data-kind={t.kind ?? 'sphere'}
+            style={`--c:${t.color}`}
+          >
+            {art ? <div class="art" set:html={artSvg(t.name, t.color)} /> : <div class="disc" />}
+            <div class="label">
+              <span class="name">{t.name}</span>
+              <span class="size" data-size={t.m} data-dim={e.dim}></span>
+              {t.note && <span class="note">{t.note}</span>}
+            </div>
           </div>
-        </div>
-      ))
+        )
+      })
     }
   </div>
 
@@ -122,7 +95,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   {/* Text alternative for anyone who cannot use the scroll interaction. */}
   <ul class="visually-hidden">
-    {THINGS.map((t) => <li>{t.name} — {t.m} metres</li>)}
+    {THINGS.map((t) => <li>{t.name} — {t.m} metres {extent(t).dim}</li>)}
   </ul>
 </GameLayout>
 
@@ -149,9 +122,15 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   const things = [...document.querySelectorAll('.thing')].map((el, i) => ({
     el,
-    disc: el.querySelector('.disc'),
+    disc: el.querySelector('.disc') || el.querySelector('.art'),
     label: el.querySelector('.label'),
     m: Number(el.dataset.m),
+    // Real extent on both axes. Equal for anything without a drawing.
+    wm: Number(el.dataset.wm),
+    hm: Number(el.dataset.hm),
+    // A drawing is its own picture of the object; letting the shader paint a
+    // lit sphere underneath it would render the thing twice.
+    art: el.dataset.art === '1',
     // Kept as a number because the shader takes the whole object list as one
     // flat float array.
     kind: ({ sphere: 0, ring: 1, disc: 2, cloud: 3, wave: 4 })[el.dataset.kind] ?? 0,
@@ -259,7 +238,11 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     const px = Math.min(window.innerWidth, window.innerHeight) / screenMetres
 
     for (const th of things) {
-      const size = th.m * px
+      const w = th.wm * px
+      const h = th.hm * px
+      // The long axis is what decides whether a thing is a speck or a wall,
+      // which is what the old single `size` meant when everything was square.
+      const size = Math.max(w, h)
       // Below 3px it is an invisible dot; above 3 screens it is just a wall.
       const show = size > 3 && size < Math.max(window.innerWidth, window.innerHeight) * 3.2
       if (show !== th.visible) {
@@ -270,8 +253,8 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
         th.visible = show
       }
       if (!show) { th.alpha = 0; continue }
-      th.disc.style.width = size + 'px'
-      th.disc.style.height = size + 'px'
+      th.disc.style.width = w + 'px'
+      th.disc.style.height = h + 'px'
       // Fade in as it becomes legible and out as it engulfs the screen.
       const grow = Math.min(1, (size - 3) / 40)
       const shrink = Math.min(1, (Math.max(window.innerWidth, window.innerHeight) * 3.2 - size) / 400)
@@ -294,6 +277,13 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     // Past the third, a label is context nobody asked for. The body keeps
     // rendering; only its caption goes.
     vis.forEach((t, k) => t.el.style.setProperty('--labelShow', k < 3 ? '1' : '0'))
+
+    /* Depth order. The shader composites its objects largest-first so the
+       small thing in front lands on top of the big one behind it; drawings are
+       DOM nodes and paint in registry order instead, which is ascending size —
+       exactly backwards. Without this the football pitch covers the whale
+       standing in front of it. */
+    vis.forEach((t, k) => (t.el.style.zIndex = String(60 - Math.min(k, 59))))
 
     // Stack the context labels upwards from the centre.
     let cursor = -(window.innerHeight * 0.12)
@@ -319,7 +309,12 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     // pushed the stack down into the space it wanted.
     if (vis[0]) {
       const h0 = vis[0].label.offsetHeight || 72
-      let y0 = Math.min(vis[0].size / 2 + 26, window.innerHeight * 0.26)
+      // Below the object where there is room, and otherwise as low as it can
+      // go while staying wholly on screen. The old clamp was a flat 26% of the
+      // viewport, which was fine while every object was a plain ball and put
+      // the caption straight across the middle of the drawings.
+      const floor = (window.innerHeight - 48) / 2 - h0 / 2 - 14
+      let y0 = Math.min(vis[0].size / 2 + 26, floor)
       const lowest = placed[0]
       if (lowest) y0 = Math.max(y0, lowest.y + lowest.h / 2 + h0 / 2 + 12)
       vis[0].el.style.setProperty('--labelY', `${y0}px`)
@@ -336,7 +331,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
       // Largest first: the shader composites in array order, so the small
       // things in front land on top of the big ones behind them.
-      const shown = things.filter((t) => t.alpha > 0.001)
+      const shown = things.filter((t) => t.alpha > 0.001 && !t.art)
         .sort((a, b) => b.size - a.size)
         .slice(0, MAX_OBJECTS)
       objCount = shown.length
@@ -366,7 +361,10 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   // Fill in each label's real-world size once.
   document.querySelectorAll('[data-size]').forEach((el) => {
-    el.textContent = fmt(Number(el.dataset.size)).replace(' across', '')
+    // "8.85 kilometres" says nothing about which way; Everest is quoted by
+    // height and the Grand Canyon by length, and a drawing makes that visible
+    // enough that not saying it starts to look like an evasion.
+    el.textContent = fmt(Number(el.dataset.size)).replace(' across', ' ' + el.dataset.dim)
   })
   update()
 </script>
@@ -382,7 +380,8 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   .skygl :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   /* The GPU draws the bodies once it is live; the CSS disc stays in the layout
-     so the label keeps centring on it, but stops painting. */
+     so the label keeps centring on it, but stops painting. A drawing is not
+     one of the shader's shapes, so it keeps painting either way. */
   :global(body.gl-on) .disc { opacity: 0; }
   :global(.night-body) { background: #100a1e; color: #fff; }
 
@@ -399,6 +398,14 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     transition: opacity 160ms linear;
   }
   .thing.on { display: grid; }
+
+  /* Scoped styles do not reach set:html content, so the svg carries its own
+     sizing; this is only the box it fills. */
+  .art {
+    grid-area: 1 / 1;
+    display: block;
+    filter: drop-shadow(0 0 30px color-mix(in srgb, var(--c) 30%, transparent));
+  }
 
   .disc {
     border-radius: 50%;
