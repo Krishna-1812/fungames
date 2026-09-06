@@ -127,12 +127,12 @@ cost).
 | `/from-memory/` | 16.9 KB |
 | `/scale/` | 17.9 KB |
 | `/overstimulated/` | 19.8 KB |
-| `/powder/` | 22.6 KB |
+| `/powder/` | 25.2 KB |
 | `/orbit/` | **142.6 KB** |
 
 Orbit is the one outlier: its WebGL renderer is built on three.js, and that
 library alone accounts for essentially all of the difference. Every other page
-stays under 23 KB total. No images, no audio files, no fonts beyond Google
+stays under 26 KB total. No images, no audio files, no fonts beyond Google
 Fonts — every sound on the site is synthesised, and every visual is either
 drawn or is one of a handful of small hand-written shaders.
 
@@ -154,12 +154,13 @@ reproduces Chelyabinsk, Tunguska, Meteor Crater and Chicxulub — the entry mode
 the airburst reflection and a crater-depth unit bug were all caught by it.*
 
 **Powder** — a falling-sand sandbox: a cellular automaton over typed arrays,
-rendered straight into an `ImageData` buffer. Twelve materials and about forty
-local rules, and everything interesting is emergent. Oil floats on water because
+rendered straight into an `ImageData` buffer. Thirty-one materials and
+forty-seven named reactions, and everything interesting is emergent. Oil floats on water because
 it is lighter. Lava quenched by water becomes stone; lava touching sand becomes
-glass; plants drink puddles and take over. *Verified: dropping lava on ice
-produced 124 steam pixels and 66 stone pixels as the reaction cascaded, and sand
-settles at a real angle of repose.*
+glass; plants drink puddles and take over. Every reaction is a thing to find,
+and the log tells you how many are left. *`scripts/check-powder.mjs` runs all
+forty-seven from both sides and checks each does what its name says — it caught
+a material you could draw with that took part in nothing at all.*
 
 **Orbit** — an n-body gravity sandbox with softened Newtonian forces and a
 leapfrog integrator, so orbits stay stable for minutes instead of spiralling
@@ -292,7 +293,7 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Five games carry enough real modelling that the maths is checked separately,
+Six games carry enough real modelling that the maths is checked separately,
 against answers from the literature, worked out by hand, or measured over a
 simulation:
 
@@ -302,11 +303,12 @@ node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
 node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots
 node scripts/check-cascade.mjs     # Rule Cascade, is it still finishable
 node scripts/check-trolley.mjs     # Trolley, are the four positions distinct
+node scripts/check-powder.mjs      # Powder, does every reaction do what it says
 ```
 
-All five exit non-zero on failure. None needs a browser — the analysis in
+All six exit non-zero on failure. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts` and
-`lib/cascade-rules.ts` and `data/dilemmas.ts` is
+`lib/cascade-rules.ts`, `data/dilemmas.ts` and `lib/powder-rules.ts` is
 deliberately pure functions over plain data so it can be run this way. The
 auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck

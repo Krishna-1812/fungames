@@ -39,7 +39,32 @@ import GameLayout from '../layouts/GameLayout.astro'
         </div>
         <p class="stat"><b id="count">0</b> particles &middot; <b id="fps">0</b> fps</p>
       </div>
+
+      {/* The reason to keep going. A sandbox with nothing to find is a toy you
+          put down after thirty seconds. */}
+      <button type="button" class="found" id="foundBtn" aria-expanded="false" aria-controls="logPanel">
+        <span><b id="foundN">0</b> of <b id="foundOf">0</b> reactions found</span>
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
     </aside>
+
+    <div class="logwrap" id="logPanel" hidden>
+      <div class="loghead">
+        <h2>Reactions</h2>
+        <button type="button" id="logClose" aria-label="Close the reaction log">Close</button>
+      </div>
+      <ol class="log" id="logList"></ol>
+      <p class="lognote">
+        Found ones show what they make. The rest are yours to stumble into.
+        Saved in this browser only.
+      </p>
+    </div>
+
+    {/* Announcements land here so a discovery is not silent for screen readers. */}
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
 </GameLayout>
 
@@ -47,47 +72,22 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { sfx, unlock } from '../lib/audio'
   import { burst, ring, shake } from '../lib/fx'
   import { createPowderRenderer } from '../lib/powder-render'
+  import {
+    MATERIALS, REACTIONS, buildLookup, describe, SLOTS,
+    EMPTY, SAND, WATER, STONE, WOOD, FIRE, SMOKE, STEAM, OIL, LAVA, ICE,
+    PLANT, ACID, POWDER, GLASS, EMBER, ASH, CLOUD, SPARK, METAL, BRINE,
+  } from '../lib/powder-rules'
 
-  const EMPTY = 0, SAND = 1, WATER = 2, STONE = 3, WOOD = 4, FIRE = 5,
-        SMOKE = 6, STEAM = 7, OIL = 8, LAVA = 9, ICE = 10, PLANT = 11,
-        ACID = 12, POWDER = 13, GLASS = 14, EMBER = 15
-
-  type Def = {
-    id: number; name: string; type: number; density: number
-    rgb: [number, number, number]; vary: number
-    life?: number; flammable?: boolean; hint?: string
-  }
-
-  // type: 0 static, 1 powder, 2 liquid, 3 gas. Density decides who sinks.
-  const DEFS: Def[] = [
-    { id: SAND,   name: 'Sand',      type: 1, density: 6, rgb: [214, 180, 104], vary: 22 },
-    { id: WATER,  name: 'Water',     type: 2, density: 3, rgb: [58, 122, 214],  vary: 14 },
-    { id: STONE,  name: 'Stone',     type: 0, density: 9, rgb: [124, 124, 132], vary: 16 },
-    { id: WOOD,   name: 'Wood',      type: 0, density: 9, rgb: [128, 84, 48],   vary: 16, flammable: true },
-    { id: PLANT,  name: 'Plant',     type: 0, density: 9, rgb: [66, 168, 74],   vary: 22, flammable: true, hint: 'Drinks water and spreads' },
-    { id: OIL,    name: 'Oil',       type: 2, density: 2, rgb: [74, 58, 42],    vary: 12, flammable: true, hint: 'Floats on water, burns fast' },
-    { id: LAVA,   name: 'Lava',      type: 2, density: 7, rgb: [232, 96, 24],   vary: 26, hint: 'Melts ice, burns wood, turns sand to glass' },
-    { id: ICE,    name: 'Ice',       type: 0, density: 9, rgb: [168, 218, 240], vary: 14, hint: 'Slowly freezes water beside it' },
-    { id: ACID,   name: 'Acid',      type: 2, density: 3, rgb: [150, 232, 40],  vary: 18, hint: 'Dissolves nearly anything, and itself' },
-    { id: POWDER, name: 'Gunpowder', type: 1, density: 6, rgb: [64, 62, 68],    vary: 14, flammable: true, hint: 'Do not put this near fire' },
-    { id: FIRE,   name: 'Fire',      type: 3, density: 0, rgb: [255, 150, 40],  vary: 40, life: 46 },
-    { id: GLASS,  name: 'Glass',     type: 0, density: 9, rgb: [186, 226, 232], vary: 10 },
-  ]
-
-  // Materials you cannot draw - they only exist as the result of a reaction.
-  const EXTRA: Def[] = [
-    { id: SMOKE, name: 'Smoke', type: 3, density: 0, rgb: [110, 110, 116], vary: 18, life: 130 },
-    { id: STEAM, name: 'Steam', type: 3, density: 0, rgb: [198, 210, 222], vary: 14, life: 170 },
-    { id: EMBER, name: 'Ember', type: 1, density: 6, rgb: [226, 78, 30],   vary: 30, life: 120 },
-  ]
-
-  const TYPE = new Uint8Array(32)
-  const DENS = new Uint8Array(32)
-  const FLAM = new Uint8Array(32)
-  const LIFE0 = new Uint16Array(32)
-  const PAL = new Uint8Array(32 * 3)
-  const VARY = new Uint8Array(32)
-  for (const d of [...DEFS, ...EXTRA]) {
+  /* Materials and reactions live in lib/powder-rules.ts. They used to be an
+     if-chain here, which worked but meant nothing could count them — and the
+     discovery log below is only possible because they are a table. */
+  const TYPE = new Uint8Array(SLOTS)
+  const DENS = new Uint8Array(SLOTS)
+  const FLAM = new Uint8Array(SLOTS)
+  const LIFE0 = new Uint16Array(SLOTS)
+  const PAL = new Uint8Array(SLOTS * 3)
+  const VARY = new Uint8Array(SLOTS)
+  for (const d of MATERIALS) {
     TYPE[d.id] = d.type
     DENS[d.id] = d.density
     FLAM[d.id] = d.flammable ? 1 : 0
@@ -97,6 +97,9 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   DENS[EMPTY] = 1
   TYPE[EMPTY] = 3
+
+  const DRAWABLE = MATERIALS.filter((m) => m.draw)
+  const RX = buildLookup()
 
   const canvas = document.getElementById('sim') as HTMLCanvasElement
   const wrap = document.getElementById('wrap') as HTMLElement
@@ -159,62 +162,71 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   let bangs = 0
 
-  /** Returns true when the cell was consumed and must not also move. */
+  /* --------------------------------------------------------------------
+     Discovery.
+
+     Every pairwise reaction is a thing to find, so the first time one fires it
+     is recorded and announced. Saved under the reaction's own id rather than
+     its index, so reordering the table never scrambles anybody's log.
+     -------------------------------------------------------------------- */
+
+  const SAVE = 'powder.found.v1'
+  const found = new Set<string>()
+  try {
+    const raw = localStorage.getItem(SAVE)
+    if (raw) for (const id of JSON.parse(raw)) found.add(id)
+  } catch { /* private mode, or a cleared profile. Start fresh. */ }
+
+  let onDiscovery: ((r: (typeof REACTIONS)[number]) => void) | null = null
+
+  function discover(r: (typeof REACTIONS)[number]) {
+    if (found.has(r.id)) return
+    found.add(r.id)
+    try { localStorage.setItem(SAVE, JSON.stringify([...found])) } catch { /* not worth breaking the sim over */ }
+    onDiscovery?.(r)
+  }
+
+  /**
+   * Returns true when the cell was consumed and must not also move.
+   *
+   * Pairwise reactions come from the table. Everything below them is something
+   * a single cell does on its own, which is why it is not in the table and not
+   * something the log asks you to find.
+   */
   function react(x: number, y: number, i: number, el: number): boolean {
+    for (const [dx, dy] of N4) {
+      const nx = x + dx, ny = y + dy
+      if (!inside(nx, ny)) continue
+      const j = idx(nx, ny)
+      const n = grid[j]
+      const r = RX[el * SLOTS + n]
+      if (!r || Math.random() >= r.p) continue
+
+      // The table stores each pair once, so work out which side we are on.
+      const forward = r.a === el
+      const selfTo = forward ? r.a2 : r.b2
+      const otherTo = forward ? r.b2 : r.a2
+      discover(r)
+
+      if (r.boom) { bangs++; explode(nx, ny, r.boom); return true }
+      if (otherTo !== undefined) put(nx, ny, otherTo)
+      if (selfTo !== undefined) { put(x, y, selfTo); return true }
+    }
+
+    /* --- things a cell does by itself ----------------------------------- */
+
     if (el === FIRE || el === EMBER) {
+      // Anything flammable without a named reaction of its own still catches.
       for (const [dx, dy] of N4) {
         const nx = x + dx, ny = y + dy
         if (!inside(nx, ny)) continue
-        const j = idx(nx, ny)
-        const n = grid[j]
-        if (n === WATER) { put(x, y, STEAM); return true }
-        if (n === POWDER) { bangs++; explode(nx, ny, 9); return true }
-        if (n === ICE) { put(nx, ny, WATER); continue }
-        if (FLAM[n] && Math.random() < (n === OIL ? 0.34 : 0.09)) put(nx, ny, n === WOOD ? EMBER : FIRE)
+        const n = grid[idx(nx, ny)]
+        if (FLAM[n] && Math.random() < 0.07) put(nx, ny, n === WOOD ? EMBER : FIRE)
       }
       if (life[i] > 0) { life[i]--; return false }
-      put(x, y, Math.random() < 0.7 ? SMOKE : EMPTY)
+      // An ember does not go out so much as go to ash.
+      put(x, y, el === EMBER ? ASH : Math.random() < 0.7 ? SMOKE : EMPTY)
       return true
-    }
-
-    if (el === LAVA) {
-      for (const [dx, dy] of N4) {
-        const nx = x + dx, ny = y + dy
-        if (!inside(nx, ny)) continue
-        const n = grid[idx(nx, ny)]
-        if (n === WATER) {
-          put(nx, ny, STEAM)
-          // Quenched lava becomes rock - this is how islands form here.
-          if (Math.random() < 0.45) { put(x, y, STONE); return true }
-        } else if (n === ICE) put(nx, ny, WATER)
-        else if (n === SAND) { if (Math.random() < 0.12) put(nx, ny, GLASS) }
-        else if (n === POWDER) { bangs++; explode(nx, ny, 10); return true }
-        else if (FLAM[n] && Math.random() < 0.16) put(nx, ny, FIRE)
-      }
-      return false
-    }
-
-    if (el === WATER) {
-      for (const [dx, dy] of N4) {
-        const nx = x + dx, ny = y + dy
-        if (!inside(nx, ny)) continue
-        const n = grid[idx(nx, ny)]
-        // Plants drink, which is what turns a puddle into a thicket.
-        if (n === PLANT && Math.random() < 0.006) { put(x, y, PLANT); return true }
-        if (n === FIRE || n === EMBER) { put(x, y, STEAM); return true }
-        if (n === ICE && Math.random() < 0.0016) { put(x, y, ICE); return true }
-      }
-      return false
-    }
-
-    if (el === ICE) {
-      for (const [dx, dy] of N4) {
-        const nx = x + dx, ny = y + dy
-        if (!inside(nx, ny)) continue
-        const n = grid[idx(nx, ny)]
-        if (n === FIRE || n === LAVA || n === EMBER) { put(x, y, WATER); return true }
-      }
-      return false
     }
 
     if (el === ACID) {
@@ -222,7 +234,9 @@ import GameLayout from '../layouts/GameLayout.astro'
         const nx = x + dx, ny = y + dy
         if (!inside(nx, ny)) continue
         const n = grid[idx(nx, ny)]
-        if (n === EMPTY || n === ACID || n === SMOKE || n === STEAM) continue
+        // Glass is the one thing it cannot touch, which is the reason real
+        // acid is sold in it.
+        if (n === EMPTY || n === ACID || n === SMOKE || n === STEAM || n === GLASS) continue
         if (Math.random() < 0.14) {
           put(nx, ny, EMPTY)
           // Acid is spent as it eats, so a splash cannot erase the whole world.
@@ -232,12 +246,11 @@ import GameLayout from '../layouts/GameLayout.astro'
       return false
     }
 
-    if (el === POWDER) {
-      for (const [dx, dy] of N4) {
-        const nx = x + dx, ny = y + dy
-        if (!inside(nx, ny)) continue
-        const n = grid[idx(nx, ny)]
-        if (n === FIRE || n === LAVA || n === EMBER) { bangs++; explode(x, y, 9); return true }
+    if (el === CLOUD) {
+      // A cloud is a rain machine rather than a reagent.
+      if (Math.random() < 0.004) {
+        const ny = y + 1
+        if (inside(x, ny) && grid[idx(x, ny)] === EMPTY) put(x, ny, WATER)
       }
       return false
     }
@@ -248,8 +261,16 @@ import GameLayout from '../layouts/GameLayout.astro'
       return true
     }
 
+    if (el === SPARK) {
+      // A spark is only ever passing through.
+      if (life[i] > 0) { life[i]--; return false }
+      put(x, y, EMPTY)
+      return true
+    }
+
     return false
   }
+
 
   let frame = 0
 
@@ -357,7 +378,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   const hintEl = document.getElementById('hint')!
 
   const palette = document.getElementById('palette')!
-  DEFS.forEach((d, n) => {
+  DRAWABLE.forEach((d, n) => {
     const b = document.createElement('button')
     b.type = 'button'
     b.className = 'mat'
@@ -386,6 +407,62 @@ import GameLayout from '../layouts/GameLayout.astro'
     palette.appendChild(b)
   })
   let hintTimer = 0
+
+  /* ----------------------------------------------------------------------
+     The log.
+     ---------------------------------------------------------------------- */
+
+  const foundBtn = document.getElementById('foundBtn')!
+  const logPanel = document.getElementById('logPanel')!
+  const logList = document.getElementById('logList')!
+  const toast = document.getElementById('toast')!
+  document.getElementById('foundOf')!.textContent = String(REACTIONS.length)
+
+  function paintCount() {
+    document.getElementById('foundN')!.textContent = String(found.size)
+    foundBtn.classList.toggle('complete', found.size === REACTIONS.length)
+  }
+
+  function paintLog() {
+    logList.innerHTML = REACTIONS.map((r) => {
+      const got = found.has(r.id)
+      return `<li class="${got ? 'got' : 'locked'}">
+        <b>${got ? describe(r) : '? ? ?'}</b>
+        <span>${got ? r.note : 'Not found yet'}</span>
+      </li>`
+    }).join('')
+  }
+
+  let toastTimer = 0
+  onDiscovery = (r) => {
+    paintCount()
+    if (!logPanel.hidden) paintLog()
+    sfx.sparkle()
+    toast.textContent = 'New reaction — ' + describe(r)
+    toast.classList.add('show')
+    clearTimeout(toastTimer)
+    toastTimer = window.setTimeout(() => toast.classList.remove('show'), 3200)
+  }
+
+  foundBtn.addEventListener('click', () => {
+    const open = logPanel.hidden
+    logPanel.hidden = !open
+    foundBtn.setAttribute('aria-expanded', String(open))
+    if (open) paintLog()
+    unlock(); sfx.click()
+  })
+  document.getElementById('logClose')!.addEventListener('click', () => {
+    logPanel.hidden = true
+    foundBtn.setAttribute('aria-expanded', 'false')
+    foundBtn.focus()
+  })
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !logPanel.hidden) {
+      logPanel.hidden = true
+      foundBtn.setAttribute('aria-expanded', 'false')
+    }
+  })
+  paintCount()
 
   function cellAt(e: PointerEvent) {
     const r = canvas.getBoundingClientRect()
@@ -500,7 +577,8 @@ import GameLayout from '../layouts/GameLayout.astro'
 <style is:global>
   .powder-body { background: #0d0e10; color: #eee9e3; }
 
-  .powder-body .stage { display: flex; height: 100%; }
+  /* The log and the toast are absolutely positioned over the whole thing. */
+  .powder-body .stage { display: flex; height: 100%; position: relative; }
   .powder-body .canvas-wrap { position: relative; flex: 1; min-width: 0; background: #0d0e10; }
   .powder-body canvas {
     width: 100%; height: 100%; display: block;
@@ -572,6 +650,56 @@ import GameLayout from '../layouts/GameLayout.astro'
     width: 14px; height: 14px; border-radius: 50%; background: #e8a75c; cursor: pointer; border: 0;
   }
 
+
+  /* --- the discovery log ------------------------------------------------ */
+
+  .powder-body .found {
+    margin: 10px; padding: 9px 11px; display: flex; align-items: center; gap: 8px;
+    justify-content: space-between; background: #241f1c; border: 1px solid #3a322d;
+    border-radius: 9px; color: #d3c8c0; font-size: 12.5px; cursor: pointer;
+    transition: border-color 140ms var(--ease), color 140ms var(--ease);
+  }
+  .powder-body .found:hover { border-color: #e8a75c; color: #fff; }
+  .powder-body .found b { color: #e8a75c; font-variant-numeric: tabular-nums; }
+  .powder-body .found.complete { border-color: #7fd6a0; }
+  .powder-body .found.complete b { color: #7fd6a0; }
+  .powder-body .found[aria-expanded='true'] svg { transform: rotate(180deg); }
+  .powder-body .found svg { transition: transform 200ms var(--ease); flex: none; }
+
+  /* Over the canvas rather than inside the panel: the list is long, and the
+     panel is already the narrowest thing on the page. */
+  .powder-body .logwrap {
+    position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column;
+    background: rgba(16, 14, 13, 0.97); padding: 16px 18px 12px;
+  }
+  .powder-body .logwrap[hidden] { display: none; }
+  .powder-body .loghead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .powder-body .loghead h2 { font-size: 17px; color: #f2ece6; }
+  .powder-body .loghead button {
+    background: none; border: 1px solid #3a322d; color: #d3c8c0; border-radius: 7px;
+    padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  .powder-body .loghead button:hover { border-color: #e8a75c; color: #fff; }
+  .powder-body .log {
+    list-style: none; margin: 12px 0 0; padding: 0 4px 0 0; overflow-y: auto; flex: 1;
+    display: grid; gap: 7px; align-content: start;
+  }
+  .powder-body .log li { padding: 7px 10px; border-radius: 8px; background: #221d1a; }
+  .powder-body .log li b { display: block; font-size: 13px; color: #f2ece6; }
+  .powder-body .log li span { display: block; font-size: 12px; color: #a99e96; margin-top: 2px; }
+  .powder-body .log li.locked { background: #1c1917; }
+  .powder-body .log li.locked b { color: #968b83; letter-spacing: 0.18em; }
+  .powder-body .log li.locked span { color: #968b83; }
+  .powder-body .lognote { font-size: 11.5px; color: #8d827b; margin: 10px 0 0; line-height: 1.5; }
+
+  .powder-body .toast {
+    position: absolute; left: 50%; top: 16px; transform: translate(-50%, -14px);
+    z-index: 6; background: #2b2019; border: 1px solid #e8a75c; color: #ffe7c9;
+    padding: 8px 16px; border-radius: 999px; font-size: 13px; pointer-events: none;
+    opacity: 0; transition: opacity 240ms var(--ease), transform 240ms var(--ease);
+    max-width: 90%; text-align: center;
+  }
+  .powder-body .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   @media (max-width: 760px) {
     .powder-body .stage { flex-direction: column; }

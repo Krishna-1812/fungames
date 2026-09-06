@@ -94,9 +94,9 @@ export const GAMES: Game[] = [
   {
     slug: 'powder',
     title: 'Powder',
-    blurb: 'Sand, water, fire, lava, acid',
+    blurb: 'Thirty-one materials, forty-seven reactions',
     description:
-      'A falling-sand sandbox with real emergent chemistry. Oil floats on water. Lava turns sand into glass. Plants drink puddles and take over. Nothing is scripted.',
+      'A falling-sand sandbox with real emergent chemistry. Oil floats on water. Lava turns sand into glass. Salt kills plants, a spark runs through metal, and thermite burns through everything. Forty-seven reactions to find, and a log that remembers which ones you have.',
     accent: '#1a120c', accent2: '#e8813c', glyph: '⏳', art: 'powder',
     added: '2026-09-15',
   },
