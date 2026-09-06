@@ -1,13 +1,14 @@
 ---
+import { iconSvg } from '../lib/icons'
 import Base from '../layouts/Base.astro'
 import Backdrop from '../components/Backdrop.astro'
 import { SITE } from '../site.config'
 ---
 
-<Base title={`Lost — ${SITE.name}`} glyph="🧭" noindex>
+<Base title={`Lost — ${SITE.name}`} favicon="compass" noindex>
   <Backdrop variant="paper" />
   <div class="lost">
-    <span class="glyph" aria-hidden="true">🧭</span>
+    <span class="glyph" aria-hidden="true" set:html={iconSvg('compass')} />
     <h1>Nothing here</h1>
     <p>That page does not exist, or it was retired.</p>
     <a class="btn" href="/">Back to the games →</a>
@@ -26,8 +27,12 @@ import { SITE } from '../site.config'
     animation: rise-in 480ms var(--ease) backwards;
   }
   .glyph {
+    /* The drawing sizes itself from inside — see iconSvg. A rule here that
+       targeted the <svg> would not apply to it, because it arrives via
+       set:html. */
     display: inline-block;
-    font-size: 40px;
+    width: 44px;
+    height: 44px;
     margin-bottom: 6px;
     filter: drop-shadow(0 8px 18px rgba(20, 18, 28, 0.14));
     /* A compass that can't settle — it's lost too. */

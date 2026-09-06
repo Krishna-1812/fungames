@@ -249,8 +249,43 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
 - **Still to do here**: lettering treatments per tile were in the original plan
   and are deliberately not done. Eighteen differently-set titles on one grid
   reads as chaos, not craft; the variety belongs in the drawings.
-- **Drawn icons replacing emoji** in Spend It (30 items), Ambient Mix (12 layers),
-  Paper Folds (19 milestones).
+- ~~**Drawn icons replacing emoji**~~ **done**, and further than planned:
+  Spend It's 30 items, Ambient Mix's 12 layers, Paper Folds' 19 milestones,
+  Overstimulated's trophy and five runners, the 404 compass and the site
+  favicon. Sixty-five drawings in `lib/icons.ts`, one set on one 24-unit grid.
+
+  Emoji were never one set. A burger and a yacht and a ringed planet come from
+  different corners of one vendor's library, drawn by different people at
+  different times, and they are three other people's drawings again on Android
+  and Windows. A row of thirty of them cannot look deliberate.
+
+  The constraint that shaped the set: Ambient Mix and Overstimulated are nearly
+  black, Spend It and Paper Folds are cream, and the same drawing has to work
+  on both. Ink is `currentColor` and every fill is mid-tone enough to clear
+  3:1 against either — a narrow band, and the reason these read muted rather
+  than like emoji.
+
+  `check-icons.mjs` renders each at the size it actually gets. Two bugs in the
+  checker itself were worth more than the assertions: resvg hands back
+  premultiplied alpha, so compositing the page colour by hand multiplied twice
+  and failed every icon at 1.8:1; and grading the darkest single pixel at 26px
+  grades the rasteriser, not the drawing.
+
+  The distinctness test had to be rebuilt twice. Alpha maps work for the tile
+  illustrations because their compositions sit in different parts of the card,
+  but every icon is a centred object, so silhouette carries almost no signal —
+  a burger and a football were both "a filled blob". Keeping colour fixed that.
+  Then the fixed threshold turned into a treadmill: going from 12 icons to 65
+  took the pair count from 66 to 2,080, and the minimum of a larger sample is
+  lower whether or not anything got worse. It now tests whether the closest
+  pair is an **outlier** against the tenth-closest, which is the actual
+  question, and it was verified by pointing one icon at another's drawing and
+  watching it fail at 0.00.
+
+  **Two emoji are deliberately left.** Fusion's come back from the worker per
+  generated element, so there is nothing to draw in advance. Rule Cascade's 🕷
+  is not decoration: the rule requires you to type it, and the moth eats every
+  character that is not one.
 - **Illustrated scenes for Trolley** — the tracks, the trolley, the people, drawn
   with actual character.
 - **Illustrated objects for Scale and Deep Time** — this is what unlocks both of

@@ -1,5 +1,7 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { MARKS } from '../lib/fold-marks'
+import { iconSvg } from '../lib/icons'
 
 /**
  * Paper Folds — exponential growth you can feel with one button.
@@ -11,30 +13,6 @@ import GameLayout from '../layouts/GameLayout.astro'
 const START_MM = 0.1
 const MAX_FOLDS = 103
 
-type Mark = { at: number; text: string; glyph: string }
-
-// Chosen so a comparison lands every few folds and each one is a real figure.
-const MARKS: Mark[] = [
-  { at: 0, text: 'A single sheet of paper.', glyph: '📄' },
-  { at: 3, text: 'About as thick as a credit card.', glyph: '💳' },
-  { at: 7, text: 'A stack of Lego bricks.', glyph: '🧱' },
-  { at: 10, text: 'Roughly a coffee mug.', glyph: '☕' },
-  { at: 13, text: 'Taller than a toddler.', glyph: '🧒' },
-  { at: 16, text: 'A two-storey house.', glyph: '🏠' },
-  { at: 20, text: 'Taller than the Statue of Liberty.', glyph: '🗽' },
-  { at: 23, text: 'Taller than the Burj Khalifa, the tallest building on Earth.', glyph: '🏙️' },
-  { at: 27, text: 'Higher than a passenger jet cruises.', glyph: '✈️' },
-  { at: 30, text: 'Past the Kármán line. This is space now.', glyph: '🛰️' },
-  { at: 34, text: 'Longer than Great Britain.', glyph: '🗺️' },
-  { at: 37, text: 'Wider than the Earth.', glyph: '🌍' },
-  { at: 42, text: 'It reaches the Moon.', glyph: '🌕' },
-  { at: 51, text: 'Past the Sun.', glyph: '☀️' },
-  { at: 60, text: 'Well beyond Pluto and out of the solar system.', glyph: '🪐' },
-  { at: 69, text: 'Past Proxima Centauri, the nearest star.', glyph: '⭐' },
-  { at: 83, text: 'Across the entire Milky Way.', glyph: '🌌' },
-  { at: 92, text: 'Beyond the Local Group of galaxies.', glyph: '✨' },
-  { at: 103, text: 'Larger than the observable universe. Please stop.', glyph: '🕳️' },
-]
 ---
 
 <GameLayout slug="paper-folds" bar="#43310f" bodyClass="fold-body">
@@ -54,7 +32,7 @@ const MARKS: Mark[] = [
 
     <svg class="scale" id="scale" viewBox="0 0 300 190" aria-hidden="true"></svg>
 
-    <p class="mark" id="mark"><span class="mark-glyph" id="markGlyph">📄</span><span id="markText">A single sheet of paper.</span></p>
+    <p class="mark" id="mark"><span class="mark-glyph" id="markGlyph" set:html={iconSvg(MARKS[0].icon)} /><span id="markText">A single sheet of paper.</span></p>
 
     <div class="actions">
       <button type="button" id="unfoldBtn" class="ghost">Unfold</button>
@@ -66,12 +44,19 @@ const MARKS: Mark[] = [
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
-  <script type="application/json" id="game-data" set:html={JSON.stringify({ START_MM, MAX_FOLDS, MARKS })} />
+  <script type="application/json" id="game-data" set:html={JSON.stringify({
+      START_MM,
+      MAX_FOLDS,
+      MARKS,
+      ICONS: Object.fromEntries(MARKS.map((m) => [m.icon, iconSvg(m.icon)])),
+    })} />
 
   <script>
-  import { burst, floatText, prefersReducedMotion } from '../lib/fx'
+  import { burst, floatIcon, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock, tone } from '../lib/audio'
-    const { START_MM, MAX_FOLDS, MARKS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+    const { START_MM, MAX_FOLDS, MARKS, ICONS } = JSON.parse(
+      document.getElementById('game-data')!.textContent!,
+    ) as any
 
   const el = (id) => document.getElementById(id)
   let n = 0
@@ -232,7 +217,7 @@ const MARKS: Mark[] = [
     const mk = currentMark()
     if (mk !== lastMark) {
       lastMark = mk
-      el('markGlyph').textContent = mk.glyph
+      el('markGlyph').innerHTML = ICONS[mk.icon]
       el('markText').textContent = mk.text
       const glyphEl = el('markGlyph')
       glyphEl.classList.remove('jump')
@@ -271,7 +256,7 @@ const MARKS: Mark[] = [
       burst(r.left + r.width / 2, r.top, {
         count: 22, colors: ['#c9a13f', '#e8d59a', '#fff'], speed: 4.5, gravity: 0.14, life: 44, size: 4,
       })
-      floatText(r.left + r.width / 2, r.top - 20, mk.glyph, '#c9a13f')
+      floatIcon(r.left + r.width / 2, r.top - 20, ICONS[mk.icon])
     }
   })
   el('unfoldBtn').addEventListener('click', () => {
@@ -339,7 +324,9 @@ const MARKS: Mark[] = [
     font-size: 17px; color: #4a3d1c; min-height: 44px; margin: 0 auto 16px;
     max-width: 34ch; text-wrap: pretty;
   }
-  .mark-glyph { font-size: 26px; display: inline-block; }
+  /* The drawing sizes itself from inside — see iconSvg. A rule here that
+     targeted the <svg> would not apply to it, because it arrives via set:html. */
+  .mark-glyph { width: 26px; height: 26px; display: inline-block; vertical-align: -6px; margin-right: 8px; }
 
   .actions { display: flex; gap: 10px; justify-content: center; }
   .actions button {

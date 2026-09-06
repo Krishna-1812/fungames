@@ -1,5 +1,6 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { iconSvg } from '../lib/icons'
 
 /**
  * Overstimulated - a clicker whose upgrades all make the page worse.
@@ -20,6 +21,15 @@ import GameLayout from '../layouts/GameLayout.astro'
       view. Keeping the room still while the furniture lurches is also the more
       unpleasant of the two, which is the point. */}
   <div class="oversky" id="oversky" aria-hidden="true"></div>
+
+  <script
+    type="application/json"
+    id="icon-data"
+    set:html={JSON.stringify({
+      trophy: iconSvg('trophy'),
+      runners: ['cat', 'duck', 'snail', 'dino', 'scooter'].map((k) => iconSvg(k)),
+    })}
+  />
 
   <div class="world" id="world">
     <h1 class="visually-hidden">Overstimulated</h1>
@@ -57,6 +67,10 @@ import GameLayout from '../layouts/GameLayout.astro'
 </GameLayout>
 
 <script>
+    const { trophy: TROPHY, runners: RUNNERS } = JSON.parse(
+      document.getElementById('icon-data')!.textContent!,
+    ) as { trophy: string; runners: string[] }
+
   import { sfx, unlock, tone, hit, scaleFreq } from '../lib/audio'
   import { burst, floatText, prefersReducedMotion } from '../lib/fx'
   import { ShaderSurface } from '../lib/gl'
@@ -154,7 +168,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   function spawnAchievement() {
     const a = document.createElement('div')
     a.className = 'achv'
-    a.innerHTML = '<span>🏆</span><div><b>Achievement unlocked</b>' +
+    a.innerHTML = '<span>' + TROPHY + '</span><div><b>Achievement unlocked</b>' +
       '<i>' + ACHIEVEMENTS[(Math.random() * ACHIEVEMENTS.length) | 0] + '</i></div>'
     world.appendChild(a)
     sfx.sparkle()
@@ -193,7 +207,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   function spawnRunner() {
     const c = document.createElement('div')
     c.className = 'runner'
-    c.textContent = ['🐈', '🦆', '🐌', '🦖', '🛴'][(Math.random() * 5) | 0]
+    c.innerHTML = RUNNERS[(Math.random() * RUNNERS.length) | 0]
     c.style.top = 20 + Math.random() * 60 + '%'
     c.style.animationDuration = 2.4 + Math.random() * 2 + 's'
     world.appendChild(c)
@@ -581,7 +595,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     padding: 9px 16px; animation: popUp 320ms var(--ease);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
-  .over-body .achv span { font-size: 20px; }
+  .over-body .achv span { width: 22px; height: 22px; flex: none; display: inline-block; }
   .over-body .achv b { display: block; font-size: 11px; color: #ffd166; letter-spacing: 0.08em; text-transform: uppercase; }
   .over-body .achv i { font-style: normal; font-size: 14px; }
   .over-body .achv.out { animation: slideOut 380ms var(--ease) forwards; }
@@ -614,7 +628,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   .over-body .runner {
-    position: absolute; left: -60px; z-index: 24; font-size: 34px;
+    position: absolute; left: -60px; z-index: 24; width: 34px; height: 34px;
     animation: runAcross linear forwards;
   }
   @keyframes runAcross { to { transform: translateX(calc(100vw + 120px)); } }

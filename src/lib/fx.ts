@@ -189,4 +189,30 @@ export function floatText(x: number, y: number, text: string, color = '#fff') {
   setTimeout(() => el.remove(), 760)
 }
 
+/**
+ * The same rise-and-fade as floatText, but carrying markup instead of a string.
+ *
+ * Paper Folds used to throw the milestone's emoji up the screen; the emoji is
+ * now a drawn icon, which is an `<svg>` and not something `textContent` can
+ * hold. Same motion, same lifetime, same reduced-motion opt-out.
+ */
+export function floatIcon(x: number, y: number, markup: string, size = 30) {
+  if (reduced) return
+  const el = document.createElement('div')
+  el.innerHTML = markup
+  Object.assign(el.style, {
+    position: 'fixed', left: `${x}px`, top: `${y}px`, zIndex: '9001',
+    width: `${size}px`, height: `${size}px`,
+    pointerEvents: 'none', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.35))',
+    transform: 'translate(-50%,-50%)',
+    transition: 'transform 700ms cubic-bezier(.22,.61,.36,1), opacity 700ms linear',
+  } as CSSStyleDeclaration)
+  document.body.appendChild(el)
+  requestAnimationFrame(() => {
+    el.style.transform = 'translate(-50%,-160%)'
+    el.style.opacity = '0'
+  })
+  setTimeout(() => el.remove(), 760)
+}
+
 export const prefersReducedMotion = reduced

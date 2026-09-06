@@ -1,4 +1,5 @@
 ---
+import { iconSvg } from '../lib/icons'
 import { SITE } from '../site.config'
 import '../styles/global.css'
 
@@ -6,8 +7,8 @@ interface Props {
   title: string
   description?: string
   image?: string
-  /** Emoji rendered as the favicon, so each game gets its own tab icon. */
-  glyph?: string
+  /** Key into lib/icons.ts for the tab icon. */
+  favicon?: string
   /** Games set this to lock page scroll. */
   fixed?: boolean
   themeColor?: string
@@ -23,7 +24,7 @@ const {
   title,
   description = SITE.description,
   image,
-  glyph = '🎲',
+  favicon = 'die',
   fixed = false,
   themeColor = '#f6f5f1',
   bodyClass = '',
@@ -45,8 +46,13 @@ const ogImage = image ? new URL(image, Astro.site ?? SITE.url).href : undefined
 // Kept as two flat statements: Astro's frontmatter scanner mis-parses *nested*
 // template literals containing raw markup.
 const faviconSvg =
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="0.9em" font-size="90">${glyph}</text></svg>`
-const favicon = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
+  // A drawn mark rather than an emoji rendered into an SVG. The emoji version
+  // was three different pictures across Windows, macOS and Android, and on the
+  // platforms with no colour emoji font in the SVG rasteriser, none at all.
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#241d12">${iconSvg(
+    favicon,
+  ).replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg>`
+const faviconHref = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
 ---
 
 <!doctype html>
@@ -59,7 +65,7 @@ const favicon = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
     <meta name="theme-color" content={themeColor} />
     {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
-    <link rel="icon" href={favicon} />
+    <link rel="icon" href={faviconHref} />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

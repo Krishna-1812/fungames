@@ -94,6 +94,8 @@ src/
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
     tile-art.ts         eighteen bespoke tile drawings, one per game slug
+    icons.ts            sixty-five drawn icons, shared across the games
+    icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
     fx.ts               particles, screen shake, floating text
     gl.ts               the WebGL runtime: shared frame loop, GLSL noise/tonemap library
@@ -336,9 +338,10 @@ node scripts/check-orbit.mjs       # Orbit, the integrator and all eight challen
 node scripts/check-mix.mjs         # Ambient Mix, do shared links survive
 node scripts/check-steady.mjs      # Steady Hand, is the scoring fair
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
+node scripts/check-icons.mjs       # the in-game icons, at the size they render
 ```
 
-All eleven exit non-zero on failure. None needs a browser — the analysis in
+All twelve exit non-zero on failure. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts`,
 `lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts`,
 `data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,
@@ -356,6 +359,13 @@ different from each other. It renders the title and blurb too, so contrast is
 judged where the type lands rather than over a rectangle that is mostly empty.
 Run it with `--sheet out.png` to get a contact sheet of all eighteen tiles
 from the same compositor.
+
+`check-icons.mjs` does the same job for the sixty-five drawn icons inside the
+games. They get 26 to 34 pixels, on pages that are cream in three cases and
+nearly black in two, so it renders each one at the size and on the background
+it actually appears on. `--sheet out.png` writes the whole set on both a cream
+and a near-black ground, which is the only way to see the constraint they are
+drawn under.
 
 It has earned its keep. It caught a "puzzle" whose illustration was invisible
 over its own card, three pairs of tiles that were the same colour as each
