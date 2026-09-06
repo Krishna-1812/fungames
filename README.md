@@ -226,8 +226,11 @@ measured peak 0.34, RMS 0.08 — real output, not just a running context.*
 **Progress** — every unit of time you are inside, draining every frame.
 *All thirteen bars checked against hand calculation.*
 
-**From Memory** — draw a bicycle, then see a real one. Deliberately not brand
-logos.
+**From Memory** — draw a bicycle, then see a real one. Sixteen prompts, ten a
+sitting, deliberately not brand logos. *`scripts/check-memory.mjs` parses every
+coordinate of every reference and checks it lands inside the box it is drawn
+over, arcs included — a wrong bounding box there is invisible in the source and
+obvious on screen.*
 
 **Life in Weeks** — ninety years as 4,680 squares from one typed date.
 
@@ -293,7 +296,7 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Six games carry enough real modelling that the maths is checked separately,
+Seven games carry enough real modelling that the maths is checked separately,
 against answers from the literature, worked out by hand, or measured over a
 simulation:
 
@@ -304,11 +307,13 @@ node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots
 node scripts/check-cascade.mjs     # Rule Cascade, is it still finishable
 node scripts/check-trolley.mjs     # Trolley, are the four positions distinct
 node scripts/check-powder.mjs      # Powder, does every reaction do what it says
+node scripts/check-memory.mjs      # From Memory, do the references fit the box
 ```
 
-All six exit non-zero on failure. None needs a browser — the analysis in
+All seven exit non-zero on failure. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts` and
-`lib/cascade-rules.ts`, `data/dilemmas.ts` and `lib/powder-rules.ts` is
+`lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts` and
+`data/memory.ts` is
 deliberately pure functions over plain data so it can be run this way. The
 auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck

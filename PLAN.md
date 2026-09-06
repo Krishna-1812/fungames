@@ -76,22 +76,42 @@ Ruthless, because that's what was asked for.
 
 Ordered by value per hour, not by what's most fun to build.
 
-### Phase 1 — Content depth (the actual problem)
+### Phase 1 — Content depth (the actual problem) — **four of five done**
+
+Rule Cascade, Trolley, Powder and From Memory are done, each with a checker
+behind it. **Fusion is not**, and is still blocked on the same thing it was
+blocked on before: the local recipe tree is the fallback for a Cloudflare Worker
+that is not deployed, so the work is worth doing but it is a different job.
+
+What the checkers caught is the argument for writing them: Rule Cascade was
+unwinnable for three hours of every day, Powder had a material you could draw
+with that did nothing at all, and four of From Memory's eight new references did
+not read as the thing they were meant to be until they were rendered and looked
+at. None of that is visible in source.
+
+The one that changed shape in the doing: Trolley's "ethical-position scoring"
+already existed in name, but it was counting lever-pulls. Making it real meant
+authoring what each of four positions says about each of twenty-six cases, which
+is the actual content, and the checker now proves the four are far enough apart
+to be worth naming.
+
 
 No new rendering. Just far more, far better *stuff*.
 
-- **Rule Cascade → 30+ rules**, including at least three *interactive* ones in the
-  spirit of Neal's chess puzzle: a rule whose answer changes live (a countdown you
-  must keep current), a rule that fights back (something that eats characters), and
-  a sacrifice rule that permanently costs you.
-- **Trolley → 26 dilemmas**, escalating from earnest to deranged, keeping the
-  ethical-position scoring (which is genuinely better than Neal's fake percentages).
-- **Powder → 30+ elements** with a **discovery log**: "You've found 14 of 38
-  reactions." Every new reaction is a small event. This turns a toy into a game
-  with almost no new engine work.
-- **From Memory → 16 prompts.**
+- ~~**Rule Cascade → 30+ rules**~~ **done.** Thirty. The three interactive ones
+  are a rule about how many rules are on screen (so satisfying it moves it), a
+  moth that eats a character every six seconds until you put a spider in, and a
+  sacrifice that takes whichever letter you leaned on hardest.
+- ~~**Trolley → 26 dilemmas**~~ **done.** The position scoring was the part that
+  needed the work: it was counting lever-pulls. Every case now records what each
+  of four positions says about it.
+- ~~**Powder → 30+ elements** with a **discovery log**~~ **done.** 31 materials,
+  47 reactions, and the log was only possible once the reactions stopped being
+  an if-chain and became a table.
+- ~~**From Memory → 16 prompts.**~~ **done.** A pool of sixteen, ten a sitting,
+  bicycle always first, so a second go is a different set.
 - **Fusion → a much larger local recipe tree** so it's playable without the worker,
-  plus discovery milestones.
+  plus discovery milestones. **Still outstanding** — the only Phase 1 item not done.
 
 ### Phase 2 — Goals for the sandboxes
 

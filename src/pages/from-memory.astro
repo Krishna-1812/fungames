@@ -8,93 +8,13 @@ import GameLayout from '../layouts/GameLayout.astro'
  * reproducing trademarks, and the effect is stronger anyway. Almost nobody can
  * draw a working bicycle, which is a genuine documented phenomenon.
  *
+ * Sixteen prompts in data/memory.ts, ten per sitting, bicycle always first.
  * Reference shapes are hand-authored SVG in a shared 200×140 viewBox so the
- * overlay lines up with the canvas exactly.
+ * overlay lines up with the canvas exactly — scripts/check-memory.mjs parses
+ * every coordinate and checks they really do stay inside it, which is not
+ * something you can see by reading a path.
  */
 
-type Item = { id: string; prompt: string; reveal: string; fact: string; svg: string }
-
-const ITEMS: Item[] = [
-  {
-    id: 'bicycle',
-    prompt: 'A bicycle',
-    reveal: 'A bicycle',
-    fact: 'In a study of 376 people, most drew a frame that could not physically work — usually the chain or the front fork.',
-    svg: `<circle cx="46" cy="100" r="30"/><circle cx="154" cy="100" r="30"/>
-          <path d="M46 100 L82 54 L128 54 L154 100 M82 54 L110 100 L154 100"/>
-          <path d="M82 54 L74 40 M63 38 L85 38"/>
-          <path d="M128 54 L136 39 M126 36 L150 36"/>
-          <circle cx="110" cy="100" r="6"/>`,
-  },
-  {
-    id: 'clock',
-    prompt: 'A clock face showing twenty to four',
-    reveal: 'Twenty to four',
-    fact: 'Most people draw the hour hand pointing exactly at the 3. At 3:40 it has already moved two thirds of the way to the 4.',
-    svg: `<circle cx="100" cy="70" r="54"/>
-          <path d="M100 22 v8 M148 70 h-8 M100 118 v-8 M52 70 h8"/>
-          <path d="M100 70 L133 82" stroke-width="4"/>
-          <path d="M100 70 L61 93"/>
-          <circle cx="100" cy="70" r="3.5" fill="currentColor"/>`,
-  },
-  {
-    id: 'dipper',
-    prompt: 'The Big Dipper',
-    reveal: 'The Big Dipper',
-    fact: 'Seven stars. The two at the end of the bowl point almost exactly at Polaris.',
-    svg: `<circle cx="32" cy="96" r="4" fill="currentColor"/><circle cx="66" cy="106" r="4" fill="currentColor"/>
-          <circle cx="100" cy="100" r="4" fill="currentColor"/><circle cx="124" cy="78" r="4" fill="currentColor"/>
-          <circle cx="150" cy="60" r="4" fill="currentColor"/><circle cx="152" cy="30" r="4" fill="currentColor"/>
-          <circle cx="118" cy="34" r="4" fill="currentColor"/>
-          <path d="M32 96 L66 106 L100 100 L124 78 L150 60 L152 30 L118 34 L124 78" stroke-dasharray="3 4"/>`,
-  },
-  {
-    id: 'key',
-    prompt: 'A house key',
-    reveal: 'A house key',
-    fact: 'The teeth go on one edge only, and the bow is usually much larger than people remember.',
-    svg: `<circle cx="48" cy="70" r="22"/><circle cx="48" cy="70" r="9"/>
-          <path d="M70 70 H160"/>
-          <path d="M120 70 v16 M134 70 v20 M148 70 v14"/>`,
-  },
-  {
-    id: 'umbrella',
-    prompt: 'An open umbrella',
-    reveal: 'An open umbrella',
-    fact: 'The canopy is made of scalloped panels, and the handle almost always curves the wrong way in drawings.',
-    svg: `<path d="M22 78 A78 78 0 0 1 178 78"/>
-          <path d="M22 78 q19 22 39 0 q19 22 39 0 q19 22 39 0 q19 22 39 0"/>
-          <path d="M100 78 V116 a14 14 0 0 0 28 0"/>
-          <path d="M100 78 V16"/>`,
-  },
-  {
-    id: 'bulb',
-    prompt: 'A light bulb',
-    reveal: 'A light bulb',
-    fact: 'The screw thread is a spiral, not a stack of rings, and the glass narrows into a neck before it starts.',
-    svg: `<path d="M100 16 a38 38 0 0 1 22 68 q-6 5 -6 12 h-32 q0 -7 -6 -12 a38 38 0 0 1 22 -68 Z"/>
-          <path d="M84 100 h32 M84 108 h32 M88 116 h24"/>
-          <path d="M92 84 q8 -18 16 0" stroke-dasharray="3 3"/>`,
-  },
-  {
-    id: 'boat',
-    prompt: 'A sailboat',
-    reveal: 'A sailboat',
-    fact: 'Two sails: a large one behind the mast and a smaller triangle in front of it.',
-    svg: `<path d="M34 104 h132 l-18 22 H52 Z"/>
-          <path d="M100 100 V16"/>
-          <path d="M104 96 V26 L150 96 Z"/>
-          <path d="M96 96 V30 L58 96 Z"/>`,
-  },
-  {
-    id: 'peace',
-    prompt: 'The peace symbol',
-    reveal: 'The peace symbol',
-    fact: 'The two lower strokes go down and outwards. Drawing them as a Y pointing up is the most common mistake.',
-    svg: `<circle cx="100" cy="70" r="54"/>
-          <path d="M100 16 V124 M100 70 L62 108 M100 70 L138 108"/>`,
-  },
-]
 ---
 
 <GameLayout slug="from-memory" bar="#3b1338" bodyClass="mem-body">
@@ -107,7 +27,7 @@ const ITEMS: Item[] = [
     <div class="dots" id="dots" aria-hidden="true"></div>
 
     <section class="card" id="card">
-      <div class="tag"><span id="tag">1 of 8</span></div>
+      <div class="tag"><span id="tag">1 of 10</span></div>
       <h2 id="prompt">—</h2>
 
       <div class="pad">
@@ -133,24 +53,25 @@ const ITEMS: Item[] = [
       <div class="shelf" id="shelf"></div>
       <div class="gallery-actions">
         <button type="button" data-share data-title="From Memory">Share</button>
-        <button type="button" id="againBtn" class="ghost">Draw them again</button>
+        <button type="button" id="againBtn" class="ghost">Draw ten more</button>
       </div>
     </section>
   </div>
 </GameLayout>
 
-  {/* Data for the module below: modules cannot take define:vars, and
-      modules are what let every game share one synthesiser. */}
-  <script type="application/json" id="game-data" set:html={JSON.stringify({ ITEMS })} />
-
   <script>
   import { burst } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { pickRound } from '../data/memory'
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
   import { PAPER_FRAG } from '../lib/memo-paper'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
-    const { ITEMS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  /* Ten of the sixteen, freshly drawn each visit, with the bicycle always
+     first. A pool bigger than the sitting is the difference between a thing you
+     do once and a thing you can hand to somebody else afterwards. */
+  let ROUND = pickRound()
 
   const el = (id) => document.getElementById(id)
   const pad = el('pad')
@@ -174,10 +95,14 @@ const ITEMS: Item[] = [
   // resize. A drawing surface that shimmers would be intolerable.
   new ShaderSurface(document.getElementById('sheet'), PAPER_FRAG, { still: true })
 
-  dots.replaceChildren(...ITEMS.map(() => {
-    const d = document.createElement('span'); d.className = 'dot'; return d
-  }))
-  const dotEls = [...dots.children]
+  let dotEls = []
+  function buildDots() {
+    dots.replaceChildren(...ROUND.map(() => {
+      const d = document.createElement('span'); d.className = 'dot'; return d
+    }))
+    dotEls = [...dots.children]
+  }
+  buildDots()
 
   /** Rebuild the whole sheet. Only for undo, clear and resize. */
   function rebuild() {
@@ -261,8 +186,8 @@ const ITEMS: Item[] = [
   el('clearBtn').addEventListener('click', () => { strokes = []; rebuild() })
 
   function render() {
-    const it = ITEMS[i]
-    el('tag').textContent = `${i + 1} of ${ITEMS.length}`
+    const it = ROUND[i]
+    el('tag').textContent = `${i + 1} of ${ROUND.length}`
     el('prompt').textContent = it.prompt
     strokes = []
     drawing = null
@@ -287,7 +212,7 @@ const ITEMS: Item[] = [
     burst(r.left + r.width / 2, r.top, {
       count: 18, colors: ['#e0629b', '#fff', '#ffd166'], speed: 4, gravity: 0.14, life: 40, size: 3,
     })
-    const it = ITEMS[i]
+    const it = ROUND[i]
     revealed = true
     end()
     // Rendered from the stroke list rather than grabbed off the pad, so the
@@ -307,7 +232,7 @@ const ITEMS: Item[] = [
   el('nextBtn').addEventListener('click', () => {
     unlock(); sfx.click()
     i++
-    if (i < ITEMS.length) return render()
+    if (i < ROUND.length) return render()
     showGallery()
   })
 
@@ -316,7 +241,7 @@ const ITEMS: Item[] = [
     dots.hidden = true
     const shelf = el('shelf')
     shelf.replaceChildren(
-      ...ITEMS.map((it, k) => {
+      ...ROUND.map((it, k) => {
         const fig = document.createElement('figure')
         fig.className = 'shot'
         /* Both layers, the way the pad showed them. The shelf used to be eight
@@ -344,7 +269,12 @@ const ITEMS: Item[] = [
   }
 
   el('againBtn').addEventListener('click', () => {
+    // A fresh ten out of the sixteen, not the same ten again — otherwise the
+    // pool may as well not exist.
+    ROUND = pickRound()
     i = 0
+    saved.length = 0
+    buildDots()
     el('card').hidden = false
     dots.hidden = false
     el('gallery').hidden = true

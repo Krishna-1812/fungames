@@ -195,9 +195,9 @@ export const GAMES: Game[] = [
     // a site anyone can clone, and everyday objects are a better test anyway.
     slug: 'from-memory',
     title: 'From Memory',
-    blurb: 'Draw things you have seen a thousand times',
+    blurb: 'Sixteen things you cannot draw',
     description:
-      'You have looked at a bicycle every day of your life. Draw one without looking, then see the real thing. It goes badly for almost everyone.',
+      'You have looked at a bicycle every day of your life. Draw one without looking, then see the real thing. Sixteen prompts, ten a sitting — a paperclip, the recycling arrows, a rainbow in the right order. It goes badly for almost everyone.',
     accent: '#3b1338', accent2: '#e0629b', glyph: '🎨', art: 'sketch',
     added: '2026-09-02',
   },
