@@ -34,25 +34,26 @@
 export type Layer = {
   id: string
   name: string
-  glyph: string
+  /** Key into lib/icons.ts. Not an emoji: see the note at the top of that file. */
+  icon: string
   hint: string
   /** Fixed for the life of the layer. Never reuse one. */
   code: string
 }
 
 export const LAYERS: Layer[] = [
-  { id: 'rain', name: 'Rain', glyph: '🌧️', hint: 'Filtered white noise', code: 'r' },
-  { id: 'waves', name: 'Waves', glyph: '🌊', hint: 'Brown noise under a slow swell', code: 'w' },
-  { id: 'wind', name: 'Wind', glyph: '🌬️', hint: 'A drifting low-pass', code: 'i' },
-  { id: 'fire', name: 'Campfire', glyph: '🔥', hint: 'Rumble plus random crackle', code: 'f' },
-  { id: 'cafe', name: 'Coffee shop', glyph: '☕', hint: 'Murmur and occasional cups', code: 'c' },
-  { id: 'birds', name: 'Birds', glyph: '🐦', hint: 'Swept sine chirps', code: 'b' },
-  { id: 'crickets', name: 'Crickets', glyph: '🦗', hint: 'Rhythmic high bursts', code: 'k' },
-  { id: 'traffic', name: 'Highway', glyph: '🛣️', hint: 'Distant steady roar', code: 't' },
-  { id: 'clock', name: 'Clock', glyph: '🕰️', hint: 'One click per second', code: 'o' },
-  { id: 'thunder', name: 'Thunder', glyph: '⛈️', hint: 'Rare, long, low', code: 'h' },
-  { id: 'mower', name: 'Lawnmower', glyph: '🚜', hint: 'A neighbour, at 8am', code: 'm' },
-  { id: 'dial', name: 'Dial-up modem', glyph: '📠', hint: 'Regrettable', code: 'd' },
+  { id: 'rain', name: 'Rain', icon: 'rain', hint: 'Filtered white noise', code: 'r' },
+  { id: 'waves', name: 'Waves', icon: 'waves', hint: 'Brown noise under a slow swell', code: 'w' },
+  { id: 'wind', name: 'Wind', icon: 'wind', hint: 'A drifting low-pass', code: 'i' },
+  { id: 'fire', name: 'Campfire', icon: 'fire', hint: 'Rumble plus random crackle', code: 'f' },
+  { id: 'cafe', name: 'Coffee shop', icon: 'cafe', hint: 'Murmur and occasional cups', code: 'c' },
+  { id: 'birds', name: 'Birds', icon: 'bird', hint: 'Swept sine chirps', code: 'b' },
+  { id: 'crickets', name: 'Crickets', icon: 'cricket', hint: 'Rhythmic high bursts', code: 'k' },
+  { id: 'traffic', name: 'Highway', icon: 'traffic', hint: 'Distant steady roar', code: 't' },
+  { id: 'clock', name: 'Clock', icon: 'clock', hint: 'One click per second', code: 'o' },
+  { id: 'thunder', name: 'Thunder', icon: 'thunder', hint: 'Rare, long, low', code: 'h' },
+  { id: 'mower', name: 'Lawnmower', icon: 'mower', hint: 'A neighbour, at 8am', code: 'm' },
+  { id: 'dial', name: 'Dial-up modem', icon: 'modem', hint: 'Regrettable', code: 'd' },
 ]
 
 export const layerById = (id: string) => LAYERS.find((l) => l.id === id)

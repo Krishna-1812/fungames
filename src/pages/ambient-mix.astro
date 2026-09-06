@@ -11,6 +11,7 @@ import GameLayout from '../layouts/GameLayout.astro'
  */
 
 import { LAYERS, PRESETS } from '../lib/mix-code'
+import { iconSvg } from '../lib/icons'
 ---
 
 <GameLayout slug="ambient-mix" bar="#132a3f" bodyClass="mix-body">
@@ -51,7 +52,7 @@ import { LAYERS, PRESETS } from '../lib/mix-code'
         LAYERS.map((l) => (
           <li class="layer" data-id={l.id}>
             <button type="button" class="toggle" aria-pressed="false">
-              <span class="glyph" aria-hidden="true">{l.glyph}</span>
+              <span class="glyph" aria-hidden="true" set:html={iconSvg(l.icon)} />
               <span class="meta">
                 <span class="name">{l.name}</span>
                 <span class="hint">{l.hint}</span>
@@ -647,7 +648,9 @@ import { LAYERS, PRESETS } from '../lib/mix-code'
     display: flex; align-items: center; gap: 12px; width: 100%;
     background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit;
   }
-  .glyph { font-size: 26px; line-height: 1; flex: none; display: inline-block; }
+  /* The drawing sizes itself from inside — see iconSvg. A rule here that
+     targeted the <svg> would not apply to it, because it arrives via set:html. */
+  .glyph { width: 26px; height: 26px; flex: none; display: inline-block; }
   /* A little jump the moment a layer actually switches on — see Spend It's
      identical .jump for why this needs a toggled class rather than tying
      straight to .on, which stays applied and would only fire once. */
