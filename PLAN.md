@@ -64,7 +64,7 @@ Ruthless, because that's what was asked for.
 | **Spend It** | Competent clone. Emoji instead of product images is the main tell. Receipt endgame is good. | **Medium** |
 | **Steady Hand** | ~~A 20-second toy with one challenge.~~ Four shapes and a combined rating. | **Medium — done** |
 | **Scale** | ~~Draws *circles* for a proton, a whale and a galaxy.~~ Twenty-six drawn objects, sized on both axes, and the shader keeps the seventeen things that really are spheres and rings. | **Medium — done** |
-| **Deep Time** | Still the problem Scale had. Forty-four events, a Wikipedia list on a gradient. The events deserve pictures. | **Medium (art-gated)** |
+| **Deep Time** | ~~A Wikipedia list on a gradient.~~ Forty-four events, forty-four scenes, and a layout that no longer spends the picture's budget on the picture. | **Medium — done** |
 | **Ambient Mix** | Quietly the most *finished* thing here. Twelve real synthesised layers. Just needs presets and a shareable mix. | **Medium** |
 | **Paper Folds** | A fact, not a game. You press one button 42 times. | **Low** |
 | **Progress** | A widget. Look once, feel briefly bad, leave. That's the whole design and it's fine. | **Low (fine as-is)** |
@@ -206,7 +206,7 @@ No new rendering. Just far more, far better *stuff*.
   — the nearest point of the ideal is nearer than the point you were pushed
   away from — was worth more than the assertion.
 
-### Phase 3 — Kill the emoji, build real art
+### Phase 3 — Kill the emoji, build real art — **done**
 
 The credibility fix. This is genuinely laborious, and honest about limits: I can
 produce good geometric/line-art SVG, not Neal's hand-drawn charm.
@@ -330,8 +330,51 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   it until they were given a depth order; and a caption clamped to 26% of the
   viewport was fine over a plain ball and lands in the middle of a picture.
 
-- **Illustrated objects for Deep Time** — still to do, and the same shape of
-  job: forty-four events, each currently a title and a note on a gradient.
+- ~~**Illustrated objects for Deep Time**~~ **done.** Forty-four scenes in
+  `lib/time-art.ts`, one per event, flat colour on one twenty-one-entry
+  palette with no gradients and no ids anywhere in the set.
+
+  The layout was the real constraint and it is an unusual one. Cards sit at
+  their true depth on an honest scale, so where events cluster they are pushed
+  into two narrow lanes and then compacted — the note goes, then the date. Add
+  a picture and the cards get taller, taller cards collide, and colliding cards
+  compact. On a phone that took the count from three cards to twelve, and the
+  tier it pushed them into is the one that **drops the picture**. The art was
+  spending its own budget.
+
+  Measuring it was what fixed it: almost none of the extra height was the
+  picture, it was the *text column* getting narrower and wrapping the titles
+  onto more lines. A 34-pixel square crop instead of a 50-pixel 3:2 one, plus
+  slightly tighter padding, gives that width back and the count returns to
+  exactly what it is with no art at all — three — with every card keeping its
+  scene.
+
+  The checker's own error is the one worth keeping. It began with a single
+  edge-density floor at all three card widths and called the narrowest the hard
+  case; that is backwards, because edge pixels track perimeter and the total
+  tracks area, so the ratio rises as an image shrinks. One floor across three
+  sizes grades size, not legibility, and it failed a scene at 116 pixels that
+  scored nearly twice as well at 52. It is two questions now: structure at the
+  width most cards get, and how much of the frame is subject rather than
+  backdrop at the width a cluster gives.
+
+  Distinctness found three real collisions in a row and then stopped, which is
+  what it is supposed to do and not the treadmill the icon set fell into: the
+  closest pair went 0.033, 0.041, 0.047, 0.049 while the tenth-closest went
+  0.053 to 0.081, so the set was genuinely spreading rather than the bar
+  sliding. The finds were honest ones — two shore scenes eighty million years
+  apart that were the same picture, and two pairs whose backgrounds were the
+  *identical* call to the same helper.
+
+  Thirteen scenes were redrawn on eyesight alone, which no measurement covered.
+  Archaeopteryx read as a centipede, a handaxe as a folded envelope and then as
+  a cut gemstone and then as a fern, and a horse's head in profile as a duck
+  and then as a whale. The two that took three attempts were both fixed by
+  changing the subject rather than the drawing: a whole four-legged animal and
+  a flat excavation-report diagram read at any size, where a head in profile
+  and a hand-held object need detail the card cannot resolve.
+
+  That closes Phase 3.
 
 ### Phase 4 — Endings, scores and sharing
 

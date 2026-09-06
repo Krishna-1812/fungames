@@ -96,6 +96,8 @@ src/
     tile-art.ts         eighteen bespoke tile drawings, one per game slug
     scale-things.ts     what Scale draws, how big it is, and the sky behind it
     scale-art.ts        twenty-six of those drawn, with both their real axes
+    time-events.ts      Deep Time's forty-four events and when they happened
+    time-art.ts         a scene for each, flat colour on one palette
     icons.ts            sixty-five drawn icons, shared across the games
     icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
@@ -342,6 +344,7 @@ node scripts/check-steady.mjs      # Steady Hand, is the scoring fair
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
+node scripts/check-time-art.mjs    # Deep Time's scenes, at the card's own widths
 ```
 
 `npm test` runs all of them and reports which suites failed; `npm run check`
@@ -395,6 +398,22 @@ written down here rather than in a commit message.
 `--sheet out.png` lays all twenty-six out on the sky each one appears over;
 `--dbg "name,name" dir` renders single objects nearly full-frame, for the part
 no measurement covers, which is whether it looks like the thing.
+
+`check-time-art.mjs` covers Deep Time's forty-four scenes. Two things make it
+different from the other two. Its drawings have **no ids, no defs and no
+gradients at all** — the other modules prefix ids to keep forty-four, twenty-six
+and eighteen drawings from colliding in one document, and having none is a
+guarantee rather than a convention — and every colour must come from one
+twenty-one-entry palette, which the file enforces rather than asks for.
+
+Its own mistake is worth reading. It first ran one edge-density floor at all
+three card widths and called the narrowest the hard case. That is backwards:
+edge pixels track the *perimeter* of what is drawn and the total tracks the
+*area*, so the ratio rises as an image shrinks, and one floor across three
+sizes grades size rather than legibility. The run proved it by failing a scene
+at 116 pixels that scored nearly twice as well at 52. It now asks two
+questions instead — structure at the width most cards get, and what fraction of
+the frame is subject rather than backdrop at the width a dense cluster gives.
 
 It has earned its keep. It caught a "puzzle" whose illustration was invisible
 over its own card, three pairs of tiles that were the same colour as each

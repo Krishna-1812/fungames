@@ -1,5 +1,8 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { EVENTS } from '../lib/time-events'
+import type { Event } from '../lib/time-events'
+import { TIME_ART, sceneSvg } from '../lib/time-art'
 
 /**
  * Deep Time — a linear scroll through 4.54 billion years.
@@ -20,55 +23,6 @@ const ACTS: Act[] = [
   { id: 'act3', from: 2_000_000, to: 12_000, yearsPerPx: 500, sky: ['#4a2a55', '#1d4e5f'] },
   { id: 'act4', from: 12_000, to: 250, yearsPerPx: 5, sky: ['#1d4e5f', '#6f9fb5'] },
   { id: 'act5', from: 250, to: 0, yearsPerPx: 0.25, sky: ['#6f9fb5', '#bcd8e2'] },
-]
-
-type Event = { at: number; title: string; note?: string; big?: boolean }
-
-const EVENTS: Event[] = [
-  { at: 4_540_000_000, title: 'Earth forms', note: 'A disc of dust and rock finishes clumping together.', big: true },
-  { at: 4_510_000_000, title: 'Something the size of Mars hits us', note: 'The debris becomes the Moon.' },
-  { at: 4_400_000_000, title: 'The first oceans', note: 'The surface finally cools enough for liquid water.' },
-  { at: 4_100_000_000, title: 'Heavy bombardment', note: 'The inner solar system is still being pelted.' },
-  { at: 3_700_000_000, title: 'The oldest trace of life', note: 'Carbon signatures in Greenland rock.', big: true },
-  { at: 3_500_000_000, title: 'Cyanobacteria', note: 'Mats of bacteria start splitting water for energy.' },
-  { at: 2_400_000_000, title: 'The Great Oxidation', note: 'Free oxygen poisons almost everything alive.', big: true },
-  { at: 2_100_000_000, title: 'The first complex cell', note: 'One cell swallows another and keeps it. Mitochondria.' },
-  { at: 1_000_000_000, title: 'The first multicellular life' },
-  { at: 720_000_000, title: 'Snowball Earth', note: 'Ice reaches the equator. Twice.' },
-  { at: 541_000_000, title: 'The Cambrian explosion', note: 'Almost every animal body plan appears at once.', big: true },
-  { at: 470_000_000, title: 'Plants move onto land' },
-  { at: 440_000_000, title: 'The first mass extinction' },
-  { at: 375_000_000, title: 'A fish crawls out of the water', note: 'Tiktaalik. Everything with a spine and legs comes from this.', big: true },
-  { at: 350_000_000, title: 'The coal forests', note: 'The trees rotting now are the fuel of the 1800s.' },
-  { at: 320_000_000, title: 'The first reptiles' },
-  { at: 252_000_000, title: 'The Great Dying', note: 'Ninety-six percent of marine species stop existing.', big: true },
-  { at: 230_000_000, title: 'The first dinosaurs' },
-  { at: 225_000_000, title: 'The first mammals', note: 'Small, nocturnal, and about to wait 160 million years.' },
-  { at: 150_000_000, title: 'Feathers and flight' },
-  { at: 130_000_000, title: 'The first flower' },
-  { at: 66_000_000, title: 'The asteroid', note: 'Ten kilometres wide. Seventy-five percent of species gone.', big: true },
-  { at: 55_000_000, title: 'The first primates' },
-  { at: 20_000_000, title: 'The first apes' },
-  { at: 7_000_000, title: 'Our line splits from chimpanzees', big: true },
-  { at: 3_200_000, title: 'Lucy walks upright' },
-  { at: 2_600_000, title: 'The first stone tool' },
-  { at: 1_000_000, title: 'Fire, kept and carried' },
-  { at: 300_000, title: 'Homo sapiens', note: 'Us. Anatomically modern, and still 290,000 years from farming.', big: true },
-  { at: 70_000, title: 'Out of Africa' },
-  { at: 40_000, title: 'Cave paintings at Chauvet' },
-  { at: 12_000, title: 'Somebody plants a seed on purpose', note: 'Agriculture. Everything after this is very fast.', big: true },
-  { at: 5_500, title: 'Writing' },
-  { at: 4_500, title: 'The Great Pyramid' },
-  { at: 2_000, title: 'The Roman Empire' },
-  { at: 570, title: 'The printing press' },
-  { at: 250, title: 'The steam engine' },
-  { at: 160, title: 'The telephone' },
-  { at: 123, title: 'Twelve seconds of powered flight' },
-  { at: 80, title: 'The first computer' },
-  { at: 55, title: 'Footprints on the Moon' },
-  { at: 35, title: 'The World Wide Web' },
-  { at: 19, title: 'A computer in everyone\u2019s pocket' },
-  { at: 0, title: 'You, scrolling', note: 'You just fell through 4.54 billion years. It took a few minutes.', big: true },
 ]
 
 // Lay the acts out end to end and resolve every event to an absolute pixel offset.
@@ -148,9 +102,12 @@ const fmt = (y: number) =>
     {
       placed.map((e) => (
         <article class:list={['ev', `lane-${e.lane}`, { big: e.big }]} style={`top:${e.top}px`}>
-          <div class="ev-when">{fmt(e.at)}</div>
-          <h2>{e.title}</h2>
-          {e.note && <p>{e.note}</p>}
+          {TIME_ART[e.title] && <div class="ev-art" set:html={sceneSvg(e.title)} />}
+          <div class="ev-text">
+            <div class="ev-when">{fmt(e.at)}</div>
+            <h2>{e.title}</h2>
+            {e.note && <p>{e.note}</p>}
+          </div>
         </article>
       ))
     }
@@ -376,7 +333,12 @@ const fmt = (y: number) =>
 
   .ev {
     position: absolute; left: 50%; transform: translateX(-50%);
-    width: min(90vw, 560px); text-align: center;
+    width: min(90vw, 560px);
+    /* A picture on the left and centred text beside it reads as two things
+       that arrived separately, so the text is ranged left now. It also wraps
+       far better in the 220px lane the dense clusters fall back to. */
+    display: grid; grid-template-columns: auto 1fr; align-items: center;
+    gap: 12px; text-align: left;
     padding: 14px 18px; border-radius: 12px;
     /* Opaque enough to stay legible against both the near-black opening and
        the pale daylight of the final act. */
@@ -388,14 +350,47 @@ const fmt = (y: number) =>
   .ev.lane-left, .ev.lane-right { padding: 11px 14px; }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 19px; }
   .ev.lane-left p, .ev.lane-right p { font-size: 14px; }
-  /* Set by the runtime layout pass when a cluster is too dense for two lanes. */
+  /* Scoped styles do not reach set:html content, so the svg carries its own
+     sizing and this is only the window it fills. `slice` on the viewBox means
+     the scene keeps its 3:2 composition and is cropped rather than squashed
+     when the lane narrows. */
+  .ev-art {
+    width: 116px; aspect-ratio: 3 / 2;
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .ev.lane-left .ev-art, .ev.lane-right .ev-art { width: 72px; }
+
+  /* Set by the runtime layout pass when a cluster is too dense for two lanes.
+     The picture shrinks first and only goes at the tier that has already given
+     up the date, because it is the most of the card, not the least. */
   .ev.compact p { display: none; }
+  .ev.compact .ev-art { width: 52px; }
   .ev.compact-hard .ev-when { display: none; }
-  .ev.compact-hard { padding: 9px 12px; }
+  .ev.compact-hard .ev-art { display: none; }
+  .ev.compact-hard { padding: 9px 12px; grid-template-columns: 1fr; }
   .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 23px; }
   @media (max-width: 620px) {
     .ev.lane-left, .ev.lane-right { width: min(46vw, 220px); }
     .ev.lane-left { transform: translateX(-104%); }
+
+    /* A square crop, not a smaller 3:2 one, and the padding comes in with it.
+     *
+     * The measurement that decided this: a phone's side lane is 172px, and a
+     * 50px picture beside the text left 113px of column, which wrapped the
+     * titles onto more lines and made the cards taller. Taller cards collide,
+     * and colliding cards get compacted — so the pictures pushed twelve cards
+     * into the tier that *drops the picture*, up from three. The art was
+     * spending its own budget.
+     *
+     * Almost none of that cost was the art's height; it was the text column.
+     * A 34px square gives 20px of it back and the padding gives the rest, and
+     * the count returns to exactly what it is with no art at all: three.
+     * The svg's own preserveAspectRatio means the square is a centre crop of
+     * the scene rather than a squashed one. */
+    .ev.lane-left .ev-art, .ev.lane-right .ev-art { width: 34px; aspect-ratio: 1 / 1; }
+    .ev.lane-left, .ev.lane-right { padding: 8px 10px; }
+    .ev { gap: 6px; }
   }
   .ev-when {
     font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
