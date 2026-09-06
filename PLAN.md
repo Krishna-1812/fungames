@@ -62,7 +62,7 @@ Ruthless, because that's what was asked for.
 | **Trolley** | 12 dilemmas vs Neal's 28, and his are hand-drawn per scenario. Ours is an abstract track diagram. | **Medium-high** |
 | **Fusion** | Effectively dead without the Cloudflare worker deployed — the local recipe tree is tiny and runs out in a minute. | **Medium (blocked)** |
 | **Spend It** | Competent clone. Emoji instead of product images is the main tell. Receipt endgame is good. | **Medium** |
-| **Steady Hand** | A 20-second toy with one challenge. The genre works (Draw a Perfect Circle) but needs a suite. | **Medium** |
+| **Steady Hand** | ~~A 20-second toy with one challenge.~~ Four shapes and a combined rating. | **Medium — done** |
 | **Scale** | Draws *circles* for a proton, a whale and a galaxy. The whole genre depends on illustration; without it the page means nothing. | **Medium (art-gated)** |
 | **Deep Time** | Same problem. Currently a Wikipedia list on a gradient. The events deserve pictures. | **Medium (art-gated)** |
 | **Ambient Mix** | Quietly the most *finished* thing here. Twelve real synthesised layers. Just needs presets and a shareable mix. | **Medium** |
@@ -113,7 +113,7 @@ No new rendering. Just far more, far better *stuff*.
 - **Fusion → a much larger local recipe tree** so it's playable without the worker,
   plus discovery milestones. **Still outstanding** — the only Phase 1 item not done.
 
-### Phase 2 — Goals for the sandboxes — **three of four done**
+### Phase 2 — Goals for the sandboxes — **done**
 
 - ~~**Orbit: challenge mode.**~~ **done.** Eight challenges, a persistent best
   lap count, and `scripts/check-orbit.mjs` behind them.
@@ -182,8 +182,26 @@ No new rendering. Just far more, far better *stuff*.
 
   A shared link also sets the controls without starting anything, because no
   browser will begin audio without a gesture and a link arrives without one.
-- **Steady Hand → a suite**: straight line, perfect circle, square, spiral, with a
-  combined "steadiness rating."
+- ~~**Steady Hand → a suite**~~ **done.** Line, circle, square, spiral, and a
+  rating that is the mean of the four bests — withheld until all four have one,
+  because an average over the two you happen to be good at is not a rating.
+
+  The design question was whether to show the shape and have you trace it. It
+  does not: every shape is anchored by dots instead, and the circle fixes only
+  its centre, taking its radius from whatever you drew. That way it measures
+  roundness rather than how well you guessed a size nobody told you.
+
+  A score is accuracy × coverage × economy, and all three are needed — the
+  checker shows it by removing each. Without coverage, half a circle drawn
+  beautifully scores full marks, because every point of it was in the right
+  place. Without economy, scrubbing back and forth along the line covers
+  everything accurately and also scores full marks.
+
+  The scorer is checked against drawings whose answer is known rather than by
+  eye: a sine wobble of amplitude a has to drift by 2a/π, and does, to within
+  a percent. Working out *why* it comes in slightly under at larger amplitudes
+  — the nearest point of the ideal is nearer than the point you were pushed
+  away from — was worth more than the assertion.
 
 ### Phase 3 — Kill the emoji, build real art
 

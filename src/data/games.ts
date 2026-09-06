@@ -139,9 +139,9 @@ export const GAMES: Game[] = [
   {
     slug: 'steady-hand',
     title: 'Steady Hand',
-    blurb: 'How straight is your line, really?',
+    blurb: 'Four shapes, and none of them forgiving',
     description:
-      'Draw one unbroken stroke between two dots. Every pixel of wobble is measured and scored. Nobody is as steady as they think.',
+      'A line, a circle, a square and a spiral, one unbroken stroke each, nothing traced. Every pixel of wobble is measured and scored, and the four average into one steadiness rating. Nobody is as steady as they think.',
     accent: '#4c1d2e', accent2: '#e8a75c', glyph: '✍️', art: 'stroke',
     added: '2026-09-08',
   },

@@ -1,12 +1,20 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { SHAPES } from '../lib/steady-shapes'
 
 /**
- * Steady Hand — draw one unbroken stroke between two dots.
+ * Steady Hand — four shapes, one unbroken stroke each.
  *
- * Scoring is honest geometry, not vibes: every sampled point's perpendicular
- * distance to the ideal segment is measured, averaged, and normalised by the
- * segment length, so the difficulty does not change when the dots move.
+ * Scoring is honest geometry rather than vibes, and it lives in
+ * lib/steady-shapes.ts so it can be run without a browser: every point's
+ * distance to the ideal is measured, weighted by arc length, and normalised by
+ * the shape's size, so the difficulty does not change with the window or the
+ * angle. scripts/check-steady.mjs feeds it drawings whose right answer is
+ * known and checks the properties the score is supposed to have.
+ *
+ * Nothing is traced. Dots anchor each shape — two for a line, four corners for
+ * a square — and the circle fixes only its centre, taking its radius from
+ * whatever you drew, so it measures roundness rather than obedience.
  */
 ---
 
@@ -17,18 +25,29 @@ import GameLayout from '../layouts/GameLayout.astro'
     <div class="felt" id="felt" aria-hidden="true"></div>
     <canvas id="c"></canvas>
 
+    <div class="shapes" id="shapes" role="tablist" aria-label="Shape">
+      {SHAPES.map((sh, i) => (
+        <button type="button" class="shape" role="tab" data-shape={sh.id}
+                aria-selected={i === 0 ? 'true' : 'false'}>
+          <b>{sh.name}</b>
+          <span class="sbest">—</span>
+        </button>
+      ))}
+    </div>
+
     <div class="hud">
       <div class="hint" id="hint">Press on the first dot and drag to the second. One stroke.</div>
       <div class="scores">
         <div><span class="k">Last</span><b id="last">—</b></div>
         <div><span class="k">Best</span><b id="best">—</b></div>
-        <div><span class="k">Tries</span><b id="tries">0</b></div>
+        <div><span class="k">Rating</span><b id="rating">—</b></div>
       </div>
     </div>
 
     <div class="result" id="result" hidden>
       <div class="big" id="bigScore">0.0%</div>
       <div class="verdict" id="verdict"></div>
+      <ul class="factors" id="factors"></ul>
       <button type="button" id="again">Again</button>
     </div>
   </div>
@@ -39,31 +58,51 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
   import { FELT_FRAG } from '../lib/steady-felt'
+  import {
+    SHAPES, shapeById, scoreStroke, rating, verdictFor, ratingName,
+    TOLERANCE, distToPath, dist, sizeOf,
+  } from '../lib/steady-shapes'
+
   const canvas = document.getElementById('c')
   const ctx = canvas.getContext('2d')
   const hint = document.getElementById('hint')
   const elLast = document.getElementById('last')
   const elBest = document.getElementById('best')
-  const elTries = document.getElementById('tries')
+  const elRating = document.getElementById('rating')
   const result = document.getElementById('result')
   const bigScore = document.getElementById('bigScore')
   const verdict = document.getElementById('verdict')
+  const factors = document.getElementById('factors')
   const again = document.getElementById('again')
+  const tabs = document.getElementById('shapes')
 
-  const STORE = 'steady-hand:best'
-  const DOT_R = 14        // visual radius of a target dot
-  const SNAP = 46         // how close the stroke must start/end to a dot
-  // Average deviation of this fraction of the segment length scores zero.
-  const TOLERANCE = 0.06
+  const STORE = 'steady-hand:bests.v1'
+  const DOT_R = 13        // visual radius of a target dot
+  const SNAP = 52         // how close the stroke must start and finish
 
   let W = 0, H = 0, dpr = 1
-  let A = { x: 0, y: 0 }, B = { x: 0, y: 0 }
-  let stroke = []
+  let shape = SHAPES[0]
+  let rot = 0
+  let dots = []
+  let stroke = []         // each point carries the deviation it was drawn at
+  let liveTarget = []     // the ideal, for colouring the stroke as it is drawn
   let drawing = false
   let locked = false
-  let tries = 0
-  let best = Number(localStorage.getItem(STORE) || 0) || 0
-  if (best) elBest.textContent = best.toFixed(1) + '%'
+  let lastScore = null
+
+  /* Bests are per shape now, and the old single number was the line. Reading
+     it back rather than dropping it means nobody loses a score they earned. */
+  const bests = {}
+  try {
+    const raw = localStorage.getItem(STORE)
+    if (raw) Object.assign(bests, JSON.parse(raw))
+    const old = Number(localStorage.getItem('steady-hand:best'))
+    if (old > 0 && !(bests.line > old)) bests.line = old
+  } catch { /* private mode. Start fresh. */ }
+
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(bests)) } catch { /* fine */ }
+  }
 
   /* Canvas CSS pixels to the space centred() builds: origin at the middle,
      units of half the short axis, y upward. */
@@ -77,8 +116,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     // Every layer is low frequency by design; see the note in steady-felt.ts.
     scale: 0.7,
     uniforms: () => ({
-      u_a: toField(A),
-      u_b: toField(B),
+      // The shader lights the two ends of the task. A shape with one dot
+      // passes the same point twice, which reads as a single glow.
+      u_a: toField(dots[0] ?? { x: W / 2, y: H / 2 }),
+      u_b: toField(dots[dots.length - 1] ?? { x: W / 2, y: H / 2 }),
       u_pen: toField(pen),
       u_penOn: drawing ? 1 : 0,
       u_locked: locked ? 1 : 0,
@@ -88,6 +129,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   // Under reduced motion the shared ticker never runs, so the surface has to be
   // asked for the frames that matter.
   function nudge() { if (prefersReducedMotion) felt.redraw() }
+
+  const box = () => ({ w: W, h: H })
 
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -100,73 +143,61 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   function place() {
-    /* Keep the pair long enough to be a real test and inside a safe margin.
-       The bottom margin is larger than the rest because the hint and the score
-       pills live down there: a dot placed under them is sitting behind text you
-       cannot click through, which made it needlessly hard to start a stroke. */
-    const m = 90
-    const bottom = 150
-    const usableH = Math.max(m + 40, H - m - bottom)
-    const minLen = Math.min(W, H) * 0.55
-    let guard = 0
-    const pick = () => ({ x: m + Math.random() * (W - 2 * m), y: m + Math.random() * (usableH - m) })
-    do {
-      A = pick()
-      B = pick()
-    } while (Math.hypot(B.x - A.x, B.y - A.y) < minLen && ++guard < 200)
+    // A fresh angle every attempt, so the shape cannot be learned as a
+    // muscle movement in one particular direction.
+    rot = Math.random() * Math.PI * 2
+    dots = shape.dots(box(), rot)
     stroke = []
     locked = false
+    lastScore = null
+    paintHud()
     render()
   }
 
-  const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y)
-
-  /** Perpendicular distance from p to the infinite line through A and B. */
-  function deviation(p) {
-    const dx = B.x - A.x, dy = B.y - A.y
-    const len = Math.hypot(dx, dy) || 1
-    return Math.abs(dy * p.x - dx * p.y + B.x * A.y - B.y * A.x) / len
-  }
+  /* ---- the board -------------------------------------------------------- */
 
   /** On the line to badly off it. */
-  function strokeColour(t) {
-    return [
-      Math.round(255 - t * 15),
-      Math.round(214 - t * 136),
-      Math.round(150 - t * 90),
-    ].join(',')
-  }
+  const strokeColour = (t) => [
+    Math.round(255 - t * 15),
+    Math.round(214 - t * 136),
+    Math.round(150 - t * 90),
+  ].join(',')
 
+  /**
+   * The ideal, and the band around it whose average deviation scores zero.
+   *
+   * Drawing the band is what turns a percentage into something you can learn
+   * from: you can see how far off you were relative to what the scoring
+   * actually cares about, instead of being told a number. It is a wide
+   * translucent stroke along the same polyline, which gets the corners of the
+   * square and the turns of the spiral right for free.
+   */
   function drawReveal() {
-    const len = dist(A, B) || 1
-    /* The band whose *average* deviation scores exactly zero. Drawing it is
-       what turns a percentage into something you can learn from: you can see
-       how far off you were relative to what the scoring actually cares about,
-       instead of being told a number. */
-    const band = TOLERANCE * len
-    const nx = -(B.y - A.y) / len, ny = (B.x - A.x) / len
-    ctx.save()
-    ctx.fillStyle = 'rgba(255, 232, 205, 0.055)'
-    ctx.beginPath()
-    ctx.moveTo(A.x + nx * band, A.y + ny * band)
-    ctx.lineTo(B.x + nx * band, B.y + ny * band)
-    ctx.lineTo(B.x - nx * band, B.y - ny * band)
-    ctx.lineTo(A.x - nx * band, A.y - ny * band)
-    ctx.closePath()
-    ctx.fill()
+    const path = lastScore ? lastScore.target : shape.target(box(), rot, [])
+    if (path.length < 2) return
+    const size = lastScore ? lastScore.size : 0
+    const band = TOLERANCE * (size || 1) * 2
 
-    // The ideal line itself, still dashed so it never reads as your stroke.
+    ctx.save()
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(path[0].x, path[0].y)
+    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y)
+    ctx.strokeStyle = 'rgba(255, 232, 205, 0.055)'
+    ctx.lineWidth = band
+    ctx.stroke()
+
+    // The ideal itself, dashed so it never reads as your stroke.
     ctx.setLineDash([7, 9])
     ctx.strokeStyle = 'rgba(255, 242, 228, 0.5)'
     ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke()
+    ctx.stroke()
     ctx.restore()
   }
 
   function drawStroke() {
     if (stroke.length < 2) return
-    const len = dist(A, B) || 1
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
 
@@ -189,7 +220,7 @@ import GameLayout from '../layouts/GameLayout.astro'
        ideal each part of the stroke drifted. */
     for (let i = 1; i < stroke.length - 1; i++) {
       const p0 = stroke[i - 1], p1 = stroke[i], p2 = stroke[i + 1]
-      const t = Math.min(1, deviation(p1) / len / TOLERANCE)
+      const t = Math.min(1, p1.t ?? 0)
       const sp = Math.min(1, dist(p0, p1) / 20)
       ctx.strokeStyle = 'rgb(' + strokeColour(t) + ')'
       ctx.lineWidth = 6.0 - sp * 3.0
@@ -201,7 +232,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   function drawDots() {
-    for (const [q, label] of [[A, 'A'], [B, 'B']]) {
+    for (const q of dots) {
       // A ring standing off the body, so the target has a footprint.
       ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R + 7, 0, Math.PI * 2)
       ctx.strokeStyle = 'rgba(255, 196, 128, 0.28)'; ctx.lineWidth = 1.5; ctx.stroke()
@@ -213,10 +244,12 @@ import GameLayout from '../layouts/GameLayout.astro'
       ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R, 0, Math.PI * 2)
       ctx.fillStyle = g; ctx.fill()
       ctx.strokeStyle = 'rgba(70, 30, 14, 0.42)'; ctx.lineWidth = 1; ctx.stroke()
-      ctx.fillStyle = '#3a121d'
-      ctx.font = '600 13px Inter, system-ui, sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(label, q.x, q.y + 1)
+      if (q.label) {
+        ctx.fillStyle = '#3a121d'
+        ctx.font = '600 12px Inter, system-ui, sans-serif'
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText(q.label, q.x, q.y + 1)
+      }
     }
   }
 
@@ -228,66 +261,87 @@ import GameLayout from '../layouts/GameLayout.astro'
     drawDots()
   }
 
+  /* ---- the readouts ----------------------------------------------------- */
+
+  function paintHud() {
+    const b = bests[shape.id]
+    elBest.textContent = typeof b === 'number' ? b.toFixed(1) + '%' : '—'
+    elLast.textContent = lastScore ? lastScore.score.toFixed(1) + '%' : '—'
+    const r = rating(bests)
+    elRating.textContent = r === null ? '—' : r.toFixed(0) + '%'
+    elRating.title = r === null
+      ? 'Set a best on all four shapes'
+      : ratingName(r)
+    for (const el of tabs.querySelectorAll('.shape')) {
+      const id = el.dataset.shape
+      el.setAttribute('aria-selected', String(id === shape.id))
+      const v = bests[id]
+      el.querySelector('.sbest').textContent = typeof v === 'number' ? v.toFixed(0) : '—'
+    }
+  }
+
   /**
-   * Put the score card where it does not cover the line it is scoring.
+   * Put the score card where it does not cover the shape it is scoring.
    *
-   * It used to sit dead centre, which hid dot B and most of the stroke behind
-   * the number describing them. Of the four corners, the one furthest from the
-   * A-B segment wins.
+   * Of the four corners, the one furthest from the ideal wins. With four
+   * shapes rather than one segment this matters more, not less: a spiral
+   * fills the middle of the board completely.
    */
   function placeResult() {
     const pad = 18
     const w = result.offsetWidth || 250
     const h = result.offsetHeight || 200
     const hud = 110                     // the score pills live along the bottom
-    const seg = (q) => {
-      const dx = B.x - A.x, dy = B.y - A.y
-      const L2 = dx * dx + dy * dy || 1
-      const u = Math.max(0, Math.min(1, ((q.x - A.x) * dx + (q.y - A.y) * dy) / L2))
-      return Math.hypot(q.x - (A.x + dx * u), q.y - (A.y + dy * u))
-    }
+    const path = lastScore ? lastScore.target : shape.target(box(), rot, [])
     const cx = [pad + w / 2, W - pad - w / 2]
-    const cy = [pad + h / 2, H - pad - h / 2 - hud]
+    const cy = [pad + h / 2 + 56, H - pad - h / 2 - hud]
     let best = null, bestD = -1
     for (const x of cx) for (const y of cy) {
       // A board too small for a corner falls back to the middle rather than
       // pushing the card off the edge.
       const q = { x: Math.max(w / 2, Math.min(W - w / 2, x)),
                   y: Math.max(h / 2, Math.min(H - h / 2, y)) }
-      const d = seg(q)
+      const d = distToPath(q, path)
       if (d > bestD) { bestD = d; best = q }
     }
     result.style.left = best.x + 'px'
     result.style.top = best.y + 'px'
   }
 
-  function score() {
-    const len = dist(A, B) || 1
-    // Resample by arc length so a slow, dense stroke is not weighted differently
-    // from a fast, sparse one.
-    let total = 0, sum = 0
-    for (let i = 1; i < stroke.length; i++) {
-      const seg = dist(stroke[i - 1], stroke[i])
-      sum += ((deviation(stroke[i - 1]) + deviation(stroke[i])) / 2) * seg
-      total += seg
-    }
-    const avg = total ? sum / total : len
-    const raw = 1 - avg / len / TOLERANCE
-    // A stroke that wanders far past the dots should not score well either.
-    const overshoot = Math.max(0, total / len - 1.06)
-    return Math.max(0, Math.min(100, (raw - overshoot) * 100))
-  }
+  /* ---- drawing ---------------------------------------------------------- */
 
   function pos(e) {
     const r = canvas.getBoundingClientRect()
     return { x: e.clientX - r.left, y: e.clientY - r.top }
   }
 
+  /** Where a stroke is allowed to begin. Closed shapes: anywhere. */
+  function startOk(p) {
+    if (shape.closed) return true
+    return dist(p, dots[0]) <= SNAP
+  }
+
+  /* The scale of the ideal fixed at the start of the stroke, so colouring a
+     point does not need the whole shape measured again per sample. */
+  let strokeScale = 1
+
+  /**
+   * Add a point, remembering how far off the ideal it was.
+   *
+   * The deviation is measured once, as the point arrives, and only decides the
+   * colour of the line. The score at the end is computed properly from the
+   * whole stroke — and for the circle, against a radius fitted to it.
+   */
+  function push(p) {
+    const d = liveTarget.length ? distToPath(p, liveTarget) : 0
+    stroke.push({ x: p.x, y: p.y, t: Math.min(1, d / (TOLERANCE * strokeScale)) })
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
     if (locked) return
     const p = pos(e)
-    if (dist(p, A) > SNAP) {
-      hint.textContent = 'Start on dot A.'
+    if (!startOk(p)) {
+      hint.textContent = 'Start on the first dot.'
       return
     }
     // Capture keeps the stroke alive if the pointer leaves the canvas; it is
@@ -295,9 +349,14 @@ import GameLayout from '../layouts/GameLayout.astro'
     try { canvas.setPointerCapture(e.pointerId) } catch {}
     unlock(); sfx.click()
     drawing = true
-    stroke = [p]
+    liveTarget = shape.target(box(), rot, [p])
+    strokeScale = sizeOf(liveTarget) || 1
+    stroke = []
+    push(p)
     pen = p
-    hint.textContent = 'Keep going to B. Do not lift.'
+    hint.textContent = shape.closed
+      ? 'All the way round, back to where you started.'
+      : 'Keep going. Do not lift.'
     render()
     nudge()
   })
@@ -306,7 +365,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   canvas.addEventListener('pointermove', (e) => {
     if (!drawing) return
     const q = pos(e)
-    stroke.push(q)
+    push(q)
     pen = q
     // A quiet tick every few samples turns a silent drag into a felt one.
     if (stroke.length - tickAt > 5) { tickAt = stroke.length; sfx.tick() }
@@ -318,48 +377,53 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (!drawing) return
     drawing = false
     const end = stroke[stroke.length - 1]
-    if (!end || dist(end, B) > SNAP) {
+    const home = shape.closed ? stroke[0] : dots[dots.length - 1]
+    if (!end || stroke.length < 6 || dist(end, home) > SNAP) {
       stroke = []
-      hint.textContent = 'You have to finish on dot B. Try again.'
+      hint.textContent = shape.closed
+        ? 'You have to come back to where you started. Try again.'
+        : 'You have to finish on the last dot. Try again.'
       render()
+      nudge()
       return
     }
     locked = true
-    tries++
-    elTries.textContent = tries
-    const s = score()
-    elLast.textContent = s.toFixed(1) + '%'
-    if (s > best) {
-      best = s
-      localStorage.setItem(STORE, String(best))
-      elBest.textContent = best.toFixed(1) + '%'
-    }
-    bigScore.textContent = s.toFixed(1) + '%'
+
+    const s = scoreStroke(shape, box(), rot, stroke)
+    lastScore = s
+    if (!(bests[shape.id] >= s.score)) { bests[shape.id] = s.score; save() }
+    paintHud()
+
+    bigScore.textContent = s.score.toFixed(1) + '%'
+    factors.innerHTML = [
+      ['Accuracy', s.accuracy, 'how close you were'],
+      ['Coverage', s.coverage, 'how much of it you drew'],
+      ['Economy', s.economy, 'against how far you travelled'],
+    ].map(([k, v, why]) =>
+      `<li><span>${k}</span><b>${Math.round(v * 100)}%</b><i>${why}</i></li>`).join('')
 
     const r = canvas.getBoundingClientRect()
-    const bx = r.left + B.x, by = r.top + B.y
-    if (s >= 95) {
+    const bx = r.left + end.x, by = r.top + end.y
+    if (s.score >= 92) {
       sfx.great()
       burst(bx, by, { count: 30, colors: ['#e8a75c', '#fff', '#ffd166'], speed: 5, gravity: 0.12, life: 46, size: 4 })
       ring(bx, by, '#ffd166', 22)
-    } else if (s >= 70) {
+    } else if (s.score >= 62) {
       sfx.good()
       burst(bx, by, { count: 14, colors: ['#e8a75c', '#fff'], speed: 3.4, gravity: 0.16, life: 34, size: 3 })
     } else {
       sfx.bad()
     }
-    floatText(bx, by - 26, s.toFixed(1) + '%', s >= 70 ? '#ffd166' : '#ff8f7a')
+    floatText(bx, by - 26, s.score.toFixed(1) + '%', s.score >= 62 ? '#ffd166' : '#ff8f7a')
 
-    verdict.textContent =
-      s >= 99 ? 'Suspicious.' :
-      s >= 95 ? 'Genuinely steady.' :
-      s >= 85 ? 'Solid. Human.' :
-      s >= 70 ? 'A bit of a wobble.' :
-      s >= 40 ? 'That is a banana.' : 'That is not a line.'
+    const r2 = rating(bests)
+    verdict.textContent = r2 !== null && Object.keys(bests).length === SHAPES.length
+      ? `${verdictFor(s.score)} Overall: ${ratingName(r2)}.`
+      : verdictFor(s.score)
     result.hidden = false
     // Measurable only once it is laid out, so this has to follow the unhide.
     placeResult()
-    hint.textContent = 'Press Again for a new pair.'
+    hint.textContent = 'Press Again, or pick another shape.'
     render()
     nudge()
   }
@@ -371,12 +435,26 @@ import GameLayout from '../layouts/GameLayout.astro'
   again.addEventListener('click', () => {
     unlock(); sfx.whoosh()
     result.hidden = true
-    hint.textContent = 'Press on the first dot and drag to the second. One stroke.'
+    hint.textContent = shape.brief
+    place()
+    nudge()
+  })
+
+  tabs.addEventListener('click', (e) => {
+    const b = e.target.closest('.shape')
+    if (!b) return
+    const s = shapeById(b.dataset.shape)
+    if (!s || s === shape) return
+    shape = s
+    unlock(); sfx.click()
+    result.hidden = true
+    hint.textContent = shape.brief
     place()
     nudge()
   })
 
   addEventListener('resize', resize)
+  hint.textContent = shape.brief
   resize()
 </script>
 
@@ -427,5 +505,56 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   @media (prefers-reduced-motion: reduce) {
     .result { transition: none; }
+  }
+
+  /* ---- the four shapes -------------------------------------------------- */
+  .shapes {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 5px; z-index: 3; max-width: 94vw;
+    background: rgba(30, 10, 16, 0.6); border: 1px solid rgba(255, 196, 128, 0.18);
+    border-radius: 999px; padding: 4px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .shape {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    background: transparent; border: 0; border-radius: 999px;
+    padding: 7px 14px; color: #f3d9c2; font: inherit; white-space: nowrap;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .shape b { font-size: 13px; font-weight: 600; }
+  .shape .sbest {
+    font-size: 11px; color: #c49a7c; font-variant-numeric: tabular-nums;
+  }
+  .shape:hover { background: rgba(255, 196, 128, 0.1); }
+  .shape[aria-selected='true'] { background: #e8a75c; color: #3a121d; }
+  .shape[aria-selected='true'] .sbest { color: #6b2a1c; }
+
+  /* ---- what the score is made of ---------------------------------------- */
+  .factors {
+    list-style: none; margin: 10px 0 0; padding: 0;
+    display: grid; gap: 4px; text-align: left;
+  }
+  /* Every one of these children is built by JS, and Astro's scoped styles do
+     not reach nodes the markup never contained — so they have to be :global.
+     Without it the whole block silently renders unstyled, which is exactly
+     how it first shipped: "Accuracy74%how close you were", all one run.
+
+     The name and the number share a row; the explanation gets its own, because
+     at this card width three columns collapse into one line of words. */
+  .factors :global(li) {
+    display: grid; grid-template-columns: 1fr auto; column-gap: 10px;
+    align-items: baseline; font-size: 11.5px;
+  }
+  .factors :global(span) { color: #c9a68d; }
+  .factors :global(b) { color: #ffe0bb; font-variant-numeric: tabular-nums; }
+  .factors :global(i) {
+    grid-column: 1 / -1; color: #a8836c; font-style: normal; font-size: 10.5px;
+    line-height: 1.4; margin-bottom: 3px;
+  }
+
+  @media (max-width: 620px) {
+    .shape { padding: 6px 9px; }
+    .shape b { font-size: 12px; }
+    .shape .sbest { display: none; }
   }
 </style>
