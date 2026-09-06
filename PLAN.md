@@ -113,12 +113,42 @@ No new rendering. Just far more, far better *stuff*.
 - **Fusion → a much larger local recipe tree** so it's playable without the worker,
   plus discovery milestones. **Still outstanding** — the only Phase 1 item not done.
 
-### Phase 2 — Goals for the sandboxes
+### Phase 2 — Goals for the sandboxes — **one of four done**
 
-- **Orbit: challenge mode.** "Achieve a stable orbit for 30 seconds." "Build a
-  binary system." "Slingshot a moon out of the system without collisions."
-  "Survive 60 seconds with 50 bodies." Plus a persistent best.
-- **Powder: scenario challenges** on top of the discovery log.
+- ~~**Orbit: challenge mode.**~~ **done.** Eight challenges, a persistent best
+  lap count, and `scripts/check-orbit.mjs` behind them.
+
+  Two of the four ideas sketched here did not survive contact with the
+  simulation, and finding that out was most of the work:
+
+  - *"Slingshot a moon out of the system"* survived and is the best one. A
+    two-body encounter cannot change a body's energy, so the only way out is
+    to take some from a third body that is moving. The checker proves the
+    challenge means that by running the identical orbit with the heavy
+    companion deleted and requiring it to fail.
+  - *"Survive 60 seconds with 50 bodies"* and its smaller cousin *"twelve
+    bodies, twenty seconds, no collisions"* were **cut**. Bodies here are
+    heavy relative to the star — a moon is 1/433 of it, against Jupiter's
+    1/1047 — so neighbouring orbits sit one or two mutual Hill radii apart
+    where about ten are wanted. Whether a crowd survives is sharply
+    non-monotonic in the body count: twelve held, eleven did not, fourteen
+    did not. That is real chaos, but a challenge you pass by luck is not a
+    challenge. Replaced with *ten laps on one body*.
+  - A *moon orbiting a planet* was cut before it was written: the stable
+    satellite zone around any planet this game offers lies entirely inside
+    the softening length, where the force has been flattened away.
+
+  Two real bugs fell out of the physics work. The presets launched planets at
+  the Kepler speed sqrt(GM/r), which is 10% too fast at the innermost radius
+  in a softened field. And the solar preset's evenly spaced radii are not
+  evenly spaced in the units that matter — measured in mutual Hill radii the
+  gaps shrank from 4.3 to 1.7 going outwards, and it lost a planet within
+  seconds, every time. Spacing geometrically holds the separation constant and
+  it now runs clean indefinitely.
+- **Powder: scenario challenges** on top of the discovery log. Worth checking
+  first whether the automaton supports goals as cleanly as the n-body did —
+  Orbit's challenges all reduce to statements about one trajectory, and
+  Powder's may not.
 - **Ambient Mix: presets** ("Thunderstorm", "3am office", "Unbearable") and a
   shareable mix code in the URL.
 - **Steady Hand → a suite**: straight line, perfect circle, square, spiral, with a

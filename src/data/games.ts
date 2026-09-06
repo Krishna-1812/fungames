@@ -85,9 +85,9 @@ export const GAMES: Game[] = [
   {
     slug: 'orbit',
     title: 'Orbit',
-    blurb: 'Fling planets, watch them collide',
+    blurb: 'Real gravity, and eight things to attempt in it',
     description:
-      'A real n-body gravity sandbox. Every body pulls on every other one, orbits stay stable for minutes, and collisions merge worlds while conserving momentum.',
+      'A real n-body gravity sandbox. Every body pulls on every other one, orbits stay stable for minutes, and collisions merge worlds while conserving momentum. Eight challenges to attempt: a circular orbit, a comet, a grazing pass, a binary star, and a genuine gravity assist.',
     accent: '#060a1e', accent2: '#4d7ce8', glyph: '🪐', art: 'orbit2',
     added: '2026-09-14',
   },

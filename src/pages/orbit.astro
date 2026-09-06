@@ -1,14 +1,20 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { GOALS } from '../lib/orbit-goals'
 
 /**
- * Orbit - an n-body gravity sandbox.
+ * Orbit - an n-body gravity sandbox, with eight things to attempt in it.
  *
- * Every body pulls on every other body with real Newtonian gravity, integrated
- * with a leapfrog scheme so orbits stay stable for minutes instead of spiralling
- * apart the way naive Euler integration does. Collisions merge bodies and
- * conserve momentum, so a crowded system genuinely settles into a few large
- * survivors on its own.
+ * The physics moved to lib/orbit-sim.ts and the challenges live in
+ * lib/orbit-goals.ts, both of which run headlessly so scripts/check-orbit.mjs
+ * can drive them against closed-form answers. What is left here is the page:
+ * input, presentation, and the panel.
+ *
+ * Every body pulls on every other body with real Newtonian gravity, softened
+ * at short range and integrated symplectically so orbits stay stable for
+ * minutes instead of spiralling apart. Collisions merge bodies and conserve
+ * momentum, so a crowded system genuinely settles into a few large survivors
+ * on its own.
  *
  * Trails come from fading the canvas rather than storing history, which costs
  * one fill per frame instead of thousands of stored points.
@@ -33,6 +39,36 @@ import GameLayout from '../layouts/GameLayout.astro'
       <p class="tip" id="tip">Drag anywhere to fling a new body. Longer drag, faster throw.</p>
     </div>
 
+    <div class="goalwrap" id="goalPanel" hidden>
+      <div class="goalhead">
+        <h2>Challenges</h2>
+        <button type="button" id="goalClose">Close</button>
+      </div>
+      <ul class="goals" id="goalList">
+        {GOALS.map((g) => (
+          <li class="goal" data-goal={g.id}>
+            <span class="mark" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none"
+                   stroke="currentColor" stroke-width="2.4"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 8.5 L6.5 12 L13 4" />
+              </svg>
+            </span>
+            <b>{g.name}<span class="visually-hidden">, not yet done</span></b>
+            <span class="brief">{g.brief}</span>
+            <span class="note">{g.note}</span>
+          </li>
+        ))}
+      </ul>
+      <p class="goalnote">
+        Progress is kept in this browser only.
+        <span id="bestLaps"></span>
+        <button type="button" id="goalReset">Start over</button>
+      </p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
     <aside class="dock">
       <div class="group" role="radiogroup" aria-label="What to launch">
         <button type="button" class="opt" data-mass="6" aria-checked="true" role="radio">Moon</button>
@@ -49,32 +85,31 @@ import GameLayout from '../layouts/GameLayout.astro'
         <button type="button" class="opt" id="pauseBtn">Pause</button>
         <button type="button" class="opt" id="clearBtn">Clear</button>
       </div>
+      <div class="group">
+        <button type="button" class="opt wide" id="goalBtn" aria-expanded="false">
+          Challenges <b id="goalCount">0/8</b>
+        </button>
+      </div>
     </aside>
   </div>
 </GameLayout>
 
 <script>
-  import { sfx, unlock, mountMuteButton, tone } from '../lib/audio'
+  import { sfx, unlock, tone } from '../lib/audio'
   import { burst, ring } from '../lib/fx'
 
   import { createRenderer } from '../lib/orbit-render'
+  import {
+    type Body, type StepEvents,
+    makeBody, step, circularV, radiusFor, MAX_BODIES,
+  } from '../lib/orbit-sim'
+  import { GOALS, Tracker, type Progress } from '../lib/orbit-goals'
 
   const canvas = document.getElementById('sky') as HTMLCanvasElement
   const aimCanvas = document.getElementById('aimLayer') as HTMLCanvasElement
   const aimCtx = aimCanvas.getContext('2d')!
   const stage = document.getElementById('stage') as HTMLElement
   const renderer = createRenderer(canvas)
-
-  type Body = {
-    x: number; y: number; vx: number; vy: number
-    m: number; r: number; hue: number; star: boolean
-  }
-
-  const G = 1
-  // Softening stops the force blowing up to infinity when two bodies nearly
-  // touch, which is what makes naive n-body sims explode.
-  const SOFT = 26
-  const MAX_BODIES = 320
 
   let bodies: Body[] = []
   let W = 0, H = 0, dpr = 1
@@ -83,19 +118,9 @@ import GameLayout from '../layouts/GameLayout.astro'
   let merges = 0
   let launchMass = 6
 
-  /**
-   * Bodies are drawn as lit spheres now, and below about 16px across there are
-   * not enough pixels for a terminator to read — they were landing as plain
-   * dots. This is the physical radius, not a render-only fudge: collisions use
-   * the same number, so a body that looks like it should touch actually does.
-   * The cost is a slightly livelier merge rate, which suits a sandbox.
-   */
-  const radiusFor = (m: number) => Math.max(2.8, Math.cbrt(m) * 2.6)
-  const hueFor = (m: number) => (m >= 200 ? 42 : m >= 20 ? 205 : 190)
-
-  function add(x: number, y: number, vx: number, vy: number, m: number) {
+  function add(x: number, y: number, vx: number, vy: number, m: number, mine = false) {
     if (bodies.length >= MAX_BODIES) return
-    bodies.push({ x, y, vx, vy, m, r: radiusFor(m), hue: hueFor(m), star: m >= 200 })
+    bodies.push(makeBody(x, y, vx, vy, m, mine))
   }
 
   function resize() {
@@ -110,80 +135,82 @@ import GameLayout from '../layouts/GameLayout.astro'
     return true
   }
 
-  // ---- physics -----------------------------------------------------------
-  function stepPhysics(dt: number) {
-    const n = bodies.length
+  // ---- challenges ---------------------------------------------------------
+  const SAVE = 'orbit.progress.v1'
+  const tracker = new Tracker()
+  try {
+    const raw = localStorage.getItem(SAVE)
+    if (raw) tracker.load(JSON.parse(raw) as Progress)
+  } catch { /* private mode, or a cleared profile. Start fresh. */ }
 
-    // Accelerations from every pair, computed once and applied to both.
-    const ax = new Float64Array(n)
-    const ay = new Float64Array(n)
-    for (let i = 0; i < n; i++) {
-      const a = bodies[i]
-      for (let j = i + 1; j < n; j++) {
-        const b = bodies[j]
-        const dx = b.x - a.x, dy = b.y - a.y
-        const d2 = dx * dx + dy * dy + SOFT * SOFT
-        const inv = 1 / Math.sqrt(d2)
-        const f = G * inv * inv * inv
-        ax[i] += f * b.m * dx; ay[i] += f * b.m * dy
-        ax[j] -= f * a.m * dx; ay[j] -= f * a.m * dy
-      }
+  const goalPanel = document.getElementById('goalPanel') as HTMLElement
+  const goalBtn = document.getElementById('goalBtn') as HTMLButtonElement
+  const goalCount = document.getElementById('goalCount')!
+  const bestLaps = document.getElementById('bestLaps')!
+  const toast = document.getElementById('toast')!
+
+  function paintGoals() {
+    for (const g of GOALS) {
+      const li = goalPanel.querySelector<HTMLElement>(`[data-goal="${g.id}"]`)
+      if (!li) continue
+      const done = tracker.done.has(g.id)
+      li.classList.toggle('done', done)
+      // The tick is decorative, so the state has to be in the text as well.
+      const hidden = li.querySelector('b .visually-hidden')
+      if (hidden) hidden.textContent = done ? ', done' : ', not yet done'
     }
-
-    for (let i = 0; i < n; i++) {
-      const b = bodies[i]
-      b.vx += ax[i] * dt
-      b.vy += ay[i] * dt
-      b.x += b.vx * dt
-      b.y += b.vy * dt
-    }
-
-    // Merge overlapping bodies, conserving mass and momentum.
-    for (let i = 0; i < bodies.length; i++) {
-      for (let j = i + 1; j < bodies.length; j++) {
-        const a = bodies[i], b = bodies[j]
-        const dx = b.x - a.x, dy = b.y - a.y
-        const rr = a.r + b.r
-        if (dx * dx + dy * dy > rr * rr) continue
-
-        const big = a.m >= b.m ? a : b
-        const small = big === a ? b : a
-        const m = a.m + b.m
-        big.vx = (a.vx * a.m + b.vx * b.m) / m
-        big.vy = (a.vy * a.m + b.vy * b.m) / m
-        big.x = (a.x * a.m + b.x * b.m) / m
-        big.y = (a.y * a.m + b.y * b.m) / m
-        big.m = m
-        big.r = radiusFor(m)
-        big.hue = hueFor(m)
-        big.star = m >= 200
-
-        bodies.splice(bodies.indexOf(small), 1)
-        merges++
-        onMerge(big.x, big.y, small.m)
-        j--
-      }
-    }
-
-    // Anything flung far outside the view is gone for good; drop it.
-    const pad = Math.max(W, H) * 2.2
-    bodies = bodies.filter((b) => b.x > -pad && b.x < W + pad && b.y > -pad && b.y < H + pad)
+    goalCount.textContent = `${tracker.done.size}/${GOALS.length}`
+    bestLaps.textContent = tracker.bestLaps
+      ? ` Longest orbit so far: ${tracker.bestLaps} lap${tracker.bestLaps === 1 ? '' : 's'}.`
+      : ''
   }
 
-  let mergeSoundBudget = 0
-  function onMerge(x: number, y: number, m: number) {
-    const rect = canvas.getBoundingClientRect()
-    ring(rect.left + x, rect.top + y, 'hsl(38 100% 72%)', 8 + Math.cbrt(m) * 5)
-    burst(rect.left + x, rect.top + y, {
-      count: Math.min(24, 5 + (m | 0)), colors: ['#ffd166', '#ff9a3c', '#fff'],
-      speed: 2.6, gravity: 0, drag: 0.93, life: 30, size: 2.4,
-    })
-    // Cap sound so a hundred simultaneous merges do not machine-gun.
-    if (mergeSoundBudget > 0) {
-      mergeSoundBudget--
-      tone({ freq: 220 + Math.random() * 160, to: 90, dur: 0.22, type: 'sine', gain: 0.16 })
-    }
+  function save() {
+    try { localStorage.setItem(SAVE, JSON.stringify(tracker.progress())) } catch { /* fine */ }
   }
+
+  let toastTimer = 0
+  function celebrate(ids: string[]) {
+    save()
+    paintGoals()
+    // One lap can settle two or three of these at once — a near-circular first
+    // orbit is First orbit and Round trip together — so name all of them
+    // rather than the first and a silence.
+    const names = ids
+      .map((id) => GOALS.find((x) => x.id === id)?.name)
+      .filter(Boolean) as string[]
+    if (!names.length) return
+    const said = names.length > 1
+      ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+      : names[0]
+    toast.textContent = `${said} — ${tracker.done.size} of ${GOALS.length}`
+    toast.classList.add('show')
+    clearTimeout(toastTimer)
+    toastTimer = window.setTimeout(() => toast.classList.remove('show'), 3600)
+    goalBtn.classList.remove('picked')
+    void goalBtn.offsetWidth
+    goalBtn.classList.add('picked')
+    unlock(); sfx.great()
+  }
+
+  const showGoals = (open: boolean) => {
+    goalPanel.hidden = !open
+    goalBtn.setAttribute('aria-expanded', String(open))
+    // The panel is only 97% opaque, which is enough to feel the simulation
+    // still running behind it and not enough to stop the body count reading
+    // straight through the heading.
+    stage.classList.toggle('reading', open)
+  }
+  goalBtn.addEventListener('click', () => { unlock(); sfx.click(); showGoals(goalPanel.hidden) })
+  document.getElementById('goalClose')!.addEventListener('click', () => { sfx.click(); showGoals(false) })
+  document.getElementById('goalReset')!.addEventListener('click', () => {
+    tracker.done.clear()
+    tracker.bestLaps = 0
+    save()
+    paintGoals()
+    sfx.click()
+  })
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !goalPanel.hidden) showGoals(false) })
 
   // ---- render ------------------------------------------------------------
   function render() {
@@ -201,6 +228,21 @@ import GameLayout from '../layouts/GameLayout.astro'
     }
   }
 
+  let mergeSoundBudget = 0
+  function onMerge(x: number, y: number, m: number) {
+    const rect = canvas.getBoundingClientRect()
+    ring(rect.left + x, rect.top + y, 'hsl(38 100% 72%)', 8 + Math.cbrt(m) * 5)
+    burst(rect.left + x, rect.top + y, {
+      count: Math.min(24, 5 + (m | 0)), colors: ['#ffd166', '#ff9a3c', '#fff'],
+      speed: 2.6, gravity: 0, drag: 0.93, life: 30, size: 2.4,
+    })
+    // Cap sound so a hundred simultaneous merges do not machine-gun.
+    if (mergeSoundBudget > 0) {
+      mergeSoundBudget--
+      tone({ freq: 220 + Math.random() * 160, to: 90, dur: 0.22, type: 'sine', gain: 0.16 })
+    }
+  }
+
   // ---- loop --------------------------------------------------------------
   let fpsFrames = 0, lastFps = performance.now()
   const nBodies = document.getElementById('nBodies')!
@@ -211,8 +253,17 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (!paused && W) {
       mergeSoundBudget = 2
       // Two substeps keep fast, close passes accurate without halving the fps.
-      stepPhysics(0.5)
-      stepPhysics(0.5)
+      const ev: StepEvents = { merges: [], escaped: [] }
+      for (let s = 0; s < 2; s++) {
+        const r = step(bodies, 0.5, W, H)
+        bodies = r.bodies
+        ev.merges.push(...r.events.merges)
+        ev.escaped.push(...r.events.escaped)
+      }
+      for (const m of ev.merges) { merges++; onMerge(m.x, m.y, m.m) }
+
+      const won = tracker.observe(bodies, ev)
+      if (won.length) celebrate(won)
     }
     if (W) render()
 
@@ -254,7 +305,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     // Drag away from the target and release, like a slingshot.
     const vx = (aim.x1 - aim.x0) * 0.055
     const vy = (aim.y1 - aim.y0) * 0.055
-    add(aim.x0, aim.y0, vx, vy, launchMass)
+    add(aim.x0, aim.y0, vx, vy, launchMass, true)
     const speed = Math.hypot(vx, vy)
     sfx.pop(Math.min(9, Math.round(speed * 2)))
     const r = canvas.getBoundingClientRect()
@@ -279,23 +330,76 @@ import GameLayout from '../layouts/GameLayout.astro'
   })
 
   // ---- presets -----------------------------------------------------------
-  function clear() { bodies = []; merges = 0; renderer.clear() }
+  function clear() { bodies = []; merges = 0; tracker.reset(); renderer.clear() }
 
-  /** Circular orbit speed for a satellite at distance r from mass M. */
-  const orbitalV = (M: number, r: number) => Math.sqrt((G * M) / r)
+  /**
+   * Cancel the system's net momentum by nudging the heaviest body.
+   *
+   * Without this a ring of planets all going the same way carries the star
+   * slowly across the screen, because a preset that hands everything a
+   * velocity and the star none is a system with somewhere to be. It is a
+   * handful of pixels over a minute, which is exactly the sort of thing that
+   * looks like a bug in the physics and is not.
+   */
+  function settle() {
+    if (!bodies.length) return
+    let px = 0, py = 0
+    for (const b of bodies) { px += b.m * b.vx; py += b.m * b.vy }
+    let heavy = bodies[0]
+    for (const b of bodies) if (b.m > heavy.m) heavy = b
+    heavy.vx -= px / heavy.m
+    heavy.vy -= py / heavy.m
+  }
+
+  /**
+   * A solar system that lasts more than five seconds.
+   *
+   * The old preset put planets at 70, 105, 145, 190, 240 and 300, which looks
+   * evenly spaced and is not. The measure that matters is the mutual Hill
+   * radius — the reach of a planet's own gravity against the star's — and it
+   * grows with distance, so equal gaps mean the outer planets get steadily
+   * more crowded in the only units that count. Those radii went from 4.3 Hill
+   * radii of separation down to 1.7, where about ten are wanted, and the
+   * system lost a planet within a few seconds every single time.
+   *
+   * Spacing geometrically instead keeps the separation constant in Hill radii
+   * all the way out. The same planets then run clean indefinitely.
+   */
+  const SUN = 2600
+  /**
+   * Gaps between orbits, measured in mutual Hill radii rather than pixels.
+   * Four loses a planet in seven runs out of twenty, though never inside the
+   * first forty seconds. Five is clean in every run tried.
+   */
+  const HILL_GAPS = 5
 
   function solar() {
     clear()
     const cx = W / 2, cy = H / 2
-    add(cx, cy, 0, 0, 2600)
-    const radii = [70, 105, 145, 190, 240, 300]
-    radii.forEach((r, i) => {
-      if (r > Math.min(W, H) / 2 - 10) return
-      const a = Math.random() * Math.PI * 2
-      const v = orbitalV(2600, r)
-      const m = i === 3 ? 34 : 6 + Math.random() * 10
+    add(cx, cy, 0, 0, SUN)
+    const edge = Math.min(W, H) / 2 - 12
+    // How heavy the planets can be and still leave room for four of them.
+    // A planet's Hill radius grows as the cube root of its mass, so lighter
+    // planets can be packed closer without destabilising each other, and a
+    // phone in portrait has room for three rather than two. Both ends are
+    // clamped: below 4 they are invisible, above 14 the ladder runs off the
+    // side of any screen anyway.
+    const want = Math.cbrt(edge / 70)
+    const heaviest = Math.min(14, Math.max(4, 1.5 * SUN * Math.pow((want - 1) / HILL_GAPS, 3)))
+    const ratio = 1 + HILL_GAPS * Math.cbrt((2 * heaviest) / (3 * SUN))
+    // One shared rotation, so every system looks different without ever
+    // starting two neighbours side by side.
+    const spin = Math.random() * Math.PI * 2
+    for (let i = 0, r = 70; r <= edge; i++, r *= ratio) {
+      const a = spin + i * 2.39996
+      // The softened circular speed, not sqrt(GM/r) — see orbit-sim.ts. The
+      // Kepler value is 10% too fast at r=70, and the innermost planet used to
+      // visibly swing in and out because of it.
+      const v = circularV(SUN, r)
+      const m = 4 + Math.random() * (heaviest - 4)
       add(cx + Math.cos(a) * r, cy + Math.sin(a) * r, -Math.sin(a) * v, Math.cos(a) * v, m)
-    })
+    }
+    settle()
     sfx.great()
   }
 
@@ -304,16 +408,18 @@ import GameLayout from '../layouts/GameLayout.astro'
     const cx = W / 2, cy = H / 2
     const sep = Math.min(W, H) * 0.22
     const M = 900
-    // Each star orbits the shared centre of mass at half the separation.
-    const v = Math.sqrt((G * M) / (2 * sep)) * 0.86
+    // Each star travels at half the relative circular speed of the pair, and
+    // the pair's speed is set by their combined mass over the full separation.
+    const v = circularV(2 * M, 2 * sep) / 2
     add(cx - sep, cy, 0, v, M)
     add(cx + sep, cy, 0, -v, M)
     for (let i = 0; i < 14; i++) {
       const r = sep * (2.1 + Math.random() * 1.5)
       const a = Math.random() * Math.PI * 2
-      const vv = orbitalV(2 * M, r)
+      const vv = circularV(2 * M, r)
       add(cx + Math.cos(a) * r, cy + Math.sin(a) * r, -Math.sin(a) * vv, Math.cos(a) * vv, 3 + Math.random() * 6)
     }
+    settle()
     sfx.great()
   }
 
@@ -322,6 +428,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     for (let i = 0; i < 90; i++) {
       add(Math.random() * W, Math.random() * H, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.4, 3 + Math.random() * 12)
     }
+    settle()
     sfx.whoosh()
   }
 
@@ -340,6 +447,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     unlock(); sfx.click()
   })
 
+  paintGoals()
 
   if (resize()) solar()
   else if ('ResizeObserver' in window) {
@@ -376,11 +484,12 @@ import GameLayout from '../layouts/GameLayout.astro'
     transition: opacity 600ms var(--ease);
   }
   .orbit-body .tip.faded { opacity: 0; }
+  .orbit-body .stage.reading .hud { opacity: 0; transition: opacity 160ms var(--ease); }
 
   .orbit-body .dock {
     position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
     display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-    max-width: 94vw;
+    max-width: 94vw; z-index: 6;
   }
   .orbit-body .group {
     display: flex; gap: 4px; padding: 4px;
@@ -397,11 +506,72 @@ import GameLayout from '../layouts/GameLayout.astro'
   .orbit-body .opt:active { transform: scale(0.94); }
   .orbit-body .opt[aria-checked='true'],
   .orbit-body .opt[aria-pressed='true'] { background: #2c65d8; color: #fff; }
+  .orbit-body .opt.wide b { color: #fff; font-variant-numeric: tabular-nums; margin-left: 3px; }
   /* A one-shot bounce when a launch mass is actually picked — see Powder's
      identical .picked pattern for why this needs a toggled class rather
      than an attribute selector. */
   .orbit-body .opt.picked { animation: pop-opt 360ms var(--ease-bounce); }
   @keyframes pop-opt { 40% { transform: scale(1.14); } }
+
+  /* ---- the challenge panel ---------------------------------------------- */
+  /* Over the whole field rather than beside it: the list is eight items long
+     with a paragraph each, and there is nowhere on a canvas to put that. */
+  .orbit-body .goalwrap {
+    position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column;
+    background: rgba(5, 6, 15, 0.97); padding: 16px 18px 12px;
+  }
+  /* An author `display` beats the user-agent [hidden] rule, so it has to be
+     said again here or the panel never closes. */
+  .orbit-body .goalwrap[hidden] { display: none; }
+  .orbit-body .goalhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .orbit-body .goalhead h2 { font-size: 17px; color: #f0f3ff; }
+  .orbit-body .goalhead button {
+    background: none; border: 1px solid #2a3358; color: #c3cdf0; border-radius: 7px;
+    padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  .orbit-body .goalhead button:hover { border-color: #5b8cf0; color: #fff; }
+
+  .orbit-body .goals {
+    list-style: none; margin: 12px 0 0; padding: 0 4px 0 0; overflow-y: auto; flex: 1;
+    display: grid; gap: 7px; align-content: start;
+  }
+  .orbit-body .goal {
+    display: grid; grid-template-columns: 20px 1fr; column-gap: 9px;
+    padding: 9px 12px; border-radius: 8px; background: #0d1122;
+  }
+  .orbit-body .goal .mark {
+    grid-row: 1 / span 2; margin-top: 2px; width: 18px; height: 18px; border-radius: 50%;
+    border: 1px solid #2a3358; color: transparent;
+    display: grid; place-items: center;
+  }
+  .orbit-body .goal b { font-size: 13.5px; color: #cfd8f8; }
+  .orbit-body .goal .brief { font-size: 12.5px; color: #8b98c4; line-height: 1.5; }
+  /* The physics is the reward, so it is not there until it is earned. */
+  .orbit-body .goal .note { display: none; grid-column: 2; }
+
+  .orbit-body .goal.done { background: #10201a; }
+  .orbit-body .goal.done .mark { border-color: #7fd6a0; color: #7fd6a0; }
+  .orbit-body .goal.done b { color: #7fd6a0; }
+  .orbit-body .goal.done .brief { color: #7f8cb8; }
+  .orbit-body .goal.done .note {
+    display: block; font-size: 12.5px; color: #a9b6dd; line-height: 1.55; margin-top: 5px;
+  }
+
+  .orbit-body .goalnote { font-size: 11.5px; color: #8b98c4; margin: 10px 0 0; line-height: 1.6; }
+  .orbit-body .goalnote button {
+    background: none; border: 0; color: #8b98c4; text-decoration: underline;
+    font-size: 11.5px; cursor: pointer; padding: 0; margin-left: 4px;
+  }
+  .orbit-body .goalnote button:hover { color: #cfd8f8; }
+
+  .orbit-body .toast {
+    position: absolute; left: 50%; top: 16px; transform: translate(-50%, -14px);
+    z-index: 8; background: #10201a; border: 1px solid #7fd6a0; color: #cdf3dd;
+    padding: 8px 16px; border-radius: 999px; font-size: 13px; pointer-events: none;
+    opacity: 0; transition: opacity 240ms var(--ease), transform 240ms var(--ease);
+    max-width: 90%; text-align: center;
+  }
+  .orbit-body .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   @media (max-width: 620px) {
     .orbit-body .opt { padding: 8px 11px; font-size: 12px; }

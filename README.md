@@ -163,11 +163,15 @@ forty-seven from both sides and checks each does what its name says — it caugh
 a material you could draw with that took part in nothing at all.*
 
 **Orbit** — an n-body gravity sandbox with softened Newtonian forces and a
-leapfrog integrator, so orbits stay stable for minutes instead of spiralling
+symplectic integrator, so orbits stay stable for minutes instead of spiralling
 apart. Collisions merge bodies and conserve momentum. Trails come from fading
-the canvas, not from stored history. *Verified: the Chaos preset collapsed 90
-scattered bodies into 5 survivors through 85 collisions, at a steady 60 fps —
-planetary accretion, unscripted.*
+the canvas, not from stored history. Eight challenges turn it from a toy into
+something with an aim: a near-circular orbit, a comet, a grazing pass, a
+binary, a real gravity assist. *`scripts/check-orbit.mjs` drives all of them
+headlessly and checks the physics underneath first — it caught the presets
+launching planets at the textbook Kepler speed, which is 10% too fast in a
+softened field, and it threw out a ninth challenge that turned out to be
+unwinnable by anything but luck.*
 
 **Overstimulated** — a clicker where every upgrade makes the page worse: a
 progress bar that measures nothing, a bassline, notifications, a newsletter
@@ -296,7 +300,7 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Seven games carry enough real modelling that the maths is checked separately,
+Eight games carry enough real modelling that the maths is checked separately,
 against answers from the literature, worked out by hand, or measured over a
 simulation:
 
@@ -308,12 +312,13 @@ node scripts/check-cascade.mjs     # Rule Cascade, is it still finishable
 node scripts/check-trolley.mjs     # Trolley, are the four positions distinct
 node scripts/check-powder.mjs      # Powder, does every reaction do what it says
 node scripts/check-memory.mjs      # From Memory, do the references fit the box
+node scripts/check-orbit.mjs       # Orbit, the integrator and all eight challenges
 ```
 
-All seven exit non-zero on failure. None needs a browser — the analysis in
-`lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts` and
-`lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts` and
-`data/memory.ts` is
+All eight exit non-zero on failure. None needs a browser — the analysis in
+`lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts`,
+`lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts`,
+`data/memory.ts`, `lib/orbit-sim.ts` and `lib/orbit-goals.ts` is
 deliberately pure functions over plain data so it can be run this way. The
 auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck
