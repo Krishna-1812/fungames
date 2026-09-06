@@ -113,7 +113,7 @@ No new rendering. Just far more, far better *stuff*.
 - **Fusion → a much larger local recipe tree** so it's playable without the worker,
   plus discovery milestones. **Still outstanding** — the only Phase 1 item not done.
 
-### Phase 2 — Goals for the sandboxes — **two of four done**
+### Phase 2 — Goals for the sandboxes — **three of four done**
 
 - ~~**Orbit: challenge mode.**~~ **done.** Eight challenges, a persistent best
   lap count, and `scripts/check-orbit.mjs` behind them.
@@ -169,8 +169,19 @@ No new rendering. Just far more, far better *stuff*.
   so the count is conserved. And water could not put out embers at all, which
   is wrong — flames are the easy part of a fire — so there is a forty-eighth
   reaction.
-- **Ambient Mix: presets** ("Thunderstorm", "3am office", "Unbearable") and a
-  shareable mix code in the URL.
+- ~~**Ambient Mix: presets** and a shareable mix code in the URL.~~ **done.**
+  Eight presets, and the whole mix in twenty-six characters at most.
+
+  The interesting part was the format rather than the presets. A mix code is a
+  promise to a stranger — somebody pastes a link and somebody else opens it a
+  month later, after the site has changed — so it is keyed on a fixed letter
+  per layer rather than on position. Encoding by index would mean that adding
+  a thirteenth layer silently rewrites every link already shared, with no error
+  anywhere, and `scripts/check-mix.mjs` guards it by decoding a real link
+  against a reordered, trimmed and extended copy of the layer table.
+
+  A shared link also sets the controls without starting anything, because no
+  browser will begin audio without a gesture and a link arrives without one.
 - **Steady Hand → a suite**: straight line, perfect circle, square, spiral, with a
   combined "steadiness rating."
 

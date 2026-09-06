@@ -229,8 +229,14 @@ part company on six of twenty-three.*
 fold so the exponential is audible. *Fold 42 reaches the Moon, fold 103 exceeds
 the observable universe; the layer count uses BigInt so it stays exact.*
 
-**Ambient Mix** — twelve soundscape layers, all synthesised live. *Analyser tap
-measured peak 0.34, RMS 0.08 — real output, not just a running context.*
+**Ambient Mix** — twelve soundscape layers, all synthesised live, eight
+presets worth arriving at, and the whole mix in the URL: every layer at once is
+twenty-six characters. *Analyser tap measured peak 0.34, RMS 0.08 — real
+output, not just a running context. `scripts/check-mix.mjs` treats the code as
+what it is, a promise to a stranger: it round-trips four thousand random mixes,
+throws two dozen kinds of mangled URL at the decoder, and checks a link still
+means the same thing after the layer list is reordered, added to and cut down —
+which is the failure an index-based format makes silently.*
 
 **Progress** — every unit of time you are inside, draining every frame.
 *All thirteen bars checked against hand calculation.*
@@ -305,7 +311,7 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Eight games carry enough real modelling that the maths is checked separately,
+Nine games carry enough real modelling that the maths is checked separately,
 against answers from the literature, worked out by hand, or measured over a
 simulation:
 
@@ -318,12 +324,14 @@ node scripts/check-trolley.mjs     # Trolley, are the four positions distinct
 node scripts/check-powder.mjs      # Powder, every reaction and every scenario
 node scripts/check-memory.mjs      # From Memory, do the references fit the box
 node scripts/check-orbit.mjs       # Orbit, the integrator and all eight challenges
+node scripts/check-mix.mjs         # Ambient Mix, do shared links survive
 ```
 
-All eight exit non-zero on failure. None needs a browser — the analysis in
+All nine exit non-zero on failure. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts`,
 `lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts`,
-`data/memory.ts`, `lib/orbit-sim.ts` and `lib/orbit-goals.ts` is
+`data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,
+`lib/powder-goals.ts` and `lib/mix-code.ts` is
 deliberately pure functions over plain data so it can be run this way. The
 auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck

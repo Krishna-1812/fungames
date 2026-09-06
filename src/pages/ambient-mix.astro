@@ -10,22 +10,7 @@ import GameLayout from '../layouts/GameLayout.astro'
  * the loops never repeat audibly because there is no loop.
  */
 
-type Layer = { id: string; name: string; glyph: string; hint: string }
-
-const LAYERS: Layer[] = [
-  { id: 'rain', name: 'Rain', glyph: '🌧️', hint: 'Filtered white noise' },
-  { id: 'waves', name: 'Waves', glyph: '🌊', hint: 'Brown noise under a slow swell' },
-  { id: 'wind', name: 'Wind', glyph: '🌬️', hint: 'A drifting low-pass' },
-  { id: 'fire', name: 'Campfire', glyph: '🔥', hint: 'Rumble plus random crackle' },
-  { id: 'cafe', name: 'Coffee shop', glyph: '☕', hint: 'Murmur and occasional cups' },
-  { id: 'birds', name: 'Birds', glyph: '🐦', hint: 'Swept sine chirps' },
-  { id: 'crickets', name: 'Crickets', glyph: '🦗', hint: 'Rhythmic high bursts' },
-  { id: 'traffic', name: 'Highway', glyph: '🛣️', hint: 'Distant steady roar' },
-  { id: 'clock', name: 'Clock', glyph: '🕰️', hint: 'One click per second' },
-  { id: 'thunder', name: 'Thunder', glyph: '⛈️', hint: 'Rare, long, low' },
-  { id: 'mower', name: 'Lawnmower', glyph: '🚜', hint: 'A neighbour, at 8am' },
-  { id: 'dial', name: 'Dial-up modem', glyph: '📠', hint: 'Regrettable' },
-]
+import { LAYERS, PRESETS } from '../lib/mix-code'
 ---
 
 <GameLayout slug="ambient-mix" bar="#132a3f" bodyClass="mix-body">
@@ -45,6 +30,18 @@ const LAYERS: Layer[] = [
         <input type="range" id="master" min="0" max="100" value="70" aria-label="Master volume" />
       </label>
       <button type="button" id="clearBtn" class="ghost">Silence</button>
+      <button type="button" id="shareBtn" class="ghost">Copy link</button>
+    </div>
+
+    {/* Twelve layers is a lot of combinations, and most of them are bad. These
+        are the ones worth arriving at. */}
+    <div class="presets" role="group" aria-label="Presets">
+      {PRESETS.map((p) => (
+        <button type="button" class="preset" data-preset={p.id} title={p.note}>
+          <b>{p.name}</b>
+          <span>{p.note}</span>
+        </button>
+      ))}
     </div>
 
     <div class="field" id="field" aria-hidden="true"></div>
@@ -77,6 +74,7 @@ const LAYERS: Layer[] = [
 <script>
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
   import { MIX_FRAG } from '../lib/mix-field'
+  import { LAYERS, PRESETS, encode, decode, presetById } from '../lib/mix-code'
 
   const grid = document.getElementById('grid')
   const masterBtn = document.getElementById('masterBtn')
@@ -438,7 +436,123 @@ const LAYERS: Layer[] = [
   document.getElementById('clearBtn').addEventListener('click', () => {
     if (!ctx) return
     for (const L of layers.values()) setLayer(L, false)
+    writeUrl()
   })
+
+  /* ----------------------------------------------------------------------
+     Presets, and the mix code in the URL.
+
+     Everything about the format lives in lib/mix-code.ts and is checked by
+     scripts/check-mix.mjs. What is left here is the two directions: putting
+     the page into a mix, and reading the mix back out of the page.
+     ---------------------------------------------------------------------- */
+
+  /** What the controls currently say, whether or not there is any audio yet. */
+  function readMix() {
+    const levels = {}
+    for (const l of LAYERS) {
+      const li = grid.querySelector(`.layer[data-id="${l.id}"]`)
+      if (!li) continue
+      const on = li.classList.contains('on')
+      const v = Number(li.querySelector('.vol').value) / 100
+      if (on && v > 0) levels[l.id] = v
+    }
+    return { master: Number(masterSlider.value) / 100, levels }
+  }
+
+  /**
+   * Put the page into a mix.
+   *
+   * This has to work before there is an AudioContext, because a shared link
+   * arrives without a gesture and browsers will not start audio without one.
+   * So it always sets the controls, and only touches the audio graph if one
+   * happens to exist.
+   */
+  function applyMix(mix) {
+    masterSlider.value = String(Math.round(mix.master * 100))
+    if (masterGain) masterGain.gain.setTargetAtTime(mix.master, ctx.currentTime, 0.06)
+    for (const l of LAYERS) {
+      const li = grid.querySelector(`.layer[data-id="${l.id}"]`)
+      if (!li) continue
+      const v = mix.levels[l.id] ?? 0
+      const on = v > 0
+      li.querySelector('.vol').value = String(Math.round((on ? v : 0.45) * 100))
+      const L = layers.get(l.id)
+      if (L) { L.vol = on ? v : 0.45; setLayer(L, on) }
+      else {
+        li.classList.toggle('on', on)
+        li.querySelector('.toggle').setAttribute('aria-pressed', String(on))
+      }
+    }
+  }
+
+  /* Written by us, so the hashchange listener knows to ignore it. */
+  let ownHash = ''
+  function writeUrl() {
+    const code = encode(readMix())
+    ownHash = '#m=' + code
+    history.replaceState(null, '', ownHash)
+    return code
+  }
+
+  const shareBtn = document.getElementById('shareBtn')
+  shareBtn.addEventListener('click', async () => {
+    writeUrl()
+    const url = location.href
+    let copied = false
+    try {
+      await navigator.clipboard.writeText(url)
+      copied = true
+    } catch { /* denied, or no clipboard: the URL bar has it either way. */ }
+    shareBtn.textContent = copied ? 'Link copied' : 'Link is in the address bar'
+    note.textContent = copied
+      ? 'That link carries the whole mix. Twenty-six characters at the very most.'
+      : 'The address bar now holds the mix — copy it from there.'
+    clearTimeout(shareBtn._t)
+    shareBtn._t = setTimeout(() => { shareBtn.textContent = 'Copy link' }, 2600)
+  })
+
+  document.querySelector('.presets').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.preset')
+    if (!btn) return
+    const p = presetById(btn.dataset.preset)
+    if (!p) return
+    if (!running) await start()
+    applyMix(p.mix)
+    writeUrl()
+    for (const b of document.querySelectorAll('.preset')) b.classList.toggle('on', b === btn)
+    note.textContent = p.note
+  })
+
+  /* A mix arriving from somebody else. The controls are set and the page waits
+     for a click, because no browser will start audio without one. */
+  function loadFromHash(announce) {
+    const m = /(?:^|[#&])m=([^&]*)/.exec(location.hash)
+    const mix = m ? decode(decodeURIComponent(m[1])) : null
+    if (!mix) return false
+    applyMix(mix)
+    if (announce) {
+      note.textContent = 'A shared mix — press the button above to hear it.'
+    }
+    return true
+  }
+
+  addEventListener('hashchange', () => {
+    if (location.hash === ownHash) return
+    loadFromHash(false)
+  })
+
+  // Keep the URL honest as the mix is fiddled with, but only once there is
+  // something to describe.
+  for (const el of [masterSlider]) el.addEventListener('change', () => { if (ctx) writeUrl() })
+  grid.addEventListener('change', (e) => {
+    if (e.target.classList.contains('vol') && ctx) writeUrl()
+  })
+  grid.addEventListener('click', (e) => {
+    if (e.target.closest('.toggle') && ctx) setTimeout(writeUrl, 0)
+  })
+
+  loadFromHash(true)
 </script>
 
 <style>
@@ -471,6 +585,26 @@ const LAYERS: Layer[] = [
   .ghost:hover { background: rgba(255, 255, 255, 0.06); transform: scale(1.04); }
   .ghost:active { transform: scale(0.95); }
   .master { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #a8bccd; }
+
+  /* ---- presets --------------------------------------------------------- */
+  .presets {
+    display: grid; gap: 8px; margin-bottom: 26px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+  .preset {
+    text-align: left; cursor: pointer; font: inherit; color: inherit;
+    background: #142433; border: 1px solid #24405a; border-radius: 12px;
+    padding: 10px 13px;
+    transition: border-color 140ms var(--ease), background 140ms var(--ease),
+                transform 180ms var(--ease-bounce);
+  }
+  .preset:hover { border-color: #5a9fd4; background: #17293a; transform: translateY(-1px); }
+  .preset:active { transform: scale(0.98); }
+  .preset.on { border-color: #5a9fd4; background: #17304a; }
+  .preset b { display: block; font-size: 13.5px; color: #eaf1f7; }
+  .preset span {
+    display: block; font-size: 12px; color: #9db3c6; margin-top: 3px; line-height: 1.5;
+  }
 
   input[type='range'] {
     -webkit-appearance: none; appearance: none;

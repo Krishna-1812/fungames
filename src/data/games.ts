@@ -175,9 +175,9 @@ export const GAMES: Game[] = [
   {
     slug: 'ambient-mix',
     title: 'Ambient Mix',
-    blurb: 'Build a soundscape, then ruin it',
+    blurb: 'Build a soundscape, then send it to someone',
     description:
-      'Rain, waves, a coffee shop, a distant lawnmower. Layer them into something calming, or keep going until it is unbearable. Every sound is synthesised live.',
+      'Rain, waves, a coffee shop, a distant lawnmower. Layer them into something calming, or keep going until it is unbearable. Every sound is synthesised live, and the whole mix fits in the link.',
     accent: '#132a3f', accent2: '#5a9fd4', glyph: '🎧', art: 'waves',
     added: '2026-09-04',
   },
