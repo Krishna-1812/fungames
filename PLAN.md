@@ -59,7 +59,7 @@ Ruthless, because that's what was asked for.
 | **Orbit** | Best engineering on the site (real n-body, HDR, bloom). Zero game. Nothing to achieve, so nobody stays. | **High** |
 | **Overstimulated** | Good joke, real escalation, but ends too early and the upgrades aren't absurd enough. Neal's version has a hamster wheel and a live video. | **High** |
 | **From Memory** | Genuinely strong concept and the best "oh no" moment on the site. Only 8 prompts. | **High** |
-| **Trolley** | 12 dilemmas vs Neal's 28, and his are hand-drawn per scenario. Ours is an abstract track diagram. | **Medium-high** |
+| **Trolley** | ~~12 dilemmas, and an abstract track diagram.~~ Twenty-six, and a drawn scene that changes with each one. | **Medium-high — done** |
 | **Fusion** | ~~Effectively dead without the Cloudflare worker.~~ Thirty-six local recipes, reachable from four seeds, checked in both orders. | **Medium — playable offline** |
 | **Spend It** | Competent clone. Emoji instead of product images is the main tell. Receipt endgame is good. | **Medium** |
 | **Steady Hand** | ~~A 20-second toy with one challenge.~~ Four shapes and a combined rating. | **Medium — done** |
@@ -289,8 +289,37 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   generated element, so there is nothing to draw in advance. Rule Cascade's 🕷
   is not decoration: the rule requires you to type it, and the moth eats every
   character that is not one.
-- **Illustrated scenes for Trolley** — the tracks, the trolley, the people, drawn
-  with actual character.
+- ~~**Illustrated scenes for Trolley**~~ **done.** It is a place now: a field
+  with scrub, a ballast bed and two rails under each track, and a tram with a
+  pole, a driver and a headlight instead of a rectangle with two circles under
+  it. The figures are filled silhouettes rather than two-pixel strokes, and the
+  lobster and the chicken are drawn as a lobster and a chicken.
+
+  The drawing moved out of the page into `lib/trolley-scene.ts` and now carries
+  its own fills. That removes a trap rather than documenting it a sixth time:
+  nodes built at runtime do not get Astro's scoped-style attribute, so every
+  rule for them had to be written `:global` or it silently matched nothing —
+  and the branch rail rendered as a solid black wedge. Colour in the markup is
+  also the only way the checker sees what the browser sees. The two rules left
+  in CSS are the two that are animation.
+
+  `check-trolley-scene.mjs` is the first checker here that tests a picture
+  against a *claim*: the footbridge case must draw no lever because it has
+  none, a dead lever must get a dashed branch, a loop must put nobody on the
+  branch. It also proves every token kind draws something — a kind the drawing
+  does not handle renders an empty track where five people should be — and it
+  found three real things: an orange "you" and a gold chicken that both sat
+  under the separation bar against the ballast they stand on, and a tram whose
+  markup was only ever correct because the page translated it on the very next
+  line. Rendered on its own it sat half outside the frame.
+
+  One of its failures was the checker's own: it reported all twenty-six scenes
+  as overflowing by an identical 3.9%, which turned out to be one pixel of
+  antialiasing around a boundary computed exactly on the frame edge. An
+  identical number across every case is the shape of a measurement bug, not of
+  a drawing one.
+
+  That closes Phase 3.
 - ~~**Illustrated objects for Scale**~~ **done.** Twenty-six drawings in
   `lib/scale-art.ts`, and the page keeps its shader for the seventeen entries
   that genuinely are lit spheres, rings, nebulae and a wave.
@@ -374,7 +403,7 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   a flat excavation-report diagram read at any size, where a head in profile
   and a hand-held object need detail the card cannot resolve.
 
-  That closes Phase 3.
+  Trolley's scenes are the one thing left in this phase.
 
 ### Phase 4 — Endings, scores and sharing
 

@@ -98,6 +98,7 @@ src/
     scale-art.ts        twenty-six of those drawn, with both their real axes
     time-events.ts      Deep Time's forty-four events and when they happened
     time-art.ts         a scene for each, flat colour on one palette
+    trolley-scene.ts    the field, the track, the tram and whoever is on it
     icons.ts            sixty-five drawn icons, shared across the games
     icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
@@ -345,6 +346,7 @@ node scripts/check-art.mjs         # the tile illustrations, rasterised and meas
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
 node scripts/check-time-art.mjs    # Deep Time's scenes, at the card's own widths
+node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
 ```
 
 `npm test` runs all of them and reports which suites failed; `npm run check`
@@ -405,6 +407,16 @@ gradients at all** — the other modules prefix ids to keep forty-four, twenty-s
 and eighteen drawings from colliding in one document, and having none is a
 guarantee rather than a convention — and every colour must come from one
 twenty-one-entry palette, which the file enforces rather than asks for.
+
+`check-trolley-scene.mjs` is the fourth, and the only one that checks a
+picture against a *claim*. Trolley's scene is the one place the player learns
+who is standing where, so the file asks whether the drawing agrees with the
+dilemma: the footbridge case must draw no lever, because it has none; a lever
+wired to nothing must draw a dashed branch; a looping branch must put nobody on
+it. It also proves every token kind draws something — a `kind` the drawing does
+not handle renders an empty track where five people are supposed to be — and
+that five people, five lobsters and five chickens are three different pictures
+rather than three rows of dots.
 
 Its own mistake is worth reading. It first ran one edge-density floor at all
 three card widths and called the narrowest the hard case. That is backwards:
