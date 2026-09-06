@@ -24,7 +24,9 @@ import { GOALS } from '../lib/orbit-goals'
 <GameLayout slug="orbit" bar="#05060f" fixed bodyClass="orbit-body">
   <div class="stage" id="stage">
     <h1 class="visually-hidden">Orbit</h1>
-    <canvas id="sky" aria-label="Gravity simulation"></canvas>
+    <canvas id="sky" tabindex="0" aria-label="Gravity simulation" aria-describedby="keyboardHelp"></canvas>
+    <p id="keyboardHelp" class="visually-hidden">Press K to aim a launch. Arrow keys move the starting point. Hold Shift and use arrow keys to change launch direction and speed. Enter launches. Escape cancels.</p>
+    <p id="keyboardStatus" class="visually-hidden" role="status" aria-live="polite"></p>
     {/* The aim indicator is interface, not scene. Keeping it on its own 2D
         layer means a crisp dashed line rather than one that picks up bloom and
         the trail fade along with everything else. */}
@@ -112,6 +114,7 @@ import { GOALS } from '../lib/orbit-goals'
         <button type="button" class="opt" id="saveScene">Save scene</button>
         <button type="button" class="opt" id="loadScene">Load scene</button>
         <button type="button" class="opt" id="helpBtn">Learn</button>
+        <button type="button" class="opt" id="keyboardBtn">Keyboard</button>
       </div>
       <div class="group">
         <button type="button" class="opt wide" id="goalBtn" aria-expanded="false">
@@ -127,6 +130,7 @@ import { GOALS } from '../lib/orbit-goals'
   import { burst, ring } from '../lib/fx'
 
   import { SCENE_KEY, captureScene, readScene, sceneBodies, encodeScene, decodeScene, fitScene, type Scene } from '../lib/orbit-scene'
+  import { adjustAim } from '../lib/orbit-input'
   import { FixedClock } from '../lib/fixed-clock'
   import { createRenderer } from '../lib/orbit-render'
   import {
@@ -337,6 +341,7 @@ import { GOALS } from '../lib/orbit-goals'
   }
 
   // ---- input -------------------------------------------------------------
+  let keyboardAim = false
   let aim: { x0: number; y0: number; x1: number; y1: number } | null = null
   const tip = document.getElementById('tip')!
 
@@ -346,6 +351,7 @@ import { GOALS } from '../lib/orbit-goals'
   }
 
   canvas.addEventListener('pointerdown', (e) => {
+    keyboardAim = false
     unlock()
     const p = local(e)
     aim = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }
@@ -354,7 +360,7 @@ import { GOALS } from '../lib/orbit-goals'
     e.preventDefault()
   })
   canvas.addEventListener('pointermove', (e) => {
-    if (!aim) return
+    if (!aim || keyboardAim) return
     const p = local(e)
     aim.x1 = p.x; aim.y1 = p.y
   })
@@ -374,8 +380,39 @@ import { GOALS } from '../lib/orbit-goals'
     })
     aim = null
   }
-  canvas.addEventListener('pointerup', release)
-  canvas.addEventListener('pointercancel', () => { aim = null })
+  canvas.addEventListener('pointerup', () => { if (!keyboardAim) release() })
+  canvas.addEventListener('pointercancel', () => { if (!keyboardAim) aim = null })
+
+  const keyboardStatus = document.getElementById('keyboardStatus')!
+  function startKeyboardAim() {
+    if (!W) return
+    keyboardAim = true; flightCard.hidden = true
+    const x = Math.min(W - 12, W / 2 + lessonRadius()), y = H / 2
+    aim = { x0: x, y0: y, x1: x, y1: y }
+    canvas.focus()
+    tip.classList.remove('faded')
+    tip.textContent = 'Arrows: position · Shift + arrows: velocity · Enter: launch · Esc: cancel'
+    keyboardStatus.textContent = 'Launch ready. Use arrows to position, Shift and arrows to set velocity, then Enter to launch.'
+  }
+  document.getElementById('keyboardBtn')!.addEventListener('click', startKeyboardAim)
+  canvas.addEventListener('keydown', (event) => {
+    if (event.key.toLowerCase() === 'k') { event.preventDefault(); startKeyboardAim(); return }
+    if (!keyboardAim || !aim) return
+    if (event.key === 'Escape') {
+      event.preventDefault(); aim = null; keyboardAim = false
+      keyboardStatus.textContent = 'Launch cancelled.'; return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault(); unlock(); release(); keyboardAim = false
+      keyboardStatus.textContent = 'Body launched.'; return
+    }
+    const directions: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+    const direction = directions[event.key]
+    if (!direction) return
+    event.preventDefault()
+    aim = adjustAim(aim, direction, event.shiftKey, W, H)
+    keyboardStatus.textContent = `Start ${Math.round(100 * aim.x0 / W)} percent across, ${Math.round(100 * aim.y0 / H)} percent down. Horizontal velocity ${((aim.x1 - aim.x0) * .055).toFixed(1)}, vertical velocity ${((aim.y1 - aim.y0) * .055).toFixed(1)}.`
+  })
 
   document.querySelectorAll<HTMLButtonElement>('.opt[data-mass]').forEach((b) => {
     b.addEventListener('click', () => {
@@ -391,7 +428,7 @@ import { GOALS } from '../lib/orbit-goals'
 
   // ---- presets -----------------------------------------------------------
   function clear() {
-    bodies = []; merges = 0; guide = false; aim = null
+    bodies = []; merges = 0; guide = false; aim = null; keyboardAim = false
     clock.reset(); tracker.reset(); renderer.clear()
     tip.classList.remove('faded')
     tip.textContent = 'Drag across the sky to launch a body. Longer drag, faster throw.'

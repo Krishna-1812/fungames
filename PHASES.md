@@ -91,6 +91,24 @@ and built-site QA, observed first-minute playtests, manual drag/keyboard
 accessibility checks, optional trajectory preview, and result presentation.
 The scene link shares a starting simulation, not full challenge-history state.
 
+### Next Orbit batch — keyboard launches
+
+Added a focusable sky and a visible Keyboard button. K starts aiming, arrow
+keys move the start point, Shift plus arrows adjust velocity, Enter launches,
+and Escape cancels. Screen-reader status announces position, velocity and the
+result. Pointer and keyboard aiming do not consume each other's release events.
+
+Validation: new input checks pass for independent velocity/position control,
+boundary clamping, immutable input and speed limits. Orbit physics/challenges,
+clock and scene suites also pass. Browser keyboard input launched exactly one
+body into a paused empty scene; cancellation kept the body count unchanged.
+No browser errors were logged. Full screen-reader and physical-device testing
+remain open, alongside the production-build verification noted above.
+
+Publishing: frozen patch scripts in the delivery outputs publish each batch
+without accidentally staging later work. Push commands will accompany every
+batch from now on, as requested by the owner.
+
 ## Phase 3 — launch trio
 
 From Memory: sketchbook, reference comparison and a downloadable postcard.
