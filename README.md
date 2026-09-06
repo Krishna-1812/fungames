@@ -207,8 +207,13 @@ wobble 86.4%, 30 px wobble 4.0%.*
 **Fusion** — drag one thing onto another. Playable offline via a local recipe
 table; the Cloudflare Worker takes over when deployed.
 
-**Trolley** — twelve dilemmas scored against four named ethical positions rather
-than against invented crowd statistics.
+**Trolley** — twenty-six dilemmas, each authored with what four named ethical
+positions actually say about it, so the ending scores your answers against all
+four instead of inventing crowd statistics. *`scripts/check-trolley.mjs` plays
+the whole game as a strict follower of each position and checks it gets named
+correctly, and that no two positions agree often enough to be the same thing
+under different names — the closest pair, utilitarian and contractualist, still
+part company on six of twenty-three.*
 
 **Paper Folds** — 0.1 mm doubled 103 times, with the pitch climbing on every
 fold so the exponential is audible. *Fold 42 reaches the Moon, fold 103 exceeds
@@ -287,7 +292,7 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Four games carry enough real modelling that the maths is checked separately,
+Five games carry enough real modelling that the maths is checked separately,
 against answers from the literature, worked out by hand, or measured over a
 simulation:
 
@@ -296,11 +301,12 @@ node scripts/check-impact.mjs      # Asteroid Launcher, vs four real impacts
 node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
 node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots
 node scripts/check-cascade.mjs     # Rule Cascade, is it still finishable
+node scripts/check-trolley.mjs     # Trolley, are the four positions distinct
 ```
 
-All four exit non-zero on failure. None needs a browser — the analysis in
+All five exit non-zero on failure. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts` and
-`lib/cascade-rules.ts` is
+`lib/cascade-rules.ts` and `data/dilemmas.ts` is
 deliberately pure functions over plain data so it can be run this way. The
 auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck

@@ -8,120 +8,27 @@ import GameLayout from '../layouts/GameLayout.astro'
  * backend collecting votes. Rather than invent plausible-looking percentages,
  * this version scores your own answers against four named ethical positions and
  * tells you which one you actually argued for. No fabricated statistics.
+ *
+ * The problems and the scoring live in data/dilemmas.ts, where every case
+ * records what each position says about it. scripts/check-trolley.mjs plays the
+ * whole game as a strict follower of each of the four and checks it gets named
+ * correctly, and that no two positions agree often enough to be the same thing
+ * under different names.
  */
 
-type Option = {
-  label: string
-  /** How many die if you pick this. */
-  deaths: number
-  /** Did you actively intervene? Deontology cares; utilitarianism does not. */
-  acts: boolean
-  outcome: string
-}
-/** What is actually standing on each track. See the note in the wiring. */
-type Token = { kind: 'people' | 'friend' | 'you' | 'lobsters' | 'box' | 'empty'; n: number; consent?: boolean }
-type Scene = { straight: Token; branch: Token; loop?: boolean; dead?: boolean; money?: boolean }
-type Dilemma = { title: string; setup: string; scene: Scene; left: Option; right: Option }
-
-const DILEMMAS: Dilemma[] = [
-  {
-    title: 'The original',
-    setup: 'A trolley is heading towards five people. You can pull a lever to divert it onto a track with one person.',
-    scene: { straight: { kind: 'people', n: 5 }, branch: { kind: 'people', n: 1 } },
-    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die. You did not touch anything.' },
-    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'One person dies, because of a decision you made.' },
-  },
-  {
-    title: 'The maths',
-    setup: 'The trolley is heading towards one person. Pulling the lever diverts it onto a track with five people.',
-    scene: { straight: { kind: 'people', n: 1 }, branch: { kind: 'people', n: 5 } },
-    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'One person dies. This was the easy one.' },
-    right: { label: 'Pull the lever', deaths: 5, acts: true, outcome: 'Five people die and it is entirely your fault.' },
-  },
-  {
-    title: 'The friend',
-    setup: 'Five strangers are on the main track. Your closest friend is on the other.',
-    scene: { straight: { kind: 'people', n: 5 }, branch: { kind: 'friend', n: 1 } },
-    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five strangers die. Your friend never finds out how close it was.' },
-    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'You saved five people. You will not be telling anyone how.' },
-  },
-  {
-    title: 'The box',
-    setup: 'Five people are on the main track. The other track disappears into a large opaque box. You have no idea what is inside.',
-    scene: { straight: { kind: 'people', n: 5 }, branch: { kind: 'box', n: 1 } },
-    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die. The box remains a mystery.' },
-    right: { label: 'Pull the lever', deaths: 2, acts: true, outcome: 'It was two people and a lot of packing foam. You got lucky.' },
-  },
-  {
-    title: 'The lobsters',
-    setup: 'One person is on the main track. Five lobsters are on the other. The lobsters are, by all accounts, having a lovely time.',
-    scene: { straight: { kind: 'people', n: 1 }, branch: { kind: 'lobsters', n: 5 } },
-    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'A person dies. The lobsters continue their lovely time.' },
-    right: { label: 'Pull the lever', deaths: 0, acts: true, outcome: 'Five lobsters die. Nobody counts this as a death, including us.' },
-  },
-  {
-    title: 'The offer',
-    setup: 'The trolley is heading towards an empty track. Nobody is in danger. If you pull the lever, one person dies and you are given one million dollars.',
-    scene: { straight: { kind: 'empty', n: 0 }, branch: { kind: 'people', n: 1 }, money: true },
-    left: { label: 'Do nothing', deaths: 0, acts: false, outcome: 'Nothing happens. You remain poor and blameless.' },
-    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'A person dies. You are now rich and everyone knows why.' },
-  },
-  {
-    title: 'The consent',
-    setup: 'Five people are tied to the main track, and all five have signed a form saying they accept the risk. One person on the other track signed nothing and is very annoyed.',
-    scene: { straight: { kind: 'people', n: 5, consent: true }, branch: { kind: 'people', n: 1 } },
-    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five consenting people die. The paperwork is in order.' },
-    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'One non-consenting person dies. The paperwork is not in order.' },
-  },
-  {
-    title: 'The self',
-    setup: 'Five people are on the main track. On the other track is you, forty years from now.',
-    scene: { straight: { kind: 'people', n: 5 }, branch: { kind: 'you', n: 1 } },
-    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die. You go on to have a long life about it.' },
-    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'You die, eventually, on schedule, on a train track.' },
-  },
-  {
-    title: 'The pointless lever',
-    setup: 'Five people are on the track. The lever is not connected to anything. Pulling it will change nothing at all.',
-    scene: { straight: { kind: 'people', n: 5 }, branch: { kind: 'empty', n: 0 }, dead: true },
-    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die and you stood still.' },
-    right: { label: 'Pull the lever', deaths: 5, acts: true, outcome: 'Five people die and you tried. It made no difference. It may have made a difference to you.' },
-  },
-  {
-    title: 'The loop',
-    setup: 'One person is tied to the main track. The other track loops around and rejoins the first, at the exact spot where that same person is tied.',
-    scene: { straight: { kind: 'people', n: 1 }, branch: { kind: 'empty', n: 0 }, loop: true },
-    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'They die.' },
-    right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'They die, slightly later, having watched you decide.' },
-  },
-  {
-    title: 'The many',
-    setup: 'Five people are on the main track. On the other track are two people, but pulling the lever also means the trolley is delayed by four minutes, and one of the five would have escaped in that time.',
-    scene: { straight: { kind: 'people', n: 5 }, branch: { kind: 'people', n: 2 } },
-    left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five die. You did not have time to work through the arithmetic anyway.' },
-    right: { label: 'Pull the lever', deaths: 2, acts: true, outcome: 'Two die. Somewhere, a person who would have escaped is now a hypothetical.' },
-  },
-  {
-    title: 'The last one',
-    setup: 'The trolley is heading towards you. There is nobody else here. The lever is within reach and would divert it onto an empty track.',
-    scene: { straight: { kind: 'you', n: 1 }, branch: { kind: 'empty', n: 0 } },
-    left: { label: 'Do nothing', deaths: 1, acts: false, outcome: 'You have made a series of choices and this is the last one.' },
-    right: { label: 'Pull the lever', deaths: 0, acts: true, outcome: 'Nobody dies. Notice how easy that was.' },
-  },
-]
 ---
 
 <GameLayout slug="trolley" bar="#3d1f14" bodyClass="trolley-body">
   <div class="wrap">
     <header class="head">
       <h1>Trolley</h1>
-      <p class="lede">Twelve levers. There is no right answer, but there is definitely a you-shaped pattern.</p>
+      <p class="lede">Twenty-six levers. There is no right answer, but there is definitely a you-shaped pattern.</p>
     </header>
 
     <div class="dots" id="dots" aria-hidden="true"></div>
 
     <section class="card" id="card" aria-live="polite">
-      <div class="tag" id="tag">Problem 1 of 12</div>
+      <div class="tag" id="tag">Problem 1 of 26</div>
       <h2 id="title">—</h2>
       <p class="setup" id="setup">—</p>
 
@@ -147,6 +54,8 @@ const DILEMMAS: Dilemma[] = [
       </div>
       <h3 id="vLabel">—</h3>
       <p id="vBlurb"></p>
+      <ul class="positions" id="vBars"></ul>
+      <p class="repeat" id="vRepeat"></p>
       <div class="verdict-actions">
         <button type="button" data-share data-title="Trolley">Share</button>
         <button type="button" id="againBtn" class="ghost">Start again</button>
@@ -155,14 +64,10 @@ const DILEMMAS: Dilemma[] = [
   </div>
 </GameLayout>
 
-  {/* Data for the module below: modules cannot take define:vars, and
-      modules are what let every game share one synthesiser. */}
-  <script type="application/json" id="game-data" set:html={JSON.stringify({ DILEMMAS })} />
-
   <script>
   import { burst, shake, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock, hit } from '../lib/audio'
-    const { DILEMMAS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+  import { DILEMMAS, POSITIONS, scoreAnswers, REPEAT_OF_FIRST } from '../data/dilemmas'
 
   const el = (id) => document.getElementById(id)
   const dots = el('dots')
@@ -174,6 +79,8 @@ const DILEMMAS: Dilemma[] = [
   let deaths = 0
   let pulls = 0
   let answered = []
+  /** One side per problem, in order — the only input the scoring needs. */
+  let picks = []
 
   dots.replaceChildren(
     ...DILEMMAS.map(() => {
@@ -216,6 +123,15 @@ const DILEMMAS: Dilemma[] = [
       '</g>'
   }
 
+  /** Not a person either, and rounder than a lobster so the two do not blur. */
+  function chicken(x, y) {
+    return '<g class="fig chicken">' +
+      '<ellipse cx="' + x + '" cy="' + (y - 5) + '" rx="3.6" ry="4.2"/>' +
+      '<circle cx="' + x + '" cy="' + (y - 11) + '" r="2.4"/>' +
+      '<path d="M' + (x + 2.2) + ' ' + (y - 11) + ' l3 1.4 l-3 1.4z"/>' +
+      '</g>'
+  }
+
   function tokens(t, cx, y) {
     if (!t || t.kind === 'empty' || !t.n) return ''
     if (t.kind === 'box') {
@@ -223,15 +139,20 @@ const DILEMMAS: Dilemma[] = [
         '<rect x="' + (cx - 19) + '" y="' + (y - 30) + '" width="38" height="30" rx="3"/>' +
         '<text x="' + cx + '" y="' + (y - 10) + '" text-anchor="middle">?</text></g>'
     }
-    const pitch = 13
+    // Fifty million people and ten thousand chickens cannot be drawn one at a
+    // time, so a handful stand for the group and the number is written above
+    // them. Pretending the picture is a headcount would be worse than saying so.
+    const pitch = t.label ? 9 : 13
     const n = t.n
     const x0 = cx - ((n - 1) * pitch) / 2
     let out = ''
     for (let k = 0; k < n; k++) {
       const x = x0 + k * pitch
       if (t.kind === 'lobsters') out += lobster(x, y)
+      else if (t.kind === 'chickens') out += chicken(x, y)
       else out += person(x, y, t.kind === 'you' ? 'self' : t.kind === 'friend' ? 'friend' : '')
     }
+    if (t.label) out += '<text class="mark" x="' + cx + '" y="' + (y - 26) + '" text-anchor="middle">' + t.label + '</text>'
     // A small tick over a group that signed the form; the dilemma turns on it.
     if (t.consent) out += '<text class="mark" x="' + cx + '" y="' + (y - 26) + '" text-anchor="middle">signed</text>'
     if (t.kind === 'you') out += '<text class="mark" x="' + cx + '" y="' + (y - 26) + '" text-anchor="middle">you</text>'
@@ -257,12 +178,18 @@ const DILEMMAS: Dilemma[] = [
     SCENE.innerHTML =
       sleepers(16, 140, Y_STRAIGHT, 15) +
       sleepers(160, 312, Y_STRAIGHT, 15) +
-      (sc.loop ? '' : sleepers(222, 312, Y_BRANCH, 15)) +
+      (sc.loop || sc.bridge ? '' : sleepers(222, 312, Y_BRANCH, 15)) +
       '<path class="rail" d="M8 ' + Y_STRAIGHT + ' H 312"/>' +
-      '<path class="rail branch' + (sc.dead ? ' dead' : '') + '" d="' + branchPath + '"/>' +
-      // The lever stand, and the switch rail it throws.
-      '<path class="stand" d="M' + (FORK - 26) + ' ' + (Y_STRAIGHT + 12) + ' v-16"/>' +
-      '<path class="switch" id="switchRail" d="M' + (FORK - 26) + ' ' + (Y_STRAIGHT - 4) + ' l14 -9"/>' +
+      (sc.bridge ? '' : '<path class="rail branch' + (sc.dead ? ' dead' : '') + '" d="' + branchPath + '"/>') +
+      // On the footbridge case there is no second track and no lever at all —
+      // drawing one would contradict the setup, which is the whole point of
+      // that problem.
+      (sc.bridge
+        ? '<path class="bridge" d="M96 ' + (Y_STRAIGHT - 46) + ' H 200"/>' +
+          '<path class="bridge leg" d="M100 ' + (Y_STRAIGHT - 46) + ' v34 M196 ' + (Y_STRAIGHT - 46) + ' v34"/>' +
+          person(172, Y_STRAIGHT - 46, 'bystander')
+        : '<path class="stand" d="M' + (FORK - 26) + ' ' + (Y_STRAIGHT + 12) + ' v-16"/>' +
+          '<path class="switch" id="switchRail" d="M' + (FORK - 26) + ' ' + (Y_STRAIGHT - 4) + ' l14 -9"/>') +
       tokens(sc.straight, STOP, Y_STRAIGHT) +
       (sc.loop ? '' : tokens(sc.branch, STOP, Y_BRANCH)) +
       (sc.money ? '<text class="mark money" x="' + STOP + '" y="' + (Y_BRANCH - 26) + '" text-anchor="middle">$1,000,000</text>' : '') +
@@ -338,12 +265,14 @@ const DILEMMAS: Dilemma[] = [
     deaths += opt.deaths
     if (opt.acts) pulls++
     answered.push({ deaths: opt.deaths, acts: opt.acts, min: Math.min(d.left.deaths, d.right.deaths) })
+    picks[i] = side
 
     el('btnLeft').disabled = true
     el('btnRight').disabled = true
     card.classList.add('resolved')
     // A lever that is not connected still throws; that is the joke.
-    if (opt.acts) el('switchRail').classList.add('thrown')
+    // There is no switch rail on the footbridge problem, and no lever to throw.
+    if (opt.acts) el('switchRail')?.classList.add('thrown')
 
     // The outcome waits for the trolley to arrive, so the picture and the text
     // land together instead of the text pre-empting it.
@@ -377,22 +306,35 @@ const DILEMMAS: Dilemma[] = [
     el('vPulls').textContent = String(pulls)
     el('vSaved').textContent = String(saved)
 
-    let label, blurb
-    if (optimal >= 11) {
-      label = 'Utilitarian'
-      blurb = 'You counted, every time, and picked the smaller number. Consistent, defensible, and slightly unnerving to be tied to a track near.'
-    } else if (pulls <= 3) {
-      label = 'Non-interventionist'
-      blurb = 'You mostly kept your hands off the lever. There is a real argument that a death you caused is worse than one you failed to prevent, and you made it twelve times.'
-    } else if (pulls >= 10) {
-      label = 'Interventionist'
-      blurb = 'You pulled almost every lever, including the one that was not connected to anything. You would rather have done something than nothing.'
-    } else {
-      label = 'Situational'
-      blurb = 'No single rule explains your answers. You weighed each one separately, which is either moral seriousness or an inability to commit.'
-    }
-    el('vLabel').textContent = label
-    el('vBlurb').textContent = blurb
+    /* Every percentage below is your own agreement rate with a position, over
+       the problems that position actually takes a side on. Nothing here is a
+       crowd statistic, because there is no crowd. */
+    const scored = scoreAnswers(picks)
+    el('vBars').innerHTML = scored.map((s) =>
+      `<li class="pos${s === scored[0] ? ' top' : ''}">
+         <div class="posrow"><b>${s.name}</b><span>${s.pct}%</span></div>
+         <div class="bar"><i style="width:${s.pct}%"></i></div>
+         <p>${POSITIONS[s.key].short}</p>
+         <small>You agreed with it on ${s.agreed} of the ${s.of} problems it has a view about.</small>
+       </li>`).join('')
+
+    const top = scored[0]
+    const runner = scored[1]
+    el('vLabel').textContent = top.name
+    el('vBlurb').textContent =
+      top.pct === runner.pct
+        ? `You split evenly between ${top.name.toLowerCase()} and ${runner.name.toLowerCase()}, at ${top.pct}% each. No single account of your answers wins.`
+        : top.pct >= 85
+          ? `You argued for it ${top.pct}% of the time, which is more consistent than most people manage. The next closest was ${runner.name.toLowerCase()}, at ${runner.pct}%.`
+          : `You argued for it ${top.pct}% of the time — ahead of ${runner.name.toLowerCase()} at ${runner.pct}%, but not by much. Most people are a mixture, and the mixture is the interesting part.`
+
+    // The twenty-fifth problem is the first one again. Whether you answered it
+    // the same way is the one thing this game can measure about you directly.
+    const changed = picks[0] && picks[REPEAT_OF_FIRST] && picks[0] !== picks[REPEAT_OF_FIRST]
+    el('vRepeat').textContent = changed
+      ? 'Problem 25 was problem 1, word for word. You answered it differently the second time.'
+      : 'Problem 25 was problem 1, word for word. You gave the same answer both times.'
+
     verdict.hidden = false
     sfx.great()
     burst(innerWidth / 2, innerHeight * 0.4, {
@@ -402,7 +344,7 @@ const DILEMMAS: Dilemma[] = [
   }
 
   el('againBtn').addEventListener('click', () => {
-    i = 0; deaths = 0; pulls = 0; answered = []
+    i = 0; deaths = 0; pulls = 0; answered = []; picks = []
     card.hidden = false; dots.hidden = false; verdict.hidden = true
     render()
     card.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -464,6 +406,14 @@ const DILEMMAS: Dilemma[] = [
   .scene :global(.fig.friend path) { stroke: #8a5a9e; }
   .scene :global(.fig.friend circle) { fill: #8a5a9e; }
   .scene :global(.fig.lobster ellipse), .scene :global(.fig.lobster circle) { fill: #c0442e; }
+  .scene :global(.fig.chicken ellipse), .scene :global(.fig.chicken circle) { fill: #b98a3d; }
+  .scene :global(.fig.chicken path) { fill: #c0442e; stroke: none; }
+  /* The bystander on the footbridge is the one you would have to push, so they
+     are marked out from the five on the track below. */
+  .scene :global(.fig.bystander path) { stroke: #8a5a9e; }
+  .scene :global(.fig.bystander circle) { fill: #8a5a9e; }
+  .scene :global(.bridge) { fill: none; stroke: #9c7f6a; stroke-width: 3; stroke-linecap: round; }
+  .scene :global(.bridge.leg) { stroke-width: 2.2; opacity: 0.75; }
   .scene :global(.fig.box rect) { fill: #efe1d5; stroke: #b9a08d; stroke-width: 2.5; }
   /* Darker than the other marks because it sits on the box fill, not on the
      card: #8a6a55 measured 3.84:1 there. */
@@ -510,6 +460,28 @@ const DILEMMAS: Dilemma[] = [
   .stat span { font-size: 12px; color: var(--ink-soft); max-width: 14ch; }
   .verdict h3 { font-size: 28px; color: #b5643c; }
   .verdict p { color: #4b4038; max-width: 48ch; margin: 10px auto 0; text-wrap: pretty; }
+  /* The four positions, best first. Left-aligned inside a centred card because
+     these are paragraphs to read, not figures to scan. */
+  /* The list items are built in JS, and JS-created nodes never get Astro's
+     scoped-style attribute — so everything below the <ul> has to be :global,
+     the same way the scene figures are. Without this the bars simply do not
+     exist and the name and percentage run together. */
+  .positions { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 16px; text-align: left; }
+  .positions :global(.pos) { border-top: 1px solid #ecdccd; padding-top: 14px; }
+  .positions :global(.posrow) { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .positions :global(.posrow b) { font-size: 16px; }
+  .positions :global(.posrow span) { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 15px; }
+  .positions :global(.pos.top .posrow b), .positions :global(.pos.top .posrow span) { color: #a84f2a; }
+  .positions :global(.bar) { height: 7px; border-radius: 4px; background: #f0e2d6; overflow: hidden; margin: 7px 0 9px; }
+  .positions :global(.bar i) { display: block; height: 100%; background: #c98a5e; transition: width 600ms var(--ease); }
+  .positions :global(.pos.top .bar i) { background: #b5643c; }
+  .positions :global(p) { margin: 0; font-size: 14px; color: #5b4e44; max-width: none; }
+  .positions :global(small) { display: block; margin-top: 5px; font-size: 12px; color: #7b6c60; }
+  .repeat {
+    margin-top: 22px !important; padding-top: 14px; border-top: 1px solid #ecdccd;
+    font-size: 14px; color: #5b4e44;
+  }
+
   .verdict-actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
   .verdict-actions .ghost { background: #fff; color: var(--ink); border: 1px solid #e3cdbb; }
 

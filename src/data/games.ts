@@ -157,9 +157,9 @@ export const GAMES: Game[] = [
   {
     slug: 'trolley',
     title: 'Trolley',
-    blurb: 'Increasingly unreasonable dilemmas',
+    blurb: 'Twenty-six increasingly unreasonable levers',
     description:
-      'A runaway trolley, a lever, and a series of choices that get less defensible every time. See how your answers compare.',
+      'A runaway trolley and twenty-six choices that get less defensible every time. At the end it scores your answers against four real ethical positions and shows you which one you actually argued for. No invented crowd statistics — the numbers are about you.',
     accent: '#3d1f14', accent2: '#d97742', glyph: '🚋', art: 'tracks',
     added: '2026-09-06',
   },
