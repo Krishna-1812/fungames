@@ -46,7 +46,7 @@ export const LAYERS: Layer[] = [
   { id: 'waves', name: 'Waves', icon: 'waves', hint: 'Brown noise under a slow swell', code: 'w' },
   { id: 'wind', name: 'Wind', icon: 'wind', hint: 'A drifting low-pass', code: 'i' },
   { id: 'fire', name: 'Campfire', icon: 'fire', hint: 'Rumble plus random crackle', code: 'f' },
-  { id: 'cafe', name: 'Coffee shop', icon: 'cafe', hint: 'Murmur and occasional cups', code: 'c' },
+  { id: 'cafe', name: 'Coffee shop', icon: 'coffee', hint: 'Murmur and occasional cups', code: 'c' },
   { id: 'birds', name: 'Birds', icon: 'bird', hint: 'Swept sine chirps', code: 'b' },
   { id: 'crickets', name: 'Crickets', icon: 'cricket', hint: 'Rhythmic high bursts', code: 'k' },
   { id: 'traffic', name: 'Highway', icon: 'traffic', hint: 'Distant steady roar', code: 't' },

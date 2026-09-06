@@ -1,51 +1,10 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { ITEMS, BUDGET } from '../lib/spend-items'
+import { iconSvg } from '../lib/icons'
 
-/**
- * Spend It — the resource-disposal archetype.
- *
- * The joke only lands if the numbers are real, so prices are researched
- * ballpark figures rather than round invented ones, and the budget is large
- * enough that buying every single item still leaves money behind. The player
- * has to actively try to get to zero.
- */
+/** Spend It — the resource-disposal archetype. The list lives in lib/spend-items. */
 
-type Item = { name: string; price: number; glyph: string }
-
-const ITEMS: Item[] = [
-  { name: 'Big Mac', price: 6, glyph: '🍔' },
-  { name: 'Latte', price: 5, glyph: '☕' },
-  { name: 'Cinema ticket', price: 15, glyph: '🎟️' },
-  { name: 'Hardback book', price: 25, glyph: '📚' },
-  { name: 'Video game', price: 70, glyph: '🎮' },
-  { name: 'Concert ticket', price: 180, glyph: '🎫' },
-  { name: 'Camera drone', price: 450, glyph: '🛸' },
-  { name: 'Smartphone', price: 1_000, glyph: '📱' },
-  { name: 'Laptop', price: 2_400, glyph: '💻' },
-  { name: 'Grand piano', price: 7_500, glyph: '🎹' },
-  { name: 'Motorcycle', price: 9_000, glyph: '🏍️' },
-  { name: 'Diamond ring', price: 18_000, glyph: '💍' },
-  { name: 'Electric car', price: 42_000, glyph: '🚗' },
-  { name: 'Sports car', price: 95_000, glyph: '🏎️' },
-  { name: 'Racehorse', price: 250_000, glyph: '🐎' },
-  { name: 'Family home', price: 400_000, glyph: '🏠' },
-  { name: 'Beach villa', price: 1_500_000, glyph: '🏖️' },
-  { name: 'Superyacht', price: 4_000_000, glyph: '🛥️' },
-  { name: 'Formula 1 car', price: 9_000_000, glyph: '🏁' },
-  { name: 'Private jet', price: 25_000_000, glyph: '🛩️' },
-  { name: 'A Van Gogh', price: 60_000_000, glyph: '🖼️' },
-  { name: 'Skyscraper', price: 120_000_000, glyph: '🏢' },
-  { name: 'Boeing 787', price: 250_000_000, glyph: '✈️' },
-  { name: 'Cruise ship', price: 600_000_000, glyph: '🛳️' },
-  { name: 'Football club', price: 1_000_000_000, glyph: '⚽' },
-  { name: 'Orbital rocket', price: 2_500_000_000, glyph: '🚀' },
-  { name: 'Nuclear submarine', price: 5_000_000_000, glyph: '⚓' },
-  { name: 'Aircraft carrier', price: 13_000_000_000, glyph: '🚢' },
-  { name: 'Mission to Mars', price: 20_000_000_000, glyph: '🪐' },
-  { name: 'A social network', price: 44_000_000_000, glyph: '🌐' },
-]
-
-const BUDGET = 100_000_000_000
 ---
 
 <GameLayout slug="spend-it" bar="#0f3d3e" bodyClass="spend-body">
@@ -71,7 +30,7 @@ const BUDGET = 100_000_000_000
       {
         ITEMS.map((item, i) => (
           <li class="item" data-price={item.price} data-name={item.name} data-i={i}>
-            <div class="glyph" aria-hidden="true">{item.glyph}</div>
+            <div class="glyph" aria-hidden="true" set:html={iconSvg(item.icon)} />
             <div class="name">{item.name}</div>
             <div class="price">${item.price.toLocaleString('en-US')}</div>
             <div class="controls">
@@ -395,7 +354,9 @@ const BUDGET = 100_000_000_000
   }
   .item.unaffordable .glyph { filter: saturate(0.2) opacity(0.75); }
   .item.unaffordable .name { color: var(--ink-soft); }
-  .glyph { font-size: 34px; line-height: 1; transition: filter 160ms var(--ease); display: inline-block; }
+  /* The drawing sizes itself from inside — see iconSvg. A rule here that
+     targeted the <svg> would not apply to it, because it arrives via set:html. */
+  .glyph { width: 34px; height: 34px; transition: filter 160ms var(--ease); display: inline-block; }
   /* A one-shot jump on the glyph itself when it's actually bought or sold —
      the burst of confetti already says "something happened"; this says
      "to this specific thing". Toggled by class, not tied to .owned, since

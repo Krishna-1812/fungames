@@ -75,22 +75,39 @@ function render(key, page, px, { onPage = false } = {}) {
   return { px: img.pixels, w: img.width, h: img.height }
 }
 
-/** A tiny normalised alpha map, for asking whether two icons are one picture. */
+/**
+ * A tiny thumbnail — premultiplied RGBA, cell by cell — for asking whether two
+ * icons are the same picture.
+ *
+ * Alpha alone was not enough. It works for the tile illustrations, where the
+ * compositions sit in different parts of the card, but every icon here is a
+ * centred object on a 24-unit grid, so silhouette carries almost no signal: a
+ * burger and a football both came out as "a filled blob in the middle" and
+ * scored 0.17 against a median of 0.84. Keeping the colour channels means the
+ * comparison sees a brown-and-green sandwich against a white-and-green ball,
+ * which is what the eye sees too.
+ *
+ * Premultiplied is what resvg hands back, and it is the right thing here: a
+ * cell that is half-covered in rust reads as half of rust, which is exactly
+ * how much rust is in it.
+ */
 function shape(img, n = 12) {
-  const out = new Float64Array(n * n)
+  const out = new Float64Array(n * n * 4)
   const s = img.w / n
-  let total = 0
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
-      let a = 0
-      for (let y = Math.floor(r * s); y < Math.floor((r + 1) * s); y++)
-        for (let x = Math.floor(c * s); x < Math.floor((c + 1) * s); x++)
-          a += img.px[(y * img.w + x) * 4 + 3]
-      out[r * n + c] = a
-      total += a
+      const acc = [0, 0, 0, 0]
+      let k = 0
+      for (let y = Math.floor(r * s); y < Math.floor((r + 1) * s); y++) {
+        for (let x = Math.floor(c * s); x < Math.floor((c + 1) * s); x++) {
+          const i = (y * img.w + x) * 4
+          for (let ch = 0; ch < 4; ch++) acc[ch] += img.px[i + ch]
+          k++
+        }
+      }
+      for (let ch = 0; ch < 4; ch++) out[(r * n + c) * 4 + ch] = acc[ch] / k / 255
     }
   }
-  for (let i = 0; i < out.length; i++) out[i] = total ? (out[i] / total) * out.length : 0
   return out
 }
 
@@ -250,10 +267,25 @@ console.log('\nno two icons are the same picture')
     for (let j = i + 1; j < ks.length; j++)
       pairs.push({ d: shapeDist(shapes[ks[i]], shapes[ks[j]]), a: ks[i], b: ks[j] })
   pairs.sort((x, y) => x.d - y.d)
-  for (const q of pairs.slice(1, 3)) console.log(`        next: ${q.a} / ${q.b} at ${q.d.toFixed(2)}`)
+  for (const q of pairs.slice(1, 4)) console.log(`        next: ${q.a} / ${q.b} at ${q.d.toFixed(2)}`)
   console.log(`        median pair ${pairs[Math.floor(pairs.length / 2)].d.toFixed(2)}`)
+  // 0.085, against a median of about 0.17 — which is printed above it, because
+  // an absolute number means nothing here without the spread.
+  //
+  // It sits where the eye and the metric agree. Everything that came in below
+  // it really was one shape in one tone and had to be redrawn: a film strip
+  // and a book as the same dark rectangle, a ticket and a keyboard as the same
+  // flat bar, an airliner and a rocket as the same pale wedge. Everything just
+  // above it is a pair that is merely related — a jet and a rocket, a house
+  // and a planet — which a 12×12 thumbnail cannot separate but a person can at
+  // a glance, with the item's name printed beside it.
+  //
+  // Raising the bar further does not make the icons better. It grows a list of
+  // exceptions, and a list of exceptions is a lowered bar in a disguise. The
+  // three cars sit at 0.09 to 0.11 and are meant to: an electric hatchback, a
+  // sports car and an F1 car are three low objects with two wheels.
   check(
-    pairs[0].d > 0.45,
+    pairs[0].d > 0.085,
     `closest pair is ${pairs[0].a} / ${pairs[0].b} at ${pairs[0].d.toFixed(2)}`,
   )
 }

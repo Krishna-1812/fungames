@@ -36,7 +36,7 @@
  */
 export const PALETTE = {
   rust: '#b5651d',
-  gold: '#b8912a',
+  gold: '#a67f1f',
   olive: '#6f7f2e',
   green: '#2e7d5b',
   teal: '#1f7d80',
@@ -136,8 +136,8 @@ export const ICONS: Record<IconKey, Icon> = {
   },
 
   /* ---- rooms and things in them ----------------------------------------- */
-  cafe: {
-    subject: 'a takeaway cup with steam off it',
+  coffee: {
+    subject: 'a mug of coffee with steam off it',
     draw: () => `
       <g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.55">
         <path d="M9.6 4.6c-1 -1.2 1 -2.2 0 -3.4"/><path d="M13.6 4.6c-1 -1.2 1 -2.2 0 -3.4"/>
@@ -199,6 +199,333 @@ export const ICONS: Record<IconKey, Icon> = {
       <g stroke="${P.olive}" stroke-width="1.6" stroke-linecap="round">
         <path d="M2.2 21.4v-2.6"/><path d="M4.6 21.4v-3.4"/>
       </g>`,
+  },
+  /* ---- things you can buy ------------------------------------------------ */
+  burger: {
+    subject: 'a burger, in section',
+    draw: () => `
+      <path d="M3.4 9.6a8.6 6 0 0 1 17.2 0Z" fill="${P.clay}"/>
+      <rect x="2.8" y="9.6" width="18.4" height="2.6" fill="${P.green}"/>
+      <rect x="2.8" y="12.2" width="18.4" height="3.2" fill="${P.rust}"/>
+      <path d="M2.8 15.4h18.4v1.8a3.2 3.2 0 0 1-3.2 3.2H6a3.2 3.2 0 0 1-3.2-3.2Z" fill="${P.clay}"/>
+      <g fill="currentColor" opacity="0.4">
+        <circle cx="8" cy="7" r="0.9"/><circle cx="12.4" cy="5.8" r="0.9"/><circle cx="16.4" cy="7.2" r="0.9"/>
+      </g>`,
+  },
+  ticket: {
+    subject: 'a torn ticket stub',
+    draw: () => `
+      <g transform="rotate(-18 12 12)">
+        <path d="M1.4 7.4h21.2v2.8a2 2 0 0 0 0 3.8v2.8H1.4v-2.8a2 2 0 0 0 0-3.8Z" fill="${P.plum}"/>
+        <path d="M14.6 7.4v9.4" stroke="currentColor" stroke-width="2.2" stroke-dasharray="2 2.2" opacity="0.55"/>
+        <path d="M4.6 10.8h6M4.6 13.6h4" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" opacity="0.7"/>
+      </g>`,
+  },
+  film: {
+    subject: 'a strip of film',
+    draw: () => `
+      <g transform="rotate(-34 12 12)">
+        <rect x="-2" y="7" width="28" height="10" fill="${P.slate}"/>
+        <g fill="currentColor" opacity="0.85">
+          <rect x="1.2" y="9.8" width="5.2" height="4.4" rx="0.6"/>
+          <rect x="9.4" y="9.8" width="5.2" height="4.4" rx="0.6"/>
+          <rect x="17.6" y="9.8" width="5.2" height="4.4" rx="0.6"/>
+        </g>
+        <g fill="currentColor" opacity="0.45">
+          <rect x="0" y="7.8" width="1.6" height="1.5"/><rect x="4" y="7.8" width="1.6" height="1.5"/>
+          <rect x="8" y="7.8" width="1.6" height="1.5"/><rect x="12" y="7.8" width="1.6" height="1.5"/>
+          <rect x="16" y="7.8" width="1.6" height="1.5"/><rect x="20" y="7.8" width="1.6" height="1.5"/>
+          <rect x="0" y="14.7" width="1.6" height="1.5"/><rect x="4" y="14.7" width="1.6" height="1.5"/>
+          <rect x="8" y="14.7" width="1.6" height="1.5"/><rect x="12" y="14.7" width="1.6" height="1.5"/>
+          <rect x="16" y="14.7" width="1.6" height="1.5"/><rect x="20" y="14.7" width="1.6" height="1.5"/>
+        </g>
+      </g>`,
+  },
+  book: {
+    subject: 'a hardback, standing',
+    draw: () => `
+      <path d="M4 3.6h13.2a2.8 2.8 0 0 1 2.8 2.8v14.2H6.8A2.8 2.8 0 0 1 4 17.8Z" fill="${P.indigo}"/>
+      <path d="M4 17.8a2.8 2.8 0 0 1 2.8-2.8H20v5.6H6.8A2.8 2.8 0 0 1 4 17.8Z" fill="currentColor" opacity="0.22"/>
+      <path d="M8 7.4h8M8 10.4h5.6" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" opacity="0.75"/>`,
+  },
+  gamepad: {
+    subject: 'a controller, two grips and a d-pad',
+    draw: () => `
+      <path d="M5.6 14.2c-.6 3.8 0 6.2 2.2 6.2 2 0 3.2-2.2 3.6-6.2Z" fill="${P.indigo}"/>
+      <path d="M18.4 14.2c.6 3.8 0 6.2-2.2 6.2-2 0-3.2-2.2-3.6-6.2Z" fill="${P.indigo}"/>
+      <rect x="2.2" y="6.6" width="19.6" height="8.4" rx="3.6" fill="${P.indigo}"/>
+      <g stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity="0.9">
+        <path d="M5.6 10.8h3.4"/><path d="M7.3 9.1v3.4"/>
+      </g>
+      <g fill="currentColor" opacity="0.9">
+        <circle cx="15.4" cy="10.8" r="1.3"/><circle cx="18.6" cy="10.8" r="1.3"/>
+      </g>`,
+  },
+  drone: {
+    subject: 'a quadcopter, from above',
+    draw: () => `
+      <g stroke="${P.slate}" stroke-width="2.4" stroke-linecap="round">
+        <path d="M7.4 7.4 5 5"/><path d="M16.6 7.4 19 5"/>
+        <path d="M7.4 16.6 5 19"/><path d="M16.6 16.6 19 19"/>
+      </g>
+      <g fill="currentColor" opacity="0.55">
+        <ellipse cx="4.4" cy="4.4" rx="3.2" ry="1.1"/><ellipse cx="19.6" cy="4.4" rx="3.2" ry="1.1"/>
+        <ellipse cx="4.4" cy="19.6" rx="3.2" ry="1.1"/><ellipse cx="19.6" cy="19.6" rx="3.2" ry="1.1"/>
+      </g>
+      <rect x="8" y="8" width="8" height="8" rx="2.4" fill="${P.slate}"/>
+      <circle cx="12" cy="12" r="2.2" fill="${P.blue}"/>`,
+  },
+  phone: {
+    subject: 'a phone',
+    draw: () => `
+      <rect x="6.6" y="1.8" width="10.8" height="20.4" rx="2.6" fill="${P.slate}"/>
+      <rect x="8.2" y="4.6" width="7.6" height="13.6" rx="0.8" fill="currentColor" opacity="0.28"/>
+      <rect x="10.4" y="19.4" width="3.2" height="1.4" rx="0.7" fill="currentColor" opacity="0.6"/>
+      <rect x="10.8" y="3" width="2.4" height="0.9" rx="0.45" fill="currentColor" opacity="0.6"/>`,
+  },
+  laptop: {
+    subject: 'an open laptop',
+    draw: () => `
+      <path d="M5 4.6h14v11H5Z" fill="${P.slate}"/>
+      <rect x="6.6" y="6.2" width="10.8" height="7.8" fill="currentColor" opacity="0.28"/>
+      <path d="M2.2 16.2h19.6l-1.2 2.4a1.8 1.8 0 0 1-1.6 1H5a1.8 1.8 0 0 1-1.6-1Z" fill="${P.ash}"/>`,
+  },
+  piano: {
+    subject: 'a keyboard, four white keys and three black',
+    draw: () => `
+      <rect x="1.8" y="6.4" width="20.4" height="11.2" rx="1.4" fill="${P.ash}"/>
+      <g stroke="currentColor" stroke-width="2.2" opacity="0.4">
+        <path d="M6.9 12.4v5.2"/><path d="M11.9 12.4v5.2"/><path d="M16.9 12.4v5.2"/>
+      </g>
+      <g fill="currentColor" opacity="0.9">
+        <rect x="5.4" y="6.4" width="3" height="6.4" rx="0.6"/>
+        <rect x="10.4" y="6.4" width="3" height="6.4" rx="0.6"/>
+        <rect x="15.4" y="6.4" width="3" height="6.4" rx="0.6"/>
+      </g>`,
+  },
+  motorcycle: {
+    subject: 'a motorcycle',
+    draw: () => `
+      <g stroke="currentColor" stroke-width="2.4" fill="none">
+        <circle cx="5.4" cy="16.6" r="4"/><circle cx="18.6" cy="16.6" r="4"/>
+      </g>
+      <path d="M5.4 16.6 9.6 9.6h4.8l4.2 7" fill="none" stroke="${P.brick}"
+            stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M8.4 9.6h6.8" stroke="${P.brick}" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M14.8 9.2 18 6.2h2.6" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round"/>`,
+  },
+  ring: {
+    subject: 'a solitaire',
+    draw: () => `
+      <circle cx="12" cy="16" r="5.6" fill="none" stroke="${P.gold}" stroke-width="2.6"/>
+      <path d="M8.6 6.2h6.8l2.6 3.4L12 14 6 9.6Z" fill="${P.blue}"/>
+      <path d="M8.6 6.2 12 14l3.4-7.8" fill="none" stroke="currentColor" stroke-width="2.2" opacity="0.4"/>`,
+  },
+  car: {
+    subject: 'a small electric hatchback, plugged in',
+    draw: () => `
+      <path d="M2.4 17.4v-3.2l2-.4 2.4-4.4a2.4 2.4 0 0 1 2.1-1.2h4.7a2.4 2.4 0 0 1 1.9.9l3.1 4.1 1.4.6v3.6Z" fill="${P.green}"/>
+      <path d="M9.4 10.2h1.9v3.2H7.6Zm3.5 0h1.3l2.4 3.2h-3.7Z" fill="currentColor" opacity="0.4"/>
+      <g fill="currentColor">
+        <circle cx="7" cy="17.8" r="2.6"/><circle cx="16.4" cy="17.8" r="2.6"/>
+      </g>
+      <g fill="${P.ash}">
+        <circle cx="7" cy="17.8" r="1"/><circle cx="16.4" cy="17.8" r="1"/>
+      </g>
+      <path d="M21.4 13v-3.4" stroke="${P.gold}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M19.8 8.4V6M23 8.4V6" stroke="${P.gold}" stroke-width="2.2" stroke-linecap="round"/>`,
+  },
+  'sports-car': {
+    subject: 'a low wedge, side on',
+    draw: () => `
+      <path d="M1.6 16.4 4 13.2l5.4-2.8h4.8l4.4 2.8 3.8 1.2v2.6a1.6 1.6 0 0 1-1.6 1.6H3.2a1.6 1.6 0 0 1-1.6-1.6Z" fill="${P.brick}"/>
+      <path d="M8 11.6h5.6l3 2.2H5.4Z" fill="currentColor" opacity="0.3"/>
+      <g fill="currentColor">
+        <circle cx="7" cy="18.4" r="2.6"/><circle cx="17.4" cy="18.4" r="2.6"/>
+      </g>
+      <path d="M2.4 8.6h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.4"/>`,
+  },
+  f1: {
+    subject: 'an open-wheeler, wing at each end',
+    draw: () => `
+      <path d="M1.4 14.4h3.4l3.6-1.4h3.4l1.4-3h2.6l.6 3h4.2v3.6H1.4Z" fill="${P.rust}"/>
+      <circle cx="12.4" cy="11.8" r="1.7" fill="currentColor" opacity="0.45"/>
+      <path d="M0.8 11.4h4.4v2.2H0.8Z" fill="${P.rust}"/>
+      <path d="M17.8 5.6h5.4v2.6h-5.4Z" fill="${P.rust}"/>
+      <path d="M20.5 8.2v6.4" stroke="${P.rust}" stroke-width="2.4"/>
+      <g fill="currentColor">
+        <circle cx="6.6" cy="17.6" r="3.2"/><circle cx="17.4" cy="17.6" r="3.2"/>
+      </g>
+      <g fill="${P.ash}">
+        <circle cx="6.6" cy="17.6" r="1.2"/><circle cx="17.4" cy="17.6" r="1.2"/>
+      </g>`,
+  },
+  horse: {
+    subject: 'a horse in profile, ears up',
+    draw: () => `
+      <path d="M20.8 10.2 16.4 13.8 12.8 14.8 10.2 21.6H5.6L8.2 11.4C9.1 7.7 11.7 5.4 15.2 5.4c3.2 0 5.6 2 5.6 4.8Z" fill="${P.clay}"/>
+      <path d="M13.4 5.6 12 1.8l3.4 2.6Z" fill="${P.clay}"/>
+      <path d="M17 5.8 20.4 2.8l-.8 3.6Z" fill="${P.clay}"/>
+      <path d="M8.6 10.4c2.2-1 3.6-2.6 4-4.6-2.6.8-4 2.2-4 4.6Z" fill="currentColor" opacity="0.32"/>
+      <circle cx="16.6" cy="9" r="1.05" fill="currentColor"/>
+      <path d="M18.6 12.6c-1.8.8-3.2.9-4.4.3" fill="none" stroke="currentColor"
+            stroke-width="2.2" stroke-linecap="round" opacity="0.5"/>`,
+  },
+  house: {
+    subject: 'a house with a chimney',
+    draw: () => `
+      <path d="M12 2.6 22.4 11h-3v10.4H4.6V11h-3Z" fill="${P.brick}"/>
+      <rect x="16.4" y="4.4" width="2.8" height="4" fill="${P.brick}"/>
+      <rect x="10.2" y="14.4" width="3.6" height="7" fill="currentColor" opacity="0.45"/>
+      <rect x="5.8" y="12.4" width="3" height="3" fill="currentColor" opacity="0.3"/>
+      <rect x="15.2" y="12.4" width="3" height="3" fill="currentColor" opacity="0.3"/>`,
+  },
+  villa: {
+    subject: 'a beach house under a palm',
+    draw: () => `
+      <path d="M2.4 21.4h19.2" stroke="${P.gold}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M4 19.6v-7.2h10.4v7.2Z" fill="${P.teal}"/>
+      <path d="M2.6 12.8 9.2 8l6.6 4.8Z" fill="currentColor" opacity="0.5"/>
+      <rect x="7.4" y="14.6" width="3.4" height="5" fill="currentColor" opacity="0.4"/>
+      <path d="M18.6 19.6c0-4 .6-6.8 1.4-8.6" fill="none" stroke="${P.clay}"
+            stroke-width="2.4" stroke-linecap="round"/>
+      <g fill="${P.green}">
+        <path d="M20 10.4c2.4-1.6 3.8-.8 4 .8-1.6-.6-3-.2-4-.8Z"/>
+        <path d="M20 10.4c-2.4-1.6-3.8-.8-4 .8 1.6-.6 3-.2 4-.8Z"/>
+        <path d="M20 10.2c-.6-2.6.4-3.6 2-3.6-1 1.2-1.2 2.6-2 3.6Z"/>
+      </g>`,
+  },
+  yacht: {
+    subject: 'a motor yacht with a flybridge',
+    draw: () => `
+      <g transform="rotate(-9 12 15)">
+        <path d="M1 15.2h22l-2.6 3.6a2 2 0 0 1-1.6.8H4.4a2 2 0 0 1-1.7-1Z" fill="${P.teal}"/>
+        <path d="M4.6 13.2 7.4 10h8.2l3.2 3.2Z" fill="currentColor" opacity="0.75"/>
+        <path d="M4.6 13.2h14.2v2H4.6Z" fill="currentColor" opacity="0.45"/>
+        <path d="M15 9.8V6.4h4" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" opacity="0.5"/>
+      </g>
+      <path d="M1 21.6c2-1.4 3.6-1.4 5.2 0s3.2 1.4 4.8 0" fill="none" stroke="${P.blue}"
+            stroke-width="2.2" stroke-linecap="round"/>`,
+  },
+  jet: {
+    subject: 'a small jet, side on',
+    draw: () => `
+      <path d="M1.6 13.6c0-1.8 2-3 5.4-3.2l8-.6c3.6-.3 6.4.3 7.6 1.6-1.2 1.4-4 2.1-7.6 1.9l-8-.4C3.6 12.7 1.6 13.6 1.6 13.6Z" fill="currentColor" opacity="0.9"/>
+      <path d="M9.4 12.2 6.6 6.4h2.2l4.6 5.4Z" fill="${P.blue}"/>
+      <path d="M9.6 13 7.4 17.6h2l3.8-4.2Z" fill="${P.blue}"/>
+      <path d="M17.6 11.4 16.4 7.4h1.6l2.4 3.6Z" fill="${P.blue}"/>
+      <circle cx="4.4" cy="12.4" r="0.9" fill="${P.blue}"/>`,
+  },
+  painting: {
+    subject: 'a framed canvas',
+    draw: () => `
+      <rect x="2.6" y="3.6" width="18.8" height="16.8" rx="1.2" fill="${P.gold}"/>
+      <rect x="5" y="6" width="14" height="12" fill="${P.indigo}"/>
+      <path d="M5 14.6c2.4-3.2 4-3.2 6 0s3.4 2 8-1.6V18H5Z" fill="${P.green}"/>
+      <circle cx="16.4" cy="9" r="2" fill="${P.gold}"/>`,
+  },
+  skyscraper: {
+    subject: 'a tower with a smaller one behind it',
+    draw: () => `
+      <path d="M13.6 8h6.8v13.4h-6.8Z" fill="${P.ash}"/>
+      <path d="M3.6 4.4h9.4v17H3.6Z" fill="${P.slate}"/>
+      <path d="M8.3 1.2v3.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <g fill="currentColor" opacity="0.42">
+        <rect x="5.6" y="7" width="2.2" height="2.4"/><rect x="8.8" y="7" width="2.2" height="2.4"/>
+        <rect x="5.6" y="11.4" width="2.2" height="2.4"/><rect x="8.8" y="11.4" width="2.2" height="2.4"/>
+        <rect x="5.6" y="15.8" width="2.2" height="2.4"/><rect x="8.8" y="15.8" width="2.2" height="2.4"/>
+        <rect x="15.6" y="10.6" width="2.2" height="2.4"/><rect x="15.6" y="15" width="2.2" height="2.4"/>
+      </g>`,
+  },
+  airliner: {
+    subject: 'an airliner, from above',
+    draw: () => `
+      <path d="M12 1.4c1.5 0 2.4 1.6 2.6 4.2l.2 3.2 7.6 4.4v2.4l-7.6-2.2.2 3.6 2.6 1.8v1.8L12 19.4l-5.6 1.2v-1.8l2.6-1.8.2-3.6-7.6 2.2v-2.4l7.6-4.4.2-3.2C9.6 3 10.5 1.4 12 1.4Z" fill="${P.blue}"/>
+      <circle cx="12" cy="7" r="1.4" fill="currentColor" opacity="0.55"/>`,
+  },
+  cruise: {
+    subject: 'a liner with a funnel and rows of cabins',
+    draw: () => `
+      <path d="M1.6 16.8h20.8l-2.2 4a1.8 1.8 0 0 1-1.6 1H5.4a1.8 1.8 0 0 1-1.6-1Z" fill="${P.slate}"/>
+      <rect x="3.4" y="12" width="17.2" height="4.8" fill="currentColor" opacity="0.8"/>
+      <rect x="5.6" y="7.6" width="12.8" height="4.4" fill="currentColor" opacity="0.55"/>
+      <rect x="14.4" y="3.4" width="3.4" height="4.2" rx="0.8" fill="${P.brick}"/>
+      <g fill="${P.blue}">
+        <rect x="5.2" y="13.6" width="1.8" height="1.8"/><rect x="8.4" y="13.6" width="1.8" height="1.8"/>
+        <rect x="11.6" y="13.6" width="1.8" height="1.8"/><rect x="14.8" y="13.6" width="1.8" height="1.8"/>
+        <rect x="18" y="13.6" width="1.8" height="1.8"/>
+      </g>`,
+  },
+  football: {
+    subject: 'a football, panels and all',
+    draw: () => `
+      <circle cx="12" cy="12" r="9.6" fill="${P.ash}"/>
+      <path d="M12 7.2 16.2 10.2 14.6 15.2h-5.2L7.8 10.2Z" fill="currentColor"/>
+      <g fill="currentColor">
+        <path d="M12 2.6 15.4 4.4 16.2 8.6 12 6.4 7.8 8.6 8.6 4.4Z"/>
+        <path d="M2.8 13.4 3.4 9.6 7.2 9.4 5.8 13.6 8.4 17 4.6 16.6Z"/>
+        <path d="M21.2 13.4 20.6 9.6 16.8 9.4 18.2 13.6 15.6 17 19.4 16.6Z"/>
+      </g>`,
+  },
+  rocket: {
+    subject: 'a rocket on the way up',
+    draw: () => `
+      <path d="M12 1.4c3 2.6 4.6 6.4 4.6 10.6v3.4H7.4V12c0-4.2 1.6-8 4.6-10.6Z" fill="currentColor" opacity="0.92"/>
+      <circle cx="12" cy="8.4" r="2.2" fill="${P.blue}"/>
+      <path d="M7.4 12.4 4 17.4v-2.6a6 6 0 0 1 3.4-5.4Z" fill="${P.brick}"/>
+      <path d="M16.6 12.4 20 17.4v-2.6a6 6 0 0 0-3.4-5.4Z" fill="${P.brick}"/>
+      <path d="M9.6 15.4h4.8L12 22.6Z" fill="${P.rust}"/>`,
+  },
+  submarine: {
+    subject: 'a submarine under the surface',
+    draw: () => `
+      <path d="M2.4 3.2c2-1.6 3.6-1.6 5.2 0s3.2 1.6 4.8 0 3.2-1.6 4.8 0 2.4 1.6 4.2.2"
+            fill="none" stroke="${P.blue}" stroke-width="2.4" stroke-linecap="round"/>
+      <rect x="2.6" y="12" width="17" height="7.4" rx="3.7" fill="${P.slate}"/>
+      <path d="M9.4 8.6h4.4v3.6H9.4Z" fill="${P.slate}"/>
+      <path d="M11 5.4v3.4" stroke="${P.slate}" stroke-width="2.2" stroke-linecap="round"/>
+      <g fill="currentColor" opacity="0.55">
+        <circle cx="6.6" cy="15.7" r="1.2"/><circle cx="10.6" cy="15.7" r="1.2"/><circle cx="14.6" cy="15.7" r="1.2"/>
+      </g>
+      <path d="M19.6 14.2 22.6 12v7.4l-3-2.2Z" fill="${P.slate}"/>`,
+  },
+  carrier: {
+    subject: 'a flat-top with an island and an aircraft on deck',
+    draw: () => `
+      <path d="M1.4 14.6h21.2l-2 5.2a1.8 1.8 0 0 1-1.7 1.2H5.1a1.8 1.8 0 0 1-1.7-1.2Z" fill="${P.ash}"/>
+      <rect x="1.4" y="11.8" width="21.2" height="2.8" fill="currentColor" opacity="0.85"/>
+      <path d="M2.6 13.2h16" stroke="${P.gold}" stroke-width="2.2" stroke-dasharray="2.4 2.4"/>
+      <rect x="16.4" y="6.8" width="3.4" height="5" fill="${P.slate}"/>
+      <path d="M18.1 3.6v3.2" stroke="${P.slate}" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M7.4 7.4 9.6 11h-4.4Z" fill="${P.brick}"/>`,
+  },
+  mars: {
+    subject: 'a red planet with a lander on its way',
+    draw: () => `
+      <circle cx="13.6" cy="13.6" r="8.2" fill="${P.brick}"/>
+      <g fill="currentColor" opacity="0.28">
+        <ellipse cx="10.6" cy="10.6" rx="2.8" ry="1.8"/>
+        <ellipse cx="16.6" cy="16" rx="3.2" ry="2"/>
+        <circle cx="17" cy="9.6" r="1.4"/>
+      </g>
+      <path d="M1.6 8.4 8 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.55"/>
+      <rect x="6.4" y="2.2" width="3.6" height="3.6" rx="0.8" fill="${P.slate}"
+            transform="rotate(-34 8.2 4)"/>`,
+  },
+  network: {
+    subject: 'a network of people, all connected',
+    draw: () => `
+      <g stroke="currentColor" stroke-width="2.2" opacity="0.5">
+        <path d="M12 5.4 5 12.6M12 5.4 19 12.6M5 12.6 12 19.6M19 12.6 12 19.6M12 5.4v14.2"/>
+      </g>
+      <circle cx="12" cy="4.6" r="3.2" fill="${P.plum}"/>
+      <circle cx="4.6" cy="12.6" r="3" fill="${P.blue}"/>
+      <circle cx="19.4" cy="12.6" r="3" fill="${P.teal}"/>
+      <circle cx="12" cy="20" r="3" fill="${P.green}"/>`,
   },
 }
 

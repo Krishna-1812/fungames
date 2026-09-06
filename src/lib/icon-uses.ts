@@ -10,6 +10,7 @@
  * an icon is only legible at a size, on a background, in an ink.
  */
 import { LAYERS } from './mix-code'
+import { ITEMS } from './spend-items'
 
 export type Page = {
   /** The page background the icon is composited over. */
@@ -31,4 +32,5 @@ export const PAGES: Record<string, Page> = {
 
 export const USES: Record<string, string[]> = {
   'ambient-mix': LAYERS.map((l) => l.icon),
+  'spend-it': ITEMS.map((i) => i.icon),
 }
