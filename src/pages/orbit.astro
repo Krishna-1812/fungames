@@ -39,6 +39,29 @@ import { GOALS } from '../lib/orbit-goals'
       <p class="tip" id="tip">Drag anywhere to fling a new body. Longer drag, faster throw.</p>
     </div>
 
+    <section class="flight-card" id="flightCard" aria-labelledby="flightTitle">
+      <p class="flight-kicker">FLIGHT SCHOOL · 01</p>
+      <h2 id="flightTitle">Give a moon<br />a way around.</h2>
+      <p id="flightBrief">An orbit is a fall that keeps missing. Start beside the star and launch sideways.</p>
+      <div class="flight-actions">
+        <button type="button" id="learnBtn">Try a launch <span aria-hidden="true">↗</span></button>
+        <button type="button" id="demoBtn">Watch an example</button>
+      </div>
+      <button type="button" id="dismissLesson">Explore freely</button>
+    </section>
+
+    <dialog id="sceneDialog" class="scene-dialog" aria-labelledby="sceneTitle">
+      <h2 id="sceneTitle">Send a little universe.</h2>
+      <p>This link opens this exact scene, paused. Your personal challenge progress stays here.</p>
+      <label for="sceneLink">Scene link</label>
+      <input id="sceneLink" type="text" readonly />
+      <p id="sceneCopyStatus" role="status"></p>
+      <div class="flight-actions">
+        <button type="button" id="copyScene">Copy link</button>
+        <button type="button" id="closeScene">Done</button>
+      </div>
+    </dialog>
+
     <div class="goalwrap" id="goalPanel" hidden>
       <div class="goalhead">
         <h2>Challenges</h2>
@@ -85,6 +108,11 @@ import { GOALS } from '../lib/orbit-goals'
         <button type="button" class="opt" id="pauseBtn">Pause</button>
         <button type="button" class="opt" id="clearBtn">Clear</button>
       </div>
+      <div class="group" aria-label="Scene controls">
+        <button type="button" class="opt" id="saveScene">Save scene</button>
+        <button type="button" class="opt" id="loadScene">Load scene</button>
+        <button type="button" class="opt" id="helpBtn">Learn</button>
+      </div>
       <div class="group">
         <button type="button" class="opt wide" id="goalBtn" aria-expanded="false">
           Challenges <b id="goalCount">0/8</b>
@@ -98,6 +126,7 @@ import { GOALS } from '../lib/orbit-goals'
   import { sfx, unlock, tone } from '../lib/audio'
   import { burst, ring } from '../lib/fx'
 
+  import { SCENE_KEY, captureScene, readScene, sceneBodies, encodeScene, decodeScene, fitScene, type Scene } from '../lib/orbit-scene'
   import { FixedClock } from '../lib/fixed-clock'
   import { createRenderer } from '../lib/orbit-render'
   import {
@@ -113,7 +142,8 @@ import { GOALS } from '../lib/orbit-goals'
   const renderer = createRenderer(canvas)
 
   let bodies: Body[] = []
-  let W = 0, H = 0, dpr = 1
+  let W = 0, H = 0, dpr = 1, viewScale = 1
+  let guide = false
   let paused = false
   let trails = true
   let merges = 0
@@ -127,8 +157,15 @@ import { GOALS } from '../lib/orbit-goals'
   function resize() {
     const r = stage.getBoundingClientRect()
     if (r.width < 8) return false
-    dpr = Math.min(devicePixelRatio || 1, 2)
-    W = r.width; H = r.height
+    if (!W) { W = r.width; H = r.height }
+    const fit = fitScene(W, H, r.width, r.height)
+    viewScale = fit.scale
+    // Allocate pixels for the displayed view, even for a large imported world.
+    dpr = Math.min(devicePixelRatio || 1, 2) * viewScale
+    for (const layer of [canvas, aimCanvas]) {
+      layer.style.width = `${W * viewScale}px`; layer.style.height = `${H * viewScale}px`
+      layer.style.left = `${fit.left}px`; layer.style.top = `${fit.top}px`
+    }
     renderer.resize(W, H, dpr)
     aimCanvas.width = Math.round(W * dpr)
     aimCanvas.height = Math.round(H * dpr)
@@ -218,6 +255,22 @@ import { GOALS } from '../lib/orbit-goals'
     renderer.draw(bodies, aim, trails, radiusFor(launchMass))
 
     aimCtx.clearRect(0, 0, W, H)
+    if (guide && !aim) {
+      const r = lessonRadius()
+      aimCtx.strokeStyle = '#b5d6ff'; aimCtx.lineWidth = 1.5
+      aimCtx.setLineDash([5, 8]); aimCtx.beginPath()
+      aimCtx.arc(W / 2, H / 2, r, 0, Math.PI * 2); aimCtx.stroke(); aimCtx.setLineDash([])
+      aimCtx.fillStyle = '#e4efff'; aimCtx.beginPath()
+      aimCtx.arc(W / 2 + r, H / 2, 7, 0, Math.PI * 2); aimCtx.fill()
+      aimCtx.font = '14px sans-serif'; aimCtx.textAlign = 'center'
+      aimCtx.fillText('Start here · drag downward', W / 2, H / 2 - r - 18)
+      const length = circularV(1200, r) / .055
+      aimCtx.strokeStyle = '#e4efff'; aimCtx.beginPath()
+      aimCtx.moveTo(W / 2 + r, H / 2 + 12); aimCtx.lineTo(W / 2 + r, H / 2 + length)
+      aimCtx.lineTo(W / 2 + r - 5, H / 2 + length - 8)
+      aimCtx.moveTo(W / 2 + r, H / 2 + length); aimCtx.lineTo(W / 2 + r + 5, H / 2 + length - 8)
+      aimCtx.stroke()
+    }
     if (aim) {
       aimCtx.strokeStyle = 'rgba(255,255,255,0.5)'
       aimCtx.lineWidth = 1.5
@@ -232,8 +285,8 @@ import { GOALS } from '../lib/orbit-goals'
   let mergeSoundBudget = 0
   function onMerge(x: number, y: number, m: number) {
     const rect = canvas.getBoundingClientRect()
-    ring(rect.left + x, rect.top + y, 'hsl(38 100% 72%)', 8 + Math.cbrt(m) * 5)
-    burst(rect.left + x, rect.top + y, {
+    ring(rect.left + x * viewScale, rect.top + y * viewScale, 'hsl(38 100% 72%)', 8 + Math.cbrt(m) * 5)
+    burst(rect.left + x * viewScale, rect.top + y * viewScale, {
       count: Math.min(24, 5 + (m | 0)), colors: ['#ffd166', '#ff9a3c', '#fff'],
       speed: 2.6, gravity: 0, drag: 0.93, life: 30, size: 2.4,
     })
@@ -289,7 +342,7 @@ import { GOALS } from '../lib/orbit-goals'
 
   const local = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect()
-    return { x: e.clientX - r.left, y: e.clientY - r.top }
+    return { x: (e.clientX - r.left) / viewScale, y: (e.clientY - r.top) / viewScale }
   }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -307,14 +360,16 @@ import { GOALS } from '../lib/orbit-goals'
   })
   function release() {
     if (!aim) return
-    // Drag away from the target and release, like a slingshot.
+    // Velocity follows the drag direction shown by the aiming line.
     const vx = (aim.x1 - aim.x0) * 0.055
     const vy = (aim.y1 - aim.y0) * 0.055
     add(aim.x0, aim.y0, vx, vy, launchMass, true)
+    guide = false
+    flightCard.hidden = true
     const speed = Math.hypot(vx, vy)
     sfx.pop(Math.min(9, Math.round(speed * 2)))
     const r = canvas.getBoundingClientRect()
-    burst(r.left + aim.x0, r.top + aim.y0, {
+    burst(r.left + aim.x0 * viewScale, r.top + aim.y0 * viewScale, {
       count: 8, colors: ['#9fd0ff', '#fff'], speed: 2, gravity: 0, drag: 0.9, life: 22, size: 2,
     })
     aim = null
@@ -335,7 +390,12 @@ import { GOALS } from '../lib/orbit-goals'
   })
 
   // ---- presets -----------------------------------------------------------
-  function clear() { bodies = []; merges = 0; tracker.reset(); renderer.clear() }
+  function clear() {
+    bodies = []; merges = 0; guide = false; aim = null
+    clock.reset(); tracker.reset(); renderer.clear()
+    tip.classList.remove('faded')
+    tip.textContent = 'Drag across the sky to launch a body. Longer drag, faster throw.'
+  }
 
   /**
    * Cancel the system's net momentum by nudging the heaviest body.
@@ -453,11 +513,96 @@ import { GOALS } from '../lib/orbit-goals'
     unlock(); sfx.click()
   })
 
-  paintGoals()
+  // ---- flight school and scene snapshots ---------------------------------
+  const flightCard = document.getElementById('flightCard')!
+  const sceneDialog = document.getElementById('sceneDialog') as HTMLDialogElement
+  const sceneLink = document.getElementById('sceneLink') as HTMLInputElement
+  const copyStatus = document.getElementById('sceneCopyStatus')!
+  function message(text: string) {
+    toast.textContent = text; toast.classList.add('show')
+    clearTimeout(toastTimer)
+    toastTimer = window.setTimeout(() => toast.classList.remove('show'), 4200)
+  }
+  function setPaused(value: boolean) {
+    paused = value; clock.reset()
+    document.getElementById('pauseBtn')!.textContent = paused ? 'Resume' : 'Pause'
+  }
+  const lessonRadius = () => Math.min(150, Math.min(W, H) * .24)
+  function lesson(example: boolean) {
+    if (!W) return
+    clear(); setPaused(false); flightCard.hidden = true
+    launchMass = 6
+    document.querySelectorAll<HTMLButtonElement>('.opt[data-mass]').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.mass) === 6)))
+    add(W / 2, H / 2, 0, 0, 1200)
+    const r = lessonRadius()
+    guide = !example
+    if (example) {
+      add(W / 2 + r, H / 2, 0, circularV(1200, r), 6)
+      message('Watch the sideways motion turn into a fall around the star. Try your own with Learn.')
+    } else {
+      tip.classList.remove('faded')
+      tip.textContent = 'Start on the bright dot. Drag downward a little, then release. Learn lets you retry.'
+    }
+  }
+  document.getElementById('learnBtn')!.addEventListener('click', () => lesson(false))
+  document.getElementById('demoBtn')!.addEventListener('click', () => lesson(true))
+  document.getElementById('dismissLesson')!.addEventListener('click', () => { flightCard.hidden = true })
+  document.getElementById('helpBtn')!.addEventListener('click', () => { flightCard.hidden = !flightCard.hidden })
 
-  if (resize()) solar()
-  else if ('ResizeObserver' in window) {
-    const ro = new ResizeObserver(() => { if (resize()) { solar(); ro.disconnect() } })
+  function applyScene(scene: Scene, shared = false) {
+    clear(); W = scene.w; H = scene.h
+    bodies = sceneBodies(scene, shared); trails = scene.trails; launchMass = scene.mass
+    resize(); setPaused(true); flightCard.hidden = true
+    document.getElementById('trailsBtn')!.setAttribute('aria-pressed', String(trails))
+    document.querySelectorAll<HTMLButtonElement>('.opt[data-mass]').forEach((b) =>
+      b.setAttribute('aria-checked', String(Number(b.dataset.mass) === launchMass)))
+    tip.classList.remove('faded'); tip.textContent = 'Scene ready. Press Resume when you are ready to explore.'
+    render()
+  }
+  document.getElementById('saveScene')!.addEventListener('click', () => {
+    if (!W) return
+    try {
+      localStorage.setItem(SCENE_KEY, JSON.stringify(captureScene(bodies, W, H, trails, launchMass)))
+      message('Scene saved on this device. Save scene replaces this snapshot.')
+    } catch { message('This device could not save the scene. You can still share a scene link.') }
+  })
+  document.getElementById('loadScene')!.addEventListener('click', () => {
+    try {
+      const raw = localStorage.getItem(SCENE_KEY)
+      if (!raw) { message('No saved scene yet. Save one you would like to revisit.'); return }
+      const scene = readScene(JSON.parse(raw))
+      if (!scene) { message('That saved scene could not be read. Your current scene is unchanged.'); return }
+      applyScene(scene); message('Saved scene loaded, paused. Completed challenges are kept; partial laps start fresh.')
+    } catch { message('The saved scene could not be opened. Your current scene is unchanged.') }
+  })
+  document.addEventListener('game:share', (event) => {
+    event.preventDefault()
+    if (!W) return
+    const code = encodeScene(captureScene(bodies, W, H, trails, launchMass))
+    if (!code) { message('This scene is too large for a link. Try sharing a smaller system.'); return }
+    const url = new URL(location.href); url.hash = `scene=${code}`
+    sceneLink.value = url.href; copyStatus.textContent = ''
+    sceneDialog.showModal()
+  })
+  document.getElementById('closeScene')!.addEventListener('click', () => sceneDialog.close())
+  document.getElementById('copyScene')!.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(sceneLink.value); copyStatus.textContent = 'Copied. Your scene is ready to send.' }
+    catch { sceneLink.focus(); sceneLink.select(); copyStatus.textContent = 'Select and copy the link above.' }
+  })
+  function initialize() {
+    if (!resize()) return false
+    const code = new URLSearchParams(location.hash.slice(1)).get('scene')
+    if (code !== null) {
+      const scene = decodeScene(code)
+      if (scene) { applyScene(scene, true); message('Shared scene loaded, paused. Launch your own bodies to earn challenges.'); return true }
+      solar(); message('This scene link could not be opened. Here is a fresh solar system.'); return true
+    }
+    solar()
+    return true
+  }
+  paintGoals()
+  if (!initialize() && 'ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => { if (initialize()) ro.disconnect() })
     ro.observe(stage)
   }
   let rt = 0
@@ -492,10 +637,37 @@ import { GOALS } from '../lib/orbit-goals'
   .orbit-body .tip.faded { opacity: 0; }
   .orbit-body .stage.reading .hud { opacity: 0; transition: opacity 160ms var(--ease); }
 
+  .orbit-body .flight-card {
+    position: absolute; z-index: 5; top: 100px; left: clamp(16px, 5vw, 72px);
+    width: min(330px, calc(100% - 32px)); padding: 26px;
+    border: 1px solid #354664; border-radius: 20px;
+    background: rgba(9, 17, 34, .94); box-shadow: 0 24px 80px #0005;
+    color: #d9e5fa;
+  }
+  .orbit-body .flight-card[hidden] { display: none; }
+  .orbit-body .stage:has(.flight-card:not([hidden])) .tip { visibility: hidden; }
+  .orbit-body .flight-kicker { margin: 0 0 16px; font-size: 10px; letter-spacing: .2em; color: #8cbbfa; }
+  .orbit-body .flight-card h2 { margin: 0 0 14px; font-size: clamp(26px, 3vw, 38px); line-height: 1.08; letter-spacing: -.035em; color: #f1f6ff; }
+  .orbit-body .flight-card p:not(.flight-kicker), .orbit-body .scene-dialog p { font-size: 14px; line-height: 1.65; color: #b6c5df; }
+  .orbit-body .flight-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .orbit-body .flight-actions button { padding: 11px 14px; border-radius: 10px; border: 1px solid #435778; color: #edf4ff; background: #1c2b44; cursor: pointer; font: inherit; font-size: 13px; }
+  .orbit-body .flight-actions button:first-child { background: #cce2ff; color: #0d2240; border-color: #cce2ff; font-weight: 650; }
+  .orbit-body #dismissLesson { background: none; color: #b6c5df; border: 0; text-decoration: underline; padding: 14px 0 0; cursor: pointer; }
+  .orbit-body .scene-dialog { color: #edf4ff; background: #101b2e; border: 1px solid #435778; border-radius: 20px; padding: 28px; width: min(480px, calc(100vw - 32px)); }
+  .orbit-body .scene-dialog::backdrop { background: #020713bd; }
+  .orbit-body .scene-dialog h2 { margin-top: 0; font-size: 26px; }
+  .orbit-body .scene-dialog label { display: block; margin-bottom: 8px; }
+  .orbit-body #sceneLink { width: 100%; padding: 12px; border: 1px solid #526a91; border-radius: 8px; color: #e1edff; background: #070e1c; }
+  .orbit-body #sceneCopyStatus { min-height: 24px; }
+  @media (max-width: 620px), (max-height: 600px) {
+    .orbit-body .flight-card { top: 66px; padding: 20px; max-height: calc(100% - 220px); overflow-y: auto; }
+    .orbit-body .flight-card h2 { font-size: 27px; }
+  }
+
   .orbit-body .dock {
     position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
     display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-    max-width: 94vw; z-index: 6;
+    width: max-content; max-width: 96vw; z-index: 6;
   }
   .orbit-body .group {
     display: flex; gap: 4px; padding: 4px;
@@ -580,7 +752,9 @@ import { GOALS } from '../lib/orbit-goals'
   .orbit-body .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   @media (max-width: 620px) {
-    .orbit-body .opt { padding: 8px 11px; font-size: 12px; }
+    .orbit-body .dock { width: calc(100% - 16px); gap: 6px; bottom: 10px; }
+    .orbit-body .group { padding: 3px; gap: 1px; }
+    .orbit-body .opt { padding: 7px; min-height: 40px; font-size: 11px; }
     .orbit-body .readout { gap: 10px; font-size: 11.5px; }
   }
 </style>

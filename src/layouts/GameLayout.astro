@@ -106,6 +106,7 @@ const videoGameLd = {
       btn.addEventListener('click', async () => {
         unlock()
         sfx.click()
+        if (!btn.dispatchEvent(new CustomEvent('game:share', { bubbles: true, cancelable: true }))) return
         const data = { title: btn.dataset.title, text: blurb, url: location.href }
         try {
           if (navigator.share) return await navigator.share(data)

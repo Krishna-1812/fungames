@@ -57,11 +57,39 @@ Still open in Phase 1:
 
 ## Phase 2 — homepage and Orbit experience
 
-Retain the new illustrations; improve homepage hierarchy and feature one
-complete Orbit experience. Next implement first-orbit onboarding, clear launch
-feedback, versioned scene save/restore, and a reproducible challenge share.
-The timing fix above establishes the physics prerequisite. Review the entire
-first-minute path on desktop and phone before expanding decorative effects.
+Implemented in the second batch, based on pushed commit `dd4ef82`:
+
+- Homepage Orbit spotlight reuses the authored artwork, with a direct Play
+  action and clearer collection heading. All 18 illustrated tiles remain.
+- Orbit flight school offers an example orbit and a repeatable manual-launch
+  setup. Its start marker and velocity arrow use the real circular-speed
+  calculation. Example launches do not earn personal challenges.
+- Versioned local scene snapshots preserve positions, velocities, masses,
+  trails and launch selection. Load is explicit and opens paused. Completed
+  challenges remain; partially completed laps restart.
+- The existing Share button opens a scene-link dialog with clipboard fallback.
+  Links use the current origin and full numerical precision. Imported bodies
+  do not acquire the recipient's launch ownership.
+- Scene parsing rejects malformed and oversized links. Large scenes can still
+  be saved locally when they exceed the link-size limit.
+- Resizing fits the world without changing coordinates, physics or escape
+  bounds. Pointer input follows the fitted view. Render buffers allocate
+  displayed pixels rather than the dimensions of a large imported world.
+- Phone controls fit into three rows, leaving more simulation visible.
+
+Validation: all 15 check suites passed, including new scene round-trip,
+future-trajectory, ownership, invalid-input, size-limit and viewport-fit tests.
+Browser checks covered desktop and 390px homepage/Orbit layouts, example and
+manual-launch setup, saving/clearing/loading, and opening a generated scene link
+in a new tab. Dev logs showed no errors during those checks. This is viewport
+QA, not a real-phone performance claim. The known production-build sandbox
+limitation from Phase 1 remains outstanding; no production build success is
+claimed for this batch.
+
+Still to finish before declaring the whole phase complete: production build
+and built-site QA, observed first-minute playtests, manual drag/keyboard
+accessibility checks, optional trajectory preview, and result presentation.
+The scene link shares a starting simulation, not full challenge-history state.
 
 ## Phase 3 — launch trio
 

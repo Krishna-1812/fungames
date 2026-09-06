@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro'
 import Backdrop from '../components/Backdrop.astro'
 import GameTile from '../components/GameTile.astro'
+import TileArt from '../components/TileArt.astro'
 import AdSlot from '../components/AdSlot.astro'
 import { SITE } from '../site.config'
 import { listedGames } from '../data/games'
@@ -48,7 +49,23 @@ const confetti = games.map((g, i) => ({
     </header>
 
     <main id="main">
-      <h2 class="visually-hidden">All games</h2>
+      <section class="orbit-feature" aria-labelledby="featureTitle">
+        <div class="feature-copy">
+          <p class="feature-label">THE PLAYGROUND SPOTLIGHT <span>01 / ORBIT</span></p>
+          <h2 id="featureTitle">Make a universe.<br />See what holds.</h2>
+          <p class="feature-description">A sideways launch. A near miss. A moon that finds its way home. Discover gravity one little experiment at a time.</p>
+          <div class="feature-links">
+            <a class="feature-play" href="/orbit/">Play Orbit <span aria-hidden="true">↗</span></a>
+            <a href="#collection">Explore all {games.length} games <span aria-hidden="true">↓</span></a>
+          </div>
+          <p class="feature-footnote">A guided first launch · Save your scene · Share your universe</p>
+        </div>
+        <div class="feature-art" aria-hidden="true"><TileArt slug="orbit" seed={1} /></div>
+      </section>
+      <div class="collection-head" id="collection">
+        <h2>Follow your curiosity.</h2>
+        <p>{games.length} little worlds. No right place to start.</p>
+      </div>
       <div class="grid">
         {games.map((game, i) => <GameTile game={game} index={i} />)}
       </div>
@@ -166,6 +183,34 @@ const confetti = games.map((g, i) => ({
 </Base>
 
 <style>
+  .orbit-feature {
+    position: relative; isolation: isolate; overflow: hidden; min-height: 390px;
+    border-radius: 26px; padding: clamp(28px, 4vw, 48px); margin: 0 0 58px;
+    background: #101d36; color: #f2f5ff;
+    box-shadow: 0 18px 40px #10203b22;
+  }
+  .feature-copy { position: relative; z-index: 1; width: 55%; }
+  .feature-label { display: flex; flex-wrap: wrap; gap: 12px; font-size: 10px; font-weight: 650; letter-spacing: .16em; color: #a7c8f5; margin: 0 0 28px; }
+  .feature-label span { color: #c5d1e4; }
+  .orbit-feature h2 { margin: 0; font-size: clamp(30px, 4.2vw, 52px); letter-spacing: -.035em; line-height: 1.04; }
+  .feature-description { max-width: 370px; color: #bbcce5; font-size: 15px; line-height: 1.75; margin: 22px 0; }
+  .feature-links { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
+  .feature-links a { color: #e4edfb; font-size: 13px; text-underline-offset: 5px; }
+  .feature-links .feature-play { display: inline-flex; align-items: center; gap: 26px; background: #d7e8ff; color: #15243e; padding: 13px 18px; border-radius: 11px; text-decoration: none; font-weight: 700; }
+  .feature-play:hover { background: #fff; }
+  .feature-footnote { font-size: 11px; line-height: 1.6; color: #a8bddb; margin: 23px 0 0; }
+  .feature-art { position: absolute; right: -4%; top: 6%; width: 64%; height: 90%; pointer-events: none; }
+  .collection-head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin: 0 0 26px; scroll-margin-top: 24px; }
+  .collection-head h2 { margin: 0; font-size: clamp(23px, 3vw, 30px); letter-spacing: -.025em; }
+  .collection-head p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+  @media (max-width: 660px) {
+    .orbit-feature { min-height: 0; padding-bottom: 230px; margin-bottom: 36px; }
+    .feature-copy { width: 100%; }
+    .feature-art { width: 100%; right: 0; height: 250px; top: auto; bottom: -12px; }
+    .feature-label { margin-bottom: 20px; }
+    .collection-head { display: block; }
+    .collection-head p { margin-top: 8px; }
+  }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 22px 72px; }
 
   .masthead { text-align: center; margin-bottom: 46px; }
