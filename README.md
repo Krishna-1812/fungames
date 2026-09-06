@@ -186,8 +186,16 @@ universe. Scroll position sets how wide the screen is in metres; objects are
 drawn at their true size relative to that. *No blank stretch across 40 sampled
 positions.*
 
-**Rule Cascade** — twelve escalating username rules, none of which ever switch
-off, one of which reads the clock. *Verified solvable by construction.*
+**Rule Cascade** — thirty escalating username rules, none of which ever switch
+off. Three of them do something rather than just checking: a moth eats one
+character every six seconds until you put a spider in, a sacrifice takes
+whichever letter you have leaned on hardest and never gives it back, and one
+rule asks how many rules are on screen — so satisfying it unlocks another and
+immediately makes it wrong again. *`scripts/check-cascade.mjs` builds a real
+solution for all 24 hours, all 26 possible sacrifices, and every rung of that
+counting ladder. It caught a no-repeats rule that made the game unwinnable for
+three hours of every day, and a parity trap where the length could never be
+prime.*
 
 **Spend It** — one hundred billion dollars, thirty real-priced things. *Balance
 cannot go negative by clicking, shift-clicking, or typing a huge quantity.*
@@ -279,7 +287,7 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Three games carry enough real modelling that the maths is checked separately,
+Four games carry enough real modelling that the maths is checked separately,
 against answers from the literature, worked out by hand, or measured over a
 simulation:
 
@@ -287,10 +295,12 @@ simulation:
 node scripts/check-impact.mjs      # Asteroid Launcher, vs four real impacts
 node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
 node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots
+node scripts/check-cascade.mjs     # Rule Cascade, is it still finishable
 ```
 
-All three exit non-zero on failure. None needs a browser — the analysis in
-`lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts` and `lib/auction.ts` is
+All four exit non-zero on failure. None needs a browser — the analysis in
+`lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts` and
+`lib/cascade-rules.ts` is
 deliberately pure functions over plain data so it can be run this way. The
 auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck

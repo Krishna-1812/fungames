@@ -7,8 +7,15 @@ import GameLayout from '../layouts/GameLayout.astro'
  * live, so late rules routinely break early ones. All validation is client-side;
  * there is no server and nothing is ever sent anywhere.
  *
- * The rule set is verified solvable — "aprilFeVX🎈1996aba" satisfies all of it
- * during hour 19. See README for how the constraints interlock.
+ * Thirty rules, three of which do something rather than just checking: a moth
+ * that eats a character every six seconds, a sacrifice that takes one letter of
+ * the alphabet away from you permanently, and a rule about how many rules are on
+ * screen, which therefore moves every time you satisfy it.
+ *
+ * The rules themselves are in lib/cascade-rules.ts, because with this many
+ * interlocking constraints "is it still possible to finish?" stopped being a
+ * question anyone could answer by reading. scripts/check-cascade.mjs builds a
+ * real solution for all 24 hours and all 26 possible sacrifices.
  */
 ---
 
@@ -34,7 +41,7 @@ import GameLayout from '../layouts/GameLayout.astro'
         placeholder="type something"></textarea>
       <div class="meter">
         <span id="count">0 characters</span>
-        <span id="score">0 / 12 rules</span>
+        <span id="score">0 / 30 rules</span>
       </div>
     </div>
 
@@ -58,6 +65,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
   import { PAPER_FRAG } from '../lib/cascade-paper'
+  import { RULES, chars } from '../lib/cascade-rules'
   const input = document.getElementById('input')
   const list = document.getElementById('rules')
   const count = document.getElementById('count')
@@ -65,49 +73,12 @@ import GameLayout from '../layouts/GameLayout.astro'
   const win = document.getElementById('win')
   const winStat = document.getElementById('winStat')
 
-  const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december']
-  const ELEMENTS = ['He','Li','Be','Ne','Na','Mg','Al','Si','Cl','Ar','Ca','Fe','Cu','Zn','Ga','Ge','As','Se','Br','Kr','Ag','Sn','Au','Hg','Pb','Ti','Cr','Mn','Co','Ni']
-  const NUMERAL = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 }
+  /* The rules live in lib/cascade-rules.ts so scripts/check-cascade.mjs can prove
+     the form is still fillable. With thirty interlocking constraints, a live
+     clock and a letter taken away mid-game, that is not something anyone can
+     check by reading it. */
+  const ctx = { hour: new Date().getHours(), unlocked: 1, banned: null }
 
-  // Code-point aware length so one emoji counts as one character.
-  const chars = (s) => Array.from(s)
-  const digitSum = (s) => (s.match(/\d/g) || []).reduce((a, d) => a + +d, 0)
-  const isPrime = (n) => {
-    if (n < 2) return false
-    for (let i = 2; i * i <= n; i++) if (n % i === 0) return false
-    return true
-  }
-  const numeralProduct = (s) => {
-    const found = (s.match(/[IVXLCDM]/g) || [])
-    return found.length ? found.reduce((a, c) => a * NUMERAL[c], 1) : 0
-  }
-  const hasPalindrome = (s) => {
-    const a = chars(s.toLowerCase())
-    for (let len = a.length; len >= 3; len--)
-      for (let i = 0; i + len <= a.length; i++) {
-        const seg = a.slice(i, i + len)
-        if (seg.join('') === [...seg].reverse().join('')) return true
-      }
-    return false
-  }
-  const hour24 = () => String(new Date().getHours()).padStart(2, '0')
-
-  const RULES = [
-    { id: 1, text: () => 'Your username must be at least 5 characters.', ok: (s) => chars(s).length >= 5 },
-    { id: 2, text: () => 'It must include a number.', ok: (s) => /\d/.test(s) },
-    { id: 3, text: () => 'It must include an uppercase letter.', ok: (s) => /[A-Z]/.test(s) },
-    { id: 4, text: () => 'It must include a month of the year.', ok: (s) => MONTHS.some((m) => s.toLowerCase().includes(m)) },
-    { id: 5, text: () => 'The digits in your username must add up to 25.', ok: (s) => digitSum(s) === 25 },
-    { id: 6, text: () => 'It must include a Roman numeral.', ok: (s) => /[IVXLCDM]/.test(s) },
-    { id: 7, text: () => 'The Roman numerals must multiply to exactly 50.', ok: (s) => numeralProduct(s) === 50 },
-    { id: 8, text: () => 'It must include a chemical element symbol, spelled correctly.', ok: (s) => ELEMENTS.some((e) => s.includes(e)) },
-    { id: 9, text: () => 'It must include an emoji.', ok: (s) => /\p{Extended_Pictographic}/u.test(s) },
-    { id: 10, text: () => `It must include the current hour on a 24-hour clock. It is ${hour24()}.`, ok: (s) => s.includes(hour24()) },
-    { id: 11, text: () => 'It must contain a palindrome at least 3 characters long.', ok: (s) => hasPalindrome(s) },
-    { id: 12, text: () => 'Its length must be a prime number.', ok: (s) => isPrime(chars(s).length) },
-  ]
-
-  let unlocked = 1
   let won = false
 
   /* The sheet. Its wear is a function of how many rules are live, so the paper
@@ -117,7 +88,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     // Nothing here has an edge; three-quarter resolution is free.
     scale: 0.75,
     uniforms: () => ({
-      u_tension: unlocked / RULES.length,
+      u_tension: ctx.unlocked / RULES.length,
       u_motion: prefersReducedMotion ? 0 : 1,
     }),
   })
@@ -171,18 +142,24 @@ import GameLayout from '../layouts/GameLayout.astro'
   function render() {
     const v = input.value
 
-    const before = unlocked
+    const before = ctx.unlocked
     // A rule unlocks only once every rule before it has been satisfied at least
     // once — but unlocked rules never lock again, which is where the pain is.
-    while (unlocked < RULES.length && RULES.slice(0, unlocked).every((r) => r.ok(v))) unlocked++
+    // One at a time, because the sacrifice has to fire the moment its own rule
+    // arrives. Unlocking in a single sweep would step straight over it: rule 25
+    // passes trivially while there is nothing banned yet.
+    while (ctx.unlocked < RULES.length && RULES.slice(0, ctx.unlocked).every((r) => r.ok(v, ctx))) {
+      ctx.unlocked++
+      maybeSacrifice()
+    }
 
-    const active = RULES.slice(0, unlocked)
-    const passingSet = new Set(active.filter((r) => r.ok(v)).map((r) => r.id))
+    const active = RULES.slice(0, ctx.unlocked)
+    const passingSet = new Set(active.filter((r) => r.ok(v, ctx)).map((r) => r.id))
     const passing = passingSet.size
 
-    if (unlocked > before) {
-      sfx.blip(Math.min(9, unlocked))
-      for (let i = before; i < unlocked; i++) announce('New rule ' + RULES[i].id + '. ' + RULES[i].text())
+    if (ctx.unlocked > before) {
+      sfx.blip(Math.min(9, ctx.unlocked))
+      for (let i = before; i < ctx.unlocked; i++) announce('New rule ' + RULES[i].id + '. ' + RULES[i].text(ctx))
     }
     for (const r of active) {
       if (passingSet.has(r.id) && !passedBefore.has(r.id)) { sfx.good(); announce('Rule ' + r.id + ' met.') }
@@ -208,7 +185,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       // rather than on every keystroke.
       const cls = 'rule ' + (done ? 'ok' : 'bad') + (li.classList.contains('enter') ? ' enter' : '')
       if (li.className !== cls) li.className = cls
-      const txt = r.text()
+      const txt = r.text(ctx)
       const textEl = li.querySelector('.text')
       if (textEl.textContent !== txt) textEl.textContent = txt
       // The glyph is decorative, so the state needs saying somewhere real.
@@ -239,7 +216,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     count.textContent = `${chars(v).length} character${chars(v).length === 1 ? '' : 's'}`
     score.textContent = `${passing} / ${RULES.length} rules`
 
-    const all = RULES.every((r) => r.ok(v))
+    const all = RULES.every((r) => r.ok(v, ctx))
     if (all && !won) {
       won = true
       const secs = Math.round((Date.now() - started) / 1000)
@@ -261,14 +238,62 @@ import GameLayout from '../layouts/GameLayout.astro'
   // The sheet only changes when a rule unlocks, and under reduced motion the
   // shared ticker never runs, so it has to be asked for that one frame.
   function repaintPaper() {
-    if (!prefersReducedMotion || paperDrawnAt === unlocked) return
-    paperDrawnAt = unlocked
+    if (!prefersReducedMotion || paperDrawnAt === ctx.unlocked) return
+    paperDrawnAt = ctx.unlocked
     paper.redraw()
   }
 
+  /* ------------------------------------------------------------------ */
+  /* The two rules that do something to you                              */
+  /* ------------------------------------------------------------------ */
+
+  const MOTH_RULE = RULES.find((r) => r.live === 'moth').id
+  const SACRIFICE_RULE = RULES.find((r) => r.live === 'sacrifice').id
+
+  /**
+   * The moth eats one character every six seconds, from a random position,
+   * until you put a spider in. It never eats the spider — a hazard you cannot
+   * end is not a puzzle, it is a wall.
+   */
+  const MOTH_MS = 6000
+  setInterval(() => {
+    if (won) return
+    if (ctx.unlocked < MOTH_RULE) return
+    const rule = RULES[MOTH_RULE - 1]
+    if (rule.ok(input.value, ctx)) return
+    const a = chars(input.value)
+    if (!a.length) return
+    const edible = a.map((_, i) => i).filter((i) => a[i] !== '🕷')
+    if (!edible.length) return
+    const at = edible[(Math.random() * edible.length) | 0]
+    const eaten = a[at]
+    a.splice(at, 1)
+    input.value = a.join('')
+    sfx.bad()
+    announce(`The moth ate a character: ${eaten}.`)
+    render()
+    repaintPaper()
+  }, MOTH_MS)
+
+  /**
+   * The sacrifice fires once, the moment its rule appears, and takes whichever
+   * letter you have leaned on hardest. It is read off what you have actually
+   * typed, so it is personal, and it never comes back.
+   */
+  function maybeSacrifice() {
+    if (ctx.banned || ctx.unlocked < SACRIFICE_RULE) return
+    const counts = new Map<string, number>()
+    for (const ch of input.value.toLowerCase())
+      if (/[a-z]/.test(ch)) counts.set(ch, (counts.get(ch) ?? 0) + 1)
+    if (!counts.size) return
+    ctx.banned = [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0]
+    announce(`The letter ${ctx.banned} has been taken away.`)
+    sfx.thud()
+  }
+
   input.addEventListener('input', () => { unlock(); keystrokes++; render(); repaintPaper() })
-  // Rule 10 is live, so keep re-checking even when nobody is typing.
-  setInterval(render, 5000)
+  // Rules 12 and 23 are live, so keep re-checking even when nobody is typing.
+  setInterval(() => { ctx.hour = new Date().getHours(); render() }, 5000)
   render()
   repaintPaper()
   input.focus()
