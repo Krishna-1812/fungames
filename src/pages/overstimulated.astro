@@ -75,6 +75,9 @@ import { iconSvg } from '../lib/icons'
   import { burst, floatText, prefersReducedMotion } from '../lib/fx'
   import { ShaderSurface } from '../lib/gl'
   import { OVER_FRAG } from '../lib/over-sky'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
 
   const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
   const world = el('world')
@@ -413,6 +416,11 @@ import { iconSvg } from '../lib/icons'
 
   // ---- the off switch ----------------------------------------------------
   let stopping = false
+  let shareCard = null
+  onShare(() => shareCard, (c) => ({
+    title: 'Overstimulated',
+    text: `${c.headline}, and then I stopped.`,
+  }))
 
   el('stopBtn').addEventListener('click', () => {
     // The loop fades 'calm' in from here; the shader multiplies every layer out
@@ -434,6 +442,28 @@ import { iconSvg } from '../lib/icons'
       ' upgrades, ' + Math.floor(secs / 60) + 'm ' + (secs % 60) + 's.'
     el('ending').hidden = false
     sfx.good()
+
+    const stat = recordPlay(
+      'overstimulated',
+      { clicks, upgrades: owned.size, seconds: secs },
+      { clicks: 'high', upgrades: 'high' },
+    )
+    shareCard = {
+      slug: 'overstimulated',
+      siteName: SITE.name,
+      /* What you did is click. The number is the joke, so it is the headline
+         rather than a chip. */
+      headline: clicks.toLocaleString('en-US') + ' clicks',
+      sub:
+        `${owned.size} of ${UPGRADES.length} upgrades, in ${Math.floor(secs / 60)}m ${secs % 60}s, ` +
+        'before deciding that was enough.' +
+        (stat.plays > 1 ? ` Session ${stat.plays}.` : ''),
+      stats: [
+        { label: 'Upgrades', value: `${owned.size} / ${UPGRADES.length}` },
+        { label: 'Minutes', value: String(Math.max(1, Math.round(secs / 60))) },
+        { label: 'Per second', value: (clicks / Math.max(1, secs)).toFixed(1) },
+      ],
+    }
   })
 
   el('againBtn').addEventListener('click', () => location.reload())

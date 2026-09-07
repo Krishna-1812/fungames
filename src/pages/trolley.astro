@@ -68,7 +68,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   <script>
   import { burst, shake, prefersReducedMotion } from '../lib/fx'
   import { recordPlay, readGame } from '../lib/stats'
-  import { shareResult, outcomeLabel } from '../lib/share-card'
+  import { onShare } from '../lib/share-card'
   import { sfx, unlock, hit } from '../lib/audio'
   import { sceneSvg, GEO } from '../lib/trolley-scene'
   import { DILEMMAS, POSITIONS, scoreAnswers, REPEAT_OF_FIRST } from '../data/dilemmas'
@@ -285,21 +285,10 @@ import GameLayout from '../layouts/GameLayout.astro'
      you actually argued for, rather than a link to the game. Before that, the
      chrome button keeps its default behaviour. */
   let shareCard = null
-  document.addEventListener('game:share', (event) => {
-    if (!shareCard) return
-    event.preventDefault()
-    const btn = event.target
-    shareResult(shareCard, {
-      title: 'Trolley',
-      text: `I came out ${shareCard.headline.toLowerCase()}.`,
-      url: location.href,
-    }).then((outcome) => {
-      if (!(btn instanceof HTMLElement)) return
-      const was = btn.textContent
-      btn.textContent = outcomeLabel[outcome]
-      setTimeout(() => (btn.textContent = was), 1600)
-    })
-  })
+  onShare(() => shareCard, (c) => ({
+    title: 'Trolley',
+    text: `I came out ${c.headline.toLowerCase()}.`,
+  }))
 
   el('againBtn').addEventListener('click', () => {
     i = 0; deaths = 0; pulls = 0; answered = []; picks = []

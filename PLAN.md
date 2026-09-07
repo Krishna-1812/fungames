@@ -452,12 +452,52 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   assumption, and `check-stats.mjs` runs the real module against six of them —
   working, throws-on-read, throws-on-write, full, full of junk, and absent.
 
-- **Every game ends in something worth screenshotting** — **Trolley done**, and
-  it is the pattern for the rest: record the play, build the card, intercept
-  the chrome Share button through the `game:share` hook that was already there.
-  The remaining games with a real ending are Steady Hand, Spend It, The Auction
-  Game, From Memory, I'm Not a Robot, Asteroid Launcher, Rule Cascade and
-  Overstimulated.
+- ~~**Every game ends in something worth screenshotting**~~ **done.** Every
+  game with a real ending now has one you can send: Trolley, Steady Hand,
+  Spend It, Rule Cascade, Overstimulated, I'm Not a Robot and Asteroid
+  Launcher here, and Auction and From Memory in the owner's own commits. From
+  Memory's is a postcard of the drawing rather than a stat card, which is
+  right — a score card for a drawing would be the wrong object.
+
+  `GameLayout` already turned every `[data-share]` button into a cancelable
+  `game:share` event, so `onShare()` in `share-card.ts` is the whole
+  integration: a game says what its card is, returns null while there is
+  nothing worth a picture, and the button keeps its old link-sharing behaviour
+  until then. Eight copies of the same listener is what that replaced.
+
+  Two things the checker could not have caught and a screenshot did. Spend It
+  printed "100.00% left" on a receipt for something you had just bought —
+  true to two decimal places of a hundred billion, and read as a bug. And
+  Asteroid's result came out "…2.4 million…", truncating a casualty count.
+
+  That second one was a layout bug, not copy. `fit()` steps the type down
+  until the text fits, and the test it stepped on was `lines.length <=
+  maxLines` — which `wrapEm` makes unconditionally true, because it enforces
+  the line limit *by* ellipsising. So `fit` could never step down: every
+  sentence too long for two lines rendered at the largest size with its tail
+  cut off, with room to spare underneath. A cut is now not a fit, and the
+  sentences set at 26–30px instead, whole.
+
+  `check-result-card.mjs` gained the two things that would have caught them.
+  Its samples were generic and cross-multiplied across every game, which tests
+  the layout and not the copy — so `WORST` now holds, per game, the longest
+  thing that game can genuinely produce, read off its own branches rather than
+  invented. And a card is failed if any of that copy gets ellipsised at all.
+
+  The declared layout boxes also had to become honest. They were built from
+  `emWidth`, a five-bucket character-width table that the same file only holds
+  to ±20% — so "ink lands inside the declared boxes" was really a second,
+  blunter test of the width model, and it failed on "Ordinarily", which sets
+  about 5% wider than predicted. The boxes now carry the model's own
+  tolerance, exported as `WIDTH_TOLERANCE` and shared with the check that
+  measures it, so widening it is visibly a change to what the card promises.
+
+  Not played end to end: Rule Cascade and I'm Not a Robot. Both build, both
+  fall back to link-sharing correctly before there is a result, and both draw
+  their card from variables the adjacent line already uses — but reaching
+  their endings means satisfying thirty interlocking rules, or completing
+  twelve checks by hand, and neither was worth the detour. Worth doing before
+  release.
 
 ### Phase 5 — Deal with the weak three
 

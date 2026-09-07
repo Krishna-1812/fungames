@@ -213,6 +213,15 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { burst, shake, prefersReducedMotion } from '../lib/fx'
   import { sfx, tone, unlock, isMuted } from '../lib/audio'
   import { Profiler, circleStats, variation, gaps, report } from '../lib/telemetry'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
+
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({
+    title: "I'm Not a Robot",
+    text: `Twelve checks said: ${c.headline.toLowerCase()}.`,
+  }))
 
   const $ = (id: string) => document.getElementById(id)!
   const box = $('box'), slot = $('slot'), promptEl = $('prompt'), hintEl = $('hint')
@@ -1091,6 +1100,33 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (ev.dodges) extras.push(`The checkbox got away from you ${ev.dodges} times.`)
     extras.push(`Twelve checks, ${ev.retries} rejection${ev.retries === 1 ? '' : 's'}, ${Math.floor(secs / 60)}m ${secs % 60}s.`)
     $('extras').innerHTML = extras.map((e) => `<li>${e}</li>`).join('')
+
+    const stat = recordPlay(
+      'not-a-robot',
+      { verdict: r.verdict, humanity: r.humanity, retries: ev.retries, seconds: secs },
+      { humanity: 'high' },
+    )
+
+    /* `r.detail` is written for the page, where it sits above a table that
+       explains it. On a card with nothing around it, a sentence naming one
+       failed channel reads as the whole result, so the card says how many
+       there were and leaves the table where it is. */
+    shareCard = {
+      slug: 'not-a-robot',
+      siteName: SITE.name,
+      headline: r.verdict,
+      sub:
+        (r.measured
+          ? `${r.passed} of ${r.measured} measurable channels looked like a person.`
+          : 'Twelve checks, and not one usable signal.') +
+        ` ${ev.retries} rejection${ev.retries === 1 ? '' : 's'} along the way.` +
+        (stat.plays > 1 ? ` Attempt ${stat.plays}.` : ''),
+      stats: [
+        { label: 'Human', value: r.humanity + '%' },
+        { label: 'Channels', value: `${r.passed} / ${r.measured}` },
+        { label: 'Time', value: `${Math.floor(secs / 60)}m ${secs % 60}s` },
+      ],
+    }
 
     $('verdict').hidden = false
     box.classList.add('done')

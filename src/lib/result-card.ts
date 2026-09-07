@@ -71,6 +71,18 @@ export const emWidth = (s: string) =>
     0,
   )
 
+/**
+ * How far `emWidth` may sit from what actually sets, either way.
+ *
+ * Five buckets of character width are not font metrics, and nothing here can
+ * measure a glyph — the card is built in a Node script with no text engine and
+ * rendered by whatever rasteriser opens it. So this is the honest error bar,
+ * and `check-result-card.mjs` imports it and fails if the model drifts past
+ * it. Widening the figure to make a failure go away is therefore a change to
+ * what the card promises, not a tweak to a checker.
+ */
+export const WIDTH_TOLERANCE = 0.2
+
 /** Break on word boundaries, at most `max` ems per line. */
 function wrapEm(text: string, maxEm: number, maxLines: number): string[] {
   const words = text.split(' ')
@@ -86,13 +98,13 @@ function wrapEm(text: string, maxEm: number, maxLines: number): string[] {
     }
   }
   if (line) lines.push(line)
-  if (lines.length <= maxLines) return lines
+  if (lines.length <= maxLines) return { lines, cut: false }
   // Dropping the rest without saying so reads as a rendering fault rather
-  // than as a sentence that was too long. The stat row throws instead,
-  // because a truncated number would be a lie; a truncated sentence is not.
+  // than as a sentence that was too long. `cut` is what tells `fit` this was
+  // not actually a fit — see the note there.
   const kept = lines.slice(0, maxLines)
   kept[maxLines - 1] = kept[maxLines - 1].replace(/[ ,;:]+$/, '') + '…'
-  return kept
+  return { lines: kept, cut: true }
 }
 
 const FONT = 'Arial, Helvetica, sans-serif'
@@ -147,10 +159,19 @@ const VALUE_PX = 32
  */
 function fit(text: string, from: number, to: number, maxLines: number) {
   for (let size = from; size >= to; size -= 2) {
-    const lines = wrapEm(text, AVAIL / size, maxLines)
-    if (lines.length <= maxLines && lines.every((l) => emWidth(l) * size <= AVAIL)) return { size, lines }
+    const { lines, cut } = wrapEm(text, AVAIL / size, maxLines)
+    /* A cut is not a fit.
+     *
+     * The test used to be `lines.length <= maxLines`, which `wrapEm` makes
+     * unconditionally true — it enforces the line limit *by* ellipsising. So
+     * the loop could never step down: every sentence longer than two lines
+     * rendered at the largest size with its tail removed, rather than at a
+     * smaller size, whole. Asteroid's result came out as "…2.4 million…",
+     * truncating a casualty count, at 32px, with 10px of room to spare. */
+    if (!cut && lines.every((l) => emWidth(l) * size <= AVAIL)) return { size, lines }
   }
-  return { size: to, lines: wrapEm(text, AVAIL / to, maxLines) }
+  // Genuinely too long even at the smallest size. Now the ellipsis is honest.
+  return { size: to, lines: wrapEm(text, AVAIL / to, maxLines).lines }
 }
 
 const chipWidth = (s: Stat) =>
@@ -203,7 +224,18 @@ export function layout(r: ResultCard) {
   const chipY = CARD.H - 168
 
   const boxes: Box[] = []
-  const wide = (lines: string[], px: number) => Math.max(...lines.map((l) => emWidth(l) * px), 0)
+  /* Widened by the width model's own tolerance, because that is all the
+     precision there is to claim. `emWidth` is a per-character table rather
+     than a font metric: "Ordinarily" at 92px sets about 5% wider than it
+     predicts. Declaring the box at the bare estimate turned "ink lands inside
+     the declared boxes" into a second, blunter test of the width model —
+     which `check-result-card.mjs` already tests directly, against this same
+     figure, and is the right place for it to fail. Nothing is lost by the
+     padding: the three boxes all start at x=84 and are separated vertically,
+     so overlap is a question about y, and whether the text stays out of the
+     illustration is measured on the painted ink, not on this. */
+  const wide = (lines: string[], px: number) =>
+    Math.max(...lines.map((l) => emWidth(l) * px), 0) * (1 + WIDTH_TOLERANCE)
   if (r.headline)
     boxes.push({
       name: 'headline',

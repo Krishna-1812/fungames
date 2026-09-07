@@ -126,6 +126,39 @@ export async function shareResult(
   }
 }
 
+/**
+ * Point every Share button on the page at a result card.
+ *
+ * `GameLayout` already turns each `[data-share]` button — the one in the
+ * chrome and any the game puts in its own ending — into a cancelable
+ * `game:share` event that bubbles to the document, so one listener covers all
+ * of them and a game never has to find the buttons itself.
+ *
+ * `card()` returns null while there is nothing worth a picture, and the
+ * button keeps its original behaviour of sharing a link to the game. That is
+ * the right fallback: before you have finished, a link is genuinely all there
+ * is to send.
+ */
+export function onShare(
+  card: () => ResultCard | null,
+  meta: (c: ResultCard) => { title: string; text: string },
+) {
+  document.addEventListener('game:share', (event) => {
+    const c = card()
+    if (!c) return
+    event.preventDefault()
+    const btn = event.target
+    shareResult(c, { ...meta(c), url: location.href }).then((outcome) => {
+      // Saying what happened matters most where nothing visibly does: a
+      // desktop download is silent apart from the browser's own shelf.
+      if (!(btn instanceof HTMLElement)) return
+      const was = btn.textContent
+      btn.textContent = outcomeLabel[outcome]
+      setTimeout(() => (btn.textContent = was), 1600)
+    })
+  })
+}
+
 /** What to put on the button afterwards. */
 export const outcomeLabel: Record<ShareOutcome, string> = {
   shared: 'Shared',

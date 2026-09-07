@@ -159,6 +159,9 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { CITIES, LAND_PATH, MAP_W, MAP_H, isLand, type City } from '../data/world'
   import { sfx, unlock } from '../lib/audio'
   import { burst, shake } from '../lib/fx'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
 
   const el = <T extends HTMLElement = HTMLElement>(id: string) =>
     document.getElementById(id) as T
@@ -337,6 +340,60 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   const RING_COLOURS = ['#fff1c9', '#ffd166', '#ff9a3c', '#ff5f2e', '#e0341c', '#8d1f12']
 
+  /* ---- the result, as a picture ----------------------------------------- */
+
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({
+    title: 'Asteroid Launcher',
+    text: `${c.headline}, where I dropped it.`,
+  }))
+
+  function buildCard(
+    r: ReturnType<typeof simulate>,
+    cas: ReturnType<typeof estimateCasualties>,
+  ) {
+    const mt = r.energyMt
+    const energy =
+      mt >= 1
+        ? `${bigNumber(Math.round(mt))} megatonnes`
+        : `${nf(mt * 1000, 1)} kilotonnes`
+
+    /* An airburst has no crater, and printing "0 m across" for one is a lie
+       the page itself does not tell — it swaps in the burst altitude. The card
+       does the same rather than carrying an empty chip. */
+    const shape = r.crater
+      ? { label: 'Crater', value: dist(r.crater.final) }
+      : { label: 'Burst at', value: dist(r.entry.burstAltitude) }
+
+    recordPlay(
+      'asteroid',
+      { megatonnes: Math.round(mt), place: target?.name ?? '', dead: cas.dead },
+      { megatonnes: 'high' },
+    )
+
+    shareCard = {
+      slug: 'asteroid',
+      siteName: SITE.name,
+      headline: energy,
+      /* Three sentences did not fit, and the one that got cut was the
+         casualty count — a truncated number, which is the one thing the card
+         refuses to print. The crater is a chip already, so the sentence keeps
+         the place and the cost and says the rest through the chips. */
+      sub:
+        `${target?.name ?? 'An unnamed spot'}. ` +
+        (cas.dead > 0
+          ? `${bigNumber(cas.dead)} people do not survive it.`
+          : r.crater
+            ? `Nobody lives close enough to be killed by it.`
+            : `It comes apart in the air and never lands.`),
+      stats: [
+        shape,
+        { label: 'Fireball', value: dist(r.fireball) },
+        { label: 'Quake', value: 'M' + r.magnitude.toFixed(1) },
+      ],
+    }
+  }
+
   el('fire').addEventListener('click', () => {
     if (!target) return
     const result = simulate(currentInput())
@@ -355,6 +412,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   function render(r: ReturnType<typeof simulate>, cas: ReturnType<typeof estimateCasualties>) {
     el('result').hidden = false
+    buildCard(r, cas)
 
     /* headline ------------------------------------------------------- */
     const mt = r.energyMt

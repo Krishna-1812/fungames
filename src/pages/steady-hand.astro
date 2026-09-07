@@ -47,6 +47,7 @@ import { SHAPES } from '../lib/steady-shapes'
     <div class="result" id="result" hidden>
       <div class="big" id="bigScore">0.0%</div>
       <div class="verdict" id="verdict"></div>
+      <p class="ready" id="ready" hidden>Share makes a card of this.</p>
       <ul class="factors" id="factors"></ul>
       <button type="button" id="again">Again</button>
     </div>
@@ -62,6 +63,9 @@ import { SHAPES } from '../lib/steady-shapes'
     SHAPES, shapeById, scoreStroke, rating, verdictFor, ratingName,
     TOLERANCE, distToPath, dist, sizeOf,
   } from '../lib/steady-shapes'
+  import { recordPlay } from '../lib/stats'
+  import { onShare } from '../lib/share-card'
+  import { SITE } from '../site.config'
 
   const canvas = document.getElementById('c')
   const ctx = canvas.getContext('2d')
@@ -74,6 +78,7 @@ import { SHAPES } from '../lib/steady-shapes'
   const verdict = document.getElementById('verdict')
   const factors = document.getElementById('factors')
   const again = document.getElementById('again')
+  const ready = document.getElementById('ready')
   const tabs = document.getElementById('shapes')
 
   const STORE = 'steady-hand:bests.v1'
@@ -89,6 +94,7 @@ import { SHAPES } from '../lib/steady-shapes'
   let drawing = false
   let locked = false
   let lastScore = null
+  let strokesDrawn = 0     // lifetime, from the shared store
 
   /* Bests are per shape now, and the old single number was the line. Reading
      it back rather than dropping it means nobody loses a score they earned. */
@@ -416,10 +422,29 @@ import { SHAPES } from '../lib/steady-shapes'
     }
     floatText(bx, by - 26, s.score.toFixed(1) + '%', s.score >= 62 ? '#ffd166' : '#ff8f7a')
 
+    /* A play here is a stroke, which is what the word means in this game:
+       there is no run to finish, only shapes you keep re-drawing. The per-shape
+       bests stay in their own key — `stats.ts` deliberately leaves that alone —
+       and what the shared store gets is the score, which is the number that
+       compares with anything else. */
+    const stat = recordPlay(
+      'steady-hand',
+      { shape: shape.id, score: Math.round(s.score * 10) / 10 },
+      { score: 'high' },
+    )
+    // Lifetime, to match the bests beside it. `plays` is strokes here.
+    strokesDrawn = stat.plays
+
     const r2 = rating(bests)
     verdict.textContent = r2 !== null && Object.keys(bests).length === SHAPES.length
       ? `${verdictFor(s.score)} Overall: ${ratingName(r2)}.`
       : verdictFor(s.score)
+
+    /* Nothing is worth a card until all four shapes have a best: a rating
+       built from the two you happen to be good at is not a steadiness rating,
+       which is exactly why `rating()` returns null until then. */
+    shareCard = r2 === null ? null : cardFor(r2)
+    ready.hidden = r2 === null
     result.hidden = false
     // Measurable only once it is laid out, so this has to follow the unhide.
     placeResult()
@@ -427,6 +452,40 @@ import { SHAPES } from '../lib/steady-shapes'
     render()
     nudge()
   }
+
+  /* ---- the result, as a picture ----------------------------------------- */
+
+  let shareCard = null
+
+  function cardFor(r) {
+    const ranked = SHAPES.map((sh) => ({ name: sh.name, best: bests[sh.id] }))
+      .sort((a, b) => b.best - a.best)
+    /* The four numbers are the interesting part, so they go in the sentence.
+       The narrowest a chip gets is 150px and three of those is most of the
+       column, so the chips carry only the short facts. */
+    const line = ranked
+      .map((v, i) => `${i ? v.name.toLowerCase() : v.name} ${v.best.toFixed(0)}`)
+      .join(', ')
+    return {
+      slug: 'steady-hand',
+      siteName: SITE.name,
+      headline: ratingName(r),
+      /* The four numbers go last. A sub-line too long for the card is
+         ellipsised, and losing "freehand" off the end costs nothing while
+         losing "line 66" costs the result. */
+      sub: `Freehand, one stroke each: ${line}.`,
+      stats: [
+        { label: 'Steadiest', value: ranked[0].name },
+        { label: 'Rating', value: r.toFixed(0) + '%' },
+        { label: 'Strokes', value: String(strokesDrawn) },
+      ],
+    }
+  }
+
+  onShare(() => shareCard, (c) => ({
+    title: 'Steady Hand',
+    text: `I draw like a ${c.headline.toLowerCase()}.`,
+  }))
 
   canvas.addEventListener('pointerup', finish)
   canvas.addEventListener('pointercancel', finish)
@@ -494,7 +553,8 @@ import { SHAPES } from '../lib/steady-shapes'
     color: #fff; border-radius: 18px; padding: 26px 38px; text-align: center;
   }
   .big { font-size: 56px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-  .verdict { opacity: 0.8; margin-bottom: 16px; }
+  .verdict { opacity: 0.8; margin-bottom: 10px; }
+  .ready { opacity: 0.55; font-size: 0.82rem; margin: 0 0 14px; }
   .result button {
     background: #e0a458; color: #3a121d; border: 0; border-radius: 999px;
     padding: 10px 26px; font-weight: 600; cursor: pointer;

@@ -25,6 +25,12 @@
  *   4. Does a stat row that does not fit get caught? The card drops the chip
  *      rather than throwing, because throwing in a browser kills the share; so
  *      catching it is this file's job.
+ *   4b. And does each *wired* game's own worst case fit? The generic samples
+ *      are cross-multiplied with every game, which tests the layout but not
+ *      the copy. What actually went wrong in practice was a game passing a
+ *      real string from its own data — "Contractualist", a position name it
+ *      has always had — so `WORST` holds, per game, the longest thing that
+ *      game can genuinely produce.
  *   5. Are the ids all prefixed? A card is rasterised alone most of the time
  *      but is also previewed inside a live page, next to tile art with ids of
  *      its own.
@@ -37,7 +43,7 @@ import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
 const { listedGames } = await import('../src/data/games.ts')
-const { resultCardSvg, CARD, emWidth, layout } = await import('../src/lib/result-card.ts')
+const { resultCardSvg, CARD, emWidth, layout, WIDTH_TOLERANCE } = await import('../src/lib/result-card.ts')
 // Imported, not reimplemented. A second copy of the ink rule in here is
 // exactly how the card's own copy drifted from what it was writing on.
 const { pickInk } = await import('../src/lib/og-card.ts')
@@ -83,6 +89,81 @@ const SAMPLES = [
   ] },
 ]
 
+/* The longest strings each wired game can actually hand the card.
+ *
+ * Taken from the branches in each page rather than invented: the longest
+ * verdict name, the largest number that fits the game's own bounds, the
+ * wordiest sentence its template can build. A generic sample cannot catch a
+ * game whose own vocabulary is too wide for a chip. */
+const WORST = {
+  trolley: {
+    headline: 'Virtue ethicist',
+    sub: '96% of the time, over twenty-six levers. Then contractualist, at 92%.',
+    stats: [
+      { label: 'Pulled', value: '26 / 26' },
+      { label: 'Saved', value: '104' },
+      { label: 'Runs', value: '128' },
+    ],
+  },
+  'steady-hand': {
+    headline: 'Ordinarily human',
+    sub: 'Freehand, one stroke each: square 100, spiral 100, circle 100, line 100.',
+    stats: [
+      { label: 'Steadiest', value: 'Square' },
+      { label: 'Rating', value: '100%' },
+      { label: 'Strokes', value: '9999' },
+    ],
+  },
+  'spend-it': {
+    headline: '$100,000,000,000 spent',
+    sub: 'Mostly on a professional football team. $99,999,999,999 of it is still there.',
+    stats: [
+      { label: 'Things', value: '9,999,999' },
+      { label: 'Kinds', value: '27' },
+      { label: 'Left', value: '<0.01%' },
+    ],
+  },
+  'rule-cascade': {
+    headline: 'All 30 rules',
+    sub: '9,999 keystrokes for a 120-character password that satisfies every rule at once. Attempt 99.',
+    stats: [
+      { label: 'Keystrokes', value: '9,999' },
+      { label: 'Length', value: '120' },
+      { label: 'Time', value: '59m 59s' },
+    ],
+  },
+  overstimulated: {
+    headline: '9,999,999 clicks',
+    sub: '15 of 15 upgrades, in 59m 59s, before deciding that was enough. Session 99.',
+    stats: [
+      { label: 'Upgrades', value: '15 / 15' },
+      { label: 'Minutes', value: '60' },
+      { label: 'Per second', value: '99.9' },
+    ],
+  },
+  'not-a-robot': {
+    headline: 'Probably human',
+    sub: '12 of 12 measurable channels looked like a person. 99 rejections along the way. Attempt 99.',
+    stats: [
+      { label: 'Human', value: '100%' },
+      { label: 'Channels', value: '12 / 12' },
+      { label: 'Time', value: '59m 59s' },
+    ],
+  },
+  asteroid: {
+    headline: '999 million megatonnes',
+    sub: 'Kinshasa, Democratic Republic of the Congo. 8.1 billion people do not survive it.',
+    stats: [
+      { label: 'Burst at', value: '99.9 km' },
+      { label: 'Fireball', value: '1,200 km' },
+      { label: 'Quake', value: 'M12.4' },
+    ],
+  },
+}
+
+/** Every generic sample, plus the worst thing this particular game can say. */
+const samplesFor = (g) => (WORST[g.slug] ? [...SAMPLES, WORST[g.slug]] : SAMPLES)
+
 /* Half size. Every threshold in this file is in card units and every
    measurement is converted back, so the numbers do not move — and a quarter of
    the pixels is the difference between finishing inside the suite's budget and
@@ -115,7 +196,7 @@ console.log('\nevery listed game can produce a card')
 {
   let bad = 0
   for (const g of games) {
-    for (const s of SAMPLES) {
+    for (const s of samplesFor(g)) {
       try {
         const svg = resultCardSvg({ slug: g.slug, siteName: SITE, ...s })
         if (!svg.startsWith('<svg') || svg.length < 800) {
@@ -142,7 +223,7 @@ console.log('\ntext stays out of the illustration')
   let bad = 0
   let worst = { x: 0, who: '' }
   for (const g of games) {
-    for (const s of SAMPLES) {
+    for (const s of samplesFor(g)) {
       const full = render({ slug: g.slug, siteName: SITE, ...s })
       // The same card with nothing written on it: same background, same art.
       const bare = render({ slug: g.slug, siteName: SITE, headline: '', stats: [] })
@@ -185,7 +266,7 @@ console.log('\nheadline, sub and stats keep to their own boxes')
 {
   let bad = 0
   for (const g of games) {
-    for (const s of SAMPLES) {
+    for (const s of samplesFor(g)) {
       const card = { slug: g.slug, siteName: SITE, ...s }
       const boxes = layout(card).boxes
       for (let i = 0; i < boxes.length; i++)
@@ -332,7 +413,7 @@ console.log('\nan over-long stat row is dropped, and that is a failure here')
 
   let bad = 0
   for (const g of games)
-    for (const s of SAMPLES) {
+    for (const s of samplesFor(g)) {
       const L = layout({ slug: g.slug, siteName: SITE, ...s })
       if (L.dropped) {
         fail(`${g.slug} / "${s.headline.slice(0, 20)}": ${L.dropped} stat(s) would not fit`)
@@ -343,6 +424,26 @@ console.log('\nan over-long stat row is dropped, and that is a failure here')
 }
 
 /* ---- 5. ids --------------------------------------------------------------- */
+
+console.log("\nno game's own worst sentence gets cut off")
+{
+  /* `wrapEm` ellipsises a sub-line that will not fit, which is right in
+     general — a sentence that loses its last clause is still a sentence. It is
+     not right for the copy a game actually writes, and the way it fails is
+     ugly: Asteroid's worst case ended "2.4 million…", truncating a number,
+     which the card's own rules call a lie. So the sentences are held to a
+     length they survive rather than the ellipsis being trusted to be tidy. */
+  let bad = 0
+  for (const [slug, s] of Object.entries(WORST)) {
+    const L = layout({ slug, siteName: SITE, ...s })
+    const last = L.sub?.lines[L.sub.lines.length - 1] ?? ''
+    if (last.endsWith('…')) {
+      fail(`${slug}: "…${last.slice(-34)}" — the sentence is longer than the card`)
+      bad++
+    }
+  }
+  check(bad === 0, 'every wired game says the whole of what it means to say')
+}
 
 console.log('\nids')
 {
@@ -405,7 +506,11 @@ console.log('\nthe width estimate against what actually sets')
   // A quarter is loose, deliberately: the model is a cheap approximation of a
   // font the renderer picks for itself, and the layout only needs it to be
   // right enough to choose a size. Test 2 is what proves the result fits.
-  check(worstErr < 0.25, `the width model is within ${(worstErr * 100).toFixed(0)}% — worst: ${who}`)
+  check(
+    worstErr < WIDTH_TOLERANCE,
+    `the width model is within ${(worstErr * 100).toFixed(0)}% of what sets, against a ` +
+      `${(WIDTH_TOLERANCE * 100).toFixed(0)}% bar — worst: ${who}`,
+  )
 }
 
 /* ---- output --------------------------------------------------------------- */

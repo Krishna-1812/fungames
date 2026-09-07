@@ -66,6 +66,9 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { ShaderSurface } from '../lib/gl'
   import { PAPER_FRAG } from '../lib/cascade-paper'
   import { RULES, chars } from '../lib/cascade-rules'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
   const input = document.getElementById('input')
   const list = document.getElementById('rules')
   const count = document.getElementById('count')
@@ -123,6 +126,12 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* Announcements are batched: typing a username is a keystroke every 150ms or
      so, and a live region that fires on each one is noise, not help. */
   const announcer = document.getElementById('announce')
+  let shareCard = null
+  onShare(() => shareCard, () => ({
+    title: 'Rule Cascade',
+    text: 'I satisfied every last one of these rules.',
+  }))
+
   const pending = []
   let announceT = 0
   function announce(msg) {
@@ -221,6 +230,29 @@ import GameLayout from '../layouts/GameLayout.astro'
       won = true
       const secs = Math.round((Date.now() - started) / 1000)
       winStat.textContent = `${keystrokes} keystrokes, ${Math.floor(secs / 60)}m ${secs % 60}s, and ${RULES.length} rules.`
+
+      /* The password itself is the result, and it is also the one thing that
+         must not go on a shareable picture: people reuse these. What the card
+         carries is what it cost to arrive at one. */
+      const stat = recordPlay(
+        'rule-cascade',
+        { keystrokes, seconds: secs, length: chars(v).length },
+        { keystrokes: 'low', seconds: 'low' },
+      )
+      shareCard = {
+        slug: 'rule-cascade',
+        siteName: SITE.name,
+        headline: `All ${RULES.length} rules`,
+        sub:
+          `${keystrokes.toLocaleString('en-US')} keystrokes for a ${chars(v).length}-character password ` +
+          `that satisfies every rule at once.` +
+          (stat.plays > 1 ? ` Attempt ${stat.plays}.` : ''),
+        stats: [
+          { label: 'Keystrokes', value: keystrokes.toLocaleString('en-US') },
+          { label: 'Length', value: String(chars(v).length) },
+          { label: 'Time', value: `${Math.floor(secs / 60)}m ${secs % 60}s` },
+        ],
+      }
       win.hidden = false
       sfx.great()
       for (let k = 0; k < 5; k++) {

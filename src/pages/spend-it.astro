@@ -76,11 +76,14 @@ import { iconSvg } from '../lib/icons'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
   import { VAULT_FRAG } from '../lib/spend-vault'
+  import { onShare } from '../lib/share-card'
+  import { SITE } from '../site.config'
     const { BUDGET } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const money = document.getElementById('money')
   const trackFill = document.getElementById('trackFill')
   const sheet = document.getElementById('sheet')
+  let shareCard = null
   const lines = document.getElementById('lines')
   const spentEl = document.getElementById('spent')
   const leftEl = document.getElementById('left')
@@ -242,9 +245,50 @@ import { iconSvg } from '../lib/icons'
           })
         : [Object.assign(document.createElement('li'), { className: 'empty', textContent: 'You have not bought anything yet.' })])
     )
-    spentEl.textContent = usd(BUDGET - balance())
-    leftEl.textContent = usd(balance())
+    const left = balance()
+    const spent = BUDGET - left
+    spentEl.textContent = usd(spent)
+    leftEl.textContent = usd(left)
     sheet.hidden = false
+
+    /* The receipt is the ending, so the Share button inside it shares the
+       receipt. Nothing bought is not a result — the card would read
+       "$0 spent", which is a screenshot of not having played. */
+    const units = bought.reduce((a, i) => a + i.n, 0)
+    const biggest = bought.slice().sort((a, b) => b.n * b.price - a.n * a.price)[0]
+    const pct = (left / BUDGET) * 100
+    shareCard = !bought.length
+      ? null
+      : {
+          slug: 'spend-it',
+          siteName: SITE.name,
+          headline: usd(spent) + ' spent',
+          /* Money is far too wide for a 150px chip — "$99,999,996,700" alone
+             is most of the column — so every figure lives in the sentence and
+             the chips carry counts. */
+          sub:
+            `Mostly on ${biggest.name.toLowerCase()}. ` +
+            (left === 0 ? 'Not a dollar left.' : `${usd(left)} of it is still there.`),
+          stats: [
+            { label: 'Things', value: units.toLocaleString('en-US') },
+            { label: 'Kinds', value: String(bought.length) },
+            {
+              /* Both ends need a word rather than a rounded figure. Spending
+                 eighteen dollars of a hundred billion really does leave
+                 99.999999982%, and printing "100.00% left" on a receipt for
+                 something you bought reads as a bug. */
+              label: 'Left',
+              value:
+                pct === 0
+                  ? '0%'
+                  : pct < 0.01
+                    ? '<0.01%'
+                    : pct > 99.99
+                      ? '>99.99%'
+                      : pct.toFixed(2) + '%',
+            },
+          ],
+        }
   })
 
   const close = () => (sheet.hidden = true)
@@ -255,8 +299,15 @@ import { iconSvg } from '../lib/icons'
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (!confirm('Give all of it back?')) return
     items.forEach((i) => (i.n = 0))
+    // The old receipt describes a fortune you no longer have.
+    shareCard = null
     render()
   })
+
+  onShare(() => shareCard, (c) => ({
+    title: 'Spend It',
+    text: `${c.headline}.`,
+  }))
 
   load()
   render()
