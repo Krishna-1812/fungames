@@ -492,12 +492,25 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   tolerance, exported as `WIDTH_TOLERANCE` and shared with the check that
   measures it, so widening it is visibly a change to what the card promises.
 
-  Not played end to end: Rule Cascade and I'm Not a Robot. Both build, both
-  fall back to link-sharing correctly before there is a result, and both draw
-  their card from variables the adjacent line already uses — but reaching
-  their endings means satisfying thirty interlocking rules, or completing
-  twelve checks by hand, and neither was worth the detour. Worth doing before
-  release.
+  ~~Not played end to end: Rule Cascade and I'm Not a Robot.~~ **Both now
+  are**, and the detour paid for itself. Rule Cascade ended every completed
+  run with its own payoff line — "Fine. That is a username." — hidden behind
+  the sticky input box, which scrolling cannot free, because the field is
+  pinned to the top and the win panel opens underneath it. The field now stops
+  being sticky once that panel is up.
+
+  Getting there needed a solver, so `check-cascade.mjs` grew an `--answer`
+  flag that prints a playable username instead of a verdict. It prints eight
+  of them: rule 23 asks for the number of rules on screen and satisfying it
+  puts another one there, so the endgame is a ladder from 23 up to 30 — which
+  is nowhere in the checker's pass/fail output.
+
+  I'm Not a Robot came through all twelve checks clean, and its ending is the
+  best one on the site: a report card scoring each channel against a human
+  range, then a grid of your own traces to pick yourself out of. The one thing
+  that looked wrong — a "not measured" tile beside a panel reporting tremor —
+  was not: the empty channel was click rhythm, genuinely empty because the run
+  was driven with synthetic clicks.
 
 ### Phase 5 — Deal with the weak three — **done**
 
