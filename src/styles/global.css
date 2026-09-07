@@ -104,11 +104,18 @@ body.is-fixed {
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-/* Skip link — visible only when focused. */
+/* Skip link — visible only when focused.
+
+   The colours here are literal rather than var(--ink), which is what they were
+   until a game themed itself dark and redefined --ink to a *light* colour. The
+   link then painted white on near-white — invisible, on the one control a
+   keyboard user meets before anything else. A dark pill with a pale ring reads
+   on the paper pages and the dark ones alike. */
 .skip {
   position: absolute; left: 8px; top: -60px; z-index: 999;
-  background: var(--ink); color: #fff; padding: 10px 16px;
+  background: #16151a; color: #fff; padding: 10px 16px;
   border-radius: 8px; text-decoration: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
   transition: top 140ms var(--ease);
 }
 .skip:focus { top: 8px; }

@@ -64,7 +64,7 @@ const person = (x: number, y: number, h: number, fill: string) =>
 export const ART: Record<string, Illustration> = {
   /* ---- Universe Forecast ----------------------------------------------- */
   'universe-forecast': {
-    subject: 'totality over a horizon, with the lunar month running along beneath it',
+    subject: 'totality, corona and prominences, with the lunar month running beneath it',
     // `full` because the subject is a sky, and a sky in a box on the right is
     // just a logo.
     //
@@ -82,7 +82,10 @@ export const ART: Record<string, Illustration> = {
     // that has to be legible belongs on the right.
     slot: 'full',
     viewBox: '0 0 320 120',
-    palette: ['#ffd98a', '#fff3d0', '#8fb4ff', '#2b3873'],
+    palette: [
+      '#ffd98a', '#ffd774', '#fff3d0', '#fff8e2', '#ffe6ae',
+      '#ff8fa8', '#8fb4ff', '#cfe0ff', '#4b5a9c', '#141c40', '#080c22',
+    ],
     draw: (seed) => {
       const CX = 224, CY = 50, R = 21
       // The corona as spokes, not a blur: a blur at tile size resolves to a
@@ -104,25 +107,67 @@ export const ART: Record<string, Illustration> = {
         return `<circle cx="${n(x)}" cy="${n(y)}" r="${n(0.6 + rnd(seed, i + 400) * 1.4)}" ` +
           `fill="#fff3d0" opacity="${n(0.18 + rnd(seed, i + 500) * 0.55)}"/>`
       }).join('')
+      // Two long equatorial streamers on top of the even spokes. A real corona
+      // is not radially symmetric — it is pulled out sideways along the Sun's
+      // magnetic equator — and the asymmetry is most of what makes a
+      // photograph of one recognisable.
+      const streamers = [0, Math.PI].map((base) => {
+        const a = base + (rnd(seed, 7) - 0.5) * 0.3
+        const len = R + 30
+        return `<path d="M${n(CX + Math.cos(a - 0.16) * R)} ${n(CY + Math.sin(a - 0.16) * R)} ` +
+          `Q${n(CX + Math.cos(a) * len * 0.7)} ${n(CY + Math.sin(a) * len * 0.7)} ` +
+          `${n(CX + Math.cos(a) * len)} ${n(CY + Math.sin(a) * len)} ` +
+          `Q${n(CX + Math.cos(a) * len * 0.7)} ${n(CY + Math.sin(a) * len * 0.7)} ` +
+          `${n(CX + Math.cos(a + 0.16) * R)} ${n(CY + Math.sin(a + 0.16) * R)}Z" ` +
+          `fill="#fff3d0" opacity="0.16"/>`
+      }).join('')
+
+      // Prominences: the pink loops on the limb, and the one detail that says
+      // this is totality rather than a hole punched in a gradient.
+      const proms = [0.7, 2.4, 4.3].map((a, i) =>
+        `<circle cx="${n(CX + Math.cos(a) * (R - 3.6))}" cy="${n(CY + Math.sin(a) * (R - 3.6))}" ` +
+        `r="${n(1.3 + rnd(seed, i + 60) * 1.1)}" fill="#ff8fa8" opacity="0.9"/>`).join('')
+
       // The month running underneath, waxing left to right — the other half of
       // what the page forecasts, and what makes the tile read as a calendar of
       // the sky rather than one picture of one eclipse.
+      //
+      // The terminator is an ellipse, not an arc of a circle: it is the edge of
+      // a sphere seen at an angle, and its width is the cosine of the phase
+      // angle. Drawing crescents as half-discs is the usual shortcut and it is
+      // why most moon icons look like logos.
       const Y = 92, r = 6.5
-      const phase = (x: number, lit: number) => {
-        if (lit === 0)
+      const phase = (x: number, frac: number, waxing: boolean) => {
+        if (frac < 0.02)
           return `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="none" stroke="#8fb4ff" stroke-width="1.4" opacity="0.7"/>`
-        if (Math.abs(lit) === 2)
-          return `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="#8fb4ff" opacity="0.9"/>`
-        return `<path d="M${n(x)} ${Y - r} a${r} ${r} 0 0 ${lit > 0 ? 1 : 0} 0 ${2 * r}Z" fill="#8fb4ff" opacity="0.9"/>` +
-          `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="none" stroke="#2b3873" stroke-width="1.2"/>`
+        if (frac > 0.98)
+          return `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="#cfe0ff" opacity="0.95"/>`
+        const ci = 2 * frac - 1
+        const rx = Math.abs(ci) * r
+        const sweep = ci > 0 ? 1 : 0
+        const body = `<path d="M${n(x)} ${Y - r} A${r} ${r} 0 0 1 ${n(x)} ${Y + r} ` +
+          `A${n(rx)} ${r} 0 0 ${sweep} ${n(x)} ${Y - r}Z" fill="#cfe0ff" opacity="0.95"/>`
+        const flipped = waxing ? body : `<g transform="translate(${n(2 * x)} 0) scale(-1 1)">${body}</g>`
+        return `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="#141c40"/>${flipped}` +
+          `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="none" stroke="#4b5a9c" stroke-width="1"/>`
       }
+      const MONTH: [number, boolean][] = [[0, true], [0.28, true], [0.75, true], [1, true], [0.4, false]]
       return `
+        <defs>
+          <radialGradient id="universe-forecast-corona" cx="0.5" cy="0.5">
+            <stop offset="${n((R - 1) / (R + 17))}" stop-color="#fff8e2" stop-opacity="0.85"/>
+            <stop offset="${n((R + 4) / (R + 17))}" stop-color="#ffe6ae" stop-opacity="0.4"/>
+            <stop offset="1" stop-color="#cfe0ff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
         <g>${stars}</g>
+        <g>${streamers}</g>
         <g>${corona}</g>
-        <circle cx="${CX}" cy="${CY}" r="${R + 4}" fill="#fff3d0" opacity="0.75"/>
-        <circle cx="${CX}" cy="${CY}" r="${R - 4}" fill="#0b1030"/>
-        <circle cx="${CX}" cy="${CY}" r="${R - 3.2}" fill="none" stroke="#ffd98a" stroke-width="1.7"/>
-        ${[0, 1, 2, -1, 0].map((lit, i) => phase(64 + i * 42, i === 2 ? 2 : lit)).join('')}`
+        <circle cx="${CX}" cy="${CY}" r="${R + 17}" fill="url(#universe-forecast-corona)"/>
+        <circle cx="${CX}" cy="${CY}" r="${R - 3.2}" fill="none" stroke="#ffd774" stroke-width="1.8"/>
+        <g>${proms}</g>
+        <circle cx="${CX}" cy="${CY}" r="${R - 4}" fill="#080c22"/>
+        ${MONTH.map(([f, w], i) => phase(64 + i * 42, f, w)).join('')}`
     },
   },
 

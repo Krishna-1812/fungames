@@ -621,7 +621,39 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    abort outright because a `slice` slot had cropped two of its shapes clean
    out of the frame.
 
-5. Then reassess against the depth work in Phases 1–2 above.
+5. ~~**Universe Forecast, drawn properly**~~ — **done.** The page shipped with
+   the dates right and the pictures decorative: five hand-drawn eclipse icons
+   that were the same five shapes whatever the numbers said. Every drawing on
+   it is now generated from the model's own output.
+
+   That needed two more chapters of Meeus. Chapter 47's distance terms give
+   how far away the Moon is on the day, and chapter 48 gives how much of it is
+   lit — so the hero draws the Moon's disc at the size it will really be
+   against the Sun, on the chord it will really take, over a sky dimmed by the
+   area actually covered; the lunar ones use the real radius of the Earth's
+   shadow at that distance; and every row in the list shows its own geometry
+   rather than an icon of its category.
+
+   The distance series bought something better than a picture. Chapter 54
+   decides total-or-annular from the sign of a coefficient that knows nothing
+   about distance, and dividing two apparent diameters decides the same
+   question from chapter 47, which knows nothing about eclipses. **They agree
+   on all 135 central eclipses of this century.** That is the strongest single
+   piece of evidence in the repository, and it fell out of work that was only
+   supposed to make the drawings honest.
+
+   The instrument was wrong twice more, and in both cases it was a mean
+   standing in for a real thing: the Moon's age came out a quarter of a day
+   off at the moment of new moon, because it was measured against the mean
+   elongation rather than against a real new moon; and the check that caught
+   that then failed on a Moon 29.71 days old, because it had been bounded by
+   the *mean* synodic month when real lunations run 29.27 to 29.83. What the
+   measuring caught in the page: a skip link painting white on near-white
+   because this page had redefined a global token, a "draw this one" button at
+   3.8:1, forty wheel markers with four-pixel hit areas, and the annular
+   eclipse's ring glow filling the Moon with gold and turning it olive.
+
+6. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

@@ -269,6 +269,13 @@ export type Eclipse = {
   gamma: number
   /** Fraction of the disc covered. Above 1 for a total lunar eclipse. */
   magnitude: number
+  /**
+   * The radius of the shadow cone where it meets the fundamental plane, in
+   * Earth radii. Negative when the umbra reaches us — which is the whole
+   * total-or-annular decision — and it is here because it is also the exact
+   * size of the shadow the page draws the Moon crossing.
+   */
+  u: number
   /** True when the shadow's axis touches the Earth at all. */
   central: boolean
 }
@@ -344,13 +351,13 @@ export function eclipseAt(k: number, kind: 'solar' | 'lunar'): Eclipse | null {
       // Partial, including the awkward band where a central eclipse clips the
       // pole and the axis still misses the Earth.
       const magnitude = (1.5433 + u - g) / (0.5461 + 2 * u)
-      return { kind, type: 'partial', jde, gamma, magnitude, central: false }
+      return { kind, type: 'partial', jde, gamma, magnitude, u, central: false }
     }
     let type: SolarKind
     if (u < 0) type = 'total'
     else if (u > 0.0047) type = 'annular'
     else type = u < 0.00464 * Math.sqrt(1 - gamma * gamma) ? 'hybrid' : 'annular'
-    return { kind, type, jde, gamma, magnitude: 1, central: true }
+    return { kind, type, jde, gamma, magnitude: 1, u, central: true }
   }
 
   // Lunar. Two shadows: the umbra, which is the eclipse people photograph, and
@@ -365,6 +372,7 @@ export function eclipseAt(k: number, kind: 'solar' | 'lunar'): Eclipse | null {
     jde,
     gamma,
     magnitude: type === 'penumbral' ? penumbral : umbral,
+    u,
     central: false,
   }
 }
@@ -394,6 +402,295 @@ export function apsisJde(year: number, which: 'perihelion' | 'aphelion'): number
     ? [1.278, -0.055, -0.091, -0.056, -0.045]
     : [-1.352, 0.061, 0.062, 0.029, 0.031]
   return jde + c.reduce((s, ci, i) => s + ci * sin(a[i]), 0)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Where the Moon is, and how big — Meeus ch. 47, 48 and 25                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The five mean arguments every lunar series in Meeus is built from.
+ *
+ * `phaseJde` above has its own set indexed by lunation number, because that is
+ * how chapter 49 is written. These are the chapter 47 versions, indexed by
+ * time, which is what you need to ask about the Moon on a day that is not a
+ * quarter phase — a question the page has to answer every time somebody loads
+ * it, since "tonight" is almost never a quarter phase.
+ */
+function lunarArgs(jde: number) {
+  const t = (jde - 2451545.0) / 36525
+  return {
+    t,
+    /** Mean elongation: 0° at new moon, 180° at full. */
+    d: 297.8501921 + 445267.1114034 * t - 0.0018819 * t * t
+      + t ** 3 / 545868 - t ** 4 / 113065000,
+    /** Sun's mean anomaly. */
+    m: 357.5291092 + 35999.0502909 * t - 0.0001536 * t * t + t ** 3 / 24490000,
+    /** Moon's mean anomaly. */
+    mp: 134.9633964 + 477198.8675055 * t + 0.0087414 * t * t
+      + t ** 3 / 69699 - t ** 4 / 14712000,
+    /** Argument of latitude. */
+    f: 93.2720950 + 483202.0175233 * t - 0.0036539 * t * t
+      - t ** 3 / 3526000 + t ** 4 / 863310000,
+    /** The eccentricity factor, applied once per power of M in an argument. */
+    e: 1 - 0.002516 * t - 0.0000074 * t * t,
+  }
+}
+
+/**
+ * The distance terms of Meeus table 47.A, as [D, M, M', F, Σr], Σr in metres.
+ *
+ * The full table is sixty terms in three columns; only the distance column is
+ * here, and only down to about a kilometre, because the one thing this is used
+ * for is how big the Moon looks — and a kilometre out of 385,000 moves the
+ * apparent diameter by three ten-thousandths of an arcsecond.
+ *
+ * The first term is the whole story: the Moon's distance swings ±21,000 km
+ * every anomalistic month, which is 5% either way, and that swing is the
+ * entire difference between an eclipse that goes dark and one that leaves a
+ * ring showing.
+ */
+const MOON_R: [number, number, number, number, number][] = [
+  [0, 0, 1, 0, -20905355], [2, 0, -1, 0, -3699111], [2, 0, 0, 0, -2955968],
+  [0, 0, 2, 0, -569925], [2, 0, -2, 0, 246158], [2, -1, 0, 0, -204586],
+  [2, 0, 1, 0, -170733], [2, -1, -1, 0, -152138], [0, 1, -1, 0, -129620],
+  [1, 0, 0, 0, 108743], [0, 1, 1, 0, 104755], [0, 0, 1, -2, 79661],
+  [0, 1, 0, 0, 48888], [4, 0, -1, 0, -34782], [2, 1, 0, 0, 30824],
+  [2, 1, -1, 0, 24208], [0, 0, 3, 0, -23210], [4, 0, -2, 0, -21636],
+  [1, 1, 0, 0, -16675], [2, 0, -3, 0, 14403], [2, -1, 1, 0, -12831],
+  [4, 0, 0, 0, -11650], [2, 0, 2, 0, -10445], [2, 0, 0, -2, 10321],
+  [2, -1, -2, 0, 10056], [2, -2, 0, 0, -9884], [0, 2, 1, 0, 8752],
+  [1, 0, -1, 0, -8379], [0, 1, -2, 0, -7003], [1, 0, 1, 0, 6322],
+  [2, 0, -1, -2, -6111], [0, 1, 2, 0, 5751], [2, -2, -1, 0, -4950],
+  [0, 0, 2, -2, -4421], [2, 0, 1, -2, 4130], [4, -1, -1, 0, -3958],
+  [3, 0, -1, 0, 3258], [0, 0, 0, 2, -3149], [2, 1, 1, 0, 2616],
+  [2, 2, -1, 0, 2354], [0, 2, -1, 0, -2117], [4, -1, -2, 0, -1897],
+  [4, -1, 0, 0, -1571], [4, 0, 1, 0, -1423], [1, 0, -2, 0, -1739],
+  [4, 0, -3, 0, 1165], [0, 0, 4, 0, -1117],
+]
+
+/**
+ * How far away the Moon is, in kilometres, centre to centre.
+ *
+ * Ranges from about 356,400 km to 406,700 km, and the checker holds it to
+ * exactly that — a range nobody chose, which falls out of the terms above.
+ */
+export function moonDistanceKm(date: Date): number {
+  const jd = dateToJulian(date)
+  const { d, m, mp, f, e } = lunarArgs(jd + deltaT(yearOf(jd)) / 86400)
+  let r = 0
+  for (const [cd, cm, cmp, cf, amp] of MOON_R) {
+    const arg = cd * d + cm * m + cmp * mp + cf * f
+    r += amp * Math.pow(e, Math.abs(cm)) * cos(arg)
+  }
+  return 385000.56 + r / 1000
+}
+
+/**
+ * How far away the Sun is, in astronomical units. Meeus ch. 25, the low
+ * accuracy version, which is good to about a hundredth of an arcsecond of
+ * apparent diameter — three orders of magnitude finer than anything here needs.
+ */
+export function sunDistanceAu(date: Date): number {
+  const t = (dateToJulian(date) - 2451545.0) / 36525
+  const m = 357.52911 + 35999.05029 * t - 0.0001537 * t * t
+  const e = 0.016708634 - 0.000042037 * t - 0.0000001267 * t * t
+  const c = (1.914602 - 0.004817 * t - 0.000014 * t * t) * sin(m)
+    + (0.019993 - 0.000101 * t) * sin(2 * m)
+    + 0.000289 * sin(3 * m)
+  return (1.000001018 * (1 - e * e)) / (1 + e * cos(m + c))
+}
+
+export type Discs = {
+  /** Apparent semidiameter of the Sun, in arcseconds. */
+  sun: number
+  /** Apparent semidiameter of the Moon from the Earth's centre, in arcseconds. */
+  moonGeocentric: number
+  /** The same, from the ground under it — which is what an observer sees. */
+  moonTopocentric: number
+  /**
+   * Moon over Sun, apparent. Above 1 the Moon is big enough to cover the Sun
+   * and the eclipse is total; below it, a ring is left showing.
+   */
+  ratio: number
+  distanceKm: number
+}
+
+const EARTH_RADIUS_KM = 6378.14
+
+/**
+ * How big the two discs look, and which is bigger.
+ *
+ * This is the whole difference between a total eclipse and an annular one, and
+ * it is worth noticing that at the Moon's *average* distance the ratio comes
+ * out just under 1 — the Moon is, on average, slightly too small. Total
+ * eclipses need the Moon nearer than usual, which is why annular ones are the
+ * commoner kind. Nothing here was arranged to produce that; it comes out of
+ * two distances and two diameters.
+ *
+ * `gamma` is how far the shadow's axis passes from the Earth's centre, in
+ * Earth radii, from `eclipseAt`. It matters because an observer under a
+ * grazing shadow stands further from the Moon than one directly beneath it,
+ * and that is enough to turn a total eclipse annular at the ends of a hybrid
+ * track.
+ */
+export function discs(date: Date, gamma = 0): Discs {
+  const distanceKm = moonDistanceKm(date)
+  const lift = EARTH_RADIUS_KM * Math.sqrt(Math.max(0, 1 - gamma * gamma))
+  const moonGeocentric = 358473400 / distanceKm
+  const moonTopocentric = 358473400 / (distanceKm - lift)
+  const sun = 959.63 / sunDistanceAu(date)
+  return { sun, moonGeocentric, moonTopocentric, ratio: moonTopocentric / sun, distanceKm }
+}
+
+export type Illumination = {
+  /** Sun–Moon–Earth angle. 0° is full, 180° is new. */
+  phaseAngle: number
+  /** Fraction of the disc lit, 0 to 1. */
+  fraction: number
+  /** True while the lit part is growing. */
+  waxing: boolean
+  /** Days since the last new moon. */
+  age: number
+}
+
+/**
+ * How much of the Moon is lit, right now. Meeus ch. 48.
+ *
+ * The low accuracy form, which is seven terms and good to a fifth of a degree
+ * of phase angle — about a thousandth in the fraction. It is here rather than
+ * the long version because the page draws the result at 96 pixels across, and
+ * a thousandth of that is a tenth of a pixel.
+ *
+ * What makes it worth trusting is not its own accuracy but that it comes from
+ * a different chapter than everything else on this page. The checker takes two
+ * hundred new moons out of `phaseJde` — chapter 49 — and asks this function
+ * what the Moon looks like at each of them. If either series is wrong, they
+ * stop agreeing.
+ */
+export function moonIllumination(date: Date): Illumination {
+  const jd = dateToJulian(date)
+  const { d, m, mp } = lunarArgs(jd + deltaT(yearOf(jd)) / 86400)
+  const i = 180 - d
+    - 6.289 * sin(mp)
+    + 2.100 * sin(m)
+    - 1.274 * sin(2 * d - mp)
+    - 0.658 * sin(2 * d)
+    - 0.214 * sin(2 * mp)
+    - 0.110 * sin(d)
+  const phaseAngle = ((i % 360) + 360) % 360
+  const dd = ((d % 360) + 360) % 360
+  return {
+    phaseAngle,
+    fraction: (1 + cos(phaseAngle)) / 2,
+    waxing: dd < 180,
+    age: ageOfMoon(date),
+  }
+}
+
+/**
+ * Days since the last new moon.
+ *
+ * The tempting version of this is mean elongation over 360, times a synodic
+ * month, and it is one line. It is also wrong by up to a third of a day,
+ * because mean elongation reaches zero when the *average* Moon catches the Sun
+ * and the real one is running early or late by the equation of the centre. The
+ * checker caught it reporting a Moon a quarter of a day old at the moment of
+ * new moon.
+ *
+ * So the age is measured against the real thing instead: step back through the
+ * lunations until one of chapter 49's new moons is behind us, and subtract.
+ * That is the same series the page's own dates come from, so the number under
+ * the drawing and the number in the list cannot disagree.
+ */
+function ageOfMoon(date: Date): number {
+  const jd = dateToJulian(date)
+  let k = lunationNear(date) + 1
+  // Never more than two steps; the guard is against a pathological date, not
+  // against the arithmetic.
+  for (let i = 0; i < 4 && dateToJulian(tdToUtc(phaseJde(k, 'new'))) > jd; i++) k--
+  return jd - dateToJulian(tdToUtc(phaseJde(k, 'new')))
+}
+
+/* -------------------------------------------------------------------------- */
+/* The geometry the drawings are made of                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Radii of the Earth's shadow where the Moon crosses it, in Earth radii.
+ *
+ * These are not in chapter 54; they have to be read back out of it, and doing
+ * that wrong is a mistake with no symptom until you draw the result.
+ *
+ * The chapter gives the umbral magnitude as `(1.0128 - u - |γ|) / 0.545`. That
+ * is zero when the Moon first touches the umbra and one when it is entirely
+ * inside, and the distance the Moon's centre travels between those two moments
+ * is two Moon radii. So `0.545` is the Moon's *diameter*, not its radius — the
+ * Moon is 0.2725 Earth radii across the radius, which is 1737 km over 6378,
+ * and that is a check on the reading rather than a coincidence.
+ *
+ * It follows that `1.0128 - u` is the umbra plus the Moon, so the umbra alone
+ * is `0.7403 - u`, and likewise the penumbra is `1.2848 + u`.
+ *
+ * Taking the printed constants at face value — umbra 1.0128, Moon 0.545 —
+ * makes the shadow and the Moon each about twice the size they should be, and
+ * the Moon twice as big *relative to* the shadow. The classification stays
+ * right, because it never uses these; only the picture is wrong, and it is
+ * wrong in a way that draws a penumbral eclipse sitting deep inside the umbra.
+ */
+export type Shadow = {
+  /** Radius of the umbra at the Moon's distance, in Earth radii. */
+  umbra: number
+  /** Radius of the penumbra, likewise. */
+  penumbra: number
+  /** The Moon's own radius, in the same units. */
+  moon: number
+  /** How far the Moon's centre passes from the shadow's axis. */
+  gamma: number
+}
+
+/** The Moon's radius in Earth radii: 1737.4 / 6378.14. */
+const MOON_RADII = 0.2725
+
+export function shadowGeometry(e: Eclipse): Shadow {
+  return {
+    umbra: 1.0128 - e.u - MOON_RADII,
+    penumbra: 1.5573 + e.u - MOON_RADII,
+    moon: MOON_RADII,
+    gamma: Math.abs(e.gamma),
+  }
+}
+
+/**
+ * How much of the Moon's diameter is inside a shadow of radius `r` when its
+ * centre passes `gamma` from the axis. The definition of eclipse magnitude,
+ * and the thing `shadowGeometry` has to reproduce if the drawing is to be the
+ * same event as the sentence beside it.
+ */
+export function immersion(s: Shadow, r: number): number {
+  return (r + s.moon - s.gamma) / (2 * s.moon)
+}
+
+export type Transit = {
+  /** The Moon's apparent radius over the Sun's, on the day. */
+  ratio: number
+  /** Closest approach of the two centres, in Sun radii. Zero if central. */
+  sMin: number
+}
+
+/**
+ * The Moon's path across the Sun, in units of the Sun's radius.
+ *
+ * Magnitude for a solar eclipse is the fraction of the Sun's *diameter*
+ * covered, so with the Sun's radius as the unit, m = (1 + ratio − s) / 2 and
+ * the separation at greatest eclipse falls straight out of it.
+ */
+export function transitGeometry(e: Eclipse, when: Date): Transit {
+  const ratio = discs(when, e.gamma).ratio
+  return {
+    ratio,
+    sMin: e.central ? 0 : Math.max(0, 1 + ratio - 2 * e.magnitude),
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -470,6 +767,20 @@ export type SkyEvent = {
   timed: boolean
   /** How much of a fuss it is, 0–3. Drives the page's typographic weight. */
   rank: number
+  /**
+   * The numbers behind the row, when there are any.
+   *
+   * The page draws every event rather than picking an icon for it, and a
+   * drawing wants the quantity, not the label: an eclipse row shows the actual
+   * bite taken out of the Sun, a moon row the actual terminator on the night
+   * it happens. Passing the model's own output through means the picture
+   * cannot drift away from the sentence beside it.
+   */
+  eclipse?: Eclipse
+  phase?: Phase
+  season?: Season
+  apsis?: 'perihelion' | 'aphelion'
+  shower?: Shower
 }
 
 const MONTHS = [
@@ -541,6 +852,7 @@ export function forecast(from: Date, to: Date): SkyEvent[] {
         when,
         timed: true,
         rank: phase === 'full' || phase === 'new' ? 1 : 0,
+        phase,
       })
     }
 
@@ -555,6 +867,7 @@ export function forecast(from: Date, to: Date): SkyEvent[] {
         when: tdToUtc(e.jde),
         timed: true,
         rank: type === 'total' ? 3 : 2,
+        eclipse: e,
       })
     }
   }
@@ -568,6 +881,7 @@ export function forecast(from: Date, to: Date): SkyEvent[] {
         when: tdToUtc(seasonJde(y, s)),
         timed: true,
         rank: 1,
+        season: s,
       })
     }
     for (const a of ['perihelion', 'aphelion'] as const) {
@@ -580,6 +894,7 @@ export function forecast(from: Date, to: Date): SkyEvent[] {
         when: tdToUtc(apsisJde(y, a)),
         timed: true,
         rank: 1,
+        apsis: a,
       })
     }
     for (const sh of SHOWERS) {
@@ -590,6 +905,7 @@ export function forecast(from: Date, to: Date): SkyEvent[] {
         when: new Date(Date.UTC(y, sh.peak[0] - 1, sh.peak[1], 12)),
         timed: false,
         rank: sh.zhr >= 100 ? 2 : 1,
+        shower: sh,
       })
     }
   }

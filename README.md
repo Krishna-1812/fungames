@@ -100,7 +100,8 @@ src/
     time-art.ts         a scene for each, flat colour on one palette
     trolley-scene.ts    the field, the track, the tram and whoever is on it
     fold-paper.ts       Gallivan's equations, and where a real sheet gives up
-    sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion
+    sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
+                        the Moon’s distance and how much of it is lit
     result-card.ts      the 1200x630 card for a *result*, not for a game
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished

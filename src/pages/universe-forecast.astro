@@ -9,28 +9,65 @@ import GameLayout from '../layouts/GameLayout.astro'
  * dates typed into a file is a page that starts lying on a day nobody chose;
  * this one is still right in 2400.
  *
- * Rendered on the client rather than at build time for the same reason. A
- * static build would freeze "next" to whatever was true the morning it was
- * deployed, and "next" is the whole proposition.
+ * The same rule applies to the drawings, which is the part that took the
+ * longest. Nothing on this page is an illustration of an eclipse. The hero is
+ * the actual geometry — the Moon's disc at the size it will really be, on the
+ * chord it will really take, over a Sun dimmed by the area it will really
+ * cover — and the lunar ones are drawn from the actual radius of the Earth's
+ * shadow at the Moon's distance that night. An icon would have been an
+ * afternoon's work and would have been the same picture every time.
+ *
+ * Rendered on the client rather than at build time for the same reason as the
+ * dates. A static build would freeze "next" to whatever was true the morning it
+ * was deployed, and "next" is the whole proposition.
  */
 ---
 
-<GameLayout slug="universe-forecast" bar="#0b1030" bodyClass="sky-body">
-  <div class="stars" id="stars" aria-hidden="true"></div>
+<GameLayout slug="universe-forecast" bar="#05081c" bodyClass="sky-body">
+  <div class="sky" id="sky" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
 
   <div class="wrap">
     <header class="head">
+      <p class="eyebrow">Computed here, in this tab</p>
       <h1>Universe Forecast</h1>
       <p class="lede">
-        What the sky is going to do, and when. Every date below is worked out in
-        your browser from the orbits themselves — nothing here was looked up.
+        What the sky is going to do, and when. Every date and every picture below
+        is worked out from the orbits themselves — nothing here was looked up.
       </p>
     </header>
 
     <!-- The one event everything else is a footnote to. -->
-    <section class="headline" id="headline" aria-live="polite">
-      <p class="loading">Working out where everything is…</p>
+    <section class="hero" id="hero" aria-live="polite">
+      <div class="hero-stage">
+        <canvas id="stage" class="stage-canvas"></canvas>
+        <p class="stage-caption" id="stageCap"></p>
+      </div>
+      <div class="hero-text" id="heroText">
+        <p class="loading">Working out where everything is…</p>
+      </div>
     </section>
+
+    <div class="panels">
+      <!-- The Moon, drawn at the phase it is actually at, right now. -->
+      <section class="panel moon-panel">
+        <h2 class="panel-h">The Moon, right now</h2>
+        <div class="moon-row">
+          <div class="moon-art" id="moonArt"></div>
+          <dl class="moon-facts" id="moonFacts"></dl>
+        </div>
+      </section>
+
+      <!-- Every event in the coming year, at its true angle round the year. -->
+      <section class="panel wheel-panel">
+        <h2 class="panel-h">The year ahead</h2>
+        <div class="wheel-wrap">
+          <div class="wheel" id="wheel"></div>
+          <p class="wheel-tip" id="wheelTip" aria-live="polite"></p>
+        </div>
+        <ul class="legend" id="legend"></ul>
+      </section>
+    </div>
 
     <div class="controls" role="group" aria-label="What to show">
       <button type="button" class="filter is-on" data-filter="all">Everything</button>
@@ -40,7 +77,8 @@ import GameLayout from '../layouts/GameLayout.astro'
       <button type="button" class="filter" data-filter="shower">Meteors</button>
     </div>
 
-    <ol class="feed" id="feed"></ol>
+    <p class="feed-hint">Pick any row and it gets drawn at the top, properly.</p>
+    <div class="feed" id="feed"></div>
 
     <p class="foot" id="foot"></p>
 
@@ -48,10 +86,11 @@ import GameLayout from '../layouts/GameLayout.astro'
       <summary>How this is worked out</summary>
       <div class="how-body">
         <p>
-          Four series out of Jean Meeus's <em>Astronomical Algorithms</em>, running
+          Six series out of Jean Meeus's <em>Astronomical Algorithms</em>, running
           in this tab: the equinoxes and solstices, the phases of the Moon, which
-          of those phases are eclipses, and the two days a year the Earth is
-          nearest and furthest from the Sun.
+          of those phases are eclipses, how far away the Moon is, how much of it
+          is lit, and the two days a year the Earth is nearest and furthest from
+          the Sun.
         </p>
         <p>
           The eclipse one is the good trick. It does not consult a catalogue of
@@ -62,6 +101,21 @@ import GameLayout from '../layouts/GameLayout.astro'
           Moon is close enough to cover the Sun completely or far enough to leave
           a ring of it showing. That is the difference between a total eclipse and
           an annular one, and it comes out of arithmetic.
+        </p>
+        <p>
+          There is a second, entirely separate way to answer that same question:
+          work out how far away the Moon is that day, divide its apparent size by
+          the Sun's, and see which is bigger. The two methods share no
+          coefficients and no chapter, and they agree on all 135 central eclipses
+          of this century. That agreement is the strongest thing this page can
+          say for itself.
+        </p>
+        <p>
+          It also means the pictures are real. The hero is not an icon of an
+          eclipse — the Moon's disc is drawn at the size it will actually be
+          against the Sun that day, following the path it will actually take, and
+          the sky dims by the area actually covered. On an annular eclipse the
+          ring is as thin as it is going to be.
         </p>
         <p>
           Times are UTC and good to about a minute. The limit is not the orbits —
@@ -81,16 +135,17 @@ import GameLayout from '../layouts/GameLayout.astro'
 </GameLayout>
 
 <script>
-  import { forecast, formatWhen, countdown } from '../lib/sky-forecast'
+  import {
+    forecast, formatWhen, countdown, moonIllumination, discs, sunDistanceAu,
+    shadowGeometry, transitGeometry,
+    type SkyEvent, type Eclipse,
+  } from '../lib/sky-forecast'
   import { recordPlay } from '../lib/stats'
   import { onShare } from '../lib/share-card'
   import { prefersReducedMotion } from '../lib/gl'
   import { SITE } from '../site.config'
 
-  const headline = document.getElementById('headline') as HTMLElement
-  const feed = document.getElementById('feed') as HTMLOListElement
-  const foot = document.getElementById('foot') as HTMLElement
-  const starsHost = document.getElementById('stars') as HTMLElement
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
   /* Two years is enough to guarantee at least four eclipses and two of every
      season in the list, without making the page a scroll through a century. */
@@ -98,116 +153,1371 @@ import GameLayout from '../layouts/GameLayout.astro'
   const HORIZON = new Date(+now + 2 * 365.25 * 86400_000)
   const events = forecast(now, HORIZON)
 
-  const ICON: Record<string, string> = {
-    eclipse: 'eclipse', phase: 'moon', season: 'sun', apsis: 'orbit', shower: 'meteor',
-  }
+  /* ------------------------------------------------------------------------ */
+  /* The sky it all sits on                                                    */
+  /* ------------------------------------------------------------------------ */
 
-  /* Drawn rather than set as emoji, for the reason the whole site is: an emoji
-     in the corner of every row is the loudest possible way of saying nobody
-     drew anything. */
-  function glyph(kind: string, title: string): string {
-    const w = '<svg viewBox="0 0 40 40" aria-hidden="true" class="glyph">'
-    switch (ICON[kind]) {
-      /* Five different things, and the first draft drew one icon for all of
-         them: a bite out of the Sun, used for lunar eclipses too. A lunar
-         eclipse is the Earth's shadow falling on the Moon, which is not that
-         picture and is not even the same object. */
-      case 'eclipse': {
-        const t = title.split(' ')[0]
-        if (/lunar/.test(title)) {
-          if (t === 'Total')
-            // Not black. A totally eclipsed Moon is a dull copper, lit by every
-            // sunrise and sunset on Earth at once, and that is the whole reason
-            // anybody gets up for one.
-            return w + '<circle cx="20" cy="20" r="12.5" fill="#a8493a"/>' +
-              '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#d9755c" stroke-width="1.3"/></svg>'
-          if (t === 'Partial')
-            return w + '<circle cx="20" cy="20" r="12.5" fill="#e9edff"/>' +
-              '<path d="M20 7.5 A12.5 12.5 0 0 0 20 32.5 A17 17 0 0 1 20 7.5Z" fill="#7a4038"/>' +
-              '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#8b96c9" stroke-width="1.1"/></svg>'
-          return w + '<circle cx="20" cy="20" r="12.5" fill="#c3c9e4"/>' +
-            '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#8b96c9" stroke-width="1.1"/></svg>'
+  /* Three layers of stars at three depths, moved by different fractions of the
+     scroll. Depth is the only reason to draw a star field rather than tile a
+     texture, and one flat layer would not have been worth the canvas.
+
+     Colours are real stellar colours rather than white: O and B stars are
+     blue, M stars are orange, and most of what you can see is somewhere in
+     between. A field of pure white dots is the single clearest sign that
+     nobody looked up. */
+  const STAR_COLOURS = [
+    '#a8c0ff', '#c4d4ff', '#dde8ff', '#fbf9ff',
+    '#fff5e8', '#ffe3c0', '#ffcb9a', '#ffb887',
+  ]
+
+  function buildSky() {
+    const host = $('sky')
+    host.textContent = ''
+    const w = Math.max(320, window.innerWidth)
+    const h = Math.max(480, window.innerHeight)
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+
+    /* A deterministic generator, so a resize redraws the same sky rather than
+       reshuffling every star under the reader. */
+    const rnd = (() => {
+      let s = 0x9e3779b9
+      return () => {
+        s = (s ^ (s << 13)) >>> 0
+        s = (s ^ (s >>> 17)) >>> 0
+        s = (s ^ (s << 5)) >>> 0
+        return s / 4294967296
+      }
+    })()
+
+    const layers: HTMLCanvasElement[] = []
+    // Far, middle, near: fewer and larger as they come towards you.
+    const spec = [
+      { n: 340, r: [0.35, 0.9], a: [0.25, 0.7], par: 0.02, blur: 0 },
+      { n: 150, r: [0.7, 1.5], a: [0.4, 0.9], par: 0.06, blur: 0.5 },
+      { n: 46, r: [1.2, 2.4], a: [0.6, 1], par: 0.13, blur: 1.2 },
+    ]
+
+    // The Milky Way, on the far layer only: a band of dense faint stars along a
+    // diagonal, with the density falling off as a gaussian either side of it.
+    const bandAngle = -0.42
+    const bandY = h * 0.28
+
+    spec.forEach((s, li) => {
+      const c = document.createElement('canvas')
+      c.width = Math.ceil(w * dpr)
+      c.height = Math.ceil(h * dpr)
+      // Sized in CSS as a share of the container, not in pixels. The bitmap
+      // is w x h and is rebuilt on resize, but between the resize and the
+      // rebuild a pixel-sized canvas leaves a hole where the sky should be —
+      // which is exactly what a 688px sky on a 980px window looked like.
+      c.style.width = '100%'
+      c.style.height = '100%'
+      c.className = 'star-layer'
+      c.dataset.par = String(s.par)
+      const g = c.getContext('2d')!
+      g.scale(dpr, dpr)
+
+      if (li === 0) {
+        // The glow of the band itself, before any of its stars.
+        g.save()
+        g.translate(w / 2, bandY)
+        g.rotate(bandAngle)
+        const grad = g.createLinearGradient(0, -h * 0.3, 0, h * 0.3)
+        grad.addColorStop(0, 'rgba(120,140,220,0)')
+        grad.addColorStop(0.42, 'rgba(126,146,226,0.09)')
+        grad.addColorStop(0.5, 'rgba(158,172,240,0.13)')
+        grad.addColorStop(0.58, 'rgba(126,146,226,0.09)')
+        grad.addColorStop(1, 'rgba(120,140,220,0)')
+        g.fillStyle = grad
+        g.fillRect(-w, -h * 0.3, w * 2, h * 0.6)
+        g.restore()
+      }
+
+      const n = li === 0 ? s.n + 420 : s.n
+      for (let i = 0; i < n; i++) {
+        let x = rnd() * w
+        let y = rnd() * h
+        // The extra stars on the far layer belong to the band.
+        if (li === 0 && i >= s.n) {
+          const along = (rnd() - 0.5) * w * 2.2
+          const across = (rnd() + rnd() + rnd() - 1.5) * h * 0.075
+          x = w / 2 + along * Math.cos(bandAngle) - across * Math.sin(bandAngle)
+          y = bandY + along * Math.sin(bandAngle) + across * Math.cos(bandAngle)
+          if (x < -20 || x > w + 20 || y < -20 || y > h + 20) continue
         }
-        if (t === 'Total')
-          return w + '<circle cx="20" cy="20" r="15.5" fill="none" stroke="#ffe9a8" stroke-width="1.5" opacity="0.85"/>' +
-            '<circle cx="20" cy="20" r="13" fill="#0b1030" stroke="#f7d774" stroke-width="1.6"/></svg>'
-        if (t === 'Annular' || t === 'Hybrid')
-          // A ring, which is exactly what the word means and what you see.
-          return w + '<circle cx="20" cy="20" r="13" fill="#f2b23c"/>' +
-            '<circle cx="20" cy="20" r="9" fill="#0b1030"/></svg>'
-        return w + '<circle cx="20" cy="20" r="13" fill="#f2b23c"/>' +
-          '<circle cx="27" cy="14" r="11" fill="#0b1030"/></svg>'
+        const inBand = li === 0 && i >= s.n
+        const r = s.r[0] + rnd() * (s.r[1] - s.r[0]) * (inBand ? 0.6 : 1)
+        const a = (s.a[0] + rnd() * (s.a[1] - s.a[0])) * (inBand ? 0.55 : 1)
+        const col = STAR_COLOURS[Math.floor(rnd() * STAR_COLOURS.length)]
+        g.globalAlpha = a
+        g.fillStyle = col
+        if (s.blur) {
+          g.shadowBlur = s.blur * 4
+          g.shadowColor = col
+        }
+        g.beginPath()
+        g.arc(x, y, r, 0, Math.PI * 2)
+        g.fill()
+        g.shadowBlur = 0
+
+        // The brightest few get the four-point glint a camera would give them.
+        if (li === 2 && r > 2) {
+          g.globalAlpha = a * 0.5
+          g.strokeStyle = col
+          g.lineWidth = 0.7
+          const L = r * 4.5
+          g.beginPath()
+          g.moveTo(x - L, y); g.lineTo(x + L, y)
+          g.moveTo(x, y - L); g.lineTo(x, y + L)
+          g.stroke()
+        }
       }
-      case 'moon': {
-        const full = /Full/.test(title)
-        const nw = /New/.test(title)
-        if (full) return w + '<circle cx="20" cy="20" r="12.5" fill="#e9edff"/></svg>'
-        if (nw) return w + '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#6b78b8" stroke-width="1.6" stroke-dasharray="3 3"/></svg>'
-        return w + '<path d="M20 7.5 a12.5 12.5 0 0 1 0 25Z" fill="#c9d3ff"/>' +
-          '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#6b78b8" stroke-width="1.4"/></svg>'
+      g.globalAlpha = 1
+      layers.push(c)
+      host.appendChild(c)
+    })
+
+    // Meteors, on their own layer. Real ones are sporadic and brief, so these
+    // are too — a steady stream would read as a screensaver.
+    if (!prefersReducedMotion) {
+      const c = document.createElement('canvas')
+      c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr)
+      c.style.width = '100%'; c.style.height = '100%'
+      c.className = 'star-layer meteor-layer'
+      const g = c.getContext('2d')!
+      g.scale(dpr, dpr)
+      let shot: { x: number; y: number; vx: number; vy: number; life: number; len: number } | null = null
+      let next = performance.now() + 2200
+      const tick = (t: number) => {
+        g.clearRect(0, 0, w, h)
+        if (!shot && t > next) {
+          const ang = 2.5 + Math.random() * 0.5
+          const sp = 0.9 + Math.random() * 0.7
+          shot = {
+            x: w * (0.3 + Math.random() * 0.75), y: h * Math.random() * 0.5,
+            vx: Math.cos(ang) * sp, vy: -Math.sin(ang) * sp * -1,
+            life: 0, len: 70 + Math.random() * 90,
+          }
+        }
+        if (shot) {
+          shot.life += 1
+          shot.x += shot.vx * 6
+          shot.y += shot.vy * 6
+          const fade = Math.max(0, 1 - shot.life / 60)
+          const grad = g.createLinearGradient(
+            shot.x, shot.y, shot.x - shot.vx * shot.len, shot.y - shot.vy * shot.len)
+          grad.addColorStop(0, `rgba(255,255,255,${0.85 * fade})`)
+          grad.addColorStop(0.35, `rgba(190,215,255,${0.35 * fade})`)
+          grad.addColorStop(1, 'rgba(160,190,255,0)')
+          g.strokeStyle = grad
+          g.lineWidth = 1.7
+          g.lineCap = 'round'
+          g.beginPath()
+          g.moveTo(shot.x, shot.y)
+          g.lineTo(shot.x - shot.vx * shot.len, shot.y - shot.vy * shot.len)
+          g.stroke()
+          if (fade <= 0 || shot.x < -200 || shot.y > h + 200) {
+            shot = null
+            next = t + 5000 + Math.random() * 11000
+          }
+        }
+        requestAnimationFrame(tick)
       }
-      case 'sun':
-        return w + '<circle cx="20" cy="20" r="8" fill="#ffd98a"/>' +
-          Array.from({ length: 8 }, (_, i) => {
-            const a = (i / 8) * Math.PI * 2
-            const x1 = 20 + Math.cos(a) * 11.5, y1 = 20 + Math.sin(a) * 11.5
-            const x2 = 20 + Math.cos(a) * 15.5, y2 = 20 + Math.sin(a) * 15.5
-            return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="#ffd98a" stroke-width="2" stroke-linecap="round"/>`
-          }).join('') + '</svg>'
-      case 'orbit':
-        return w + '<ellipse cx="20" cy="20" rx="16" ry="8" fill="none" stroke="#8fb4ff" stroke-width="1.5"/>' +
-          '<circle cx="20" cy="20" r="4.5" fill="#ffd98a"/><circle cx="35" cy="21" r="3" fill="#7fe0c0"/></svg>'
-      default:
-        return w + '<path d="M6 32 L26 10" stroke="#b9c9ff" stroke-width="2.4" stroke-linecap="round"/>' +
-          '<path d="M17 33 L30 18" stroke="#8fb4ff" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>' +
-          '<path d="M25 34 L34 24" stroke="#8fb4ff" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>'
+      requestAnimationFrame(tick)
+      host.appendChild(c)
     }
+
+    return layers
   }
 
-  /* ---- the headline ----------------------------------------------------- */
+  let starLayers = buildSky()
+
+  /* Parallax. The container is fixed, so shifting each layer by a fraction of
+     the scroll is the whole effect — the near stars slide, the far ones barely
+     move, and the page feels like it is in front of something. */
+  if (!prefersReducedMotion) {
+    let queued = false
+    const onScroll = () => {
+      if (queued) return
+      queued = true
+      requestAnimationFrame(() => {
+        queued = false
+        const y = window.scrollY
+        for (const c of starLayers)
+          c.style.transform = `translate3d(0, ${(-y * Number(c.dataset.par)).toFixed(1)}px, 0)`
+      })
+    }
+    addEventListener('scroll', onScroll, { passive: true })
+  }
+
+  // Once more after load: the first build can measure a window that is still
+  // settling, and a sky built at the wrong size is the most visible thing on
+  // the page.
+  addEventListener('load', () => { starLayers = buildSky() })
+
+  let resizeTimer = 0
+  addEventListener('resize', () => {
+    clearTimeout(resizeTimer)
+    resizeTimer = window.setTimeout(() => { starLayers = buildSky() }, 220)
+  })
+
+  /* ------------------------------------------------------------------------ */
+  /* Geometry shared by every eclipse drawing                                  */
+  /* ------------------------------------------------------------------------ */
+
+  /**
+   * How much of the Sun's *area* is covered when two discs of radius 1 and r
+   * have their centres d apart. Not the same as magnitude, which is a fraction
+   * of the diameter, and much lower for most of an eclipse — an eclipse that
+   * is "half" by magnitude has covered under 40% of the light, which is why a
+   * 50% partial eclipse is barely noticeable outdoors.
+   */
+  function obscuration(d: number, r: number): number {
+    if (d >= 1 + r) return 0
+    if (d <= Math.abs(1 - r)) return Math.min(1, r * r)
+    const a = r * r * Math.acos((d * d + r * r - 1) / (2 * d * r))
+      + Math.acos((d * d + 1 - r * r) / (2 * d))
+      - 0.5 * Math.sqrt((-d + r + 1) * (d + r - 1) * (d - r + 1) * (d + r + 1))
+    return a / Math.PI
+  }
+
+  /* Both of these live in lib/sky-forecast.ts, not here, and that is the
+     point: a drawing built from numbers the checker cannot see is a drawing
+     nothing is holding to account. check-forecast now asserts that the shadow
+     these describe puts exactly the model's own magnitude of Moon inside it,
+     which is the check that would have caught the mistake they were written
+     to fix — the printed constants read at face value, making the shadow and
+     the Moon each about twice their real size. */
+  const solarGeom = (e: Eclipse, when: Date) => {
+    const t = transitGeometry(e, when)
+    return { ...t, span: (1 + t.ratio) * 1.16 }
+  }
+
+  const lunarGeom = (e: Eclipse) => {
+    const s = shadowGeometry(e)
+    return { ...s, span: (s.penumbra + s.moon) * 1.1 }
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* The hero stage                                                            */
+  /* ------------------------------------------------------------------------ */
 
   /* The next eclipse if there is one within the window, otherwise the next
      thing that is not simply the Moon doing what it does every month. Leading
      on "first quarter, in three days" would waste the largest type on the page
      on the least interesting fact available. */
-  const lead =
+  const defaultLead: SkyEvent | undefined =
     events.find((e) => e.kind === 'eclipse' && e.rank === 3) ??
     events.find((e) => e.kind === 'eclipse') ??
     events.find((e) => e.rank >= 2) ??
     events[0]
 
-  function paintHeadline() {
-    if (!lead) { headline.innerHTML = '<p class="loading">Nothing in the next two years, which cannot be right.</p>'; return }
-    headline.innerHTML =
-      `<p class="hl-kicker">Next, the one worth putting in the diary</p>
+  /* Not a constant, because any row can take the stage. Drawing every event
+     properly cost about as much as drawing one, and once the pictures are real
+     it would be strange to only let you look at the first one. */
+  let lead = defaultLead
+
+  const stage = $<HTMLCanvasElement>('stage')
+  const sctx = stage.getContext('2d')!
+  let sw = 0, sh = 0
+
+  function sizeStage() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    const box = stage.getBoundingClientRect()
+    sw = Math.max(240, box.width)
+    sh = Math.max(180, box.height)
+    stage.width = Math.round(sw * dpr)
+    stage.height = Math.round(sh * dpr)
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  }
+
+  /** A cheap deterministic hash, for corona streamers that stay put. */
+  const hash = (i: number) => {
+    const x = Math.sin(i * 127.1 + 311.7) * 43758.5453
+    return x - Math.floor(x)
+  }
+
+  function drawHorizon(g: CanvasRenderingContext2D, dark: number) {
+    // A horizon, because the whole point of a total eclipse is what happens to
+    // the landscape. At totality the glow runs all the way round rather than
+    // sitting in one place — you are inside the shadow, and every direction is
+    // somebody else's sunset.
+    const hy = sh * 0.86
+    const glow = g.createLinearGradient(0, hy - sh * 0.3, 0, hy)
+    glow.addColorStop(0, 'rgba(255,150,90,0)')
+    glow.addColorStop(1, `rgba(255,152,84,${(0.03 + dark * 0.3).toFixed(3)})`)
+    g.fillStyle = glow
+    g.fillRect(0, hy - sh * 0.3, sw, sh * 0.3)
+
+    g.fillStyle = '#04060f'
+    g.beginPath()
+    g.moveTo(0, sh)
+    g.lineTo(0, hy + 6)
+    // A gentle ridge, so the bottom edge is a place rather than a rectangle.
+    for (let x = 0; x <= sw; x += 8) {
+      const y = hy + Math.sin(x * 0.011) * 5 + Math.sin(x * 0.0037 + 1.4) * 8
+      g.lineTo(x, y)
+    }
+    g.lineTo(sw, sh)
+    g.closePath()
+    g.fill()
+  }
+
+  function drawSolar(g: CanvasRenderingContext2D, e: Eclipse, when: Date, t: number) {
+    const geo = solarGeom(e, when)
+    // Slow through the middle: the exponent puts most of the frames near
+    // greatest eclipse, which is the only part anybody wants to look at.
+    const q = t * 2 - 1
+    const x = geo.span * Math.sign(q) * Math.pow(Math.abs(q), 1.7)
+    const sep = Math.hypot(x, geo.sMin)
+    const obs = obscuration(sep, geo.ratio)
+
+    const cx = sw / 2
+    const cy = sh * 0.46
+    /* The Moon rides sMin above the Sun, and on a shallow partial sMin can be
+       most of two Sun-radii — enough to put the Moon's disc off the top of the
+       frame at the size a central eclipse wants. So the scale is whatever
+       keeps the highest thing drawn inside the canvas. */
+    const R = Math.min(Math.min(sw, sh) * 0.19, (cy - 12) / (geo.sMin + geo.ratio + 0.15))
+
+    // The sky, dimming with the light actually removed. The eye compensates,
+    // so the real thing looks less dark than the numbers until the last few
+    // per cent — hence the power.
+    const dark = Math.pow(obs, 3)
+    const sky = g.createLinearGradient(0, 0, 0, sh)
+    const top = [7, 11, 34], bot = [22, 38, 78]
+    const mix = (a: number[], f: number) =>
+      `rgb(${a.map((v) => Math.round(v * (1 - f * 0.75))).join(',')})`
+    sky.addColorStop(0, mix(top, dark))
+    sky.addColorStop(1, mix(bot, dark))
+    g.fillStyle = sky
+    g.fillRect(0, 0, sw, sh)
+
+    // Stars come out, but only in the last moments before totality.
+    if (dark > 0.25) {
+      const a = Math.min(1, (dark - 0.25) / 0.5)
+      for (let i = 0; i < 70; i++) {
+        g.globalAlpha = a * (0.2 + hash(i * 3) * 0.6)
+        g.fillStyle = STAR_COLOURS[Math.floor(hash(i * 5) * STAR_COLOURS.length)]
+        g.beginPath()
+        g.arc(hash(i) * sw, hash(i * 7 + 2) * sh * 0.78, 0.4 + hash(i * 11) * 1.1, 0, 7)
+        g.fill()
+      }
+      g.globalAlpha = 1
+    }
+
+    drawHorizon(g, dark)
+
+    const total = e.central && geo.ratio >= 1
+    const covered = sep <= Math.abs(geo.ratio - 1)
+
+    // The Sun's own glow, shrinking as it is eaten.
+    if (!(total && covered)) {
+      const halo = g.createRadialGradient(cx, cy, R * 0.8, cx, cy, R * (2.6 - obs * 1.4))
+      halo.addColorStop(0, `rgba(255,226,150,${(0.4 * (1 - obs * 0.8)).toFixed(3)})`)
+      halo.addColorStop(0.4, `rgba(255,190,96,${(0.13 * (1 - obs * 0.8)).toFixed(3)})`)
+      halo.addColorStop(1, 'rgba(255,180,80,0)')
+      g.fillStyle = halo
+      g.beginPath()
+      g.arc(cx, cy, R * 2.6, 0, 7)
+      g.fill()
+    }
+
+    // The photosphere.
+    const face = g.createRadialGradient(cx - R * 0.25, cy - R * 0.25, R * 0.05, cx, cy, R)
+    face.addColorStop(0, '#fffdf4')
+    face.addColorStop(0.55, '#ffe9a8')
+    face.addColorStop(0.92, '#ffc44d')
+    face.addColorStop(1, '#ff9e2c')
+    g.fillStyle = face
+    g.beginPath()
+    g.arc(cx, cy, R, 0, 7)
+    g.fill()
+
+    const mx = cx + x * R
+    const my = cy - geo.sMin * R
+    const mr = R * geo.ratio
+
+    // Corona and prominences, only once the photosphere is gone. This is the
+    // one thing you cannot see at any other time, so it is the one thing the
+    // drawing spends its detail on.
+    if (total && covered) {
+      const bloom = Math.min(1, (Math.abs(geo.ratio - 1) - sep) / (Math.abs(geo.ratio - 1) * 0.6 + 0.02))
+      const a = Math.max(0, Math.min(1, bloom))
+      g.save()
+      g.globalAlpha = a
+      // Streamers. Longer at the equator than the poles, which is what the
+      // corona actually does at solar minimum.
+      for (let i = 0; i < 132; i++) {
+        const ang = (i / 132) * Math.PI * 2
+        const eq = Math.pow(Math.abs(Math.cos(ang)), 1.6)
+        const len = mr * (1.18 + eq * 0.85 + hash(i) * 0.5)
+        const gr = g.createLinearGradient(
+          cx + Math.cos(ang) * mr, cy + Math.sin(ang) * mr,
+          cx + Math.cos(ang) * len, cy + Math.sin(ang) * len)
+        gr.addColorStop(0, `rgba(255,250,232,${(0.42 + hash(i * 3) * 0.3).toFixed(3)})`)
+        gr.addColorStop(0.5, 'rgba(226,232,255,0.13)')
+        gr.addColorStop(1, 'rgba(200,215,255,0)')
+        g.strokeStyle = gr
+        g.lineWidth = 1 + hash(i * 5) * 2.4
+        g.beginPath()
+        g.moveTo(cx + Math.cos(ang) * mr * 0.99, cy + Math.sin(ang) * mr * 0.99)
+        g.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len)
+        g.stroke()
+      }
+      // The inner corona, which is a solid pearly ring rather than rays.
+      const inner = g.createRadialGradient(cx, cy, mr * 0.98, cx, cy, mr * 1.55)
+      inner.addColorStop(0, 'rgba(255,253,245,0.62)')
+      inner.addColorStop(0.4, 'rgba(226,236,255,0.2)')
+      inner.addColorStop(1, 'rgba(200,215,255,0)')
+      g.fillStyle = inner
+      g.beginPath(); g.arc(cx, cy, mr * 1.55, 0, 7); g.fill()
+
+      // Prominences — the pink loops on the limb, which are hydrogen.
+      for (let i = 0; i < 4; i++) {
+        const ang = hash(i * 17 + 4) * Math.PI * 2
+        const size = mr * (0.04 + hash(i * 23) * 0.05)
+        g.fillStyle = `rgba(255,${90 + hash(i) * 40},${110 + hash(i * 2) * 40},0.85)`
+        g.beginPath()
+        g.arc(mx + Math.cos(ang) * mr, my + Math.sin(ang) * mr, size, 0, 7)
+        g.fill()
+      }
+      g.restore()
+    }
+
+    // On an annular one the ring gets its own glow, because a ring of Sun is
+    // still blindingly bright — the thing people get wrong about annular
+    // eclipses. It goes on before the Moon and starts at the Sun's own edge:
+    // drawn after, a gradient whose inner radius is the Moon's radius fills
+    // the Moon with 50% gold, which turned the disc olive.
+    if (e.central && geo.ratio < 1 && sep < 1 - geo.ratio) {
+      const rg = g.createRadialGradient(cx, cy, R * 0.96, cx, cy, R * 2.1)
+      rg.addColorStop(0, 'rgba(255,214,120,0.5)')
+      rg.addColorStop(0.22, 'rgba(255,190,90,0.16)')
+      rg.addColorStop(1, 'rgba(255,180,80,0)')
+      g.fillStyle = rg
+      g.beginPath(); g.arc(cx, cy, R * 2.1, 0, 7); g.fill()
+    }
+
+    // The Moon. Not pure black: the sky behind it is not nothing, and a true
+    // black hole in the middle of the picture looks like a bug.
+    g.fillStyle = total && covered ? '#05070f' : '#070a18'
+    g.beginPath()
+    g.arc(mx, my, mr, 0, 7)
+    g.fill()
+
+    // The diamond ring, in the second either side of totality.
+    if (total && !covered && sep < Math.abs(geo.ratio - 1) + 0.09) {
+      const k = 1 - (sep - Math.abs(geo.ratio - 1)) / 0.09
+      const ang = Math.atan2(my - cy, mx - cx) + Math.PI
+      const dx = mx + Math.cos(ang) * mr * 0.98
+      const dy = my + Math.sin(ang) * mr * 0.98
+      const dg = g.createRadialGradient(dx, dy, 0, dx, dy, R * 0.7 * k)
+      dg.addColorStop(0, `rgba(255,255,255,${(0.95 * k).toFixed(3)})`)
+      dg.addColorStop(0.2, `rgba(255,240,200,${(0.5 * k).toFixed(3)})`)
+      dg.addColorStop(1, 'rgba(255,220,150,0)')
+      g.fillStyle = dg
+      g.beginPath(); g.arc(dx, dy, R * 0.7 * k, 0, 7); g.fill()
+    }
+
+    return { obs, sep, ratio: geo.ratio, total: total && covered }
+  }
+
+  function drawLunar(g: CanvasRenderingContext2D, e: Eclipse, t: number) {
+    const geo = lunarGeom(e)
+    const q = t * 2 - 1
+    const x = geo.span * Math.sign(q) * Math.pow(Math.abs(q), 1.5)
+    const sep = Math.hypot(x, geo.gamma)
+
+    const cx = sw / 2
+    const cy = sh * 0.52
+    /* A penumbral eclipse is one where the Moon misses the umbra entirely,
+       which means gamma is above 1.55 by definition — further off the axis
+       than the penumbra is wide. Scaling to the penumbra alone put the Moon
+       off the top of the canvas on exactly the eclipses that are defined by
+       being up there. */
+    const reach = Math.max(geo.penumbra, geo.gamma + geo.moon)
+    const S = Math.min(sw / (geo.span * 2.1), sh * 0.44 / reach)
+
+    const sky = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(sw, sh) * 0.8)
+    sky.addColorStop(0, '#0b1030')
+    sky.addColorStop(1, '#05081c')
+    g.fillStyle = sky
+    g.fillRect(0, 0, sw, sh)
+
+    for (let i = 0; i < 90; i++) {
+      g.globalAlpha = 0.18 + hash(i * 11) * 0.5
+      g.fillStyle = STAR_COLOURS[Math.floor(hash(i * 5) * STAR_COLOURS.length)]
+      g.beginPath()
+      g.arc(hash(i) * sw, hash(i * 7 + 2) * sh, 0.35 + hash(i * 13) * 1, 0, 7)
+      g.fill()
+    }
+    g.globalAlpha = 1
+
+    // The penumbra: real, but so soft that most people looking at a penumbral
+    // eclipse conclude nothing is happening.
+    const pg = g.createRadialGradient(cx, cy, geo.umbra * S, cx, cy, geo.penumbra * S)
+    pg.addColorStop(0, 'rgba(3,5,14,0.55)')
+    pg.addColorStop(1, 'rgba(3,5,14,0)')
+    g.fillStyle = pg
+    g.beginPath(); g.arc(cx, cy, geo.penumbra * S, 0, 7); g.fill()
+
+    // The umbra. Shown at all because the whole interest of a lunar eclipse is
+    // the size and shape of the thing crossing the Moon, and you cannot see a
+    // shadow in empty space — so this is the one frankly diagrammatic mark on
+    // the page. Kept dim and given a warm rim, so it reads as a shadow and not
+    // as a red planet, which is what a solid maroon disc looked like.
+    const ug = g.createRadialGradient(cx, cy, 0, cx, cy, geo.umbra * S)
+    ug.addColorStop(0, 'rgba(24,11,14,0.92)')
+    ug.addColorStop(0.8, 'rgba(20,10,16,0.86)')
+    ug.addColorStop(1, 'rgba(30,14,18,0.6)')
+    g.fillStyle = ug
+    g.beginPath(); g.arc(cx, cy, geo.umbra * S, 0, 7); g.fill()
+    g.strokeStyle = 'rgba(186,92,66,0.3)'
+    g.lineWidth = 1
+    g.beginPath(); g.arc(cx, cy, geo.umbra * S, 0, 7); g.stroke()
+
+    const mx = cx + x * S
+    const my = cy - geo.gamma * S
+    const mr = geo.moon * S
+
+    // The Moon, lit.
+    const face = g.createRadialGradient(mx - mr * 0.3, my - mr * 0.3, mr * 0.1, mx, my, mr)
+    face.addColorStop(0, '#fdfcff')
+    face.addColorStop(0.7, '#dfe4f4')
+    face.addColorStop(1, '#a8b0c8')
+    g.fillStyle = face
+    g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill()
+    drawMaria(g, mx, my, mr, 1)
+
+    // Then the part of it that is inside the shadow, clipped to the disc. This
+    // is why the edge of the Earth's shadow looks curved on the Moon, and it
+    // is the observation Aristotle used to argue the Earth was a sphere.
+    g.save()
+    g.beginPath(); g.arc(mx, my, mr, 0, 7); g.clip()
+    const sg = g.createRadialGradient(cx, cy, 0, cx, cy, geo.umbra * S)
+    sg.addColorStop(0, 'rgba(168,62,44,0.97)')
+    sg.addColorStop(0.8, 'rgba(150,56,42,0.95)')
+    sg.addColorStop(1, 'rgba(112,50,58,0.88)')
+    g.fillStyle = sg
+    g.beginPath(); g.arc(cx, cy, geo.umbra * S, 0, 7); g.fill()
+    // and the penumbral greying, over the rest of it
+    const spg = g.createRadialGradient(cx, cy, geo.umbra * S, cx, cy, geo.penumbra * S)
+    spg.addColorStop(0, 'rgba(30,26,44,0.5)')
+    spg.addColorStop(1, 'rgba(30,26,44,0)')
+    g.fillStyle = spg
+    g.beginPath(); g.arc(cx, cy, geo.penumbra * S, 0, 7); g.fill()
+    g.restore()
+
+    // The same formula the model's magnitude is defined by, so the picture
+    // and the number cannot come apart.
+    const depth = (geo.umbra + geo.moon - sep) / (2 * geo.moon)
+    return { depth, sep, ratio: 0, total: depth >= 1 }
+  }
+
+  /**
+   * The maria — the dark basalt plains. Always the same, because the Moon
+   * keeps one face towards us, so drawing them from a fixed table is not a
+   * shortcut: it is the fact.
+   */
+  const MARIA: [number, number, number, number][] = [
+    [-0.30, -0.36, 0.26, 0.14], [-0.02, -0.42, 0.20, 0.15],
+    [0.30, -0.22, 0.22, 0.22], [0.14, 0.05, 0.30, 0.24],
+    [-0.34, 0.02, 0.24, 0.26], [-0.20, 0.40, 0.20, 0.16],
+    [0.44, 0.30, 0.13, 0.12],
+  ]
+
+  function drawMaria(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, alpha: number) {
+    g.save()
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.clip()
+    // Blurred, because hard-edged ellipses read as bubbles rather than as
+    // plains. The first version of this looked like soap.
+    g.filter = `blur(${(r * 0.07).toFixed(2)}px)`
+    for (let i = 0; i < MARIA.length; i++) {
+      const [x, y, rx, ry] = MARIA[i]
+      g.globalAlpha = 0.2 * alpha
+      g.fillStyle = '#5c6382'
+      g.beginPath()
+      g.ellipse(cx + x * r, cy + y * r, rx * r, ry * r, 0.4 + i * 0.3, 0, 7)
+      g.fill()
+    }
+    g.filter = 'none'
+    // One bright rayed crater, which is the other thing you can pick out with
+    // the naked eye. Two of them looked like a face.
+    g.globalAlpha = 0.16 * alpha
+    g.fillStyle = '#ffffff'
+    g.beginPath(); g.arc(cx - 0.16 * r, cy + 0.54 * r, 0.055 * r, 0, 7); g.fill()
+    g.restore()
+  }
+
+  /** The night sky the non-eclipse scenes are staged against. */
+  function drawNight(g: CanvasRenderingContext2D, n = 110) {
+    const cx = sw / 2, cy = sh * 0.48
+    const sky = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(sw, sh) * 0.8)
+    sky.addColorStop(0, '#101740'); sky.addColorStop(1, '#05081c')
+    g.fillStyle = sky; g.fillRect(0, 0, sw, sh)
+    for (let i = 0; i < n; i++) {
+      g.globalAlpha = 0.2 + hash(i * 11) * 0.5
+      g.fillStyle = STAR_COLOURS[Math.floor(hash(i * 5) * STAR_COLOURS.length)]
+      g.beginPath(); g.arc(hash(i) * sw, hash(i * 7 + 2) * sh, 0.4 + hash(i * 13) * 1.1, 0, 7); g.fill()
+    }
+    g.globalAlpha = 1
+  }
+
+  /**
+   * A solstice or an equinox, which is a fact about where the Sun is overhead.
+   *
+   * The declination is not estimated: at an equinox the Sun is over the equator
+   * by definition, and at a solstice it is over a tropic, which is the Earth's
+   * axial tilt — 23.44°. Those two numbers are what the event *is*, so the
+   * terminator is tilted by exactly them, and the June solstice comes out with
+   * the whole Arctic in daylight without anybody drawing it that way.
+   */
+  function drawSeason(g: CanvasRenderingContext2D, ev: SkyEvent) {
+    drawNight(g, 80)
+    const cx = sw * 0.56, cy = sh * 0.5
+    const R = Math.min(sw * 0.22, sh * 0.32)
+    const decl = ev.season === 'june' ? 23.44 : ev.season === 'december' ? -23.44 : 0
+
+    // The Sun, off to the left, and the light coming from it.
+    const sx = sw * 0.1, sy = sh * 0.5
+    const sg = g.createRadialGradient(sx, sy, 0, sx, sy, R * 1.5)
+    sg.addColorStop(0, '#fffdf2'); sg.addColorStop(0.1, '#ffe9a8'); sg.addColorStop(0.2, '#ffc65a')
+    sg.addColorStop(1, 'rgba(255,180,80,0)')
+    g.fillStyle = sg; g.beginPath(); g.arc(sx, sy, R * 1.5, 0, 7); g.fill()
+
+    // The Earth, lit from the left.
+    const face = g.createRadialGradient(cx - R * 0.6, cy - R * 0.2, R * 0.1, cx, cy, R * 1.05)
+    face.addColorStop(0, '#78b8e8'); face.addColorStop(0.5, '#2f7fbe')
+    face.addColorStop(1, '#123a63')
+    g.fillStyle = face
+    g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill()
+
+    // Latitude lines, so the tilt of the shadow has something to be tilted
+    // against, and the two tropics picked out because they are the subject.
+    g.save()
+    g.beginPath(); g.arc(cx, cy, R, 0, 7); g.clip()
+    for (let lat = -60; lat <= 60; lat += 30) {
+      const y = cy - Math.sin((lat * Math.PI) / 180) * R
+      const w = Math.cos((lat * Math.PI) / 180) * R
+      g.strokeStyle = lat === 0 ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.12)'
+      g.lineWidth = lat === 0 ? 1.1 : 0.7
+      g.beginPath(); g.ellipse(cx, y, w, w * 0.16, 0, 0, 7); g.stroke()
+    }
+    for (const lat of [23.44, -23.44]) {
+      const y = cy - Math.sin((lat * Math.PI) / 180) * R
+      const w = Math.cos((lat * Math.PI) / 180) * R
+      g.strokeStyle = 'rgba(255,217,138,0.34)'
+      g.setLineDash([3, 4]); g.lineWidth = 1
+      g.beginPath(); g.ellipse(cx, y, w, w * 0.16, 0, 0, 7); g.stroke()
+      g.setLineDash([])
+    }
+
+    // Night: the half of the sphere facing away, its edge tilted by the
+    // declination. Straight, because a great circle seen edge-on is a line.
+    g.translate(cx, cy)
+    g.rotate((-decl * Math.PI) / 180)
+    const ng = g.createLinearGradient(0, 0, R, 0)
+    ng.addColorStop(0, 'rgba(4,7,20,0.55)')
+    ng.addColorStop(0.25, 'rgba(4,7,20,0.88)')
+    ng.addColorStop(1, 'rgba(4,7,20,0.94)')
+    g.fillStyle = ng
+    g.fillRect(0, -R * 1.2, R * 1.3, R * 2.4)
+    // City lights, on the night side only.
+    for (let i = 0; i < 26; i++) {
+      const a = hash(i * 31) * Math.PI - Math.PI / 2
+      const rr = Math.sqrt(hash(i * 7 + 3)) * R * 0.96
+      const x = Math.cos(a) * rr, y = Math.sin(a) * rr
+      if (x < R * 0.06) continue
+      g.globalAlpha = 0.3 + hash(i * 5) * 0.5
+      g.fillStyle = '#ffd9a0'
+      g.beginPath(); g.arc(x, y, 0.9, 0, 7); g.fill()
+    }
+    g.globalAlpha = 1
+    g.restore()
+
+    // The Earth's axis, upright here, with the shadow doing the leaning.
+    g.strokeStyle = 'rgba(255,255,255,0.3)'
+    g.setLineDash([4, 5]); g.lineWidth = 1
+    g.beginPath(); g.moveTo(cx, cy - R * 1.22); g.lineTo(cx, cy + R * 1.22); g.stroke()
+    g.setLineDash([])
+  }
+
+  /**
+   * Perihelion and aphelion: the Sun at the size it is that day, with a dashed
+   * ring where its edge will be six months later.
+   *
+   * The first version of this drew the orbit. It was honest — a true ellipse
+   * at e = 0.0167 — and it was useless, because at that eccentricity the orbit
+   * is a circle to a fifth of a per cent and the Sun sits under two pixels off
+   * centre. The picture said "the Earth goes round the Sun", which nobody came
+   * here to learn.
+   *
+   * The difference you can actually see is the size of the Sun, and it is
+   * about three per cent. Drawn big enough, three per cent is a visible gap —
+   * and a visible gap that small, standing for five million kilometres, is the
+   * real point: this is not what causes the seasons.
+   */
+  function drawApsis(g: CanvasRenderingContext2D, ev: SkyEvent) {
+    drawNight(g, 70)
+    const cx = sw / 2, cy = sh * 0.5
+    const near = ev.apsis === 'perihelion'
+
+    // The other end of the orbit, half a year away, for the comparison.
+    const other = new Date(+ev.when + 182.6 * 86400_000)
+    const rNow = 959.63 / sunDistanceAu(ev.when)
+    const rThen = 959.63 / sunDistanceAu(other)
+    const base = Math.min(sw * 0.3, sh * 0.36)
+    const R = base * (near ? 1 : rNow / rThen)
+    const R2 = base * (near ? rThen / rNow : 1)
+
+    const halo = g.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 2.3)
+    halo.addColorStop(0, 'rgba(255,206,120,0.3)')
+    halo.addColorStop(0.35, 'rgba(255,180,90,0.09)')
+    halo.addColorStop(1, 'rgba(255,170,80,0)')
+    g.fillStyle = halo
+    g.beginPath(); g.arc(cx, cy, R * 2.3, 0, 7); g.fill()
+
+    const face = g.createRadialGradient(cx - R * 0.2, cy - R * 0.2, R * 0.05, cx, cy, R)
+    face.addColorStop(0, '#fffdf3'); face.addColorStop(0.5, '#ffe49c')
+    face.addColorStop(0.9, '#ffc251'); face.addColorStop(1, '#ff9c2c')
+    g.fillStyle = face
+    g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill()
+
+    // Where the edge is at the other apsis. Concentric, because the comparison
+    // is only readable if the two share a centre.
+    g.strokeStyle = 'rgba(190,214,255,0.75)'
+    g.setLineDash([4, 5])
+    g.lineWidth = 1.2
+    g.beginPath(); g.arc(cx, cy, R2, 0, 7); g.stroke()
+    g.setLineDash([])
+
+    /* And a magnifier on the limb, because three per cent of a disc this size
+       is four pixels and four pixels is not an argument. Eight times up, the
+       gap between the two edges is finally something you can look at — and it
+       is still obviously a sliver, which is the honest half of the point. */
+    const Z = 8
+    const ir = Math.min(58, sh * 0.2)
+    const ix = sw - ir - 16, iy = sh - ir - 36
+    const px = cx + Math.max(R, R2), py = cy
+
+    g.save()
+    g.beginPath(); g.arc(ix, iy, ir, 0, 7); g.clip()
+    g.fillStyle = '#080c22'; g.fillRect(ix - ir, iy - ir, ir * 2, ir * 2)
+    g.translate(ix, iy)
+    g.scale(Z, Z)
+    g.translate(-px + (Math.max(R, R2) - Math.min(R, R2)) / 2, -py)
+    const zf = g.createRadialGradient(cx, cy, R * 0.98, cx, cy, R)
+    zf.addColorStop(0, '#ffd76e'); zf.addColorStop(1, '#ff9c2c')
+    g.fillStyle = zf
+    g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill()
+    // The sliver itself, picked out, so the inset shows a quantity and not
+    // just two lines near each other.
+    g.beginPath()
+    g.arc(cx, cy, Math.max(R, R2), 0, 7)
+    g.arc(cx, cy, Math.min(R, R2), 0, 7, true)
+    g.fillStyle = 'rgba(255,255,255,0.34)'
+    g.fill()
+    g.strokeStyle = 'rgba(214,230,255,0.95)'
+    g.setLineDash([3 / Z, 4 / Z]); g.lineWidth = 1.4 / Z
+    g.beginPath(); g.arc(cx, cy, R2, 0, 7); g.stroke()
+    g.setLineDash([])
+    g.restore()
+
+    g.strokeStyle = 'rgba(160,182,240,0.4)'
+    g.lineWidth = 1
+    g.beginPath(); g.arc(ix, iy, ir, 0, 7); g.stroke()
+    // The line back to the bit of the limb it is showing.
+    g.strokeStyle = 'rgba(160,182,240,0.22)'
+    g.setLineDash([2, 4])
+    g.beginPath(); g.moveTo(px, py); g.lineTo(ix - ir * 0.7, iy - ir * 0.7); g.stroke()
+    g.setLineDash([])
+  }
+
+  /**
+   * A meteor shower: streaks that all lead back to one point on the sky.
+   *
+   * The count comes from the rate in the table, so the Geminids visibly rain
+   * and the Leonids visibly do not — which is the one thing about showers
+   * worth knowing before deciding whether to stand outside at 3am.
+   */
+  function drawShower(g: CanvasRenderingContext2D, ev: SkyEvent, t: number) {
+    drawNight(g, 150)
+    const zhr = ev.shower?.zhr ?? 20
+    const rx = sw * 0.7, ry = sh * 0.2
+    const n = Math.max(6, Math.min(40, Math.round(zhr / 4)))
+
+    // The radiant. Real showers have one because the debris is on one orbit
+    // and we drive into it; perspective does the rest.
+    const rg = g.createRadialGradient(rx, ry, 0, rx, ry, 46)
+    rg.addColorStop(0, 'rgba(255,190,230,0.32)')
+    rg.addColorStop(1, 'rgba(255,190,230,0)')
+    g.fillStyle = rg; g.beginPath(); g.arc(rx, ry, 46, 0, 7); g.fill()
+
+    for (let i = 0; i < n; i++) {
+      // Each streak has its own moment in a rolling cycle, so they arrive one
+      // at a time rather than all at once.
+      const ph = (t * 1.6 + i / n + hash(i * 13) * 0.35) % 1
+      const life = ph < 0.28 ? ph / 0.28 : 0
+      if (life <= 0) continue
+      const ang = Math.PI * (0.62 + hash(i) * 0.72)
+      const reach = (0.35 + hash(i * 7) * 1.05) * Math.max(sw, sh)
+      const head = 0.12 + life * 0.88
+      const x0 = rx + Math.cos(ang) * reach * head * 0.34
+      const y0 = ry + Math.sin(ang) * reach * head * 0.34
+      const tail = 40 + hash(i * 11) * 90
+      const fade = Math.sin(life * Math.PI)
+      const grad = g.createLinearGradient(
+        x0, y0, x0 - Math.cos(ang) * tail, y0 - Math.sin(ang) * tail)
+      grad.addColorStop(0, `rgba(255,255,255,${(0.9 * fade).toFixed(3)})`)
+      grad.addColorStop(0.3, `rgba(255,190,230,${(0.4 * fade).toFixed(3)})`)
+      grad.addColorStop(1, 'rgba(255,160,210,0)')
+      g.strokeStyle = grad
+      g.lineWidth = 1.1 + hash(i * 3) * 1.3
+      g.lineCap = 'round'
+      g.beginPath()
+      g.moveTo(x0, y0)
+      g.lineTo(x0 - Math.cos(ang) * tail, y0 - Math.sin(ang) * tail)
+      g.stroke()
+    }
+    drawHorizon(g, 0)
+  }
+
+  /** Whichever scene the selected event calls for. */
+  function drawScene(g: CanvasRenderingContext2D, ev: SkyEvent, t: number) {
+    if (ev.eclipse) {
+      if (ev.eclipse.kind === 'solar') drawSolar(g, ev.eclipse, ev.when, t)
+      else drawLunar(g, ev.eclipse, t)
+      return
+    }
+    if (ev.kind === 'season') { drawSeason(g, ev); return }
+    if (ev.kind === 'apsis') { drawApsis(g, ev); return }
+    if (ev.kind === 'shower') { drawShower(g, ev, t); return }
+    drawNight(g, 120)
+    const ill = moonIllumination(ev.when)
+    drawMoonFace(g, sw / 2, sh * 0.47, Math.min(sw, sh) * 0.24, ill.fraction, ill.waxing, ill.phaseAngle)
+    drawHorizon(g, 0)
+  }
+
+  /**
+   * A Moon at a given illuminated fraction, drawn the way the light actually
+   * falls: the terminator is the edge of a sphere seen at an angle, so it is
+   * an ellipse whose width is the cosine of the phase angle — not an arc of a
+   * circle, which is what a crescent icon usually is and why it never looks
+   * quite right.
+   */
+  function drawMoonFace(
+    g: CanvasRenderingContext2D, cx: number, cy: number, r: number,
+    fraction: number, waxing: boolean, phaseAngle: number,
+  ) {
+    const ci = Math.cos((phaseAngle * Math.PI) / 180)
+
+    // Earthshine: the unlit part is not black, it is lit by a nearly full
+    // Earth. Strongest at a thin crescent, which is exactly when you see it.
+    const glowA = 0.1 + (1 - fraction) * 0.14
+    const dark = g.createRadialGradient(cx - r * 0.2, cy - r * 0.2, r * 0.2, cx, cy, r)
+    dark.addColorStop(0, `rgba(96,110,158,${glowA + 0.06})`)
+    dark.addColorStop(1, `rgba(52,62,102,${glowA})`)
+    g.fillStyle = dark
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill()
+
+    g.save()
+    g.translate(cx, cy)
+    if (!waxing) g.scale(-1, 1)
+    g.beginPath()
+    g.moveTo(0, -r)
+    g.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false)
+    g.ellipse(0, 0, Math.abs(ci) * r, r, 0, Math.PI / 2, -Math.PI / 2, ci <= 0)
+    g.closePath()
+    g.clip()
+    const lit = g.createRadialGradient(-r * 0.25, -r * 0.25, r * 0.08, 0, 0, r * 1.05)
+    lit.addColorStop(0, '#ffffff')
+    lit.addColorStop(0.62, '#e8ecf8')
+    lit.addColorStop(1, '#b6bed6')
+    g.fillStyle = lit
+    g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill()
+    // The maria belong inside the lit shape, not across the whole disc. Drawn
+    // over both, they turned the earthshine side into a grey smudge — the
+    // dark limb is a hint of a Moon, and detail on it reads as dirt.
+    g.restore()
+    g.save()
+    g.translate(cx, cy)
+    if (!waxing) g.scale(-1, 1)
+    g.beginPath()
+    g.moveTo(0, -r)
+    g.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false)
+    g.ellipse(0, 0, Math.abs(ci) * r, r, 0, Math.PI / 2, -Math.PI / 2, ci <= 0)
+    g.closePath()
+    g.clip()
+    if (!waxing) g.scale(-1, 1)
+    drawMaria(g, 0, 0, r, 0.95)
+    g.restore()
+    drawMaria(g, cx, cy, r, 0.18)
+
+    // A faint rim so the disc has an edge against a dark page.
+    g.strokeStyle = 'rgba(180,196,255,0.28)'
+    g.lineWidth = 1
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke()
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Hero text and the loop                                                    */
+  /* ------------------------------------------------------------------------ */
+
+  const heroText = $('heroText')
+  const stageCap = $('stageCap')
+
+  const num = (n: number) => Math.round(n).toLocaleString('en-GB')
+
+  function heroFacts(ev: SkyEvent): string[] {
+    const e = ev.eclipse
+    if (!e) {
+      if (ev.kind === 'phase') {
+        const ill = moonIllumination(ev.when)
+        const d = discs(ev.when)
+        return [
+          `<b>${(ill.fraction * 100).toFixed(1)}%</b> of the disc lit that night`,
+          `<b>${ill.age.toFixed(1)} days</b> since the last new moon`,
+          `<b>${num(d.distanceKm)} km</b> away, ${d.distanceKm < 385000 ? 'nearer' : 'further'} than average`,
+        ]
+      }
+      if (ev.kind === 'season') {
+        const decl = ev.season === 'june' ? '23.44° north'
+          : ev.season === 'december' ? '23.44° south' : 'the equator'
+        return [
+          `<b>${decl}</b> — where the Sun is directly overhead at noon`,
+          `<b>${ev.season === 'march' || ev.season === 'september' ? '12 hours' : '0 or 24 hours'}</b> of daylight at the poles`,
+        ]
+      }
+      if (ev.kind === 'apsis') {
+        const au = sunDistanceAu(ev.when)
+        return [
+          `<b>${num(au * 149597870.7)} km</b> to the Sun`,
+          `<b>${((au - 1) * 100).toFixed(2)}%</b> off the average distance`,
+          `<b>0.0167</b> the eccentricity of the orbit — which is a circle, to look at`,
+        ]
+      }
+      if (ev.shower) {
+        return [
+          `<b>${ev.shower.zhr}</b> an hour at the peak, under a dark sky`,
+          `<b>${ev.shower.parent}</b> laid the debris down`,
+        ]
+      }
+      return []
+    }
+    if (e.kind === 'solar') {
+      const d = discs(ev.when, e.gamma)
+      const geo = solarGeom(e, ev.when)
+      const maxObs = obscuration(geo.sMin, geo.ratio)
+      return [
+        `<b>${(d.ratio * 100).toFixed(1)}%</b> the Moon's disc, against the Sun's`,
+        `<b>${(maxObs * 100).toFixed(maxObs > 0.995 ? 0 : 1)}%</b> of the Sun's light gone at greatest eclipse`,
+        `<b>${num(d.distanceKm)} km</b> to the Moon that day`,
+        `<b>${Math.abs(e.gamma).toFixed(3)}</b> Earth radii from the centre, where the axis passes`,
+      ]
+    }
+    const geo = lunarGeom(e)
+    return [
+      `<b>${e.magnitude.toFixed(2)}</b> of the Moon's diameter inside the Earth's shadow`,
+      `<b>${(geo.umbra / geo.moon).toFixed(1)}×</b> the Moon's own width — the shadow it is crossing`,
+      `<b>${num(discs(ev.when).distanceKm)} km</b> to the Moon that night`,
+      `<b>${Math.abs(e.gamma).toFixed(3)}</b> Earth radii from the shadow's axis`,
+    ]
+  }
+
+  const STAGE_CAP: Record<string, string> = {
+    eclipse: 'Drawn to scale, from the distances and angles for that day',
+    phase: 'The terminator as it will actually fall that night',
+    season: 'The Earth’s shadow, tilted by where the Sun stands overhead',
+    apsis: 'The Sun that day, magnified at the limb — dashed is six months later',
+    shower: 'One streak per few an hour, from the rate observers count',
+  }
+
+  function paintHero() {
+    if (!lead) {
+      heroText.innerHTML = '<p class="loading">Nothing in the next two years, which cannot be right.</p>'
+      return
+    }
+    const facts = heroFacts(lead)
+    const kicker = lead === defaultLead
+      ? 'Next, the one worth putting in the diary'
+      : 'You picked this one'
+    heroText.innerHTML =
+      `<p class="hl-kicker">${kicker}</p>
        <h2 class="hl-title">${lead.title}</h2>
        <p class="hl-when">${formatWhen(lead.when, lead.timed)}</p>
        <p class="hl-count" id="hlCount">${countdown(new Date(), lead.when)}</p>
-       <p class="hl-detail">${lead.detail}</p>`
+       <p class="hl-detail">${lead.detail}</p>
+       ${facts.length ? `<ul class="hl-facts">${facts.map((f) => `<li>${f}</li>`).join('')}</ul>` : ''}
+       ${lead === defaultLead ? '' : '<button type="button" class="hl-back" id="hlBack">Back to the next big one</button>'}`
+    stageCap.textContent = STAGE_CAP[lead.kind] ?? ''
+    document.getElementById('hlBack')?.addEventListener('click', () => select(defaultLead!))
   }
 
-  /* ---- the feed --------------------------------------------------------- */
+  let raf = 0
+  function runStage() {
+    sizeStage()
+    if (!lead) return
+    // A still frame at greatest eclipse for anybody who asked not to be moved.
+    // Freezing at t=0.5 is the right frame rather than a convenient one: it is
+    // the moment the page is about.
+    if (prefersReducedMotion) { drawScene(sctx, lead, 0.5); return }
+    const PERIOD = lead.eclipse?.kind === 'lunar' ? 21000 : lead.kind === 'shower' ? 9000 : 17000
+    const t0 = performance.now()
+    const tick = (t: number) => {
+      const u = ((t - t0) % PERIOD) / PERIOD
+      drawScene(sctx, lead!, u)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+  }
+
+  /** Put an event on the stage. */
+  function select(ev: SkyEvent) {
+    lead = ev
+    paintHero()
+    if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    runStage()
+    for (const r of document.querySelectorAll('.ev'))
+      r.classList.toggle('is-lead', (r as HTMLElement).dataset.at === String(+ev.when))
+    $('hero').scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' })
+  }
+
+  // Nothing to animate while the stage is off screen.
+  const heroObs = new IntersectionObserver((rows) => {
+    for (const r of rows) {
+      if (r.isIntersecting) { if (!raf) runStage() }
+      else if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    }
+  }, { rootMargin: '120px' })
+  heroObs.observe(stage)
+
+  let stageTimer = 0
+  addEventListener('resize', () => {
+    clearTimeout(stageTimer)
+    stageTimer = window.setTimeout(() => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0 }
+      runStage()
+    }, 220)
+  })
+
+  /* ------------------------------------------------------------------------ */
+  /* The Moon, right now                                                       */
+  /* ------------------------------------------------------------------------ */
+
+  const PHASE_NAME = (f: number, waxing: boolean) => {
+    if (f < 0.02) return 'New moon'
+    if (f > 0.98) return 'Full moon'
+    if (Math.abs(f - 0.5) < 0.04) return waxing ? 'First quarter' : 'Last quarter'
+    const shape = f < 0.5 ? 'crescent' : 'gibbous'
+    return `${waxing ? 'Waxing' : 'Waning'} ${shape}`
+  }
+
+  function paintMoon() {
+    const host = $('moonArt')
+    const size = 132
+    let c = host.querySelector('canvas')
+    if (!c) {
+      c = document.createElement('canvas')
+      c.style.width = size + 'px'
+      c.style.height = size + 'px'
+      host.appendChild(c)
+    }
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    c.width = size * dpr
+    c.height = size * dpr
+    const g = c.getContext('2d')!
+    g.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+    const t = new Date()
+    const ill = moonIllumination(t)
+    const d = discs(t)
+
+    // A soft halo, so a nearly-new Moon is not a black hole in the layout.
+    const halo = g.createRadialGradient(size / 2, size / 2, size * 0.3, size / 2, size / 2, size * 0.5)
+    halo.addColorStop(0, 'rgba(150,175,255,0.14)')
+    halo.addColorStop(1, 'rgba(150,175,255,0)')
+    g.fillStyle = halo
+    g.fillRect(0, 0, size, size)
+
+    drawMoonFace(g, size / 2, size / 2, size * 0.39, ill.fraction, ill.waxing, ill.phaseAngle)
+
+    // Mean geocentric semidiameter is 932"; the swing either side of it is the
+    // whole "supermoon" business, and it is under a tenth.
+    const rel = (d.moonGeocentric / 932.6 - 1) * 100
+    const nextFull = events.find((e) => e.phase === 'full')
+    const nextNew = events.find((e) => e.phase === 'new')
+
+    const rows: [string, string][] = [
+      ['Lit', `${(ill.fraction * 100).toFixed(1)}%`],
+      ['Phase', PHASE_NAME(ill.fraction, ill.waxing)],
+      ['Age', `${ill.age.toFixed(1)} days`],
+      ['Distance', `${Math.round(d.distanceKm).toLocaleString('en-GB')} km`],
+      ['Apparent size', `${rel >= 0 ? '+' : ''}${rel.toFixed(1)}% on average`],
+      ['Next full', nextFull ? countdown(t, nextFull.when).replace(/^in /, '') : '—'],
+      ['Next new', nextNew ? countdown(t, nextNew.when).replace(/^in /, '') : '—'],
+    ]
+    $('moonFacts').innerHTML = rows
+      .map(([k, v]) => `<div class="mf"><dt>${k}</dt><dd>${v}</dd></div>`).join('')
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* The year ahead                                                            */
+  /* ------------------------------------------------------------------------ */
+
+  const KIND_COLOUR: Record<string, string> = {
+    eclipse: '#ffd98a', phase: '#aebeff', season: '#7fe0c0',
+    shower: '#ff9fd0', apsis: '#ffb27f',
+  }
+  const KIND_LABEL: Record<string, string> = {
+    eclipse: 'Eclipses', phase: 'Full & new moons', season: 'Equinox & solstice',
+    shower: 'Meteor showers', apsis: 'Earth’s orbit',
+  }
+  const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+  function paintWheel() {
+    const R = 118, CX = 132, CY = 132
+    const t0 = +new Date()
+    const t1 = t0 + 365.25 * 86400_000
+    const ang = (t: number) => ((t - t0) / (t1 - t0)) * Math.PI * 2 - Math.PI / 2
+    const pt = (a: number, r: number) => [CX + Math.cos(a) * r, CY + Math.sin(a) * r]
+
+    let s = `<svg viewBox="0 0 264 264" role="img" aria-label="Every event of the coming year, placed round a ring by date">`
+
+    // Month sectors, alternating, from real month boundaries.
+    const bounds: number[] = []
+    const d0 = new Date(t0)
+    for (let i = 0; i <= 13; i++) {
+      const b = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + i, 1)
+      if (b > t0 && b < t1) bounds.push(b)
+    }
+    const edges = [t0, ...bounds, t1]
+    for (let i = 0; i < edges.length - 1; i++) {
+      const a0 = ang(edges[i]), a1 = ang(edges[i + 1])
+      const [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R)
+      const [ix1, iy1] = pt(a1, R - 17), [ix0, iy0] = pt(a0, R - 17)
+      s += `<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} L${ix1.toFixed(1)} ${iy1.toFixed(1)} A${R - 17} ${R - 17} 0 0 0 ${ix0.toFixed(1)} ${iy0.toFixed(1)} Z" fill="${i % 2 ? 'rgba(120,140,220,0.10)' : 'rgba(120,140,220,0.04)'}"/>`
+      const mid = (a0 + a1) / 2
+      const [lx, ly] = pt(mid, R - 8.5)
+      const label = MONTH_SHORT[new Date(edges[i] + 86400_000 * 3).getUTCMonth()]
+      if (a1 - a0 > 0.32)
+        s += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" class="wm" text-anchor="middle" dominant-baseline="central" transform="rotate(${((mid * 180) / Math.PI + 90).toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})">${label}</text>`
+    }
+
+    s += `<circle cx="${CX}" cy="${CY}" r="${R - 17}" fill="none" stroke="rgba(140,160,240,0.18)"/>`
+    s += `<circle cx="${CX}" cy="${CY}" r="46" fill="none" stroke="rgba(140,160,240,0.12)"/>`
+
+    // The events. Radius carries rank, so the eclipses sit on their own ring
+    // and the ordinary business of the Moon sits inside it.
+    const year = events.filter((e) => +e.when <= t1 && (e.rank >= 1))
+    for (const e of year) {
+      const a = ang(+e.when)
+      const rr = 52 + e.rank * 15
+      const [x, y] = pt(a, rr)
+      const col = KIND_COLOUR[e.kind]
+      const big = e.kind === 'eclipse'
+      if (big)
+        s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="none" stroke="${col}" stroke-opacity="0.4"/>`
+      /* A group with an invisible hit circle in it, rather than a bare dot.
+         A transparent *stroke* would have worked for the mouse and left the
+         element measuring 4px, which is what an audit and a screen reader
+         would both have believed. A filled circle is the honest version. */
+      s += `<g class="wd" tabindex="0" role="button" data-i="${events.indexOf(e)}">` +
+        `<title>${e.title} — ${formatWhen(e.when, e.timed)}</title>` +
+        `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" fill="transparent"/>` +
+        `<circle class="wd-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${big ? 3.6 : e.rank >= 2 ? 2.8 : 1.9}" fill="${col}" fill-opacity="${big ? 1 : 0.8}"/></g>`
+    }
+
+    // Now: a hand at the top, because the ring starts today rather than in
+    // January. A ring that started in January would need a hand that moved,
+    // and would put the interesting half behind you.
+    const [nx, ny] = pt(-Math.PI / 2, R - 17)
+    s += `<line x1="${CX}" y1="${CY}" x2="${nx}" y2="${ny}" stroke="rgba(255,217,138,0.5)" stroke-width="1.2" stroke-dasharray="3 4"/>`
+    s += `<circle cx="${CX}" cy="${CY}" r="4" fill="#ffd98a"/>`
+    s += `<text x="${CX}" y="${CY + 22}" class="wnow" text-anchor="middle">tonight</text>`
+    s += '</svg>'
+    $('wheel').innerHTML = s
+
+    $('legend').innerHTML = Object.keys(KIND_LABEL)
+      .map((k) => `<li><i style="background:${KIND_COLOUR[k]}"></i>${KIND_LABEL[k]}</li>`).join('')
+
+    const tip = $('wheelTip')
+    for (const dot of $('wheel').querySelectorAll<SVGGElement>('.wd')) {
+      const ev = events[Number(dot.dataset.i)]
+      const show = () => {
+        tip.textContent = `${ev.title} · ${formatWhen(ev.when, ev.timed).replace(/, \d\d:\d\d UTC$/, '')}`
+      }
+      dot.addEventListener('mouseenter', show)
+      dot.addEventListener('focus', show)
+      dot.addEventListener('keydown', (k) => {
+        if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); select(ev) }
+      })
+      // A dot is a date on a ring, and clicking it should show you the thing
+      // rather than scroll you to a line of text about it.
+      dot.addEventListener('click', () => select(events[Number(dot.dataset.i)]))
+    }
+    $('wheel').addEventListener('mouseleave', () => { tip.textContent = '' })
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* The feed                                                                  */
+  /* ------------------------------------------------------------------------ */
+
+  /* Drawn from the model's own numbers rather than picked from a set of icons.
+     A moon row shows the terminator the Moon will really have that night; an
+     eclipse row shows the two discs at the separation they will really reach.
+     The first draft of this page used one eclipse icon for all five kinds,
+     including a bite out of the Sun for lunar eclipses — which is not that
+     picture and is not even the same object. */
+  function glyph(e: SkyEvent): string {
+    const w = (inner: string) =>
+      `<svg viewBox="0 0 44 44" aria-hidden="true" class="glyph">${inner}</svg>`
+    const C = 22
+
+    if (e.kind === 'eclipse' && e.eclipse) {
+      const ec = e.eclipse
+      if (ec.kind === 'solar') {
+        const geo = solarGeom(ec, e.when)
+        const R = 13
+        const mr = R * geo.ratio
+        const dx = geo.sMin * R * 0.7
+        const dy = -geo.sMin * R * 0.7
+        const totality = ec.central && geo.ratio >= 1
+        return w(
+          (totality
+            ? `<circle cx="${C}" cy="${C}" r="${(mr * 1.5).toFixed(1)}" fill="url(#cor)"/>
+               <defs><radialGradient id="cor"><stop offset="0.55" stop-color="#fff6dd" stop-opacity="0"/><stop offset="0.68" stop-color="#fff2cf" stop-opacity="0.85"/><stop offset="1" stop-color="#cfe0ff" stop-opacity="0"/></radialGradient></defs>`
+            : `<circle cx="${C}" cy="${C}" r="${R + 3}" fill="#f2b23c" opacity="0.12"/>`) +
+          (totality ? '' : `<circle cx="${C}" cy="${C}" r="${R}" fill="#f5b942"/>`) +
+          `<circle cx="${(C + dx).toFixed(1)}" cy="${(C + dy).toFixed(1)}" r="${mr.toFixed(1)}" fill="#0a0e24"/>`,
+        )
+      }
+      /* The row shows what you would see, which is the Moon with a curved
+         bite of shadow across it — the shadow itself is invisible in empty
+         space. Scaling to fit the whole umbra in 44 units, as the hero does,
+         left the Moon a five-pixel speck, because the umbra is 2.7 Moon
+         widths across. So the Moon is drawn full size and the umbra is a
+         circle 2.7 times bigger, mostly outside the frame, clipped to it. */
+      const geo = lunarGeom(ec)
+      const Rm = 13
+      const k = Rm / geo.moon
+      const uR = geo.umbra * k
+      const off = geo.gamma * k
+      const id = `u${+e.when}`
+      const grey = ec.type === 'penumbral'
+      return w(
+        `<clipPath id="${id}"><circle cx="${C}" cy="${C}" r="${Rm}"/></clipPath>` +
+        `<circle cx="${C}" cy="${C}" r="${Rm}" fill="${grey ? '#c3c9e4' : '#e9edff'}"/>` +
+        `<circle cx="${C - 4}" cy="${C - 3}" r="3.2" fill="#a9b1cc" opacity="0.45"/>` +
+        `<circle cx="${C + 4}" cy="${C + 4}" r="4.2" fill="#a9b1cc" opacity="0.38"/>` +
+        (grey ? '' :
+          `<circle cx="${C}" cy="${(C - off).toFixed(1)}" r="${uR.toFixed(1)}" fill="#a8493a" clip-path="url(#${id})"/>`) +
+        `<circle cx="${C}" cy="${C}" r="${Rm}" fill="none" stroke="#8b96c9" stroke-width="1"/>`,
+      )
+    }
+
+    if (e.kind === 'phase') {
+      const ill = moonIllumination(e.when)
+      const R = 13
+      const ci = Math.cos((ill.phaseAngle * Math.PI) / 180)
+      const rx = Math.abs(ci) * R
+      const sweep = ci > 0 ? 1 : 0
+      const flip = ill.waxing ? '' : ` transform="translate(${C * 2} 0) scale(-1 1)"`
+      if (ill.fraction < 0.015)
+        return w(`<circle cx="${C}" cy="${C}" r="${R}" fill="#151b3c" stroke="#57649f" stroke-width="1.2" stroke-dasharray="2.6 2.8"/>`)
+      if (ill.fraction > 0.985)
+        return w(`<circle cx="${C}" cy="${C}" r="${R}" fill="#eef1ff"/><circle cx="${C - 4}" cy="${C - 3}" r="3.4" fill="#c3cbe6" opacity="0.5"/><circle cx="${C + 4}" cy="${C + 4}" r="4.4" fill="#c3cbe6" opacity="0.4"/>`)
+      return w(
+        `<circle cx="${C}" cy="${C}" r="${R}" fill="#151b3c"/>` +
+        `<g${flip}><path d="M${C} ${C - R} A${R} ${R} 0 0 1 ${C} ${C + R} A${rx.toFixed(2)} ${R} 0 0 ${sweep} ${C} ${C - R} Z" fill="#e9edff"/></g>` +
+        `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#57649f" stroke-width="0.9" opacity="0.7"/>`,
+      )
+    }
+
+    if (e.kind === 'season') {
+      // The Sun's height at noon is what a solstice and an equinox differ by,
+      // so that is what the mark shows: an arc, high or low or halfway.
+      const high = e.season === 'june'
+      const low = e.season === 'december'
+      const y = high ? 12 : low ? 30 : 21
+      return w(
+        `<path d="M4 34 H40" stroke="#3a4783" stroke-width="1.4"/>` +
+        `<path d="M6 34 Q22 ${(y - 12).toFixed(0)} 38 34" fill="none" stroke="#7fe0c0" stroke-width="1.3" stroke-dasharray="2.5 3" opacity="0.75"/>` +
+        `<circle cx="${C}" cy="${y}" r="6.5" fill="#ffd98a"/>` +
+        `<circle cx="${C}" cy="${y}" r="10" fill="#ffd98a" opacity="0.16"/>`,
+      )
+    }
+
+    if (e.kind === 'apsis') {
+      const near = e.apsis === 'perihelion'
+      return w(
+        `<ellipse cx="${C}" cy="${C}" rx="17" ry="9" fill="none" stroke="#4a5796" stroke-width="1.2"/>` +
+        `<circle cx="${(C + (near ? 3 : -3)).toFixed(0)}" cy="${C}" r="5" fill="#ffd98a"/>` +
+        `<circle cx="${near ? C + 12 : C - 15}" cy="${C + (near ? 3 : -3)}" r="3.2" fill="#7fb4ff"/>`,
+      )
+    }
+
+    // Meteors: as many streaks as the rate deserves, which is why the Geminids
+    // look busier than the Leonids.
+    const zhr = e.shower?.zhr ?? 20
+    const n = Math.max(2, Math.min(6, Math.round(Math.log2(zhr))))
+    let m = `<circle cx="33" cy="11" r="1.8" fill="#ffd6ee" opacity="0.9"/>`
+    for (let i = 0; i < n; i++) {
+      const t = i / Math.max(1, n - 1)
+      const len = 10 + t * 13
+      const x0 = 31 - t * 6, y0 = 13 + t * 3
+      m += `<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} L${(x0 - len).toFixed(1)} ${(y0 + len * 0.85).toFixed(1)}" stroke="#ff9fd0" stroke-width="${(1.9 - t * 0.9).toFixed(1)}" stroke-linecap="round" opacity="${(0.95 - t * 0.5).toFixed(2)}"/>`
+    }
+    return w(m)
+  }
 
   let filter = 'all'
+  const feed = $('feed')
+  const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December']
 
   function paintFeed() {
     const shown = events.filter((e) => filter === 'all' || e.kind === filter)
     /* The Moon alone is fifty rows a year, which buries everything else. Shown
        in full only when it is what you asked for. */
-    const list = filter === 'all' ? shown.filter((e) => e.rank >= 1).slice(0, 40) : shown.slice(0, 60)
-    feed.innerHTML = list.map((e) => {
+    const list = filter === 'all' ? shown.filter((e) => e.rank >= 1).slice(0, 44) : shown.slice(0, 64)
+
+    let out = ''
+    let month = ''
+    let i = 0
+    for (const e of list) {
+      const key = `${MONTHS_LONG[e.when.getUTCMonth()]} ${e.when.getUTCFullYear()}`
+      if (key !== month) {
+        if (month) out += '</ol></section>'
+        month = key
+        out += `<section class="mon"><h3 class="mon-h"><span>${key}</span></h3><ol class="mon-list">`
+      }
       const soon = +e.when - +new Date() < 7 * 86400_000
-      return `<li class="ev rank-${e.rank}${soon ? ' soon' : ''}">
-        ${glyph(e.kind, e.title)}
+      // The stagger is capped: a list of forty rows arriving one at a time is
+      // a wait, not an entrance.
+      const delay = Math.min(i, 14) * 26
+      out += `<li class="ev rank-${e.rank} k-${e.kind}${soon ? ' soon' : ''}${e === lead ? ' is-lead' : ''}" data-at="${+e.when}" style="--d:${delay}ms">
+        <div class="ev-glyph">${glyph(e)}</div>
         <div class="ev-body">
           <p class="ev-title">${e.title}</p>
-          <p class="ev-when">${formatWhen(e.when, e.timed)} · <span class="ev-count" data-at="${+e.when}">${countdown(new Date(), e.when)}</span></p>
+          <p class="ev-when">${formatWhen(e.when, e.timed)} <span class="dot">·</span> <span class="ev-count" data-at="${+e.when}">${countdown(new Date(), e.when)}</span></p>
           <p class="ev-detail">${e.detail}</p>
         </div>
+        <button type="button" class="ev-pick" data-i="${events.indexOf(e)}">Draw this one</button>
       </li>`
-    }).join('')
-    foot.textContent =
+      i++
+    }
+    if (month) out += '</ol></section>'
+    feed.innerHTML = out || '<p class="loading">Nothing of that kind in the next two years.</p>'
+
+    $('foot').textContent =
       `${shown.length} events between now and ${HORIZON.getUTCFullYear()}, all of them computed here, in this tab.`
+
+    /* One listener rather than forty-four. The button is a real button and not
+       a click handler on the row, because the row is the only thing on the
+       page a keyboard could not otherwise reach. */
+    for (const b of feed.querySelectorAll<HTMLButtonElement>('.ev-pick'))
+      b.addEventListener('click', () => select(events[Number(b.dataset.i)]))
   }
 
   for (const btn of document.querySelectorAll<HTMLButtonElement>('.filter')) {
@@ -218,36 +1528,26 @@ import GameLayout from '../layouts/GameLayout.astro'
     })
   }
 
-  paintHeadline()
+  paintHero()
+  paintMoon()
+  paintWheel()
   paintFeed()
 
-  /* The countdowns are the only live thing. Once a minute is enough — they are
-     never quoted finer than that, so a rAF loop would be a lot of work to
-     rewrite the same string sixty times a second. */
+  /* The countdowns and the Moon are the only live things. Once a minute is
+     enough — nothing here is quoted finer than that, so a rAF loop would be a
+     lot of work to rewrite the same string sixty times a second. */
   setInterval(() => {
     const t = new Date()
     const hl = document.getElementById('hlCount')
     if (hl && lead) hl.textContent = countdown(t, lead.when)
     for (const el of document.querySelectorAll<HTMLElement>('.ev-count'))
       el.textContent = countdown(t, new Date(Number(el.dataset.at)))
-  }, 30_000)
+    paintMoon()
+  }, 60_000)
 
-  /* ---- the sky it sits on ----------------------------------------------- */
-
-  /* Static stars, drawn once. A twinkle would be motion for its own sake on a
-     page that is mostly text, and this is the kind of page people read. */
-  {
-    const rnd = (s: number) => { const x = Math.sin(s * 9301 + 49297) * 233280; return x - Math.floor(x) }
-    let s = ''
-    for (let i = 0; i < 160; i++) {
-      const r = 0.4 + rnd(i * 3) * 1.5
-      s += `<circle cx="${(rnd(i) * 100).toFixed(2)}%" cy="${(rnd(i * 7 + 1) * 100).toFixed(2)}%" r="${r.toFixed(2)}" fill="#dfe6ff" opacity="${(0.18 + rnd(i * 11) * 0.55).toFixed(2)}"/>`
-    }
-    starsHost.innerHTML = `<svg width="100%" height="100%" aria-hidden="true">${s}</svg>`
-    if (!prefersReducedMotion) starsHost.classList.add('drift')
-  }
-
-  /* ---- the record ------------------------------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /* The record                                                                */
+  /* ------------------------------------------------------------------------ */
 
   recordPlay('universe-forecast')
 
@@ -291,94 +1591,330 @@ import GameLayout from '../layouts/GameLayout.astro'
 
 <!-- is:global, and every rule namespaced under .sky-body.
 
-     The headline and the whole feed are built with innerHTML at runtime, and
-     nodes created that way never receive Astro's scoping attribute — a scoped
-     .ev rule matches nothing, which left every row 781px tall with its glyph
-     rendering at natural size. The namespace is what keeps going global from
-     also meaning going loose: .wrap, .head and .ev are common enough names to
-     collide with the layout's own global rules otherwise. -->
+     The hero, the panels and the whole feed are built with innerHTML at
+     runtime, and nodes created that way never receive Astro's scoping
+     attribute — a scoped .ev rule matches nothing, which left every row 781px
+     tall with its glyph rendering at natural size. The namespace is what keeps
+     going global from also meaning going loose: .wrap, .head and .ev are
+     common enough names to collide with the layout's own global rules. -->
 <style is:global>
-  .sky-body { background: #070b1e; color: #e9edff; }
+  .sky-body {
+    background: #05081c;
+    color: #e9edff;
+    --sky-ink: #e9edff;
+    --dim: #a3b1e4;
+    --faint: #7f8dc6;
+    --gold: #ffd98a;
+    --line: rgba(126, 146, 226, 0.22);
+    --panel: rgba(14, 20, 48, 0.72);
+  }
 
-  .sky-body .stars {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  /* --- the sky ----------------------------------------------------------- */
+
+  .sky-body .sky {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
     background:
-      radial-gradient(ellipse 120% 80% at 50% -10%, #1b2450 0%, transparent 62%),
-      radial-gradient(ellipse 90% 60% at 85% 105%, #17324a 0%, transparent 60%);
+      radial-gradient(ellipse 120% 78% at 50% -12%, #16204c 0%, transparent 62%),
+      radial-gradient(ellipse 80% 55% at 88% 108%, #123049 0%, transparent 60%),
+      radial-gradient(ellipse 60% 44% at 8% 72%, #241a48 0%, transparent 62%);
   }
-  .sky-body .stars.drift svg { animation: sky-drift 240s linear infinite alternate; }
-  @keyframes sky-drift { to { transform: translate3d(-2%, 1.5%, 0) scale(1.06); } }
-
-  .sky-body .wrap { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 44px 20px 100px; }
-
-  .sky-body .head { text-align: center; margin-bottom: 30px; }
-  .sky-body .head h1 { font-size: clamp(34px, 7vw, 58px); }
-  .sky-body .lede { color: #a8b6e8; margin: 12px auto 0; max-width: 50ch; text-wrap: pretty; }
-
-  /* --- the headline ------------------------------------------------------ */
-
-  .sky-body .headline {
-    background: linear-gradient(168deg, #141d47, #0d1330);
-    border: 1px solid #2b3873; border-radius: var(--radius-lg);
-    padding: 26px 24px 24px; text-align: center;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  .sky-body .star-layer {
+    position: absolute; top: 0; left: 0;
+    will-change: transform;
   }
+  /* A vignette does the job a lens does: it holds the eye in the middle of a
+     dark page instead of letting it slide off the corners. */
+  .sky-body .vignette {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse 80% 70% at 50% 42%, transparent 40%, rgba(2, 4, 14, 0.72) 100%);
+  }
+
+  .sky-body .wrap {
+    position: relative; z-index: 1;
+    max-width: 860px; margin: 0 auto; padding: 40px 20px 110px;
+  }
+
+  /* --- the masthead ------------------------------------------------------ */
+
+  .sky-body .head { text-align: center; margin-bottom: 32px; }
+  .sky-body .eyebrow {
+    margin: 0 0 10px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #6f7fc4;
+  }
+  .sky-body .head h1 {
+    font-size: clamp(38px, 8.4vw, 74px);
+    line-height: 0.96;
+    letter-spacing: -0.02em;
+    background: linear-gradient(178deg, #ffffff 8%, #c8d5ff 52%, #8fa2e8 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    /* The glow sits behind the type rather than on it, so the letterforms keep
+       their edges. */
+    filter: drop-shadow(0 0 34px rgba(120, 150, 255, 0.3));
+  }
+  .sky-body .lede {
+    color: var(--dim); margin: 14px auto 0; max-width: 52ch;
+    font-size: 15.5px; line-height: 1.6; text-wrap: pretty;
+  }
+
+  /* --- the hero ---------------------------------------------------------- */
+
+  .sky-body .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 0;
+    background: linear-gradient(168deg, rgba(20, 29, 71, 0.9), rgba(9, 13, 38, 0.92));
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(180, 200, 255, 0.08);
+  }
+  .sky-body .hero-stage { position: relative; min-height: 300px; background: #05081c; }
+  .sky-body .stage-canvas { display: block; width: 100%; height: 100%; min-height: 300px; }
+  .sky-body .stage-caption {
+    position: absolute; left: 0; right: 0; bottom: 0; margin: 0;
+    padding: 22px 14px 9px;
+    font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(190, 205, 250, 0.62); text-align: center;
+    background: linear-gradient(to top, rgba(3, 5, 16, 0.85), transparent);
+  }
+  .sky-body .hero-text { padding: 26px 26px 28px; align-self: center; }
   .sky-body .loading { color: #8593c9; margin: 0; }
   .sky-body .hl-kicker {
-    margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em;
+    margin: 0; font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
     text-transform: uppercase; color: #7f8fd0;
   }
-  .sky-body .hl-title { font-size: clamp(26px, 5.4vw, 40px); margin: 10px 0 0; }
-  .sky-body .hl-when { margin: 8px 0 0; color: #b9c6f5; font-variant-numeric: tabular-nums; }
-  .sky-body .hl-count {
-    margin: 14px 0 0; font-size: 19px; font-weight: 700; color: #ffd98a;
-    font-variant-numeric: tabular-nums;
+  .sky-body .hl-title {
+    font-size: clamp(24px, 3.6vw, 34px); margin: 9px 0 0; line-height: 1.08;
+    letter-spacing: -0.015em;
   }
-  .sky-body .hl-detail { margin: 14px auto 0; max-width: 48ch; color: #a3b1e4; font-size: 15px; text-wrap: pretty; }
+  .sky-body .hl-when { margin: 9px 0 0; color: #b9c6f5; font-variant-numeric: tabular-nums; font-size: 14.5px; }
+  .sky-body .hl-count {
+    margin: 12px 0 0; font-size: 22px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(96deg, #ffd98a, #ffb27f 60%, #ff9fd0);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sky-body .hl-detail { margin: 12px 0 0; color: var(--dim); font-size: 14px; line-height: 1.6; text-wrap: pretty; }
+  .sky-body .hl-facts {
+    list-style: none; margin: 16px 0 0; padding: 14px 0 0; display: grid; gap: 7px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px; color: #93a1d8; line-height: 1.45;
+  }
+  .sky-body .hl-facts b {
+    color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 700;
+  }
+
+  /* --- the two panels ---------------------------------------------------- */
+
+  .sky-body .panels {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 14px; margin: 14px 0 0;
+  }
+  .sky-body .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 18px 18px 20px;
+    backdrop-filter: blur(2px);
+  }
+  .sky-body .panel-h {
+    margin: 0 0 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.17em;
+    text-transform: uppercase; color: #7f8fd0;
+  }
+
+  .sky-body .moon-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .sky-body .moon-art { flex: none; line-height: 0; }
+  .sky-body .moon-facts { margin: 0; flex: 1 1 150px; min-width: 0; display: grid; gap: 5px; }
+  .sky-body .mf {
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+    border-bottom: 1px dashed rgba(126, 146, 226, 0.16); padding-bottom: 4px;
+  }
+  .sky-body .mf:last-child { border-bottom: 0; }
+  .sky-body .mf dt { font-size: 11.5px; color: var(--faint); letter-spacing: 0.03em; }
+  .sky-body .mf dd {
+    margin: 0; font-size: 13px; font-weight: 650; color: #dbe3ff;
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+
+  .sky-body .wheel-wrap { position: relative; }
+  .sky-body .wheel { line-height: 0; }
+  .sky-body .wheel svg { width: 100%; height: auto; max-width: 300px; margin: 0 auto; display: block; }
+  .sky-body .wheel .wm {
+    font-size: 8.5px; fill: #7c8ac2; letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: inherit;
+  }
+  .sky-body .wheel .wnow {
+    font-size: 9px; fill: #9aa8dd; letter-spacing: 0.14em; text-transform: uppercase;
+    font-family: inherit;
+  }
+  /* The dots are 4-8px because they are a scatter plot, and a scatter plot of
+     fifty events cannot have 24px marks. They carry a transparent stroke
+     instead, which widens the hit area to about 20px without changing the
+     drawing — and every one of them has a full-size button on the same page,
+     in the row it belongs to. */
+  .sky-body .wheel .wd { cursor: pointer; }
+  .sky-body .wheel .wd-dot { transition: r 120ms var(--ease); }
+  .sky-body .wheel .wd:hover .wd-dot, .sky-body .wheel .wd:focus-visible .wd-dot { r: 5.5; }
+  .sky-body .wheel .wd:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .sky-body .wheel-tip {
+    margin: 4px 0 0; min-height: 2.6em; font-size: 12px; color: #a8b4e0; text-align: center;
+    line-height: 1.3;
+  }
+  .sky-body .legend {
+    list-style: none; margin: 8px 0 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 4px 13px; justify-content: center;
+    font-size: 11px; color: var(--faint);
+  }
+  .sky-body .legend li { display: flex; align-items: center; gap: 5px; }
+  .sky-body .legend i { width: 7px; height: 7px; border-radius: 50%; display: block; }
 
   /* --- filters ----------------------------------------------------------- */
 
-  .sky-body .controls { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin: 22px 0 14px; }
-  .sky-body .filter {
-    border: 1px solid #33407c; background: #131b3f; color: #b6c3f0;
-    border-radius: 999px; padding: 7px 15px; font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: background 140ms var(--ease), color 140ms var(--ease),
-      border-color 140ms var(--ease);
+  /* The chrome bar is fixed and 48px tall, so a bar stuck at the top of the
+     viewport is a bar stuck behind it. Both sticky layers clear it, and the
+     month headers clear the filters in turn. */
+  .sky-body .controls {
+    display: flex; flex-wrap: wrap; gap: 7px; justify-content: center;
+    margin: 28px -20px 6px; padding: 10px 20px 12px;
+    position: sticky; top: 48px; z-index: 4;
+    background: linear-gradient(180deg, rgba(5, 8, 28, 0.94) 55%, rgba(5, 8, 28, 0));
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
-  .sky-body .filter:hover { background: #1b2554; color: #e9edff; }
-  .sky-body .filter.is-on { background: #dfe6ff; border-color: #dfe6ff; color: #0d1330; }
+  .sky-body .filter {
+    border: 1px solid #33407c; background: rgba(16, 22, 54, 0.86); color: #b6c3f0;
+    border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; backdrop-filter: blur(6px);
+    transition: background 140ms var(--ease), color 140ms var(--ease),
+      border-color 140ms var(--ease), transform 140ms var(--ease);
+  }
+  .sky-body .filter:hover { background: #1b2554; color: var(--sky-ink); transform: translateY(-1px); }
+  .sky-body .filter.is-on {
+    background: linear-gradient(180deg, #eef2ff, #c9d6ff);
+    border-color: #dfe6ff; color: #0d1330;
+    box-shadow: 0 6px 18px rgba(160, 190, 255, 0.2);
+  }
 
   /* --- the feed ---------------------------------------------------------- */
 
-  .sky-body .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .sky-body .feed { display: grid; gap: 4px; }
+  .sky-body .mon-h {
+    position: sticky; top: 104px; z-index: 2;
+    margin: 16px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #8b99d4;
+    display: flex; align-items: center; gap: 12px;
+    /* The whole bar needs the backdrop, not just the label: with only the span
+       painted, rows slid through the gap between the text and the rule. */
+    padding: 7px 0 8px;
+    background: linear-gradient(180deg, rgba(5, 8, 28, 0.95) 60%, rgba(5, 8, 28, 0.82));
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+  }
+  .sky-body .mon-h::after {
+    content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent);
+  }
+  .sky-body .mon:first-child .mon-h { margin-top: 4px; }
+  .sky-body .mon-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+
   .sky-body .ev {
     display: flex; gap: 14px; align-items: flex-start;
-    background: rgba(19, 26, 60, 0.72);
-    border: 1px solid #232f63; border-left: 3px solid #2b3873;
-    border-radius: 13px; padding: 13px 15px;
+    background: linear-gradient(150deg, rgba(21, 28, 64, 0.78), rgba(13, 18, 45, 0.72));
+    border: 1px solid rgba(35, 47, 99, 0.9);
+    border-radius: 15px; padding: 13px 16px 14px;
+    position: relative; overflow: hidden;
+    transition: transform 160ms var(--ease), border-color 160ms var(--ease),
+      box-shadow 160ms var(--ease);
+    animation: ev-in 380ms var(--ease) both;
+    animation-delay: var(--d, 0ms);
+  }
+  @keyframes ev-in { from { opacity: 0; transform: translateY(8px); } }
+  /* The rail is the row's own colour, so the list is scannable by kind
+     without a legend beside every line. */
+  .sky-body .ev::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, var(--rail, #2b3873), transparent 140%);
+  }
+  .sky-body .ev.k-eclipse { --rail: #ffd98a; }
+  .sky-body .ev.k-phase { --rail: #aebeff; }
+  .sky-body .ev.k-season { --rail: #7fe0c0; }
+  .sky-body .ev.k-shower { --rail: #ff9fd0; }
+  .sky-body .ev.k-apsis { --rail: #ffb27f; }
+  .sky-body .ev:hover {
+    transform: translateY(-2px);
+    border-color: rgba(96, 118, 200, 0.7);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.36);
   }
   /* Weighted by how much of a fuss the thing actually is, so a total eclipse
      does not sit in the same typography as a first quarter. */
-  .sky-body .ev.rank-2 { border-left-color: #6d7fd8; }
-  .sky-body .ev.rank-3 { border-left-color: #ffd98a; background: rgba(30, 32, 66, 0.85); }
-  .sky-body .ev.rank-3 .ev-title { color: #ffe9b8; font-size: 17px; }
-  .sky-body .ev.soon { box-shadow: inset 0 0 0 1px rgba(255, 217, 138, 0.25); }
+  .sky-body .ev.rank-3 {
+    background: linear-gradient(150deg, rgba(44, 40, 78, 0.9), rgba(19, 20, 51, 0.85));
+    border-color: rgba(255, 217, 138, 0.32);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.38), inset 0 0 34px rgba(255, 200, 110, 0.05);
+  }
+  .sky-body .ev.rank-3 .ev-title { color: #ffe9b8; font-size: 17.5px; }
+  .sky-body .ev.soon::after {
+    content: 'soon'; position: absolute; top: 11px; right: 13px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #0d1330; background: var(--gold); padding: 2px 7px; border-radius: 999px;
+  }
+  /* The row whose picture is on the stage. */
+  .sky-body .ev.is-lead {
+    border-color: rgba(255, 217, 138, 0.55);
+    box-shadow: 0 0 0 1px rgba(255, 217, 138, 0.3), 0 12px 34px rgba(0, 0, 0, 0.4);
+  }
+  .sky-body .ev.is-lead::before { background: var(--gold); }
 
-  .sky-body .glyph { width: 36px; height: 36px; flex: none; margin-top: 1px; }
-  .sky-body .ev-body { min-width: 0; }
-  .sky-body .ev-title { margin: 0; font-weight: 700; font-size: 15.5px; }
+  /* "Draw this one" is a small real button rather than a click handler
+     stretched over the whole row. A row-sized invisible button would have
+     swallowed text selection on a page that is mostly there to be read, and it
+     is always visible rather than hover-only, because a control that appears
+     on hover does not exist on a phone. */
+  .sky-body .ev-pick {
+    position: absolute; right: 11px; bottom: 10px;
+    border: 1px solid transparent; background: transparent; cursor: pointer;
+    font: inherit; font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    /* #64719f measured 3.8:1 on the row's own gradient, under the 4.5 that
+       10.5px text needs. */
+    color: #8b98cb;
+    padding: 7px 10px; border-radius: 999px; min-height: 24px;
+    transition: color 150ms var(--ease), background 150ms var(--ease),
+      border-color 150ms var(--ease);
+  }
+  .sky-body .ev-pick:hover, .sky-body .ev-pick:focus-visible {
+    color: #0d1330; background: var(--gold); border-color: var(--gold);
+  }
+  .sky-body .ev-pick:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .sky-body .ev.is-lead .ev-pick { visibility: hidden; }
+  /* Room for it, so it never lands on the last line of the blurb. */
+  .sky-body .ev-body { padding-bottom: 18px; }
+  .sky-body .feed-hint {
+    margin: 0 0 4px; font-size: 12px; color: var(--faint); text-align: center;
+  }
+
+  .sky-body .hl-back {
+    margin: 16px 0 0; border: 1px solid var(--line); background: rgba(20, 28, 66, 0.7);
+    color: #b6c3f0; border-radius: 999px; padding: 8px 15px; font-size: 12.5px;
+    font-weight: 600; cursor: pointer;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .sky-body .hl-back:hover { background: #1f2a5e; color: var(--sky-ink); }
+
+  .sky-body .ev-glyph { flex: none; line-height: 0; }
+  .sky-body .glyph { width: 40px; height: 40px; display: block; }
+  .sky-body .ev-body { min-width: 0; flex: 1; }
+  .sky-body .ev-title { margin: 0; font-weight: 700; font-size: 15.5px; letter-spacing: -0.005em; }
   .sky-body .ev-when {
     margin: 3px 0 0; font-size: 12.5px; color: #98a6dd;
     font-variant-numeric: tabular-nums;
   }
-  .sky-body .ev-count { color: #d6b877; }
-  .sky-body .ev-detail { margin: 6px 0 0; font-size: 13.5px; color: #a8b4e0; line-height: 1.5; text-wrap: pretty; }
+  .sky-body .ev-when .dot { opacity: 0.45; }
+  .sky-body .ev-count { color: #e0c17d; font-weight: 600; }
+  .sky-body .ev-detail { margin: 7px 0 0; font-size: 13.5px; color: #a8b4e0; line-height: 1.55; text-wrap: pretty; }
 
-  .sky-body .foot { margin: 22px 0 0; text-align: center; font-size: 13px; color: #7f8dc6; }
+  .sky-body .foot { margin: 26px 0 0; text-align: center; font-size: 13px; color: var(--faint); }
 
   /* --- the explanation --------------------------------------------------- */
 
-  .sky-body .how { margin: 30px 0 0; border-top: 1px solid #232f63; padding-top: 16px; }
+  .sky-body .how { margin: 30px 0 0; border-top: 1px solid var(--line); padding-top: 14px; }
   .sky-body .how summary {
     cursor: pointer; font-weight: 600; font-size: 14px; color: #b6c3f0; list-style: none;
     /* A 22px line box is under the 24px minimum, and this is the only control
@@ -390,11 +1926,31 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .how summary::-webkit-details-marker { display: none; }
   .sky-body .how summary::before { content: '\25B8  '; color: #6d7fd8; }
   .sky-body .how[open] summary::before { content: '\25BE  '; }
-  .sky-body .how-body p { color: #99a7dc; font-size: 14px; line-height: 1.65; max-width: 62ch; text-wrap: pretty; }
+  .sky-body .how-body p { color: #99a7dc; font-size: 14px; line-height: 1.65; max-width: 64ch; text-wrap: pretty; }
   .sky-body .how-caveat { border-left: 2px solid #33407c; padding-left: 12px; }
 
+  /* --- narrow ------------------------------------------------------------ */
+
+  @media (max-width: 760px) {
+    .sky-body .hero { grid-template-columns: 1fr; }
+    .sky-body .hero-stage { min-height: 250px; }
+    .sky-body .stage-canvas { min-height: 250px; }
+    .sky-body .panels { grid-template-columns: 1fr; }
+  }
   @media (max-width: 480px) {
-    .sky-body .glyph { width: 28px; height: 28px; }
+    .sky-body .wrap { padding: 30px 14px 90px; }
+    /* Match the wrap padding, so the sticky bar reaches the viewport edge
+       exactly instead of six pixels past it. */
+    .sky-body .controls { margin-inline: -14px; padding-inline: 14px; }
+    .sky-body .hero-text { padding: 20px 18px 22px; }
+    .sky-body .panel { padding: 15px 14px 17px; }
+    .sky-body .glyph { width: 32px; height: 32px; }
     .sky-body .ev { gap: 11px; padding: 12px 13px; }
+    .sky-body .moon-row { justify-content: center; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sky-body .ev { animation: none; }
+    .sky-body .ev.flash { animation: none; outline: 2px solid var(--gold); }
   }
 </style>
