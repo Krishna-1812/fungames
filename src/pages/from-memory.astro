@@ -20,8 +20,9 @@ import GameLayout from '../layouts/GameLayout.astro'
 <GameLayout slug="from-memory" bar="#3b1338" bodyClass="mem-body">
   <div class="wrap">
     <header class="head">
+      <p class="edition">THE EVERYDAY SKETCHBOOK · NO. 01</p>
       <h1>From Memory</h1>
-      <p class="lede">No looking. Draw it, then find out what it actually looks like.</p>
+      <p class="lede">You see these things every day. How much stayed in your head?</p>
     </header>
 
     <div class="dots" id="dots" aria-hidden="true"></div>
@@ -29,6 +30,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     <section class="card" id="card">
       <div class="tag"><span id="tag">1 of 10</span></div>
       <h2 id="prompt">—</h2>
+      <p class="drawing-hint">Draw without looking. Beautifully wrong is welcome.</p>
 
       <div class="pad">
         <div class="sheet" id="sheet" aria-hidden="true"></div>
@@ -37,6 +39,16 @@ import GameLayout from '../layouts/GameLayout.astro'
           class="ref" id="ref" viewBox="0 0 200 140" aria-hidden="true" hidden
         ></svg>
       </div>
+
+      <div class="comparison" id="comparison" hidden>
+        <figure><figcaption>What you remembered</figcaption><img id="attemptImage" alt="Your drawing" /></figure>
+        <figure><figcaption>The reference</figcaption><svg id="comparisonRef" viewBox="0 0 200 140" role="img" aria-label="Reference drawing"></svg></figure>
+      </div>
+      <div class="result-tools" id="resultTools" hidden>
+        <button type="button" id="compareBtn" aria-pressed="false">Side by side</button>
+        <button type="button" id="postcardBtn">Download postcard</button>
+      </div>
+      <p id="exportStatus" role="status"></p>
 
       <div class="tools">
         <button type="button" id="undoBtn" class="ghost">Undo</button>
@@ -67,6 +79,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { PAPER_FRAG } from '../lib/memo-paper'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
+  import { memoryPostcard } from '../lib/memo-postcard'
+  import { download } from '../lib/share-card'
 
   /* Ten of the sixteen, freshly drawn each visit, with the bicycle always
      first. A pool bigger than the sitting is the difference between a thing you
@@ -86,6 +100,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   let strokes = []
   let drawing = null
   let revealed = false
+  let activePointer: number | null = null
   const saved = []       // data URLs, one per item
 
   const ink = new InkSurface(pad)
@@ -140,7 +155,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   pad.addEventListener('pointerdown', (e) => {
-    if (revealed) return
+    if (revealed || activePointer !== null || !e.isPrimary || e.button !== 0) return
+    activePointer = e.pointerId
     try { pad.setPointerCapture(e.pointerId) } catch {}
     unlock(); sfx.tick()
     const q = pos(e)
@@ -156,7 +172,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   })
 
   pad.addEventListener('pointermove', (e) => {
-    if (!drawing) return
+    if (!drawing || e.pointerId !== activePointer) return
     /* Coalesced events are the samples the browser collected since the last
        frame and would otherwise throw away. A pen reports far faster than the
        display refreshes, and taking only the delivered event throws most of a
@@ -172,6 +188,7 @@ import GameLayout from '../layouts/GameLayout.astro'
      meant that drawing off the edge of the paper and back cut the stroke in
      two, which is not what happens with a pen. */
   const end = () => {
+    activePointer = null
     if (!drawing) return
     drawing = null
     nib.end()
@@ -179,11 +196,11 @@ import GameLayout from '../layouts/GameLayout.astro'
     ink.commit()
     ink.blit()
   }
-  pad.addEventListener('pointerup', end)
-  pad.addEventListener('pointercancel', end)
+  pad.addEventListener('pointerup', e => { if (e.pointerId === activePointer) end() })
+  pad.addEventListener('pointercancel', e => { if (e.pointerId === activePointer) end() })
 
-  el('undoBtn').addEventListener('click', () => { strokes.pop(); rebuild() })
-  el('clearBtn').addEventListener('click', () => { strokes = []; rebuild() })
+  el('undoBtn').addEventListener('click', () => { end(); strokes.pop(); rebuild() })
+  el('clearBtn').addEventListener('click', () => { end(); strokes = []; rebuild() })
 
   function render() {
     const it = ROUND[i]
@@ -193,6 +210,12 @@ import GameLayout from '../layouts/GameLayout.astro'
     drawing = null
     nib = null
     revealed = false
+    el('comparison').hidden = true
+    el('resultTools').hidden = true
+    el('compareBtn').setAttribute('aria-pressed', 'false')
+    el('compareBtn').textContent = 'Side by side'
+    el('exportStatus').textContent = ''
+    pad.parentElement.hidden = false
     ink.resize()
     rebuild()
     reveal.stop()
@@ -218,6 +241,11 @@ import GameLayout from '../layouts/GameLayout.astro'
     // Rendered from the stroke list rather than grabbed off the pad, so the
     // gallery is sharp whatever size the pad happened to be.
     saved[i] = renderStrokes(strokes, 300).toDataURL('image/png')
+    el('attemptImage').src = saved[i]
+    el('attemptImage').alt = `Your drawing: ${it.prompt}`
+    el('comparisonRef').innerHTML = it.svg
+    el('comparisonRef').setAttribute('aria-label', `Reference: ${it.prompt}`)
+    el('resultTools').hidden = false
     ref.hidden = false
     reveal.play(it.svg, prefersReducedMotion)
     el('fact').textContent = it.fact
@@ -234,6 +262,29 @@ import GameLayout from '../layouts/GameLayout.astro'
     i++
     if (i < ROUND.length) return render()
     showGallery()
+  })
+
+  el('compareBtn').addEventListener('click', () => {
+    const sideBySide = el('comparison').hidden
+    el('comparison').hidden = !sideBySide
+    pad.parentElement.hidden = sideBySide
+    el('compareBtn').setAttribute('aria-pressed', String(sideBySide))
+    el('compareBtn').textContent = sideBySide ? 'Overlay drawings' : 'Side by side'
+  })
+  el('postcardBtn').addEventListener('click', async () => {
+    const button = el('postcardBtn') as HTMLButtonElement
+    const roundIndex = i
+    const it = ROUND[i]
+    const snapshot = strokes.map(stroke => stroke.map(point => ({ ...point })))
+    button.disabled = true
+    el('exportStatus').textContent = 'Preparing your postcard…'
+    try {
+      const blob = await memoryPostcard(snapshot, it.svg, it.prompt)
+      download(blob, 'from-memory-postcard.png')
+      if (i === roundIndex) el('exportStatus').textContent = 'Postcard ready. Check your downloads.'
+    } catch {
+      if (i === roundIndex) el('exportStatus').textContent = 'The postcard could not be created. Try again.'
+    } finally { button.disabled = false }
   })
 
   function showGallery() {
@@ -291,7 +342,22 @@ import GameLayout from '../layouts/GameLayout.astro'
 </script>
 
 <style>
-  :global(.mem-body) { background: #fdf3f8; }
+  .edition { font-size: 10px; letter-spacing: .2em; color: #84644e; margin-bottom: 14px; }
+  .drawing-hint { color: #806957; font-size: 13px; margin: -5px 0 18px; }
+  .head h1 { font-family: Georgia, serif; font-weight: 500; letter-spacing: -.05em; }
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .comparison[hidden], .result-tools[hidden], .pad[hidden] { display: none; }
+  .comparison figure { margin: 0; min-width: 0; }
+  .comparison figcaption { font-size: 12px; color: #806957; margin-bottom: 12px; }
+  .comparison img, .comparison svg { display: block; width: 100%; aspect-ratio: 200/140; background: #fffcf7; border: 1px solid #e6dacc; border-radius: 8px; }
+  .comparison svg { fill: none; stroke: #c9346f; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: #c9346f; }
+  .result-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .result-tools button { border: 1px solid #c7b3a2; background: #fffcf7; color: #45332c; padding: 11px 16px; border-radius: 8px; cursor: pointer; }
+  .result-tools button[aria-pressed='true'] { background: #eee1d0; }
+  #exportStatus { font-size: 12px; color: #775f51; }
+  #exportStatus:empty { display: none; }
+  @media (max-width: 480px) { .comparison { grid-template-columns: 1fr; } }
+  :global(.mem-body) { background: #f6f0e5; }
 
   .wrap { max-width: 700px; margin: 0 auto; padding: 44px 22px 80px; }
   .head { text-align: center; margin-bottom: 22px; }
@@ -303,7 +369,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .dots :global(.dot.done) { background: #e0629b; }
 
   .card {
-    background: #fff; border: 1px solid #f2d9e6; border-radius: var(--radius-lg);
+    background: #fffcf7; border: 1px solid #e6dacc; border-radius: 8px 20px 20px 8px;
     padding: 22px 20px 20px; box-shadow: var(--shadow);
   }
   .tag { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #b8497d; font-weight: 600; }

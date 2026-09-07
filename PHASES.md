@@ -128,6 +128,19 @@ Do not treat this batch as release-ready until those checks are completed.
 From Memory: sketchbook, reference comparison and a downloadable postcard.
 Auction: coherent lot artwork, bidder presentation and a shareable result.
 
+From Memory's first presentation batch adds a warm sketchbook layout, a
+side-by-side comparison (stacked on narrow phones), and a 1200×800 PNG postcard
+containing the actual drawing and reference. It reuses the shared download
+helper. Export snapshots the strokes before asynchronous work. Pointer input
+now keeps one active pointer; undo and clear finish any active stroke first.
+Browser QA covered a drawn mark, reveal, comparison, PNG creation and moving
+to the next prompt at desktop and 390px widths. Astro compilation returned no
+diagnostics. Full regression results are recorded in the delivery notes.
+
+Orbit follow-up: the running development site now shows the mission readout;
+the flight-log dialog opens, restores focus on close and resumes a previously
+running sky. This does not replace real-device or built-site release testing.
+
 ## Phase 4 — remaining collection
 
 Start with Powder world preservation across resizing; then apply the same
