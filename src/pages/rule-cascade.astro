@@ -353,6 +353,14 @@ import GameLayout from '../layouts/GameLayout.astro'
     border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
     position: sticky; top: 58px; z-index: 20;
   }
+  /* The field follows you down the page while there is still typing to do.
+     Once the form is finally accepted it has to stop, because the win panel
+     opens below it and a box pinned 58px from the top of a page you have
+     scrolled to the end of sits directly over "Fine. That is a username." --
+     the one sentence the whole game is for. It was hidden behind the input on
+     every completed run. Hung off the panel's own hidden attribute rather than
+     a second class, so the two states cannot drift apart. */
+  .stage:has(.win:not([hidden])) .field { position: static; }
   textarea {
     width: 100%; border: 0; outline: 0; resize: none; display: block;
     padding: 16px; font-size: 22px; font-family: var(--mono);

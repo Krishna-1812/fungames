@@ -138,6 +138,34 @@ function solve(hour, banned, count = RULES.length) {
 
 /* -------------------------------------------------------------------------- */
 
+/* The solver, asked for one concrete answer instead of a verdict.
+ *
+ * Proving a solution exists for every hour and every sacrifice is not the same
+ * as anyone having seen the ending. This flag hands over an actual username, so
+ * the last screen can be reached and looked at:
+ *
+ *   node scripts/check-cascade.mjs --answer [hour] [sacrificed letter]
+ *
+ * The hour and the letter come from the running game, which picks the letter
+ * itself. There is no single final answer, because rule 23 asks for the number
+ * of rules on screen and satisfying it puts another one there: the game is a
+ * ladder from 23 up to 30, and this prints every rung.
+ */
+if (process.argv.includes('--answer')) {
+  const rest = process.argv.slice(process.argv.indexOf('--answer') + 1)
+  const hour = rest[0] === undefined ? new Date().getHours() : Number(rest[0])
+  const banned = rest[1] && rest[1] !== '-' ? rest[1] : null
+  for (let n = 23; n <= RULES.length; n++) {
+    const answer = solve(hour, banned, n)
+    if (!answer) {
+      console.error(`no solution at ${n} rules, hour ${hour}, ${banned ?? 'nothing'} taken`)
+      process.exit(1)
+    }
+    console.log(`${n}\t${answer}`)
+  }
+  process.exit(0)
+}
+
 let failures = 0
 const report = (label, ok, extra = '') => {
   if (!ok) failures++
