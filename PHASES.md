@@ -143,6 +143,20 @@ running sky. This does not replace real-device or built-site release testing.
 
 ## Phase 4 — remaining collection
 
+### Auction bidder presentation and release-check follow-up
+
+Added five distinct decorative bidder portraits, collapsible descriptions of
+bidding styles, and visible reactions for watching, leading, insufficient
+funds and winning. A live status near the bid button identifies the current
+leader. Budget bars now use each bidder's own initial funds as their baseline.
+
+All 23 automated suites passed in the complete aggregate run. Desktop browser
+checks covered the portraits, opening state, bidding and player-leading
+announcement, and the first lot's winner. The production build still fails
+inside existing aria-query/axobject-query dependency resolution with Windows
+`Cannot read directory "..": Access is denied`. This is not a successful
+release build. Development preview was restored after the failed build.
+
 Start with Powder world preservation across resizing; then apply the same
 state, interaction, accessibility and art checks to the remaining games.
 Unity stays an optional later prototype, not a replacement for the Astro site.
