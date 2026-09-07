@@ -113,6 +113,100 @@ body.is-fixed {
 }
 .skip:focus { top: 8px; }
 
+/* ---------------------------------------------------------------------------
+   Scrollbars.
+
+   The Windows default is seventeen pixels of grey chrome with a stepper arrow
+   at each end, and it turns up in a dozen places here — the powder tray, the
+   fusion recipe list, the auction bid log — always immediately beside
+   something that was drawn with care. So it is designed once, here.
+
+   Two engines, two mechanisms, and they fight: Chromium ignores
+   ::-webkit-scrollbar entirely on any element that also sets scrollbar-width.
+   So the standard properties are gated behind "does this engine lack the
+   webkit pseudo-element". Firefox takes that branch and gets a thin bar in the
+   right colour; Chromium and Safari fall through to the pseudo-elements and
+   get the whole design — a rounded pill floating in a transparent gutter, held
+   slim by a transparent border rather than by a narrow gutter, so that it
+   still has seventeen pixels of grab even while it looks like five.
+
+   Colour is four variables, so each game can dress its own bars in its own
+   palette without touching any of the geometry. Every scrollable panel on the
+   site sits inside an element that sets them.
+   --------------------------------------------------------------------------- */
+:root {
+  --sb-size: 12px;       /* the gutter the browser reserves */
+  --sb-inset: 3.5px;     /* transparent border, so: a 5px pill at rest */
+  --sb-grab: 2px;        /* and an 8px one under the cursor */
+  --sb-track: transparent;
+  --sb-a: #ff7a3d;       /* pill gradient, start */
+  --sb-b: #ffab35;       /* pill gradient, end */
+  --sb-solid: #f2823f;   /* the same thing for engines that take one colour */
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-solid) var(--sb-track);
+  }
+}
+
+::-webkit-scrollbar {
+  width: var(--sb-size);
+  height: var(--sb-size);
+  background: transparent;
+}
+::-webkit-scrollbar-track {
+  background: var(--sb-track);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  /* A transparent border, clipped out of the paint, is the only way to get a
+     slim pill in a wide gutter — and the gutter has to stay wide, because the
+     border still belongs to the thumb and is what you actually grab. */
+  border: var(--sb-inset) solid transparent;
+  background-clip: padding-box;
+  background-image: linear-gradient(180deg, var(--sb-a), var(--sb-b));
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background-image: linear-gradient(90deg, var(--sb-a), var(--sb-b));
+}
+::-webkit-scrollbar-thumb:hover { border-width: var(--sb-grab); }
+::-webkit-scrollbar-thumb:active {
+  border-width: var(--sb-grab);
+  filter: saturate(1.3) brightness(1.06);
+}
+/* The stepper arrows cannot be restyled into this, only removed. */
+::-webkit-scrollbar-button { display: none; }
+
+/* Each game's own bars, in its own colours. Kept together as one table rather
+   than scattered across fifteen page stylesheets, because the only way to tell
+   whether a set of palettes works is to read them next to each other.
+
+   Every one of these is picked off something already on the page — the fire in
+   Asteroid, the gilt in Auction, the mint in Orbit — so the bar reads as part
+   of the game rather than as browser furniture that happened to get painted.
+   Dark grounds take luminous pairs; the two light games take deep ones, since
+   a bright thumb on cream is a bar you cannot find. */
+.mix-body    { --sb-a: #5fd3d0; --sb-b: #6aa9ff; --sb-solid: #62bcdd; }
+.rock-body   { --sb-a: #ff7a45; --sb-b: #ffd166; --sb-solid: #ff9350; }
+.saleroom    { --sb-a: #f0d29c; --sb-b: #c8894a; --sb-solid: #dcae73; }
+.night-body  { --sb-a: #7fd8ff; --sb-b: #b79cff; --sb-solid: #97bcff; }
+.mem-body    { --sb-a: #ff8fd0; --sb-b: #ffc46b; --sb-solid: #ffa4b0; }
+.weeks-body  { --sb-a: #8ea2ff; --sb-b: #c7b3ff; --sb-solid: #a5aeff; }
+.robot-body  { --sb-a: #5b8cff; --sb-b: #6fe3ff; --sb-solid: #63b4ff; }
+.orbit-body  { --sb-a: #7fe0c0; --sb-b: #9fd0ff; --sb-solid: #8dd8dd; }
+.over-body   { --sb-a: #ff5fd2; --sb-b: #7af0ff; --sb-solid: #cf78e8; }
+.powder-body { --sb-a: #f0c47a; --sb-b: #d8734a; --sb-solid: #e49b62; }
+.progress-body { --sb-a: #b98cff; --sb-b: #ff9ad5; --sb-solid: #cb90e8; }
+.trolley-body  { --sb-a: #ff9c5c; --sb-b: #e0563a; --sb-solid: #ef7a4a; }
+.fusion-body   { --sb-a: #b79cff; --sb-b: #7af0ff; --sb-solid: #9cb6f5; }
+/* The two that sit on paper. */
+.fold-body   { --sb-a: #d3a733; --sb-b: #8a6f2e; --sb-solid: #b08c2f; }
+.spend-body  { --sb-a: #3fb98f; --sb-b: #0f3d3e; --sb-solid: #2a8a72; }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {
