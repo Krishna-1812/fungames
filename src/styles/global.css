@@ -203,9 +203,13 @@ body.is-fixed {
 .progress-body { --sb-a: #b98cff; --sb-b: #ff9ad5; --sb-solid: #cb90e8; }
 .trolley-body  { --sb-a: #ff9c5c; --sb-b: #e0563a; --sb-solid: #ef7a4a; }
 .fusion-body   { --sb-a: #b79cff; --sb-b: #7af0ff; --sb-solid: #9cb6f5; }
-/* The two that sit on paper. */
-.fold-body   { --sb-a: #d3a733; --sb-b: #8a6f2e; --sb-solid: #b08c2f; }
-.spend-body  { --sb-a: #3fb98f; --sb-b: #0f3d3e; --sb-solid: #2a8a72; }
+.hand-body   { --sb-a: #e0a458; --sb-b: #c9663f; --sb-solid: #d8894c; }
+/* The three that sit on paper. Rule Cascade in particular is a page you type
+   on, and until it had a class of its own its caret came out of the site-wide
+   orange while everything around it was green. */
+.fold-body    { --sb-a: #d3a733; --sb-b: #8a6f2e; --sb-solid: #b08c2f; }
+.spend-body   { --sb-a: #3fb98f; --sb-b: #0f3d3e; --sb-solid: #2a8a72; }
+.cascade-body { --sb-a: #2f8a55; --sb-b: #0f3d2e; --sb-solid: #24784a; }
 
 
 /* ---------------------------------------------------------------------------
@@ -284,6 +288,40 @@ input[type='range']::-moz-range-thumb {
   border-radius: 50%; background: var(--sl-b);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
+
+
+/* ---------------------------------------------------------------------------
+   The rest of the browser's furniture.
+
+   Chrome's blue selection band, the translucent black rectangle a phone flashes
+   over whatever you tapped, a grey caret, a grey placeholder: four things left
+   at their defaults on pages that have otherwise been coloured end to end, and
+   each one is the browser saying nobody got round to it.
+
+   They read the same two accent variables as the scrollbars and the sliders, so
+   every game already has an answer for all four and nothing new has to be
+   chosen. The accent used is --sb-a rather than --sb-b throughout, because a
+   caret is a two-pixel line and the deeper of the pair is the one that survives
+   being that thin -- including on the white panels inside the dark games, which
+   is where the light end of an accent disappears.
+   --------------------------------------------------------------------------- */
+::selection {
+  /* A wash rather than a solid, so the selected text keeps its own contrast
+     against whatever it was already sitting on -- cream or near-black. */
+  background: color-mix(in srgb, var(--sb-a, #ff7a3d) 34%, transparent);
+}
+
+body {
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--sb-a, #ff7a3d) 20%, transparent);
+  accent-color: var(--sb-a, #ff7a3d);
+}
+
+input, textarea { caret-color: var(--sb-a, #ff7a3d); }
+
+/* Placeholders take the colour of the text they stand in for. A fixed grey
+   would be wrong in one direction or the other on a site with white search
+   boxes on dark purple and dark ones on cream. */
+::placeholder { color: currentColor; opacity: 0.45; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
