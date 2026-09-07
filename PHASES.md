@@ -160,3 +160,17 @@ release build. Development preview was restored after the failed build.
 Start with Powder world preservation across resizing; then apply the same
 state, interaction, accessibility and art checks to the remaining games.
 Unity stays an optional later prototype, not a replacement for the Astro site.
+
+Powder state batch: resize now fits the existing world with square cells,
+preserving cells, lifetimes, shades, reaction history and active scenario
+statistics. The scenario drawing mask follows the fitted canvas. Resize ends
+the active drawing gesture rather than joining points across two layouts.
+Sandbox experiments have an explicit local save/load slot; loads validate all
+arrays and material IDs before replacement and open paused, with rain off.
+Scenario sessions cannot save/load sandbox snapshots. Saves do not capture the
+random generator, so future evolution is not promised to be identical.
+
+Snapshot regression checks and Powder's complete reaction/scenario suite pass.
+Browser verification remains pending because Astro's development overlay is
+blocked by the existing dependency-access error. User device testing is deferred
+until the collection work is complete, per the owner's instruction.

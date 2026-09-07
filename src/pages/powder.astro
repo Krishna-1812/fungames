@@ -17,7 +17,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     <h1 class="visually-hidden">Powder</h1>
 
     <div class="canvas-wrap" id="wrap">
-      <canvas id="sim" aria-label="Falling sand simulation"></canvas>
+      <div id="worldSurface" class="world-surface"><canvas id="sim" aria-label="Falling sand simulation"></canvas></div>
       <div class="hint" id="hint">Draw with the mouse. Try dropping lava on ice.</div>
 
       <div class="scbar" id="scBar" hidden>
@@ -48,6 +48,10 @@ import GameLayout from '../layouts/GameLayout.astro'
         <div class="btns">
           <button type="button" id="rainBtn" class="ctl">Rain</button>
           <button type="button" id="quakeBtn" class="ctl">Meteor</button>
+        </div>
+        <div class="btns">
+          <button type="button" id="saveExperiment" class="ctl">Save experiment</button>
+          <button type="button" id="loadExperiment" class="ctl">Load experiment</button>
         </div>
         <p class="stat"><b id="count">0</b> particles &middot; <b id="fps">0</b> fps</p>
       </div>
@@ -106,6 +110,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { sfx, unlock } from '../lib/audio'
   import { burst, ring, shake } from '../lib/fx'
   import { createPowderRenderer } from '../lib/powder-render'
+  import { POWDER_SAVE, captureExperiment, readExperiment, restoreExperiment } from '../lib/powder-scene'
   import {
     MATERIALS, REACTIONS, buildLookup, describe,
     SAND, WATER, STONE, WOOD, GLASS, ICE, LAVA,
@@ -128,6 +133,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   const canvas = document.getElementById('sim') as HTMLCanvasElement
   const wrap = document.getElementById('wrap') as HTMLElement
+  const surface = document.getElementById('worldSurface') as HTMLElement
   const CELL = 4
   let W = 0, H = 0
   let world: World = createWorld(1, 1)
@@ -141,9 +147,14 @@ import GameLayout from '../layouts/GameLayout.astro'
   function build() {
     const r = wrap.getBoundingClientRect()
     if (r.width < 8 || r.height < 8) return false
-    W = Math.max(80, Math.min(340, Math.floor(r.width / CELL)))
-    H = Math.max(60, Math.min(250, Math.floor(r.height / CELL)))
-    world = createWorld(W, H)
+    if (!W) {
+      W = Math.max(80, Math.min(340, Math.floor(r.width / CELL)))
+      H = Math.max(60, Math.min(250, Math.floor(r.height / CELL)))
+      world = createWorld(W, H)
+    }
+    const scale = Math.min(r.width / W, r.height / H)
+    surface.style.width = `${W * scale}px`; surface.style.height = `${H * scale}px`
+    surface.style.left = `${(r.width - W * scale) / 2}px`; surface.style.top = `${(r.height - H * scale) / 2}px`
     renderer.resize(W, H)
     return true
   }
@@ -246,9 +257,9 @@ import GameLayout from '../layouts/GameLayout.astro'
     // more than most of these scenarios hand you in total — so the default
     // there would spend the whole budget before you had finished the stroke.
     setBrush(3)
-    wrap.classList.toggle('masked', sc.drawTo !== undefined)
+    surface.classList.toggle('masked', sc.drawTo !== undefined)
     if (sc.drawTo !== undefined) {
-      wrap.style.setProperty('--reach', `${sc.drawTo * 100}%`)
+      surface.style.setProperty('--reach', `${sc.drawTo * 100}%`)
     }
     scPanel.hidden = true
     scBtn.setAttribute('aria-expanded', 'false')
@@ -263,7 +274,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     stats = null
     solved = false
     bar.hidden = true
-    wrap.classList.remove('masked')
+    surface.classList.remove('masked')
     paintPalette()
     clearWorld(world)
     seed()
@@ -596,11 +607,35 @@ import GameLayout from '../layouts/GameLayout.astro'
       for (let y = H - 26; y < H - 8; y++) put(world, x, y, SAND)
   }
 
-  /** Rebuild after a resize, keeping whatever was on screen conceptually. */
+  document.getElementById('saveExperiment')!.addEventListener('click', () => {
+    if (active) { toastText('Leave the scenario to save a sandbox experiment.'); return }
+    if (!W) return
+    try {
+      localStorage.setItem(POWDER_SAVE, JSON.stringify(captureExperiment(world)))
+      toastText('Experiment saved on this device. Saving again replaces it.')
+    } catch { toastText('This device could not save the experiment. Your world is still here.') }
+  })
+  document.getElementById('loadExperiment')!.addEventListener('click', () => {
+    if (active) { toastText('Leave the scenario before loading an experiment.'); return }
+    try {
+      const raw = localStorage.getItem(POWDER_SAVE)
+      if (!raw) { toastText('No saved experiment yet.'); return }
+      const scene = raw.length <= 2000000 ? readExperiment(JSON.parse(raw)) : null
+      if (!scene) { toastText('That save could not be read. Your world is unchanged.'); return }
+      const restored = restoreExperiment(scene)
+      stop(); world = restored; W = world.w; H = world.h
+      paused = true; raining = false
+      document.getElementById('pauseBtn')!.textContent = 'Resume'
+      document.getElementById('rainBtn')!.classList.remove('on')
+      build()
+      toastText('Experiment loaded, paused. Future reactions may unfold differently.')
+    } catch { toastText('The experiment could not be loaded.'); }
+  })
+
+  /** Resize the view only. Cells, scenario budgets and reaction history survive. */
   function rebuild() {
-    if (!build()) return
-    if (active) loadScenario(active)
-    else seed()
+    stop()
+    build()
   }
 
   // Lay out immediately where possible; rAF is paused in background tabs, so a
@@ -624,6 +659,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* The log and the toast are absolutely positioned over the whole thing. */
   .powder-body .stage { display: flex; height: 100%; position: relative; }
   .powder-body .canvas-wrap { position: relative; flex: 1; min-width: 0; background: #0d0e10; }
+  .powder-body .world-surface { position: absolute; }
   .powder-body canvas {
     width: 100%; height: 100%; display: block;
     image-rendering: pixelated; touch-action: none; cursor: crosshair;
@@ -783,7 +819,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .powder-body .scbar-acts button:hover { border-color: #e8a75c; color: #fff; }
 
   /* The region a masked scenario will not let you draw in. */
-  .powder-body .canvas-wrap.masked::after {
+  .powder-body .world-surface.masked::after {
     content: ''; position: absolute; inset: 0 0 0 var(--reach, 100%);
     pointer-events: none; z-index: 3;
     background: repeating-linear-gradient(
