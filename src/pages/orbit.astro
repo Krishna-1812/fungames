@@ -41,6 +41,23 @@ import { GOALS } from '../lib/orbit-goals'
       <p class="tip" id="tip">Drag anywhere to fling a new body. Longer drag, faster throw.</p>
     </div>
 
+    <button type="button" class="mission-readout" id="missionBtn" aria-haspopup="dialog">
+      <span id="missionTitle">Your first orbit</span>
+      <small id="missionDetail">Launch a body to begin · Open flight log</small>
+    </button>
+
+    <dialog id="flightLog" class="scene-dialog" aria-labelledby="logTitle">
+      <p class="flight-kicker">PERSONAL FLIGHT LOG</p>
+      <h2 id="logTitle">Every orbit starts with a leap.</h2>
+      <p id="logSummary"></p>
+      <ul id="logEntries" class="log-entries"></ul>
+      <p>Achievements belong to this browser. Scene links share the simulation, not these results.</p>
+      <div class="flight-actions">
+        <button type="button" id="downloadLog">Download flight log</button>
+        <button type="button" id="closeLog">Back to the sky</button>
+      </div>
+    </dialog>
+
     <section class="flight-card" id="flightCard" aria-labelledby="flightTitle">
       <p class="flight-kicker">FLIGHT SCHOOL · 01</p>
       <h2 id="flightTitle">Give a moon<br />a way around.</h2>
@@ -191,6 +208,45 @@ import { GOALS } from '../lib/orbit-goals'
   const bestLaps = document.getElementById('bestLaps')!
   const toast = document.getElementById('toast')!
 
+  const flightLog = document.getElementById('flightLog') as HTMLDialogElement
+  let resumeAfterLog = false
+  function missionReadout() {
+    const complete = tracker.done.size === GOALS.length
+    const laps = tracker.liveLaps()
+    document.getElementById('missionTitle')!.textContent = complete
+      ? 'Eight discoveries. Your universe.'
+      : tracker.done.has('orbit') ? `${tracker.done.size} of ${GOALS.length} discoveries` : 'Mission 01 · Your first orbit'
+    document.getElementById('missionDetail')!.textContent = !tracker.done.has('orbit')
+      ? `${laps > 0 ? `${Math.min(100, Math.floor(laps * 100))}% around the star` : 'Launch your own body to begin'} · Flight log ↗`
+      : `Longest orbit: ${tracker.bestLaps} laps · Flight log ↗`
+  }
+  function logText() {
+    return ['ORBIT — PERSONAL FLIGHT LOG', `${tracker.done.size} / ${GOALS.length} discoveries`,
+      `Longest orbit: ${tracker.bestLaps} laps`, '',
+      ...GOALS.filter(g => tracker.done.has(g.id)).map(g => `${g.name}\n${g.note}\n`),
+      'Recorded in this browser. Scene links do not transfer achievements.'].join('\n')
+  }
+  document.getElementById('missionBtn')!.addEventListener('click', () => {
+    resumeAfterLog = !paused; setPaused(true)
+    document.getElementById('logSummary')!.textContent = tracker.done.size
+      ? `${tracker.done.size} discoveries earned. Longest orbit: ${tracker.bestLaps} laps.`
+      : 'Your log is waiting for its first discovery. Use Learn to set up a star, then launch your own moon sideways.'
+    document.getElementById('logEntries')!.replaceChildren(...GOALS.filter(g => tracker.done.has(g.id)).map(g => {
+      const li = document.createElement('li')
+      const title = document.createElement('strong'); title.textContent = g.name
+      const note = document.createElement('p'); note.textContent = g.note
+      li.append(title, note); return li
+    }))
+    flightLog.showModal()
+  })
+  document.getElementById('closeLog')!.addEventListener('click', () => flightLog.close())
+  flightLog.addEventListener('close', () => { if (resumeAfterLog) setPaused(false) })
+  document.getElementById('downloadLog')!.addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([logText()], { type: 'text/plain;charset=utf-8' }))
+    const a = document.createElement('a'); a.href = url; a.download = 'orbit-flight-log.txt'
+    a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  })
+
   function paintGoals() {
     for (const g of GOALS) {
       const li = goalPanel.querySelector<HTMLElement>(`[data-goal="${g.id}"]`)
@@ -202,6 +258,7 @@ import { GOALS } from '../lib/orbit-goals'
       if (hidden) hidden.textContent = done ? ', done' : ', not yet done'
     }
     goalCount.textContent = `${tracker.done.size}/${GOALS.length}`
+    missionReadout()
     bestLaps.textContent = tracker.bestLaps
       ? ` Longest orbit so far: ${tracker.bestLaps} lap${tracker.bestLaps === 1 ? '' : 's'}.`
       : ''
@@ -242,12 +299,15 @@ import { GOALS } from '../lib/orbit-goals'
     // still running behind it and not enough to stop the body count reading
     // straight through the heading.
     stage.classList.toggle('reading', open)
+    if (open) document.getElementById('goalClose')!.focus()
+    else goalBtn.focus()
   }
   goalBtn.addEventListener('click', () => { unlock(); sfx.click(); showGoals(goalPanel.hidden) })
   document.getElementById('goalClose')!.addEventListener('click', () => { sfx.click(); showGoals(false) })
   document.getElementById('goalReset')!.addEventListener('click', () => {
     tracker.done.clear()
     tracker.bestLaps = 0
+    tracker.reset()
     save()
     paintGoals()
     sfx.click()
@@ -303,6 +363,7 @@ import { GOALS } from '../lib/orbit-goals'
 
   // ---- loop --------------------------------------------------------------
   let fpsFrames = 0, lastFps = performance.now()
+  let savedBestLaps = tracker.bestLaps
   const nBodies = document.getElementById('nBodies')!
   const nMerges = document.getElementById('nMerges')!
   const nFps = document.getElementById('nFps')!
@@ -335,6 +396,8 @@ import { GOALS } from '../lib/orbit-goals'
       nFps.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
       nBodies.textContent = String(bodies.length)
       nMerges.textContent = String(merges)
+      missionReadout()
+      if (tracker.bestLaps !== savedBestLaps) { save(); savedBestLaps = tracker.bestLaps }
       lastFps = now; fpsFrames = 0
     }
     requestAnimationFrame(frame)
@@ -648,6 +711,15 @@ import { GOALS } from '../lib/orbit-goals'
 </script>
 
 <style is:global>
+  .orbit-body .mission-readout { position: absolute; top: 70px; right: 18px; z-index: 4; display: grid; gap: 5px; max-width: calc(100% - 36px); text-align: left; padding: 12px 16px; background: #101b2ee8; color: #e1edff; border: 1px solid #435778; border-radius: 14px; cursor: pointer; }
+  .orbit-body .mission-readout span { font-size: 13px; font-weight: 650; }
+  .orbit-body .mission-readout small { font-size: 11px; color: #b6c5df; }
+  .orbit-body .stage:has(.flight-card:not([hidden])) .mission-readout { display: none; }
+  .orbit-body .log-entries { list-style: none; padding: 0; display: grid; gap: 12px; }
+  .orbit-body .log-entries li { border-left: 2px solid #8fcdb5; padding: 4px 0 4px 14px; }
+  .orbit-body .log-entries strong { color: #b9ebd6; }
+  .orbit-body .log-entries p { margin: 5px 0; }
+  .orbit-body #flightLog { max-height: 85dvh; overflow-y: auto; }
   .orbit-body { background: #05060f; color: #e9edff; }
 
   .orbit-body .stage { position: relative; height: 100%; }

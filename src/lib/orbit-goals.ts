@@ -200,6 +200,15 @@ export class Tracker {
     return { done: [...this.done], bestLaps: this.bestLaps }
   }
 
+  /** Current living player bodies only; presets and lost bodies cannot fill it. */
+  liveLaps(): number {
+    let best = 0
+    for (const t of this.tracks.values()) {
+      if (t.mine) best = Math.max(best, t.laps + Math.min(1, Math.abs(t.swept - t.lapOpened) / TAU))
+    }
+    return best
+  }
+
   private win(id: string, out: string[]) {
     if (this.done.has(id)) return
     this.done.add(id)

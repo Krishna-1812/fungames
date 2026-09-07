@@ -111,6 +111,20 @@ batch from now on, as requested by the owner.
 
 ## Phase 3 — launch trio
 
+### Orbit mission/result follow-up (implemented; verification pending)
+
+Added a persistent mission readout showing progress around the primary for
+player-launched bodies, plus a personal flight-log dialog with earned goal
+explanations and a downloadable text record. Opening the log pauses the sky;
+closing it restores the previous running state. Best lap counts now persist
+when they improve, and resetting achievements clears trajectory tracking.
+
+Orbit physics/challenge checks and the new mission ownership/half-lap/pruning
+regression passed. Full regression results and browser QA remain unverified:
+the command environment stopped returning results and the replacement preview
+could not write Astro's generated files because of Windows permissions.
+Do not treat this batch as release-ready until those checks are completed.
+
 From Memory: sketchbook, reference comparison and a downloadable postcard.
 Auction: coherent lot artwork, bidder presentation and a shareable result.
 
