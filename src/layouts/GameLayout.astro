@@ -151,8 +151,17 @@ const videoGameLd = {
     letter-spacing: -0.01em;
     text-decoration: none;
     opacity: 0.92;
-    transition: opacity 140ms var(--ease), transform 140ms var(--ease);
+    /* The only way back to the rest of the site, and it was a 22px-tall line
+       box floating in a 48px bar -- under the 24px minimum, and nothing like
+       a thumb. The padding takes it to the full height of the bar it sits in;
+       the matching negative margin means the text has not moved a pixel. */
+    padding: 13px 9px;
+    margin-inline: -9px;
+    border-radius: 10px;
+    transition: opacity 140ms var(--ease), transform 140ms var(--ease),
+      background 140ms var(--ease);
   }
+  .chrome-home:hover { background: rgba(255, 255, 255, 0.1); }
   .chrome-home:hover { opacity: 1; transform: translateX(-2px) rotate(-3deg); }
   .chrome-title {
     margin-inline: auto;
