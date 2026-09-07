@@ -499,13 +499,50 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   twelve checks by hand, and neither was worth the detour. Worth doing before
   release.
 
-### Phase 5 — Deal with the weak three
+### Phase 5 — Deal with the weak three — **done**
 
-- **Paper Folds**: fold it into Scale as a chapter, or give it a real interaction
-  (fold *manually*, with the paper visibly resisting after fold 7 — the actual
-  physical fact that makes it interesting).
-- **Progress / Life in Weeks**: leave them. They're small, honest, complete things,
-  and not everything needs to be a game.
+- ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the
+  paper resisting. It is not folded into Scale, because it turned out to have
+  a subject of its own that Scale has no room for.
+
+  The reason you cannot fold paper eight times is not that it "gets too
+  strong", which is the usual answer and is wrong. It is geometric, and
+  Britney Gallivan worked it out in 2002 while still at school: every fold has
+  to bend the whole accumulated stack through 180°, and the paper that goes
+  round that bend is no longer available to be folded. The stack halves in
+  length each fold while the length eaten by the bend grows like 4^n, and that
+  race is lost quickly.
+
+  So `lib/fold-paper.ts` is her two equations, and the fold limit is a
+  property of a sheet rather than a number typed into the page. You pick one —
+  A4, a banknote, a tissue, her 1,219-metre roll, a football pitch of tissue,
+  gold leaf — and drag its edge over to fold it. It stops where that sheet
+  stops. `check-fold.mjs` holds the model to three things people have actually
+  done: A4 folds seven times alternating and six in one direction, and the
+  roll folded twelve, which was her record.
+
+  The drawing is the argument rather than decoration. The sheet is edge-on
+  with both dimensions to the same scale, so A4 starts as a hairline 297 mm
+  long and ends, after seven folds, as a bar 1.6 mm across and 13 mm thick —
+  it visibly turns on its side. Over it sits a dashed circle: the turn the
+  next fold has to make, radius half the stack, growing at exactly the rate
+  the paper shrinks. Watching those two cross is the whole answer.
+
+  The first version drew that circle **as** the paper's rounded end, which at
+  fold seven came out as a clean coin 13 mm across drawn from a sheet 1.6 mm
+  wide — a picture of the fold succeeding, which is the opposite of what
+  happens. Solid is now only ever the paper you have, and the requirement is a
+  ghost laid over it.
+
+  This also fixed a truthfulness problem that was the page's real weakness.
+  The old button folded 103 times with nothing to say that seven is where
+  paper gives up, so the imaginary half was presented as something you were
+  doing. Both halves are still there — the log axis out to the observable
+  universe is the best thing on the page — but reaching the second one now
+  takes a button that says **Carry on anyway**, and the readout says so too.
+
+- ~~**Progress / Life in Weeks**~~ left alone, as planned. They are small,
+  honest, complete things, and not everything needs to be a game.
 
 ---
 
