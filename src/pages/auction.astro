@@ -36,6 +36,7 @@ import GameLayout from '../layouts/GameLayout.astro'
             catalogue furniture is hidden rather than showing a category and an
             estimate that belong to nothing. */}
         <article class="catalogue is-intro" id="card">
+          <div class="lot-art" id="lotArt" aria-hidden="true"></div>
           <p class="cat" id="cat">Curiosities</p>
           <h1 class="lotTitle" id="title">The Auction Game</h1>
           <p class="blurb" id="blurb">
@@ -83,6 +84,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   </div>
 
   <section class="reckoning" id="reckoning" hidden>
+    <div id="auctionResult" class="auction-result"></div>
     <p class="stamp" id="stamp">Down £1,200</p>
     <p class="lede" id="lede"></p>
 
@@ -109,7 +111,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     </table>
 
     <div class="acts">
-      <button type="button" data-share data-title="The Auction Game">Share this</button>
+      <button type="button" id="shareAuction">Share your result</button>
       <button type="button" id="again">New sale</button>
       <a href="/">try something else →</a>
     </div>
@@ -162,6 +164,11 @@ import GameLayout from '../layouts/GameLayout.astro'
   } from '../lib/auction'
   import type { Bidder, LotState, LotOutcome } from '../lib/auction'
   import type { Lot } from '../data/lots'
+  import { lotArt } from '../lib/auction-art'
+  import { previewCard, shareResult, outcomeLabel } from '../lib/share-card'
+  import type { ResultCard } from '../lib/result-card'
+  import { SITE } from '../site.config'
+  let result: ResultCard | null = null
 
   const $ = (id: string) => document.getElementById(id)!
   const money = (n: number) => '£' + Math.round(n).toLocaleString('en-GB')
@@ -179,6 +186,16 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   const everyone = [...rivals, you]
   const outcomes: LotOutcome[] = []
+  $('lotArt').innerHTML = lotArt('fox')
+  $('shareAuction').addEventListener('click', async () => {
+    if (!result) return
+    const button = $('shareAuction') as HTMLButtonElement
+    button.disabled = true
+    try {
+      const outcome = await shareResult(result, { title: 'The Auction Game', text: result.headline, url: location.href })
+      button.textContent = outcome === 'failed' ? 'Could not share — try again' : outcomeLabel[outcome]
+    } finally { button.disabled = false }
+  })
 
   let idx = -1
   let state: LotState | null = null
@@ -231,6 +248,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* ------------------------------------------------------------------ */
 
   function showCard(lot: Lot) {
+    $('lotArt').innerHTML = lotArt(lot.id)
     $('cat').textContent = lot.category
     $('title').textContent = lot.title
     $('blurb').textContent = lot.blurb
@@ -417,6 +435,13 @@ import GameLayout from '../layouts/GameLayout.astro'
     })
     const paid = START_FUNDS - you.budget
     const net = worth - paid
+    result = {
+      slug: 'auction', siteName: SITE.name,
+      headline: !mine.length ? 'Kept every penny' : net >= 0 ? `Up ${money(net)}` : `Down ${money(-net)}`,
+      sub: 'At the end of fourteen lots',
+      stats: [{label:'Bought',value:String(mine.length)}, {label:'Paid',value:money(paid)}, {label:'Appraised',value:money(worth)}],
+    }
+    previewCard($('auctionResult'), result)
 
     $('sheet').innerHTML = rows.length
       ? rows.join('') +
@@ -483,6 +508,9 @@ import GameLayout from '../layouts/GameLayout.astro'
 </script>
 
 <style is:global>
+  .saleroom .lot-art { height: clamp(160px, 24vw, 250px); margin: -4px 0 22px; border-radius: 12px; background: radial-gradient(ellipse at 50% 20%, #e7c99455, transparent 65%), #2a2927; overflow: hidden; }
+  .saleroom .lot-art svg { width: 100%; height: 100%; display: block; }
+  .saleroom .auction-result { max-width: 760px; margin: 0 auto 30px; border-radius: 16px; overflow: hidden; }
   .saleroom { background: #1b0f11; color: #f2e7dd; }
 
   .wrap { max-width: 1060px; margin: 0 auto; padding: 22px 18px 40px; }
