@@ -114,5 +114,41 @@ const faviconHref = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
   <body class:list={[bodyClass, { 'is-fixed': fixed }]}>
     <a class="skip" href="#main">Skip to content</a>
     <slot />
+
+    <script>
+      /* The filled part of a slider.
+
+         Firefox has ::-moz-range-progress and needs nothing from here.
+         Chromium has no equivalent, so the fill is a gradient stop in
+         global.css positioned by --fill, and something has to write it. One
+         delegated listener in the layout does every slider on the site. */
+      const paint = (el) => {
+        const min = Number(el.min || 0)
+        const max = Number(el.max === '' ? 100 : el.max)
+        const pct = max > min ? ((Number(el.value) - min) / (max - min)) * 100 : 0
+        el.style.setProperty('--fill', pct + '%')
+      }
+
+      document.addEventListener('input', (e) => {
+        const t = e.target
+        if (t instanceof HTMLInputElement && t.type === 'range') paint(t)
+      })
+      document.querySelectorAll('input[type="range"]').forEach(paint)
+
+      /* Not every slider is in the markup: the tone challenge in I'm Not a
+         Robot builds its own, and a slider that appears already halfway along
+         with an empty track behind it is worse than one that was never
+         styled. So late arrivals get found too. The check runs only over the
+         nodes an insertion actually added, which costs nothing next to the
+         insertion itself. */
+      new MutationObserver((records) => {
+        for (const r of records)
+          for (const node of r.addedNodes) {
+            if (!(node instanceof HTMLElement)) continue
+            if (node instanceof HTMLInputElement && node.type === 'range') paint(node)
+            else node.querySelectorAll('input[type="range"]').forEach(paint)
+          }
+      }).observe(document.body, { childList: true, subtree: true })
+    </script>
   </body>
 </html>

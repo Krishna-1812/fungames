@@ -207,6 +207,84 @@ body.is-fixed {
 .fold-body   { --sb-a: #d3a733; --sb-b: #8a6f2e; --sb-solid: #b08c2f; }
 .spend-body  { --sb-a: #3fb98f; --sb-b: #0f3d3e; --sb-solid: #2a8a72; }
 
+
+/* ---------------------------------------------------------------------------
+   Sliders.
+
+   Every range input on the site was four pixels tall. Each game had styled the
+   track onto the input element itself — height: 4px — which leaves the thumb
+   hanging outside its own box, so the thing you actually have to hit was a
+   four-pixel band. With a mouse that is finicky; with a thumb on a phone it is
+   a coin toss. The track now lives on ::-webkit-slider-runnable-track, which
+   frees the input to be twenty-six pixels of grab with nothing visible in it.
+
+   And it shows its value. A bare slider tells you where the handle is and
+   nothing about what that means, so the part behind the handle is filled —
+   the difference between a control and a readout. Chromium has no
+   pseudo-element for the filled part (Firefox has ::-moz-range-progress), so
+   the fill is a gradient stop written from --fill by one delegated listener in
+   the layout.
+
+   Colour defaults to the same two variables the scrollbars use, so a game's
+   accent furniture is one hue without anyone having to remember to keep them
+   in step.
+   --------------------------------------------------------------------------- */
+input[type='range'] {
+  --sl-a: var(--sb-a, #ff7a3d);
+  --sl-b: var(--sb-b, #ffab35);
+  --sl-track: rgba(128, 128, 128, 0.32);
+  --sl-h: 5px;
+  --sl-thumb: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 26px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: var(--sl-h);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--sl-a) 0,
+    var(--sl-b) var(--fill, 0%),
+    var(--sl-track) var(--fill, 0%)
+  );
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--sl-thumb);
+  height: var(--sl-thumb);
+  border: 0;
+  border-radius: 50%;
+  background: var(--sl-b);
+  /* Centred on the track by arithmetic rather than by a magic number, so
+     changing either size keeps it centred. */
+  margin-top: calc((var(--sl-h) - var(--sl-thumb)) / 2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(255, 255, 255, 0);
+  transition: transform 130ms var(--ease), box-shadow 130ms var(--ease);
+}
+input[type='range']:hover::-webkit-slider-thumb { transform: scale(1.14); }
+input[type='range']:active::-webkit-slider-thumb {
+  transform: scale(1.24);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 6px color-mix(in srgb, var(--sl-b) 22%, transparent);
+}
+input[type='range']::-moz-range-track {
+  height: var(--sl-h); border-radius: 999px; background: var(--sl-track);
+}
+input[type='range']::-moz-range-progress {
+  height: var(--sl-h); border-radius: 999px;
+  background: linear-gradient(90deg, var(--sl-a), var(--sl-b));
+}
+input[type='range']::-moz-range-thumb {
+  width: var(--sl-thumb); height: var(--sl-thumb); border: 0;
+  border-radius: 50%; background: var(--sl-b);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

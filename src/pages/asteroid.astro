@@ -614,16 +614,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   .rock-body .ctl input { grid-column: 1 / -1; }
 
   .rock-body input[type='range'] {
-    -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
-    border-radius: 3px; background: #4a2418; outline: none;
-  }
-  .rock-body input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none; width: 17px; height: 17px;
-    border-radius: 50%; background: #ff7a33; cursor: pointer; border: 0;
-  }
-  .rock-body input[type='range']::-moz-range-thumb {
-    width: 17px; height: 17px; border-radius: 50%; background: #ff7a33;
-    cursor: pointer; border: 0;
+    width: 100%;
+    --sl-a: #c9421c; --sl-b: #ff9a3d; --sl-track: #4a2418; --sl-thumb: 17px;
   }
 
   .rock-body .comp { border: 0; padding: 0; margin: 0 0 14px; }

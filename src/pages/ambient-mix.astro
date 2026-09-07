@@ -607,19 +607,11 @@ import { iconSvg } from '../lib/icons'
     display: block; font-size: 12px; color: #9db3c6; margin-top: 3px; line-height: 1.5;
   }
 
+  /* Geometry and behaviour are global (see global.css); a game only says what
+     colour its sliders are. */
   input[type='range'] {
-    -webkit-appearance: none; appearance: none;
-    height: 4px; border-radius: 3px; background: #2b4a66; outline: none;
     width: 120px;
-  }
-  input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 15px; height: 15px; border-radius: 50%; background: #cfe0ee;
-    cursor: pointer; border: 0;
-  }
-  input[type='range']::-moz-range-thumb {
-    width: 15px; height: 15px; border-radius: 50%; background: #cfe0ee;
-    cursor: pointer; border: 0;
+    --sl-a: #4f9fd6; --sl-b: #9ed8f2; --sl-track: #2b4a66;
   }
 
   .field {

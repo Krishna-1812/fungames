@@ -1342,7 +1342,9 @@ import GameLayout from '../layouts/GameLayout.astro'
   .tonebox svg { width: min(300px, 100%); }
   .w-ref { stroke: #6f8dff; }
   .w-mine { stroke: #ffd166; }
-  .slider { width: min(300px, 100%); accent-color: #2b56c4; }
+  /* This one sits on a white panel, so it keeps the dialog's own blue rather
+     than the page-level accent, which is a cyan that vanishes on white. */
+  .slider { width: min(300px, 100%); --sl-a: #6a92f0; --sl-b: #2b56c4; --sl-track: #dfe3ee; }
   .tonebtns { display: flex; gap: 8px; }
 
   /* --- hands ------------------------------------------------------------ */
