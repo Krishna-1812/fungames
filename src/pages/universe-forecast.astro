@@ -77,7 +77,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       <button type="button" class="filter" data-filter="shower">Meteors</button>
     </div>
 
-    <p class="feed-hint">Pick any row and it gets drawn at the top, properly.</p>
+    <p class="feed-hint">Every picture is a button. Tap one and it gets drawn, big, at the top.</p>
     <div class="feed" id="feed"></div>
 
     <p class="foot" id="foot"></p>
@@ -1476,6 +1476,27 @@ import GameLayout from '../layouts/GameLayout.astro'
   const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December']
 
+  const pad2 = (v: number) => String(v).padStart(2, '0')
+  const clockOf = (e: SkyEvent) =>
+    e.timed ? `${pad2(e.when.getUTCHours())}:${pad2(e.when.getUTCMinutes())} UTC` : 'all night'
+
+  /**
+   * The list, as a timeline rather than as a stack of cards.
+   *
+   * It went through a version that was forty-four identical bordered boxes,
+   * each with the full date spelled out and the words "draw this one" in the
+   * corner. Three things were wrong with it. The date was repeated in every
+   * row when the rows are already in date order, so it cost a line and told
+   * you nothing. The instruction was repeated forty-four times, which is the
+   * single loudest element on the page and says the same thing every time. And
+   * a boxed list of equal boxes hides the one structural fact worth showing,
+   * which is that these are events strung along time.
+   *
+   * So: one panel per month, a hairline between rows, a date in its own
+   * column, and a rail running down through the drawings. The drawing is the
+   * button — it is the best thing in the row and the thing you want bigger,
+   * and making it the control removes the caption entirely.
+   */
   function paintFeed() {
     const shown = events.filter((e) => filter === 'all' || e.kind === filter)
     /* The Moon alone is fifty rows a year, which buries everything else. Shown
@@ -1490,20 +1511,29 @@ import GameLayout from '../layouts/GameLayout.astro'
       if (key !== month) {
         if (month) out += '</ol></section>'
         month = key
-        out += `<section class="mon"><h3 class="mon-h"><span>${key}</span></h3><ol class="mon-list">`
+        out += `<section class="mon"><h3 class="mon-h">` +
+          `<span>${MONTHS_LONG[e.when.getUTCMonth()]}</span>` +
+          `<span class="yr">${e.when.getUTCFullYear()}</span></h3><ol class="mon-list">`
       }
       const soon = +e.when - +new Date() < 7 * 86400_000
       // The stagger is capped: a list of forty rows arriving one at a time is
       // a wait, not an entrance.
       const delay = Math.min(i, 14) * 26
+      const day = e.when.getUTCDate()
+      const mon = MONTH_SHORT[e.when.getUTCMonth()]
+      const cd = countdown(new Date(), e.when)
       out += `<li class="ev rank-${e.rank} k-${e.kind}${soon ? ' soon' : ''}${e === lead ? ' is-lead' : ''}" data-at="${+e.when}" style="--d:${delay}ms">
-        <div class="ev-glyph">${glyph(e)}</div>
+        <div class="ev-date" aria-hidden="true"><b>${day}</b><i>${mon}</i></div>
+        <div class="ev-rail">
+          <button type="button" class="ev-node" data-i="${events.indexOf(e)}"
+            aria-label="Draw the ${e.title.toLowerCase()} of ${formatWhen(e.when, e.timed)} at the top of the page">${glyph(e)}</button>
+        </div>
         <div class="ev-body">
-          <p class="ev-title">${e.title}</p>
-          <p class="ev-when">${formatWhen(e.when, e.timed)} <span class="dot">·</span> <span class="ev-count" data-at="${+e.when}">${countdown(new Date(), e.when)}</span></p>
+          <p class="ev-title">${e.title}${soon ? '<span class="ev-soon">soon</span>' : ''}</p>
+          <p class="ev-meta"><span class="ev-day">${day} ${mon} · </span>${clockOf(e)}<span class="ev-count ev-count-inline" data-at="${+e.when}">${cd}</span></p>
           <p class="ev-detail">${e.detail}</p>
         </div>
-        <button type="button" class="ev-pick" data-i="${events.indexOf(e)}">Draw this one</button>
+        <p class="ev-count ev-count-block" data-at="${+e.when}">${cd}</p>
       </li>`
       i++
     }
@@ -1513,10 +1543,11 @@ import GameLayout from '../layouts/GameLayout.astro'
     $('foot').textContent =
       `${shown.length} events between now and ${HORIZON.getUTCFullYear()}, all of them computed here, in this tab.`
 
-    /* One listener rather than forty-four. The button is a real button and not
-       a click handler on the row, because the row is the only thing on the
-       page a keyboard could not otherwise reach. */
-    for (const b of feed.querySelectorAll<HTMLButtonElement>('.ev-pick'))
+    /* One listener rather than forty-four. A real button and not a click
+       handler on the row: a row-sized invisible button would swallow text
+       selection on a page that is mostly there to be read, and it is the only
+       thing here a keyboard could not otherwise reach. */
+    for (const b of feed.querySelectorAll<HTMLButtonElement>('.ev-node'))
       b.addEventListener('click', () => select(events[Number(b.dataset.i)]))
   }
 
@@ -1775,9 +1806,18 @@ import GameLayout from '../layouts/GameLayout.astro'
     display: flex; flex-wrap: wrap; gap: 7px; justify-content: center;
     margin: 28px -20px 6px; padding: 10px 20px 12px;
     position: sticky; top: 48px; z-index: 4;
-    background: linear-gradient(180deg, rgba(5, 8, 28, 0.94) 55%, rgba(5, 8, 28, 0));
+    /* Solid for its whole height, with the soft edge pushed below it by the
+       pseudo-element. A gradient that fades inside the bar leaves a window for
+       rows to scroll through, which reads as a rendering fault. */
+    background: rgba(5, 8, 28, 0.96);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
+  }
+  .sky-body .controls::after,
+  .sky-body .mon-h::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 11px;
+    background: linear-gradient(180deg, rgba(5, 8, 28, 0.96), rgba(5, 8, 28, 0));
+    pointer-events: none;
   }
   .sky-body .filter {
     border: 1px solid #33407c; background: rgba(16, 22, 54, 0.86); color: #b6c3f0;
@@ -1793,101 +1833,174 @@ import GameLayout from '../layouts/GameLayout.astro'
     box-shadow: 0 6px 18px rgba(160, 190, 255, 0.2);
   }
 
-  /* --- the feed ---------------------------------------------------------- */
+  /* --- the feed ----------------------------------------------------------
 
-  .sky-body .feed { display: grid; gap: 4px; }
+     A timeline, not a stack of cards. The previous version was forty-four
+     bordered boxes of equal weight, each spelling out its full date and each
+     captioned "draw this one" — the date repeated in a list that is already in
+     date order, and the instruction repeated forty-four times, which made it
+     the loudest thing on the page. Boxes of equal weight also hid the one
+     structural fact worth showing, which is that these are events strung along
+     time.
+
+     So: one panel per month, hairlines between rows, the date in its own
+     column, and a rail running down through the drawings. The drawing is the
+     button. It was already the best thing in the row, it wanted to be bigger,
+     and making it the control let the caption go. */
+
+  .sky-body .feed { display: grid; }
+  .sky-body .feed-hint {
+    margin: 0 0 10px; font-size: 12.5px; color: var(--faint); text-align: center;
+  }
+
+  .sky-body .mon { margin-top: 20px; }
+  .sky-body .mon:first-child { margin-top: 2px; }
   .sky-body .mon-h {
-    position: sticky; top: 104px; z-index: 2;
-    margin: 16px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
-    text-transform: uppercase; color: #8b99d4;
-    display: flex; align-items: center; gap: 12px;
-    /* The whole bar needs the backdrop, not just the label: with only the span
-       painted, rows slid through the gap between the text and the rule. */
-    padding: 7px 0 8px;
-    background: linear-gradient(180deg, rgba(5, 8, 28, 0.95) 60%, rgba(5, 8, 28, 0.82));
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    /* 108px is where the filter bar ends, so the two form one plane rather
+       than leaving a gap for the list to show through. */
+    position: sticky; top: 108px; z-index: 2;
+    margin: 0 0 10px;
+    display: flex; align-items: baseline; gap: 10px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.15em;
+    text-transform: uppercase; color: #a3b3f0;
+    /* The whole bar needs the backdrop, not just the label: with only the text
+       painted, rows slid through the gap between it and the rule. */
+    padding: 8px 2px 9px;
+    background: rgba(5, 8, 28, 0.96);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
+  .sky-body .mon-h .yr { color: #6b78b4; letter-spacing: 0.12em; font-weight: 600; }
   .sky-body .mon-h::after {
-    content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent);
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--line), transparent);
   }
-  .sky-body .mon:first-child .mon-h { margin-top: 4px; }
-  .sky-body .mon-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+
+  .sky-body .mon-list {
+    list-style: none; margin: 0; padding: 0;
+    background: linear-gradient(180deg, rgba(16, 22, 52, 0.72), rgba(10, 14, 38, 0.66));
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 20px 46px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(180, 200, 255, 0.05);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    overflow: hidden;
+  }
 
   .sky-body .ev {
-    display: flex; gap: 14px; align-items: flex-start;
-    background: linear-gradient(150deg, rgba(21, 28, 64, 0.78), rgba(13, 18, 45, 0.72));
-    border: 1px solid rgba(35, 47, 99, 0.9);
-    border-radius: 15px; padding: 13px 16px 14px;
-    position: relative; overflow: hidden;
-    transition: transform 160ms var(--ease), border-color 160ms var(--ease),
-      box-shadow 160ms var(--ease);
+    display: grid;
+    grid-template-columns: 44px 46px minmax(0, 1fr) auto;
+    gap: 0 15px;
+    align-items: start;
+    padding: 15px 18px 16px;
+    position: relative;
+    transition: background 150ms var(--ease);
     animation: ev-in 380ms var(--ease) both;
     animation-delay: var(--d, 0ms);
   }
   @keyframes ev-in { from { opacity: 0; transform: translateY(8px); } }
-  /* The rail is the row's own colour, so the list is scannable by kind
-     without a legend beside every line. */
-  .sky-body .ev::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-    background: linear-gradient(180deg, var(--rail, #2b3873), transparent 140%);
-  }
+  .sky-body .ev + .ev { border-top: 1px solid rgba(126, 146, 226, 0.12); }
+  .sky-body .ev:hover { background: rgba(126, 146, 226, 0.055); }
+
+  /* Each kind has its own colour, and it is carried by the glow behind the
+     drawing rather than by a stripe — one fewer graphic element, and it lands
+     on the thing you are meant to look at. */
   .sky-body .ev.k-eclipse { --rail: #ffd98a; }
   .sky-body .ev.k-phase { --rail: #aebeff; }
   .sky-body .ev.k-season { --rail: #7fe0c0; }
   .sky-body .ev.k-shower { --rail: #ff9fd0; }
   .sky-body .ev.k-apsis { --rail: #ffb27f; }
-  .sky-body .ev:hover {
-    transform: translateY(-2px);
-    border-color: rgba(96, 118, 200, 0.7);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.36);
+
+  .sky-body .ev-date { text-align: right; padding-top: 5px; line-height: 1; }
+  .sky-body .ev-date b {
+    display: block; font-size: 20px; font-weight: 700; color: #d6dfff;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
   }
+  .sky-body .ev-date i {
+    display: block; font-style: normal; margin-top: 3px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: #7182c2;
+  }
+
+  /* The rail. Each row draws its own segment, extended by the row's padding so
+     consecutive segments meet across the hairline and read as one line. */
+  /* Stretched, not start-aligned: as a shrink-to-fit grid item the rail was
+     only as tall as the node, so its segment stopped short of the next row and
+     the line never joined up. */
+  .sky-body .ev-rail {
+    position: relative; align-self: stretch;
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+  .sky-body .ev-rail::before {
+    content: ''; position: absolute; left: 50%; width: 1px; margin-left: -0.5px;
+    top: -16px; bottom: -17px;
+    background: linear-gradient(180deg, rgba(126, 146, 226, 0.1), rgba(126, 146, 226, 0.34) 25%, rgba(126, 146, 226, 0.34) 75%, rgba(126, 146, 226, 0.1));
+  }
+  .sky-body .ev:first-child .ev-rail::before { top: 10px; }
+  .sky-body .ev:last-child .ev-rail::before { bottom: 10px; }
+
+  .sky-body .ev-node {
+    position: relative; z-index: 1;
+    width: 46px; height: 46px; flex: none;
+    display: grid; place-items: center;
+    padding: 0; cursor: pointer;
+    border-radius: 50%;
+    border: 1px solid rgba(126, 146, 226, 0.3);
+    background: radial-gradient(circle at 50% 36%, rgba(31, 41, 88, 0.99), rgba(9, 13, 34, 0.99));
+    /* The opaque outer ring is what the rail passes behind. */
+    box-shadow: 0 0 0 5px rgba(8, 11, 32, 0.92), 0 0 20px -8px var(--rail, #6d7fd8);
+    transition: transform 170ms var(--ease), border-color 170ms var(--ease),
+      box-shadow 170ms var(--ease);
+  }
+  .sky-body .ev-node .glyph { width: 32px; height: 32px; display: block; }
+  .sky-body .ev-node:hover, .sky-body .ev-node:focus-visible {
+    transform: scale(1.09);
+    border-color: var(--rail, #6d7fd8);
+    box-shadow: 0 0 0 5px rgba(8, 11, 32, 0.92), 0 0 26px -3px var(--rail, #6d7fd8);
+  }
+  .sky-body .ev-node:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+  .sky-body .ev-body { min-width: 0; padding-top: 2px; }
+  .sky-body .ev-title {
+    margin: 0; font-weight: 700; font-size: 15.5px; letter-spacing: -0.005em;
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  }
+  .sky-body .ev-soon {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase;
+    color: #0d1330; background: var(--gold); padding: 3px 7px; border-radius: 999px;
+  }
+  .sky-body .ev-meta {
+    margin: 4px 0 0; font-size: 12px; color: #8d9bd6;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.015em;
+  }
+  .sky-body .ev-day { display: none; }
+  .sky-body .ev-detail {
+    margin: 8px 0 0; font-size: 13.5px; color: #a8b4e0; line-height: 1.55;
+    text-wrap: pretty; max-width: 60ch;
+  }
+
+  .sky-body .ev-count { color: #e5c684; font-weight: 650; }
+  .sky-body .ev-count-block {
+    margin: 0; justify-self: end; padding-top: 5px;
+    font-size: 12.5px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .sky-body .ev-count-inline { display: none; }
+  .sky-body .ev-count-inline::before { content: ' · '; opacity: 0.45; color: #8d9bd6; }
+
   /* Weighted by how much of a fuss the thing actually is, so a total eclipse
      does not sit in the same typography as a first quarter. */
-  .sky-body .ev.rank-3 {
-    background: linear-gradient(150deg, rgba(44, 40, 78, 0.9), rgba(19, 20, 51, 0.85));
-    border-color: rgba(255, 217, 138, 0.32);
-    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.38), inset 0 0 34px rgba(255, 200, 110, 0.05);
-  }
-  .sky-body .ev.rank-3 .ev-title { color: #ffe9b8; font-size: 17.5px; }
-  .sky-body .ev.soon::after {
-    content: 'soon'; position: absolute; top: 11px; right: 13px;
-    font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #0d1330; background: var(--gold); padding: 2px 7px; border-radius: 999px;
-  }
+  .sky-body .ev.rank-3 .ev-title { color: #ffe9b8; font-size: 17px; }
+  .sky-body .ev.rank-3 .ev-node { border-color: rgba(255, 217, 138, 0.34); }
+
   /* The row whose picture is on the stage. */
   .sky-body .ev.is-lead {
-    border-color: rgba(255, 217, 138, 0.55);
-    box-shadow: 0 0 0 1px rgba(255, 217, 138, 0.3), 0 12px 34px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(90deg, rgba(255, 217, 138, 0.11), rgba(255, 217, 138, 0.02) 55%, transparent);
   }
-  .sky-body .ev.is-lead::before { background: var(--gold); }
-
-  /* "Draw this one" is a small real button rather than a click handler
-     stretched over the whole row. A row-sized invisible button would have
-     swallowed text selection on a page that is mostly there to be read, and it
-     is always visible rather than hover-only, because a control that appears
-     on hover does not exist on a phone. */
-  .sky-body .ev-pick {
-    position: absolute; right: 11px; bottom: 10px;
-    border: 1px solid transparent; background: transparent; cursor: pointer;
-    font: inherit; font-size: 10.5px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    /* #64719f measured 3.8:1 on the row's own gradient, under the 4.5 that
-       10.5px text needs. */
-    color: #8b98cb;
-    padding: 7px 10px; border-radius: 999px; min-height: 24px;
-    transition: color 150ms var(--ease), background 150ms var(--ease),
-      border-color 150ms var(--ease);
-  }
-  .sky-body .ev-pick:hover, .sky-body .ev-pick:focus-visible {
-    color: #0d1330; background: var(--gold); border-color: var(--gold);
-  }
-  .sky-body .ev-pick:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-  .sky-body .ev.is-lead .ev-pick { visibility: hidden; }
-  /* Room for it, so it never lands on the last line of the blurb. */
-  .sky-body .ev-body { padding-bottom: 18px; }
-  .sky-body .feed-hint {
-    margin: 0 0 4px; font-size: 12px; color: var(--faint); text-align: center;
+  .sky-body .ev.is-lead .ev-date b { color: var(--gold); }
+  .sky-body .ev.is-lead .ev-node {
+    border-color: rgba(255, 217, 138, 0.62);
+    box-shadow: 0 0 0 5px rgba(8, 11, 32, 0.92), 0 0 26px -3px rgba(255, 217, 138, 0.6);
   }
 
   .sky-body .hl-back {
@@ -1898,19 +2011,25 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   .sky-body .hl-back:hover { background: #1f2a5e; color: var(--sky-ink); }
 
-  .sky-body .ev-glyph { flex: none; line-height: 0; }
-  .sky-body .glyph { width: 40px; height: 40px; display: block; }
-  .sky-body .ev-body { min-width: 0; flex: 1; }
-  .sky-body .ev-title { margin: 0; font-weight: 700; font-size: 15.5px; letter-spacing: -0.005em; }
-  .sky-body .ev-when {
-    margin: 3px 0 0; font-size: 12.5px; color: #98a6dd;
-    font-variant-numeric: tabular-nums;
-  }
-  .sky-body .ev-when .dot { opacity: 0.45; }
-  .sky-body .ev-count { color: #e0c17d; font-weight: 600; }
-  .sky-body .ev-detail { margin: 7px 0 0; font-size: 13.5px; color: #a8b4e0; line-height: 1.55; text-wrap: pretty; }
+  .sky-body .foot { margin: 28px 0 0; text-align: center; font-size: 13px; color: var(--faint); }
 
-  .sky-body .foot { margin: 26px 0 0; text-align: center; font-size: 13px; color: var(--faint); }
+  /* Narrow: the date column and the right-hand countdown both fold into the
+     meta line, which is why each is rendered twice and hidden once. */
+  @media (max-width: 620px) {
+    .sky-body .ev {
+      grid-template-columns: 44px minmax(0, 1fr);
+      gap: 0 13px; padding: 13px 14px 14px;
+    }
+    .sky-body .ev-date, .sky-body .ev-count-block { display: none; }
+    /* The filter pills wrap to two rows down here, so a month header stuck at a
+       fixed offset lands behind them. Two stacked sticky bars on a phone is
+       most of the screen anyway. */
+    .sky-body .mon-h { position: static; backdrop-filter: none; background: none; }
+    /* Static, so its soft edge would anchor to .wrap and land anywhere. */
+    .sky-body .mon-h::before { display: none; }
+    .sky-body .ev-day { display: inline; }
+    .sky-body .ev-count-inline { display: inline; }
+  }
 
   /* --- the explanation --------------------------------------------------- */
 
@@ -1944,13 +2063,14 @@ import GameLayout from '../layouts/GameLayout.astro'
     .sky-body .controls { margin-inline: -14px; padding-inline: 14px; }
     .sky-body .hero-text { padding: 20px 18px 22px; }
     .sky-body .panel { padding: 15px 14px 17px; }
-    .sky-body .glyph { width: 32px; height: 32px; }
-    .sky-body .ev { gap: 11px; padding: 12px 13px; }
+    .sky-body .ev-node { width: 42px; height: 42px; }
+    .sky-body .ev-node .glyph { width: 29px; height: 29px; }
+    .sky-body .ev { grid-template-columns: 42px minmax(0, 1fr); }
     .sky-body .moon-row { justify-content: center; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .sky-body .ev { animation: none; }
-    .sky-body .ev.flash { animation: none; outline: 2px solid var(--gold); }
+    .sky-body .ev-node:hover, .sky-body .ev-node:focus-visible { transform: none; }
   }
 </style>
