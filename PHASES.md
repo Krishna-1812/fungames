@@ -143,6 +143,14 @@ running sky. This does not replace real-device or built-site release testing.
 
 ## Phase 4 — remaining collection
 
+Fusion interaction batch: added a native two-selector form for combining
+discovered elements without dragging, including identical pairs. It calls the
+same merge/discovery path as pointer input, prevents duplicate form submissions
+and leaves a persistent readable result. New discoveries populate the selectors
+and existing choices survive tray filtering. Recipe, storage and failure tests
+pass; Astro markup and client script compilation pass. Full keyboard/browser
+verification is pending the existing preview dependency-access blocker.
+
 ### Auction bidder presentation and release-check follow-up
 
 Added five distinct decorative bidder portraits, collapsible descriptions of

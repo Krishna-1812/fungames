@@ -22,6 +22,17 @@ const API = SITE.fusionApi
         <button type="button" id="reset" title="Start over">reset</button>
       </div>
       <input id="filter" type="search" placeholder="search…" aria-label="Filter elements" />
+      <details class="recipe-controls">
+        <summary>Combine without dragging</summary>
+        <form id="recipeForm">
+          <label for="firstIngredient">First element</label>
+          <select id="firstIngredient" required></select>
+          <label for="secondIngredient">Second element</label>
+          <select id="secondIngredient" required></select>
+          <button type="submit" id="combineButton">Combine elements</button>
+          <p id="recipeStatus" role="status">Choose two discoveries. You can use the same element twice.</p>
+        </form>
+      </details>
       <div class="tray-list" id="tray"></div>
     </aside>
 
@@ -49,6 +60,11 @@ const API = SITE.fusionApi
   const foundEl = document.getElementById('found')
   const toast = document.getElementById('toast')
   const tip = document.getElementById('tip')
+  const firstIngredient = document.getElementById('firstIngredient') as HTMLSelectElement
+  const secondIngredient = document.getElementById('secondIngredient') as HTMLSelectElement
+  const recipeStatus = document.getElementById('recipeStatus')!
+  const combineButton = document.getElementById('combineButton') as HTMLButtonElement
+  let recipeBusy = false
   document.getElementById('reset').addEventListener('click', () => {
     if (confirm('Throw away every discovery?')) {
       try { localStorage.removeItem(KEY); location.reload() }
@@ -239,6 +255,12 @@ const API = SITE.fusionApi
     board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
     if (!target) return
 
+    await mergePieces(el, target)
+  }
+
+  async function mergePieces(el, target) {
+    if (el.disabled || target.disabled || el === target) return null
+
     const a = { text: el.dataset.text, emoji: el.dataset.emoji }
     const b = { text: target.dataset.text, emoji: target.dataset.emoji }
     const left = parseFloat(target.style.left)
@@ -253,7 +275,7 @@ const API = SITE.fusionApi
     if (!res) {
       sfx.bad()
       show(`No recipe for ${a.text} + ${b.text} yet. Try a different pair.`)
-      return
+      return null
     }
 
     el.remove()
@@ -286,6 +308,7 @@ const API = SITE.fusionApi
     }
     save()
     renderTray()
+    return made
   }
   board.addEventListener('pointerup', drop)
   board.addEventListener('pointercancel', () => {
@@ -297,6 +320,46 @@ const API = SITE.fusionApi
   })
 
   // ---- tray ---------------------------------------------------------------
+  function refreshIngredients() {
+    for (const [index, select] of [firstIngredient, secondIngredient].entries()) {
+      const previous = select.value
+      select.replaceChildren(...state.items.map(item => {
+        const option = document.createElement('option')
+        option.value = item.text; option.textContent = `${item.emoji} ${item.text}`
+        return option
+      }))
+      select.value = state.items.some(item => item.text === previous) ? previous : state.items[Math.min(index, state.items.length - 1)].text
+    }
+  }
+  document.getElementById('recipeForm')!.addEventListener('submit', async e => {
+    e.preventDefault()
+    if (recipeBusy) return
+    const a = state.items.find(item => item.text === firstIngredient.value)
+    const b = state.items.find(item => item.text === secondIngredient.value)
+    if (!a || !b) return
+    recipeBusy = true; combineButton.disabled = true
+    firstIngredient.disabled = secondIngredient.disabled = true
+    recipeStatus.textContent = `Combining ${a.text} and ${b.text}…`
+    unlock(); tip.hidden = true
+    const bounds = board.getBoundingClientRect()
+    const x = Math.max(8, bounds.width / 2 - 70), y = Math.max(8, bounds.height / 2 - 25)
+    const first = spawn(a, x, y), second = spawn(b, x, y)
+    try {
+      const made = await mergePieces(first, second)
+      if (made) recipeStatus.textContent = `${a.text} + ${b.text} = ${made.dataset.text}. Ready for another pair.`
+      else {
+        first.remove(); second.remove()
+        recipeStatus.textContent = `No recipe for ${a.text} + ${b.text} yet. Try another pair.`
+      }
+    } catch {
+      first.remove(); second.remove()
+      recipeStatus.textContent = 'Could not complete this combination. Please try again.'
+    } finally {
+      recipeBusy = false; combineButton.disabled = false
+      firstIngredient.disabled = secondIngredient.disabled = false
+      if (document.activeElement === document.body) combineButton.focus({ preventScroll: true })
+    }
+  })
   function renderTray() {
     const q = filter.value.trim().toLowerCase()
     const items = state.items.filter((i) => !q || i.text.toLowerCase().includes(q))
@@ -315,6 +378,7 @@ const API = SITE.fusionApi
       })
     )
     foundEl.textContent = String(state.items.length)
+    refreshIngredients()
   }
   filter.addEventListener('input', renderTray)
 
@@ -350,6 +414,14 @@ const API = SITE.fusionApi
 <!-- .piece / .chip are created in JS, and JS-created nodes do not get Astro's
      scoped-style attribute, so these rules must be global. -->
 <style is:global>
+  .recipe-controls { margin: 0 12px 10px; border: 1px solid #51457e; border-radius: 10px; background: #211b43; overflow-y: auto; flex-shrink: 0; max-height: 50%; }
+  .recipe-controls summary { padding: 10px; cursor: pointer; font-size: 12px; color: #e7dbff; }
+  #recipeForm { display: grid; gap: 7px; padding: 0 10px 10px; }
+  #recipeForm label { font-size: 12px; color: #c9bde5; }
+  #recipeForm select, #recipeForm button { width: 100%; min-width: 0; padding: 9px; border-radius: 7px; border: 1px solid #685b94; color: #fff; background: #302751; font: inherit; font-size: 13px; }
+  #recipeForm button { cursor: pointer; background: #ded0ff; color: #241d3b; font-weight: 600; }
+  #recipeForm button:disabled { opacity: .65; cursor: wait; }
+  #recipeStatus { font-size: 12px; line-height: 1.5; color: #dacdea; margin: 2px 0; }
   .stage { position: relative; height: 100%; display: flex; background: #16122e; color: #fff; }
 
   .board { position: relative; flex: 1; overflow: hidden; touch-action: none; }
