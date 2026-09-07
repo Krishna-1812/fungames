@@ -62,6 +62,70 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
 export const ART: Record<string, Illustration> = {
+  /* ---- Universe Forecast ----------------------------------------------- */
+  'universe-forecast': {
+    subject: 'totality over a horizon, with the lunar month running along beneath it',
+    // `full` because the subject is a sky, and a sky in a box on the right is
+    // just a logo.
+    //
+    // Two constraints come with it, and the first draft broke both. `full` is
+    // xMidYMid *slice*, and the three card widths have aspect ratios from 2.03
+    // to 3.89, so a drawing gets cropped hard on one axis or the other. Against
+    // this 320x120 box the region visible on every card is only x 38–282 by
+    // y 19–101; the first version put its horizon and its row of moons at
+    // y 100–130, which on the widest card were not merely cut off but outside
+    // the frame entirely — and resvg panics outright on an element with no
+    // visible box, taking the whole checker down with a Rust backtrace and no
+    // slug. Everything below therefore lives inside that band.
+    //
+    // The second: the slot dissolves from 10% to 70% of the width, so anything
+    // that has to be legible belongs on the right.
+    slot: 'full',
+    viewBox: '0 0 320 120',
+    palette: ['#ffd98a', '#fff3d0', '#8fb4ff', '#2b3873'],
+    draw: (seed) => {
+      const CX = 224, CY = 50, R = 21
+      // The corona as spokes, not a blur: a blur at tile size resolves to a
+      // fuzzy grey ring and reads as a rendering mistake rather than as light.
+      const corona = range(34).map((i) => {
+        const a = (i / 34) * Math.PI * 2 + rnd(seed, i) * 0.12
+        const r1 = R + 4 + rnd(seed, i + 40) * 16
+        return `<path d="M${n(CX + Math.cos(a) * (R + 1))} ${n(CY + Math.sin(a) * (R + 1))} ` +
+          `L${n(CX + Math.cos(a) * r1)} ${n(CY + Math.sin(a) * r1)}" ` +
+          `stroke="#ffd98a" stroke-width="${n(0.9 + rnd(seed, i + 90) * 1.7)}" ` +
+          `stroke-linecap="round" opacity="${n(0.22 + rnd(seed, i + 12) * 0.5)}"/>`
+      }).join('')
+      // Stars only inside the always-visible band, and never inside the corona,
+      // where they would read as dust on the lens.
+      const stars = range(54).map((i) => {
+        const x = 44 + rnd(seed, i + 200) * 234
+        const y = 24 + rnd(seed, i + 300) * 52
+        if (Math.hypot(x - CX, y - CY) < R + 21) return ''
+        return `<circle cx="${n(x)}" cy="${n(y)}" r="${n(0.6 + rnd(seed, i + 400) * 1.4)}" ` +
+          `fill="#fff3d0" opacity="${n(0.18 + rnd(seed, i + 500) * 0.55)}"/>`
+      }).join('')
+      // The month running underneath, waxing left to right — the other half of
+      // what the page forecasts, and what makes the tile read as a calendar of
+      // the sky rather than one picture of one eclipse.
+      const Y = 92, r = 6.5
+      const phase = (x: number, lit: number) => {
+        if (lit === 0)
+          return `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="none" stroke="#8fb4ff" stroke-width="1.4" opacity="0.7"/>`
+        if (Math.abs(lit) === 2)
+          return `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="#8fb4ff" opacity="0.9"/>`
+        return `<path d="M${n(x)} ${Y - r} a${r} ${r} 0 0 ${lit > 0 ? 1 : 0} 0 ${2 * r}Z" fill="#8fb4ff" opacity="0.9"/>` +
+          `<circle cx="${n(x)}" cy="${Y}" r="${r}" fill="none" stroke="#2b3873" stroke-width="1.2"/>`
+      }
+      return `
+        <g>${stars}</g>
+        <g>${corona}</g>
+        <circle cx="${CX}" cy="${CY}" r="${R + 4}" fill="#fff3d0" opacity="0.75"/>
+        <circle cx="${CX}" cy="${CY}" r="${R - 4}" fill="#0b1030"/>
+        <circle cx="${CX}" cy="${CY}" r="${R - 3.2}" fill="none" stroke="#ffd98a" stroke-width="1.7"/>
+        ${[0, 1, 2, -1, 0].map((lit, i) => phase(64 + i * 42, i === 2 ? 2 : lit)).join('')}`
+    },
+  },
+
   /* ---- The Auction Game ------------------------------------------------ */
   auction: {
     subject: 'a gavel coming down on the block, over a bidding paddle',

@@ -31,6 +31,15 @@ export type Game = {
 
 export const GAMES: Game[] = [
   {
+    slug: 'universe-forecast',
+    title: 'Universe Forecast',
+    blurb: 'The weather, for the sky',
+    description:
+      'Every eclipse, solstice, full moon and meteor shower for the next two years, worked out in your browser from the orbits themselves rather than looked up. It can tell a total eclipse from a ring, and it will still be right in 2400.',
+    accent: '#0b1030', accent2: '#ffd98a',
+    added: '2026-09-19',
+  },
+  {
     slug: 'auction',
     title: 'The Auction Game',
     blurb: 'Fourteen lots. You will overpay.',

@@ -600,7 +600,28 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    increments, a real buyer's premium, a reserve and chandelier bidding. The
    site now has a game loop. `scripts/check-auction.mjs` measures the winner's
    curse emerging from the model over 28,000 lots, and guards the balance.
-4. Then reassess against the depth work in Phases 1–2 above.
+4. ~~**Universe Forecast**~~ — **done.** Four series out of Meeus running in
+   the browser: equinoxes and solstices, phases of the Moon, which of those
+   phases are eclipses and of what kind, and the Earth at perihelion and
+   aphelion. `scripts/check-forecast.mjs` holds it to Meeus's own worked
+   examples and to eight eclipses people have stood outside and watched, by
+   date *and* by type — and then to the things no single wrong coefficient
+   could fake: every solar eclipse landing on its own new moon, the Saros
+   recurrence at 223 lunations, and between two and five solar eclipses in
+   every year from 1900 to 2100.
+
+   The pattern held for a fourth time, including the part where the instrument
+   contradicts you and you have to ask which of the two is wrong. Three checks
+   failed on the first run and none of them was the model: one expected value
+   was the *mean* phase Meeus prints before applying corrections rather than
+   the answer, one demanded minute-level agreement on a quantity the Moon
+   moves by hours, and one set a tolerance tighter than the measurement could
+   support. What the checkers did catch was real: a share card whose sentence
+   and stat labels both ran off the end, and an eclipse tile that made resvg
+   abort outright because a `slice` slot had cropped two of its shapes clean
+   out of the frame.
+
+5. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

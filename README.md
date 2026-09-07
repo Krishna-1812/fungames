@@ -100,6 +100,7 @@ src/
     time-art.ts         a scene for each, flat colour on one palette
     trolley-scene.ts    the field, the track, the tram and whoever is on it
     fold-paper.ts       Gallivan's equations, and where a real sheet gives up
+    sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion
     result-card.ts      the 1200x630 card for a *result*, not for a game
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished
@@ -352,6 +353,7 @@ node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
 node scripts/check-time-art.mjs    # Deep Time's scenes, at the card's own widths
 node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
 node scripts/check-fold.mjs        # the paper model, against paper
+node scripts/check-forecast.mjs    # the sky model, against Meeus and real eclipses
 node scripts/check-result-card.mjs # the share card, at every game and result shape
 node scripts/check-stats.mjs       # what the site remembers, against a hostile store
 ```

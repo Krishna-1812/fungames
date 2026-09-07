@@ -1,0 +1,400 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+
+/**
+ * Universe Forecast — the weather, for the sky.
+ *
+ * Every date here is computed in the visitor's browser from orbital mechanics
+ * (see lib/sky-forecast.ts), which is the entire point of the page. A list of
+ * dates typed into a file is a page that starts lying on a day nobody chose;
+ * this one is still right in 2400.
+ *
+ * Rendered on the client rather than at build time for the same reason. A
+ * static build would freeze "next" to whatever was true the morning it was
+ * deployed, and "next" is the whole proposition.
+ */
+---
+
+<GameLayout slug="universe-forecast" bar="#0b1030" bodyClass="sky-body">
+  <div class="stars" id="stars" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <header class="head">
+      <h1>Universe Forecast</h1>
+      <p class="lede">
+        What the sky is going to do, and when. Every date below is worked out in
+        your browser from the orbits themselves — nothing here was looked up.
+      </p>
+    </header>
+
+    <!-- The one event everything else is a footnote to. -->
+    <section class="headline" id="headline" aria-live="polite">
+      <p class="loading">Working out where everything is…</p>
+    </section>
+
+    <div class="controls" role="group" aria-label="What to show">
+      <button type="button" class="filter is-on" data-filter="all">Everything</button>
+      <button type="button" class="filter" data-filter="eclipse">Eclipses</button>
+      <button type="button" class="filter" data-filter="phase">The Moon</button>
+      <button type="button" class="filter" data-filter="season">Seasons</button>
+      <button type="button" class="filter" data-filter="shower">Meteors</button>
+    </div>
+
+    <ol class="feed" id="feed"></ol>
+
+    <p class="foot" id="foot"></p>
+
+    <details class="how">
+      <summary>How this is worked out</summary>
+      <div class="how-body">
+        <p>
+          Four series out of Jean Meeus's <em>Astronomical Algorithms</em>, running
+          in this tab: the equinoxes and solstices, the phases of the Moon, which
+          of those phases are eclipses, and the two days a year the Earth is
+          nearest and furthest from the Sun.
+        </p>
+        <p>
+          The eclipse one is the good trick. It does not consult a catalogue of
+          eclipses. It takes the angle between the Moon and the plane the Earth
+          goes round the Sun in, and if that angle is too steep it stops, because
+          the shadow will miss. If it is shallow enough, five more numbers decide
+          whether the shadow's axis actually lands on the Earth, and whether the
+          Moon is close enough to cover the Sun completely or far enough to leave
+          a ring of it showing. That is the difference between a total eclipse and
+          an annular one, and it comes out of arithmetic.
+        </p>
+        <p>
+          Times are UTC and good to about a minute. The limit is not the orbits —
+          those are known far better than that — but the Earth's own rotation,
+          which speeds up and slows down unpredictably and has to be measured
+          rather than predicted.
+        </p>
+        <p class="how-caveat">
+          The meteor showers are the exception, and are marked as such: a shower's
+          peak is where the Earth runs into debris laid down over centuries, and
+          the rates are what observers counted. Those are a table. Everything else
+          on this page is a calculation.
+        </p>
+      </div>
+    </details>
+  </div>
+</GameLayout>
+
+<script>
+  import { forecast, formatWhen, countdown } from '../lib/sky-forecast'
+  import { recordPlay } from '../lib/stats'
+  import { onShare } from '../lib/share-card'
+  import { prefersReducedMotion } from '../lib/gl'
+  import { SITE } from '../site.config'
+
+  const headline = document.getElementById('headline') as HTMLElement
+  const feed = document.getElementById('feed') as HTMLOListElement
+  const foot = document.getElementById('foot') as HTMLElement
+  const starsHost = document.getElementById('stars') as HTMLElement
+
+  /* Two years is enough to guarantee at least four eclipses and two of every
+     season in the list, without making the page a scroll through a century. */
+  const now = new Date()
+  const HORIZON = new Date(+now + 2 * 365.25 * 86400_000)
+  const events = forecast(now, HORIZON)
+
+  const ICON: Record<string, string> = {
+    eclipse: 'eclipse', phase: 'moon', season: 'sun', apsis: 'orbit', shower: 'meteor',
+  }
+
+  /* Drawn rather than set as emoji, for the reason the whole site is: an emoji
+     in the corner of every row is the loudest possible way of saying nobody
+     drew anything. */
+  function glyph(kind: string, title: string): string {
+    const w = '<svg viewBox="0 0 40 40" aria-hidden="true" class="glyph">'
+    switch (ICON[kind]) {
+      /* Five different things, and the first draft drew one icon for all of
+         them: a bite out of the Sun, used for lunar eclipses too. A lunar
+         eclipse is the Earth's shadow falling on the Moon, which is not that
+         picture and is not even the same object. */
+      case 'eclipse': {
+        const t = title.split(' ')[0]
+        if (/lunar/.test(title)) {
+          if (t === 'Total')
+            // Not black. A totally eclipsed Moon is a dull copper, lit by every
+            // sunrise and sunset on Earth at once, and that is the whole reason
+            // anybody gets up for one.
+            return w + '<circle cx="20" cy="20" r="12.5" fill="#a8493a"/>' +
+              '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#d9755c" stroke-width="1.3"/></svg>'
+          if (t === 'Partial')
+            return w + '<circle cx="20" cy="20" r="12.5" fill="#e9edff"/>' +
+              '<path d="M20 7.5 A12.5 12.5 0 0 0 20 32.5 A17 17 0 0 1 20 7.5Z" fill="#7a4038"/>' +
+              '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#8b96c9" stroke-width="1.1"/></svg>'
+          return w + '<circle cx="20" cy="20" r="12.5" fill="#c3c9e4"/>' +
+            '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#8b96c9" stroke-width="1.1"/></svg>'
+        }
+        if (t === 'Total')
+          return w + '<circle cx="20" cy="20" r="15.5" fill="none" stroke="#ffe9a8" stroke-width="1.5" opacity="0.85"/>' +
+            '<circle cx="20" cy="20" r="13" fill="#0b1030" stroke="#f7d774" stroke-width="1.6"/></svg>'
+        if (t === 'Annular' || t === 'Hybrid')
+          // A ring, which is exactly what the word means and what you see.
+          return w + '<circle cx="20" cy="20" r="13" fill="#f2b23c"/>' +
+            '<circle cx="20" cy="20" r="9" fill="#0b1030"/></svg>'
+        return w + '<circle cx="20" cy="20" r="13" fill="#f2b23c"/>' +
+          '<circle cx="27" cy="14" r="11" fill="#0b1030"/></svg>'
+      }
+      case 'moon': {
+        const full = /Full/.test(title)
+        const nw = /New/.test(title)
+        if (full) return w + '<circle cx="20" cy="20" r="12.5" fill="#e9edff"/></svg>'
+        if (nw) return w + '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#6b78b8" stroke-width="1.6" stroke-dasharray="3 3"/></svg>'
+        return w + '<path d="M20 7.5 a12.5 12.5 0 0 1 0 25Z" fill="#c9d3ff"/>' +
+          '<circle cx="20" cy="20" r="12.5" fill="none" stroke="#6b78b8" stroke-width="1.4"/></svg>'
+      }
+      case 'sun':
+        return w + '<circle cx="20" cy="20" r="8" fill="#ffd98a"/>' +
+          Array.from({ length: 8 }, (_, i) => {
+            const a = (i / 8) * Math.PI * 2
+            const x1 = 20 + Math.cos(a) * 11.5, y1 = 20 + Math.sin(a) * 11.5
+            const x2 = 20 + Math.cos(a) * 15.5, y2 = 20 + Math.sin(a) * 15.5
+            return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="#ffd98a" stroke-width="2" stroke-linecap="round"/>`
+          }).join('') + '</svg>'
+      case 'orbit':
+        return w + '<ellipse cx="20" cy="20" rx="16" ry="8" fill="none" stroke="#8fb4ff" stroke-width="1.5"/>' +
+          '<circle cx="20" cy="20" r="4.5" fill="#ffd98a"/><circle cx="35" cy="21" r="3" fill="#7fe0c0"/></svg>'
+      default:
+        return w + '<path d="M6 32 L26 10" stroke="#b9c9ff" stroke-width="2.4" stroke-linecap="round"/>' +
+          '<path d="M17 33 L30 18" stroke="#8fb4ff" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>' +
+          '<path d="M25 34 L34 24" stroke="#8fb4ff" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>'
+    }
+  }
+
+  /* ---- the headline ----------------------------------------------------- */
+
+  /* The next eclipse if there is one within the window, otherwise the next
+     thing that is not simply the Moon doing what it does every month. Leading
+     on "first quarter, in three days" would waste the largest type on the page
+     on the least interesting fact available. */
+  const lead =
+    events.find((e) => e.kind === 'eclipse' && e.rank === 3) ??
+    events.find((e) => e.kind === 'eclipse') ??
+    events.find((e) => e.rank >= 2) ??
+    events[0]
+
+  function paintHeadline() {
+    if (!lead) { headline.innerHTML = '<p class="loading">Nothing in the next two years, which cannot be right.</p>'; return }
+    headline.innerHTML =
+      `<p class="hl-kicker">Next, the one worth putting in the diary</p>
+       <h2 class="hl-title">${lead.title}</h2>
+       <p class="hl-when">${formatWhen(lead.when, lead.timed)}</p>
+       <p class="hl-count" id="hlCount">${countdown(new Date(), lead.when)}</p>
+       <p class="hl-detail">${lead.detail}</p>`
+  }
+
+  /* ---- the feed --------------------------------------------------------- */
+
+  let filter = 'all'
+
+  function paintFeed() {
+    const shown = events.filter((e) => filter === 'all' || e.kind === filter)
+    /* The Moon alone is fifty rows a year, which buries everything else. Shown
+       in full only when it is what you asked for. */
+    const list = filter === 'all' ? shown.filter((e) => e.rank >= 1).slice(0, 40) : shown.slice(0, 60)
+    feed.innerHTML = list.map((e) => {
+      const soon = +e.when - +new Date() < 7 * 86400_000
+      return `<li class="ev rank-${e.rank}${soon ? ' soon' : ''}">
+        ${glyph(e.kind, e.title)}
+        <div class="ev-body">
+          <p class="ev-title">${e.title}</p>
+          <p class="ev-when">${formatWhen(e.when, e.timed)} · <span class="ev-count" data-at="${+e.when}">${countdown(new Date(), e.when)}</span></p>
+          <p class="ev-detail">${e.detail}</p>
+        </div>
+      </li>`
+    }).join('')
+    foot.textContent =
+      `${shown.length} events between now and ${HORIZON.getUTCFullYear()}, all of them computed here, in this tab.`
+  }
+
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.filter')) {
+    btn.addEventListener('click', () => {
+      filter = btn.dataset.filter!
+      for (const b of document.querySelectorAll('.filter')) b.classList.toggle('is-on', b === btn)
+      paintFeed()
+    })
+  }
+
+  paintHeadline()
+  paintFeed()
+
+  /* The countdowns are the only live thing. Once a minute is enough — they are
+     never quoted finer than that, so a rAF loop would be a lot of work to
+     rewrite the same string sixty times a second. */
+  setInterval(() => {
+    const t = new Date()
+    const hl = document.getElementById('hlCount')
+    if (hl && lead) hl.textContent = countdown(t, lead.when)
+    for (const el of document.querySelectorAll<HTMLElement>('.ev-count'))
+      el.textContent = countdown(t, new Date(Number(el.dataset.at)))
+  }, 30_000)
+
+  /* ---- the sky it sits on ----------------------------------------------- */
+
+  /* Static stars, drawn once. A twinkle would be motion for its own sake on a
+     page that is mostly text, and this is the kind of page people read. */
+  {
+    const rnd = (s: number) => { const x = Math.sin(s * 9301 + 49297) * 233280; return x - Math.floor(x) }
+    let s = ''
+    for (let i = 0; i < 160; i++) {
+      const r = 0.4 + rnd(i * 3) * 1.5
+      s += `<circle cx="${(rnd(i) * 100).toFixed(2)}%" cy="${(rnd(i * 7 + 1) * 100).toFixed(2)}%" r="${r.toFixed(2)}" fill="#dfe6ff" opacity="${(0.18 + rnd(i * 11) * 0.55).toFixed(2)}"/>`
+    }
+    starsHost.innerHTML = `<svg width="100%" height="100%" aria-hidden="true">${s}</svg>`
+    if (!prefersReducedMotion) starsHost.classList.add('drift')
+  }
+
+  /* ---- the record ------------------------------------------------------- */
+
+  recordPlay('universe-forecast')
+
+  /* The card is the next real event and how long you have to wait for it,
+     which is the only thing on this page anybody would want to send someone.
+     Its sentence is not the feed's — check-result-card measured the feed blurb
+     running off the end of the card, and the stat labels with it. A card gets
+     one short line, so these are written for the card. */
+  const CARD_LINE: [RegExp, string][] = [
+    [/Total solar/, 'Daylight stops, somewhere.'],
+    [/Annular solar|Hybrid solar/, 'A ring of Sun, somewhere.'],
+    [/Partial solar/, 'A bite out of the Sun.'],
+    [/Total lunar/, 'The Moon turns red.'],
+    [/Partial lunar/, 'The Earth’s shadow, half across it.'],
+    [/Penumbral lunar/, 'A faint greying of the Moon.'],
+  ]
+
+  onShare(
+    () => {
+      if (!lead) return null
+      const eclipses = events.filter((e) => e.kind === 'eclipse').length
+      const tail = CARD_LINE.find(([re]) => re.test(lead.title))?.[1] ?? ''
+      return {
+        slug: 'universe-forecast',
+        siteName: SITE.name,
+        headline: lead.title,
+        sub: `${formatWhen(lead.when, lead.timed)}${tail ? '. ' + tail : ''}`,
+        stats: [
+          { label: 'From now', value: countdown(new Date(), lead.when).replace(/^in /, '') },
+          { label: 'Eclipses', value: String(eclipses) },
+          { label: 'Events', value: String(events.length) },
+        ],
+      }
+    },
+    (c) => ({
+      title: 'Universe Forecast',
+      text: `${c.headline} — ${countdown(new Date(), lead!.when)}.`,
+    }),
+  )
+</script>
+
+<!-- is:global, and every rule namespaced under .sky-body.
+
+     The headline and the whole feed are built with innerHTML at runtime, and
+     nodes created that way never receive Astro's scoping attribute — a scoped
+     .ev rule matches nothing, which left every row 781px tall with its glyph
+     rendering at natural size. The namespace is what keeps going global from
+     also meaning going loose: .wrap, .head and .ev are common enough names to
+     collide with the layout's own global rules otherwise. -->
+<style is:global>
+  .sky-body { background: #070b1e; color: #e9edff; }
+
+  .sky-body .stars {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 120% 80% at 50% -10%, #1b2450 0%, transparent 62%),
+      radial-gradient(ellipse 90% 60% at 85% 105%, #17324a 0%, transparent 60%);
+  }
+  .sky-body .stars.drift svg { animation: sky-drift 240s linear infinite alternate; }
+  @keyframes sky-drift { to { transform: translate3d(-2%, 1.5%, 0) scale(1.06); } }
+
+  .sky-body .wrap { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 44px 20px 100px; }
+
+  .sky-body .head { text-align: center; margin-bottom: 30px; }
+  .sky-body .head h1 { font-size: clamp(34px, 7vw, 58px); }
+  .sky-body .lede { color: #a8b6e8; margin: 12px auto 0; max-width: 50ch; text-wrap: pretty; }
+
+  /* --- the headline ------------------------------------------------------ */
+
+  .sky-body .headline {
+    background: linear-gradient(168deg, #141d47, #0d1330);
+    border: 1px solid #2b3873; border-radius: var(--radius-lg);
+    padding: 26px 24px 24px; text-align: center;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  }
+  .sky-body .loading { color: #8593c9; margin: 0; }
+  .sky-body .hl-kicker {
+    margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: #7f8fd0;
+  }
+  .sky-body .hl-title { font-size: clamp(26px, 5.4vw, 40px); margin: 10px 0 0; }
+  .sky-body .hl-when { margin: 8px 0 0; color: #b9c6f5; font-variant-numeric: tabular-nums; }
+  .sky-body .hl-count {
+    margin: 14px 0 0; font-size: 19px; font-weight: 700; color: #ffd98a;
+    font-variant-numeric: tabular-nums;
+  }
+  .sky-body .hl-detail { margin: 14px auto 0; max-width: 48ch; color: #a3b1e4; font-size: 15px; text-wrap: pretty; }
+
+  /* --- filters ----------------------------------------------------------- */
+
+  .sky-body .controls { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin: 22px 0 14px; }
+  .sky-body .filter {
+    border: 1px solid #33407c; background: #131b3f; color: #b6c3f0;
+    border-radius: 999px; padding: 7px 15px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 140ms var(--ease), color 140ms var(--ease),
+      border-color 140ms var(--ease);
+  }
+  .sky-body .filter:hover { background: #1b2554; color: #e9edff; }
+  .sky-body .filter.is-on { background: #dfe6ff; border-color: #dfe6ff; color: #0d1330; }
+
+  /* --- the feed ---------------------------------------------------------- */
+
+  .sky-body .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .sky-body .ev {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: rgba(19, 26, 60, 0.72);
+    border: 1px solid #232f63; border-left: 3px solid #2b3873;
+    border-radius: 13px; padding: 13px 15px;
+  }
+  /* Weighted by how much of a fuss the thing actually is, so a total eclipse
+     does not sit in the same typography as a first quarter. */
+  .sky-body .ev.rank-2 { border-left-color: #6d7fd8; }
+  .sky-body .ev.rank-3 { border-left-color: #ffd98a; background: rgba(30, 32, 66, 0.85); }
+  .sky-body .ev.rank-3 .ev-title { color: #ffe9b8; font-size: 17px; }
+  .sky-body .ev.soon { box-shadow: inset 0 0 0 1px rgba(255, 217, 138, 0.25); }
+
+  .sky-body .glyph { width: 36px; height: 36px; flex: none; margin-top: 1px; }
+  .sky-body .ev-body { min-width: 0; }
+  .sky-body .ev-title { margin: 0; font-weight: 700; font-size: 15.5px; }
+  .sky-body .ev-when {
+    margin: 3px 0 0; font-size: 12.5px; color: #98a6dd;
+    font-variant-numeric: tabular-nums;
+  }
+  .sky-body .ev-count { color: #d6b877; }
+  .sky-body .ev-detail { margin: 6px 0 0; font-size: 13.5px; color: #a8b4e0; line-height: 1.5; text-wrap: pretty; }
+
+  .sky-body .foot { margin: 22px 0 0; text-align: center; font-size: 13px; color: #7f8dc6; }
+
+  /* --- the explanation --------------------------------------------------- */
+
+  .sky-body .how { margin: 30px 0 0; border-top: 1px solid #232f63; padding-top: 16px; }
+  .sky-body .how summary {
+    cursor: pointer; font-weight: 600; font-size: 14px; color: #b6c3f0; list-style: none;
+    /* A 22px line box is under the 24px minimum, and this is the only control
+       in the footer. Padded out, with the inline half pulled back so the text
+       still lines up with the paragraphs beneath it. */
+    padding: 9px 10px; margin-inline: -10px; border-radius: 9px;
+  }
+  .sky-body .how summary:hover { background: rgba(109, 127, 216, 0.14); }
+  .sky-body .how summary::-webkit-details-marker { display: none; }
+  .sky-body .how summary::before { content: '\25B8  '; color: #6d7fd8; }
+  .sky-body .how[open] summary::before { content: '\25BE  '; }
+  .sky-body .how-body p { color: #99a7dc; font-size: 14px; line-height: 1.65; max-width: 62ch; text-wrap: pretty; }
+  .sky-body .how-caveat { border-left: 2px solid #33407c; padding-left: 12px; }
+
+  @media (max-width: 480px) {
+    .sky-body .glyph { width: 28px; height: 28px; }
+    .sky-body .ev { gap: 11px; padding: 12px 13px; }
+  }
+</style>

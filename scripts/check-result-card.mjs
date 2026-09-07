@@ -96,6 +96,22 @@ const SAMPLES = [
  * wordiest sentence its template can build. A generic sample cannot catch a
  * game whose own vocabulary is too wide for a chip. */
 const WORST = {
+  /* The longest card Universe Forecast can actually produce. The headline is
+     always an eclipse — the lead picker prefers one over everything else, and a
+     two-year window always holds several — so this is the longest eclipse name
+     over the longest date over the longest of the card's own short lines.
+     The first version of this entry used the feed's blurb instead, and this
+     check is how I found out it does not fit; the page now writes a separate
+     sentence for the card. */
+  'universe-forecast': {
+    headline: 'Penumbral lunar eclipse',
+    sub: '17 September 2027, 07:14 UTC. The Earth’s shadow, half across it.',
+    stats: [
+      { label: 'From now', value: '22 months' },
+      { label: 'Eclipses', value: '8' },
+      { label: 'Events', value: '133' },
+    ],
+  },
   trolley: {
     headline: 'Virtue ethicist',
     sub: '96% of the time, over twenty-six levers. Then contractualist, at 92%.',

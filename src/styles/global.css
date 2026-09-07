@@ -204,6 +204,7 @@ body.is-fixed {
 .trolley-body  { --sb-a: #ff9c5c; --sb-b: #e0563a; --sb-solid: #ef7a4a; }
 .fusion-body   { --sb-a: #b79cff; --sb-b: #7af0ff; --sb-solid: #9cb6f5; }
 .hand-body   { --sb-a: #e0a458; --sb-b: #c9663f; --sb-solid: #d8894c; }
+.sky-body    { --sb-a: #8fb4ff; --sb-b: #ffd98a; --sb-solid: #c2c4c8; }
 /* The three that sit on paper. Rule Cascade in particular is a page you type
    on, and until it had a class of its own its caret came out of the site-wide
    orange while everything around it was green. */

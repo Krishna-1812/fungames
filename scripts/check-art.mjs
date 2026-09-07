@@ -274,6 +274,25 @@ function artOnlySvg(game, W, H) {
          preserveAspectRatio="${PRESERVE[il.slot]}">${il.draw(1)}</svg></svg>`
 }
 
+/**
+ * What is being rasterised right now, for when it goes wrong.
+ *
+ * resvg is a Rust library behind a native binding, and some malformed geometry
+ * makes it panic and abort rather than throw — an element whose visible box is
+ * empty does it, which is easy to produce by accident in a `slice` slot, since
+ * the three card aspect ratios crop a drawing hard and a shape placed outside
+ * the surviving band disappears completely. An abort takes the process down
+ * before any JS handler runs, so the only way to know which drawing did it is
+ * to have said so beforehand, with a write that has already reached the pipe.
+ *
+ * On stderr, and unbuffered: check-all shows stderr only for a suite that
+ * failed, so this is silent when everything works and names the culprit when
+ * it does not.
+ */
+const mark = (what) => {
+  fs.writeSync(2, `  rasterising ${what}\n`)
+}
+
 const raster = (svg, W) => {
   const img = new Resvg(svg, { fitTo: { mode: 'width', value: W } }).render()
   return { px: img.pixels, w: img.width, h: img.height }
@@ -554,6 +573,7 @@ for (const g of games) {
   const worst = { notes: [], line: '' }
   for (const card of CARDS) {
     const { w: W, h: H } = card
+    mark(`${g.slug} on ${card.name} (${W}x${H})`)
     const withArt = raster(tileSvg(g, { card, W, H }), W)
     const bare = raster(tileSvg(g, { withArt: false, card, W, H }), W)
     const typed = raster(tileSvg(g, { withArt: false, withText: true, card, W, H }), W)
