@@ -67,7 +67,7 @@ Ruthless, because that's what was asked for.
 | **Deep Time** | ~~A Wikipedia list on a gradient.~~ Forty-four events, forty-four scenes, and a layout that no longer spends the picture's budget on the picture. | **Medium — done** |
 | **Ambient Mix** | Quietly the most *finished* thing here. Twelve real synthesised layers. Just needs presets and a shareable mix. | **Medium** |
 | **Paper Folds** | A fact, not a game. You press one button 42 times. | **Low** |
-| **Progress** | A widget. Look once, feel briefly bad, leave. That's the whole design and it's fine. | **Low (fine as-is)** |
+| **Progress** | ~~Thirteen identical bars for thirteen things that are not alike, and are not parallel either.~~ Fifteen concentric channels on one machined dial, ordered by span, plus a date model that survives a 23-hour day. | **Low — done** |
 | **Life in Weeks** | Same. Look once, feel dread, leave. Legitimately complete. | **Low (fine as-is)** |
 
 ---
@@ -557,6 +557,14 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
 - ~~**Progress / Life in Weeks**~~ left alone, as planned. They are small,
   honest, complete things, and not everything needs to be a game.
 
+  **Progress was reopened anyway** — see item 13 below. The judgement that it
+  was complete was about its *content*, and that judgement stands: it still
+  says one thing and says it in one screen. What was wrong was the picture.
+  Thirteen horizontal bars claimed these units were thirteen separate things,
+  and they are not: this minute is inside this hour is inside today. Concentric
+  channels say the true thing, and they were never more work than parallel
+  ones. Life in Weeks is genuinely still fine.
+
 ---
 
 ## The catalogue gap
@@ -1003,7 +1011,53 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     being drawn at ten-pixel uppercase mono. A descendant selector where a
     child selector was meant. It is now `.fig > span`.
 
-12. Then reassess against the depth work in Phases 1–2 above.
+13. ~~**Progress, as one instrument**~~ — **done.** Thirteen horizontal bars
+    became fifteen concentric channels milled into a single machined dial, one
+    unit each, ordered by span: this second at the rim, the Sun's life dead
+    centre. The ordering *is* the argument — each unit contains the one outside
+    it — and parallel bars had been quietly denying it. The channels carry the
+    same rate-coloured material the bars did, hot lume at the rim and cold
+    mineral at the middle, so a still screenshot still says which is which. The
+    backdrop's rock strata went with the bars: a chronometer in front of a core
+    sample was two metaphors arguing, and the page is now one object — a wall
+    panel, an instrument bolted to it, a data plate under that.
+
+    The real work was making any of it testable. Nothing on this site has ever
+    had a test for a shader, because every shader module imports `lib/gl.ts`
+    and Node's TypeScript loader refuses that file — parameter properties it
+    will not parse, and a `matchMedia` call at import time. So the geometry and
+    the palette moved into `progress-geom.ts`, which imports nothing, and the
+    shader interpolates them into its own source. `check-progress-dial.mjs`
+    walks the radius and asserts the ring the pointer finds is the ring the
+    shader milled — the failure being two plausible-looking statements of where
+    a channel is, silently drifting — and reads the shader back as text to
+    confirm no second copy of a dimension has appeared.
+
+    Three things it caught that looking could not. **A day is not always
+    twenty-four hours.** `setSeconds(0, 0)` decomposes an instant into local
+    wall-clock fields and recomposes it, and during the autumn repeated hour
+    that names two instants: at 2024-11-03T06:42:00Z in New York the minute
+    containing that instant came back a full hour earlier than the instant. Two
+    rows would have read 0% or 100% for an hour, once a year, in every zone
+    that changes its clocks. Flooring in offset-shifted epoch space has no such
+    step, and it survives the half-hour offsets that make plain epoch flooring
+    wrong for the hour. **The 32-bit row dies in 2038** — it is the one unit
+    here that happens once rather than recurring, and after 19 January 2038 it
+    sits at 100% with negative time left, which is precisely the fault the
+    weekend row was fixed for. It now drops out, and the dial becomes a
+    fourteen-ring dial. **The readout did not fit its own recess** on a phone:
+    "100.0000%" wanted 117 pixels in 92.
+
+    And the CSS lesson, which cost three separate bugs: a custom property
+    holding `min(100%, …)` looks reusable and is a trap. A percentage means the
+    container's width in `width`, the parent's *font size* in `font-size`, and
+    the element's own height in `translateY`. In one afternoon it collapsed the
+    dial to zero height, stacked all four bezel numerals on top of each other,
+    and rendered the hero number at 0.688 pixels. The dial's width is written
+    once now and everything inside it sizes in `cqw` or a percentage of that
+    box.
+
+14. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

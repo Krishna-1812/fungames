@@ -5,13 +5,26 @@ import GameLayout from '../layouts/GameLayout.astro'
  * Progress — every unit of time you are currently inside, draining live.
  *
  * All of it is computed from the visitor's own clock, so it is correct in any
- * timezone and needs no backend. Weeks start on Monday, months and years use
- * real lengths (leap years included) rather than 30/365 approximations.
+ * timezone and needs no backend. The date arithmetic lives in
+ * `lib/progress-time.ts` and is exercised by `scripts/check-progress.mjs`
+ * across four timezones and a year of instants; the instrument's geometry
+ * lives in `lib/progress-dial.ts` so that the shader and the pointer hit-test
+ * cannot disagree about where a ring is.
+ *
+ * The page is one object: a wall panel, a chronometer bolted to it, and a data
+ * plate under that. The register at the bottom is the readout — everything the
+ * dial shows, in text, which is also what a screen reader gets, since the dial
+ * itself is a canvas and says nothing.
  */
 ---
 
-<GameLayout slug="progress" bar="#2c1440" bodyClass="progress-body">
-  <div class="shaft" id="shaft" aria-hidden="true"></div>
+<GameLayout
+  slug="progress"
+  bar="#2c1440"
+  bodyClass="progress-body"
+  fonts={['IBM+Plex+Mono:wght@400;500;600']}
+>
+  <div class="panel" id="panel" aria-hidden="true"></div>
 
   <div class="wrap">
     <header class="head">
@@ -19,15 +32,38 @@ import GameLayout from '../layouts/GameLayout.astro'
       <p class="lede">
         Everything you are currently inside of, and how much of it is already gone.
       </p>
-      <p class="now" id="now">—</p>
     </header>
 
-    <div class="bars-wrap">
-      <ul class="bars" id="bars"></ul>
-      <!-- Sits over the list, drawing every fill in one pass. See the note in
-           lib/progress-bars.ts for why it is not a canvas per row. -->
-      <div class="meters" id="meters" aria-hidden="true"></div>
+    <div class="rig">
+      <div class="dial" id="dial">
+        <!-- The canvas is injected here. Everything it draws is also written
+             out in the register below, so it is decoration as far as assistive
+             technology is concerned. -->
+        <!-- Every channel sweeps clockwise from twelve, so one set of numerals
+             on the bezel reads all fifteen of them. -->
+        <div class="scale" aria-hidden="true">
+          <span style="--a:0deg"><i>0</i></span>
+          <span style="--a:90deg"><i>25</i></span>
+          <span style="--a:180deg"><i>50</i></span>
+          <span style="--a:270deg"><i>75</i></span>
+        </div>
+
+        <div class="aper" id="aper" aria-hidden="true">
+          <span class="ap-pct" id="apPct">—</span>
+          <span class="ap-tag" id="apTag">—</span>
+        </div>
+      </div>
+
+      <div class="plate" aria-hidden="true">
+        <p class="pl-name" id="plName">—</p>
+        <p class="pl-left" id="plLeft">—</p>
+        <p class="pl-clock" id="plClock">—</p>
+      </div>
+
+      <p class="hint" id="hint">Fifteen channels, fastest at the rim. Point at one.</p>
     </div>
+
+    <ol class="reg" id="reg"></ol>
 
     <p class="foot">Updates every frame. This does not help.</p>
   </div>
@@ -35,224 +71,167 @@ import GameLayout from '../layouts/GameLayout.astro'
 
 <script>
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
-  import { SHAFT_FRAG } from '../lib/progress-shaft'
-  import { BARS_FRAG, MAX_ROWS, rateOf } from '../lib/progress-bars'
+  import { PANEL_FRAG } from '../lib/progress-panel'
+  import { DIAL_FRAG } from '../lib/progress-dial'
+  import { DIAL, ringAt, lumeCss } from '../lib/progress-geom'
+  import { liveUnits, MAX_UNITS, read } from '../lib/progress-time'
 
-  const list = document.getElementById('bars')
-  const nowEl = document.getElementById('now')
+  const el = (id: string) => document.getElementById(id)!
 
-  const DAY = 86_400_000
+  const dialHost = el('dial')
+  const reg = el('reg')
+  const apPct = el('apPct')
+  const apTag = el('apTag')
+  const plName = el('plName')
+  const plLeft = el('plLeft')
+  const plClock = el('plClock')
 
-  /** Each entry returns [start, end] as epoch milliseconds for "right now". */
-  const ROWS = [
-    {
-      name: 'This minute',
-      span: (d) => { const s = new Date(d); s.setSeconds(0, 0); return [+s, +s + 60_000] },
-    },
-    {
-      name: 'This hour',
-      span: (d) => { const s = new Date(d); s.setMinutes(0, 0, 0); return [+s, +s + 3_600_000] },
-    },
-    {
-      name: 'Today',
-      span: (d) => { const s = new Date(d); s.setHours(0, 0, 0, 0); const e = new Date(s); e.setDate(e.getDate() + 1); return [+s, +e] },
-    },
-    {
-      name: 'This week',
-      span: (d) => {
-        const s = new Date(d); s.setHours(0, 0, 0, 0)
-        // Monday-first, matching most of the world.
-        s.setDate(s.getDate() - ((s.getDay() + 6) % 7))
-        const e = new Date(s); e.setDate(e.getDate() + 7)
-        return [+s, +e]
-      },
-    },
-    {
-      name: 'This month',
-      span: (d) => {
-        const s = new Date(d.getFullYear(), d.getMonth(), 1)
-        const e = new Date(d.getFullYear(), d.getMonth() + 1, 1)
-        return [+s, +e]
-      },
-    },
-    {
-      name: 'This year',
-      span: (d) => [+new Date(d.getFullYear(), 0, 1), +new Date(d.getFullYear() + 1, 0, 1)],
-    },
-    {
-      name: 'This decade',
-      span: (d) => {
-        const y = Math.floor(d.getFullYear() / 10) * 10
-        return [+new Date(y, 0, 1), +new Date(y + 10, 0, 1)]
-      },
-    },
-    {
-      name: 'This century',
-      span: (d) => {
-        const y = Math.floor(d.getFullYear() / 100) * 100
-        return [+new Date(y, 0, 1), +new Date(y + 100, 0, 1)]
-      },
-    },
-    {
-      name: 'This millennium',
-      span: (d) => {
-        const y = Math.floor(d.getFullYear() / 1000) * 1000
-        return [+new Date(y, 0, 1), +new Date(y + 1000, 0, 1)]
-      },
-    },
-    {
-      /*
-       * Two rows in one, because the old single version was dead for two days
-       * out of every seven. It ran Monday 00:00 to Saturday 00:00, so from the
-       * moment the weekend started until Monday it sat at 100.0000% with
-       * "0.0 seconds left" — the one row on the page you would look at on a
-       * Saturday, and the only one that had stopped telling the truth.
-       */
-      name: (d) => (isWeekend(d) ? 'The weekend itself' : 'Until the weekend'),
-      span: (d) => {
-        const s = new Date(d); s.setHours(0, 0, 0, 0)
-        if (isWeekend(d)) {
-          s.setDate(s.getDate() - (d.getDay() === 0 ? 1 : 0))   // back to Saturday
-          const e = new Date(s); e.setDate(e.getDate() + 2)     // Monday 00:00
-          return [+s, +e]
-        }
-        s.setDate(s.getDate() - ((s.getDay() + 6) % 7))         // Monday
-        const e = new Date(s); e.setDate(e.getDate() + 5)       // Saturday 00:00
-        return [+s, +e]
-      },
-    },
-    {
-      name: 'The current lunar cycle',
-      span: (d) => {
-        // Synodic month, anchored to a known new moon (2000-01-06 18:14 UTC).
-        const SYN = 29.530588853 * DAY
-        const anchor = Date.UTC(2000, 0, 6, 18, 14)
-        const k = Math.floor((+d - anchor) / SYN)
-        return [anchor + k * SYN, anchor + (k + 1) * SYN]
-      },
-    },
-    {
-      name: 'Until 32-bit time runs out',
-      span: () => [+new Date(1970, 0, 1), 2_147_483_647_000],
-      note: 'The Unix timestamp overflows on 19 January 2038.',
-    },
-    {
-      name: "The Sun's life",
-      // Fixed astronomical figures: ~4.6 Gyr in, ~10 Gyr total.
-      fixed: () => 4.6 / 10,
-      note: 'It has about five billion years of hydrogen left.',
-    },
-  ]
+  const now = new Date()
+  // Not UNITS: the 32-bit row stops being something you are inside of in 2038.
+  const RINGS = liveUnits(now)
+  const N = RINGS.length
 
-  const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6
+  // The aperture is sized off the same constant the shader mills it at, so a
+  // change to the dial's proportions cannot leave the readout hanging over the
+  // lip of its own recess.
+  dialHost.style.setProperty('--aper', String(DIAL.aperR))
+  // Halved twice: the shader's radii are fractions of the half-width, and CSS
+  // is offsetting from the centre by a fraction of the full width.
+  dialHost.style.setProperty('--scale-r', String((DIAL.bezelIn + DIAL.caseR) / 4))
 
-  const pad = (n) => String(n).padStart(2, '0')
+  /* ------------------------------------------------------------------------
+     The register. Built once, then only text and widths are touched — a frame
+     that changes nothing writes nothing.
+     ------------------------------------------------------------------------ */
 
-  function human(ms) {
-    if (ms < 0) ms = 0
-    const s = ms / 1000
-    if (s < 60) return `${s.toFixed(1)} seconds left`
-    const m = s / 60
-    if (m < 60) return `${Math.floor(m)}m ${pad(Math.floor(s % 60))}s left`
-    const h = m / 60
-    if (h < 24) return `${Math.floor(h)}h ${pad(Math.floor(m % 60))}m left`
-    const d = h / 24
-    // Singular below two: the old version said "1 days, 9h left" every Saturday.
-    const dn = Math.floor(d)
-    if (d < 31) return `${dn} ${dn === 1 ? 'day' : 'days'}, ${Math.floor(h % 24)}h left`
-    if (d < 400) return `${dn} days left`
-    const y = d / 365.2425
-    if (y < 1000) return `${y.toFixed(1)} years left`
-    if (y < 1e6) return `${Math.round(y).toLocaleString('en-US')} years left`
-    return `${(y / 1e9).toFixed(1)} billion years left`
+  type Row = {
+    btn: HTMLButtonElement
+    name: HTMLElement
+    rule: HTMLElement
+    pct: HTMLElement
+    left: HTMLElement
+    lastName: string
+    lastPct: string
+    lastLeft: string
+    lastW: number
   }
 
-  // Build once, then only mutate text and widths — no DOM churn per frame.
-  const nodes = ROWS.map((r) => {
+  const rows: Row[] = RINGS.map((u, i) => {
     const li = document.createElement('li')
-    li.className = 'row'
-    li.innerHTML =
-      `<span class="r-name"><b></b>${r.note ? `<em>${r.note}</em>` : ''}</span>` +
-      `<span class="r-track"><span class="r-fill"></span></span>` +
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'row'
+    btn.setAttribute('aria-pressed', 'false')
+    btn.innerHTML =
+      `<span class="r-i">${String(i + 1).padStart(2, '0')}</span>` +
+      `<span class="r-name"><b></b>${u.note ? `<em>${u.note}</em>` : ''}</span>` +
+      `<span class="r-rule"><i></i></span>` +
       `<span class="r-pct"></span><span class="r-left"></span>`
-    list.appendChild(li)
+    li.append(btn)
+    reg.append(li)
+
+    /* A unit's rate never changes, so its colour is set once and never again.
+       The rule and the ring it points at both come out of the same two
+       constants — `lume()` in the shader, `lumeCss()` here — which is the only
+       reason they are the same colour. */
+    const rate = read(u, now).rate
+    btn.style.setProperty('--lume', lumeCss(rate))
+    btn.style.setProperty('--lume-dim', lumeCss(rate, 0.3))
+    // Lifted, for type rather than for a rule. See the note by .row.lit .r-i.
+    btn.style.setProperty('--lume-lit', lumeCss(rate, 2.5))
+
     return {
-      r,
-      title: li.querySelector('b'),
-      track: li.querySelector('.r-track'),
-      fill: li.querySelector('.r-fill'),
-      pct: li.querySelector('.r-pct'),
-      left: li.querySelector('.r-left'),
-      // Last values written, so a frame that changes nothing touches no DOM.
-      // "973.3 years left" was being rewritten sixty times a second.
-      lastPct: '', lastLeft: '', lastName: '', lastW: -1,
+      btn,
+      name: btn.querySelector('b')!,
+      rule: btn.querySelector('.r-rule i') as HTMLElement,
+      pct: btn.querySelector('.r-pct') as HTMLElement,
+      left: btn.querySelector('.r-left') as HTMLElement,
+      lastName: '', lastPct: '', lastLeft: '', lastW: -1,
     }
   })
 
   /* ------------------------------------------------------------------------
-     The meters.
+     Focus: which ring is lit, and what the aperture is reading.
 
-     Thirteen fills, one surface. The CSS fill underneath stays exactly as it
-     was and is what a browser without WebGL2 shows; when the shader is up the
-     list gets a class that hides it, so the two are never both on screen.
+     Two separate things. `focus` dims the other fourteen rings and is -1 when
+     nobody is pointing at anything; `shown` is what the aperture reads and is
+     never -1, because a blank aperture on an instrument means it is broken.
      ------------------------------------------------------------------------ */
 
-  const fracs = new Float32Array(MAX_ROWS)
-  const rates = new Float32Array(MAX_ROWS)
-  const ys = new Float32Array(MAX_ROWS)
-  let x0 = 0, x1 = 1, thX = 0.01, thY = 0.01
+  const DEFAULT = Math.max(0, RINGS.findIndex((u) => u.id === 'year'))
+  let hovered = -1
+  let pinned = -1
+  let focusMix = 0
 
-  const metersHost = document.getElementById('meters')
+  const focus = () => (pinned >= 0 ? pinned : hovered)
+  const shown = () => { const f = focus(); return f >= 0 ? f : DEFAULT }
 
-  function measure() {
-    const hb = metersHost.getBoundingClientRect()
-    // A zero box means the element is not laid out yet; the observers below
-    // will call back the moment it is.
-    if (hb.width < 1 || hb.height < 1) return
-    const t0 = nodes[0].track.getBoundingClientRect()
-    x0 = (t0.left - hb.left) / hb.width
-    x1 = (t0.right - hb.left) / hb.width
-    thX = t0.height / 2 / hb.width
-    thY = t0.height / 2 / hb.height
-    for (let i = 0; i < nodes.length; i++) {
-      const t = nodes[i].track.getBoundingClientRect()
-      // Canvas y runs bottom-up; CSS y runs top-down.
-      ys[i] = 1 - ((t.top + t.bottom) / 2 - hb.top) / hb.height
+  function syncPressed() {
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].btn.setAttribute('aria-pressed', String(i === pinned))
+      rows[i].btn.classList.toggle('lit', i === focus())
     }
   }
 
-  measure()
+  rows.forEach((row, i) => {
+    row.btn.addEventListener('pointerenter', () => { hovered = i; syncPressed() })
+    row.btn.addEventListener('pointerleave', () => { if (hovered === i) hovered = -1; syncPressed() })
+    // Focus follows the keyboard as well, or the dial would be inert to it.
+    row.btn.addEventListener('focus', () => { hovered = i; syncPressed() })
+    row.btn.addEventListener('blur', () => { if (hovered === i) hovered = -1; syncPressed() })
+    row.btn.addEventListener('click', () => { pinned = pinned === i ? -1 : i; syncPressed() })
+  })
 
-  const meters = new ShaderSurface(metersHost, BARS_FRAG, {
+  /* ------------------------------------------------------------------------
+     The instrument.
+     ------------------------------------------------------------------------ */
+
+  const fracs = new Float32Array(MAX_UNITS)
+  const rates = new Float32Array(MAX_UNITS)
+
+  const dial = new ShaderSurface(dialHost, DIAL_FRAG, {
     uniforms: () => ({
-      u_n: nodes.length,
-      u_y: ys,
+      u_n: N,
       u_frac: fracs,
       u_rate: rates,
-      u_x0: x0,
-      u_x1: x1,
-      u_thX: thX,
-      u_thY: thY,
+      u_focus: focus(),
+      u_focusMix: focusMix,
       u_motion: prefersReducedMotion ? 0 : 1,
     }),
   })
 
-  const glOn = !!meters.canvas.isConnected
-  if (glOn) list.classList.add('gl')
+  /* Pointing at the dial. The hit test runs on the same geometry the shader
+     mills the channels from, in the same space: origin at the centre, 1.0 at
+     the edge, y up. The flip is here and nowhere else. */
+  function aim(e: PointerEvent) {
+    const b = dialHost.getBoundingClientRect()
+    if (b.width < 1) return
+    const x = ((e.clientX - b.left) / b.width) * 2 - 1
+    const y = 1 - ((e.clientY - b.top) / b.height) * 2
+    dial.setPointer((x + 1) / 2, (y + 1) / 2)
+    const hit = ringAt(x, y, N)
+    if (hit !== hovered) { hovered = hit; syncPressed() }
+  }
 
-  // Row geometry is read off the real elements, so anything that reflows them
-  // — a resize, a font landing late, the notes wrapping — has to re-measure.
-  const ro = new ResizeObserver(() => { measure(); if (prefersReducedMotion) meters.redraw() })
-  ro.observe(metersHost)
-  for (const n of nodes) ro.observe(n.track)
+  dialHost.addEventListener('pointermove', aim)
+  dialHost.addEventListener('pointerdown', (e) => {
+    aim(e)
+    // On a touchscreen there is no hover, so the tap has to do the pinning.
+    if (hovered >= 0) { pinned = pinned === hovered ? -1 : hovered; syncPressed() }
+  })
+  dialHost.addEventListener('pointerleave', () => {
+    hovered = -1
+    dial.setPointer(0.5, 0.5)
+    syncPressed()
+  })
 
   /* ------------------------------------------------------------------------
-     The shaft behind everything. Fixed to the viewport and told where the page
-     has been scrolled to, rather than being a very tall canvas.
+     The panel behind everything. Fixed to the viewport and told where the page
+     has been scrolled to, rather than being one very tall canvas.
      ------------------------------------------------------------------------ */
 
   let scroll = 0
-  const shaft = new ShaderSurface(document.getElementById('shaft'), SHAFT_FRAG, {
+  const panel = new ShaderSurface(el('panel'), PANEL_FRAG, {
     scale: 0.75,
     uniforms: () => ({ u_scroll: scroll, u_motion: prefersReducedMotion ? 0 : 1 }),
   })
@@ -264,164 +243,364 @@ import GameLayout from '../layouts/GameLayout.astro'
   readScroll()
   addEventListener('scroll', () => {
     readScroll()
-    // The ticker is parked under reduced motion, so the shaft needs asking.
-    if (prefersReducedMotion) shaft.redraw()
+    // The shared ticker is parked under reduced motion, so the panel needs asking.
+    if (prefersReducedMotion) panel.redraw()
   }, { passive: true })
 
   /* ------------------------------------------------------------------------
      The clock
      ------------------------------------------------------------------------ */
 
-  // Built once. Constructing an Intl.DateTimeFormat is expensive, and
-  // toLocaleString builds one every call — this ran sixty times a second to
+  // Built once. Constructing an Intl.DateTimeFormat is expensive and
+  // toLocaleString builds one per call — this ran sixty times a second to
   // produce a string that changes once a second.
   const fmt = new Intl.DateTimeFormat(undefined, {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   })
   let lastSecond = -1
-  /* Under reduced motion the shared ticker never runs, so the meters have to
-     be asked to redraw — but only when a fill has actually moved. A bar
+  let lastTag = ''
+  let lastApPct = ''
+  let lastPlName = ''
+  let lastPlLeft = ''
+  /* Under reduced motion the shared ticker never runs, so the dial has to be
+     asked to redraw — but only when something has actually moved. A ring
      advancing is the page working, not decoration, so it is not something to
      suppress; redrawing sixty times a second to show a change that happens
      seventeen times a second is. */
   let dirty = false
 
-  function tick() {
+  function frame() {
     const d = new Date()
 
     const sec = Math.floor(+d / 1000)
     if (sec !== lastSecond) {
       lastSecond = sec
-      nowEl.textContent = fmt.format(d)
+      plClock.textContent = fmt.format(d)
     }
 
-    for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i]
-      let frac, remaining, rate
-      if (n.r.fixed) {
-        frac = n.r.fixed()
-        remaining = null
-        // Not slow: stopped. It has read 46% since before there were eyes.
-        rate = 0
-      } else {
-        const [s, e] = n.r.span(d)
-        frac = Math.min(1, Math.max(0, (+d - s) / (e - s)))
-        remaining = e - +d
-        rate = rateOf((e - s) / 1000)
+    const s = shown()
+    let sv = null as ReturnType<typeof read> | null
+
+    for (let i = 0; i < N; i++) {
+      const row = rows[i]
+      const v = read(RINGS[i], d)
+      if (i === s) sv = v
+
+      fracs[i] = v.frac
+      rates[i] = v.rate
+
+      if (v.name !== row.lastName) { row.lastName = v.name; row.name.textContent = v.name }
+
+      // Rounded to a tenth of a percent of the rule's width: below that
+      // nothing moves on screen, and a style write per row per frame is not
+      // free at fifteen rows and sixty frames.
+      const w = Math.round(v.frac * 1000)
+      if (w !== row.lastW) {
+        row.lastW = w
+        dirty = true
+        row.rule.style.width = (w / 10).toFixed(1) + '%'
       }
-      fracs[i] = frac
-      rates[i] = rate
-
-      const name = typeof n.r.name === 'function' ? n.r.name(d) : n.r.name
-      if (name !== n.lastName) { n.lastName = name; n.title.textContent = name }
-
-      // Rounded to a tenth of a percent of the bar's width: below that nothing
-      // moves on screen, and a style write per row per frame is not free.
-      const w = Math.round(frac * 1000)
-      if (w !== n.lastW) { n.lastW = w; dirty = true; n.fill.style.width = (w / 10).toFixed(1) + '%' }
-
-      // More decimals where a whole percent would take years to move.
-      const dp = frac > 0.9999 ? 4 : n.r.fixed ? 1 : remaining > DAY * 200 ? 4 : 2
-      const pct = (frac * 100).toFixed(dp) + '%'
-      if (pct !== n.lastPct) { n.lastPct = pct; n.pct.textContent = pct }
-
-      const left = remaining === null ? 'about 5 billion years left' : human(remaining)
-      if (left !== n.lastLeft) { n.lastLeft = left; n.left.textContent = left }
+      if (v.pct !== row.lastPct) { row.lastPct = v.pct; row.pct.textContent = v.pct }
+      if (v.left !== row.lastLeft) { row.lastLeft = v.left; row.left.textContent = v.left }
     }
 
-    if (glOn && prefersReducedMotion && dirty) { dirty = false; meters.redraw() }
-    requestAnimationFrame(tick)
+    // The aperture and the plate read whichever ring is under the pointer.
+    if (sv) {
+      if (sv.pct !== lastApPct) { lastApPct = sv.pct; apPct.textContent = sv.pct }
+      const tag = String(s + 1).padStart(2, '0')
+      if (tag !== lastTag) { lastTag = tag; apTag.textContent = tag }
+      if (sv.name !== lastPlName) { lastPlName = sv.name; plName.textContent = sv.name }
+      if (sv.left !== lastPlLeft) { lastPlLeft = sv.left; plLeft.textContent = sv.left }
+    }
+
+    // Focus fades rather than snaps: fifteen rings going dark in one frame
+    // reads as a bug, and over 150ms it reads as an instrument.
+    const want = focus() >= 0 ? 1 : 0
+    if (focusMix !== want) {
+      focusMix = prefersReducedMotion ? want : focusMix + (want - focusMix) * 0.18
+      if (Math.abs(focusMix - want) < 0.004) focusMix = want
+      dirty = true
+    }
+
+    if (prefersReducedMotion && dirty) { dirty = false; dial.redraw() }
+    requestAnimationFrame(frame)
   }
-  tick()
+
+  syncPressed()
+  frame()
+
+  /* The count is written from the count. It says fifteen today and will say
+     fourteen in 2038, and touch has no hover, so the invitation also has to
+     name the thing that actually works there. */
+  const WORDS = ['', '', '', '', '', '', '', '', '', '', '', 'Eleven', 'Twelve',
+    'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen']
+  el('hint').textContent =
+    `${WORDS[N] ?? N} channels, fastest at the rim. ` +
+    (matchMedia('(hover: none)').matches ? 'Tap one.' : 'Point at one.')
 </script>
 
 <style is:global>
   /* Rows are built at runtime, so these cannot be scoped. */
-  .progress-body { background: #14091f; color: #f1eaf8; }
+  .progress-body {
+    background: #14091f;
+    color: #f1eaf8;
+    --ink: #f1eaf8;
+    --ink2: #b3a1c9;
+    --ink3: #a08cbb;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
 
-  .progress-body .shaft {
+  .progress-body .panel {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
     /* The still fallback, roughly what the shader settles to: without WebGL2
        this is the page's own background and nothing looks missing. */
     background:
-      radial-gradient(120% 60% at 50% 0%, #241040 0%, transparent 62%),
-      linear-gradient(180deg, #180b25, #120817 62%, #0e0613);
+      radial-gradient(105% 55% at 44% -6%, #2a1547 0%, transparent 60%),
+      linear-gradient(180deg, #190c28, #120817 58%, #0d0512);
   }
-  .progress-body .shaft .gl-surface {
+  .progress-body .panel .gl-surface,
+  .progress-body .dial .gl-surface {
     position: absolute; inset: 0; width: 100%; height: 100%; display: block;
   }
 
   .progress-body .wrap {
     position: relative; z-index: 1;
-    max-width: 780px; margin: 0 auto; padding: 46px 22px 80px;
-  }
-  .progress-body .head { text-align: center; margin-bottom: 30px; }
-  .progress-body .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .progress-body .lede { color: #b3a1c9; margin: 10px auto 0; max-width: 42ch; }
-  .progress-body .now {
-    font-variant-numeric: tabular-nums; font-size: 13.5px; color: #a08cbb;
-    margin-top: 14px; letter-spacing: 0.01em;
+    max-width: 820px; margin: 0 auto; padding: 40px 22px 84px;
   }
 
-  .progress-body .bars-wrap { position: relative; }
-  .progress-body .bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
-  .progress-body .meters {
-    position: absolute; inset: 0; pointer-events: none;
-    /* Above the grooves, below nothing: the rows underneath still take hover. */
-    z-index: 2;
+  .progress-body .head { text-align: center; }
+  .progress-body .head h1 { font-size: clamp(34px, 6vw, 54px); }
+  .progress-body .lede { color: var(--ink2); margin: 10px auto 0; max-width: 42ch; }
+
+  /* ---------------------------------------------------------------- rig -- */
+
+  .progress-body .rig { display: grid; justify-items: center; margin: 26px 0 34px; }
+
+  .progress-body .dial {
+    /* 100%, not 96vw: the wrap has 22px of padding either side, and a viewport
+       measure walks straight through it — on a 390px phone the dial started at
+       the left padding and ran six pixels off the right of the page.
+       The 76vh is not belt and braces either. This thing is square, and in a
+       short laptop window a 700px dial is taller than the viewport, so the
+       instrument and its own readout can never be on screen together. */
+    --aper: 0.285;
+    --scale-r: 0.4445;
+    position: relative;
+    /* 100%, not a viewport measure: the wrap has 22px of padding either side
+       and `96vw` walks straight through it — on a 390px phone the dial started
+       at the left padding and ran six pixels off the right of the page. The
+       76vh is not belt and braces either: this thing is square, and in a short
+       laptop window a 700px dial is taller than the viewport, so the instrument
+       and its own readout can never be on screen together.
+
+       The width is written here rather than kept in a custom property, and
+       everything inside sizes off `cqw` or a percentage of this box. A custom
+       property holding `min(100%, …)` looks reusable and is a trap: a
+       percentage means the container's width in `width`, the parent's font
+       size in `font-size`, and the element's own height in `translateY`. It
+       collapsed the dial to zero and then rendered the readout at 0.688px. */
+    width: min(100%, 700px, 76vh);
+    aspect-ratio: 1;
+    container-type: inline-size;
+    /* The channels are the control; the pointer has to be able to find them. */
+    touch-action: manipulation;
   }
-  .progress-body .meters .gl-surface {
-    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+
+  /* Numerals stamped into the bezel.
+     Each is a full-size overlay rotated about the dial's centre, with the glyph
+     pushed out to the bezel by padding. Padding percentages resolve against the
+     containing block's *width* — the dial — which is the only percentage basis
+     here that unambiguously means what it says. Offsetting with a translate
+     was the obvious way to write this and it silently measured the numeral's
+     own 14px box instead, stacking all four on top of each other. */
+  .progress-body .scale span {
+    position: absolute; inset: 0;
+    display: flex; justify-content: center; align-items: flex-start;
+    padding-top: calc((0.5 - var(--scale-r)) * 100%);
+    transform: rotate(var(--a));
+    pointer-events: none;
   }
+  /* Counter-rotated, so you read a gauge without tilting your head. */
+  .progress-body .scale i {
+    transform: rotate(calc(-1 * var(--a)));
+    margin-top: -0.6em;
+    font-family: var(--mono); font-style: normal;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.06em;
+    color: #cfc3e2;
+    text-shadow: 0 -1px 1px rgb(0 0 0 / 0.8);
+  }
+
+  /* Above the canvas. ShaderSurface appends its canvas to the host, so without
+     this everything printed on the dial is painted over by the dial. */
+  .progress-body .aper,
+  .progress-body .scale span { z-index: 2; }
+
+  .progress-body .aper {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    /* 1.8 rather than 2: type inside a circle gets the chord, not the diameter,
+       or the ends of a wide number sit under the lip of the recess. */
+    width: calc(var(--aper) * 1.8 * 100%);
+    display: grid; justify-items: center; gap: 2px;
+    pointer-events: none;
+  }
+  .progress-body .ap-pct {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    /* Sized off the aperture, not off taste. The widest thing this can ever
+       read is "100.0000%" — nine characters at 0.6em each in Plex Mono — and
+       at 5.8cqw that was 117px of number in a 92px recess on a phone. */
+    font-size: 4.3cqw;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: #f6efff;
+    /* Lumed, not printed: a dark hairline above the glyph and a soft bloom
+       around it, which is what a filled engraving does under one light. */
+    text-shadow: 0 -1px 0 rgb(0 0 0 / 0.85), 0 0 16px rgb(186 120 255 / 0.34);
+  }
+  .progress-body .ap-tag {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: 0.28em; text-indent: 0.28em;
+    /* Not a quieter violet. The aperture's luminance cap is a guarantee, and
+       the guarantee only holds down to L = 0.288; anything dimmer passes
+       against what the recess actually renders today and fails against what
+       the shader is allowed to render tomorrow. */
+    color: var(--ink3);
+  }
+
+  /* -------------------------------------------------------------- plate -- */
+
+  .progress-body .plate {
+    position: relative;
+    margin-top: -6px;
+    min-width: min(92vw, 380px);
+    padding: 13px 30px 12px;
+    text-align: center;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #1d1229, #150d1f);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.055),
+      inset 0 -1px 0 rgb(0 0 0 / 0.5),
+      0 10px 24px -14px rgb(0 0 0 / 0.9);
+  }
+  /* Two screws, because a plate is fixed to something. */
+  .progress-body .plate::before,
+  .progress-body .plate::after {
+    content: ''; position: absolute; top: 50%; width: 5px; height: 5px;
+    margin-top: -2.5px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #6b6076, #241c30 70%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.07);
+  }
+  .progress-body .plate::before { left: 11px; }
+  .progress-body .plate::after { right: 11px; }
+
+  .progress-body .pl-name {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.18em; text-indent: 0.18em; text-transform: uppercase;
+    color: var(--ink);
+  }
+  .progress-body .pl-left {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 13px; color: var(--ink2); margin-top: 3px;
+  }
+  .progress-body .pl-clock {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 11px; color: var(--ink3); margin-top: 7px;
+    padding-top: 7px; border-top: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  .progress-body .hint {
+    margin-top: 14px; font-size: 12.5px; color: var(--ink3); text-align: center;
+  }
+
+  /* ----------------------------------------------------------- register -- */
+
+  .progress-body .reg { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 
   .progress-body .row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 2.2fr 66px;
-    grid-template-areas: 'n t p' '. l l';
+    width: 100%;
+    /* The name column is wider than it looks like it needs to be because of
+       "The current lunar cycle", which wrapped to two lines and took its note
+       to a third, making one row half again as tall as the other fourteen. */
+    grid-template-columns: 2.1rem minmax(0, 1.4fr) 1.7fr 4.9rem;
+    grid-template-areas: 'i n r p' '. l l l';
     align-items: center;
     gap: 4px 12px;
-    padding: 11px 14px;
-    border-radius: 12px;
-    transition: background 160ms var(--ease);
+    padding: 10px 12px;
+    border: 0; border-radius: 10px;
+    background: transparent;
+    color: inherit; font: inherit; text-align: left;
+    cursor: pointer;
+    transition: background 150ms var(--ease);
   }
-  .progress-body .row:hover { background: #1f1030; }
+  .progress-body .row.lit { background: rgb(255 255 255 / 0.045); }
+  .progress-body .row:focus-visible { outline: 2px solid #c79bff; outline-offset: -2px; }
 
+  .progress-body .r-i {
+    grid-area: i;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    /* #7c6796 was quieter and measured 3.89:1. */
+    color: #8d78ab; letter-spacing: 0.04em;
+  }
+  /* The lit row's index takes its ring's colour — but the *lifted* one. The
+     lume as painted runs down to rgb(110 83 187) at the slow end, which is
+     3.33:1 on this background: the moment you pointed at the Sun's row, its
+     number stopped being readable. */
+  .progress-body .row.lit .r-i { color: var(--lume-lit); }
   .progress-body .r-name { grid-area: n; font-weight: 600; font-size: 15px; }
   .progress-body .r-name b { font-weight: inherit; }
   .progress-body .r-name em {
     display: block; font-style: normal; font-weight: 400;
-    font-size: 12px; color: #a08cbb; margin-top: 1px;
+    font-size: 12px; color: var(--ink3); margin-top: 1px;
   }
-  .progress-body .r-track {
-    grid-area: t; height: 8px; border-radius: 5px;
-    background: #2a1740; overflow: hidden;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+
+  /* A scale rule engraved in the plate, not a progress bar: a hairline groove
+     with the travelled part filled in the ring's own colour. */
+  .progress-body .r-rule {
+    grid-area: r; position: relative;
+    height: 4px; border-radius: 3px;
+    background: #1b1029;
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.65), 0 1px 0 rgb(255 255 255 / 0.045);
+    overflow: hidden;
   }
-  .progress-body .r-fill {
-    display: block; height: 100%; width: 0;
-    background: linear-gradient(90deg, #a86ede, #f0a8ff);
-    border-radius: 5px;
+  .progress-body .r-rule i {
+    position: relative;
+    display: block; height: 100%; width: 0; border-radius: 3px;
+    background: linear-gradient(90deg, var(--lume-dim), var(--lume));
   }
-  /* The shader draws every fill once it is up. The CSS one stays in the markup
-     as the fallback and is simply not shown. */
-  .progress-body .bars.gl .r-fill { display: none; }
+  /* The head, which is the only part of a gauge anyone watches. Positioned
+     against the fill rather than the groove, or it would sit at the far end of
+     the track and never move. */
+  .progress-body .r-rule i::after {
+    content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 2px;
+    background: #fff; opacity: 0.55;
+  }
 
   .progress-body .r-pct {
     grid-area: p; text-align: right;
-    font-variant-numeric: tabular-nums; font-size: 13.5px; font-weight: 600;
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 13px; font-weight: 500;
   }
   .progress-body .r-left {
-    grid-area: l; font-variant-numeric: tabular-nums;
-    font-size: 12px; color: #a08cbb;
+    grid-area: l;
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 11.5px; color: var(--ink3);
   }
 
-  .progress-body .foot { text-align: center; color: #a08cbb; font-size: 13.5px; margin-top: 30px; }
+  .progress-body .foot {
+    text-align: center; color: var(--ink3); font-size: 13.5px; margin-top: 30px;
+  }
 
   @media (max-width: 620px) {
     .progress-body .row {
-      grid-template-columns: minmax(0, 1fr) 62px;
-      grid-template-areas: 'n p' 't t' 'l l';
+      grid-template-columns: 1.9rem minmax(0, 1fr) 4.6rem;
+      grid-template-areas: 'i n p' 'i r r' 'i l l';
     }
+    .progress-body .dial { width: min(100%, 460px, 80vh); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress-body .row { transition: none; }
   }
 </style>

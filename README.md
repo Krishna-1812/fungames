@@ -108,6 +108,13 @@ src/
     fold-scale.ts       thirty-two real things with real heights, from a grain
                         of sand to the observable universe, and the silhouettes
                         the page stands next to the paper
+    progress-time.ts    the fifteen units you are inside of, ordered by span,
+                        and the date arithmetic that survives a 23-hour day
+    progress-geom.ts    where each of the dial's channels is, which one a
+                        point is in, and how dark the readout's ground may be
+    progress-dial.ts    that instrument as a fragment shader: milled channels,
+                        a knurled bezel, engine turning and a crystal
+    progress-panel.ts   the wall it is bolted to, and the one lamp above it
     sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
                         the Moon’s distance and how much of it is lit
     robot-scene.ts      the CAPTCHA's street, in perspective, with materials,
@@ -144,7 +151,7 @@ cost).
 | `/steady-hand/` | 14.4 KB |
 | `/ambient-mix/` | 14.5 KB |
 | `/life-in-weeks/` | 14.7 KB |
-| `/progress/` | 15.3 KB |
+| `/progress/` | 18.1 KB |
 | `/rule-cascade/` | 15.3 KB |
 | `/deep-time/` | 16.1 KB |
 | `/fusion/` | 16.1 KB |
@@ -293,8 +300,18 @@ throws two dozen kinds of mangled URL at the decoder, and checks a link still
 means the same thing after the layer list is reordered, added to and cut down —
 which is the failure an index-based format makes silently.*
 
-**Progress** — every unit of time you are inside, draining every frame.
-*All thirteen bars checked against hand calculation.*
+**Progress** — every unit of time you are inside, draining every frame. Fifteen
+of them, ordered by span and drawn as concentric channels milled into one dial:
+this second at the rim, the Sun's life dead centre, and each one containing the
+one outside it. The fast channels run with hot lume and the slow ones hold cold
+mineral, so a still screenshot still says which is which. *`check-progress.mjs`
+walks a year of instants through the date model in five timezones — including
+Lord Howe Island, whose clocks move by thirty minutes — and found that
+`setSeconds(0, 0)` does not survive the autumn change: during the repeated hour
+a local wall-clock time names two instants, and the minute came back an hour
+away from the instant inside it. `check-progress-dial.mjs` walks the radius and
+checks the ring the pointer finds is the ring the shader milled, at fifteen
+rings and at the fourteen it will have after January 2038.*
 
 **From Memory** — draw a bicycle, then see a real one. Sixteen prompts, ten a
 sitting, deliberately not brand logos. *`scripts/check-memory.mjs` parses every
@@ -406,6 +423,8 @@ node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
 node scripts/check-fold.mjs        # the paper model, against paper
 node scripts/check-fold-scene.mjs  # Paper Folds' drawing, and its sky, at every fold
 node scripts/check-fold-scale.mjs  # the ladder of real things, and the silhouettes
+node scripts/check-progress.mjs    # Progress's date maths, in five timezones
+node scripts/check-progress-dial.mjs # the instrument: rings, hit test, readout
 node scripts/check-forecast.mjs    # the sky model, against Meeus and real eclipses
 node scripts/check-result-card.mjs # the share card, at every game and result shape
 node scripts/check-stats.mjs       # what the site remembers, against a hostile store
@@ -417,7 +436,8 @@ adds the production build. Each exits non-zero on its own. None needs a browser 
 `lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts`,
 `data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,
 `lib/powder-goals.ts`, `lib/mix-code.ts`, `lib/steady-shapes.ts`,
-`lib/tile-art.ts`, `lib/icons.ts` and `lib/scale-art.ts` is deliberately pure
+`lib/tile-art.ts`, `lib/icons.ts`, `lib/progress-time.ts`,
+`lib/progress-geom.ts` and `lib/scale-art.ts` is deliberately pure
 functions over plain data so it can be run this way.
 
 `check-art.mjs` is the odd one out and worth explaining, because illustration
