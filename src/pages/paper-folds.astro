@@ -79,7 +79,7 @@ const MAX_FOLDS = 103
       </div>
 
       <div class="con-main">
-        <section class="bay">
+        <section class="bay stage-bay">
           <div class="bay-top">
             <p class="sheet-note" id="sheetNote"></p>
             <div class="ways" role="radiogroup" aria-label="Which way you fold">
@@ -110,10 +110,20 @@ const MAX_FOLDS = 103
           </div>
         </section>
 
-        <aside class="alt" aria-hidden="true">
-          <p class="alt-cap">altitude</p>
-          <canvas id="ladder"></canvas>
-        </aside>
+        <section class="bay scale-bay">
+          <div class="scale-top">
+            <p class="scale-lead" id="scaleLead">as tall as</p>
+            <p class="scale-name" id="scaleName">a grain of sand</p>
+            <p class="scale-rel" id="scaleRel">20% of it</p>
+          </div>
+          <canvas id="scale" role="img"
+            aria-label="A size comparison between the folded stack and something the same height."
+          ></canvas>
+          <div class="climb">
+            <canvas id="rail" aria-hidden="true"></canvas>
+            <p class="climb-text" id="climbText">fold 0 of 103</p>
+          </div>
+        </section>
       </div>
 
       <section class="read" id="figures">
@@ -164,6 +174,10 @@ const MAX_FOLDS = 103
   } from '../lib/fold-paper'
   import { fold3d, fitCam, fitCorners } from '../lib/fold-scene'
   import { skyAt, starField, rgb, rgba, shade } from '../lib/fold-sky'
+  import {
+    target as scaleTarget, passed as scalePassed, worldHeight,
+    relation, leadIn,
+  } from '../lib/fold-scale'
 
   const { START_MM, MAX_FOLDS, MARKS, ICONS } = JSON.parse(
     document.getElementById('game-data')!.textContent!,
@@ -259,7 +273,8 @@ const MAX_FOLDS = 103
     const c = el(id) as HTMLCanvasElement
     return { c, g: c.getContext('2d')!, w: 0, h: 0 }
   }
-  const SKY = surf('sky'), STAGE = surf('stage'), LADDER = surf('ladder')
+  const SKY = surf('sky'), STAGE = surf('stage')
+  const SCALE = surf('scale'), RAIL = surf('rail')
 
   function size(s: Surface) {
     const dpr = Math.min(2, devicePixelRatio || 1)
@@ -461,7 +476,7 @@ const MAX_FOLDS = 103
     const a = geo.halfW / norm, d = geo.halfD / norm, hh = geo.height / norm
 
     const want = fitCam(fitCorners(a, d, hh), { ...BASE_CAM, yaw },
-      Math.min(w, h * 1.45), { x: w / 2, y: h * 0.56 }, 0.8)
+      Math.min(w * 0.9, h * 1.5), { x: w / 2, y: h * 0.56 }, 0.86)
     if (!camNow) camNow = { f: want.f, cx: want.cx, cy: want.cy }
     const kk = prefersReducedMotion ? 1 : 0.18
     camNow.f = lerp(camNow.f, want.f, kk)
@@ -729,117 +744,560 @@ const MAX_FOLDS = 103
   }
 
   /* ---------------------------------------------------------------------- */
-  /* The altimeter: the whole climb, as one instrument                       */
+  /* The comparison: how big it is, said by standing something next to it    */
   /* ---------------------------------------------------------------------- */
 
-  const ANCHORS: [number, string][] = [
-    [0, 'paper'],
-    [16, 'a house'],
-    [30, 'space'],
-    [42, 'the Moon'],
-    [69, 'nearest star'],
-    [83, 'the galaxy'],
-    [103, 'everything'],
-  ]
-
-  let ladderStrip: HTMLCanvasElement | null = null
-
-  /** The gradient is the journey, so it is drawn once and kept. */
-  function buildLadder() {
-    const h = Math.max(40, LADDER.h)
-    const c = document.createElement('canvas')
-    c.width = 1
-    c.height = h
-    const g = c.getContext('2d')!
-    for (let y = 0; y < h; y++) {
-      const folds = (1 - y / (h - 1)) * MAX_FOLDS
-      g.fillStyle = rgb(skyAt(heightM(folds)).bottom)
-      g.fillRect(0, y, 1, 1)
-    }
-    ladderStrip = c
-  }
+  /**
+   * The frame's world height in metres, eased in log space.
+   *
+   * Log space rather than linear because the target jumps by factors of three
+   * to a thousand, and easing a factor of a thousand linearly spends the first
+   * two thirds of the animation showing nothing and the last third arriving.
+   * In log space every overtake takes the same time and reads as the camera
+   * pulling back — which is what the number is doing too.
+   */
+  let world = worldHeight(heightM(0))
 
   const round = (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
     if ((g as any).roundRect) { g.beginPath(); (g as any).roundRect(x, y, w, h, r) }
     else { g.beginPath(); g.rect(x, y, w, h) }
   }
 
-  function drawLadder() {
-    const { g, w, h } = LADDER
-    if (!ladderStrip || ladderStrip.height !== h) buildLadder()
-    g.clearRect(0, 0, w, h)
-    const BAR = 11
-    const PADY = 4
-    const inner = h - PADY * 2
-    const yOf = (f: number) => PADY + inner - (f / MAX_FOLDS) * inner
-    // Labels need about sixty pixels beside the track. Below that the altimeter
-    // is not a smaller altimeter, it is a glowing rail — which is the right
-    // thing on a phone, where the names are on the readout anyway.
-    const roomy = w - BAR > 58
+  /** Path2D is not free to build and the silhouettes never change. */
+  const PATHS = new Map<string, Path2D>()
+  const pathOf = (d: string) => {
+    let q = PATHS.get(d)
+    if (!q) { q = new Path2D(d); PATHS.set(d, q) }
+    return q
+  }
 
-    // The groove the track sits in.
-    g.save()
-    round(g, 0, 0, BAR + 4, h, (BAR + 4) / 2)
-    g.fillStyle = rgb(sky.well)
-    g.fill()
-    g.strokeStyle = 'rgb(0 0 0 / 0.6)'
-    g.lineWidth = 1
-    g.stroke()
-    g.restore()
+  /** Deterministic noise, so the same nebula turns up every frame. */
+  const nz = (k: number) => {
+    const s = Math.sin(k * 91.7 + 13.3) * 43758.5453
+    return s - Math.floor(s)
+  }
 
-    // The climb itself.
-    g.save()
-    round(g, 2, PADY, BAR, inner, BAR / 2)
-    g.clip()
-    g.drawImage(ladderStrip!, 0, 0, 1, ladderStrip!.height, 2, PADY, BAR, inner)
-    // Everything above where you are is dimmed, so the strip reads as progress
-    // rather than as decoration.
-    const yNow = clamp(yOf(shown), PADY, PADY + inner)
-    g.fillStyle = 'rgb(6 6 10 / 0.62)'
-    g.fillRect(0, 0, BAR + 4, yNow)
-    const soften = g.createLinearGradient(0, yNow - 26, 0, yNow)
-    soften.addColorStop(0, 'rgb(6 6 10 / 0)')
-    soften.addColorStop(1, 'rgb(6 6 10 / 0.34)')
-    g.fillStyle = soften
-    g.fillRect(0, yNow - 26, BAR + 4, 26)
-    g.restore()
+  /* ---- the things that are not silhouettes -------------------------------- */
 
-    // Ten-fold ticks down the side of the groove: the scale, quietly.
+  /**
+   * A body, drawn at its own colours rather than as a silhouette.
+   *
+   * Everything standing on the ground below is backlit and nearly black, which
+   * is what an object between you and the lamp looks like. These are not
+   * between you and the lamp — they *are* the light, or they are lit by a star
+   * that is not in the frame — so they keep their colours, and the panel
+   * changes character as you climb out of the atmosphere. That change is the
+   * altimeter the old rail was trying to be.
+   */
+  function orb(g: CanvasRenderingContext2D, kind: string, cx: number, cy: number, r: number, a = 1) {
+    if (!(r > 0.4) || !isFinite(r)) return
     g.save()
-    g.strokeStyle = rgba(sky.inkSoft, 0.26)
-    g.lineWidth = 1
-    for (let f = 10; f < MAX_FOLDS; f += 10) {
-      const y = Math.round(yOf(f)) + 0.5
-      g.beginPath(); g.moveTo(BAR + 6, y); g.lineTo(BAR + 9, y); g.stroke()
+    g.globalAlpha = a
+    const disc = (fill: string | CanvasGradient) => {
+      g.fillStyle = fill; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill()
+    }
+    const glow = (col: string, k: number, alpha: number) => {
+      const gg = g.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * k)
+      gg.addColorStop(0, col.replace('%A%', String(alpha)))
+      gg.addColorStop(1, col.replace('%A%', '0'))
+      g.fillStyle = gg; g.beginPath(); g.arc(cx, cy, r * k, 0, Math.PI * 2); g.fill()
+    }
+    switch (kind) {
+      case 'earth': {
+        glow('rgb(122 186 246 / %A%)', 1.26, 0.5)
+        const b = g.createRadialGradient(cx - r * 0.4, cy - r * 0.44, r * 0.04, cx, cy, r * 1.04)
+        b.addColorStop(0, 'rgb(136 196 232)')
+        b.addColorStop(0.4, 'rgb(46 106 160)')
+        b.addColorStop(0.8, 'rgb(20 48 86)')
+        b.addColorStop(1, 'rgb(7 16 32)')
+        disc(b)
+        if (r > 7) {
+          g.save(); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.clip()
+          g.fillStyle = 'rgb(78 122 76 / 0.5)'
+          for (let k = 0; k < 8; k++) {
+            g.beginPath()
+            g.ellipse(cx + (nz(k) * 2 - 1) * r * 0.74, cy + (nz(k + 40) * 2 - 1) * r * 0.74,
+              r * (0.12 + nz(k + 9) * 0.2), r * (0.08 + nz(k + 21) * 0.13),
+              nz(k + 3) * 3, 0, Math.PI * 2)
+            g.fill()
+          }
+          g.fillStyle = 'rgb(238 246 255 / 0.32)'
+          for (let k = 0; k < 6; k++) {
+            g.beginPath()
+            g.ellipse(cx + (nz(k + 60) * 2 - 1) * r * 0.8, cy + (nz(k + 77) * 2 - 1) * r * 0.8,
+              r * 0.24, r * 0.07, nz(k + 5) * 3, 0, Math.PI * 2)
+            g.fill()
+          }
+          g.restore()
+        }
+        break
+      }
+      case 'moon': {
+        const b = g.createRadialGradient(cx - r * 0.38, cy - r * 0.4, r * 0.05, cx, cy, r * 1.05)
+        b.addColorStop(0, 'rgb(228 226 218)')
+        b.addColorStop(0.6, 'rgb(150 148 142)')
+        b.addColorStop(1, 'rgb(44 44 46)')
+        disc(b)
+        if (r > 5) {
+          g.save(); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.clip()
+          g.fillStyle = 'rgb(96 96 100 / 0.5)'
+          for (let k = 0; k < 5; k++) {
+            g.beginPath()
+            g.arc(cx + (nz(k + 11) * 2 - 1) * r * 0.6, cy + (nz(k + 31) * 2 - 1) * r * 0.6,
+              r * (0.12 + nz(k) * 0.2), 0, Math.PI * 2)
+            g.fill()
+          }
+          g.restore()
+        }
+        break
+      }
+      case 'sun': {
+        glow('rgb(255 186 74 / %A%)', 2.1, 0.32)
+        glow('rgb(255 232 168 / %A%)', 1.3, 0.85)
+        const b = g.createRadialGradient(cx, cy, 0, cx, cy, r)
+        b.addColorStop(0, 'rgb(255 255 250)')
+        b.addColorStop(0.62, 'rgb(255 236 176)')
+        b.addColorStop(1, 'rgb(250 182 68)')
+        disc(b)
+        break
+      }
+      case 'star': {
+        glow('rgb(198 220 255 / %A%)', 4.6, 0.28)
+        g.fillStyle = 'rgb(246 250 255)'
+        g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill()
+        g.strokeStyle = 'rgb(214 232 255 / 0.65)'
+        g.lineWidth = Math.max(0.7, r * 0.24)
+        g.beginPath()
+        g.moveTo(cx - r * 4.4, cy); g.lineTo(cx + r * 4.4, cy)
+        g.moveTo(cx, cy - r * 4.4); g.lineTo(cx, cy + r * 4.4)
+        g.stroke()
+        break
+      }
+      case 'iss': {
+        const u = Math.max(1.6, r)
+        g.strokeStyle = 'rgb(226 232 244)'
+        g.lineWidth = Math.max(1, u * 0.32)
+        g.beginPath(); g.moveTo(cx - u * 2.4, cy); g.lineTo(cx + u * 2.4, cy); g.stroke()
+        g.fillStyle = 'rgb(58 82 156)'
+        for (const s of [-1, 1]) g.fillRect(cx + s * u * 1.2 - u * 0.75, cy - u * 1.5, u * 1.5, u * 3)
+        g.fillStyle = 'rgb(236 240 250)'
+        g.fillRect(cx - u * 0.45, cy - u * 0.7, u * 0.9, u * 1.4)
+        break
+      }
+      case 'galaxy': {
+        g.save(); g.translate(cx, cy); g.rotate(-0.42); g.scale(1, 0.3)
+        const halo = g.createRadialGradient(0, 0, 0, 0, 0, r)
+        halo.addColorStop(0, 'rgb(255 244 220 / 0.95)')
+        halo.addColorStop(0.16, 'rgb(212 208 246 / 0.58)')
+        halo.addColorStop(0.55, 'rgb(140 150 226 / 0.24)')
+        halo.addColorStop(1, 'rgb(96 110 200 / 0)')
+        g.fillStyle = halo
+        g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill()
+        g.strokeStyle = 'rgb(198 212 255 / 0.3)'
+        g.lineWidth = Math.max(0.8, r * 0.035)
+        for (const s of [1, -1]) {
+          g.beginPath()
+          for (let k = 0; k <= 26; k++) {
+            const th = (k / 26) * 3.5, rr = r * 0.1 + (k / 26) * r * 0.9
+            const x = Math.cos(th) * rr * s, y = Math.sin(th) * rr * s
+            if (k) g.lineTo(x, y); else g.moveTo(x, y)
+          }
+          g.stroke()
+        }
+        g.restore()
+        break
+      }
+      case 'nebula': {
+        for (let k = 0; k < 9; k++) {
+          const ax = cx + (nz(k + 7) * 2 - 1) * r * 0.62
+          const ay = cy + (nz(k + 29) * 2 - 1) * r * 0.62
+          const ar = r * (0.24 + nz(k + 3) * 0.42)
+          const hue = k % 3 === 0 ? '236 118 148' : k % 3 === 1 ? '104 146 236' : '176 128 226'
+          const gg = g.createRadialGradient(ax, ay, 0, ax, ay, ar)
+          gg.addColorStop(0, 'rgb(' + hue + ' / 0.32)')
+          gg.addColorStop(1, 'rgb(' + hue + ' / 0)')
+          g.fillStyle = gg
+          g.beginPath(); g.arc(ax, ay, ar, 0, Math.PI * 2); g.fill()
+        }
+        g.fillStyle = 'rgb(255 250 240 / 0.9)'
+        for (let k = 0; k < 14; k++) {
+          g.beginPath()
+          g.arc(cx + (nz(k + 61) * 2 - 1) * r * 0.7, cy + (nz(k + 83) * 2 - 1) * r * 0.7,
+            Math.max(0.5, r * 0.012), 0, Math.PI * 2)
+          g.fill()
+        }
+        break
+      }
+      case 'cluster': {
+        for (let k = 0; k < 26; k++) {
+          const ar = r * (0.02 + nz(k + 17) * 0.055)
+          g.save()
+          g.translate(cx + (nz(k + 5) * 2 - 1) * r * 0.85, cy + (nz(k + 44) * 2 - 1) * r * 0.85)
+          g.rotate(nz(k) * 3); g.scale(1, 0.34)
+          const gg = g.createRadialGradient(0, 0, 0, 0, 0, ar * 4)
+          gg.addColorStop(0, 'rgb(248 240 226 / 0.85)')
+          gg.addColorStop(1, 'rgb(150 160 226 / 0)')
+          g.fillStyle = gg
+          g.beginPath(); g.arc(0, 0, ar * 4, 0, Math.PI * 2); g.fill()
+          g.restore()
+        }
+        break
+      }
+      case 'web': {
+        g.strokeStyle = 'rgb(176 190 244 / 0.3)'
+        for (let k = 0; k < 12; k++) {
+          g.lineWidth = 0.6 + nz(k) * 1.1
+          const x0 = cx + (nz(k + 2) * 2 - 1) * r, y0 = cy + (nz(k + 19) * 2 - 1) * r * 0.9
+          const x1 = cx + (nz(k + 51) * 2 - 1) * r, y1 = cy + (nz(k + 71) * 2 - 1) * r * 0.9
+          g.beginPath()
+          g.moveTo(x0, y0)
+          g.quadraticCurveTo((x0 + x1) / 2 + (nz(k + 8) * 2 - 1) * r * 0.3,
+            (y0 + y1) / 2 + (nz(k + 34) * 2 - 1) * r * 0.3, x1, y1)
+          g.stroke()
+        }
+        for (let k = 0; k < 22; k++) {
+          const ax = cx + (nz(k + 90) * 2 - 1) * r, ay = cy + (nz(k + 12) * 2 - 1) * r * 0.9
+          const ar = Math.max(0.7, r * (0.008 + nz(k + 4) * 0.02))
+          const gg = g.createRadialGradient(ax, ay, 0, ax, ay, ar * 5)
+          gg.addColorStop(0, 'rgb(240 236 250 / 0.8)')
+          gg.addColorStop(1, 'rgb(160 170 236 / 0)')
+          g.fillStyle = gg
+          g.beginPath(); g.arc(ax, ay, ar * 5, 0, Math.PI * 2); g.fill()
+        }
+        break
+      }
+      case 'sphere': {
+        const shell = g.createRadialGradient(cx, cy, r * 0.42, cx, cy, r)
+        shell.addColorStop(0, 'rgb(150 168 236 / 0)')
+        shell.addColorStop(0.82, 'rgb(158 176 244 / 0.12)')
+        shell.addColorStop(0.96, 'rgb(198 212 255 / 0.32)')
+        shell.addColorStop(1, 'rgb(198 212 255 / 0)')
+        disc(shell)
+        g.fillStyle = 'rgb(236 240 255 / 0.6)'
+        for (let k = 0; k < 34; k++) {
+          const th = nz(k) * 6.283, rr = r * Math.sqrt(nz(k + 40))
+          g.beginPath()
+          g.arc(cx + Math.cos(th) * rr, cy + Math.sin(th) * rr * 0.98,
+            Math.max(0.5, r * 0.008), 0, Math.PI * 2)
+          g.fill()
+        }
+        break
+      }
     }
     g.restore()
+  }
 
-    if (roomy) {
-      g.font = '600 9px ' + getComputedStyle(document.body).getPropertyValue('--mono')
-      g.textBaseline = 'middle'
-      for (const [at, label] of ANCHORS) {
-        const y = clamp(Math.round(yOf(at)) + 0.5, 7, h - 7)
-        g.strokeStyle = rgba(sky.inkSoft, 0.5)
-        g.lineWidth = 1
-        g.beginPath(); g.moveTo(BAR + 6, y); g.lineTo(BAR + 12, y); g.stroke()
-        g.fillStyle = rgba(sky.inkSoft, 0.92)
-        g.fillText(label.toUpperCase(), BAR + 16, y)
+  /**
+   * How far below the frame's ground line the limb has fallen at x.
+   *
+   * The bodies at the foot of a distance are spheres, and a column standing on
+   * a sphere at the right-hand edge of the panel does not stand at the same
+   * height as one standing at the middle. Two lines of Pythagoras, and the
+   * paper stops hovering a few pixels above the Earth.
+   */
+  const LIMB_R = 3.4
+  function limbDrop(kind: string, w: number, x: number) {
+    if (kind === 'star' || kind === 'galaxy') return 0
+    const R = w * LIMB_R, dx = x - w / 2
+    return R - Math.sqrt(Math.max(0, R * R - dx * dx))
+  }
+
+  /** The thing a distance is measured from, curving away under the frame. */
+  function horizonOf(g: CanvasRenderingContext2D, kind: string, w: number, y: number) {
+    if (kind === 'star') { orb(g, 'star', w * 0.5, y, 4.5); return }
+    if (kind === 'galaxy') { orb(g, 'galaxy', w * 0.5, y, Math.min(w * 0.34, 54)); return }
+    const warm = kind === 'sun'
+    const R = w * LIMB_R, cy = y + R
+    g.save()
+    const k = warm ? 1.1 : 1.06
+    const rim = g.createRadialGradient(w / 2, cy, R * (warm ? 0.99 : 0.985), w / 2, cy, R * k)
+    rim.addColorStop(0, warm ? 'rgb(255 214 130 / 0.95)' : 'rgb(126 190 248 / 0.9)')
+    rim.addColorStop(1, warm ? 'rgb(255 160 40 / 0)' : 'rgb(70 130 210 / 0)')
+    g.fillStyle = rim
+    g.beginPath(); g.arc(w / 2, cy, R * k, 0, Math.PI * 2); g.fill()
+    const ball = g.createLinearGradient(0, y, 0, y + 120)
+    if (warm) { ball.addColorStop(0, 'rgb(255 246 214)'); ball.addColorStop(1, 'rgb(232 156 44)') }
+    else { ball.addColorStop(0, 'rgb(60 116 168)'); ball.addColorStop(1, 'rgb(12 28 52)') }
+    g.fillStyle = ball
+    g.beginPath(); g.arc(w / 2, cy, R, 0, Math.PI * 2); g.fill()
+    g.restore()
+  }
+
+  /* ---- the things that are silhouettes ------------------------------------ */
+
+  /**
+   * A reference object, backlit.
+   *
+   * Everything on the ground is between you and the lamp, so it is nearly
+   * black with a warm contour and whatever light is inside it — the windows of
+   * the house, the snow on Everest, the platforms of the Eiffel Tower. That is
+   * the detail path, and it is the difference between a chart and a place.
+   * dim is atmospheric perspective: the further back down the ladder a thing
+   * is, the more air you are looking through to see it.
+   */
+  function drawStand(
+    g: CanvasRenderingContext2D, ref: any, cx: number, groundY: number, hPx: number, dim: number,
+  ) {
+    if (!(hPx > 1.2)) return
+    const s = hPx / 100
+    const wPx = ref.w * s
+
+    g.save()
+    g.globalAlpha = 0.55 * dim
+    g.translate(cx, groundY)
+    g.scale(1, 0.15)
+    const sh = g.createRadialGradient(0, 0, 0, 0, 0, wPx * 0.8)
+    sh.addColorStop(0, 'rgb(0 0 0 / 0.75)')
+    sh.addColorStop(1, 'rgb(0 0 0 / 0)')
+    g.fillStyle = sh
+    g.beginPath(); g.arc(0, 0, wPx * 0.8, 0, Math.PI * 2); g.fill()
+    g.restore()
+
+    g.save()
+    g.globalAlpha = dim
+    g.translate(cx, groundY)
+    g.scale(s, s)
+    g.translate(-ref.w / 2, -100)
+
+    const body = pathOf(ref.d)
+
+    // Dark, and bluer towards the top, which is the air between you and it.
+    const fill = g.createLinearGradient(0, 0, 0, 100)
+    fill.addColorStop(0, 'rgb(48 56 76)')
+    fill.addColorStop(0.5, 'rgb(24 28 40)')
+    fill.addColorStop(1, 'rgb(10 11 16)')
+    g.fillStyle = fill
+    g.fill(body)
+
+    /* The rim light, done properly rather than as an outline.
+       Stroking the whole silhouette lights the shaded side too, which is what
+       makes a backlit object look like a sticker. Clipping to the shape and
+       raking a warm gradient across it from the left puts the light where the
+       lamp is — the same left-hand lamp the sheet on the stage is lit by. */
+    if (hPx > 14) {
+      g.save()
+      g.clip(body)
+      const rake = g.createLinearGradient(0, 0, ref.w * 0.62, 100)
+      rake.addColorStop(0, 'rgb(255 208 146 / 0.55)')
+      rake.addColorStop(0.32, 'rgb(255 196 130 / 0.12)')
+      rake.addColorStop(1, 'rgb(255 190 120 / 0)')
+      g.fillStyle = rake
+      g.fillRect(0, 0, ref.w, 100)
+      g.restore()
+      g.strokeStyle = 'rgb(255 222 172 / 0.34)'
+      g.lineWidth = Math.min(1.6, 1 / s)
+      g.stroke(body)
+    }
+    if (ref.detail && hPx > 30) {
+      g.fillStyle = ref.tone === 'pale'
+        ? 'rgb(222 232 246 / 0.42)'
+        : 'rgb(255 202 122 / 0.72)'
+      g.fill(pathOf(ref.detail))
+    }
+    g.restore()
+  }
+
+  /* ---- the panel ---------------------------------------------------------- */
+
+  function drawScale() {
+    const { g, w, h } = SCALE
+    g.clearRect(0, 0, w, h)
+    if (w < 60 || h < 60) return
+
+    const groundY = h - 24
+    const usable = groundY - 12
+    const perM = usable / world
+    const stackM = heightM(shown)
+    const tgt: any = scaleTarget(stackM)
+    /** Filled in by whichever layout branch runs. */
+    let paperAt = -1
+    let backNamed: { name: string; cx: number } | null = null
+
+    // What is underfoot.
+    if (tgt.kind === 'span') horizonOf(g, tgt.from, w, groundY)
+    else if (tgt.kind === 'stand') {
+      const f = g.createLinearGradient(0, groundY, 0, groundY + 16)
+      f.addColorStop(0, rgba(sky.inkSoft, 0.09))
+      f.addColorStop(1, rgba(sky.inkSoft, 0))
+      g.fillStyle = f
+      g.fillRect(0, groundY, w, 16)
+    }
+    if (tgt.kind !== 'span') {
+      g.strokeStyle = rgba(sky.inkSoft, tgt.kind === 'body' ? 0.16 : 0.4)
+      g.lineWidth = 1
+      g.beginPath(); g.moveTo(0, groundY + 0.5); g.lineTo(w, groundY + 0.5); g.stroke()
+    }
+    /** Where the ground actually is at x — flat, unless it is a planet. */
+    const floorAt = (x: number) =>
+      tgt.kind === 'span' ? groundY + limbDrop(tgt.from, w, x) : groundY
+
+    const gap = Math.max(14, w * 0.03)
+    const paperW = Math.max(8, Math.min(17, w * 0.021))
+
+    // Where the target sits, and how much room it takes.
+    const tgtH = Math.min(tgt.metres * perM, usable)
+    let tgtLeft: number
+    if (tgt.kind === 'stand') {
+      /* Measured before anything is drawn, so the whole group — everything it
+         has passed, the paper, the thing it is chasing — can be centred. Laid
+         out from the right edge instead, the picture drifts left as the ladder
+         fills up and leaves half the panel empty at the bottom of it. */
+      const tw = (tgt.w / 100) * tgtH
+      const back: { ref: any; h: number; w: number }[] = []
+      let used = tw + gap + paperW
+      for (const r of scalePassed(stackM) as any[]) {
+        if (r.kind !== 'stand') continue
+        const ph = r.metres * perM
+        if (ph < 4) break
+        const pw = (r.w / 100) * ph
+        if (used + gap * 0.8 + pw > w - 12) break
+        used += gap * 0.8 + pw
+        back.push({ ref: r, h: ph, w: pw })
+      }
+      let x = Math.max(6, (w - used) / 2)
+      // Smallest first, so the row climbs towards the thing being chased.
+      for (const b of back.reverse()) {
+        drawStand(g, b.ref, x + b.w / 2, groundY, b.h, 0.44)
+        if (b.h > 16) backNamed = { name: b.ref.name, cx: x + b.w / 2 }
+        x += b.w + gap * 0.8
+      }
+      paperAt = x + paperW / 2
+      x += paperW + gap
+      drawStand(g, tgt, x + tw / 2, groundY, tgtH, 1)
+      tgtLeft = x
+    } else if (tgt.kind === 'body') {
+      const r = tgtH / 2
+      const cx = Math.min(w - gap - Math.min(r, w * 0.28), w * 0.68)
+      tgtLeft = Math.max(w * 0.36, cx - r)
+      orb(g, tgt.disc, cx, groundY - r, r)
+    } else {
+      const cx = w - gap - 22
+      tgtLeft = cx - 28
+      // The measure itself: a dotted riser from the ground to the marker, so
+      // the gap being described is a thing you can see rather than a caption.
+      g.save()
+      g.strokeStyle = rgba(sky.inkSoft, 0.45)
+      g.setLineDash([2, 4])
+      g.lineWidth = 1
+      g.beginPath()
+      g.moveTo(cx + 0.5, floorAt(cx)); g.lineTo(cx + 0.5, groundY - tgtH)
+      g.stroke()
+      g.restore()
+      if (tgt.to === 'line') {
+        g.save()
+        g.strokeStyle = rgba(sky.accent, 0.8)
+        g.setLineDash([6, 5])
+        g.lineWidth = 1.4
+        g.beginPath()
+        g.moveTo(w * 0.08, groundY - tgtH + 0.5); g.lineTo(w - gap, groundY - tgtH + 0.5)
+        g.stroke()
+        g.restore()
+      } else {
+        orb(g, tgt.to, cx, groundY - tgtH, tgt.to === 'iss' ? 4 : tgt.to === 'star' ? 3.4 : 13)
       }
     }
 
-    // Where you are: a lit index across the track, and a bead beside it.
-    const y = clamp(yOf(shown), PADY + 1, PADY + inner - 1)
+    // The paper: to the left of whatever it is chasing, and in front of it.
+    // Above the atmosphere nothing it has passed is more than a pixel tall, so
+    // there is no row to lay out and the column simply stands clear.
+    const paperH = Math.min(stackM * perM, usable * 1.04)
+    const paperCx = paperAt >= 0
+      ? paperAt
+      : Math.max(paperW, Math.min(tgtLeft - gap - paperW / 2, w - paperW))
+    const named = backNamed
+
+    /* The paper's column.
+       Its height is to scale. Its width is not, and cannot be: at fold ten the
+       sheet is 26 cm wide and 10 cm tall, and by fold forty it is narrower
+       than an atom. The inset on the stage is where both axes share one scale.
+       This is a measure standing next to a thing, and it is drawn as one. */
     g.save()
-    if ('filter' in g) g.filter = 'blur(5px)'
-    g.fillStyle = rgba(sky.accent, 0.55)
-    g.fillRect(0, y - 3, BAR + 4, 6)
+    if ('filter' in g) {
+      g.filter = 'blur(9px)'
+      g.globalAlpha = 0.5
+      g.fillStyle = 'rgb(255 240 208)'
+      g.fillRect(paperCx - paperW / 2, groundY - paperH, paperW, paperH)
+      g.filter = 'none'
+      g.globalAlpha = 1
+    }
+    const col = g.createLinearGradient(paperCx - paperW / 2, 0, paperCx + paperW / 2, 0)
+    col.addColorStop(0, 'rgb(212 200 174)')
+    col.addColorStop(0.3, 'rgb(255 253 246)')
+    col.addColorStop(1, 'rgb(204 190 162)')
+    g.fillStyle = col
+    const foot = floorAt(paperCx)
+    g.fillRect(paperCx - paperW / 2, groundY - paperH, paperW, Math.max(1.5, paperH) + (foot - groundY))
+    g.fillStyle = 'rgb(255 255 252)'
+    g.fillRect(paperCx - paperW / 2, groundY - paperH, paperW, Math.min(2, paperH))
+    g.restore()
+
+    // The reading: a dashed line off the top of the stack, run across to the
+    // thing it is being measured against.
+    if (paperH > 3 && paperH < usable) {
+      g.save()
+      g.strokeStyle = rgba(sky.accent, 0.55)
+      g.setLineDash([3, 4])
+      g.lineWidth = 1
+      g.beginPath()
+      g.moveTo(paperCx + paperW / 2, groundY - paperH + 0.5)
+      g.lineTo(Math.max(paperCx + paperW / 2 + 8, w - gap * 0.6), groundY - paperH + 0.5)
+      g.stroke()
+      g.restore()
+    }
+
+    // Names, small. The target's name is in the panel's header, where it has
+    // room to be a phrase; these are only so the receding shapes are placeable.
+    g.font = '600 8.5px ' + getComputedStyle(document.body).getPropertyValue('--mono')
+    g.textAlign = 'center'
+    g.textBaseline = 'top'
+    g.fillStyle = rgb(sky.accent)
+    g.fillText('THE PAPER', paperCx, Math.min(h - 11, floorAt(paperCx) + 7))
+    if (named && Math.abs(named.cx - paperCx) > 46) {
+      g.fillStyle = rgba(sky.inkSoft, 0.72)
+      g.fillText(named.name.replace(/^(a|an|the) /, '').toUpperCase(), named.cx, groundY + 7)
+    }
+    g.textAlign = 'start'
+  }
+
+  /* ---- the whole climb, as one thin line ---------------------------------- */
+
+  let railStrip: HTMLCanvasElement | null = null
+
+  function buildRail() {
+    const w = Math.max(40, RAIL.w)
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = 1
+    const g = c.getContext('2d')!
+    for (let x = 0; x < w; x++) {
+      g.fillStyle = rgb(skyAt(heightM((x / (w - 1)) * MAX_FOLDS)).bottom)
+      g.fillRect(x, 0, 1, 1)
+    }
+    railStrip = c
+  }
+
+  function drawRail() {
+    const { g, w, h } = RAIL
+    if (!railStrip || railStrip.width !== w) buildRail()
+    g.clearRect(0, 0, w, h)
+    const H = 5, y = Math.round((h - H) / 2)
+    g.save()
+    round(g, 0, y, w, H, H / 2)
+    g.clip()
+    g.drawImage(railStrip!, 0, 0, railStrip!.width, 1, 0, y, w, H)
+    const x = (shown / MAX_FOLDS) * w
+    g.fillStyle = 'rgb(6 6 10 / 0.66)'
+    g.fillRect(x, 0, w - x, h)
+    g.restore()
+    g.save()
+    if ('filter' in g) g.filter = 'blur(4px)'
+    g.fillStyle = rgba(sky.accent, 0.7)
+    g.beginPath(); g.arc(x, h / 2, 5, 0, Math.PI * 2); g.fill()
     g.restore()
     g.fillStyle = rgb(sky.accent)
-    g.fillRect(0, y - 1, BAR + 4, 2)
-    g.beginPath(); g.arc(BAR + 4, y, 3.4, 0, Math.PI * 2)
-    g.fill()
-    g.strokeStyle = rgb(sky.surface)
-    g.lineWidth = 1.4
+    g.beginPath(); g.arc(x, h / 2, 3.2, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = rgb(sky.well)
+    g.lineWidth = 1.2
     g.stroke()
   }
 
@@ -1051,6 +1509,15 @@ const MAX_FOLDS = 103
     el('layersLabel').textContent = plural(2 ** Math.min(n, 40), 'layer') + ' of paper'
     el('where').querySelector('span')!.textContent = sky.where
 
+    // The comparison names itself in words, because "as tall as the Eiffel
+    // Tower" is the sentence the picture is making and a picture that needs
+    // its sentence read out loud is only half a picture.
+    const tgt = scaleTarget(heightM(n))
+    el('scaleLead').textContent = leadIn(tgt)
+    el('scaleName').textContent = tgt.name
+    el('scaleRel').textContent = relation(heightM(n), tgt)
+    el('climbText').textContent = 'fold ' + n + ' of ' + MAX_FOLDS
+
     for (const b of el('picker').querySelectorAll('.chip'))
       b.setAttribute('aria-checked', String((b as HTMLElement).dataset.sheet === sheet.id))
     for (const b of document.querySelectorAll('.way'))
@@ -1147,11 +1614,22 @@ const MAX_FOLDS = 103
     const target = n + (imaginary ? 0 : u)
     const moved = Math.abs(target - shown) > 0.0005
     shown = prefersReducedMotion ? target : lerp(shown, target, 0.16)
-    if (moved || dirty) {
+    // The frame pulls back in log space. It steps by a factor of three to a
+    // thousand whenever the paper overtakes something, and easing that
+    // linearly would spend most of the animation showing nothing.
+    const wantWorld = worldHeight(heightM(shown))
+    const zooming = Math.abs(Math.log(wantWorld / world)) > 1e-4
+    if (!prefersReducedMotion && zooming) {
+      world = Math.exp(lerp(Math.log(world), Math.log(wantWorld), 0.13))
+    } else {
+      world = wantWorld
+    }
+    if (moved || zooming || dirty) {
       sky = skyAt(heightM(shown))
       paintPalette()
       drawSky()
-      drawLadder()
+      drawScale()
+      drawRail()
     }
     drawStage()
     if (yaw !== 0) {
@@ -1159,7 +1637,7 @@ const MAX_FOLDS = 103
       dirty = true
     }
     const camMoving = !!camNow && Math.abs(camNow.f - 0) >= 0 && dirty
-    dirty = moved || yaw !== 0 || dragging || !!running
+    dirty = moved || zooming || yaw !== 0 || dragging || !!running
     if (dirty || camMoving) loop = requestAnimationFrame(frame)
   }
 
@@ -1171,8 +1649,8 @@ const MAX_FOLDS = 103
   }
 
   function relayout() {
-    size(SKY); size(STAGE); size(LADDER)
-    buildLadder()
+    size(SKY); size(STAGE); size(SCALE); size(RAIL)
+    buildRail()
     if (!fibre) makeFibre()
     camNow = null
     paint()
@@ -1335,24 +1813,23 @@ const MAX_FOLDS = 103
   /* --- the bay ----------------------------------------------------------- */
 
   .con-main {
-    display: grid; grid-template-columns: minmax(0, 1fr) 132px;
-    gap: 12px; align-items: stretch;
+    display: grid; gap: 12px;
     padding: 0 14px 14px;
   }
 
   /* Recesses, not cards: the stage and the altimeter are cut *into* the
      console, which is why they are darker than it and lit along the bottom
      edge rather than the top. */
-  .bay, .alt {
+  .bay {
     border-radius: 18px;
     background: var(--well);
     box-shadow:
       inset 0 2px 5px rgb(0 0 0 / 0.55),
       inset 0 0 0 1px rgb(0 0 0 / 0.5),
       0 1px 0 var(--rim-a);
+    padding: 13px 14px 15px;
+    overflow: hidden;
   }
-
-  .bay { padding: 13px 14px 15px; overflow: hidden; }
   .bay-top {
     display: flex; align-items: flex-start; gap: 12px;
     padding-bottom: 11px; border-bottom: 1px solid var(--line-a);
@@ -1380,7 +1857,7 @@ const MAX_FOLDS = 103
 
   .stage-hold { position: relative; margin-top: 10px; }
   #stage {
-    display: block; width: 100%; height: 296px;
+    display: block; width: 100%; height: 340px;
     touch-action: none; cursor: ew-resize; border-radius: 12px;
   }
   #stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -1437,20 +1914,51 @@ const MAX_FOLDS = 103
     font-variant-numeric: tabular-nums; min-height: 17px;
   }
 
-  /* --- the altimeter ----------------------------------------------------- */
+  /* --- the comparison ---------------------------------------------------- */
 
-  .alt { padding: 12px 8px 10px; display: flex; flex-direction: column; }
-  .alt-cap {
-    margin: 0 0 8px; text-align: center;
-    font: 600 8.5px/1 var(--mono); letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--ink-soft); opacity: 0.75;
+  /* The rail this replaced was a gradient with seven words beside it: PAPER,
+     A HOUSE, SPACE, THE MOON. Words are not a measurement — "nearest star"
+     next to a coloured strip tells you something you already knew and nothing
+     at all about size. So the panel now draws the smallest real thing the
+     paper has not yet passed, to scale, standing on the same ground. */
+  .scale-bay { padding: 11px 12px 10px; }
+  .scale-top {
+    display: flex; align-items: baseline; gap: 9px;
+    padding-bottom: 9px; border-bottom: 1px solid var(--line-a);
   }
-  #ladder { display: block; width: 100%; flex: 1; min-height: 300px; }
+  .scale-lead {
+    margin: 0; flex: none;
+    font: 600 9.5px/1.6 var(--mono); letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .scale-name {
+    margin: 0; flex: 1; min-width: 0;
+    font-family: var(--display); font-weight: 800; font-size: 19px;
+    letter-spacing: -0.025em; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .scale-rel {
+    margin: 0; flex: none;
+    font: 700 12px/1.6 var(--mono); color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  #scale { display: block; width: 100%; height: 216px; margin-top: 4px; }
+
+  .climb {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 2px; padding-top: 9px; border-top: 1px solid var(--line-a);
+  }
+  #rail { display: block; flex: 1; min-width: 0; height: 14px; }
+  .climb-text {
+    margin: 0; flex: none;
+    font: 600 9.5px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-soft); font-variant-numeric: tabular-nums;
+  }
 
   /* --- the readout ------------------------------------------------------- */
 
   .read {
-    display: grid; grid-template-columns: 1.65fr 0.62fr 1fr;
+    display: grid; grid-template-columns: 1.9fr 0.5fr 1.05fr;
     column-gap: 14px; row-gap: 4px;
     align-items: end; text-align: left;
     margin: 0 14px; padding: 16px 16px 18px;
@@ -1462,11 +1970,14 @@ const MAX_FOLDS = 103
      deep space has a different contrast at every fold. */
   .read.imaginary { box-shadow: inset 0 0 0 1px var(--line-a); border-radius: 14px; }
   .read.imaginary .mark { border-top-style: dashed; }
+  /* The layer count reaches forty-one digits and the thickness reaches
+     "107 billion light years". Both wrap, and the sizes here are what stops
+     them wrapping into each other. */
   .fig b {
     display: block; font-family: var(--display); font-weight: 800;
     letter-spacing: -0.035em; color: var(--ink);
-    font-variant-numeric: tabular-nums; line-height: 1.02;
-    font-size: 20px; word-break: break-word;
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+    font-size: clamp(14px, 2vw, 17px); overflow-wrap: anywhere;
   }
   /* Hairlines between the readouts. An instrument panel divides its dials;
      three numbers in a row with nothing between them is a table. */
@@ -1477,7 +1988,7 @@ const MAX_FOLDS = 103
     color: var(--ink-soft);
   }
   .fig-lead b {
-    font-size: clamp(28px, 5.6vw, 44px);
+    font-size: clamp(25px, 4.4vw, 38px); line-height: 1.04;
     filter: drop-shadow(0 0 22px var(--glow-soft));
   }
   .fig-lead b.bump { animation: bump 340ms var(--ease); }
@@ -1548,14 +2059,17 @@ const MAX_FOLDS = 103
     .console { border-radius: 20px; }
     .con-head { padding: 24px 20px 18px; }
     .rail { padding: 0 14px 16px; }
-    .con-main { grid-template-columns: minmax(0, 1fr) 34px; gap: 8px; padding: 0 10px 10px; }
-    .alt { padding: 10px 5px 8px; }
-    .alt-cap { display: none; }
+    .con-main { gap: 8px; padding: 0 10px 10px; }
     .bay { padding: 11px 11px 13px; }
     .bay-top { flex-direction: column; gap: 9px; }
     .ways { align-self: flex-start; }
-    #stage { height: 236px; }
-    #ladder { min-height: 240px; }
+    #stage { height: 250px; }
+    #scale { height: 178px; }
+    .scale-bay { padding: 10px 10px 9px; }
+    /* The lead-in is the one part of the sentence a reader can supply from the
+       picture, so it is what goes when there is no room for all three. */
+    .scale-lead { display: none; }
+    .scale-name { font-size: 16px; }
     .inset-hold { width: 98px; }
     .inset { width: 92px; height: 55px; }
     /* The full caption is nineteen characters and the plate is ninety-two

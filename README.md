@@ -105,6 +105,9 @@ src/
     fold-sky.ts         where you are, given how thick the stack is — a desk
                         at fold zero, intergalactic space at a hundred and
                         three — and the dark palette the console is cut from
+    fold-scale.ts       thirty-two real things with real heights, from a grain
+                        of sand to the observable universe, and the silhouettes
+                        the page stands next to the paper
     sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
                         the Moon’s distance and how much of it is lit
     robot-scene.ts      the CAPTCHA's street, in perspective, with materials,
@@ -265,7 +268,10 @@ went round the bend — grows until it is wider than the paper left to feed it.
 you are past the Kármán line, and the last fold has nothing behind it but other
 galaxies. It is all one dark instrument, so the sheet of paper is the brightest
 thing on the screen — which is the point, and which the first version got
-backwards. *Fold 42 reaches the Moon, fold 103 exceeds the observable universe;
+backwards. And beside it the page answers "how big is that?" by standing
+something real next to it: at fold twenty-one the stack is 64% of the way up
+the Eiffel Tower, at twenty-two it is past it and the view pulls back to
+Everest. *Fold 42 reaches the Moon, fold 103 exceeds the observable universe;
 the layer count uses BigInt so it stays exact. The limit is not typed in — it
 comes out of Gallivan's two equations, and `check-fold.mjs` holds them to what
 people have actually managed. A page whose background travels thirty orders of
@@ -395,6 +401,7 @@ node scripts/check-time-art.mjs    # Deep Time's scenes, at the card's own width
 node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
 node scripts/check-fold.mjs        # the paper model, against paper
 node scripts/check-fold-scene.mjs  # Paper Folds' drawing, and its sky, at every fold
+node scripts/check-fold-scale.mjs  # the ladder of real things, and the silhouettes
 node scripts/check-forecast.mjs    # the sky model, against Meeus and real eclipses
 node scripts/check-result-card.mjs # the share card, at every game and result shape
 node scripts/check-stats.mjs       # what the site remembers, against a hostile store

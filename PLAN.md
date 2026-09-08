@@ -906,7 +906,58 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    That is now the test, and unlike the old one it is a statement about how the
    thing is drawn rather than a hope about where the colours landed.
 
-10. Then reassess against the depth work in Phases 1–2 above.
+10. ~~**Paper Folds, given a ruler**~~ — **done.** The altimeter was the worst
+    thing left on the page: a gradient rail with seven words beside it —
+    PAPER, A HOUSE, SPACE, THE MOON. Words are not a measurement. "Nearest
+    star" written next to a coloured strip tells you something you already knew
+    and nothing whatever about size, which is the exact failure the game exists
+    to fix, sitting in the game's own furniture.
+
+    So `fold-scale.ts` holds thirty-two real things with their real heights,
+    from a grain of sand at half a millimetre to the observable universe at
+    8.8e26 metres, and the panel draws the smallest one the paper has not yet
+    passed — to scale, standing on the same ground, with the paper beside it
+    and the things it has already outgrown receding behind. Fold twenty-one and
+    the stack is 64% of the way up the Eiffel Tower. Fold twenty-two and it is
+    past it, the frame pulls back by a factor of twenty-seven, and Everest is
+    standing there instead. The zoom is eased in log space, so an overtake
+    takes the same time whether the next rung is three times bigger or a
+    thousand.
+
+    Above about ten kilometres nothing stands on the ground any more, so the
+    drawing changes rather than pretending: a curved limb at the foot of the
+    frame and a marker at the top for a distance, a body whose own diameter is
+    the measure for a size. That change of character *is* the altitude
+    readout — the thing the rail was gesturing at.
+
+    Two honesty notes are in the code where they belong. The paper's column is
+    to scale in height and not in width, because the true width is 26 cm at
+    fold ten and narrower than an atom at fold forty; the edge-on inset on the
+    stage is where both axes share one scale, and that is the drawing that
+    answers the question the game actually asks. And the silhouettes are
+    backlit — nearly black, with a warm contour and whatever light is inside
+    them — because they are between you and the same left-hand lamp the sheet
+    is lit by.
+
+    `check-fold-scale.mjs` paid for itself immediately. Eighteen heights are
+    typed in again, independently, so a slip has to happen twice to survive;
+    the ladder is held to being sorted with no gap wider than 7.2 folds; and
+    every silhouette's path is *walked*, cubic extrema solved rather than
+    approximated by control points, to prove it stands on y=100 and reaches the
+    top of its box. That last one found six real defects a screenshot had not:
+    the coffee mug's rim was in the lit detail and not in the silhouette, so
+    the shape stopped a fifth below the top of the mug; Everest was drawn 8%
+    shorter than the 8,849 m the caption claims for it; the grain of sand 7%
+    short; and the pencil and the Burj Khalifa each declared a box a third
+    wider than the shape inside it, which reserves layout space and then leaves
+    it empty. Every one of those looks almost right in any single frame.
+
+    The seventh was found by eye and is worth recording as the kind a checker
+    cannot catch: Everest's snow cap was painted with the same warm colour as
+    the windows of the house, and read as a gold hat. Lit and pale are now
+    different materials.
+
+11. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run
