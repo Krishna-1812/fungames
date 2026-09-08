@@ -1,6 +1,6 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
-import { STREET, GRAIN_RECT, HAND_DEFS } from '../lib/robot-scene'
+import { HAND_DEFS } from '../lib/robot-scene'
 
 /**
  * I'm Not a Robot — thirteen checks that start like a CAPTCHA and end
@@ -24,8 +24,7 @@ import { STREET, GRAIN_RECT, HAND_DEFS } from '../lib/robot-scene'
  * Nothing leaves the tab. There is no server on this site at all.
  */
 
-const sceneDefs = STREET.defs + HAND_DEFS
-const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
+const sceneDefs = HAND_DEFS
 ---
 
 <GameLayout
@@ -57,11 +56,11 @@ const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
     </div>
   </div>
 
-  {/* One copy of the street, hoisted out of the tiles. Each square is a window
-      on to it through <use>, so nine tiles cost one drawing. */}
+{/* The hands are drawn in the browser and share one set of gradients. The
+      street is not: it is baked to /street.png at build time, because nine
+      tiles of one filtered drawing means nine runs of the filter stack. */}
   <svg class="scene-src" width="0" height="0" aria-hidden="true" focusable="false">
     <defs set:html={sceneDefs} />
-    <g id="rc-street" set:html={sceneBody} />
   </svg>
 
   <div class="wrap">
@@ -375,18 +374,18 @@ const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
        stroke-linecap="round" stroke-linejoin="round"/></svg>`
 
   /**
-   * Nine windows on one drawing. A four-pixel gutter between them eats four
+   * Nine crops of one photograph. A four-pixel gutter between them eats four
    * pixels of picture, exactly as the real ones do, and the squares still line
-   * up with the answer key because each window is defined by its own offset
-   * into the scene rather than by where a CSS box happened to land.
+   * up with the answer key because each crop is a fixed third of the image
+   * rather than whatever the layout happened to produce.
    */
   function streetGrid() {
     return `<div class="tiles" role="group" aria-label="Nine squares of one street">
       ${Array.from({ length: 9 }, (_, i) => {
         const col = i % 3, row = (i / 3) | 0
         return `<button type="button" class="tile" data-i="${i}" aria-pressed="false">
-          <span class="tile-img" aria-hidden="true"><svg viewBox="0 0 100 100">
-            <use href="#rc-street" x="${-col * 100}" y="${-row * 100}"/></svg></span>
+          <span class="tile-img street" aria-hidden="true"
+            style="background-position:${col * 50}% ${row * 50}%"></span>
           <span class="tile-tick" aria-hidden="true">${TICK}</span>
           <span class="visually-hidden">Square ${i + 1}</span>
         </button>`
@@ -1591,6 +1590,7 @@ const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
     transition: transform 280ms cubic-bezier(0.2, 0.75, 0.3, 1);
   }
   .tile-img svg { display: block; width: 100%; height: 100%; }
+  .tile-img.street { background-image: url('/street.jpg'); background-size: 300% 300%; }
   .tile[aria-pressed='true'] .tile-img { transform: scale(0.72); }
   .tile:hover .tile-img { filter: brightness(1.07); }
   .tile:focus-visible { outline: 3px solid var(--rc-blue-d); outline-offset: -3px; }

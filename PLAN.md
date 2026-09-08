@@ -765,6 +765,51 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    well, which left it floating next to the hand rather than attached to it —
    visible in one render, invisible in the code.
 
+   **The street, made photographic.** The honest note on the first pass was
+   that the picture was a good illustration and Neal ships JPEGs. Closing that
+   is mostly one idea repeated: nothing in a photograph is even. Every surface
+   got a multiply-texture filter — asphalt, concrete, brick, plaster, paving,
+   metal, foliage, each its own frequency — plus a slow mottle over the whole
+   frame, because each shape still had one colour inside it and no shape in a
+   photograph does. A filmic grade with black lifted off zero, since light
+   scatters in a lens and a photograph has no true black. A quarter-unit blur
+   over everything, since a lens and a sensor put about a pixel of softness on
+   the world and a vector render is the only picture with none. Grain over the
+   lot. And the content a street actually has: overhead wires, lamp standards,
+   parked cars, trees, signs, bollards, a fire escape, roof clutter, people,
+   drains, cracks, patched tarmac, worn paint.
+
+   The largest single gain was the cheapest: **a cast shadow.** The sun is off
+   the right, so the right-hand buildings throw a diagonal across the road, the
+   left row is warm and the right row is cool, and shade is bluer rather than
+   merely darker. A street without that reads as an overcast render of a street
+   whatever else is done to it.
+
+   It is served as a **build-time JPEG** now. Two reasons, and the second is
+   the better one: nine tiles of one filtered drawing meant nine runs of the
+   filter stack in the browser, and a real challenge's tiles are crops of one
+   photograph. PNG came out at 1.2MB against 86KB of JPEG — texture and grain
+   are precisely what lossless compression cannot help with — and JPEG's own
+   ringing and softening are part of what a real tile looks like.
+
+   The new checks measure the artefact that ships, decoded, rather than the SVG
+   it came from. Two of them found things. **Nothing in the frame was flat**
+   passed at 1.4%, but **the road grain did not fall off with distance** failed,
+   and it was right to: a filter works in screen space, so one texture painted
+   chippings the same size underfoot and a hundred metres away. Fixed with a
+   second, finer asphalt masked in by a gradient over the whole road, so there
+   is no band edge where two noise frequencies meet. The other failure was mine
+   rather than the picture's: the first depth metric compared a band of windows
+   against a band of empty road and was measuring how much was going on at each
+   height, not how sharp it was. It now samples the same material at two
+   distances, and in relative contrast rather than absolute, because the near
+   band sits deeper in the shadow and the same texture there produces smaller
+   absolute differences.
+
+   **It is still not a photograph.** It is a much more photographic rendering:
+   the geometry is regular in a way buildings are not, the silhouettes are
+   exact, and the cars are simple. Anyone looking for it will see a render.
+
 8. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that

@@ -102,8 +102,9 @@ src/
     fold-paper.ts       Gallivan's equations, and where a real sheet gives up
     sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
                         the Moon’s distance and how much of it is lit
-    robot-scene.ts      the CAPTCHA's street, in perspective, and which of its
-                        nine squares the traffic light is actually in
+    robot-scene.ts      the CAPTCHA's street, in perspective, with materials,
+                        light direction, haze and grain — and which of its nine
+                        squares the traffic light is actually in
     result-card.ts      the 1200x630 card for a *result*, not for a game
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished
@@ -304,7 +305,10 @@ renders the scene with the light and without it, and checks that the squares
 whose pixels moved are the squares the arithmetic named. There are two keys,
 because the signal head is a fact and the pole under it is a judgement, and
 grading a judgement as though it were a fact is the single thing that makes real
-CAPTCHAs infuriating.
+CAPTCHAs infuriating. The street is baked to a JPEG at build time by
+`pages/street.jpg.ts`, because the tiles are crops of one picture rather than
+nine copies of a drawing, and because the artefacts of lossy compression are
+themselves part of what a real tile looks like.
 
 ---
 

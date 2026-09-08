@@ -18,8 +18,11 @@
  *   - Does the answer turn on the coverage threshold? If some square sat at
  *     4.6% against a 4.5% cut, the key would be one nudge from changing, and
  *     nothing would say so.
- *   - Is the scene a photograph or a diagram? Measured as the number of
- *     distinct tones present: flat fills produce very few.
+ *   - Is the scene a photograph or a diagram? Several ways: how many distinct
+ *     tones there are, how much of the frame is perfectly flat, whether the
+ *     far end is softer than the near end, and whether the sunlit side of the
+ *     street is actually brighter than the shaded side. These are measured on
+ *     the encoded JPEG the page really loads, not on the SVG it came from.
  *   - Is the distorted text distorted, and still all there?
  *   - Do the four hands have the number of fingers they say they have, and is
  *     exactly one of them right?
@@ -27,12 +30,14 @@
  *   node scripts/check-robot-scene.mjs [--png dir]
  */
 import { Resvg } from '@resvg/resvg-js'
+import sharp from 'sharp'
 import fs from 'node:fs'
 import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
 const {
   STREET, MIN_COVER, answerCells, coreCells, mark, coverage, cellBox, sceneSvg, warpedText, ALPHABET,
+  STREET_JPEG,
   hands, HAND_DEFS,
 } = await import('../src/lib/robot-scene.ts')
 
@@ -146,45 +151,129 @@ for (const [name, scene] of SCENES) {
 console.log('\nDoes it look like a photograph')
 /* ------------------------------------------------------------------------ */
 
-for (const [name, scene] of SCENES) {
-  const img = raster(sceneSvg(scene, true), scene.size)
+/**
+ * Everything below is measured on the JPEG the browser downloads, encoded
+ * exactly as src/pages/street.jpg.ts encodes it. Checking the SVG instead
+ * would be checking something nobody ever sees: the encoder softens the flat
+ * areas and rings the hard edges, and both of those change the answers.
+ */
+{
+  const png = new Resvg(sceneSvg(STREET, true), {
+    fitTo: { mode: 'width', value: STREET_JPEG.width },
+  }).render().asPng()
+  const jpg = await sharp(png)
+    .jpeg({ quality: STREET_JPEG.quality, mozjpeg: true, chromaSubsampling: '4:2:0' })
+    .toBuffer()
+
+  if (jpg.length > STREET_JPEG.maxBytes)
+    fail('the street is ' + (jpg.length / 1024).toFixed(0) + 'KB, over the ' +
+      (STREET_JPEG.maxBytes / 1024).toFixed(0) + 'KB budget')
+  else
+    ok('the street ships as ' + (jpg.length / 1024).toFixed(0) + 'KB of JPEG at ' +
+      STREET_JPEG.width + 'px')
+
+  const dec = await sharp(jpg).raw().toBuffer({ resolveWithObject: true })
+  const px = dec.data, W = dec.info.width, H = dec.info.height, CH = dec.info.channels
+  const lum = (x, y) => {
+    const o = (y * W + x) * CH
+    return 0.2126 * px[o] + 0.7152 * px[o + 1] + 0.0722 * px[o + 2]
+  }
 
   // A drawing made of flat fills has a handful of colours in it. A photograph
-  // has thousands, because every surface is a gradient and nothing is even.
+  // has thousands, because every surface is textured and nothing is even.
   const tones = new Set()
-  for (let o = 0; o < img.px.length; o += 4)
-    tones.add((img.px[o] >> 3) * 1024 + (img.px[o + 1] >> 3) * 32 + (img.px[o + 2] >> 3))
-  if (tones.size < 400) fail(name + ': only ' + tones.size + ' distinct tones — that is a diagram')
-  else ok(name + ': ' + tones.size + ' distinct tones')
+  for (let o = 0; o < px.length; o += CH)
+    tones.add((px[o] >> 3) * 1024 + (px[o + 1] >> 3) * 32 + (px[o + 2] >> 3))
+  if (tones.size < 900) fail('only ' + tones.size + ' distinct tones — that is a diagram')
+  else ok(tones.size + ' distinct tones')
+
+  /**
+   * The one that actually separates the two. A photograph has no perfectly
+   * even patches anywhere in it — sensor noise alone guarantees that — and
+   * vector art is nothing but perfectly even patches. Counted as the fraction
+   * of the frame whose three-by-three neighbourhood is completely uniform.
+   */
+  let flat = 0, total = 0
+  for (let y = 1; y < H - 1; y += 2)
+    for (let x = 1; x < W - 1; x += 2) {
+      total++
+      const c = lum(x, y)
+      let same = true
+      for (let dy = -1; dy <= 1 && same; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (Math.abs(lum(x + dx, y + dy) - c) > 0.5) { same = false; break }
+      if (same) flat++
+    }
+  const flatPct = (flat / total) * 100
+  if (flatPct > 8) fail(flatPct.toFixed(1) + '% of the frame is perfectly flat — that reads as rendered')
+  else ok(flatPct.toFixed(1) + '% of the frame is perfectly flat')
+
+  /**
+   * Depth, as haze washing out contrast with distance.
+   *
+   * The first version of this compared a band near the horizon against a band
+   * near the bottom and failed, because the horizon band is full of windows
+   * and the bottom band is empty road: it was measuring how much is going on
+   * at each height, not how sharp any of it is. Both samples now sit on the
+   * same material — shaded asphalt — at two distances.
+   *
+   * And it is relative contrast, not absolute. The near band is deeper in the
+   * building's shadow and therefore darker, so the same texture there produces
+   * smaller absolute differences; dividing by the local mean is what makes the
+   * two numbers comparable, and it is what the eye is doing anyway.
+   */
+  const grit = (y0, y1, x0, x1) => {
+    let e = 0, m = 0, n = 0
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1 - 1; x++) { e += Math.abs(lum(x, y) - lum(x + 1, y)); m += lum(x, y); n++ }
+    return (e / n) / Math.max(1, m / n) * 100
+  }
+  const xa = Math.round(W * 0.6), xb = Math.round(W * 0.7)
+  const far = grit(Math.round(H * 0.545), Math.round(H * 0.585), xa, xb)
+  const near = grit(Math.round(H * 0.8), Math.round(H * 0.855), xa, xb)
+  if (far >= near)
+    fail('road grit does not fall off with distance (' + far.toFixed(2) + ' far vs ' +
+      near.toFixed(2) + ' near) — there is no air in this picture')
+  else ok('road grit falls from ' + near.toFixed(2) + '% contrast underfoot to ' + far.toFixed(2) + '% up the street')
+
+  // The sun is somewhere. Sampled across the road at one height, the lit side
+  // has to be brighter than the shaded side — if the cast shadow ever stops
+  // being drawn, this is what says so.
+  const rowAvg = (y, x0, x1) => {
+    let a = 0
+    for (let x = x0; x < x1; x++) a += lum(x, y)
+    return a / (x1 - x0)
+  }
+  const y = Math.round(H * 0.8)
+  const litSide = rowAvg(y, Math.round(W * 0.06), Math.round(W * 0.22))
+  const shadeSide = rowAvg(y, Math.round(W * 0.74), Math.round(W * 0.9))
+  if (litSide - shadeSide < 8)
+    fail('the two sides of the street differ by only ' + (litSide - shadeSide).toFixed(1) +
+      ' levels — there is no sun in this picture')
+  else ok('the sunlit side is ' + (litSide - shadeSide).toFixed(0) + ' levels brighter than the shade')
 
   // Every square has to carry something. A tile that is one flat colour looks
   // like a loading failure, and there are nine chances to ship one.
   for (let i = 0; i < 9; i++) {
-    const b = cellBox(img.w, 3, i)
+    const b = cellBox(W, 3, i)
     let min = 255, max = 0
-    for (let y = b.y; y < b.y + b.h; y++)
-      for (let x = b.x; x < b.x + b.w; x++) {
-        const o = (y * img.w + x) * 4
-        const l = 0.2126 * img.px[o] + 0.7152 * img.px[o + 1] + 0.0722 * img.px[o + 2]
+    for (let yy = b.y; yy < b.y + b.h; yy++)
+      for (let xx = b.x; xx < b.x + b.w; xx++) {
+        const l = lum(xx, yy)
         if (l < min) min = l
         if (l > max) max = l
       }
     if (max - min < 40)
-      fail(name + ': square ' + i + ' spans only ' + (max - min).toFixed(0) + ' levels — it is blank')
+      fail('square ' + i + ' spans only ' + (max - min).toFixed(0) + ' levels — it is blank')
   }
-  ok(name + ': no square is flat')
+  ok('no square is flat')
 
-  // The corners of a photograph are darker than the middle. This is the
-  // vignette, and it is the cue that stops a rendering reading as a swatch.
-  const lum = (x, y) => {
-    const o = (y * img.w + x) * 4
-    return 0.2126 * img.px[o] + 0.7152 * img.px[o + 1] + 0.0722 * img.px[o + 2]
-  }
-  const e = 6
-  const corner = (lum(e, e) + lum(img.w - e, e)) / 2
-  const middle = lum(Math.floor(img.w / 2), e)
-  if (corner >= middle) fail(name + ': the top corners are not darker than the top middle')
-  else ok(name + ': corners sit ' + (middle - corner).toFixed(0) + ' levels under the middle')
+  // The corners of a photograph are darker than the middle.
+  const e = 8
+  const corner = (lum(e, e) + lum(W - e, e)) / 2
+  const middle = lum(Math.floor(W / 2), e)
+  if (corner >= middle) fail('the top corners are not darker than the top middle')
+  else ok('corners sit ' + (middle - corner).toFixed(0) + ' levels under the middle')
 }
 
 /* ------------------------------------------------------------------------ */
@@ -298,6 +387,10 @@ if (dir) {
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(dir + '/street.png',
     new Resvg(sceneSvg(STREET, true), { fitTo: { mode: 'width', value: 600 } }).render().asPng())
+  fs.writeFileSync(dir + '/street.jpg', await sharp(
+    new Resvg(sceneSvg(STREET, true), { fitTo: { mode: 'width', value: STREET_JPEG.width } })
+      .render().asPng())
+    .jpeg({ quality: STREET_JPEG.quality, mozjpeg: true, chromaSubsampling: '4:2:0' }).toBuffer())
   fs.writeFileSync(dir + '/street-nolight.png',
     new Resvg(sceneSvg(STREET, false), { fitTo: { mode: 'width', value: 600 } }).render().asPng())
   const sheet = hands().map((h, i) =>
