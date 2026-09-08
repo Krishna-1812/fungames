@@ -1,60 +1,142 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { STREET, GRAIN_RECT } from '../lib/robot-scene'
 
 /**
- * I'm Not a Robot — twelve checks that start like a CAPTCHA and end somewhere
- * else.
+ * I'm Not a Robot — thirteen checks that start like a CAPTCHA and end
+ * somewhere else.
  *
- * The joke only works because the measuring is real. Every number the report
- * card reads back is computed in src/lib/telemetry.ts from your own pointer,
- * clicks, keystrokes, tremor and freehand circle, and that maths is checked
- * against known answers by scripts/check-telemetry.mjs.
+ * The joke only works if the first one is indistinguishable from the real
+ * thing, so the widget is built to the real thing's measurements: a 300x74
+ * anchor with a 28px box, a challenge that floats over a dimmed page, a blue
+ * instruction header with the target word set large and bold under a small
+ * lead-in, four-pixel gutters between the tiles, a tick that lands in the
+ * corner as the tile shrinks away from it, and Roboto over the lot. What
+ * changes as you go is the colour of that header, which starts the blue every
+ * verification dialog on the internet is, and works its way round to red.
+ *
+ * Every number the report card reads back is computed in src/lib/telemetry.ts
+ * from your own pointer, clicks, keystrokes, tremor and freehand circle, and
+ * that maths is checked against known answers by scripts/check-telemetry.mjs.
+ * The street, and which of its squares the traffic light is actually in, comes
+ * from src/lib/robot-scene.ts and is checked by scripts/check-robot-scene.mjs.
  *
  * Nothing leaves the tab. There is no server on this site at all.
  */
+
+const sceneDefs = STREET.defs
+const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
 ---
 
-<GameLayout slug="not-a-robot" bar="#101a33" bodyClass="robot-body">
+<GameLayout
+  slug="not-a-robot"
+  bar="#1b2027"
+  bodyClass="robot-body"
+  fonts={['Roboto:wght@400;500;700']}
+>
+  {/* The page the challenge is sitting on top of. A verification dialog never
+      appears on its own — it appears over something you were trying to do, and
+      the dimming behind it is half of why it reads as one. */}
+  <div class="host" aria-hidden="true">
+    <div class="host-page">
+      <div class="host-nav">
+        <i style="width:78px;height:14px"></i><b></b>
+        <i style="width:46px"></i><i style="width:58px"></i><i style="width:40px"></i>
+      </div>
+      <div class="host-hero">
+        <i style="width:62%;height:26px"></i>
+        <i style="width:84%"></i><i style="width:76%"></i><i style="width:44%"></i>
+      </div>
+      <div class="host-form">
+        <i style="width:38%;height:11px"></i>
+        <u></u>
+        <i style="width:30%;height:11px"></i>
+        <u></u>
+        <s></s>
+      </div>
+    </div>
+  </div>
+
+  {/* One copy of the street, hoisted out of the tiles. Each square is a window
+      on to it through <use>, so nine tiles cost one drawing. */}
+  <svg class="scene-src" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs set:html={sceneDefs} />
+    <g id="rc-street" set:html={sceneBody} />
+  </svg>
+
   <div class="wrap">
-    <section class="box" id="box" data-heat="0">
-      <header class="boxhead">
-        <span class="mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="22" height="22">
-            <path d="M12 2.6 20 5.4v6.1c0 4.7-3.2 8.3-8 9.9-4.8-1.6-8-5.2-8-9.9V5.4z"
-              fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" />
-            <path d="M8.2 12.1 11 14.9l5-5.4" fill="none" stroke="currentColor"
-              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </span>
-        <div class="titles">
-          <h1>I'm Not a Robot</h1>
-          <p class="subtitle" id="subtitle">Routine security check</p>
+    <div class="column">
+      <section class="rc" id="rc" hidden aria-label="Verification challenge">
+        <div class="rc-head" id="rcHead" aria-live="polite">
+          <p class="rc-lead" id="rcLead">Select all squares with</p>
+          <p class="rc-target" id="rcTarget">a traffic light</p>
+          <p class="rc-tail" id="rcTail">Click verify once there are none left</p>
         </div>
-        <p class="stepline" id="stepline">1 / 12</p>
-      </header>
 
-      <div class="rail" aria-hidden="true"><i id="bar"></i></div>
+        <div class="rc-body" id="slot"></div>
 
-      <div class="boxbody">
-        <h2 class="prompt" id="prompt">Select all squares with a traffic light.</h2>
-        <p class="hint" id="hint"></p>
-        <div class="slot" id="slot"></div>
+        <p class="rc-error" id="status" role="status" aria-live="polite"></p>
+
+        <div class="rc-foot">
+          <div class="rc-tools">
+            <button type="button" class="rc-tool" id="reload" aria-label="Get a new challenge">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path
+                d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7Z" /></svg>
+            </button>
+            <button type="button" class="rc-tool" id="sound" aria-pressed="false"
+              aria-label="Turn sound on">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path
+                d="M12 3a8 8 0 0 0-8 8v6a2 2 0 0 0 2 2h3v-9H6.2A5.9 5.9 0 0 1 17.8 10H15v9h3a2 2 0 0 0 2-2v-6a8 8 0 0 0-8-8Z" /></svg>
+            </button>
+            <button type="button" class="rc-tool" id="help" aria-label="What is being measured">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path
+                d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17h-2v-2h2Zm1.9-7.3-.9.9c-.7.7-1 1.3-1 2.4h-2v-.5c0-1.1.4-2.1 1-2.8l1.3-1.3c.3-.4.5-.9.5-1.4a2 2 0 1 0-4 0H7.8a4.2 4.2 0 1 1 8.4 0c0 .9-.4 1.7-1.3 2.7Z" /></svg>
+            </button>
+          </div>
+          <button class="rc-skip" type="button" id="skip" hidden>Can't do this one</button>
+          <button class="rc-verify" type="button" id="action">Verify</button>
+        </div>
+
+        <div class="rc-rail" aria-hidden="true"><i id="bar"></i></div>
+
+        {/* The half-second a real one spends looking pleased with you. */}
+        <div class="rc-flash" id="flash" hidden aria-hidden="true">
+          <svg viewBox="0 0 48 48"><path d="m14 25 7 7 14-16" fill="none" stroke="currentColor"
+            stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+      </section>
+
+      {/* The anchor. Real measurements: 300 by 74, a 28px box with a 2px
+          border, the label at 14px, and the brand column on the right. */}
+      <div class="anchor" id="anchor">
+        <button type="button" class="anchor-hit" id="anchorHit" aria-pressed="false" aria-label="I&apos;m not a robot">
+          <span class="anchor-box" aria-hidden="true">
+            <svg class="anchor-tick" viewBox="0 0 24 24"><path d="m5 12.5 5 5 9-11"
+              fill="none" stroke="currentColor" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </span>
+          <span class="anchor-label">I'm not a robot</span>
+        </button>
+        <span class="anchor-brand" aria-hidden="true">
+          <svg class="anchor-mark" viewBox="0 0 32 32">
+            <path d="M16 2.5 27 8v9c0 6.6-4.5 11.6-11 13.5C9.5 28.6 5 23.6 5 17V8Z" fill="#4a7fbd" />
+            <path d="M16 2.5 27 8v9c0 6.6-4.5 11.6-11 13.5Z" fill="#2f588c" />
+            <path d="m10.8 16.2 3.6 3.6 7-7.4" fill="none" stroke="#fff" stroke-width="2.6"
+              stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <b>VERIFY</b>
+          <small>Privacy · Terms</small>
+        </span>
       </div>
 
-      <footer class="boxfoot">
-        <p class="status" id="status" role="status" aria-live="polite"></p>
-        <button class="optout" type="button" id="skip" hidden>Can't do this one</button>
-        <button class="go" type="button" id="action">Verify</button>
-      </footer>
-
-      {/* The banner a real CAPTCHA shows for half a second before it moves on. */}
-      <div class="flash" id="flash" hidden aria-hidden="true">Verified</div>
-    </section>
+      <p class="stepline" id="stepline">Tick the box to begin</p>
+      <h1 class="sr-title">I'm Not a Robot</h1>
+    </div>
 
     {/* The readout is the whole conceit: while you answer the questions, the
         page is measuring you, and it shows its working the entire time. */}
     <aside class="signal" aria-label="Live behavioural signal">
-      <h2>Signal</h2>
+      <h2>Behaviour</h2>
       <dl id="signal">
         <div><dt>Pointer samples</dt><dd id="s-samples">0</dd></div>
         <div><dt>Straightness</dt><dd id="s-straight">—</dd></div>
@@ -62,9 +144,29 @@ import GameLayout from '../layouts/GameLayout.astro'
         <div><dt>Click rhythm</dt><dd id="s-clicks">—</dd></div>
         <div><dt>Typing rhythm</dt><dd id="s-keys">—</dd></div>
       </dl>
+      <svg class="spark" id="spark" viewBox="0 0 200 44" aria-hidden="true"></svg>
       <p class="note">Measured in this tab. Never sent anywhere.</p>
     </aside>
   </div>
+
+  <dialog class="helpbox" id="helpbox">
+    <h2>What this is measuring</h2>
+    <p>
+      Where your pointer goes between clicks, the gaps between your clicks, the
+      gaps between your keystrokes, how far your hand drifts while you hold it
+      still, and how round your freehand circle is.
+    </p>
+    <p>
+      <b>The measurements are real. The thresholds are not.</b> Genuine bot
+      detection reads these same channels, but the bands that decide "human"
+      here were picked so the joke lands.
+    </p>
+    <p>
+      None of it is transmitted. This site is static files; there is no server
+      to send it to, and nothing is written to storage.
+    </p>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
 
   {/* Written into the served HTML rather than built in JavaScript. It is a
       document nobody reads, and clause 4 is the page's real privacy statement,
@@ -201,6 +303,13 @@ import GameLayout from '../layouts/GameLayout.astro'
         should be refused anything on the strength of this page.
       </p>
       <p>
+        The street is a drawing, and which of its squares hold the traffic light
+        is worked out from where the light is rather than written down beside
+        it. The first square you were asked about is graded the way a person
+        would grade it: the signal head is not negotiable, the pole holding it
+        up is yours to call.
+      </p>
+      <p>
         None of it is transmitted. This site is static files; there is no server
         to send it to, and nothing is written to storage.
       </p>
@@ -211,11 +320,12 @@ import GameLayout from '../layouts/GameLayout.astro'
 
 <script>
   import { burst, shake, prefersReducedMotion } from '../lib/fx'
-  import { sfx, tone, unlock, isMuted } from '../lib/audio'
+  import { sfx, tone, unlock, isMuted, setMuted } from '../lib/audio'
   import { Profiler, circleStats, variation, gaps, report } from '../lib/telemetry'
   import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
+  import { STREET, ALPHABET, answerCells, coreCells, mark, warpedText } from '../lib/robot-scene'
 
   let shareCard: import('../lib/result-card').ResultCard | null = null
   onShare(() => shareCard, (c) => ({
@@ -224,10 +334,12 @@ import GameLayout from '../layouts/GameLayout.astro'
   }))
 
   const $ = (id: string) => document.getElementById(id)!
-  const box = $('box'), slot = $('slot'), promptEl = $('prompt'), hintEl = $('hint')
+  const rc = $('rc'), slot = $('slot')
+  const leadEl = $('rcLead'), targetEl = $('rcTarget'), tailEl = $('rcTail')
   const statusEl = $('status'), actionBtn = $('action') as HTMLButtonElement
   const skipBtn = $('skip') as HTMLButtonElement
-  const flash = $('flash'), bar = $('bar'), stepline = $('stepline'), subtitle = $('subtitle')
+  const flash = $('flash'), bar = $('bar'), stepline = $('stepline')
+  const anchor = $('anchor'), anchorHit = $('anchorHit') as HTMLButtonElement
   const TERMS = ($('terms-src') as HTMLTemplateElement).innerHTML
 
   /* ------------------------------------------------------------------ */
@@ -254,75 +366,70 @@ import GameLayout from '../layouts/GameLayout.astro'
   const started = Date.now()
 
   /* ------------------------------------------------------------------ */
-  /* Shared drawing                                                      */
+  /* The image grid                                                      */
   /* ------------------------------------------------------------------ */
 
-  /* One street, reused. The second time you are asked about it the question is
-     different, and the fact that the picture has not changed is the point. */
-  const STREET = `
-    <rect width="300" height="300" fill="#a9c7de"/>
-    <rect x="0" y="58" width="66" height="127" fill="#7d8a99"/>
-    <rect x="54" y="96" width="46" height="89" fill="#6c7a8b"/>
-    <rect x="208" y="38" width="60" height="147" fill="#727f8f"/>
-    <rect x="256" y="86" width="44" height="99" fill="#62707f"/>
-    ${Array.from({ length: 22 }, (_, i) => {
-      const col = i % 4, row = (i / 4) | 0
-      return `<rect x="${8 + col * 14 + (i > 11 ? 208 : 0)}" y="${
-        (i > 11 ? 50 : 70) + row * 18
-      }" width="9" height="11" fill="#c9d6e0" opacity="${0.3 + ((i * 7) % 5) * 0.13}"/>`
-    }).join('')}
-    <rect x="0" y="185" width="300" height="115" fill="#4b4c54"/>
-    <rect x="0" y="185" width="300" height="6" fill="#8d9099"/>
-    ${Array.from({ length: 5 }, (_, i) => `<rect x="${8 + i * 62}" y="248" width="30" height="6" rx="3" fill="#d9d5c6"/>`).join('')}
-    <rect x="52" y="120" width="7" height="65" fill="#4a4b53"/>
-    <circle cx="55.5" cy="112" r="17" fill="#2f5fa8" stroke="#e9eef4" stroke-width="4"/>
-    <rect x="143" y="96" width="9" height="104" fill="#33343c"/>
-    <rect x="124" y="26" width="44" height="72" rx="10" fill="#25262d"/>
-    <circle cx="146" cy="44" r="11" fill="#d8483c"/>
-    <circle cx="146" cy="62" r="11" fill="#3a3b44"/>
-    <circle cx="146" cy="80" r="11" fill="#3a3b44"/>
-    <g fill="#c1553f">
-      <rect x="196" y="212" width="88" height="26" rx="9"/>
-      <path d="M212 212 l12-16 h40 l12 16 z"/>
-    </g>
-    <circle cx="216" cy="240" r="9" fill="#26262c"/>
-    <circle cx="266" cy="240" r="9" fill="#26262c"/>
-  `
-  /** Cells 1 and 4 — the light head, and the pole below it. */
-  const STREET_ANSWER = new Set([1, 4])
+  const TICK =
+    `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4.5 4.5 8.5-10"
+       fill="none" stroke="currentColor" stroke-width="3"
+       stroke-linecap="round" stroke-linejoin="round"/></svg>`
 
-  /* The cells sit flush against each other and the dividing lines are drawn
-     inside the picture. With a CSS gap the buttons would each cover a slightly
-     different region of the image than the third of the viewBox the answer is
-     defined against, and "the square with the traffic light in it" would stop
-     meaning exactly one thing. */
-  const GRID_LINES =
-    '<path d="M100 0V300M200 0V300M0 100H300M0 200H300" fill="none" stroke="#eef1f7" stroke-width="3"/>'
-
-  function gridMarkup(scene: string) {
-    return `<div class="grid" role="group">
-      <svg class="scene" viewBox="0 0 300 300" aria-hidden="true">${scene}${GRID_LINES}</svg>
-      ${Array.from({ length: 9 }, (_, i) =>
-        `<button type="button" class="cell" data-i="${i}" aria-pressed="false">
-           <span class="visually-hidden">Square ${i + 1}</span>
-           <span class="tickbox" aria-hidden="true"></span>
-         </button>`).join('')}
+  /**
+   * Nine windows on one drawing. A four-pixel gutter between them eats four
+   * pixels of picture, exactly as the real ones do, and the squares still line
+   * up with the answer key because each window is defined by its own offset
+   * into the scene rather than by where a CSS box happened to land.
+   */
+  function streetGrid() {
+    return `<div class="tiles" role="group" aria-label="Nine squares of one street">
+      ${Array.from({ length: 9 }, (_, i) => {
+        const col = i % 3, row = (i / 3) | 0
+        return `<button type="button" class="tile" data-i="${i}" aria-pressed="false">
+          <span class="tile-img" aria-hidden="true"><svg viewBox="0 0 100 100">
+            <use href="#rc-street" x="${-col * 100}" y="${-row * 100}"/></svg></span>
+          <span class="tile-tick" aria-hidden="true">${TICK}</span>
+          <span class="visually-hidden">Square ${i + 1}</span>
+        </button>`
+      }).join('')}
     </div>`
   }
 
-  function wireGrid(host: HTMLElement, onChange?: (n: number) => void) {
+  function wireTiles(host: HTMLElement, onChange?: (n: number) => void) {
     const chosen = new Set<number>()
-    host.querySelectorAll<HTMLButtonElement>('.cell').forEach((btn) => {
+    host.querySelectorAll<HTMLButtonElement>('.tile').forEach((btn) => {
       btn.addEventListener('click', () => {
         const i = Number(btn.dataset.i)
-        if (chosen.has(i)) { chosen.delete(i); btn.setAttribute('aria-pressed', 'false') }
-        else { chosen.add(i); btn.setAttribute('aria-pressed', 'true') }
-        btn.classList.toggle('on', chosen.has(i))
+        if (chosen.has(i)) chosen.delete(i)
+        else chosen.add(i)
+        btn.setAttribute('aria-pressed', String(chosen.has(i)))
         sfx.tick()
         onChange?.(chosen.size)
       })
     })
     return chosen
+  }
+
+  /** The anchor widget, for the check that hands it back to you. */
+  function anchorHtml(id: string) {
+    return `<div class="anchor loose" id="${id}">
+      <button type="button" class="anchor-hit" aria-pressed="false" aria-label="I&apos;m not a robot">
+        <span class="anchor-box" aria-hidden="true">
+          <svg class="anchor-tick" viewBox="0 0 24 24"><path d="m5 12.5 5 5 9-11"
+            fill="none" stroke="currentColor" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="anchor-label">I'm not a robot</span>
+      </button>
+      <span class="anchor-brand" aria-hidden="true">
+        <svg class="anchor-mark" viewBox="0 0 32 32">
+          <path d="M16 2.5 27 8v9c0 6.6-4.5 11.6-11 13.5C9.5 28.6 5 23.6 5 17V8Z" fill="#4a7fbd"/>
+          <path d="M16 2.5 27 8v9c0 6.6-4.5 11.6-11 13.5Z" fill="#2f588c"/>
+          <path d="m10.8 16.2 3.6 3.6 7-7.4" fill="none" stroke="#fff" stroke-width="2.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <b>VERIFY</b><small>Privacy · Terms</small>
+      </span>
+    </div>`
   }
 
   /* ------------------------------------------------------------------ */
@@ -336,10 +443,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     action: (label: string | null, fn?: () => void) => void
     skip: (label: string, fn: () => void) => void
   }
+  /** The header, in the three sizes a real one uses. */
+  type Head = { lead: string; target: string; tail?: string }
   type Check = {
-    prompt: string
-    hint?: string
-    subtitle: string
+    head: Head
     mount: (host: HTMLElement, api: Api) => void
   }
 
@@ -349,39 +456,48 @@ import GameLayout from '../layouts/GameLayout.astro'
     const n = Math.round(Math.abs(v))
     return `${n} cent${n === 1 ? '' : 's'}`
   }
+  const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`
 
   const CHECKS: Check[] = [
     /* 1 ------------------------------------------------------------- */
     {
-      prompt: 'Select all squares with a traffic light.',
-      hint: 'If there are none, click Verify.',
-      subtitle: 'Routine security check',
+      head: {
+        lead: 'Select all squares with',
+        target: 'a traffic light',
+        tail: 'Click verify once there are none left',
+      },
       mount(host, api) {
-        host.innerHTML = gridMarkup(STREET)
-        const chosen = wireGrid(host)
+        host.innerHTML = streetGrid()
+        const chosen = wireTiles(host)
         api.action('Verify', () => {
-          const same =
-            chosen.size === STREET_ANSWER.size && [...chosen].every((i) => STREET_ANSWER.has(i))
-          if (same) api.pass('Two squares. Correct.')
-          else api.reject('Please try again.')
+          if (!chosen.size) return api.reject('Please select all matching images.')
+          const m = mark(STREET, chosen)
+          if (m.ok) {
+            const extra = chosen.size - coreCells(STREET).length
+            api.pass(extra > 0
+              ? `${chosen.size} squares — you counted the pole. So would I.`
+              : `${chosen.size} squares. The head, and nothing else.`)
+          } else if (m.missed.length) {
+            api.reject('Please select all matching images.')
+          } else {
+            api.reject('Please only select squares with a traffic light in them.')
+          }
         })
       },
     },
 
     /* 2 ------------------------------------------------------------- */
     {
-      prompt: 'Tick the box.',
-      hint: 'The box would rather you did not.',
-      subtitle: 'Routine security check',
+      head: {
+        lead: 'To continue, please',
+        target: 'tick the box',
+        tail: 'The box would rather you did not',
+      },
       mount(host, api) {
-        host.innerHTML =
-          `<div class="stage" id="stage">
-             <button type="button" class="tickbtn" id="tick">
-               <span class="tickbox" aria-hidden="true"></span> I'm not a robot
-             </button>
-           </div>`
+        host.innerHTML = `<div class="stage" id="stage">${anchorHtml('runner')}</div>`
         const stage = host.querySelector('#stage') as HTMLElement
-        const btn = host.querySelector('#tick') as HTMLButtonElement
+        const box = host.querySelector('#runner') as HTMLElement
+        const btn = box.querySelector('.anchor-hit') as HTMLButtonElement
         let dodges = 0
         const LIMIT = 5
 
@@ -393,8 +509,8 @@ import GameLayout from '../layouts/GameLayout.astro'
           dodges++
           ev.dodges = dodges
           sfx.whoosh()
-          const w = Math.max(0, stage.clientWidth - btn.offsetWidth)
-          const h = Math.max(0, stage.clientHeight - btn.offsetHeight)
+          const w = Math.max(0, stage.clientWidth - box.offsetWidth)
+          const h = Math.max(0, stage.clientHeight - box.offsetHeight)
           const r = stage.getBoundingClientRect()
           let best = { x: 0, y: 0 }
           let bestD = -1
@@ -403,16 +519,16 @@ import GameLayout from '../layouts/GameLayout.astro'
               const x = (gx / 2) * w
               const y = (gy / 2) * h
               const d = Math.hypot(
-                r.left + x + btn.offsetWidth / 2 - px,
-                r.top + y + btn.offsetHeight / 2 - py,
+                r.left + x + box.offsetWidth / 2 - px,
+                r.top + y + box.offsetHeight / 2 - py,
               )
               if (d > bestD) { bestD = d; best = { x, y } }
             }
-          btn.style.left = `${best.x}px`
-          btn.style.top = `${best.y}px`
+          box.style.left = `${best.x}px`
+          box.style.top = `${best.y}px`
           if (dodges >= LIMIT) {
             api.say('Fine.')
-            btn.classList.add('caught')
+            box.classList.add('caught')
           }
         }
 
@@ -420,9 +536,9 @@ import GameLayout from '../layouts/GameLayout.astro'
         // from under the tap. Neither device should have an easier time.
         stage.addEventListener('pointermove', (e) => {
           if (dodges >= LIMIT) return
-          const r = btn.getBoundingClientRect()
+          const r = box.getBoundingClientRect()
           const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2))
-          if (d < 105) flee(e.clientX, e.clientY)
+          if (d < 120) flee(e.clientX, e.clientY)
         })
         // A finger never hovers, so on touch the dodge has to happen under the
         // tap itself or the box would simply be tickable first time.
@@ -436,11 +552,11 @@ import GameLayout from '../layouts/GameLayout.astro'
           // nothing for the box to dodge, and refusing it would leave a
           // keyboard-only player stuck on step two forever.
           if (dodges < LIMIT && e.detail === 0) {
-            btn.classList.add('ticked')
+            box.classList.add('is-done')
             return api.pass('Tabbed to it and pressed Enter. That is cheating, and it worked.')
           }
           if (dodges < LIMIT) return
-          btn.classList.add('ticked')
+          box.classList.add('is-done')
           api.pass(`It got away ${dodges} times.`)
         })
         api.action(null)
@@ -449,44 +565,29 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 3 ------------------------------------------------------------- */
     {
-      prompt: 'Type the characters you see.',
-      subtitle: 'Standard verification',
+      head: {
+        lead: 'Type the characters',
+        target: 'you see in the image',
+        tail: 'Not case sensitive',
+      },
       mount(host, api) {
-        const ALPHABET = 'ABCDEFGHJKLMNPQRTUVWXYZ2346789'
         let code = ''
         const draw = () => {
           code = Array.from({ length: 5 }, () => ALPHABET[rand(ALPHABET.length)]).join('')
-          const glyphs = Array.from(code, (ch, i) => {
-            const x = 34 + i * 44
-            const rot = (Math.random() - 0.5) * 46
-            const dy = (Math.random() - 0.5) * 16
-            const skew = (Math.random() - 0.5) * 26
-            return `<text x="${x}" y="${62 + dy}" font-size="46" font-family="ui-monospace, monospace"
-                      fill="#1d2437" transform="rotate(${rot} ${x} ${62 + dy}) skewX(${skew})">${ch}</text>`
-          }).join('')
-          const noise = Array.from({ length: 4 }, () => {
-            const y = 18 + Math.random() * 70
-            const d = Array.from({ length: 9 }, (_, k) =>
-              `${k ? 'L' : 'M'}${k * 32} ${(y + Math.sin(k + Math.random() * 3) * 15).toFixed(1)}`).join(' ')
-            return `<path d="${d}" fill="none" stroke="#1d2437" stroke-width="1.6" opacity="0.35"/>`
-          }).join('')
-          host.querySelector('.captcha')!.innerHTML =
-            `<svg viewBox="0 0 256 96" aria-hidden="true">
-               <rect width="256" height="96" fill="#e6e9f0"/>${noise}${glyphs}
-             </svg>`
+          host.querySelector('.captcha')!.innerHTML = warpedText(code, rand(9000) + 1).svg
         }
         host.innerHTML =
           `<div class="captcha"></div>
            <input class="text" id="code" type="text" inputmode="text" autocomplete="off"
              autocapitalize="characters" spellcheck="false" maxlength="8" aria-label="The characters shown"
-             placeholder="five characters">`
+             placeholder="Enter the text">`
         draw()
         const input = host.querySelector('#code') as HTMLInputElement
         input.focus()
         api.action('Verify', () => {
           if (input.value.trim().toUpperCase() === code) api.pass('Legible after all.')
           else {
-            api.reject('That was not it. Here is another.')
+            api.reject('Multiple correct solutions required — please solve more.')
             draw()
             input.value = ''
             input.focus()
@@ -498,15 +599,21 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 4 ------------------------------------------------------------- */
     {
-      prompt: 'How many tones do you hear?',
-      hint: 'Each tone also flashes, so this works with the sound off.',
-      subtitle: 'Standard verification',
+      head: {
+        lead: 'Press play, then tell us',
+        target: 'how many tones',
+        tail: 'Each tone also flashes, so this works with the sound off',
+      },
       mount(host, api) {
         const n = 4 + rand(4)
         host.innerHTML =
           `<div class="audio">
+             <svg class="audio-icon" viewBox="0 0 24 24" aria-hidden="true"><path
+               d="M12 3a8 8 0 0 0-8 8v6a2 2 0 0 0 2 2h3v-9H6.2A5.9 5.9 0 0 1 17.8 10H15v9h3a2 2 0 0 0 2-2v-6a8 8 0 0 0-8-8Z"/></svg>
              <div class="lamp" id="lamp" aria-hidden="true"></div>
-             <button type="button" class="ghost" id="play">Play</button>
+             <button type="button" class="chip play" id="play">
+               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg> Play
+             </button>
              <div class="choices" id="choices" role="group" aria-label="How many tones">
                ${[3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="chip" data-n="${k}">${k}</button>`).join('')}
              </div>
@@ -531,10 +638,10 @@ import GameLayout from '../layouts/GameLayout.astro'
         }
         host.querySelector('#play')!.addEventListener('click', play)
         let chosen: number | null = null
-        host.querySelectorAll<HTMLButtonElement>('.chip').forEach((c) =>
+        host.querySelectorAll<HTMLButtonElement>('.chip[data-n]').forEach((c) =>
           c.addEventListener('click', () => {
             chosen = Number(c.dataset.n)
-            host.querySelectorAll('.chip').forEach((o) => o.classList.remove('on'))
+            host.querySelectorAll('.chip[data-n]').forEach((o) => o.classList.remove('on'))
             c.classList.add('on')
             sfx.tick()
           }))
@@ -544,15 +651,17 @@ import GameLayout from '../layouts/GameLayout.astro'
           if (chosen === n) api.pass(`${n} tones. Correct.`)
           else { api.reject(`There were ${n}. Here is a new set.`); setTimeout(play, 500) }
         })
-        if (isMuted()) api.say('Sound is muted — watch the lamp instead.')
+        if (isMuted()) api.say('Sound is off — watch the lamp, or use the headphones button.')
       },
     },
 
     /* 5 ------------------------------------------------------------- */
     {
-      prompt: 'Hold still on the target for three seconds.',
-      hint: 'Press and hold. Do not move.',
-      subtitle: 'Additional verification required',
+      head: {
+        lead: 'Press and hold the target',
+        target: 'still, for three seconds',
+        tail: 'Do not move',
+      },
       mount(host, api) {
         host.innerHTML =
           `<div class="hold">
@@ -574,7 +683,7 @@ import GameLayout from '../layouts/GameLayout.astro'
         ringfill.style.strokeDashoffset = String(CIRC)
 
         const HOLD_MS = 3000
-        let holding = false, anchor = { x: 0, y: 0 }, worst = 0, t0 = 0, raf = 0
+        let holding = false, anch = { x: 0, y: 0 }, worst = 0, t0 = 0, raf = 0
         let attempt = 0
 
         const finish = (completed: boolean) => {
@@ -602,7 +711,7 @@ import GameLayout from '../layouts/GameLayout.astro'
           try { target.setPointerCapture(e.pointerId) } catch { /* not fatal */ }
           holding = true
           worst = 0
-          anchor = { x: e.clientX, y: e.clientY }
+          anch = { x: e.clientX, y: e.clientY }
           t0 = performance.now()
           target.classList.add('holding')
           const step = () => {
@@ -617,7 +726,7 @@ import GameLayout from '../layouts/GameLayout.astro'
         })
         target.addEventListener('pointermove', (e) => {
           if (!holding) return
-          worst = Math.max(worst, Math.hypot(e.clientX - anchor.x, e.clientY - anchor.y))
+          worst = Math.max(worst, Math.hypot(e.clientX - anch.x, e.clientY - anch.y))
         })
         // Deliberately not pointerleave: the pointer is captured, so a hand that
         // wobbles a few pixels off the button still belongs to this hold, and
@@ -632,9 +741,11 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 6 ------------------------------------------------------------- */
     {
-      prompt: 'Match the tone.',
-      hint: 'Drag the slider until your wave matches the one above it.',
-      subtitle: 'Additional verification required',
+      head: {
+        lead: 'Drag the slider until',
+        target: 'the two waves match',
+        tail: 'Theirs is on top. Yours is underneath.',
+      },
       mount(host, api) {
         const LO = 180, HI = 900
         const target = 250 + Math.random() * 420
@@ -650,14 +761,14 @@ import GameLayout from '../layouts/GameLayout.astro'
         host.innerHTML =
           `<div class="tonebox">
              <svg viewBox="0 0 300 130" aria-hidden="true">
-               <rect width="300" height="130" rx="10" fill="#0d1730"/>
+               <rect width="300" height="130" rx="4" fill="#20242c"/>
                <g id="waves"></g>
              </svg>
              <input class="slider" id="freq" type="range" min="0" max="1000" value="500"
                aria-label="Your tone, low to high">
              <div class="tonebtns">
-               <button type="button" class="ghost" id="playRef">Play theirs</button>
-               <button type="button" class="ghost" id="playMine">Play mine</button>
+               <button type="button" class="chip" id="playRef">Play theirs</button>
+               <button type="button" class="chip" id="playMine">Play mine</button>
              </div>
            </div>`
         const waves = host.querySelector('#waves') as SVGGElement
@@ -694,12 +805,14 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 7 ------------------------------------------------------------- */
     {
-      prompt: 'Select all squares that contain suffering.',
-      hint: 'Same street.',
-      subtitle: 'Enhanced verification',
+      head: {
+        lead: 'Select all squares that contain',
+        target: 'suffering',
+        tail: 'The same street',
+      },
       mount(host, api) {
-        host.innerHTML = gridMarkup(STREET)
-        const chosen = wireGrid(host)
+        host.innerHTML = streetGrid()
+        const chosen = wireTiles(host)
         api.action('Verify', () => {
           if (!chosen.size) return api.say('At least one.')
           ev.suffering = chosen.size
@@ -710,8 +823,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 8 ------------------------------------------------------------- */
     {
-      prompt: 'Which of these is a human hand?',
-      subtitle: 'Enhanced verification',
+      head: { lead: 'Select the image showing', target: 'a human hand' },
       mount(host, api) {
         // Palm plus digits. The wrong ones are wrong in the specific ways a
         // picture of a hand goes wrong when nobody counted.
@@ -758,9 +870,11 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 9 ------------------------------------------------------------- */
     {
-      prompt: 'Type this sentence exactly.',
-      hint: 'We are not reading the words. We are timing the gaps between them.',
-      subtitle: 'Manual review',
+      head: {
+        lead: 'Type this sentence',
+        target: 'exactly as written',
+        tail: 'We are not reading the words. We are timing the gaps between them.',
+      },
       mount(host, api) {
         const LINE = pick([
           'i have a body and it needs things from me',
@@ -789,9 +903,11 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 10 ------------------------------------------------------------ */
     {
-      prompt: 'Draw a circle.',
-      hint: 'One stroke, freehand. It will be measured.',
-      subtitle: 'Manual review',
+      head: {
+        lead: 'In the box below, draw',
+        target: 'a circle',
+        tail: 'One stroke, freehand. It will be measured.',
+      },
       mount(host, api) {
         host.innerHTML =
           `<div class="pad">
@@ -846,8 +962,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 11 ------------------------------------------------------------ */
     {
-      prompt: 'Read and accept the terms.',
-      subtitle: 'Escalated review',
+      head: { lead: 'Read, and then accept', target: 'the terms', tail: 'All of them' },
       mount(host, api) {
         host.innerHTML =
           `<div class="terms" id="terms" tabindex="0" role="region" aria-label="Terms of engagement">
@@ -884,27 +999,28 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     /* 12 ------------------------------------------------------------ */
     {
-      prompt: 'Select all squares that contain you.',
-      hint: 'Seven of these are traces of what you just did. Two are not.',
-      subtitle: 'Final determination',
+      head: {
+        lead: 'Select all squares that contain',
+        target: 'you',
+        tail: 'Seven of these are traces of what you just did. Two are not.',
+      },
       mount(host, api) {
         const cells = youGrid()
         host.innerHTML =
-          `<div class="grid mine">
+          `<div class="tiles mine">
              ${cells.map((c, i) =>
-               `<button type="button" class="cell trace" data-i="${i}" aria-pressed="false">
-                  <svg viewBox="0 0 100 100" aria-hidden="true">${c.svg}</svg>
+               `<button type="button" class="tile trace" data-i="${i}" aria-pressed="false">
+                  <span class="tile-img" aria-hidden="true"><svg viewBox="0 0 100 100">${c.svg}</svg></span>
+                  <span class="tile-tick" aria-hidden="true">${TICK}</span>
                   <span class="visually-hidden">${c.label}</span>
-                  <span class="tickbox" aria-hidden="true"></span>
                 </button>`).join('')}
            </div>`
         const chosen = new Set<number>()
-        host.querySelectorAll<HTMLButtonElement>('.cell').forEach((btn) =>
+        host.querySelectorAll<HTMLButtonElement>('.tile').forEach((btn) =>
           btn.addEventListener('click', () => {
             const i = Number(btn.dataset.i)
             if (chosen.has(i)) chosen.delete(i)
             else chosen.add(i)
-            btn.classList.toggle('on', chosen.has(i))
             btn.setAttribute('aria-pressed', String(chosen.has(i)))
             sfx.tick()
           }))
@@ -1014,7 +1130,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   const api: Api = {
     pass(note) {
-      statusEl.textContent = note ?? ''
+      say(note ?? '', 'good')
       sfx.good()
       flash.hidden = false
       flash.classList.remove('in')
@@ -1026,11 +1142,11 @@ import GameLayout from '../layouts/GameLayout.astro'
     },
     reject(msg) {
       ev.retries++
-      statusEl.textContent = msg
+      say(msg, 'bad')
       sfx.bad()
-      shake(box, 7, 300)
+      shake(rc, 7, 300)
     },
-    say(msg) { statusEl.textContent = msg },
+    say(msg) { say(msg, 'plain') },
     action(label, fn) {
       actionFn = fn ?? null
       actionBtn.hidden = label === null
@@ -1043,24 +1159,91 @@ import GameLayout from '../layouts/GameLayout.astro'
     },
   }
 
+  /* Red is reserved for being turned away. A real one uses exactly one colour
+     down there and it means one thing; using it for "pick a number first"
+     would spend it. */
+  function say(msg: string, tone: 'plain' | 'good' | 'bad') {
+    statusEl.textContent = msg
+    statusEl.dataset.tone = tone
+  }
+
   function show(i: number) {
     if (i >= CHECKS.length) return finish()
     idx = i
     const c = CHECKS[i]
-    promptEl.textContent = c.prompt
-    hintEl.textContent = c.hint ?? ''
-    hintEl.hidden = !c.hint
-    statusEl.textContent = ''
-    stepline.textContent = `${i + 1} / ${CHECKS.length}`
-    subtitle.textContent = c.subtitle
-    bar.style.width = `${(i / CHECKS.length) * 100}%`
-    box.dataset.heat = String(i)
+    leadEl.textContent = c.head.lead
+    targetEl.textContent = c.head.target
+    tailEl.textContent = c.head.tail ?? ''
+    tailEl.hidden = !c.head.tail
+    say('', 'plain')
+    stepline.textContent = `Step ${i + 1} of ${CHECKS.length}`
+    // Which step you are on, matching the line under the widget. Checks
+    // completed would read zero on the first one and look broken.
+    bar.style.width = `${((i + 1) / CHECKS.length) * 100}%`
+    /* On the body, not on the widget. `--rc-blue` is declared on `.robot-body`,
+       and a custom property is substituted where it is declared rather than
+       where it is used — setting `--heat` further down the tree leaves the
+       header computing against the fallback and staying blue for all twelve. */
+    document.body.style.setProperty('--heat', String(i))
     skipBtn.hidden = true
     skipBtn.onclick = null
     slot.innerHTML = ''
     api.action('Verify')
+    // The anchor is the thing the second check takes away from you, so it goes
+    // out of sight while that is happening and comes back afterwards.
+    anchor.hidden = i === 1
     c.mount(slot, api)
   }
+
+  /* ------------------------------------------------------------------ */
+  /* The gate                                                            */
+  /* ------------------------------------------------------------------ */
+
+  /* Nothing is open until you tick the box, because that is the order it
+     happens in everywhere else: one checkbox, a pause while something
+     invisible decides it does not believe you, and then the questions. */
+  anchorHit.addEventListener('click', () => {
+    if (anchor.classList.contains('is-checking') || anchor.classList.contains('is-done')) return
+    unlock()
+    sfx.click()
+    anchor.classList.add('is-checking')
+    anchorHit.setAttribute('aria-pressed', 'true')
+    stepline.textContent = 'Verifying…'
+    setTimeout(() => {
+      anchor.classList.remove('is-checking')
+      anchor.classList.add('is-done')
+      sfx.blip(3)
+      setTimeout(() => {
+        rc.hidden = false
+        rc.classList.add('in')
+        show(0)
+      }, prefersReducedMotion ? 0 : 260)
+    }, prefersReducedMotion ? 200 : 950)
+  })
+
+  /* ------------------------------------------------------------------ */
+  /* The three buttons a real one has                                    */
+  /* ------------------------------------------------------------------ */
+
+  $('reload').addEventListener('click', () => {
+    sfx.click()
+    // A new challenge of the same kind, which is what the arrows mean. It does
+    // not skip you forward, and it does not count as a rejection.
+    show(idx)
+  })
+
+  const soundBtn = $('sound') as HTMLButtonElement
+  const paintSound = () => {
+    const off = isMuted()
+    soundBtn.setAttribute('aria-pressed', String(!off))
+    soundBtn.setAttribute('aria-label', off ? 'Turn sound on' : 'Turn sound off')
+    soundBtn.classList.toggle('is-off', off)
+  }
+  soundBtn.addEventListener('click', () => { unlock(); setMuted(!isMuted()); paintSound(); sfx.tick() })
+  paintSound()
+
+  const helpbox = $('helpbox') as HTMLDialogElement
+  $('help').addEventListener('click', () => { sfx.click(); helpbox.showModal() })
 
   /* ------------------------------------------------------------------ */
   /* Verdict                                                             */
@@ -1098,7 +1281,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (ev.wpm) extras.push(`You read the terms at ${Math.round(ev.wpm).toLocaleString('en-US')} words per minute.`)
     if (ev.cents !== null) extras.push(`Your ear was ${cents(ev.cents)} off the reference tone.`)
     if (ev.dodges) extras.push(`The checkbox got away from you ${ev.dodges} times.`)
-    extras.push(`Twelve checks, ${ev.retries} rejection${ev.retries === 1 ? '' : 's'}, ${Math.floor(secs / 60)}m ${secs % 60}s.`)
+    extras.push(`Twelve checks, ${plural(ev.retries, 'rejection')}, ${Math.floor(secs / 60)}m ${secs % 60}s.`)
     $('extras').innerHTML = extras.map((e) => `<li>${e}</li>`).join('')
 
     const stat = recordPlay(
@@ -1119,7 +1302,7 @@ import GameLayout from '../layouts/GameLayout.astro'
         (r.measured
           ? `${r.passed} of ${r.measured} measurable channels looked like a person.`
           : 'Twelve checks, and not one usable signal.') +
-        ` ${ev.retries} rejection${ev.retries === 1 ? '' : 's'} along the way.` +
+        ` ${plural(ev.retries, 'rejection')} along the way.` +
         (stat.plays > 1 ? ` Attempt ${stat.plays}.` : ''),
       stats: [
         { label: 'Human', value: r.humanity + '%' },
@@ -1128,13 +1311,17 @@ import GameLayout from '../layouts/GameLayout.astro'
       ],
     }
 
+    rc.hidden = true
+    anchor.hidden = true
+    stepline.hidden = true
+    // The page it was all sitting on top of goes with it.
+    document.body.classList.add('unmasked')
     $('verdict').hidden = false
-    box.classList.add('done')
     sfx.great()
     if (r.humanity === 100)
       for (let k = 0; k < 4; k++)
         setTimeout(() => burst(innerWidth * (0.25 + Math.random() * 0.5), innerHeight * 0.35, {
-          count: 16, colors: ['#5b8def', '#9dd6ff', '#fff'], speed: 6, gravity: 0.2, life: 58, size: 5, shape: 'square',
+          count: 16, colors: ['#4a90e2', '#9dd6ff', '#fff'], speed: 6, gravity: 0.2, life: 58, size: 5, shape: 'square',
         }), k * 120)
     $('verdict').scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -1146,6 +1333,12 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* ------------------------------------------------------------------ */
 
   const dash = '—'
+  const spark = $('spark')
+  /* The five numbers say what the channels are worth. The line under them says
+     what the last few seconds of your hand looked like, which is the part you
+     can recognise as yours. */
+  const speedHistory: number[] = []
+
   setInterval(() => {
     const p = prof.path(), c = prof.clicks(), k = prof.keys()
     $('s-samples').textContent = String(prof.samples.length)
@@ -1153,280 +1346,496 @@ import GameLayout from '../layouts/GameLayout.astro'
     $('s-jitter').textContent = p ? p.jitter.toFixed(2) + ' px' : dash
     $('s-clicks').textContent = c ? c.cv.toFixed(2) : dash
     $('s-keys').textContent = k ? k.cv.toFixed(2) : dash
-  }, 500)
 
-  show(0)
+    const tail = prof.samples.slice(-14)
+    let moved = 0
+    for (let i = 1; i < tail.length; i++)
+      moved += Math.hypot(tail[i].x - tail[i - 1].x, tail[i].y - tail[i - 1].y)
+    speedHistory.push(moved)
+    if (speedHistory.length > 48) speedHistory.shift()
+    const max = Math.max(60, ...speedHistory)
+    const d = speedHistory.map((v, i) =>
+      `${i ? 'L' : 'M'}${((i / 47) * 200).toFixed(1)} ${(42 - (v / max) * 38).toFixed(1)}`).join(' ')
+    spark.innerHTML = speedHistory.length > 1
+      ? `<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linejoin="round" stroke-linecap="round"/>`
+      : ''
+  }, 500)
 </script>
 
 <style is:global>
   /* A class, not a bare `body`: global.css already sets the site's paper
      background on the element selector, and two rules of equal specificity are
      settled by order, which is not something a page should be relying on. */
-  .robot-body { background: #0b1224; color: #e8ecf6; }
+  .robot-body {
+    background: #10121a;
+    color: #e6e9f2;
+
+    /* Roboto, because that is what the real widget is set in and the substitute
+       is the first thing that gives a copy away. The fallbacks after it are the
+       real one's own fallbacks, so a browser without it lands where the real
+       one would land too. */
+    --rc-font: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+    /* The blue every verification dialog on the internet is — and then, one
+       check at a time, the long way round the wheel to red. It runs through
+       violet rather than green, because the short way passes through the
+       colour that means everything is fine. */
+    /* The real header is #4a90e2, and white on #4a90e2 is 2.9:1 — the widget
+       everybody trusts does not pass its own contrast check. This is the same
+       hue at the lightness where white clears 4.5:1 across all twelve steps
+       (worst case 4.8:1). It is a shade deeper than the real one. Shipping an
+       illegible header to be faithful to an illegible header is not a trade
+       worth making, and it is the only measurement here I have knowingly
+       moved away from the original. */
+    --rc-blue: hsl(calc(212 + var(--heat, 0) * 13) 66% 46%);
+    --rc-blue-d: hsl(calc(212 + var(--heat, 0) * 13) 66% 38%);
+    --rc-line: #d3d3d3;
+    --rc-mute: #5f6368;
+    --rc-err: #c5221f;
+  }
+  .robot-body .chrome { position: relative; z-index: 3; }
+
+  /* The visible <h1> would be a title bar on a dialog that does not have one,
+     so the page keeps its heading for the document outline and hides it. */
+  .sr-title {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+
+  /* --- the page it is sitting on top of -------------------------------- */
+
+  /* A verification dialog never appears on its own. It appears over something
+     you were in the middle of, greyed out and slightly out of focus, and that
+     dimming is half of the reason the thing on top reads as a dialog. */
+  .host { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .host-page {
+    position: absolute; inset: -30px;
+    background: #eceef2; filter: blur(4px) saturate(0.35);
+    padding: 66px 8vw 0;
+  }
+  .host-nav { display: flex; align-items: center; gap: 18px; margin-bottom: 52px; }
+  .host-nav b { flex: 1; }
+  .host-hero { max-width: 460px; margin-bottom: 46px; }
+  .host-form {
+    max-width: 380px; background: #fff; border-radius: 6px; padding: 22px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+  .host i, .host u, .host s {
+    display: block; height: 9px; border-radius: 3px; background: #c8ccd4;
+    margin-bottom: 12px; text-decoration: none;
+  }
+  .host-hero i:first-child { background: #9aa1ad; margin-bottom: 18px; }
+  .host u { height: 30px; background: #e2e5ea; margin-bottom: 18px; }
+  .host s { height: 34px; width: 116px; background: #b6bcc6; margin: 22px 0 0; }
+  .robot-body.unmasked .host { opacity: 0; transition: opacity 800ms var(--ease); }
+  .host::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(120% 90% at 50% 34%, rgba(12, 14, 20, 0.6), rgba(8, 9, 13, 0.9));
+  }
+
+  /* --- layout ----------------------------------------------------------- */
 
   .wrap {
-    max-width: 1020px; margin: 0 auto; padding: 30px 18px 40px;
-    display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 20px; align-items: start;
+    position: relative; z-index: 1;
+    max-width: 1000px; margin: 0 auto; padding: 34px 18px 56px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 208px; gap: 26px;
+    align-items: start; justify-items: center;
   }
+  .column { display: grid; justify-items: center; gap: 14px; width: 100%; }
+  .scene-src { position: absolute; width: 0; height: 0; overflow: hidden; }
 
-  /* --- the dialog ---------------------------------------------------- */
-  .box {
-    background: #f4f6fb; color: #16192a;
-    border-radius: 14px; overflow: hidden; position: relative;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 26px 60px rgba(0, 0, 0, 0.45);
-    /* The frame heats up as the checks get less reasonable, driven off the step
-       index rather than a timer so it tracks how far in you are. It runs the
-       long way round the wheel — blue, violet, magenta, red — because the short
-       way passes through green, and a green banner reads as reassurance. */
-    border-top: 5px solid hsl(calc(218 + var(--heat, 0) * 13) 62% 52%);
-    transition: border-color 500ms var(--ease);
+  /* --- the challenge ---------------------------------------------------- */
+
+  .rc {
+    width: min(412px, 100%);
+    background: #fff; color: #000; font-family: var(--rc-font);
+    border-radius: 3px; overflow: hidden; position: relative;
+    /* The real one's shadow is almost nothing. Over a dimmed page it does not
+       need to be more than that, and a soft halo underneath does the lifting. */
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3), 0 22px 56px rgba(0, 0, 0, 0.55);
   }
-  .box[data-heat="6"], .box[data-heat="7"] { --heat: 4; }
-  .box[data-heat="8"], .box[data-heat="9"] { --heat: 7; }
-  .box[data-heat="10"] { --heat: 9; }
-  .box[data-heat="11"] { --heat: 11; }
+  .rc[hidden] { display: none; }
+  .rc.in { animation: rc-in 260ms var(--ease-bounce); }
+  @keyframes rc-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } }
 
-  .boxhead { display: flex; align-items: center; gap: 11px; padding: 14px 16px 12px; }
-  .mark { color: #2b56c4; display: grid; place-items: center; flex: none; }
-  .titles { min-width: 0; }
-  .box h1 { font-size: 16px; letter-spacing: -0.01em; margin: 0; }
-  .subtitle { margin: 1px 0 0; font-size: 12px; color: #5c627a; letter-spacing: 0.02em; }
-  .stepline {
-    margin: 0 0 0 auto; flex: none; font: 600 12px/1 var(--mono);
-    color: #5c627a; font-variant-numeric: tabular-nums;
+  .rc-head {
+    background: var(--rc-blue); color: #fff; padding: 13px 16px 15px;
+    transition: background 520ms var(--ease);
   }
-
-  .rail { height: 3px; background: #dfe3ee; }
-  .rail i { display: block; height: 100%; width: 0; background: #2b56c4; transition: width 420ms var(--ease); }
-
-  .boxbody { padding: 18px 16px 6px; }
-  .prompt { font-size: 21px; line-height: 1.25; margin: 0; }
-  .hint { margin: 6px 0 0; font-size: 13px; color: #5c627a; }
-  .slot { margin-top: 16px; }
-
-  .boxfoot {
-    display: flex; align-items: center; gap: 10px;
-    padding: 14px 16px; border-top: 1px solid #e2e6f0; margin-top: 16px;
+  .rc-lead { margin: 0; font-size: 14px; line-height: 1.25; }
+  .rc-target {
+    margin: 1px 0 0; font-size: 25px; font-weight: 700; line-height: 1.16;
+    letter-spacing: -0.004em;
   }
-  .status { margin: 0; font-size: 13px; color: #5c627a; min-height: 1.2em; flex: 1; }
-  .go {
-    flex: none; background: #2b56c4; color: #fff; border: 0; border-radius: 8px;
-    padding: 9px 20px; font-weight: 600; cursor: pointer;
-    transition: transform 200ms var(--ease-bounce), background 140ms var(--ease);
-  }
-  .go:hover { background: #1e45ab; transform: translateY(-1px); }
-  .go:active { transform: scale(0.96); }
-  .go:disabled { opacity: 0.5; cursor: default; transform: none; }
-  .optout {
-    flex: none; background: none; border: 0; color: #5c627a;
-    font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px;
-  }
+  .rc-tail { margin: 7px 0 0; font-size: 12px; line-height: 1.35; opacity: 0.92; }
+  .rc-tail[hidden] { display: none; }
 
-  .flash {
+  .rc-body { padding: 10px; background: #fff; }
+
+  /* One line, one colour, one meaning: this is where a real one tells you it
+     is not letting you through. */
+  .rc-error {
+    margin: 0; padding: 0 12px 2px; min-height: 19px;
+    font-size: 13px; line-height: 1.45; color: var(--rc-mute);
+  }
+  .rc-error[data-tone='bad'] { color: var(--rc-err); }
+  .rc-error[data-tone='good'] { color: #188038; }
+
+  .rc-foot { display: flex; align-items: center; gap: 4px; padding: 4px 10px 10px; }
+  .rc-tools { display: flex; gap: 1px; }
+  .rc-tool {
+    width: 34px; height: 34px; padding: 0; display: grid; place-items: center;
+    border: 0; border-radius: 50%; background: none; cursor: pointer; color: #767b81;
+    transition: background 130ms var(--ease), color 130ms var(--ease);
+  }
+  .rc-tool:hover { background: #eceef1; color: #3c4043; }
+  .rc-tool:focus-visible { outline: 2px solid var(--rc-blue-d); outline-offset: -2px; }
+  .rc-tool svg { width: 20px; height: 20px; fill: currentColor; }
+  .rc-tool.is-off { color: #b9bcc0; }
+  .rc-tool.is-off::after {
+    content: ''; position: absolute; width: 22px; height: 1.6px; background: #767b81;
+    transform: rotate(-45deg);
+  }
+  .rc-tool { position: relative; }
+
+  .rc-skip {
+    margin-left: 6px; background: none; border: 0; color: var(--rc-mute);
+    font: 400 12px/1.3 var(--rc-font); text-decoration: underline; cursor: pointer;
+    padding: 6px 4px; min-height: 26px;
+  }
+  .rc-verify {
+    margin-left: auto; flex: none;
+    background: var(--rc-blue); color: #fff; border: 0; border-radius: 2px;
+    height: 34px; min-width: 82px; padding: 0 16px;
+    font: 500 15px/1 var(--rc-font); cursor: pointer;
+    transition: background 140ms var(--ease);
+  }
+  .rc-verify:hover { background: var(--rc-blue-d); }
+  .rc-verify:active { transform: translateY(1px); }
+  .rc-verify:disabled { opacity: 0.55; cursor: default; }
+  .rc-verify[hidden] { display: none; }
+
+  .rc-rail { height: 2px; background: #e8eaed; }
+  .rc-rail i { display: block; height: 100%; width: 0; background: var(--rc-blue); transition: width 420ms var(--ease); }
+
+  .rc-flash {
     position: absolute; inset: 0; display: grid; place-items: center;
-    background: rgba(31, 122, 74, 0.94); color: #fff;
-    font: 700 26px/1 var(--display); letter-spacing: -0.02em; z-index: 5;
+    background: rgba(255, 255, 255, 0.94); color: #188038; z-index: 5;
   }
   /* An author `display` beats the user-agent rule for [hidden], so the banner
      needs telling explicitly or it never goes away. */
-  .flash[hidden] { display: none; }
-  .flash.in { animation: flashin 620ms var(--ease); }
-  @keyframes flashin { from { opacity: 0; } 80% { opacity: 1; } to { opacity: 0.96; } }
+  .rc-flash[hidden] { display: none; }
+  .rc-flash svg { width: 62px; height: 62px; }
+  .rc-flash.in { animation: rc-flash 620ms var(--ease); }
+  @keyframes rc-flash { from { opacity: 0; } 70% { opacity: 1; } to { opacity: 0.96; } }
 
-  /* --- the signal panel ---------------------------------------------- */
-  .signal {
-    background: #131c36; border: 1px solid #24304f; border-radius: 12px;
-    padding: 14px; position: sticky; top: 62px;
-  }
-  .signal h2 {
-    font: 600 11px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
-    color: #7f8db3; margin: 0 0 10px;
-  }
-  .signal dl { margin: 0; display: grid; gap: 8px; }
-  .signal div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-  .signal dt { font-size: 12px; color: #98a4c6; }
-  .signal dd {
-    margin: 0; font: 600 13px/1 var(--mono); color: #cfe0ff;
-    font-variant-numeric: tabular-nums;
-  }
-  .signal .note { margin: 12px 0 0; font-size: 11px; color: #7a87ac; line-height: 1.4; }
+  /* --- the anchor ------------------------------------------------------- */
 
-  /* --- the 3x3 grid -------------------------------------------------- */
-  .grid {
-    position: relative; display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 0; width: min(340px, 100%); margin: 0 auto; background: #cdd4e4;
-    border: 1px solid #cdd4e4; border-radius: 8px; overflow: hidden;
+  /* Real measurements. 300 by 74 with a 28px box is the object everybody has
+     clicked a thousand times, and it stops looking like it the moment any one
+     of those numbers is rounded to something tidier. */
+  .anchor {
+    width: 300px; max-width: 100%; height: 74px; box-sizing: border-box;
+    display: flex; align-items: center;
+    background: #f9f9f9; border: 1px solid var(--rc-line); border-radius: 3px;
+    font-family: var(--rc-font); color: #000;
+    box-shadow: 0 0 4px 1px rgba(0, 0, 0, 0.08);
   }
-  .scene { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .cell {
-    position: relative; aspect-ratio: 1; border: 0; padding: 0; cursor: pointer;
-    background: transparent; overflow: hidden;
-    transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+  .anchor[hidden] { display: none; }
+  .anchor-hit {
+    flex: 1; min-width: 0; height: 100%;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 0 0 12px; border: 0; background: none; cursor: pointer;
+    font: 400 14px/1 var(--rc-font); color: #000; text-align: left;
   }
-  .cell:hover { box-shadow: inset 0 0 0 3px rgba(43, 86, 196, 0.55); }
-  .cell.on { transform: scale(0.86); box-shadow: inset 0 0 0 3px #2b56c4; border-radius: 4px; }
-  .cell .tickbox {
-    position: absolute; top: 5px; left: 5px; width: 19px; height: 19px;
-    border-radius: 5px; background: #2b56c4; opacity: 0; transform: scale(0.4);
-    transition: opacity 150ms var(--ease), transform 220ms var(--ease-bounce);
+  .anchor-hit:focus-visible { outline: 2px solid var(--rc-blue-d); outline-offset: -3px; }
+  .anchor-box {
+    position: relative; flex: none; width: 28px; height: 28px;
+    border: 2px solid #c1c1c1; border-radius: 2px; background: #fff;
+    display: grid; place-items: center;
+    transition: border-color 180ms var(--ease);
   }
-  .cell .tickbox::after {
-    content: ''; position: absolute; inset: 0;
-    background: no-repeat center/12px
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.4 8.5 6.6 11.7 12.6 4.9' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  .anchor-tick {
+    width: 26px; height: 26px; color: #009688; opacity: 0;
+    stroke-dasharray: 26; stroke-dashoffset: 26;
   }
-  .cell.on .tickbox { opacity: 1; transform: scale(1); }
+  /* The pause. Nothing is happening during it, which is exactly what is
+     happening during it in the real one too. */
+  .anchor.is-checking .anchor-box { border-color: transparent; }
+  .anchor.is-checking .anchor-box::after {
+    content: ''; position: absolute; inset: -2px; border-radius: 50%;
+    border: 3px solid #dcdcdc; border-top-color: var(--rc-blue);
+    animation: rc-spin 800ms linear infinite;
+  }
+  @keyframes rc-spin { to { transform: rotate(360deg); } }
+  .anchor.is-done .anchor-box { border-color: transparent; }
+  .anchor.is-done .anchor-tick { opacity: 1; animation: rc-draw 420ms var(--ease) forwards; }
+  @keyframes rc-draw { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .anchor.is-checking .anchor-box::after { animation-duration: 2s; }
+    .anchor.is-done .anchor-tick { animation: none; stroke-dashoffset: 0; }
+  }
+
+  .anchor-brand {
+    flex: none; width: 84px; padding-right: 8px;
+    display: grid; justify-items: center; gap: 1px; text-align: center;
+  }
+  .anchor-mark { width: 32px; height: 32px; }
+  .anchor-brand b {
+    font: 700 10px/1 var(--rc-font); letter-spacing: 0.06em; color: var(--rc-mute);
+  }
+    /* #9b9b9b is what the real one uses down here, and it is 2.5:1. This is
+     the same grey read at a glance and 4.8:1 read properly. */
+  .anchor-brand small { font: 400 8px/1.2 var(--rc-font); color: #666b70; }
+
+  .stepline {
+    margin: 0; font: 400 12px/1 var(--rc-font); letter-spacing: 0.04em;
+    color: #8b93a3;
+  }
+  .stepline[hidden] { display: none; }
+
+  /* --- the tiles -------------------------------------------------------- */
+
+  /* Four pixels of white between the squares, which eats four pixels of the
+     picture. The real ones do that, and the answer key still holds because
+     each square is a window at a fixed offset into one drawing rather than a
+     crop of whatever the layout happened to produce. */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .tile {
+    position: relative; aspect-ratio: 1; padding: 0; border: 0; overflow: hidden;
+    background: #fff; cursor: pointer;
+  }
+  .tile-img {
+    position: absolute; inset: 0; display: block; transform-origin: 50% 50%;
+    transition: transform 280ms cubic-bezier(0.2, 0.75, 0.3, 1);
+  }
+  .tile-img svg { display: block; width: 100%; height: 100%; }
+  .tile[aria-pressed='true'] .tile-img { transform: scale(0.72); }
+  .tile:hover .tile-img { filter: brightness(1.07); }
+  .tile:focus-visible { outline: 3px solid var(--rc-blue-d); outline-offset: -3px; }
+  .tile-tick {
+    position: absolute; top: 12px; left: 12px; width: 26px; height: 26px;
+    border-radius: 50%; background: var(--rc-blue); color: #fff;
+    display: grid; place-items: center; box-shadow: 0 0 0 2px #fff;
+    transform: scale(0); transition: transform 240ms var(--ease-bounce);
+  }
+  .tile-tick svg { width: 16px; height: 16px; }
+  .tile[aria-pressed='true'] .tile-tick { transform: scale(1); }
+  @media (prefers-reduced-motion: reduce) {
+    .tile-img, .tile-tick { transition: none; }
+  }
 
   /* The final grid draws data, not a photograph, so it needs its own ground. */
-  .grid.mine { background: #1a2340; border-color: #2a3757; gap: 3px; }
-  .cell.trace { background: #121a33; color: #8fb6ff; display: grid; place-items: center; }
-  .cell.trace svg { width: 100%; height: 100%; }
+  .tiles.mine .tile { background: #171a21; color: #8fb6ff; }
+  .tiles.mine .tile-img { display: grid; place-items: center; }
 
-  /* --- the fleeing checkbox ------------------------------------------ */
-  .stage { position: relative; height: 220px; border: 1px dashed #c6cde0; border-radius: 10px; }
-  .tickbtn {
-    position: absolute; left: 12px; top: 84px;
-    display: inline-flex; align-items: center; gap: 10px;
-    background: #fff; border: 1px solid #c6cde0; border-radius: 8px;
-    padding: 12px 16px; font-size: 15px; cursor: pointer;
-    box-shadow: 0 1px 3px rgba(20, 25, 45, 0.14);
+  /* --- the box that runs away ------------------------------------------- */
+
+  .stage { position: relative; height: 268px; border: 1px dashed #ccd0d8; border-radius: 3px; }
+  .anchor.loose {
+    position: absolute; left: 6px; top: 80px;
     transition: left 260ms var(--ease-bounce), top 260ms var(--ease-bounce);
   }
-  .tickbtn .tickbox {
-    width: 20px; height: 20px; border: 2px solid #9aa3bd; border-radius: 4px;
-    position: static; opacity: 1; transform: none; background: transparent;
-  }
-  .tickbtn.caught { border-color: #2b56c4; }
-  .tickbtn.ticked .tickbox { background: #2b56c4; border-color: #2b56c4; opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { .tickbtn { transition: none; } }
+  .anchor.loose.caught { border-color: var(--rc-blue); }
+  @media (prefers-reduced-motion: reduce) { .anchor.loose { transition: none; } }
 
-  /* --- text entry ----------------------------------------------------- */
-  .captcha svg { width: min(256px, 100%); display: block; margin: 0 auto; border-radius: 8px; }
+  /* --- text entry -------------------------------------------------------- */
+
+  .captcha svg { width: 100%; max-width: 264px; display: block; margin: 4px auto 0; }
   .text {
-    display: block; width: 100%; margin-top: 14px; padding: 11px 13px;
-    border: 1px solid #c6cde0; border-radius: 8px; background: #fff;
-    font-family: var(--mono); font-size: 17px; letter-spacing: 0.06em;
+    display: block; width: 100%; box-sizing: border-box; margin-top: 14px;
+    padding: 10px 12px; border: 1px solid #c6cbd4; border-radius: 2px; background: #fff;
+    font-family: var(--rc-font); font-size: 16px; color: #000;
   }
-  textarea.text { letter-spacing: 0; font-size: 15px; resize: none; }
+  .text:focus-visible { outline: 2px solid var(--rc-blue-d); outline-offset: -1px; border-color: transparent; }
+  textarea.text { font-size: 15px; resize: none; }
   .copyline {
-    margin: 0; padding: 12px 14px; background: #e9edf6; border-radius: 8px;
-    font-family: var(--mono); font-size: 15px; line-height: 1.5; user-select: none;
+    margin: 0; padding: 12px 14px; background: #f1f3f6; border-radius: 2px;
+    font-family: var(--rc-font); font-size: 15px; line-height: 1.5; user-select: none;
   }
 
-  /* --- audio ---------------------------------------------------------- */
-  .audio { display: grid; gap: 14px; justify-items: center; }
-  .lamp { width: 54px; height: 54px; border-radius: 50%; background: #d8dded; }
+  /* --- audio -------------------------------------------------------------- */
+
+  .audio { display: grid; gap: 13px; justify-items: center; padding: 8px 0 4px; }
+  .audio-icon { width: 34px; height: 34px; fill: #9aa0a6; }
+  .lamp { width: 50px; height: 50px; border-radius: 50%; background: #e3e6ea; }
   .lamp.lit { animation: lit 260ms var(--ease); }
   @keyframes lit { from { background: #ffd166; box-shadow: 0 0 0 12px rgba(255, 209, 102, 0.35); } }
-  .choices { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .chip, .ghost {
-    background: #fff; border: 1px solid #c6cde0; border-radius: 8px;
-    padding: 9px 16px; font-weight: 600; cursor: pointer;
-    transition: transform 180ms var(--ease-bounce), border-color 140ms var(--ease);
+  .choices { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
+    background: #fff; border: 1px solid #c6cbd4; border-radius: 2px;
+    padding: 6px 14px; font: 500 14px/1 var(--rc-font); color: #202124; cursor: pointer;
+    transition: border-color 140ms var(--ease), background 140ms var(--ease);
   }
-  .chip:hover, .ghost:hover { border-color: #2b56c4; transform: translateY(-1px); }
-  .chip.on { background: #2b56c4; border-color: #2b56c4; color: #fff; }
+  .chip:hover { border-color: var(--rc-blue-d); }
+  .chip svg { width: 14px; height: 14px; fill: currentColor; }
+  .chip.on { background: var(--rc-blue); border-color: var(--rc-blue); color: #fff; }
 
-  /* --- hold still ------------------------------------------------------ */
-  .hold { display: grid; justify-items: center; gap: 10px; }
+  /* --- hold still ---------------------------------------------------------- */
+
+  .hold { display: grid; justify-items: center; gap: 8px; padding: 6px 0; }
   .target {
-    width: 140px; height: 140px; border: 0; background: none; padding: 0;
-    color: #2b56c4; cursor: pointer; touch-action: none;
+    width: 148px; height: 148px; border: 0; background: none; padding: 0;
+    color: var(--rc-blue-d); cursor: pointer; touch-action: none;
   }
   .target svg { width: 100%; height: 100%; }
-  .target.holding { color: #1f7a4a; }
-  .readout { margin: 0; font: 600 13px/1 var(--mono); color: #5c627a; }
+  .target.holding { color: #188038; }
+  .readout { margin: 0; font: 500 13px/1 var(--rc-font); color: var(--rc-mute); }
 
-  /* --- tone matching --------------------------------------------------- */
+  /* --- tone matching -------------------------------------------------------- */
+
   .tonebox { display: grid; gap: 12px; justify-items: center; }
-  .tonebox svg { width: min(300px, 100%); }
-  .w-ref { stroke: #6f8dff; }
+  .tonebox svg { width: 100%; max-width: 300px; }
+  .w-ref { stroke: #7fa8ff; }
   .w-mine { stroke: #ffd166; }
-  /* This one sits on a white panel, so it keeps the dialog's own blue rather
-     than the page-level accent, which is a cyan that vanishes on white. */
-  .slider { width: min(300px, 100%); --sl-a: #6a92f0; --sl-b: #2b56c4; --sl-track: #dfe3ee; }
+  .slider { width: min(300px, 100%); --sl-a: #7ba4e8; --sl-b: #2f588c; --sl-track: #dfe3ea; }
   .tonebtns { display: flex; gap: 8px; }
 
-  /* --- hands ------------------------------------------------------------ */
-  .hands { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  /* --- hands ---------------------------------------------------------------- */
+
+  .hands { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .handbtn {
-    background: #fff; border: 1px solid #c6cde0; border-radius: 10px; padding: 6px;
+    background: #fff; border: 1px solid #c6cbd4; border-radius: 2px; padding: 5px;
     cursor: pointer; transition: transform 180ms var(--ease-bounce), border-color 140ms var(--ease);
   }
   .handbtn svg { width: 100%; height: auto; display: block; }
-  .handbtn:hover { border-color: #2b56c4; transform: translateY(-2px); }
-  .handbtn.right { border-color: #1f7a4a; box-shadow: 0 0 0 3px rgba(31, 122, 74, 0.25); }
-  .handbtn.wrong { border-color: #b93a2c; }
+  .handbtn:hover { border-color: var(--rc-blue-d); transform: translateY(-2px); }
+  .handbtn.right { border-color: #188038; box-shadow: 0 0 0 2px rgba(24, 128, 56, 0.3); }
+  .handbtn.wrong { border-color: var(--rc-err); }
 
-  /* --- drawing pad ------------------------------------------------------ */
+  /* --- drawing pad ---------------------------------------------------------- */
+
   .pad { display: grid; justify-items: center; gap: 8px; }
+  /* Graph paper rather than an empty white box. A box with nothing in it
+     reads as a rendering failure, and the one guide that would fix that — a
+     faint circle — is the answer. */
   .pad svg {
-    width: 100%; max-width: 340px; aspect-ratio: 320 / 260;
-    background: #fff; border: 1px solid #c6cde0; border-radius: 10px;
+    width: 100%; aspect-ratio: 320 / 260;
+    border: 1px solid #c6cbd4; border-radius: 2px;
     color: #16192a; touch-action: none; cursor: crosshair;
+    background:
+      linear-gradient(#eef1f5 1px, transparent 1px) 0 0 / 100% 20px,
+      linear-gradient(90deg, #eef1f5 1px, transparent 1px) 0 0 / 20px 100%,
+      #fff;
   }
 
-  /* --- terms ------------------------------------------------------------ */
+  /* --- terms ---------------------------------------------------------------- */
+
   .terms {
-    height: 210px; overflow-y: auto; background: #fff; border: 1px solid #c6cde0;
-    border-radius: 8px; padding: 14px 16px; font-size: 13px; line-height: 1.6;
+    height: 218px; overflow-y: auto; background: #fff; border: 1px solid #c6cbd4;
+    border-radius: 2px; padding: 14px 16px; font-size: 13px; line-height: 1.6;
+    font-family: var(--rc-font);
   }
-  .terms h3 { font-size: 13px; margin: 14px 0 4px; font-family: var(--font); }
+  .terms h3 { font-size: 13px; margin: 14px 0 4px; font-family: var(--rc-font); }
   .terms h3:first-child { margin-top: 0; }
   .terms p { margin: 0 0 8px; }
-  .agree { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; font-size: 14px; }
+  /* The native box is 13px, which is under any sane target size. The label
+     wraps it, so the row is the target — but only if the row is tall enough
+     to be one. */
+  .agree {
+    display: flex; gap: 9px; align-items: center; margin-top: 12px;
+    min-height: 32px; padding: 4px 2px; cursor: pointer;
+    font: 400 14px/1.4 var(--rc-font);
+  }
+  .agree input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--rc-blue); }
 
-  /* --- verdict ---------------------------------------------------------- */
-  .verdict { max-width: 720px; margin: 0 auto; padding: 0 18px 90px; }
+  /* --- the panel beside it --------------------------------------------------- */
+
+  .signal {
+    width: 100%;
+    background: rgba(23, 26, 33, 0.92); border: 1px solid #2b2f39; border-radius: 4px;
+    padding: 13px; position: sticky; top: 62px;
+    backdrop-filter: blur(6px);
+  }
+  .signal h2 {
+    font: 600 11px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: #8d94a4; margin: 0 0 10px;
+  }
+  .signal dl { margin: 0; display: grid; gap: 8px; }
+  .signal div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .signal dt { font-size: 12px; color: #a2a9b8; }
+  .signal dd {
+    margin: 0; font: 600 13px/1 var(--mono); color: #d6e2f7;
+    font-variant-numeric: tabular-nums;
+  }
+  .spark { display: block; width: 100%; height: 40px; margin-top: 12px; color: #6ea8f0; }
+  .signal .note { margin: 8px 0 0; font-size: 11px; color: #8b93a3; line-height: 1.45; }
+
+  /* --- help ------------------------------------------------------------------ */
+
+  .helpbox {
+    max-width: 420px; border: 0; border-radius: 4px; padding: 22px;
+    background: #fff; color: #202124; font-family: var(--rc-font);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  }
+  .helpbox::backdrop { background: rgba(8, 9, 13, 0.6); }
+  .helpbox h2 { margin: 0 0 12px; font: 500 19px/1.2 var(--rc-font); }
+  .helpbox p { margin: 0 0 12px; font-size: 14px; line-height: 1.6; }
+  .helpbox button {
+    background: var(--rc-blue, #4a90e2); color: #fff; border: 0; border-radius: 2px;
+    height: 34px; padding: 0 18px; font: 500 15px/1 var(--rc-font); cursor: pointer;
+  }
+
+  /* --- verdict ---------------------------------------------------------------- */
+
+  .verdict { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 0 18px 90px; }
   .stamp {
     display: inline-block; margin: 0 0 10px; padding: 8px 18px;
     border: 3px solid currentColor; border-radius: 8px; transform: rotate(-2.5deg);
     font: 700 24px/1 var(--display); letter-spacing: -0.02em; text-transform: uppercase;
   }
-  .stamp[data-tone="good"] { color: #6fe0a4; }
-  .stamp[data-tone="mid"] { color: #ffd166; }
-  .stamp[data-tone="bad"] { color: #ff8778; }
+  .stamp[data-tone='good'] { color: #6fe0a4; }
+  .stamp[data-tone='mid'] { color: #ffd166; }
+  .stamp[data-tone='bad'] { color: #ff8778; }
   .score { margin: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
   .score b { font: 700 44px/1 var(--display); }
-  .score span { color: #9aa6c8; font-size: 14px; }
-  .detail { margin: 0 0 22px; color: #c3cce5; max-width: 54ch; }
+  .score span { color: #a4abbb; font-size: 14px; }
+  .detail { margin: 0 0 22px; color: #c8cdd8; max-width: 54ch; }
 
   .card { width: 100%; border-collapse: collapse; font-size: 14px; }
   .card caption {
     text-align: left; font: 600 11px/1 var(--mono); letter-spacing: 0.14em;
-    text-transform: uppercase; color: #7f8db3; padding-bottom: 8px;
+    text-transform: uppercase; color: #8d94a4; padding-bottom: 8px;
   }
-  .card th, .card td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #24304f; }
-  .card thead th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #7f8db3; font-weight: 600; }
+  .card th, .card td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #2b2f39; }
+  .card thead th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #8d94a4; font-weight: 600; }
   .card tbody th { font-weight: 500; }
-  .card td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: #cfe0ff; }
+  .card td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: #d6e2f7; }
   .card tr.yes td:last-child { color: #6fe0a4; }
   .card tr.no td:last-child { color: #ff8778; }
-  .card .na { color: #7a87ac; font-family: var(--font); }
+  .card .na { color: #8b93a3; font-family: var(--font); }
 
-  .extras { margin: 22px 0 0; padding-left: 20px; color: #c3cce5; font-size: 14px; line-height: 1.7; }
+  .extras { margin: 22px 0 0; padding-left: 20px; color: #c8cdd8; font-size: 14px; line-height: 1.7; }
   .acts { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 26px; }
   .acts button {
-    background: #2b56c4; color: #fff; border: 0; border-radius: 999px;
+    background: #2a6fb8; color: #fff; border: 0; border-radius: 999px;
     padding: 10px 22px; font-weight: 600; cursor: pointer;
     transition: transform 200ms var(--ease-bounce);
   }
   .acts button:hover { transform: translateY(-2px) scale(1.03); }
-  .acts button:nth-of-type(2) { background: #24304f; }
-  .acts a { color: #9aa6c8; font-size: 15px; }
+  .acts button:nth-of-type(2) { background: #2b3038; }
+  .acts a { color: #a4abbb; font-size: 15px; display: inline-flex; align-items: center; min-height: 26px; }
 
-  .how { margin-top: 30px; border-top: 1px solid #24304f; padding-top: 16px; color: #9aa6c8; font-size: 14px; }
-  .how summary { cursor: pointer; color: #cfe0ff; font-weight: 600; }
+  .how { margin-top: 30px; border-top: 1px solid #2b2f39; padding-top: 16px; color: #a4abbb; font-size: 14px; }
+  .how summary { cursor: pointer; color: #d6e2f7; font-weight: 600; }
   .how p { max-width: 62ch; line-height: 1.65; }
-  .how b { color: #cfe0ff; }
+  .how b { color: #d6e2f7; }
 
-  @media (max-width: 820px) {
+  @media (prefers-reduced-motion: reduce) {
+    .rc.in, .rc-flash.in { animation: none; }
+    .rc-head { transition: none; }
+    .robot-body.unmasked .host { transition: none; }
+  }
+
+  @media (max-width: 860px) {
     .wrap { grid-template-columns: minmax(0, 1fr); }
-    .signal { position: static; order: 2; }
+    .signal { position: static; order: 2; max-width: 412px; }
   }
   @media (max-width: 460px) {
-    .prompt { font-size: 18px; }
-    .hands { gap: 5px; }
-    .boxfoot { flex-wrap: wrap; }
+    .rc-target { font-size: 21px; }
+    .hands { gap: 4px; }
+    .host-page { padding-top: 40px; }
   }
 </style>

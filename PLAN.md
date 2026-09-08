@@ -680,7 +680,80 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    `color` on SVG text, which is not what paints it — with `fill` read
    properly, two labels were under 4.5:1.
 
-7. Then reassess against the depth work in Phases 1–2 above.
+7. ~~**I'm Not a Robot, made authentic**~~ — **done.** The checks were good
+   and the shell was ours: a rounded card with a shield, a title, a subtitle
+   and a step counter. Nobody has ever seen that object. The whole joke rests
+   on the first thirty seconds being indistinguishable from the real thing, and
+   it was not.
+
+   So the widget is built to the real one's measurements. A 300 by 74 anchor
+   with a 28-pixel box, a spinner that pauses for most of a second before
+   anything decides it believes you, and a tick that draws itself in. The
+   challenge floats over a dimmed, out-of-focus page, because a verification
+   dialog never appears on its own — it appears over something you were trying
+   to do, and that dimming is half of why the thing on top reads as a dialog.
+   The header is the blue instruction block with the target word set at 25
+   bold under a 14-point lead-in. Four-pixel gutters between the tiles. A tick
+   that lands in the corner as the tile shrinks away from it. Roboto over the
+   lot, loaded for this page alone through a `fonts` prop on the layout so it
+   costs one extra family on one URL rather than a second request on
+   twenty-one pages. The substitute typeface is the first thing that gives a
+   copy away.
+
+   The one measurement I knowingly moved: white on the real `#4a90e2` is 2.9:1.
+   The widget everybody in the world trusts does not pass its own contrast
+   check. Ours is the same hue at the lightness where white clears 4.5:1 across
+   all twelve steps. Being faithful to an illegible header is not a trade worth
+   making. What the header does instead is drift — one step at a time, the long
+   way round the wheel through violet and magenta to red, because the short way
+   passes through the colour that means everything is fine.
+
+   The street is a new thing: `lib/robot-scene.ts`, drawn in one-point
+   perspective with converging buildings, a crossing under the camera, haze on
+   the far end, occlusion where every surface meets the pavement, a vignette
+   and grain — and one light direction obeyed by all ten buildings, which is
+   most of what separates a drawing from a photograph. Nine tiles share one
+   copy of it through `<use>`, and the nine turbulence filters that grain them
+   turned out to cost nothing: 16.7ms median frame time with the selection
+   animation running, measured rather than assumed.
+
+   **The answer key is derived, not typed.** The tempting shape was to draw the
+   street and then write down which squares the light is in — two facts held in
+   step by hand, which is exactly the pair that goes stale the moment the
+   drawing moves. Instead the light is kept apart from the rest of the scene
+   with its own bounding boxes, and `answerCells` works out which squares hold
+   it. `scripts/check-robot-scene.mjs` then asks the same question a completely
+   different way: render the street twice, with the light and without, and see
+   which squares changed. Pixels do not care what the boxes say. The two agree.
+
+   That framing produced the better idea. There are **two keys, not one.** A
+   signal head hanging over the road is in a square or it is not. The pole
+   holding it up clips three more squares on the way down, and whether those
+   "contain a traffic light" is a judgement rather than a fact. Real CAPTCHAs
+   grade that judgement as though it were a fact, and that — not the blurry
+   photographs — is the thing that makes them infuriating. So the head is
+   required, the pole is optional, and ticking a square the light never reaches
+   is the only way to be wrong.
+
+   The three footer buttons everybody recognises are real controls rather than
+   decoration: the arrows give you a fresh challenge of the same kind, the
+   headphones toggle the site's sound, and the question mark opens what is
+   being measured and where it goes. And the anchor is now the way in — you
+   tick it, it thinks about you, and then the questions start, which is the
+   order it happens in everywhere else. That makes step two, where the same
+   widget starts running away, a much better joke than it was when it was the
+   first thing you ever saw.
+
+   What the measuring caught, over all twelve steps at 375 and at full width:
+   the header colour never moved, because `--rc-blue` is declared on the body
+   and a custom property is substituted where it is *declared*, not where it is
+   used — setting `--heat` on the widget left every step blue. Two contrast
+   failures, both in eight-point grey. The terms checkbox was a 13-pixel target
+   and the sign-off link 23 pixels tall. And my own auditor was reading a
+   translucent white button as an opaque white background, which is how a
+   perfectly legible control on a dark bar reported 1:1.
+
+8. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

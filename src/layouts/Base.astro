@@ -16,6 +16,8 @@ interface Props {
   bodyClass?: string
   /** The 404 page sets this — a static host may still answer with 200. */
   noindex?: boolean
+  /** Extra Google Fonts families a single page needs, as css2 'family=' values. */
+  fonts?: string[]
   /** Extra JSON-LD objects (breadcrumbs, VideoGame) a page wants alongside the sitewide WebSite one. */
   structuredData?: Record<string, unknown>[]
 }
@@ -29,8 +31,17 @@ const {
   themeColor = '#f6f5f1',
   bodyClass = '',
   noindex = false,
+  fonts = [],
   structuredData = [],
 } = Astro.props
+
+// One request, not two: a page that wants another family appends it here
+// rather than adding a second render-blocking link to the same host.
+const fontHref =
+  'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800' +
+  '&family=Inter:wght@400;500;600;700' +
+  fonts.map((f) => '&family=' + f).join('') +
+  '&display=swap'
 
 const websiteLd = {
   '@context': 'https://schema.org',
@@ -71,7 +82,7 @@ const faviconHref = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg)
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap"
+      href={fontHref}
     />
 
     <meta property="og:type" content="website" />

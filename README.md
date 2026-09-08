@@ -102,6 +102,8 @@ src/
     fold-paper.ts       Gallivan's equations, and where a real sheet gives up
     sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
                         the Moon’s distance and how much of it is lit
+    robot-scene.ts      the CAPTCHA's street, in perspective, and which of its
+                        nine squares the traffic light is actually in
     result-card.ts      the 1200x630 card for a *result*, not for a game
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished
@@ -283,13 +285,26 @@ a premium/affordability pair that was not an exact inverse, and a room where one
 rival won 70% of everything.*
 
 **I'm Not a Robot** — twelve checks that start like a CAPTCHA and end somewhere
-else, over a behavioural profiler that measures the same channels real bot
-detection does: pointer straightness, tremor, velocity profile, click and
+else, built to the real widget's measurements: a 300x74 anchor with a 28px box
+and a spinner that pauses before it believes you, a challenge floating over a
+dimmed page, a blue instruction header with the target word set large under a
+small lead-in, four-pixel gutters, a tick that lands in the corner as the tile
+shrinks away from it, and Roboto over the lot. What changes as you go is the
+colour of that header, which starts where every verification dialog on the
+internet starts and works its way round to red. Underneath it is a behavioural
+profiler measuring the same channels real bot detection does: pointer straightness, tremor, velocity profile, click and
 keystroke rhythm, hand drift while holding still, and the isoperimetric quotient
 of a freehand circle. The report card reads your own numbers back. *The
 thresholds are invented for the joke and the page says so; the maths is checked
 by `scripts/check-telemetry.mjs` against a ruler-straight path, a unit zigzag, a
-square and a 64-gon, all with answers worked out by hand.*
+square and a 64-gon, all with answers worked out by hand.* The street is a
+drawing, and which of its squares hold the traffic light is derived from where
+the light is rather than written down beside it: `scripts/check-robot-scene.mjs`
+renders the scene with the light and without it, and checks that the squares
+whose pixels moved are the squares the arithmetic named. There are two keys,
+because the signal head is a fact and the pole under it is a judgement, and
+grading a judgement as though it were a fact is the single thing that makes real
+CAPTCHAs infuriating.
 
 ---
 
@@ -340,6 +355,7 @@ simulation:
 ```bash
 node scripts/check-impact.mjs      # Asteroid Launcher, vs four real impacts
 node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
+node scripts/check-robot-scene.mjs # the CAPTCHA street, and its answer key, in pixels
 node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots
 node scripts/check-cascade.mjs     # Rule Cascade, is it still finishable
 node scripts/check-trolley.mjs     # Trolley, are the four positions distinct

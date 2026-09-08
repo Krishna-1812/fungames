@@ -12,9 +12,11 @@ interface Props {
   /** Set false for games that draw their own branding. */
   chrome?: boolean
   bodyClass?: string
+  /** Extra Google Fonts families this one game needs, as css2 `family=` values. */
+  fonts?: string[]
 }
 
-const { slug, fixed = false, bar, chrome = true, bodyClass = '' } = Astro.props
+const { slug, fixed = false, bar, chrome = true, bodyClass = '', fonts = [] } = Astro.props
 const game = gameBySlug(slug)
 if (!game) throw new Error(`No registry entry for game "${slug}" — add it to src/data/games.ts`)
 
@@ -55,6 +57,7 @@ const videoGameLd = {
   fixed={fixed}
   themeColor={barColor}
   bodyClass={bodyClass}
+  fonts={fonts}
   structuredData={[breadcrumbLd, videoGameLd]}
 >
   {
