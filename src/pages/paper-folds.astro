@@ -8,7 +8,7 @@ import { iconSvg } from '../lib/icons'
  * Paper Folds — fold a real sheet until it stops you, then keep going anyway.
  *
  * The game is in two halves and they are different kinds of thing, which the
- * page now says out loud rather than blurring.
+ * page says out loud rather than blurring.
  *
  * The first half is real. You fold an actual sheet by dragging its edge over,
  * and it stops when a sheet of that size and thickness stops — seven times for
@@ -17,21 +17,34 @@ import { iconSvg } from '../lib/icons'
  * lib/fold-paper.ts, and scripts/check-fold.mjs holds those to what people
  * have actually managed.
  *
- * The second half is the old one, and it is imaginary: thickness 0.1 mm × 2^n
- * up to fold 103, where the stack is wider than the observable universe. It
- * used to be presented as something you were doing, with a button that folded
- * a hundred and three times and no hint that seven is where paper gives up.
- * That was the more misleading half of an otherwise honest game, so reaching
- * it now takes a button that says what you are doing.
+ * The second half is imaginary: 0.1 mm × 2^n up to fold 103, where the stack
+ * is wider than the observable universe. Reaching it takes a button that says
+ * what you are doing.
+ *
+ * What is new is that the page stopped *describing* the second half and
+ * started going there. The backdrop is the altitude: fold zero is a warm desk,
+ * by thirty you are past the Kármán line, and the last fold has nothing behind
+ * it but other galaxies. lib/fold-sky.ts holds that journey and
+ * check-fold-scene.mjs holds it to being readable at every one of the hundred
+ * and four stops — a page whose background travels that far has exactly one
+ * catastrophic failure mode, and it is that somewhere in the middle the ink
+ * and the paper it sits on pass through the same grey.
+ *
+ * The sheet itself is drawn as an object on that desk rather than as a line in
+ * a box, by lib/fold-scene.ts. The old edge-on diagram was and is the honest
+ * picture — both axes to one scale, so the bend at the crease can be seen
+ * outgrowing the paper — so it stays, as an inset, labelled.
  */
 const START_MM = 0.1
 const MAX_FOLDS = 103
-
 ---
 
-<GameLayout slug="paper-folds" bar="#43310f" bodyClass="fold-body">
+<GameLayout slug="paper-folds" bar="#241b12" bodyClass="fold-body">
+  <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+
   <div class="wrap">
-    <header class="head">
+    <header class="head card">
+      <p class="where" id="where">on the desk</p>
       <h1>Paper Folds</h1>
       <p class="lede">
         A sheet of paper is a tenth of a millimetre thick. Every fold doubles
@@ -40,93 +53,151 @@ const MAX_FOLDS = 103
       </p>
     </header>
 
-    <section class="bench" aria-labelledby="benchH">
-      <h2 id="benchH" class="sr-only">Fold a sheet</h2>
+    <div class="picker" id="picker" role="radiogroup" aria-label="Which sheet">
+      {SHEETS.map((s, i) => (
+        <button type="button" class="chip" data-sheet={s.id} role="radio"
+                aria-checked={i === 0 ? 'true' : 'false'}>{s.name}</button>
+      ))}
+    </div>
 
-      <div class="picker" id="picker" role="radiogroup" aria-label="Which sheet">
-        {SHEETS.map((s, i) => (
-          <button type="button" class="chip" data-sheet={s.id} role="radio"
-                  aria-checked={i === 0 ? 'true' : 'false'}>{s.name}</button>
-        ))}
+    <div class="deck">
+      <section class="card stage-card">
+        <div class="card-top">
+          <p class="sheet-note" id="sheetNote"></p>
+          <div class="ways" role="radiogroup" aria-label="Which way you fold">
+            <button type="button" class="way" data-mode="alternate" role="radio" aria-checked="true">
+              Turning it
+            </button>
+            <button type="button" class="way" data-mode="single" role="radio" aria-checked="false">
+              Same way
+            </button>
+          </div>
+        </div>
+
+        <div class="stage-hold">
+          <canvas id="stage" role="application" tabindex="0"
+            aria-label="The sheet on a desk. Drag its right edge to the left to fold it, or press the right arrow key."
+          ></canvas>
+          <svg class="inset" id="inset" viewBox="0 0 132 86" aria-hidden="true"></svg>
+          <p class="inset-cap" aria-hidden="true">true scale, edge on</p>
+        </div>
+
+        <p class="grip" id="grip">Drag the right-hand edge over to the left.</p>
+
+        <div class="budget">
+          <div class="budget-bar"><i id="budgetFill"></i></div>
+          <p class="budget-text" id="budgetText"></p>
+        </div>
+      </section>
+
+      <aside class="card ladder-card" aria-hidden="true">
+        <canvas id="ladder"></canvas>
+      </aside>
+    </div>
+
+    <section class="figures card" id="figures">
+      <div class="fig fig-lead">
+        <b id="thick">0.1 millimetres</b>
+        <span>thick</span>
+      </div>
+      <div class="fig">
+        <b id="folds">0</b>
+        <span id="foldsLabel">folds</span>
+      </div>
+      <div class="fig">
+        <b id="layers">1</b>
+        <span id="layersLabel">layer of paper</span>
       </div>
 
-      <div class="ways" role="radiogroup" aria-label="Which way you fold">
-        <button type="button" class="way" data-mode="alternate" role="radio" aria-checked="true">
-          Turning it each time
-        </button>
-        <button type="button" class="way" data-mode="single" role="radio" aria-checked="false">
-          Always the same way
-        </button>
-      </div>
-
-      <svg class="bed" id="bed" viewBox="0 0 300 172"
-           role="application" tabindex="0"
-           aria-label="The sheet, seen edge-on. Drag it leftwards to fold it, or press the right arrow key."></svg>
-
-      <p class="grip" id="grip">Drag the right-hand edge over to the left.</p>
-
-      <div class="budget">
-        <div class="budget-bar"><div class="budget-fill" id="budgetFill"></div></div>
-        <p class="budget-text" id="budgetText"></p>
-      </div>
-
-      <p class="sheet-note" id="sheetNote"></p>
+      <p class="mark" id="mark">
+        <span class="mark-glyph" id="markGlyph" set:html={iconSvg(MARKS[0].icon)} />
+        <span id="markText">A single sheet of paper.</span>
+      </p>
     </section>
-
-    <section class="readout" id="readout">
-      <div class="fold-count"><span id="folds">0</span> <small>folds</small></div>
-      <div class="thick" id="thick" aria-live="polite">0.1 millimetres</div>
-      <div class="layers"><span id="layers">1</span> layers of paper</div>
-    </section>
-
-    <svg class="scale" id="scale" viewBox="0 0 300 190" aria-hidden="true"></svg>
-
-    <p class="mark" id="mark"><span class="mark-glyph" id="markGlyph" set:html={iconSvg(MARKS[0].icon)} /><span id="markText">A single sheet of paper.</span></p>
 
     <div class="actions">
       <button type="button" id="unfoldBtn" class="ghost">Unfold</button>
       <button type="button" id="foldBtn" class="primary">Fold in half</button>
     </div>
-    <p class="hint" id="hint">In reality nobody has folded a sheet more than twelve times.</p>
+    <p class="hint card" id="hint">Everything above is a sheet you could actually hold.</p>
   </div>
 </GameLayout>
 
-  {/* Data for the module below: modules cannot take define:vars, and
-      modules are what let every game share one synthesiser. */}
-  <script type="application/json" id="game-data" set:html={JSON.stringify({
-      START_MM,
-      MAX_FOLDS,
-      MARKS,
-      ICONS: Object.fromEntries(MARKS.map((m) => [m.icon, iconSvg(m.icon)])),
-    })} />
+{/* Data for the module below: modules cannot take define:vars, and modules
+    are what let every game share one synthesiser. */}
+<script type="application/json" id="game-data" set:html={JSON.stringify({
+  START_MM,
+  MAX_FOLDS,
+  MARKS,
+  ICONS: Object.fromEntries(MARKS.map((m) => [m.icon, iconSvg(m.icon)])),
+})} />
 
-  <script>
+<script>
   import { burst, floatIcon, prefersReducedMotion } from '../lib/fx'
   import { sfx, unlock, tone } from '../lib/audio'
   import {
-    SHEETS, sheetById, maxFolds, need, have, reach, profile,
-    thicknessAt, bendRadius, mm,
+    SHEETS, sheetById, maxFolds, need, have, reach, footprint,
+    thicknessAt, mm,
   } from '../lib/fold-paper'
-    const { START_MM, MAX_FOLDS, MARKS, ICONS } = JSON.parse(
-      document.getElementById('game-data')!.textContent!,
-    ) as any
+  import { fold3d, fitCam, fitCorners } from '../lib/fold-scene'
+  import { skyAt, starField, rgb, rgba } from '../lib/fold-sky'
 
-  const el = (id) => document.getElementById(id)
+  const { START_MM, MAX_FOLDS, MARKS, ICONS } = JSON.parse(
+    document.getElementById('game-data')!.textContent!,
+  ) as any
+
+  const el = (id: string) => document.getElementById(id)!
+  const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+  const plural = (n: number, one: string, many = one + 's') => (n === 1 ? one : many)
+
+  /* ---------------------------------------------------------------------- */
+  /* State                                                                   */
+  /* ---------------------------------------------------------------------- */
+
   let n = 0
-  let lastMark = null
-
-  /* The real half. `sheet` and `mode` decide where paper gives up; `imaginary`
-     records that you have gone past that on purpose, which changes what every
-     readout on the page is claiming. */
   let sheet = SHEETS[0]
-  let mode = 'alternate'
+  let mode: 'alternate' | 'single' = 'alternate'
   let imaginary = false
+  let lastMark: any = null
+  let refusedAt = -1e9
   const limit = () => maxFolds(sheet, mode)
 
-  /** Pick a sensible unit across 30 orders of magnitude. */
-  function fmt(mm) {
-    const m = mm / 1000
-    const units = [
+  /** The fold under the hand, 0 to 1. */
+  let u = 0
+  let dragging = false
+
+  /** The turn the sheet is part way through, after an alternating fold. */
+  let yaw = 0
+  /** Smoothed fold position, so the sky and the ladder move with the hand. */
+  let shown = 0
+
+  /**
+   * The sheet as it is drawn — derived from the fold count every time rather
+   * than carried forward. Accumulating it worked and was wrong to do: two
+   * places would then be keeping the same fact, and the moment they disagreed
+   * the picture and the numbers under it would be describing different sheets.
+   */
+  function geoAt(folds: number) {
+    const f = footprint(sheet, Math.min(folds, limit()), mode)
+    return {
+      halfW: f.w / 2,
+      halfD: f.d / 2,
+      // Past the sheet's limit the stack keeps doubling but the paper does not
+      // keep shrinking, because there is no longer any paper.
+      height: thicknessAt(sheet.thickness, Math.min(folds, limit())),
+    }
+  }
+  let geo = { halfW: 0, halfD: 0, height: 0 }
+
+  /* ---------------------------------------------------------------------- */
+  /* Numbers a person reads                                                  */
+  /* ---------------------------------------------------------------------- */
+
+  /** A sensible unit across thirty orders of magnitude. */
+  function fmt(v: number) {
+    const m = v / 1000
+    const units: [number, string, number][] = [
       [0, 'millimetres', 1e-3],
       [0.01, 'centimetres', 1e-2],
       [1, 'metres', 1],
@@ -137,17 +208,18 @@ const MAX_FOLDS = 103
       [9.461e24, 'billion light years', 9.461e24],
     ]
     let pick = units[0]
-    for (const u of units) if (m >= u[0]) pick = u
-    const v = m / pick[2]
-    if (v >= 1e6) return `${v.toExponential(2).replace('e+', ' × 10^')} ${pick[1]}`
-    const shown = v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)
-    return `${Number(shown).toLocaleString('en-US')} ${pick[1]}`
+    for (const un of units) if (m >= un[0]) pick = un
+    const q = m / pick[2]
+    if (q >= 1e6) return q.toExponential(2).replace('e+', ' × 10^') + ' ' + pick[1]
+    const shownV = q >= 100 ? q.toFixed(0) : q >= 10 ? q.toFixed(1) : q.toFixed(2)
+    return Number(shownV).toLocaleString('en-US') + ' ' + pick[1]
   }
 
-  function bigInt(exp) {
-    // 2^n exactly, via BigInt, so the layer count stays truthful past 2^53.
-    return (1n << BigInt(exp)).toLocaleString('en-US')
-  }
+  /** 2^n exactly, via BigInt, so the layer count stays truthful past 2^53. */
+  const bigInt = (e: number) => (1n << BigInt(e)).toLocaleString('en-US')
+
+  /** Metres of stack, which is what the sky is a function of. */
+  const heightM = (folds: number) => (START_MM * Math.pow(2, folds)) / 1000
 
   function currentMark() {
     let m = MARKS[0]
@@ -155,626 +227,1010 @@ const MAX_FOLDS = 103
     return m
   }
 
-  /* ----------------------------------------------------------------------
-     The scale.
+  /* ---------------------------------------------------------------------- */
+  /* Canvases                                                                */
+  /* ---------------------------------------------------------------------- */
 
-     What used to be here was a stack of bars that doubled until it hit
-     sixty-four and then stopped changing -- which is fold six. The other
-     ninety-seven folds, the ones that go past the Moon and out of the galaxy,
-     had no picture at all, which is a strange thing for a game about a number
-     you cannot picture.
+  type Surface = { c: HTMLCanvasElement; g: CanvasRenderingContext2D; w: number; h: number }
+  const surf = (id: string): Surface => {
+    const c = el(id) as HTMLCanvasElement
+    return { c, g: c.getContext('2d')!, w: 0, h: 0 }
+  }
+  const SKY = surf('sky'), STAGE = surf('stage'), LADDER = surf('ladder')
 
-     A logarithmic axis fixes it, and it fixes it in the way the subject wants:
-     because every fold doubles, every fold is the SAME distance up this ruler.
-     Constant effort, constant ratio, and the labels beside it going from a
-     credit card to the observable universe. That is the whole argument of the
-     game, drawn.
-     ---------------------------------------------------------------------- */
-
-  /* ----------------------------------------------------------------------
-     The bench: one sheet, edge-on, drawn true to itself.
-
-     Both dimensions are to the same scale, which is the whole argument. A
-     sheet of A4 starts 297 mm long and 0.1 mm thick — a hairline — and after
-     seven folds it is 2.3 mm long and 12.8 mm thick, five times taller than
-     it is wide. Nothing about that is stylised: the block genuinely turns on
-     its side as you fold it, and the half-circle at the end, which is the
-     paper going round the bend, ends up bigger than the flat part. That is
-     where the length goes, and it is why the eighth fold is not close.
-     ---------------------------------------------------------------------- */
-
-  const BED = el('bed')
-  const BX = 22, BY = 12, BW = 256, BH = 112
-
-  /** The fold being made, 0 to 1, purely for the drawing. */
-  let dragU = 0
-  let dragging = false
-  let springing = 0
-
-  function bedGeometry() {
-    const flat = have(sheet, mode) / 2 ** n
-    const thick = thicknessAt(sheet.thickness, n)
-    // One scale for both axes, or the picture stops being an argument.
-    // The ghost turn sticks out half a stack past the edge, and is labelled
-    // above, so the space to fit is the sheet plus that circle.
-    const s = Math.min(BW / (flat + thick), (BH - 14) / (thick * 1.2))
-    return { flat, thick, s, w: flat * s, h: Math.max(1.5, thick * s) }
+  function size(s: Surface) {
+    const dpr = Math.min(2, devicePixelRatio || 1)
+    const r = s.c.getBoundingClientRect()
+    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height))
+    if (s.w === w && s.h === h && s.c.width === w * dpr) return false
+    s.w = w; s.h = h
+    s.c.width = Math.round(w * dpr); s.c.height = Math.round(h * dpr)
+    s.g.setTransform(dpr, 0, 0, dpr, 0, 0)
+    return true
   }
 
-  function drawBed() {
-    const g = bedGeometry()
-    const left = BX + (BW - g.w) / 2
-    // Centred, so the stack grows both ways and the ghost turn has room to
-    // be labelled above it. The ruler stays on the floor of the bed.
-    const base = BY + BH
-    const top = BY + (BH - g.h) / 2
+  /* Paper is not a flat colour. One tile of fibre, drawn over the sheet in
+     overlay, is the whole difference between card stock and construction
+     paper — and it costs one 96-pixel canvas. */
+  let fibre: CanvasPattern | null = null
+  function makeFibre() {
+    const c = document.createElement('canvas')
+    c.width = c.height = 96
+    const g = c.getContext('2d')!
+    const im = g.createImageData(96, 96)
+    for (let i = 0; i < 96 * 96; i++) {
+      const v = 116 + ((Math.random() * 76) | 0)
+      im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v
+      im.data[i * 4 + 3] = 255
+    }
+    g.putImageData(im, 0, 0)
+    fibre = STAGE.g.createPattern(c, 'repeat')
+  }
 
-    let out = ''
-    out += '<rect class="bench-bed" x="' + BX + '" y="' + BY + '" width="' + BW +
-           '" height="' + BH + '" rx="6"/>'
+  const STARS = starField(260, 7)
+  const GALAXIES = starField(14, 91)
 
-    /* Solid is the paper you have. Dashed is the turn the next fold needs.
-       Keeping those two separate is the whole point of the picture.
+  /* ---------------------------------------------------------------------- */
+  /* The sky                                                                 */
+  /* ---------------------------------------------------------------------- */
 
-       An earlier version drew the rounded ends at the radius the paper *would*
-       have to bend through, which at the seventh fold of A4 came out as a
-       clean circle 12.8 mm across — a coin, drawn out of a sheet 1.6 mm wide.
-       It was a picture of the fold succeeding, which is the opposite of what
-       is happening. So the block is now only ever as big as the sheet is, and
-       the requirement is a ghost laid over it.
+  let sky = skyAt(heightM(0))
 
-       The ghost is exact: turning a stack of thickness h through 180° and
-       bringing it back parallel takes a semicircle of radius h/2. The stack
-       doubles every fold while the sheet halves, so the circle grows at
-       precisely the rate the paper shrinks, and somewhere around the seventh
-       fold it stops fitting. That crossing is the answer to the question the
-       game asks. */
-    const midX = left + g.w / 2
-    const cy = top + g.h / 2
-    const round = Math.min(g.h / 2, g.w / 2)
+  function drawSky() {
+    const { g, w, h } = SKY
+    g.clearRect(0, 0, w, h)
 
-    const prof = profile(n, g.h)
-    out += '<g class="stack">'
-    out += '<rect class="sheet-block" x="' + left.toFixed(2) + '" y="' + top.toFixed(2) +
-           '" width="' + g.w.toFixed(2) + '" height="' + g.h.toFixed(2) +
-           '" rx="' + round.toFixed(2) + '"/>'
-    if (!prof.merged && prof.layers.length > 1 && g.w > 3)
-      for (const l of prof.layers.slice(1))
-        out += '<path class="crease" d="M' + left.toFixed(2) + ' ' +
-               (top + l.y).toFixed(2) + ' h' + g.w.toFixed(2) + '"/>'
-    out += '</g>'
+    const grad = g.createLinearGradient(0, 0, 0, h)
+    grad.addColorStop(0, rgb(sky.top))
+    grad.addColorStop(1, rgb(sky.bottom))
+    g.fillStyle = grad
+    g.fillRect(0, 0, w, h)
 
-    // The turn fold n+1 has to make, whether or not there is paper for it.
+    if (sky.galaxies > 0.01) {
+      for (const s of GALAXIES) {
+        const x = s.x * w, y = s.y * h * 0.9
+        const r = 30 + s.r * 90
+        const gg = g.createRadialGradient(x, y, 0, x, y, r)
+        gg.addColorStop(0, 'rgb(150 160 210 / ' + (0.1 * sky.galaxies * s.a).toFixed(3) + ')')
+        gg.addColorStop(1, 'rgb(120 130 190 / 0)')
+        g.fillStyle = gg
+        g.save(); g.translate(x, y); g.rotate(s.hue); g.scale(1, 0.42)
+        g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill(); g.restore()
+      }
+    }
+
+    if (sky.stars > 0.01) {
+      for (const s of STARS) {
+        g.globalAlpha = s.a * sky.stars
+        g.fillStyle = 'hsl(' + s.hue + ' 60% 88%)'
+        g.beginPath()
+        g.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2)
+        g.fill()
+      }
+      g.globalAlpha = 1
+    }
+
+    // The limb of the Earth: one enormous circle, most of it off the bottom of
+    // the screen, with the air above it as a bright rim.
+    if (sky.curve > 0.01) {
+      const R = w * 2.6
+      const cy = h + R - h * 0.24 * sky.curve
+      g.save()
+      g.globalAlpha = sky.curve
+      const rim = g.createRadialGradient(w / 2, cy, R * 0.985, w / 2, cy, R * 1.05)
+      rim.addColorStop(0, 'rgb(120 178 236 / 0.85)')
+      rim.addColorStop(0.5, 'rgb(90 150 220 / 0.3)')
+      rim.addColorStop(1, 'rgb(70 130 210 / 0)')
+      g.fillStyle = rim
+      g.beginPath(); g.arc(w / 2, cy, R * 1.05, 0, Math.PI * 2); g.fill()
+      const ball = g.createLinearGradient(0, cy - R, 0, h)
+      ball.addColorStop(0, 'rgb(56 104 158)')
+      ball.addColorStop(1, 'rgb(22 46 78)')
+      g.fillStyle = ball
+      g.beginPath(); g.arc(w / 2, cy, R, 0, Math.PI * 2); g.fill()
+      g.restore()
+    }
+
+    if (sky.clouds > 0.01) {
+      g.save()
+      g.globalAlpha = sky.clouds * 0.6
+      for (let i = 0; i < 7; i++) {
+        const x = ((i * 137) % 100) / 100 * w
+        const y = h * (0.52 + ((i * 53) % 40) / 100)
+        const rx = w * (0.1 + ((i * 31) % 20) / 100)
+        const gg = g.createRadialGradient(x, y, 0, x, y, rx)
+        gg.addColorStop(0, 'rgb(255 255 255 / 0.5)')
+        gg.addColorStop(1, 'rgb(255 255 255 / 0)')
+        g.fillStyle = gg
+        g.save(); g.translate(x, y); g.scale(1, 0.3)
+        g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill(); g.restore()
+      }
+      g.restore()
+    }
+
+    // The room you started in: a warm floor and a pool of lamplight.
+    if (sky.ground > 0.01) {
+      g.save()
+      g.globalAlpha = sky.ground
+      const fl = g.createLinearGradient(0, h * 0.52, 0, h)
+      fl.addColorStop(0, 'rgb(196 172 128 / 0)')
+      fl.addColorStop(1, 'rgb(158 128 84 / 0.55)')
+      g.fillStyle = fl
+      g.fillRect(0, h * 0.52, w, h * 0.48)
+      const pool = g.createRadialGradient(w * 0.42, h * 0.42, 0, w * 0.42, h * 0.42, w * 0.7)
+      pool.addColorStop(0, 'rgb(255 244 214 / 0.4)')
+      pool.addColorStop(1, 'rgb(255 240 200 / 0)')
+      g.fillStyle = pool
+      g.fillRect(0, 0, w, h)
+      g.restore()
+    }
+
+    // The corners of anything are darker than the middle.
+    const vig = g.createRadialGradient(w / 2, h * 0.44, 0, w / 2, h * 0.44, Math.max(w, h) * 0.78)
+    vig.addColorStop(0.55, 'rgb(0 0 0 / 0)')
+    vig.addColorStop(1, 'rgb(0 0 0 / 0.3)')
+    g.fillStyle = vig
+    g.fillRect(0, 0, w, h)
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* The sheet                                                               */
+  /* ---------------------------------------------------------------------- */
+
+  const BASE_CAM = { yaw: 0, pitch: 0.44, dist: 3.1, f: 1, cx: 0, cy: 0 }
+  /** The camera eases between fits, so a commit is a move rather than a cut. */
+  let camNow: { f: number; cx: number; cy: number } | null = null
+
+  /** Paper, by which face of it you are looking at. */
+  const PAPER: Record<string, [number, number, number]> = {
+    top: [251, 247, 238],
+    under: [226, 217, 197],
+    side: [232, 223, 202],
+    end: [228, 218, 197],
+    bend: [244, 237, 220],
+    desk: [200, 176, 132],
+  }
+
+  function faceFill(kind: string, shade: number) {
+    const b = PAPER[kind] ?? PAPER.top
+    const k = 0.4 + 0.68 * shade
+    return [
+      clamp(Math.round(b[0] * k), 0, 255),
+      clamp(Math.round(b[1] * k), 0, 255),
+      clamp(Math.round(b[2] * k), 0, 255),
+    ] as [number, number, number]
+  }
+
+  function drawStage() {
+    const { g, w, h } = STAGE
+    g.clearRect(0, 0, w, h)
+    if (w < 8 || h < 8) return
+
+    // Everything in scene units where the sheet's own millimetres are the unit,
+    // normalised so the numbers stay near 1 and the perspective stays sane.
+    const norm = Math.max(geo.halfW, geo.halfD, geo.height) || 1
+    const a = geo.halfW / norm, d = geo.halfD / norm, hh = geo.height / norm
+
+    const want = fitCam(fitCorners(a, d, hh), { ...BASE_CAM, yaw },
+      Math.min(w, h * 1.45), { x: w / 2, y: h * 0.56 }, 0.8)
+    if (!camNow) camNow = { f: want.f, cx: want.cx, cy: want.cy }
+    const kk = prefersReducedMotion ? 1 : 0.18
+    camNow.f = lerp(camNow.f, want.f, kk)
+    camNow.cx = lerp(camNow.cx, want.cx, kk)
+    camNow.cy = lerp(camNow.cy, want.cy, kk)
+    const cam = { ...BASE_CAM, yaw, f: camNow.f, cx: camNow.cx, cy: camNow.cy }
+
+    const scene = fold3d({
+      halfW: a, halfD: d, height: hh, layers: 2 ** Math.min(n, 30),
+      u, cam, grounded: sky.ground > 0.05,
+    })
+    const topY = Math.min(...scene.faces.flatMap((f) => f.pts.map((q) => q[1])))
+
+    // The desk: a soft pool of light under the sheet rather than a rectangle,
+    // so the sheet sits in a place instead of on a shape.
+    if (sky.ground > 0.02) {
+      g.save()
+      g.globalAlpha = sky.ground
+      const pool = g.createRadialGradient(w * 0.5, h * 0.66, 0, w * 0.5, h * 0.66, w * 0.62)
+      pool.addColorStop(0, 'rgb(226 202 158 / 0.55)')
+      pool.addColorStop(1, 'rgb(206 178 130 / 0)')
+      g.fillStyle = pool
+      g.fillRect(0, 0, w, h)
+      g.restore()
+    }
+
+    if (imaginary) drawColumn(g, w, h, topY + 4)
+
+    if (scene.shadow.length) {
+      g.save()
+      if ('filter' in g) g.filter = 'blur(' + (6 + hh * 40).toFixed(1) + 'px)'
+      g.globalAlpha = 0.34 * (1 - 0.4 * u)
+      g.fillStyle = '#3a2a12'
+      poly(g, scene.shadow)
+      g.fill()
+      g.restore()
+    }
+
+    for (const f of scene.faces) {
+      const c = faceFill(f.kind, f.shade)
+      // A gradient across each face rather than a flat fill: a real sheet is
+      // never one value from edge to edge, and at this size that reads as the
+      // difference between paper and cardboard.
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+      for (const [px, py] of f.pts) {
+        x0 = Math.min(x0, px); x1 = Math.max(x1, px)
+        y0 = Math.min(y0, py); y1 = Math.max(y1, py)
+      }
+      const gr = g.createLinearGradient(x0, y0, x1, y1)
+      gr.addColorStop(0, 'rgb(' + c.map((v) => clamp(Math.round(v * 1.045), 0, 255)).join(' ') + ')')
+      gr.addColorStop(1, 'rgb(' + c.map((v) => Math.round(v * 0.93)).join(' ') + ')')
+      g.fillStyle = gr
+      poly(g, f.pts)
+      g.fill()
+    }
+
+    // Fibre, over the whole sheet at once, clipped to it.
+    if (fibre && scene.faces.length) {
+      g.save()
+      g.beginPath()
+      for (const f of scene.faces) poly(g, f.pts, false)
+      g.clip()
+      g.globalCompositeOperation = 'overlay'
+      g.globalAlpha = 0.2
+      g.fillStyle = fibre
+      g.fillRect(0, 0, w, h)
+      g.restore()
+    }
+
+    // A hairline where two faces meet. Without it a folded stack is a blob.
+    g.save()
+    g.strokeStyle = 'rgb(120 100 66 / 0.34)'
+    g.lineWidth = 0.6
+    for (const f of scene.faces) { poly(g, f.pts); g.stroke() }
+    g.restore()
+
+    if (scene.laminations.length) {
+      g.save()
+      g.strokeStyle = 'rgb(126 104 62 / 0.4)'
+      g.lineWidth = 0.55
+      g.beginPath()
+      for (const l of scene.laminations) {
+        g.moveTo(l[0][0], l[0][1])
+        g.lineTo(l[1][0], l[1][1])
+      }
+      g.stroke()
+      g.restore()
+    }
+
+    // The sheen: one soft highlight raked across the top, which is what tells
+    // you the surface is smooth.
+    const top = scene.faces.filter((f) => f.kind === 'top')
+    if (top.length) {
+      g.save()
+      g.beginPath()
+      for (const f of top) poly(g, f.pts, false)
+      g.clip()
+      const sx = w * 0.3, sy = h * 0.34
+      const sh = g.createRadialGradient(sx, sy, 0, sx, sy, Math.max(w, h) * 0.5)
+      sh.addColorStop(0, 'rgb(255 253 244 / 0.5)')
+      sh.addColorStop(1, 'rgb(255 250 235 / 0)')
+      g.fillStyle = sh
+      g.fillRect(0, 0, w, h)
+      g.restore()
+    }
+
+  }
+
+  /**
+   * Past the sheet's limit there is no sheet, and the stage should not go on
+   * implying there is. What there is instead is the stack, still doubling,
+   * drawn to the same scale as the paper it came from — which puts its top off
+   * the frame immediately and keeps it there for ninety-six more folds. That
+   * is the only honest way to draw a number that does that: not smaller, gone.
+   */
+  function drawColumn(g: CanvasRenderingContext2D, w: number, h: number, baseY: number) {
+    const colW = Math.max(6, w * 0.055)
+    const x = w / 2 - colW / 2
+    g.save()
+    const glow = g.createLinearGradient(x - colW, 0, x + colW * 2, 0)
+    glow.addColorStop(0, rgba(sky.accent, 0))
+    glow.addColorStop(0.5, rgba(sky.accent, 0.22))
+    glow.addColorStop(1, rgba(sky.accent, 0))
+    g.fillStyle = glow
+    g.fillRect(x - colW, 0, colW * 3, baseY)
+    const body = g.createLinearGradient(x, 0, x + colW, 0)
+    body.addColorStop(0, rgba(sky.accent, 0.5))
+    body.addColorStop(0.35, 'rgb(255 250 236 / 0.92)')
+    body.addColorStop(1, rgba(sky.accent, 0.4))
+    g.fillStyle = body
+    g.fillRect(x, 0, colW, baseY)
+    // It does not fade out at the top; it is cut off by the frame, which is
+    // the whole point.
+    const fade = g.createLinearGradient(0, baseY - 26, 0, baseY)
+    fade.addColorStop(0, 'rgb(255 250 236 / 0)')
+    fade.addColorStop(1, rgba(sky.accent, 0.34))
+    g.fillStyle = fade
+    g.fillRect(x, baseY - 26, colW, 26)
+    g.restore()
+  }
+
+  function poly(g: CanvasRenderingContext2D, pts: any[], begin = true) {
+    if (begin) g.beginPath()
+    g.moveTo(pts[0][0], pts[0][1])
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1])
+    g.closePath()
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* The inset: the argument, drawn true                                     */
+  /* ---------------------------------------------------------------------- */
+
+  /* Both axes to one scale. This is the picture that answers the question, and
+     it is worth keeping precisely because the pretty one does not: the dashed
+     circle is the turn the *next* fold has to make, and watching it swell past
+     the paper is why there is no eighth fold. */
+  function drawInset() {
+    const W = 132, H = 86, PAD = 9
+    const flat = geo.halfW * 2
+    // geo is clamped at the sheet's limit, and so is this: past it the stack
+    // is still doubling but the *paper* is not, and printing a twenty-five
+    // digit thickness beside a drawing of a sheet claims otherwise.
+    const thick = thicknessAt(sheet.thickness, Math.min(n, limit()))
+    const rNeed = thick / 2
+    const s = Math.min((W - PAD * 2) / (flat + rNeed * 2), (H - PAD * 2 - 12) / Math.max(thick, rNeed * 2))
+    const bw = flat * s, bh = Math.max(1.1, thick * s)
+    const left = PAD + (W - PAD * 2 - bw) / 2
+    const cy = PAD + 6 + (H - PAD * 2 - 12) / 2
+
+    let out = '<rect class="in-bed" x="1" y="1" width="' + (W - 2) + '" height="' + (H - 2) + '" rx="7"/>'
+    out += '<rect class="in-block" x="' + left.toFixed(2) + '" y="' + (cy - bh / 2).toFixed(2) +
+      '" width="' + bw.toFixed(2) + '" height="' + bh.toFixed(2) +
+      '" rx="' + Math.min(bh / 2, bw / 2).toFixed(2) + '"/>'
     if (!imaginary && n < MAX_FOLDS) {
-      const rNeed = g.h / 2
-      const gx = left + g.w
-      out += '<circle class="ghost" cx="' + gx.toFixed(2) + '" cy="' + cy.toFixed(2) +
-             '" r="' + rNeed.toFixed(2) + '"/>'
-      if (rNeed > g.w * 0.9)
-        out += '<text class="ghost-t" x="' + gx.toFixed(2) + '" y="' +
-               (cy - rNeed - 5).toFixed(2) + '" text-anchor="middle">the bend it needs</text>'
+      const r = rNeed * s
+      out += '<circle class="in-ghost" cx="' + (left + bw).toFixed(2) + '" cy="' + cy.toFixed(2) +
+        '" r="' + r.toFixed(2) + '"/>'
     }
-
-    /* The flap coming over, at the real bend radius for the fold being made.
-       Half the stack it has to carry round — so it grows as fast as the stack
-       does, while the flat length it has to come out of is halving. */
-    if (dragU > 0.001) {
-      const r = Math.max(0.6, bendRadius(sheet.thickness, n + 1) * g.s)
-      const a = Math.PI * dragU
-      const hinge = left + g.w
-      const cy = top + g.h / 2
-      const len = g.w
-      const tipX = hinge - Math.cos(a) * len
-      const tipY = cy - Math.sin(a) * (len * 0.55) - r * dragU
-      out += '<path class="flap" d="M' + hinge.toFixed(2) + ' ' + cy.toFixed(2) +
-             ' Q' + (hinge + r).toFixed(2) + ' ' + (cy - r * 1.6).toFixed(2) +
-             ' ' + tipX.toFixed(2) + ' ' + tipY.toFixed(2) + '"/>'
-      out += '<circle class="grabdot" cx="' + tipX.toFixed(2) + '" cy="' + tipY.toFixed(2) + '" r="5"/>'
-    } else {
-      out += '<circle class="grabdot" cx="' + (left + g.w).toFixed(2) + '" cy="' +
-             (top + g.h / 2).toFixed(2) + '" r="5"/>'
-    }
-
-    // A ruler, so "it got shorter" is a measurement rather than an impression.
-    out += '<path class="rule" d="M' + left.toFixed(2) + ' ' + (base + 9) + ' h' + g.w.toFixed(2) + '"/>'
-    out += '<text class="rule-t" x="' + (left + g.w / 2).toFixed(2) + '" y="' + (base + 22) +
-           '" text-anchor="middle">' + mm(g.flat) + ' across, ' + mm(g.thick) + ' thick</text>'
-    BED.innerHTML = out
+    out += '<path class="in-rule" d="M' + left.toFixed(2) + ' ' + (H - 15) + ' h' + bw.toFixed(2) + '"/>'
+    out += '<text class="in-t" x="' + (W / 2) + '" y="' + (H - 5) + '" text-anchor="middle">' +
+      (imaginary ? 'the sheet stopped at ' + limit() : mm(flat) + ' × ' + mm(thick)) + '</text>'
+    el('inset').innerHTML = out
   }
 
-  /* ---- folding it by hand --------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* The ladder: the whole climb, as one strip                               */
+  /* ---------------------------------------------------------------------- */
 
-  function attempt(u) {
-    // Never further than this sheet will actually go.
-    dragU = Math.min(u, reach(sheet, n + 1, mode))
-    drawBed()
+  const ANCHORS: [number, string][] = [
+    [0, 'paper'],
+    [16, 'a house'],
+    [30, 'space'],
+    [42, 'the Moon'],
+    [69, 'nearest star'],
+    [83, 'the galaxy'],
+    [103, 'everything'],
+  ]
+
+  let ladderStrip: HTMLCanvasElement | null = null
+
+  /** The gradient is the journey, so it is drawn once and kept. */
+  function buildLadder() {
+    const h = Math.max(40, LADDER.h)
+    const c = document.createElement('canvas')
+    c.width = 1
+    c.height = h
+    const g = c.getContext('2d')!
+    for (let y = 0; y < h; y++) {
+      const folds = (1 - y / (h - 1)) * MAX_FOLDS
+      g.fillStyle = rgb(skyAt(heightM(folds)).bottom)
+      g.fillRect(0, y, 1, 1)
+    }
+    ladderStrip = c
   }
 
-  function release() {
-    const got = reach(sheet, n + 1, mode)
-    if (got >= 1 && dragU > 0.55) {
-      dragU = 0
-      doFold()
-    } else {
-      if (got < 1 && dragU > 0.05) refuse()
-      spring()
+  function drawLadder() {
+    const { g, w, h } = LADDER
+    if (!ladderStrip || ladderStrip.height !== h) buildLadder()
+    g.clearRect(0, 0, w, h)
+    const BAR = 22
+    const yOf = (f: number) => h - (f / MAX_FOLDS) * h
+
+    g.save()
+    g.beginPath()
+    ;(g as any).roundRect ? (g as any).roundRect(0, 0, BAR, h, 5) : g.rect(0, 0, BAR, h)
+    g.clip()
+    g.drawImage(ladderStrip!, 0, 0, 1, ladderStrip!.height, 0, 0, BAR, h)
+    g.restore()
+
+    g.strokeStyle = rgba(sky.line, 0.9)
+    g.lineWidth = 1
+    for (const [at, label] of ANCHORS) {
+      const y = Math.round(yOf(at)) + 0.5
+      g.beginPath(); g.moveTo(BAR + 2, y); g.lineTo(BAR + 7, y); g.stroke()
+      g.fillStyle = rgb(sky.inkSoft)
+      g.font = '500 9px ui-sans-serif, system-ui, sans-serif'
+      g.textBaseline = 'middle'
+      g.fillText(label, BAR + 11, clamp(y, 6, h - 6))
+    }
+
+    // Where you are: a bright line across the strip and a dot on it.
+    const y = clamp(yOf(shown), 1, h - 1)
+    g.strokeStyle = rgb(sky.ink)
+    g.lineWidth = 2
+    g.beginPath(); g.moveTo(0, y); g.lineTo(BAR, y); g.stroke()
+    g.fillStyle = rgb(sky.accent)
+    g.beginPath(); g.arc(BAR + 0.5, y, 3.2, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = rgb(sky.surface)
+    g.lineWidth = 1.2
+    g.stroke()
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Folding                                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  /** Land the fold: halve one way, and in alternate mode turn the sheet. */
+  function commit() {
+    const wasMark = currentMark().at
+    n++
+    u = 0
+    geo = geoAt(n)
+    // The quarter turn is what "alternate" means, and seeing it happen says so
+    // better than the label on the button does.
+    if (mode === 'alternate' && !prefersReducedMotion) yaw = -Math.PI / 2
+    unlock()
+    tone({ freq: 180 * Math.pow(1.055, n), to: 120 * Math.pow(1.055, n), dur: 0.16, type: 'triangle', gain: 0.2 })
+    paint(1)
+    const mk = currentMark()
+    if (mk.at !== wasMark) {
+      sfx.great()
+      const r = STAGE.c.getBoundingClientRect()
+      burst(r.left + r.width / 2, r.top + r.height * 0.5, {
+        count: 24, colors: ['#e2c47a', '#f4e6bd', '#fff'],
+        speed: 4.6, gravity: 0.14, life: 46, size: 4,
+      })
+      floatIcon(r.left + r.width / 2, r.top + r.height * 0.4, ICONS[mk.icon])
     }
   }
 
-  function spring() {
-    cancelAnimationFrame(springing)
-    if (prefersReducedMotion) { dragU = 0; drawBed(); return }
-    const from = dragU
+  /** One press runs the same gesture a drag does, so both meet the same paper. */
+  let running = 0
+  function runFold() {
+    if (n >= MAX_FOLDS || running) return
+    const got = imaginary ? 1 : reach(sheet, n + 1, mode)
+    if (prefersReducedMotion) {
+      if (got >= 1) commit()
+      else { u = got; refuse(); u = 0; paint() }
+      return
+    }
     const t0 = performance.now()
-    const step = (now) => {
-      const k = Math.min(1, (now - t0) / 220)
-      dragU = from * (1 - k * k)
-      drawBed()
-      if (k < 1) springing = requestAnimationFrame(step)
-    }
-    springing = requestAnimationFrame(step)
+    const DUR = got >= 1 ? 340 : 240
+    running = requestAnimationFrame(function step(now) {
+      const k = clamp((now - t0) / DUR, 0, 1)
+      u = got * (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
+      paint()
+      if (k < 1) { running = requestAnimationFrame(step); return }
+      running = 0
+      if (got >= 1) commit()
+      else { refuse(); spring() }
+    })
   }
 
-  let refusedAt = 0
   function refuse() {
     unlock(); sfx.bad()
     refusedAt = performance.now()
-    BED.classList.remove('refuse')
-    void BED.offsetWidth
-    BED.classList.add('refuse')
-    render()
+    STAGE.c.classList.remove('refuse')
+    void STAGE.c.offsetWidth
+    STAGE.c.classList.add('refuse')
+    paint()
   }
 
-  function doFold() {
-    const wasMark = currentMark().at
-    n++
-    unlock()
-    tone({ freq: 180 * Math.pow(1.055, n), to: 120 * Math.pow(1.055, n), dur: 0.14, type: 'triangle', gain: 0.2 })
-    render(1)
-    celebrate(wasMark)
-  }
-
-  function celebrate(wasMark) {
-    const mk = currentMark()
-    if (mk.at === wasMark) return
-    sfx.great()
-    const r = BED.getBoundingClientRect()
-    burst(r.left + r.width / 2, r.top + r.height / 2, {
-      count: 22, colors: ['#c9a13f', '#e8d59a', '#fff'], speed: 4.5, gravity: 0.14, life: 44, size: 4,
+  let springing = 0
+  function spring() {
+    cancelAnimationFrame(springing)
+    if (prefersReducedMotion) { u = 0; paint(); return }
+    const from = u, t0 = performance.now()
+    springing = requestAnimationFrame(function step(now) {
+      const k = clamp((now - t0) / 260, 0, 1)
+      u = from * (1 - k * k)
+      paint()
+      if (k < 1) springing = requestAnimationFrame(step)
     })
-    floatIcon(r.left + r.width / 2, r.top + r.height / 2 - 20, ICONS[mk.icon])
   }
 
-  /* Pointer, with the drag measured against the sheet's own width so the
-     gesture means the same thing on a phone as on a desktop. */
+  /* Pointer, measured against the canvas's own width so the gesture means the
+     same thing on a phone as on a desktop. */
   let grabX = 0
-  BED.addEventListener('pointerdown', (e) => {
-    if (imaginary) return
+  STAGE.c.addEventListener('pointerdown', (e) => {
+    if (imaginary || running) return
     dragging = true
     grabX = e.clientX
-    BED.setPointerCapture(e.pointerId)
+    STAGE.c.setPointerCapture(e.pointerId)
     cancelAnimationFrame(springing)
   })
-  BED.addEventListener('pointermove', (e) => {
+  STAGE.c.addEventListener('pointermove', (e) => {
     if (!dragging) return
-    const span = Math.max(60, BED.getBoundingClientRect().width * 0.62)
-    attempt(Math.max(0, (grabX - e.clientX) / span))
+    const span = Math.max(70, STAGE.c.getBoundingClientRect().width * 0.6)
+    u = clamp((grabX - e.clientX) / span, 0, reach(sheet, n + 1, mode))
+    paint()
   })
-  const endDrag = (e) => {
+  const endDrag = (e: PointerEvent) => {
     if (!dragging) return
     dragging = false
-    try { BED.releasePointerCapture(e.pointerId) } catch { /* already gone */ }
-    release()
-  }
-  BED.addEventListener('pointerup', endDrag)
-  BED.addEventListener('pointercancel', endDrag)
-
-  /* The keyboard gets the same fold, not a different one: one press runs the
-     whole gesture, so a person who cannot drag still meets the resistance. */
-  function foldByKey() {
-    if (imaginary) { n = Math.min(n + 1, MAX_FOLDS); render(1); return }
+    try { STAGE.c.releasePointerCapture(e.pointerId) } catch { /* already gone */ }
     const got = reach(sheet, n + 1, mode)
-    if (got >= 1) { doFold(); return }
-    attempt(got)
-    refuse()
-    spring()
+    if (got >= 1 && u > 0.5) { u = 0; commit() }
+    else { if (got < 1 && u > 0.05) refuse(); spring() }
   }
+  STAGE.c.addEventListener('pointerup', endDrag)
+  STAGE.c.addEventListener('pointercancel', endDrag)
 
-  BED.addEventListener('keydown', (e) => {
+  STAGE.c.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
       e.preventDefault()
-      foldByKey()
+      el('foldBtn').click()
     }
     if (e.key === 'ArrowLeft') { e.preventDefault(); el('unfoldBtn').click() }
   })
 
-  /* ---- the picker ------------------------------------------------------ */
+  /* ---------------------------------------------------------------------- */
+  /* Wiring                                                                  */
+  /* ---------------------------------------------------------------------- */
 
   function reset() {
-    n = 0
-    dragU = 0
-    imaginary = false
-    lastMark = null
-    render()
+    n = 0; u = 0; imaginary = false; lastMark = null
+    yaw = 0
+    geo = geoAt(0)
+    camNow = null
+    paint()
   }
 
   el('picker').addEventListener('click', (e) => {
-    const b = e.target.closest('.chip')
+    const b = (e.target as HTMLElement).closest('.chip') as HTMLElement | null
     if (!b) return
-    const s = sheetById(b.dataset.sheet)
+    const s = sheetById(b.dataset.sheet!)
     if (!s || s === sheet) return
     sheet = s
     unlock(); sfx.click()
     reset()
   })
 
-  document.querySelector('.ways').addEventListener('click', (e) => {
-    const b = e.target.closest('.way')
+  document.querySelector('.ways')!.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('.way') as HTMLElement | null
     if (!b || b.dataset.mode === mode) return
-    mode = b.dataset.mode
+    mode = b.dataset.mode as any
     unlock(); sfx.click()
     reset()
   })
 
-  const SCALE = el('scale')
-  const TOP = 12, BOT = 178
-  const COL_X = 26, COL_W = 46
-
-  /** Folds map linearly onto the axis, because log2 of a doubling is 1. */
-  const yOf = (folds) => BOT - (folds / MAX_FOLDS) * (BOT - TOP)
-
-  /* Anchors, chosen for even spacing rather than for every milestone: the
-     marks all get a tick, but a label every few pixels is a wall of text. */
-  const ANCHORS = [
-    [0, 'a sheet of paper'],
-    [16, 'a house'],
-    [30, 'space begins'],
-    [42, 'the Moon'],
-    [69, 'the nearest star'],
-    [83, 'the Milky Way'],
-    [103, 'the observable universe'],
-  ]
-
-  function buildScale() {
-    // The gradient lives inside the SVG because buildScale replaces its whole
-    // contents, so a defs block in the template would be wiped on first paint.
-    let out = '<defs><linearGradient id="foldGrad" x1="0" y1="0" x2="1" y2="0">' +
-      '<stop offset="0" stop-color="#f0e0ab"/>' +
-      '<stop offset="0.5" stop-color="#d8b558"/>' +
-      '<stop offset="1" stop-color="#b98f2f"/>' +
-      '</linearGradient></defs>'
-    // The empty channel the paper climbs.
-    out += '<rect class="chan" x="' + COL_X + '" y="' + TOP + '" width="' + COL_W +
-           '" height="' + (BOT - TOP) + '" rx="4"/>'
-    // A tick for every comparison in the list, labelled or not.
-    for (const mk of MARKS) {
-      const y = yOf(mk.at)
-      out += '<path class="tick" d="M' + (COL_X + COL_W + 3) + ' ' + y + ' h6"/>'
+  el('foldBtn').addEventListener('click', () => {
+    if (n >= MAX_FOLDS) return
+    if (!imaginary && n >= limit()) {
+      // The button stops pretending, and says so, before it carries on.
+      imaginary = true
+      unlock(); sfx.click()
+      paint()
+      return
     }
-    for (const [at, label] of ANCHORS) {
-      const y = yOf(at)
-      out += '<path class="tick big" d="M' + (COL_X + COL_W + 3) + ' ' + y + ' h11"/>'
-      out += '<text class="axis" x="' + (COL_X + COL_W + 18) + '" y="' + (y + 3.4) + '">' + label + '</text>'
+    if (imaginary) {
+      n = Math.min(n + 1, MAX_FOLDS)
+      unlock()
+      tone({ freq: 180 * Math.pow(1.055, n), to: 120 * Math.pow(1.055, n), dur: 0.16, type: 'triangle', gain: 0.2 })
+      const wasMark = currentMark().at
+      paint(1)
+      const mk = currentMark()
+      if (mk.at !== wasMark) {
+        sfx.great()
+        const r = el('figures').getBoundingClientRect()
+        burst(r.left + r.width / 2, r.top, {
+          count: 22, colors: ['#e2c47a', '#f4e6bd', '#fff'],
+          speed: 4.5, gravity: 0.14, life: 44, size: 4,
+        })
+        floatIcon(r.left + r.width / 2, r.top - 20, ICONS[mk.icon])
+      }
+      return
     }
-    // The paper itself, and the marker riding its top edge.
-    out += '<g id="paperCol"><rect class="paper" x="' + COL_X + '" width="' + COL_W + '" rx="3"/>' +
-           '<g id="grain"></g></g>'
-    out += '<g id="head"><path class="edge" d="M' + (COL_X - 6) + ' 0 h' + (COL_W + 12) + '"/></g>'
-    SCALE.innerHTML = out
-  }
+    runFold()
+  })
 
-  /* One striation per fold, so the column is literally made of the folds you
-     have done.
+  el('unfoldBtn').addEventListener('click', () => {
+    if (n <= 0) return
+    n--
+    u = 0
+    if (n <= limit()) imaginary = false
+    geo = geoAt(n)
+    unlock(); sfx.blip(Math.max(0, 6 - (n % 6)))
+    paint(-1)
+  })
 
-     Note the spacing is CONSTANT, not a function of the count: the axis is
-     linear in folds, so each fold always adds the same height and therefore
-     the same one line. It works out at about 1.6px, which is a fine lamination
-     rather than something you could count -- which is the right impression for
-     a stack whose layer count has thirty-one digits. */
-  function grainFor(folds, topY) {
-    const step = (BOT - topY) / Math.max(1, folds)
-    if (folds < 2 || step < 1.1) return ''
-    let out = ''
-    for (let k = 1; k < folds; k++) {
-      const y = BOT - k * step
-      out += '<path d="M' + (COL_X + 3) + ' ' + y + ' h' + (COL_W - 6) + '"/>'
-    }
-    return out
-  }
+  addEventListener('keydown', (e) => {
+    if (document.activeElement === STAGE.c) return
+    const t = e.target as HTMLElement
+    if (t && /^(BUTTON|INPUT|A)$/.test(t.tagName)) return
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); el('foldBtn').click() }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); el('unfoldBtn').click() }
+  })
 
-  let anim = 0
-  let shownFolds = 0
-  function paintCol(folds) {
-    const topY = yOf(folds)
-    const rect = SCALE.querySelector('.paper')
-    if (!rect) return
-    rect.setAttribute('y', String(topY))
-    rect.setAttribute('height', String(Math.max(0, BOT - topY)))
-    SCALE.querySelector('#grain').innerHTML = grainFor(folds, topY)
-    const head = SCALE.querySelector('#head')
-    head.setAttribute('transform', 'translate(0,' + topY + ')')
-    head.style.opacity = folds > 0 ? '1' : '0.35'
-  }
+  /* ---------------------------------------------------------------------- */
+  /* Paint                                                                   */
+  /* ---------------------------------------------------------------------- */
 
-  function drawScale(target) {
-    cancelAnimationFrame(anim)
-    if (prefersReducedMotion) { shownFolds = target; paintCol(target); return }
-    const from = shownFolds
-    const t0 = performance.now()
-    const DUR = 260
-    const step = (now) => {
-      const u = Math.min(1, (now - t0) / DUR)
-      const e = u * u * (3 - 2 * u)
-      shownFolds = from + (target - from) * e
-      paintCol(shownFolds)
-      if (u < 1) anim = requestAnimationFrame(step)
-      else { shownFolds = target; paintCol(target) }
-    }
-    anim = requestAnimationFrame(step)
-  }
-
-  /* Which way the sheet is short, and by how much: the bar is the sentence
-     "you need this much paper and you have that much", drawn. */
-  function paintBench() {
-    for (const b of el('picker').querySelectorAll('.chip'))
-      b.setAttribute('aria-checked', String(b.dataset.sheet === sheet.id))
-    for (const b of document.querySelectorAll('.way'))
-      b.setAttribute('aria-checked', String(b.dataset.mode === mode))
-
+  function paintText(dir?: number) {
     const lim = limit()
+
+    el('thick').textContent = fmt(START_MM * Math.pow(2, n))
+    el('folds').textContent = String(n)
+    el('foldsLabel').textContent = plural(n, 'fold')
+    el('layers').textContent = bigInt(n)
+    el('layersLabel').textContent = plural(2 ** Math.min(n, 40), 'layer') + ' of paper'
+    el('where').textContent = sky.where
+
+    for (const b of el('picker').querySelectorAll('.chip'))
+      b.setAttribute('aria-checked', String((b as HTMLElement).dataset.sheet === sheet.id))
+    for (const b of document.querySelectorAll('.way'))
+      b.setAttribute('aria-checked', String((b as HTMLElement).dataset.mode === mode))
+
     el('sheetNote').textContent =
       sheet.note + ' Folded this way it goes ' + lim + ' time' + (lim === 1 ? '' : 's') + '.'
 
     const room = have(sheet, mode)
     const wanted = need(sheet, n + 1, mode)
-    const frac = Math.max(0, Math.min(1, room / wanted))
-    const fill = el('budgetFill')
+    const frac = clamp(room / wanted, 0, 1)
+    const fill = el('budgetFill') as HTMLElement
     fill.style.width = (frac * 100).toFixed(1) + '%'
     fill.classList.toggle('short', frac < 1)
-
     el('budgetText').textContent = imaginary
       ? 'No sheet is involved any more.'
-      : n >= MAX_FOLDS
-        ? ''
-        : 'Fold ' + (n + 1) + ' needs ' + mm(wanted) + ' of paper. You have ' + mm(room) + '.'
+      : n >= MAX_FOLDS ? ''
+      : 'Fold ' + (n + 1) + ' needs ' + mm(wanted) + ' of paper. You have ' + mm(room) + '.'
 
     el('grip').textContent =
       imaginary ? 'The sheet stopped a while ago.'
       : n >= lim
-        ? (performance.now() - refusedAt < 2200
+        ? (performance.now() - refusedAt < 2400
             ? 'It moves, and then it will not close. That is the paper, not you.'
             : 'It will not take another. The bend at the end has eaten the length.')
       : 'Drag the right-hand edge over to the left.'
-  }
-
-  buildScale()
-
-  function render(dir) {
-    el('folds').textContent = String(n)
-    el('thick').textContent = fmt(START_MM * Math.pow(2, n))
-    el('layers').textContent = bigInt(n)
 
     const mk = currentMark()
     if (mk !== lastMark) {
       lastMark = mk
       el('markGlyph').innerHTML = ICONS[mk.icon]
       el('markText').textContent = mk.text
-      const glyphEl = el('markGlyph')
-      glyphEl.classList.remove('jump')
-      void glyphEl.offsetWidth
-      glyphEl.classList.add('jump')
+      const gl = el('markGlyph')
+      gl.classList.remove('jump'); void gl.offsetWidth; gl.classList.add('jump')
     }
 
-    drawScale(n)
-    drawBed()
-    paintBench()
-
-    el('foldBtn').disabled = n >= MAX_FOLDS
-    el('unfoldBtn').disabled = n === 0
-    el('foldBtn').textContent = imaginary || n >= limit() ? 'Carry on anyway' : 'Fold in half'
-    el('readout').classList.toggle('imaginary', imaginary)
+    const fb = el('foldBtn') as HTMLButtonElement
+    fb.disabled = n >= MAX_FOLDS
+    ;(el('unfoldBtn') as HTMLButtonElement).disabled = n === 0
+    fb.textContent = n >= MAX_FOLDS ? 'Nothing left'
+      : imaginary ? 'Double it again'
+      : n >= lim ? 'Carry on without the paper'
+      : 'Fold in half'
+    el('figures').classList.toggle('imaginary', imaginary)
+    document.body.classList.toggle('is-imaginary', imaginary)
     el('hint').textContent =
       n >= MAX_FOLDS ? 'There is nothing left to fold it through.'
       : imaginary ? 'From here on nothing is being folded. This is only what the doubling does.'
-      : n >= limit() ? 'That is as far as this sheet goes. The button carries on without it.'
+      : n >= lim ? 'That is as far as this sheet goes. The button carries on without it.'
       : 'Everything above is a sheet you could actually hold.'
 
     if (dir) {
-      el('thick').classList.remove('bump')
-      void el('thick').offsetWidth
-      el('thick').classList.add('bump')
+      const t = el('thick')
+      t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump')
     }
   }
 
-  /* The button does the honest thing at both ends of the sheet's life: it
-     folds while there is paper, and once there is not it stops pretending and
-     says so. Everything past the limit is the second, imaginary half. */
-  el('foldBtn').addEventListener('click', (e) => {
-    if (n >= MAX_FOLDS) return
-    if (!imaginary && n >= limit()) imaginary = true
-    const wasMark = currentMark().at
-    n++
-    unlock()
-    // Pitch climbs with the fold count, so the exponential is audible.
-    tone({ freq: 180 * Math.pow(1.055, n), to: 120 * Math.pow(1.055, n), dur: 0.14, type: 'triangle', gain: 0.2 })
-    render(1)
-    const mk = currentMark()
-    if (mk.at !== wasMark) {
-      sfx.great()
-      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      burst(r.left + r.width / 2, r.top, {
-        count: 22, colors: ['#c9a13f', '#e8d59a', '#fff'], speed: 4.5, gravity: 0.14, life: 44, size: 4,
-      })
-      floatIcon(r.left + r.width / 2, r.top - 20, ICONS[mk.icon])
+  /** The palette every panel on the page is drawn from. */
+  function paintPalette() {
+    const s = document.body.style
+    s.setProperty('--surface', rgb(sky.surface))
+    s.setProperty('--ink', rgb(sky.ink))
+    s.setProperty('--ink-soft', rgb(sky.inkSoft))
+    s.setProperty('--line', rgb(sky.line))
+    s.setProperty('--accent', rgb(sky.accent))
+    s.setProperty('--glow', rgba(sky.accent, 0.28))
+  }
+
+  /* One loop. The sky, the ladder and the sheet all read the same eased fold
+     position, so dragging the paper halfway moves the sky halfway — which is
+     the only way the two halves of the page feel like one thing. */
+  let loop = 0
+  let dirty = true
+  function frame() {
+    loop = 0
+    const target = n + (imaginary ? 0 : u)
+    const moved = Math.abs(target - shown) > 0.0005
+    shown = prefersReducedMotion ? target : lerp(shown, target, 0.16)
+    if (moved || dirty) {
+      sky = skyAt(heightM(shown))
+      paintPalette()
+      drawSky()
+      drawLadder()
     }
-  })
-  el('unfoldBtn').addEventListener('click', () => {
-    if (n <= 0) return
-    n--
-    if (n <= limit()) imaginary = false
-    unlock(); sfx.blip(Math.max(0, 6 - (n % 6)))
-    render(-1)
-  })
-  addEventListener('keydown', (e) => {
-    if (document.activeElement === BED) return   // the bed has its own keys
-    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); el('foldBtn').click() }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); el('unfoldBtn').click() }
+    drawStage()
+    if (yaw !== 0) {
+      yaw = Math.abs(yaw) < 0.004 ? 0 : lerp(yaw, 0, 0.14)
+      dirty = true
+    }
+    const camMoving = !!camNow && Math.abs(camNow.f - 0) >= 0 && dirty
+    dirty = moved || yaw !== 0 || dragging || !!running
+    if (dirty || camMoving) loop = requestAnimationFrame(frame)
+  }
+
+  function paint(dir?: number) {
+    paintText(dir)
+    drawInset()
+    dirty = true
+    if (!loop) loop = requestAnimationFrame(frame)
+  }
+
+  function relayout() {
+    size(SKY); size(STAGE); size(LADDER)
+    buildLadder()
+    if (!fibre) makeFibre()
+    camNow = null
+    paint()
+  }
+
+  let rt = 0
+  addEventListener('resize', () => {
+    clearTimeout(rt)
+    rt = window.setTimeout(relayout, 120)
   })
 
-  render()
+  geo = geoAt(0)
+  relayout()
+  // Fonts and late layout both move the canvases; one more pass costs nothing.
+  addEventListener('load', relayout)
 </script>
 
-<style>
-  :global(.fold-body) { background: #faf6ea; }
-
-  .wrap { max-width: 620px; margin: 0 auto; padding: 30px 22px 80px; text-align: center; }
-  .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .lede { color: var(--ink-soft); margin: 10px auto 20px; max-width: 40ch; }
-
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; overflow: hidden;
-    clip-path: inset(50%); white-space: nowrap;
+<style is:global>
+  /* A class, not a bare `body`: global.css sets the site's paper background on
+     the element selector, and two rules of equal specificity are settled by
+     order, which is not something a page should rely on. */
+  .fold-body {
+    background: #0d1220;
+    /* Set from lib/fold-sky.ts every frame. The values here are only what the
+       page looks like for the instant before the first paint. */
+    --surface: #fffdf6;
+    --ink: #2a2010;
+    --ink-soft: #685834;
+    --line: #e8dbbd;
+    --accent: #b28428;
+    --glow: rgb(178 132 40 / 0.28);
   }
 
-  /* --- the bench: the half of the game with real paper in it ------------- */
+  .sky {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+  .fold-body .chrome { position: relative; z-index: 3; }
 
-  .bench {
-    background: #fff; border: 1px solid #ece0c4; border-radius: var(--radius-lg);
-    padding: 16px 16px 18px; box-shadow: var(--shadow-sm); margin-bottom: 16px;
+  .wrap {
+    position: relative; z-index: 1;
+    max-width: 760px; margin: 0 auto; padding: 26px 20px 90px;
+    text-align: center;
   }
 
-  .picker { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  /* --- head -------------------------------------------------------------- */
+
+  /* Nothing on this page sits directly on the sky.
+     It is tempting — a big title floating over deep space looks wonderful, and
+     it looks wonderful at exactly two of the hundred and four altitudes. In
+     between, the backdrop passes through every luminance there is, and no
+     single text colour survives that. So every word is on a surface, and
+     check-fold-scene.mjs holds that surface to 4.5:1 at every fold. */
+  .head { margin-bottom: 14px; padding: 20px 24px 22px; }
+  .where {
+    margin: 0 0 8px; font: 600 11px/1 var(--mono);
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent);
+  }
+  .head h1 {
+    font-size: clamp(34px, 6.4vw, 52px); letter-spacing: -0.035em; margin: 0;
+    color: var(--ink); line-height: 1;
+  }
+  .lede {
+    color: var(--ink-soft); margin: 12px auto 0; max-width: 46ch;
+    text-wrap: pretty;
+  }
+
+  /* --- panels ------------------------------------------------------------ */
+
+  .card {
+    background: var(--surface);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.16),
+      0 14px 40px rgb(0 0 0 / 0.3),
+      0 0 0 1px rgb(255 255 255 / 0.04);
+    transition: background 400ms var(--ease);
+  }
+
+  .picker {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+    margin: 0 0 14px;
+  }
+  /* Unselected is ink on the surface; selected is the surface on ink. One
+     pair of colours, so one contrast ratio covers both states. */
   .chip {
-    border: 1px solid #e2d5b4; background: #fdfaf2; color: #4a3d1c;
-    border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: background 140ms var(--ease), border-color 140ms var(--ease);
+    border: 0; border-radius: 999px; padding: 8px 15px; min-height: 34px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    background: var(--surface); color: var(--ink-soft);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+    transition: transform 200ms var(--ease-bounce), color 160ms var(--ease),
+                background 300ms var(--ease);
   }
-  .chip:hover { background: #f6eeda; }
-  .chip[aria-checked='true'] { background: #43310f; border-color: #43310f; color: #fdfaf2; }
+  .chip:hover { transform: translateY(-1px); color: var(--ink); }
+  .chip[aria-checked='true'] {
+    background: var(--ink); color: var(--surface);
+    box-shadow: 0 3px 14px rgb(0 0 0 / 0.32);
+  }
 
-  .ways { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+  .deck {
+    display: grid; grid-template-columns: minmax(0, 1fr) 118px;
+    gap: 14px; align-items: stretch;
+  }
+
+  .stage-card { padding: 14px 14px 16px; text-align: left; overflow: hidden; }
+  .card-top {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--line);
+  }
+  .sheet-note {
+    flex: 1; margin: 0; font-size: 12.5px; line-height: 1.45;
+    color: var(--ink-soft); text-wrap: pretty;
+  }
+  .ways {
+    flex: none; display: flex; gap: 2px; padding: 3px; border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 7%, var(--surface));
+  }
   .way {
-    border: 0; background: none; color: #7d6a3a; font-size: 12.5px; cursor: pointer;
-    padding: 4px 8px; border-radius: 6px; border-bottom: 2px solid transparent;
+    border: 0; background: none; cursor: pointer; color: var(--ink-soft);
+    font: 600 11.5px/1 var(--font); padding: 7px 11px; min-height: 26px;
+    border-radius: 999px; white-space: nowrap;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
   }
-  .way:hover { color: #43310f; }
-  .way[aria-checked='true'] { color: #43310f; font-weight: 700; border-bottom-color: #c9a13f; }
+  .way:hover { color: var(--ink); }
+  .way[aria-checked='true'] {
+    background: var(--surface); color: var(--ink);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.16);
+  }
 
-  .bed {
-    display: block; width: 100%; height: auto; margin: 10px auto 0;
-    touch-action: none; cursor: ew-resize; border-radius: 8px;
+  .stage-hold { position: relative; margin-top: 10px; }
+  #stage {
+    display: block; width: 100%; height: 268px;
+    touch-action: none; cursor: ew-resize; border-radius: 12px;
   }
-  .bed:focus-visible { outline: 3px solid #c9a13f; outline-offset: 2px; }
-  /* A shake for the fold the sheet will not take. It is the one piece of
-     feedback that has to arrive without being read. */
-  .bed.refuse { animation: bed-refuse 340ms var(--ease); }
-  @keyframes bed-refuse {
-    20% { transform: translateX(5px); } 50% { transform: translateX(-4px); }
+  #stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  /* The one piece of feedback that has to arrive without being read. */
+  #stage.refuse { animation: refuse 360ms var(--ease); }
+  @keyframes refuse {
+    20% { transform: translateX(6px); } 50% { transform: translateX(-5px); }
     80% { transform: translateX(2px); }
   }
-  /* Built at runtime, so every rule has to be :global or it matches nothing
-     and the whole drawing falls back to fill:black. */
-  .bed :global(.bench-bed) { fill: #f7f1e0; stroke: #e8ddc0; }
-  .bed :global(.sheet-block) { fill: #ddb95f; stroke: #8a6f2e; stroke-width: 0.8; }
-  .bed :global(.ghost) {
-    fill: none; stroke: #b4653f; stroke-width: 1.1; stroke-dasharray: 4 3.5; opacity: 0.85;
-  }
-  .bed :global(.ghost-t) { fill: #b4653f; font-size: 8px; letter-spacing: 0.02em; }
-  .bed :global(.crease) { stroke: rgba(96, 70, 18, 0.35); stroke-width: 0.4; }
-  .bed :global(.flap) {
-    fill: none; stroke: #c69f3c; stroke-width: 3; stroke-linecap: round;
-  }
-  .bed :global(.grabdot) { fill: #43310f; stroke: #fff; stroke-width: 1.6; }
-  .bed :global(.rule) { stroke: #b6a276; stroke-width: 1; }
-  .bed :global(.rule-t) { fill: #7d6a3a; font-size: 9px; }
 
-  .grip { font-size: 13px; color: #6f5c28; margin: 8px 0 0; min-height: 34px; text-wrap: pretty; }
+  .inset {
+    position: absolute; right: 4px; bottom: 20px; width: 132px; height: 86px;
+    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.14));
+  }
+  .inset-cap {
+    position: absolute; right: 8px; bottom: 6px; margin: 0;
+    font: 500 9px/1 var(--mono); letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--ink-soft); opacity: 0.75;
+  }
+  .inset .in-bed { fill: color-mix(in srgb, var(--ink) 6%, var(--surface)); stroke: var(--line); }
+  .inset .in-block { fill: var(--accent); }
+  .inset .in-ghost {
+    fill: none; stroke: #c0603c; stroke-width: 1.1; stroke-dasharray: 3.5 3;
+  }
+  .inset .in-rule { stroke: var(--ink-soft); stroke-width: 0.8; opacity: 0.6; }
+  .inset .in-t { fill: var(--ink-soft); font-size: 8px; }
 
-  .budget { margin-top: 4px; }
+  .grip {
+    margin: 10px 0 0; font-size: 13px; color: var(--ink-soft);
+    min-height: 34px; text-wrap: pretty;
+  }
   .budget-bar {
-    height: 7px; background: #f1e8d0; border-radius: 999px; overflow: hidden;
-    border: 1px solid #e3d5ae;
+    height: 6px; border-radius: 999px; overflow: hidden;
+    background: color-mix(in srgb, var(--ink) 9%, var(--surface));
   }
-  .budget-fill {
-    height: 100%; background: #6f9c5a; border-radius: 999px;
-    transition: width 220ms var(--ease), background 220ms var(--ease);
+  .budget-bar i {
+    display: block; height: 100%; border-radius: 999px; background: #4f8c52;
+    transition: width 260ms var(--ease), background 260ms var(--ease);
   }
-  .budget-fill.short { background: #c0603c; }
+  .budget-bar i.short { background: #b4562f; }
   .budget-text {
-    font-size: 12.5px; color: #7d6a3a; margin: 6px 0 0;
-    font-variant-numeric: tabular-nums; min-height: 18px;
+    margin: 6px 0 0; font-size: 12px; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums; min-height: 17px;
   }
-  .sheet-note { font-size: 12.5px; color: var(--ink-faint); margin: 8px 0 0; text-wrap: pretty; }
 
-  .readout {
-    background: #fff; border: 1px solid #ece0c4; border-radius: var(--radius-lg);
-    padding: 18px 20px; box-shadow: var(--shadow-sm);
-    transition: opacity 200ms var(--ease);
-  }
-  /* Past the sheet's limit nothing is being folded, and the readout should not
-     go on looking like a measurement of something. */
-  .readout.imaginary { background: #fbf7ec; border-style: dashed; }
-  .fold-count {
-    font-family: var(--display); font-size: 15px; color: #8a6f2e;
-    letter-spacing: 0.02em; font-weight: 600;
-  }
-  .fold-count span { font-size: 22px; }
-  .thick {
-    font-family: var(--display);
-    font-size: clamp(28px, 6.4vw, 48px); font-weight: 800;
-    letter-spacing: -0.03em; margin: 4px 0 2px;
-    font-variant-numeric: tabular-nums;
-    color: #43310f;
-    text-wrap: balance;
-  }
-  .thick.bump { animation: bump 280ms var(--ease); }
-  @keyframes bump { 0% { transform: scale(0.94); opacity: 0.5; } }
-  .layers { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; word-break: break-all; }
+  .ladder-card { padding: 10px 8px; }
+  #ladder { display: block; width: 100%; height: 100%; min-height: 260px; }
 
-  .scale {
-    display: block; width: min(310px, 100%); height: auto;
-    margin: 12px auto 6px;
+  /* --- figures ----------------------------------------------------------- */
+
+  .figures {
+    display: grid; grid-template-columns: 1.6fr 0.7fr 1fr;
+    column-gap: 10px; row-gap: 4px;
+    align-items: end; text-align: left;
+    margin-top: 14px; padding: 16px 18px 18px;
   }
-  /* Everything inside is built at runtime, and runtime nodes do not carry
-     Astro's scoped-style attribute -- without :global these match nothing and
-     the SVG falls back to fill:black. */
-  .scale :global(.chan) { fill: #f1e8d0; stroke: #e3d5ae; stroke-width: 1; }
-  /* Darker than they look like they need to be: the milestone ticks carry
-     position information the labels do not repeat, so they are held to the 3:1
-     non-text threshold. At #cbbb90 they measured 1.76:1 on this page. */
-  .scale :global(.tick) { stroke: #93804a; stroke-width: 1.5; stroke-linecap: round; }
-  .scale :global(.tick.big) { stroke: #6f5c28; stroke-width: 2; }
-  .scale :global(.axis) { fill: #6a5828; font-size: 9px; letter-spacing: 0.01em; }
-  .scale :global(.paper) { fill: url(#foldGrad); }
-  .scale :global(#grain path) { stroke: rgba(96, 70, 18, 0.30); stroke-width: 0.6; }
-  .scale :global(.edge) { stroke: #43310f; stroke-width: 2.5; stroke-linecap: round; }
+  /* Past the sheet's limit nothing is being measured, and the panel should
+     stop looking like a measurement. Marked with a ring rather than with
+     transparency: a see-through card over a sky that travels from daylight to
+     deep space has a different contrast at every fold. */
+  .figures.imaginary {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.16), 0 14px 40px rgb(0 0 0 / 0.3),
+      inset 0 0 0 2px var(--line);
+  }
+  .figures.imaginary .mark { border-top-style: dashed; }
+  .fig b {
+    display: block; font-family: var(--display); font-weight: 800;
+    letter-spacing: -0.03em; color: var(--ink);
+    font-variant-numeric: tabular-nums; line-height: 1.02;
+    font-size: 20px; word-break: break-word;
+  }
+  .fig span {
+    display: block; margin-top: 3px;
+    font: 600 10.5px/1.2 var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .fig-lead b { font-size: clamp(26px, 5.2vw, 40px); }
+  .fig-lead b.bump { animation: bump 300ms var(--ease); }
+  @keyframes bump { 0% { transform: scale(0.94); opacity: 0.55; } }
 
   .mark {
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    font-size: 17px; color: #4a3d1c; min-height: 44px; margin: 0 auto 16px;
-    max-width: 34ch; text-wrap: pretty;
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 11px;
+    font-size: 16px; color: var(--ink); min-height: 40px;
+    margin: 4px 0 0; padding-top: 14px; border-top: 1px solid var(--line);
+    text-wrap: pretty;
   }
-  /* The drawing sizes itself from inside — see iconSvg. A rule here that
-     targeted the <svg> would not apply to it, because it arrives via set:html. */
-  .mark-glyph { width: 26px; height: 26px; display: inline-block; vertical-align: -6px; margin-right: 8px; }
+  .mark-glyph { width: 26px; height: 26px; flex: none; color: var(--accent); }
+  .mark-glyph.jump { animation: jump-glyph 380ms var(--ease-bounce); }
+  @keyframes jump-glyph { 40% { transform: translateY(-5px) scale(1.2) rotate(-8deg); } }
+
+  /* --- actions ----------------------------------------------------------- */
 
   .actions { display: flex; gap: 10px; justify-content: center; }
   .actions button {
-    border-radius: 999px; padding: 13px 26px; font-weight: 600; font-size: 16px;
-    cursor: pointer; border: 0;
-    transition: transform 180ms var(--ease-bounce), filter 140ms var(--ease);
+    border-radius: 999px; padding: 14px 28px; font-weight: 700; font-size: 16px;
+    cursor: pointer; border: 0; min-height: 46px;
+    transition: transform 200ms var(--ease-bounce), filter 160ms var(--ease),
+                box-shadow 200ms var(--ease);
   }
-  .actions button:hover:not(:disabled) { transform: translateY(-2px) scale(1.03); filter: brightness(1.06); }
-  .actions button:active:not(:disabled) { transform: scale(0.95); }
-  .actions button:disabled { cursor: default; }
-  /* A little jump whenever the milestone text actually changes underneath it —
-     see Spend It's identical .jump for why this needs a toggled class. */
-  .mark-glyph.jump { animation: jump-glyph 380ms var(--ease-bounce); }
-  @keyframes jump-glyph { 40% { transform: translateY(-5px) scale(1.2) rotate(-8deg); } }
-  .primary:disabled { background: #8b7b52; color: #fdfaf2; }
-  .ghost:disabled { color: #6f6b78; border-color: #e6ddc2 !important; }
-  .primary { background: #43310f; color: #fff; }
-  .ghost { background: #fff; border: 1px solid #ddcfa8 !important; color: var(--ink); }
+  .actions button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.05); }
+  .actions button:active:not(:disabled) { transform: scale(0.97); }
+  .actions button:disabled { cursor: default; opacity: 0.55; }
+  .primary {
+    background: var(--surface); color: var(--ink);
+    box-shadow: 0 4px 18px rgb(0 0 0 / 0.34), 0 0 0 6px var(--glow);
+  }
+  .ghost {
+    background: var(--surface); color: var(--ink-soft);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.22), inset 0 0 0 1px var(--line);
+  }
 
-  .hint { color: var(--ink-faint); font-size: 13.5px; margin-top: 18px; }
+  .hint {
+    display: inline-block; color: var(--ink-soft); font-size: 13px;
+    margin: 16px auto 0; padding: 9px 16px; border-radius: 999px;
+    text-wrap: pretty;
+  }
+
+  @media (max-width: 620px) {
+    .deck { grid-template-columns: minmax(0, 1fr) 92px; gap: 10px; }
+    .card-top { flex-direction: column; gap: 8px; }
+    .ways { align-self: flex-start; }
+    #stage { height: 224px; }
+    .inset { width: 106px; height: 70px; bottom: 18px; }
+    .figures { grid-template-columns: 1fr 1fr; row-gap: 12px; }
+    .fig-lead { grid-column: 1 / -1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .where, .budget-bar i { transition: none; }
+    #stage.refuse { animation: none; }
+  }
 </style>

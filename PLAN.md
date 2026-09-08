@@ -810,7 +810,60 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    the geometry is regular in a way buildings are not, the silhouettes are
    exact, and the cars are simple. Anyone looking for it will see a render.
 
-8. Then reassess against the depth work in Phases 1–2 above.
+8. ~~**Paper Folds, made a place**~~ — **done.** The model was the best on
+   the site and the page was the plainest: a cream column of cards, and a
+   hero interaction that at fold zero was a 1.5-pixel hairline in an empty
+   rectangle. The hairline was the thing you were supposed to want to touch.
+
+   Two new libraries. `fold-scene.ts` puts the sheet on a desk — a small
+   perspective projection, one light obeyed by every face, laminations down
+   the cut edge, a contact shadow that follows the footprint, and the rounded
+   lip at the crease drawn at half the stack, which is the radius the length
+   accounting charges for. `fold-sky.ts` is the other half of the idea: **the
+   page's own backdrop is the altitude.** Nine stops from a warm desk to
+   intergalactic space, with the ground, the clouds, the limb of the Earth,
+   the stars and the galaxies fading in and out along the way, and the whole
+   climb also drawn as a single gradient strip beside the sheet so you can see
+   where on it you are. Folding alternately now turns the sheet a real quarter
+   turn between folds, which says what "alternate" means better than the label
+   on the button does.
+
+   The rule that made it tractable: **the panels stay light.** The obvious
+   version darkens the cards along with the sky, and somewhere around fold
+   forty-eight the surface and the ink pass through the same grey. Keeping the
+   surfaces light and letting only the world behind them travel means there is
+   no crossing to get wrong — and nothing on the page sits directly on the sky,
+   because a big title floating over deep space looks wonderful at exactly two
+   of the hundred and four altitudes.
+
+   `check-fold-scene.mjs` earned itself several times over. It found the
+   projection had the camera *underneath* the desk looking up — which renders,
+   and renders wrong, and is invisible until something asks whether the far
+   edge is narrower than the near one. It found back-face culling done by
+   screen winding, which depends on the projection's handedness and was
+   therefore backwards. It found fourteen sub-pixel quads per frame whose
+   winding was whatever the rounding decided.
+
+   And it found the real one. The check that the lip outgrows the sheet at the
+   fold the sheet gives up **passed, and passed for the wrong reason**: the
+   page was computing the remaining width as `have/2^n`, which is the answer
+   for folding the same way every time, and under alternate folding it is off
+   by a factor of sixteen at fold seven. The right footprint is now in
+   `fold-paper.ts`, derived rather than accumulated, and the honest
+   relationship is recorded instead of the flattering one: this fold's bend
+   alone would allow nine folds of A4, and charging for all the earlier bends
+   too allows seven. Gallivan's bound is the stricter one, and it has to be,
+   because paper that went round fold three is still going round it at fold
+   seven.
+
+   Two of the four failures were the metric's rather than the picture's, which
+   is worth writing down: one compared the topmost pixel of the scene against a
+   point on the centre line, on a sheet whose far corners sit six times higher
+   than the height being measured; the other compared a band of windows against
+   a band of empty road. Both were measuring how much was going on rather than
+   what they claimed to measure.
+
+9. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

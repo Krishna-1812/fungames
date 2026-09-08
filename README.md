@@ -100,6 +100,10 @@ src/
     time-art.ts         a scene for each, flat colour on one palette
     trolley-scene.ts    the field, the track, the tram and whoever is on it
     fold-paper.ts       Gallivan's equations, and where a real sheet gives up
+    fold-scene.ts       that sheet as an object on a desk: projection, one
+                        light, and the lip the crease has to turn through
+    fold-sky.ts         where you are, given how thick the stack is — a desk
+                        at fold zero, intergalactic space at a hundred and three
     sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
                         the Moon’s distance and how much of it is lit
     robot-scene.ts      the CAPTCHA's street, in perspective, with materials,
@@ -250,9 +254,20 @@ correctly, and that no two positions agree often enough to be the same thing
 under different names — the closest pair, utilitarian and contractualist, still
 part company on six of twenty-three.*
 
-**Paper Folds** — 0.1 mm doubled 103 times, with the pitch climbing on every
-fold so the exponential is audible. *Fold 42 reaches the Moon, fold 103 exceeds
-the observable universe; the layer count uses BigInt so it stays exact.*
+**Paper Folds** — fold a real sheet by dragging its edge over, and it stops
+when a sheet of that size and thickness stops: seven times for A4, twelve for
+the 1,219-metre roll Britney Gallivan used in 2002. Then a button that says what
+it is doing carries the doubling on to 103 without any paper. The sheet is drawn
+as an object on a lit desk, and the rounded lip at the crease — the paper that
+went round the bend — grows until it is wider than the paper left to feed it.
+**The page's backdrop is the altitude**: fold zero is a warm desk, by thirty you
+are past the Kármán line, and the last fold has nothing behind it but other
+galaxies. *Fold 42 reaches the Moon, fold 103 exceeds the observable universe;
+the layer count uses BigInt so it stays exact. The limit is not typed in — it
+comes out of Gallivan's two equations, and `check-fold.mjs` holds them to what
+people have actually managed. A page whose background travels that far has one
+catastrophic failure mode, so `check-fold-scene.mjs` checks the contrast at all
+104 stops rather than at the two ends.*
 
 **Ambient Mix** — twelve soundscape layers, all synthesised live, eight
 presets worth arriving at, and the whole mix in the URL: every layer at once is
@@ -374,6 +389,7 @@ node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
 node scripts/check-time-art.mjs    # Deep Time's scenes, at the card's own widths
 node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
 node scripts/check-fold.mjs        # the paper model, against paper
+node scripts/check-fold-scene.mjs  # Paper Folds' drawing, and its sky, at every fold
 node scripts/check-forecast.mjs    # the sky model, against Meeus and real eclipses
 node scripts/check-result-card.mjs # the share card, at every game and result shape
 node scripts/check-stats.mjs       # what the site remembers, against a hostile store

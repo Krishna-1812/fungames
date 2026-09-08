@@ -132,6 +132,27 @@ export const have = (sheet: Sheet, mode: Mode) =>
   mode === 'single' ? sheet.length : Math.min(sheet.length, sheet.width)
 
 /**
+ * How big the sheet still is after `n` folds.
+ *
+ * `w` is the side the next fold runs across — the one the picture puts under
+ * your hand — and `d` is the other one. Folding alternately means they take
+ * turns, so after an odd number of folds they have swapped over.
+ *
+ * This is not the same quantity as `have`, and conflating the two is a mistake
+ * worth naming because the page made it: `have(sheet, 'alternate') / 2**n`
+ * looks like the remaining width and is not. `have` is the side Gallivan's
+ * *alternating* bound is measured against, which is a property of the sheet
+ * you started with; halving it n times describes a sheet folded n times the
+ * same way. For A4 at seven folds the two answers are 1.6 mm and 26 mm.
+ */
+export function footprint(sheet: Sheet, n: number, mode: Mode): { w: number; d: number } {
+  if (mode === 'single') return { w: sheet.length / 2 ** n, d: sheet.width }
+  return n % 2 === 0
+    ? { w: sheet.length / 2 ** (n / 2), d: sheet.width / 2 ** (n / 2) }
+    : { w: sheet.width / 2 ** ((n - 1) / 2), d: sheet.length / 2 ** ((n + 1) / 2) }
+}
+
+/**
  * How many times this sheet can actually be folded.
  *
  * Counted rather than solved, because the closed form needs a Lambert W and
