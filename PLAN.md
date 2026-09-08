@@ -653,7 +653,34 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    3.8:1, forty wheel markers with four-pixel hit areas, and the annular
    eclipse's ring glow filling the Moon with gold and turning it olive.
 
-6. Then reassess against the depth work in Phases 1–2 above.
+6. ~~**Universe Forecast, made an instrument**~~ — **done.** The drawings were
+   right but you could only watch them. Now the stage stops, and you can drag
+   through the event yourself; the list and the ring are two views of the same
+   forty-four things and light each other up; the Moon panel scrubs a fortnight
+   either way and recomputes every number for the day you land on; the legend
+   switches kinds off the ring; and each month on the ring is a button into the
+   list.
+
+   The scrubber needed one more piece of chapter 54 — the Moon's motion
+   relative to the shadow's axis — which gives every lunar eclipse's contact
+   times. They come out within a minute or two of the times people actually
+   sat through: the longest totality of the century at 103 minutes, the March
+   2025 eclipse first contact at 03:59 UTC. That produced the page's sharpest
+   asymmetry, which is now stated rather than papered over: a lunar eclipse
+   happens at one instant for everybody who can see the Moon, so it gets a
+   clock, and a solar eclipse's contact times are different in every town the
+   shadow crosses, so it does not get one.
+
+   Three things the measuring caught. A linked highlight that added and removed
+   classes in matched pairs leaked — a row re-rendered under the pointer never
+   sends its "out", and its mark on the ring stayed lit for the session; it
+   clears wholesale now. The ring's last wedge is a part-month and rendered as
+   a 17px target, so each sector is measured after it renders and demoted to
+   decoration if it is not a real one. And the contrast auditor was reading
+   `color` on SVG text, which is not what paints it — with `fill` read
+   properly, two labels were under 4.5:1.
+
+7. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

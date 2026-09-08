@@ -29,7 +29,7 @@ const {
   seasonJde, phaseJde, eclipseAt, apsisJde, apsisJde: _a,
   dateToJulian, tdToUtc, lunationNear, forecast, countdown, formatWhen,
   deltaT, SHOWERS, moonDistanceKm, sunDistanceAu, discs, moonIllumination,
-  shadowGeometry, transitGeometry, immersion,
+  shadowGeometry, transitGeometry, immersion, lunarContacts,
 } = await import('../src/lib/sky-forecast.ts')
 
 let failures = 0
@@ -602,6 +602,98 @@ console.log('\nthe geometry the pictures are drawn from\n')
     check(central.every((e) => transitGeometry(e.eclipse, e.when).sMin === 0),
       `the ${central.length} central ones are drawn dead concentric, which is what central means`)
   }
+}
+
+/* -------------------------------------------------------------------------- */
+console.log('\nhow long a lunar eclipse lasts\n')
+/* -------------------------------------------------------------------------- */
+
+/* Durations are worth checking separately from dates because they come from a
+   different part of chapter 54 — the Moon's motion relative to the shadow axis
+   — and because they are published to the minute for eclipses people have sat
+   through. Getting the instant right and the length wrong is entirely
+   possible, and would show up on the page as a scrubber that runs off the end
+   of the night. */
+
+const lunarByDate = (iso) => {
+  const k0 = lunationNear(new Date(iso))
+  for (let k = k0 - 2; k <= k0 + 2; k++) {
+    const e = eclipseAt(k, 'lunar')
+    if (e && tdToUtc(e.jde).toISOString().slice(0, 10) === iso) return e
+  }
+  return null
+}
+
+/* Total and umbral durations for four eclipses in living memory. The 2018 one
+   is here because it is the longest totality of the century, which is a
+   number a wrong coefficient would be unlikely to reproduce by accident. */
+const WATCHED_DURATIONS = [
+  // date          totality    umbral phase   what it was
+  ['2018-07-27', 103, 235, 'the longest totality of the century'],
+  ['2019-01-21', 62, 197, 'the one over the Americas and Europe'],
+  ['2022-11-08', 85, 220, 'the last total one before a three-year gap'],
+  ['2025-03-14', 65, 218, 'the "blood moon" of March 2025'],
+]
+for (const [iso, tot, umb, what] of WATCHED_DURATIONS) {
+  const e = lunarByDate(iso)
+  if (!e || !e.timing) { fail(`no lunar eclipse found on ${iso}`); continue }
+  const t = e.timing
+  const gotTot = Math.round(t.total * 2)
+  const gotUmb = Math.round(t.partial * 2)
+  check(Math.abs(gotTot - tot) <= 5 && Math.abs(gotUmb - umb) <= 6,
+    `${iso}: totality ${gotTot} min (observed ${tot}), umbral phase ${gotUmb} min (${umb}) — ${what}`)
+}
+
+/* The phases have to nest: you cannot be in the umbra without being in the
+   penumbra, or fully inside without being partly inside. */
+{
+  const list = []
+  const k0 = lunationNear(new Date('1950-01-01T00:00:00Z'))
+  const k1 = lunationNear(new Date('2100-01-01T00:00:00Z'))
+  for (let k = k0; k <= k1; k++) {
+    const e = eclipseAt(k, 'lunar')
+    if (e) list.push(e)
+  }
+  const bad = list.filter((e) => {
+    const t = e.timing
+    if (!t) return true
+    if (!(t.penumbral > 0)) return true
+    if (t.partial > t.penumbral || t.total > t.partial) return true
+    if (e.type === 'penumbral' && t.partial > 0) return true
+    if (e.type === 'partial' && (t.partial <= 0 || t.total > 0)) return true
+    if (e.type === 'total' && t.total <= 0) return true
+    return false
+  })
+  check(bad.length === 0,
+    `${list.length} lunar eclipses 1950-2100: penumbral ⊇ umbral ⊇ total, and each type has exactly the phases its name says`)
+
+  /* The theoretical ceiling on totality is about an hour and three quarters,
+     set by the size of the umbra and how fast the Moon crosses it. Nothing in
+     the code knows that. */
+  const longest = Math.max(...list.map((e) => e.timing.total * 2))
+  check(longest > 95 && longest < 110,
+    `the longest totality in those 150 years is ${longest.toFixed(0)} minutes (the ceiling is about 107)`)
+
+  /* And the penumbral phase of a central eclipse runs to something like six
+     hours, which is why almost nobody watches one from end to end. */
+  const longestPen = Math.max(...list.map((e) => e.timing.penumbral * 2))
+  check(longestPen > 330 && longestPen < 400,
+    `and the longest penumbral phase is ${(longestPen / 60).toFixed(1)} hours`)
+}
+
+/* The contact list has to come out in order and straddle greatest eclipse. */
+{
+  const e = lunarByDate('2025-03-14')
+  const cs = lunarContacts(e)
+  check(cs.length === 7, `a total eclipse has all seven contacts (${cs.length})`)
+  check(cs.every((c, i) => i === 0 || +cs[i - 1].at <= +c.at), 'and they come out in order')
+  check(cs[3].label === 'Greatest eclipse', 'with greatest eclipse in the middle')
+  const span = (+cs[6].at - +cs[0].at) / 60000
+  near(span, e.timing.penumbral * 2, 0.02, 'first to last contact is the full penumbral duration')
+  ok(`  ${cs.map((c) => `${c.label} ${stamp(c.at).slice(11)}`).join(' · ')}`)
+
+  const pen = lunarContacts(eclipseAt(lunationNear(new Date('2027-02-20T00:00:00Z')), 'lunar'))
+  check(pen.length === 3, `a penumbral one has only three — it never reaches the umbra (${pen.length})`)
 }
 
 /* -------------------------------------------------------------------------- */

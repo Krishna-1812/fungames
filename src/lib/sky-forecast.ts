@@ -278,6 +278,17 @@ export type Eclipse = {
   u: number
   /** True when the shadow's axis touches the Earth at all. */
   central: boolean
+  /** How long each phase lasts. Lunar eclipses only — see the note below. */
+  timing?: LunarTiming
+}
+
+export type LunarTiming = {
+  /** The Moon's motion relative to the shadow's axis, in Earth radii per hour. */
+  perHour: number
+  /** Half-durations in minutes. Zero for a phase that does not happen. */
+  penumbral: number
+  partial: number
+  total: number
 }
 
 /**
@@ -366,6 +377,22 @@ export function eclipseAt(k: number, kind: 'solar' | 'lunar'): Eclipse | null {
   const umbral = (1.0128 - u - g) / 0.545
   if (penumbral <= 0) return null
   const type: LunarKind = umbral >= 1 ? 'total' : umbral > 0 ? 'partial' : 'penumbral'
+
+  /* How long it lasts. Meeus gives the Moon's motion relative to the shadow's
+     axis as `n` Earth radii per hour, and every semiduration is then just the
+     half-chord of a circle of the appropriate radius — Pythagoras, once the
+     hard part is done.
+     This is worth having for a reason beyond the number: a lunar eclipse
+     happens at the same instant for everybody who can see the Moon, so these
+     times are the times, everywhere. A solar eclipse's clock depends on where
+     you are standing, which is why this page prints contact times for one and
+     not for the other. */
+  const nPerHour = 0.5458 + 0.04 * cos(mp)
+  const half = (radius: number) => {
+    const v = radius * radius - gamma * gamma
+    return v > 0 ? (60 / nPerHour) * Math.sqrt(v) : 0
+  }
+
   return {
     kind,
     type,
@@ -374,6 +401,12 @@ export function eclipseAt(k: number, kind: 'solar' | 'lunar'): Eclipse | null {
     magnitude: type === 'penumbral' ? penumbral : umbral,
     u,
     central: false,
+    timing: {
+      perHour: nPerHour,
+      penumbral: half(1.5573 + u),
+      partial: half(1.0128 - u),
+      total: half(0.4678 - u),
+    },
   }
 }
 
@@ -669,6 +702,32 @@ export function shadowGeometry(e: Eclipse): Shadow {
  */
 export function immersion(s: Shadow, r: number): number {
   return (r + s.moon - s.gamma) / (2 * s.moon)
+}
+
+export type Contact = { label: string; at: Date }
+
+/**
+ * The moments a lunar eclipse passes from one phase to the next.
+ *
+ * Seven of them at most, and they are the same seven instants for every
+ * observer on the night side of the Earth — which is the whole difference
+ * between a lunar eclipse and a solar one. A solar eclipse has no single
+ * contact time; it has a different one for every place the shadow crosses, and
+ * a page that printed one number would be printing a fiction. So the Moon gets
+ * a clock here and the Sun does not.
+ */
+export function lunarContacts(e: Eclipse): Contact[] {
+  const t = e.timing
+  if (!t) return []
+  const at = (mins: number) => tdToUtc(e.jde + mins / 1440)
+  const out: Contact[] = [{ label: 'Penumbra first touches', at: at(-t.penumbral) }]
+  if (t.partial > 0) out.push({ label: 'Umbra first touches', at: at(-t.partial) })
+  if (t.total > 0) out.push({ label: 'Totality begins', at: at(-t.total) })
+  out.push({ label: 'Greatest eclipse', at: at(0) })
+  if (t.total > 0) out.push({ label: 'Totality ends', at: at(t.total) })
+  if (t.partial > 0) out.push({ label: 'Umbra leaves', at: at(t.partial) })
+  out.push({ label: 'Penumbra leaves', at: at(t.penumbral) })
+  return out
 }
 
 export type Transit = {

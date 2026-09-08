@@ -39,9 +39,24 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     <!-- The one event everything else is a footnote to. -->
     <section class="hero" id="hero" aria-live="polite">
+      <!-- The stage is an instrument, not a loop. You can stop it and drag
+           through the event yourself; on a lunar eclipse the scrubber is a
+           real clock, because a lunar eclipse happens at one instant for
+           everybody. A solar one does not, so it gets no clock. -->
       <div class="hero-stage">
         <canvas id="stage" class="stage-canvas"></canvas>
-        <p class="stage-caption" id="stageCap"></p>
+        <div class="stage-foot">
+          <div class="stage-bar">
+            <button type="button" class="stage-play" id="stagePlay" aria-label="Pause">
+              <svg viewBox="0 0 16 16" aria-hidden="true" class="i-pause"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg>
+              <svg viewBox="0 0 16 16" aria-hidden="true" class="i-play"><path d="M5 3.4 L13 8 L5 12.6 Z"/></svg>
+            </button>
+            <input type="range" class="stage-scrub" id="stageScrub" min="0" max="1000" value="500"
+              aria-label="Move through the event" />
+            <p class="stage-read" id="stageRead"></p>
+          </div>
+          <p class="stage-caption" id="stageCap"></p>
+        </div>
       </div>
       <div class="hero-text" id="heroText">
         <p class="loading">Working out where everything is…</p>
@@ -51,10 +66,18 @@ import GameLayout from '../layouts/GameLayout.astro'
     <div class="panels">
       <!-- The Moon, drawn at the phase it is actually at, right now. -->
       <section class="panel moon-panel">
-        <h2 class="panel-h">The Moon, right now</h2>
+        <h2 class="panel-h">The Moon <span id="moonWhen">right now</span></h2>
         <div class="moon-row">
           <div class="moon-art" id="moonArt"></div>
           <dl class="moon-facts" id="moonFacts"></dl>
+        </div>
+        <!-- Drag a fortnight either way. The drawing and every number under it
+             are recomputed for the day you land on, which is the cheapest way
+             to make the point that none of this is a picture of a moon. -->
+        <div class="moon-scrubber">
+          <input type="range" id="moonScrub" min="-14.8" max="14.8" step="0.1" value="0"
+            aria-label="Move the Moon forwards or backwards through the month" />
+          <button type="button" class="moon-now" id="moonNow">Now</button>
         </div>
       </section>
 
@@ -137,7 +160,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 <script>
   import {
     forecast, formatWhen, countdown, moonIllumination, discs, sunDistanceAu,
-    shadowGeometry, transitGeometry,
+    shadowGeometry, transitGeometry, lunarContacts, phaseJde, tdToUtc, lunationNear,
     type SkyEvent, type Eclipse,
   } from '../lib/sky-forecast'
   import { recordPlay } from '../lib/stats'
@@ -465,10 +488,11 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   function drawSolar(g: CanvasRenderingContext2D, e: Eclipse, when: Date, t: number) {
     const geo = solarGeom(e, when)
-    // Slow through the middle: the exponent puts most of the frames near
-    // greatest eclipse, which is the only part anybody wants to look at.
-    const q = t * 2 - 1
-    const x = geo.span * Math.sign(q) * Math.pow(Math.abs(q), 1.7)
+    /* Linear in t, because t is now a position on a scrubber the reader can
+       drag, and a scrubber whose middle is stretched is a lie about time. The
+       dwell near greatest eclipse moved into the playback clock instead, which
+       advances t slowly through the middle and quickly at the ends. */
+    const x = geo.span * (t * 2 - 1)
     const sep = Math.hypot(x, geo.sMin)
     const obs = obscuration(sep, geo.ratio)
 
@@ -620,13 +644,22 @@ import GameLayout from '../layouts/GameLayout.astro'
       g.beginPath(); g.arc(dx, dy, R * 0.7 * k, 0, 7); g.fill()
     }
 
-    return { obs, sep, ratio: geo.ratio, total: total && covered }
+    /* What the scrubber says at this position. No clock: a solar eclipse does
+       not have one. Its contact times are different in every town the shadow
+       crosses, so a single time printed here would be a time for nowhere. */
+    const label = total && covered ? 'totality'
+      : e.central && geo.ratio < 1 && sep < 1 - geo.ratio ? 'the ring, complete'
+      : obs <= 0 ? 'the discs are clear of each other'
+      : `${(obs * 100).toFixed(obs > 0.995 ? 0 : 1)}% of the Sun covered`
+    return { label, obs, sep, ratio: geo.ratio, total: total && covered }
   }
 
   function drawLunar(g: CanvasRenderingContext2D, e: Eclipse, t: number) {
     const geo = lunarGeom(e)
-    const q = t * 2 - 1
-    const x = geo.span * Math.sign(q) * Math.pow(Math.abs(q), 1.5)
+    // Linear, and here it is more than a convention: the Moon really does
+    // cross the shadow at a steady rate, so x is proportional to the clock and
+    // the scrubber's position is a time.
+    const x = geo.span * (t * 2 - 1)
     const sep = Math.hypot(x, geo.gamma)
 
     const cx = sw / 2
@@ -712,7 +745,19 @@ import GameLayout from '../layouts/GameLayout.astro'
     // The same formula the model's magnitude is defined by, so the picture
     // and the number cannot come apart.
     const depth = (geo.umbra + geo.moon - sep) / (2 * geo.moon)
-    return { depth, sep, ratio: 0, total: depth >= 1 }
+    /* A lunar eclipse does have a clock, and it is the same clock for everyone
+       who can see the Moon. x is in Earth radii and the Moon crosses at
+       `perHour` of them an hour, so the position on the scrubber converts
+       straight into a time — and the ends of the track are first and last
+       contact, to the minute. */
+    const mins = (x / (e.timing?.perHour ?? 0.55)) * 60
+    const at = new Date(+tdToUtc(e.jde) + mins * 60000)
+    const clock = `${pad2(at.getUTCHours())}:${pad2(at.getUTCMinutes())} UTC`
+    const state = depth >= 1 ? 'totality'
+      : depth > 0 ? `${(depth * 100).toFixed(0)}% into the shadow`
+      : sep < geo.penumbra + geo.moon ? 'in the penumbra only'
+      : 'clear of the shadow'
+    return { label: `${clock} · ${state}`, depth, sep, ratio: 0, total: depth >= 1 }
   }
 
   /**
@@ -983,20 +1028,31 @@ import GameLayout from '../layouts/GameLayout.astro'
     drawHorizon(g, 0)
   }
 
-  /** Whichever scene the selected event calls for. */
-  function drawScene(g: CanvasRenderingContext2D, ev: SkyEvent, t: number) {
+  /** Whichever scene the selected event calls for, and what to say about it. */
+  function drawScene(g: CanvasRenderingContext2D, ev: SkyEvent, t: number): string {
     if (ev.eclipse) {
-      if (ev.eclipse.kind === 'solar') drawSolar(g, ev.eclipse, ev.when, t)
-      else drawLunar(g, ev.eclipse, t)
-      return
+      return ev.eclipse.kind === 'solar'
+        ? drawSolar(g, ev.eclipse, ev.when, t).label
+        : drawLunar(g, ev.eclipse, t).label
     }
-    if (ev.kind === 'season') { drawSeason(g, ev); return }
-    if (ev.kind === 'apsis') { drawApsis(g, ev); return }
-    if (ev.kind === 'shower') { drawShower(g, ev, t); return }
+    if (ev.kind === 'season') { drawSeason(g, ev); return SEASON_READ[ev.season!] }
+    if (ev.kind === 'apsis') { drawApsis(g, ev); return ev.apsis === 'perihelion' ? 'nearest the Sun' : 'furthest from the Sun' }
+    if (ev.kind === 'shower') {
+      drawShower(g, ev, t)
+      return `up to ${ev.shower?.zhr} an hour, under a dark sky`
+    }
     drawNight(g, 120)
     const ill = moonIllumination(ev.when)
     drawMoonFace(g, sw / 2, sh * 0.47, Math.min(sw, sh) * 0.24, ill.fraction, ill.waxing, ill.phaseAngle)
     drawHorizon(g, 0)
+    return `${(ill.fraction * 100).toFixed(0)}% lit`
+  }
+
+  const SEASON_READ: Record<string, string> = {
+    march: 'the Sun crosses the equator, going north',
+    june: 'the Sun stands over the tropic of Cancer',
+    september: 'the Sun crosses the equator, going south',
+    december: 'the Sun stands over the tropic of Capricorn',
   }
 
   /**
@@ -1154,32 +1210,91 @@ import GameLayout from '../layouts/GameLayout.astro'
     document.getElementById('hlBack')?.addEventListener('click', () => select(defaultLead!))
   }
 
+  const scrub = $<HTMLInputElement>('stageScrub')
+  const playBtn = $<HTMLButtonElement>('stagePlay')
+  const readOut = $('stageRead')
+
   let raf = 0
+  /* Where we are in the event, 0 to 1, linear in time. The one piece of state
+     the stage has, shared by the playback clock and the scrubber — which is
+     what makes dragging feel like taking the wheel rather than fighting it. */
+  let tLin = 0.5
+  // Anybody who asked not to be moved gets the still frame at greatest
+  // eclipse, which is the right frame rather than a convenient one: it is the
+  // moment the page is about. They can still drag it.
+  let playing = !prefersReducedMotion
+
+  function frame(t: number) {
+    const label = drawScene(sctx, lead!, t)
+    readOut.textContent = label
+    scrub.value = String(Math.round(t * 1000))
+    scrub.style.setProperty('--fill', (t * 100).toFixed(1) + '%')
+  }
+
+  function setPlaying(on: boolean) {
+    playing = on
+    playBtn.classList.toggle('is-playing', on)
+    playBtn.setAttribute('aria-label', on ? 'Pause' : 'Play')
+  }
+
   function runStage() {
     sizeStage()
     if (!lead) return
-    // A still frame at greatest eclipse for anybody who asked not to be moved.
-    // Freezing at t=0.5 is the right frame rather than a convenient one: it is
-    // the moment the page is about.
-    if (prefersReducedMotion) { drawScene(sctx, lead, 0.5); return }
-    const PERIOD = lead.eclipse?.kind === 'lunar' ? 21000 : lead.kind === 'shower' ? 9000 : 17000
-    const t0 = performance.now()
-    const tick = (t: number) => {
-      const u = ((t - t0) % PERIOD) / PERIOD
-      drawScene(sctx, lead!, u)
+    if (!playing) { frame(tLin); return }
+    const PERIOD = lead.eclipse?.kind === 'lunar' ? 22000 : lead.kind === 'shower' ? 9000 : 18000
+    // Start the loop where the scrubber was left, so pressing play does not
+    // jump back to first contact.
+    const t0 = performance.now() - inversePhase(tLin) * PERIOD
+    const tick = (now: number) => {
+      if (!playing) { raf = 0; return }
+      const phase = (((now - t0) % PERIOD) + PERIOD) % PERIOD / PERIOD
+      /* The dwell that used to live inside the drawing lives here instead: the
+         clock crawls through the middle of the event and hurries the empty
+         ends, while the scrubber underneath stays honestly linear. */
+      const q = phase * 2 - 1
+      tLin = 0.5 + 0.5 * Math.sign(q) * Math.pow(Math.abs(q), 1.7)
+      frame(tLin)
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
   }
 
+  /** The playback phase that would produce a given position. */
+  function inversePhase(t: number): number {
+    const q = (t - 0.5) * 2
+    return (Math.sign(q) * Math.pow(Math.abs(q), 1 / 1.7) + 1) / 2
+  }
+
+  function stop() { if (raf) { cancelAnimationFrame(raf); raf = 0 } }
+
+  scrub.addEventListener('input', () => {
+    setPlaying(false)
+    stop()
+    tLin = Number(scrub.value) / 1000
+    frame(tLin)
+  })
+  playBtn.addEventListener('click', () => {
+    setPlaying(!playing)
+    stop()
+    runStage()
+  })
+  // The canvas itself, because a big picture that moves invites a click at it.
+  stage.addEventListener('click', () => { playBtn.click() })
+
   /** Put an event on the stage. */
   function select(ev: SkyEvent) {
     lead = ev
     paintHero()
-    if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    stop()
+    // A new event starts at its middle and starts moving, whatever the last
+    // one was left doing.
+    tLin = 0.5
+    setPlaying(!prefersReducedMotion)
     runStage()
     for (const r of document.querySelectorAll('.ev'))
       r.classList.toggle('is-lead', (r as HTMLElement).dataset.at === String(+ev.when))
+    for (const d of document.querySelectorAll('.wd'))
+      d.classList.toggle('is-lead', (d as HTMLElement).dataset.at === String(+ev.when))
     $('hero').scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' })
   }
 
@@ -1187,7 +1302,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   const heroObs = new IntersectionObserver((rows) => {
     for (const r of rows) {
       if (r.isIntersecting) { if (!raf) runStage() }
-      else if (raf) { cancelAnimationFrame(raf); raf = 0 }
+      else stop()
     }
   }, { rootMargin: '120px' })
   heroObs.observe(stage)
@@ -1195,11 +1310,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   let stageTimer = 0
   addEventListener('resize', () => {
     clearTimeout(stageTimer)
-    stageTimer = window.setTimeout(() => {
-      if (raf) { cancelAnimationFrame(raf); raf = 0 }
-      runStage()
-    }, 220)
+    stageTimer = window.setTimeout(() => { stop(); runStage() }, 220)
   })
+
+  setPlaying(playing)
 
   /* ------------------------------------------------------------------------ */
   /* The Moon, right now                                                       */
@@ -1212,6 +1326,19 @@ import GameLayout from '../layouts/GameLayout.astro'
     const shape = f < 0.5 ? 'crescent' : 'gibbous'
     return `${waxing ? 'Waxing' : 'Waning'} ${shape}`
   }
+
+  /** The next time the Moon is exactly full, or exactly new, after a date. */
+  function nextPhaseAfter(from: Date, phase: 'full' | 'new'): Date {
+    let k = lunationNear(from) - 2
+    for (let i = 0; i < 6; i++, k++) {
+      const d = tdToUtc(phaseJde(k, phase))
+      if (+d > +from) return d
+    }
+    return tdToUtc(phaseJde(k, phase))
+  }
+
+  /** Days away from now that the Moon panel is showing. */
+  let moonOffset = 0
 
   function paintMoon() {
     const host = $('moonArt')
@@ -1229,7 +1356,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     const g = c.getContext('2d')!
     g.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-    const t = new Date()
+    const t = new Date(+new Date() + moonOffset * 86400_000)
     const ill = moonIllumination(t)
     const d = discs(t)
 
@@ -1245,20 +1372,26 @@ import GameLayout from '../layouts/GameLayout.astro'
     // Mean geocentric semidiameter is 932"; the swing either side of it is the
     // whole "supermoon" business, and it is under a tenth.
     const rel = (d.moonGeocentric / 932.6 - 1) * 100
-    const nextFull = events.find((e) => e.phase === 'full')
-    const nextNew = events.find((e) => e.phase === 'new')
 
     const rows: [string, string][] = [
       ['Lit', `${(ill.fraction * 100).toFixed(1)}%`],
       ['Phase', PHASE_NAME(ill.fraction, ill.waxing)],
       ['Age', `${ill.age.toFixed(1)} days`],
-      ['Distance', `${Math.round(d.distanceKm).toLocaleString('en-GB')} km`],
+      ['Distance', `${num(d.distanceKm)} km`],
       ['Apparent size', `${rel >= 0 ? '+' : ''}${rel.toFixed(1)}% on average`],
-      ['Next full', nextFull ? countdown(t, nextFull.when).replace(/^in /, '') : '—'],
-      ['Next new', nextNew ? countdown(t, nextNew.when).replace(/^in /, '') : '—'],
+      // Relative to the day being shown, not to today, so scrubbing forwards
+      // does not leave two of the seven numbers describing a different date.
+      ['Next full', countdown(t, nextPhaseAfter(t, 'full')).replace(/^in /, '')],
+      ['Next new', countdown(t, nextPhaseAfter(t, 'new')).replace(/^in /, '')],
     ]
     $('moonFacts').innerHTML = rows
       .map(([k, v]) => `<div class="mf"><dt>${k}</dt><dd>${v}</dd></div>`).join('')
+
+    const off = Math.round(moonOffset)
+    $('moonWhen').textContent = Math.abs(moonOffset) < 0.05
+      ? 'right now'
+      : `on ${t.getUTCDate()} ${MONTH_SHORT[t.getUTCMonth()]}, ${Math.abs(off)} day${Math.abs(off) === 1 ? '' : 's'} ${off > 0 ? 'from now' : 'ago'}`
+    $('moonNow').hidden = Math.abs(moonOffset) < 0.05
   }
 
   /* ------------------------------------------------------------------------ */
@@ -1275,16 +1408,23 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+  /** Kinds switched off on the wheel, by the legend. */
+  const wheelOff = new Set<string>()
+
   function paintWheel() {
     const R = 118, CX = 132, CY = 132
+    // 22 rather than 17, so the month band is a 25px target at the size this
+    // renders — the sectors are buttons now, and a 19px one is not.
+    const BAND = 22
     const t0 = +new Date()
     const t1 = t0 + 365.25 * 86400_000
     const ang = (t: number) => ((t - t0) / (t1 - t0)) * Math.PI * 2 - Math.PI / 2
     const pt = (a: number, r: number) => [CX + Math.cos(a) * r, CY + Math.sin(a) * r]
 
-    let s = `<svg viewBox="0 0 264 264" role="img" aria-label="Every event of the coming year, placed round a ring by date">`
+    let s = `<svg viewBox="0 0 264 264" role="group" aria-label="Every event of the coming year, placed round a ring by date">`
 
-    // Month sectors, alternating, from real month boundaries.
+    // Month sectors, alternating, from real month boundaries. Each is a button
+    // that takes you to that month in the list below.
     const bounds: number[] = []
     const d0 = new Date(t0)
     for (let i = 0; i <= 13; i++) {
@@ -1295,68 +1435,141 @@ import GameLayout from '../layouts/GameLayout.astro'
     for (let i = 0; i < edges.length - 1; i++) {
       const a0 = ang(edges[i]), a1 = ang(edges[i + 1])
       const [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R)
-      const [ix1, iy1] = pt(a1, R - 17), [ix0, iy0] = pt(a0, R - 17)
-      s += `<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} L${ix1.toFixed(1)} ${iy1.toFixed(1)} A${R - 17} ${R - 17} 0 0 0 ${ix0.toFixed(1)} ${iy0.toFixed(1)} Z" fill="${i % 2 ? 'rgba(120,140,220,0.10)' : 'rgba(120,140,220,0.04)'}"/>`
+      const [ix1, iy1] = pt(a1, R - BAND), [ix0, iy0] = pt(a0, R - BAND)
       const mid = (a0 + a1) / 2
-      const [lx, ly] = pt(mid, R - 8.5)
-      const label = MONTH_SHORT[new Date(edges[i] + 86400_000 * 3).getUTCMonth()]
+      const [lx, ly] = pt(mid, R - BAND / 2 - 0.5)
+      const at = new Date(edges[i] + 86400_000 * 3)
+      const label = MONTH_SHORT[at.getUTCMonth()]
+      const key = `${MONTHS_LONG[at.getUTCMonth()]} ${at.getUTCFullYear()}`
+      s += `<g class="ws" role="button" tabindex="0" data-month="${key}">` +
+        `<title>Go to ${key}</title>` +
+        `<path class="ws-face" d="M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} L${ix1.toFixed(1)} ${iy1.toFixed(1)} A${R - BAND} ${R - BAND} 0 0 0 ${ix0.toFixed(1)} ${iy0.toFixed(1)} Z" fill="${i % 2 ? 'rgba(120,140,220,0.11)' : 'rgba(120,140,220,0.045)'}"/>`
       if (a1 - a0 > 0.32)
         s += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" class="wm" text-anchor="middle" dominant-baseline="central" transform="rotate(${((mid * 180) / Math.PI + 90).toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})">${label}</text>`
+      s += '</g>'
     }
 
-    s += `<circle cx="${CX}" cy="${CY}" r="${R - 17}" fill="none" stroke="rgba(140,160,240,0.18)"/>`
-    s += `<circle cx="${CX}" cy="${CY}" r="46" fill="none" stroke="rgba(140,160,240,0.12)"/>`
+    s += `<circle cx="${CX}" cy="${CY}" r="${R - BAND}" fill="none" stroke="rgba(140,160,240,0.18)"/>`
+    s += `<circle cx="${CX}" cy="${CY}" r="44" fill="none" stroke="rgba(140,160,240,0.12)"/>`
 
     // The events. Radius carries rank, so the eclipses sit on their own ring
     // and the ordinary business of the Moon sits inside it.
-    const year = events.filter((e) => +e.when <= t1 && (e.rank >= 1))
+    const year = events.filter((e) => +e.when <= t1 && e.rank >= 1)
     for (const e of year) {
       const a = ang(+e.when)
-      const rr = 52 + e.rank * 15
+      const rr = 44 + e.rank * 14
       const [x, y] = pt(a, rr)
       const col = KIND_COLOUR[e.kind]
       const big = e.kind === 'eclipse'
-      if (big)
-        s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="none" stroke="${col}" stroke-opacity="0.4"/>`
+      const dim = wheelOff.has(e.kind)
       /* A group with an invisible hit circle in it, rather than a bare dot.
          A transparent *stroke* would have worked for the mouse and left the
          element measuring 4px, which is what an audit and a screen reader
          would both have believed. A filled circle is the honest version. */
-      s += `<g class="wd" tabindex="0" role="button" data-i="${events.indexOf(e)}">` +
+      s += `<g class="wd${dim ? ' is-off' : ''}${e === lead ? ' is-lead' : ''}" tabindex="${dim ? -1 : 0}" role="button"` +
+        ` data-i="${events.indexOf(e)}" data-at="${+e.when}" data-kind="${e.kind}">` +
         `<title>${e.title} — ${formatWhen(e.when, e.timed)}</title>` +
         `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" fill="transparent"/>` +
+        (big ? `<circle class="wd-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="none" stroke="${col}" stroke-opacity="0.4"/>` : '') +
         `<circle class="wd-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${big ? 3.6 : e.rank >= 2 ? 2.8 : 1.9}" fill="${col}" fill-opacity="${big ? 1 : 0.8}"/></g>`
     }
 
     // Now: a hand at the top, because the ring starts today rather than in
     // January. A ring that started in January would need a hand that moved,
     // and would put the interesting half behind you.
-    const [nx, ny] = pt(-Math.PI / 2, R - 17)
+    const [nx, ny] = pt(-Math.PI / 2, R - BAND)
     s += `<line x1="${CX}" y1="${CY}" x2="${nx}" y2="${ny}" stroke="rgba(255,217,138,0.5)" stroke-width="1.2" stroke-dasharray="3 4"/>`
-    s += `<circle cx="${CX}" cy="${CY}" r="4" fill="#ffd98a"/>`
-    s += `<text x="${CX}" y="${CY + 22}" class="wnow" text-anchor="middle">tonight</text>`
+    s += `<g class="wcentre" role="button" tabindex="0"><title>Back to the next big event</title>` +
+      `<circle cx="${CX}" cy="${CY}" r="26" fill="transparent"/>` +
+      `<circle class="wcentre-dot" cx="${CX}" cy="${CY}" r="4" fill="#ffd98a"/>` +
+      `<text x="${CX}" y="${CY + 22}" class="wnow" text-anchor="middle">tonight</text></g>`
     s += '</svg>'
     $('wheel').innerHTML = s
 
-    $('legend').innerHTML = Object.keys(KIND_LABEL)
-      .map((k) => `<li><i style="background:${KIND_COLOUR[k]}"></i>${KIND_LABEL[k]}</li>`).join('')
+    // The legend switches kinds off, which is the only way to read the ring
+    // when fifty full and new moons are sitting on top of everything else.
+    $('legend').innerHTML = Object.keys(KIND_LABEL).map((k) =>
+      `<li><button type="button" class="lg${wheelOff.has(k) ? ' is-off' : ''}" data-kind="${k}"` +
+      ` aria-pressed="${!wheelOff.has(k)}"><i style="background:${KIND_COLOUR[k]}"></i>${KIND_LABEL[k]}</button></li>`).join('')
+    for (const b of $('legend').querySelectorAll<HTMLButtonElement>('.lg'))
+      b.addEventListener('click', () => {
+        const k = b.dataset.kind!
+        if (wheelOff.has(k)) wheelOff.delete(k); else wheelOff.add(k)
+        paintWheel()
+      })
 
     const tip = $('wheelTip')
+    const say = (t: string) => { tip.textContent = t }
+
     for (const dot of $('wheel').querySelectorAll<SVGGElement>('.wd')) {
       const ev = events[Number(dot.dataset.i)]
       const show = () => {
-        tip.textContent = `${ev.title} · ${formatWhen(ev.when, ev.timed).replace(/, \d\d:\d\d UTC$/, '')}`
+        say(`${ev.title} · ${formatWhen(ev.when, ev.timed).replace(/, \d\d:\d\d UTC$/, '')}`)
+        setHot(dot.dataset.at)
       }
+      const hide = () => setHot(undefined)
       dot.addEventListener('mouseenter', show)
       dot.addEventListener('focus', show)
+      dot.addEventListener('mouseleave', hide)
+      dot.addEventListener('blur', hide)
       dot.addEventListener('keydown', (k) => {
         if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); select(ev) }
       })
       // A dot is a date on a ring, and clicking it should show you the thing
       // rather than scroll you to a line of text about it.
-      dot.addEventListener('click', () => select(events[Number(dot.dataset.i)]))
+      dot.addEventListener('click', () => select(ev))
     }
-    $('wheel').addEventListener('mouseleave', () => { tip.textContent = '' })
+
+    for (const sec of $('wheel').querySelectorAll<SVGGElement>('.ws')) {
+      /* The ring starts today, so its first and last wedges are part-months —
+         and at the far side of the circle a wedge worth eight days comes out
+         17px across. Rather than guess an angle that is always big enough,
+         measure the wedge that actually rendered and demote the ones that are
+         not a real target. Every month is still one tap away in the list. */
+      const box = sec.getBoundingClientRect()
+      if (box.width < 24 || box.height < 24) {
+        sec.classList.remove('ws')
+        sec.removeAttribute('role')
+        sec.removeAttribute('tabindex')
+        sec.querySelector('title')?.remove()
+        continue
+      }
+      const go = () => goToMonth(sec.dataset.month!)
+      sec.addEventListener('click', go)
+      sec.addEventListener('mouseenter', () => say(sec.dataset.month!))
+      sec.addEventListener('focus', () => say(sec.dataset.month!))
+      sec.addEventListener('keydown', (k) => {
+        if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); go() }
+      })
+    }
+
+    const centre = $('wheel').querySelector<SVGGElement>('.wcentre')!
+    const home = () => { if (defaultLead) select(defaultLead) }
+    centre.addEventListener('click', home)
+    centre.addEventListener('mouseenter', () => say('Back to the next big event'))
+    centre.addEventListener('focus', () => say('Back to the next big event'))
+    centre.addEventListener('keydown', (k) => {
+      if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); home() }
+    })
+
+    $('wheel').addEventListener('mouseleave', () => { say(''); setHot(undefined) })
+  }
+
+  /** Scroll the list to a month, unfiltering first if it is not showing. */
+  function goToMonth(key: string) {
+    if (filter !== 'all') {
+      filter = 'all'
+      for (const b of document.querySelectorAll('.filter'))
+        b.classList.toggle('is-on', (b as HTMLElement).dataset.filter === 'all')
+      paintFeed()
+    }
+    const head = [...feed.querySelectorAll<HTMLElement>('.mon')]
+      .find((m) => m.dataset.month === key)
+    if (!head) return
+    head.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
+    head.classList.remove('is-hit')
+    void head.offsetWidth
+    head.classList.add('is-hit')
   }
 
   /* ------------------------------------------------------------------------ */
@@ -1511,7 +1724,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       if (key !== month) {
         if (month) out += '</ol></section>'
         month = key
-        out += `<section class="mon"><h3 class="mon-h">` +
+        out += `<section class="mon" data-month="${key}"><h3 class="mon-h">` +
           `<span>${MONTHS_LONG[e.when.getUTCMonth()]}</span>` +
           `<span class="yr">${e.when.getUTCFullYear()}</span></h3><ol class="mon-list">`
       }
@@ -1525,11 +1738,15 @@ import GameLayout from '../layouts/GameLayout.astro'
       out += `<li class="ev rank-${e.rank} k-${e.kind}${soon ? ' soon' : ''}${e === lead ? ' is-lead' : ''}" data-at="${+e.when}" style="--d:${delay}ms">
         <div class="ev-date" aria-hidden="true"><b>${day}</b><i>${mon}</i></div>
         <div class="ev-rail">
+          <!-- Decorative twin of the title button: a big friendly target for a
+               pointer, kept out of the tab order and the accessibility tree so
+               a screen reader is not read the same row twice. -->
           <button type="button" class="ev-node" data-i="${events.indexOf(e)}"
-            aria-label="Draw the ${e.title.toLowerCase()} of ${formatWhen(e.when, e.timed)} at the top of the page">${glyph(e)}</button>
+            tabindex="-1" aria-hidden="true">${glyph(e)}</button>
         </div>
         <div class="ev-body">
-          <p class="ev-title">${e.title}${soon ? '<span class="ev-soon">soon</span>' : ''}</p>
+          <p class="ev-title"><button type="button" class="ev-name" data-i="${events.indexOf(e)}"
+            aria-label="Draw the ${e.title.toLowerCase()} of ${formatWhen(e.when, e.timed)} at the top of the page">${e.title}</button>${soon ? '<span class="ev-soon">soon</span>' : ''}</p>
           <p class="ev-meta"><span class="ev-day">${day} ${mon} · </span>${clockOf(e)}<span class="ev-count ev-count-inline" data-at="${+e.when}">${cd}</span></p>
           <p class="ev-detail">${e.detail}</p>
         </div>
@@ -1547,7 +1764,7 @@ import GameLayout from '../layouts/GameLayout.astro'
        handler on the row: a row-sized invisible button would swallow text
        selection on a page that is mostly there to be read, and it is the only
        thing here a keyboard could not otherwise reach. */
-    for (const b of feed.querySelectorAll<HTMLButtonElement>('.ev-node'))
+    for (const b of feed.querySelectorAll<HTMLButtonElement>('.ev-node, .ev-name'))
       b.addEventListener('click', () => select(events[Number(b.dataset.i)]))
   }
 
@@ -1559,6 +1776,59 @@ import GameLayout from '../layouts/GameLayout.astro'
     })
   }
 
+  const moonScrub = $<HTMLInputElement>('moonScrub')
+  moonScrub.addEventListener('input', () => {
+    moonOffset = Number(moonScrub.value)
+    paintMoon()
+  })
+  $('moonNow').addEventListener('click', () => {
+    moonOffset = 0
+    moonScrub.value = '0'
+    moonScrub.dispatchEvent(new Event('input', { bubbles: true }))
+    moonScrub.focus()
+  })
+
+  /* Hovering a row lights its mark on the wheel, and the other way round. Two
+     views of the same forty-four things, and without the link you have to find
+     the date in one of them by reading. */
+  const wheelDot = (at: string | undefined) =>
+    at ? $('wheel').querySelector<SVGGElement>(`.wd[data-at="${at}"]`) : null
+  const feedRow = (at: string | undefined) =>
+    at ? feed.querySelector<HTMLElement>(`.ev[data-at="${at}"]`) : null
+
+  /* Cleared wholesale rather than un-set one at a time. Adding and removing
+     the class in matched pairs looks tidier and leaks: a row that is
+     re-rendered while the pointer is over it never sends its "out", and its
+     mark on the wheel stays lit for the rest of the session. Only one thing
+     can be hot at a time, so saying exactly that is both simpler and correct. */
+  function setHot(at: string | undefined) {
+    for (const el of document.querySelectorAll('.is-hot')) el.classList.remove('is-hot')
+    if (!at) return
+    wheelDot(at)?.classList.add('is-hot')
+    feedRow(at)?.classList.add('is-hot')
+  }
+
+  feed.addEventListener('pointerover', (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.ev')
+    setHot(row?.dataset.at)
+  })
+  feed.addEventListener('pointerleave', () => setHot(undefined))
+
+  /* The filters say how many of each there are. It is one number per pill and
+     it turns a row of categories into a summary of the two years. */
+  function countFilters() {
+    for (const btn of document.querySelectorAll<HTMLButtonElement>('.filter')) {
+      const k = btn.dataset.filter!
+      const n = k === 'all' ? events.length : events.filter((e) => e.kind === k).length
+      if (btn.querySelector('.tally')) continue
+      const label = btn.textContent!.trim()
+      // Hidden from the name, or the pill announces itself as "Everything133".
+      btn.insertAdjacentHTML('beforeend', `<span class="tally" aria-hidden="true">${n}</span>`)
+      btn.setAttribute('aria-label', `${label}, ${n} events`)
+    }
+  }
+
+  countFilters()
   paintHero()
   paintMoon()
   paintWheel()
@@ -1701,13 +1971,6 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   .sky-body .hero-stage { position: relative; min-height: 300px; background: #05081c; }
   .sky-body .stage-canvas { display: block; width: 100%; height: 100%; min-height: 300px; }
-  .sky-body .stage-caption {
-    position: absolute; left: 0; right: 0; bottom: 0; margin: 0;
-    padding: 22px 14px 9px;
-    font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
-    color: rgba(190, 205, 250, 0.62); text-align: center;
-    background: linear-gradient(to top, rgba(3, 5, 16, 0.85), transparent);
-  }
   .sky-body .hero-text { padding: 26px 26px 28px; align-self: center; }
   .sky-body .loading { color: #8593c9; margin: 0; }
   .sky-body .hl-kicker {
@@ -1769,7 +2032,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .wheel { line-height: 0; }
   .sky-body .wheel svg { width: 100%; height: auto; max-width: 300px; margin: 0 auto; display: block; }
   .sky-body .wheel .wm {
-    font-size: 8.5px; fill: #7c8ac2; letter-spacing: 0.1em; text-transform: uppercase;
+    /* #7c8ac2 came out 4.3:1 against the sector it sits on. */
+    font-size: 8.5px; fill: #8e9cd2; letter-spacing: 0.1em; text-transform: uppercase;
     font-family: inherit;
   }
   .sky-body .wheel .wnow {
@@ -1919,7 +2183,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .ev-date i {
     display: block; font-style: normal; margin-top: 3px;
     font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em;
-    text-transform: uppercase; color: #7182c2;
+    /* Measured 3.9:1 against the row it sits on; 10px uppercase needs 4.5. */
+    text-transform: uppercase; color: #8e9cd2;
   }
 
   /* The rail. Each row draws its own segment, extended by the row's padding so
@@ -2047,6 +2312,128 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .how[open] summary::before { content: '\25BE  '; }
   .sky-body .how-body p { color: #99a7dc; font-size: 14px; line-height: 1.65; max-width: 64ch; text-wrap: pretty; }
   .sky-body .how-caveat { border-left: 2px solid #33407c; padding-left: 12px; }
+
+
+  /* --- the stage's own controls ------------------------------------------ */
+
+  .sky-body .hero-stage { display: flex; flex-direction: column; }
+  .sky-body .stage-canvas { flex: 1; }
+  .sky-body .stage-foot {
+    border-top: 1px solid rgba(126, 146, 226, 0.14);
+    background: rgba(5, 8, 26, 0.6);
+    padding: 9px 14px 10px;
+  }
+  .sky-body .stage-bar { display: flex; align-items: center; gap: 11px; }
+  .sky-body .stage-play {
+    flex: none; width: 30px; height: 30px; padding: 0;
+    display: grid; place-items: center;
+    border-radius: 50%; cursor: pointer;
+    border: 1px solid rgba(126, 146, 226, 0.34);
+    background: rgba(22, 30, 68, 0.9);
+    transition: background 140ms var(--ease), border-color 140ms var(--ease);
+  }
+  .sky-body .stage-play:hover { background: #26326e; border-color: var(--gold); }
+  .sky-body .stage-play svg { width: 14px; height: 14px; fill: #d8e1ff; }
+  /* One button, two glyphs, and the class says which is showing. */
+  .sky-body .stage-play .i-pause { display: none; }
+  .sky-body .stage-play.is-playing .i-pause { display: block; }
+  .sky-body .stage-play.is-playing .i-play { display: none; }
+
+  .sky-body .stage-scrub { flex: 1; min-width: 0; --sl-thumb: 14px; --sl-h: 4px; }
+  .sky-body .stage-read {
+    flex: none; margin: 0; min-width: 12.5em; text-align: right;
+    font-size: 11.5px; color: #b9c6f5; font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+  .sky-body .stage-caption {
+    margin: 7px 0 0; text-align: center;
+    font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    /* Measured 3.75:1 at 50% alpha. Small uppercase text needs 4.5. */
+    color: #8b99d1;
+  }
+
+  /* --- the Moon's scrubber ------------------------------------------------ */
+
+  .sky-body .panel-h #moonWhen { color: #b6c3f0; letter-spacing: 0.1em; }
+  .sky-body .moon-scrubber {
+    display: flex; align-items: center; gap: 10px; margin: 14px 0 0;
+    padding-top: 12px; border-top: 1px solid rgba(126, 146, 226, 0.14);
+  }
+  .sky-body .moon-scrubber input { flex: 1; min-width: 0; --sl-thumb: 15px; }
+  .sky-body .moon-now {
+    flex: none; border: 1px solid var(--line); background: rgba(22, 30, 68, 0.8);
+    color: #b6c3f0; border-radius: 999px; padding: 6px 12px; min-height: 26px;
+    font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .sky-body .moon-now:hover { background: var(--gold); color: #0d1330; border-color: var(--gold); }
+
+  /* --- the wheel's controls ----------------------------------------------- */
+
+  .sky-body .wheel .ws { cursor: pointer; }
+  .sky-body .wheel .ws-face { transition: fill 130ms var(--ease); }
+  .sky-body .wheel .ws:hover .ws-face,
+  .sky-body .wheel .ws:focus-visible .ws-face { fill: rgba(150, 175, 255, 0.24); }
+  .sky-body .wheel .ws:focus-visible { outline: 2px solid var(--gold); outline-offset: -1px; }
+
+  .sky-body .wheel .wcentre { cursor: pointer; }
+  .sky-body .wheel .wcentre-dot { transition: r 140ms var(--ease); }
+  .sky-body .wheel .wcentre:hover .wcentre-dot,
+  .sky-body .wheel .wcentre:focus-visible .wcentre-dot { r: 7; }
+  .sky-body .wheel .wcentre:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* Switched off by the legend: still drawn, because a dot that vanishes takes
+     the shape of the year with it, but pushed far enough back to read past. */
+  .sky-body .wheel .wd.is-off { pointer-events: none; }
+  .sky-body .wheel .wd.is-off .wd-dot,
+  .sky-body .wheel .wd.is-off .wd-ring { opacity: 0.1; }
+  /* Lit from the list below. */
+  .sky-body .wheel .wd.is-hot .wd-dot { r: 6; }
+  .sky-body .wheel .wd.is-lead .wd-dot { stroke: #fff; stroke-width: 1.6; }
+
+  .sky-body .legend li { display: block; }
+  .sky-body .lg {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid transparent; background: transparent; cursor: pointer;
+    font: inherit; font-size: 11px; color: var(--faint);
+    padding: 5px 8px; min-height: 24px; border-radius: 999px;
+    transition: background 130ms var(--ease), color 130ms var(--ease), opacity 130ms var(--ease);
+  }
+  .sky-body .lg:hover { background: rgba(126, 146, 226, 0.14); color: #cdd8ff; }
+  .sky-body .lg:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .sky-body .lg i { width: 7px; height: 7px; border-radius: 50%; display: block; flex: none; }
+  .sky-body .lg.is-off { opacity: 0.42; text-decoration: line-through; }
+
+  /* --- counts on the filters ---------------------------------------------- */
+
+  .sky-body .filter .tally {
+    display: inline-block; margin-left: 7px; padding: 1px 6px;
+    border-radius: 999px; font-size: 10.5px; font-weight: 700;
+    background: rgba(126, 146, 226, 0.24); color: #c4d0ff;
+    font-variant-numeric: tabular-nums;
+  }
+  .sky-body .filter.is-on .tally { background: rgba(13, 19, 48, 0.14); color: #2c3566; }
+
+  /* --- the two views, linked ---------------------------------------------- */
+
+  .sky-body .ev.is-hot { background: rgba(126, 146, 226, 0.11); }
+  .sky-body .mon.is-hit .mon-h { animation: mon-hit 1200ms var(--ease); }
+  @keyframes mon-hit {
+    0%, 100% { color: #a3b3f0; }
+    20% { color: var(--gold); }
+  }
+
+  /* The title is the real control; the picture beside it is the same button
+     for a pointer. Underlined only on hover, because forty-four underlined
+     headings would be a page of links. */
+  .sky-body .ev-name {
+    border: 0; background: none; padding: 0; margin: 0; cursor: pointer;
+    font: inherit; color: inherit; text-align: left;
+    border-radius: 5px;
+  }
+  .sky-body .ev-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .sky-body .ev-name:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .sky-body .ev:hover .ev-node { border-color: var(--rail, #6d7fd8); }
 
   /* --- narrow ------------------------------------------------------------ */
 
