@@ -21,6 +21,8 @@
  *   - Is the scene a photograph or a diagram? Measured as the number of
  *     distinct tones present: flat fills produce very few.
  *   - Is the distorted text distorted, and still all there?
+ *   - Do the four hands have the number of fingers they say they have, and is
+ *     exactly one of them right?
  *
  *   node scripts/check-robot-scene.mjs [--png dir]
  */
@@ -31,6 +33,7 @@ register('./resolve-ts.mjs', import.meta.url)
 
 const {
   STREET, MIN_COVER, answerCells, coreCells, mark, coverage, cellBox, sceneSvg, warpedText, ALPHABET,
+  hands, HAND_DEFS,
 } = await import('../src/lib/robot-scene.ts')
 
 let failed = 0
@@ -234,6 +237,62 @@ console.log('\nThe distorted text')
 
 /* ------------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------------ */
+console.log('\nThe hands')
+/* ------------------------------------------------------------------------ */
+
+const HAND_SVG = (h) =>
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140" width="120" height="140">' +
+  '<defs>' + HAND_DEFS + '</defs>' + h.svg + '</svg>'
+
+{
+  const list = hands()
+  const right = list.filter((h) => h.ok)
+  if (right.length !== 1) fail(right.length + ' of the four hands are correct, not one')
+  else ok('exactly one of the four has five digits')
+
+  // The count comes out of the loop that draws them, so a hand cannot say four
+  // and be drawn with five. This checks the counts are the ones intended.
+  const got = list.map((h) => h.digits).join(',')
+  if (got !== '5,6,4,6') fail('digit counts are ' + got + ', expected 5,6,4,6')
+  else ok('digit counts drawn: ' + got)
+
+  for (const h of list) if (!h.ok && !h.why) fail('a wrong hand does not say why it is wrong')
+  ok('every wrong hand says what is wrong with it')
+
+  // Four pictures that are nearly the same picture is not a question. Rendered
+  // and compared, because "I moved a rectangle" is not evidence of difference.
+  const imgs = list.map((h) => raster(HAND_SVG(h), 120))
+  for (let i = 0; i < imgs.length; i++)
+    for (let j = i + 1; j < imgs.length; j++) {
+      let moved = 0
+      for (let o = 0; o < imgs[i].px.length; o += 4)
+        if (Math.abs(imgs[i].px[o] - imgs[j].px[o]) > 14) moved++
+      const f = moved / (imgs[i].px.length / 4)
+      if (f < 0.015) fail('hands ' + i + ' and ' + j + ' differ in only ' + (f * 100).toFixed(1) + '% of pixels')
+    }
+  ok('all six pairs are visibly different from each other')
+
+  // And each one has to be a hand on a ground, not a ground.
+  for (let i = 0; i < imgs.length; i++) {
+    const img = imgs[i]
+    let skin = 0
+    for (let o = 0; o < img.px.length; o += 4) {
+      const [r, g, b] = [img.px[o], img.px[o + 1], img.px[o + 2]]
+      if (r > 150 && r - b > 30 && g > b) skin++
+    }
+    const f = skin / (img.px.length / 4)
+    if (f < 0.12) fail('hand ' + i + ' covers only ' + (f * 100).toFixed(1) + '% of its frame')
+  }
+  ok('every hand fills at least 12% of its frame')
+
+  const tones = new Set()
+  for (let o = 0; o < imgs[0].px.length; o += 4)
+    tones.add((imgs[0].px[o] >> 3) * 1024 + (imgs[0].px[o + 1] >> 3) * 32 + (imgs[0].px[o + 2] >> 3))
+  if (tones.size < 150) fail('a hand has only ' + tones.size + ' distinct tones — that is an outline')
+  else ok('the correct hand has ' + tones.size + ' distinct tones')
+}
+
 const dir = process.argv.indexOf('--png') >= 0 ? process.argv[process.argv.indexOf('--png') + 1] : null
 if (dir) {
   fs.mkdirSync(dir, { recursive: true })
@@ -241,6 +300,12 @@ if (dir) {
     new Resvg(sceneSvg(STREET, true), { fitTo: { mode: 'width', value: 600 } }).render().asPng())
   fs.writeFileSync(dir + '/street-nolight.png',
     new Resvg(sceneSvg(STREET, false), { fitTo: { mode: 'width', value: 600 } }).render().asPng())
+  const sheet = hands().map((h, i) =>
+    '<g transform="translate(' + i * 120 + ' 0)">' + h.svg + '</g>').join('')
+  fs.writeFileSync(dir + '/hands.png', new Resvg(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 140" width="480" height="140">' +
+    '<defs>' + HAND_DEFS + '</defs>' + sheet + '</svg>',
+    { fitTo: { mode: 'width', value: 720 } }).render().asPng())
   fs.writeFileSync(dir + '/text.png',
     new Resvg(warpedText('K4WBP', 7).svg, { fitTo: { mode: 'width', value: 528 } }).render().asPng())
   console.log('\nwrote ' + dir)

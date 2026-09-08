@@ -550,3 +550,115 @@ export function warpedText(code: string, seed: number): WarpedText {
     '</svg>'
   return { svg, width: W, height: H }
 }
+
+/* ------------------------------------------------------------------------ */
+/* The hands                                                                 */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Four pictures of a hand, one of which has the right number of parts.
+ *
+ * The joke is the one everybody has made about generated images, so these have
+ * to look generated rather than drawn: a studio ground, skin that is lit from
+ * one side, creases at the joints, nails, a shadow underneath. A flat outline
+ * would be a diagram of a hand, and the question "is this a real photograph of
+ * a hand" does not mean anything about a diagram.
+ *
+ * `digits` is counted from the loop that draws them rather than typed in
+ * beside it, so a hand cannot claim four fingers and be drawn with five.
+ */
+export type Hand = { svg: string; digits: number; ok: boolean; why: string }
+
+export const HAND_DEFS =
+  '<linearGradient id="rh-bg" x1="0" y1="0" x2="0.3" y2="1">' +
+  '<stop offset="0" stop-color="#eef1f4"/><stop offset="1" stop-color="#c3ccd4"/></linearGradient>' +
+  '<radialGradient id="rh-vig" cx="0.5" cy="0.42" r="0.75">' +
+  '<stop offset="0.45" stop-color="#000" stop-opacity="0"/>' +
+  '<stop offset="1" stop-color="#0d141b" stop-opacity="0.26"/></radialGradient>' +
+  // Lit from the left, like the street is, so the two do not disagree.
+  '<linearGradient id="rh-skin" x1="0" y1="0" x2="1" y2="0.2">' +
+  '<stop offset="0" stop-color="#f6cfae"/><stop offset="0.42" stop-color="#e7b189"/>' +
+  '<stop offset="1" stop-color="#c1855f"/></linearGradient>' +
+  '<radialGradient id="rh-palm" cx="0.38" cy="0.3">' +
+  '<stop offset="0" stop-color="#f5cdaa"/><stop offset="1" stop-color="#d29b74"/></radialGradient>' +
+  '<linearGradient id="rh-nail" x1="0" y1="0" x2="0" y2="1">' +
+  '<stop offset="0" stop-color="#fadfc8"/><stop offset="1" stop-color="#e9bd9c"/></linearGradient>'
+
+/** One hand, with however many fingers and thumbs it was asked for. */
+export function handSvg(fingers: number, thumbs: number): { svg: string; digits: number } {
+  const span = Math.max(46, fingers * 14)
+  const x0 = 60 - span / 2
+  const per = span / fingers
+  let digits = 0
+  let s = '<rect width="120" height="140" fill="url(#rh-bg)"/>'
+  // The shadow it casts on the ground behind it.
+  s += '<ellipse cx="63" cy="134" rx="30" ry="6" fill="#28323a" opacity="0.3"/>'
+
+  /**
+   * One digit: a capsule with the two creases a finger actually bends at, a
+   * nail, and a highlight down its lit side. `rot` turns it about a pivot,
+   * which is how a thumb gets its angle while its base stays inside the palm —
+   * drawing the thumb out to one side and then rotating it as well is what
+   * leaves it floating next to the hand instead of attached to it.
+   */
+  const digit = (x: number, y: number, w: number, h: number, rot = 0, cx = 0, cy = 0) => {
+    digits++
+    const t2 = rot ? ' transform="rotate(' + rot + ' ' + f1(cx) + ' ' + f1(cy) + ')"' : ''
+    let d = '<g' + t2 + '>'
+    d += '<rect x="' + f1(x) + '" y="' + f1(y) + '" width="' + f1(w) + '" height="' + f1(h) +
+      '" rx="' + f1(w / 2) + '" fill="url(#rh-skin)"/>'
+    d += '<rect x="' + f1(x + w * 0.14) + '" y="' + f1(y + w * 0.5) + '" width="' + f1(w * 0.2) +
+      '" height="' + f1(h - w) + '" rx="' + f1(w * 0.1) + '" fill="#ffe4cd" opacity="0.34"/>'
+    for (const k of [0.42, 0.68])
+      d += '<path d="M' + f1(x + w * 0.14) + ' ' + f1(y + h * k) + ' q' + f1(w * 0.36) + ' ' +
+        f1(w * 0.2) + ' ' + f1(w * 0.72) + ' 0" fill="none" stroke="#a06a49" ' +
+        'stroke-width="0.9" opacity="0.5"/>'
+    d += '<rect x="' + f1(x + w * 0.2) + '" y="' + f1(y + w * 0.36) + '" width="' + f1(w * 0.6) +
+      '" height="' + f1(w * 0.82) + '" rx="' + f1(w * 0.26) + '" fill="url(#rh-nail)"/>'
+    d += '</g>'
+    return d
+  }
+
+  // Fingers, longest in the middle — the shape you check without knowing you
+  // are checking it. Their lower ends run under the palm, which is drawn after.
+  for (let i = 0; i < fingers; i++) {
+    const t2 = fingers === 1 ? 0.5 : i / (fingers - 1)
+    const h = 36 + Math.sin(t2 * Math.PI) * 20
+    const w = per - 3.4
+    s += digit(x0 + i * per + 1.7, 76 - h, w, h + 18)
+  }
+
+  // Palm over the bottom of them, then the wrist under that.
+  s += '<rect x="46" y="102" width="28" height="38" rx="9" fill="#cf9a72"/>'
+  s += '<rect x="' + f1(x0 - 5) + '" y="64" width="' + f1(span + 10) +
+    '" height="48" rx="16" fill="url(#rh-palm)"/>'
+  // Knuckles: a soft dark band where the fingers meet the palm.
+  s += '<rect x="' + f1(x0 - 3) + '" y="64" width="' + f1(span + 6) +
+    '" height="8" rx="4" fill="#ac7754" opacity="0.28"/>'
+  // Two palm creases, because a palm without them is a mitten.
+  s += '<path d="M' + f1(x0 + 2) + ' 80 q' + f1(span * 0.44) + ' 11 ' + f1(span * 0.84) +
+    ' 3" fill="none" stroke="#ac7754" stroke-width="1.2" opacity="0.4"/>'
+  s += '<path d="M' + f1(x0 + 5) + ' 90 q' + f1(span * 0.34) + ' 13 ' + f1(span * 0.58) +
+    ' 17" fill="none" stroke="#ac7754" stroke-width="1.2" opacity="0.34"/>'
+
+  // Thumbs. Base inside the palm, tip swung out and up.
+  if (thumbs >= 1) s += digit(x0 - 6, 72, 17, 42, -36, x0 + 2.5, 112)
+  if (thumbs >= 2) s += digit(x0 + span - 11, 72, 17, 42, 36, x0 + span - 2.5, 112)
+
+  s += '<rect width="120" height="140" fill="url(#rh-vig)"/>'
+  return { svg: s, digits }
+}
+
+/** The four options. Exactly one of them has five digits. */
+export function hands(): Hand[] {
+  const make = (fingers: number, thumbs: number, why: string): Hand => {
+    const { svg, digits } = handSvg(fingers, thumbs)
+    return { svg, digits, ok: digits === 5, why }
+  }
+  return [
+    make(4, 1, ''),
+    make(5, 1, 'Six digits.'),
+    make(3, 1, 'Four digits.'),
+    make(4, 2, 'Two thumbs.'),
+  ]
+}

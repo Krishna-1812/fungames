@@ -753,6 +753,18 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    translucent white button as an opaque white background, which is how a
    perfectly legible control on a dark bar reported 1:1.
 
+   The hands were the last part that still looked homemade. Four flat outlines
+   four-across in a 400-pixel body, with the thumbs too small to count. They
+   are now four image tiles two-by-two — the other shape a real challenge comes
+   in — drawn with a studio ground, skin lit from the same side the street is,
+   creases where a finger actually bends, nails, and a shadow underneath. The
+   digit count comes out of the loop that draws them rather than being typed in
+   beside it, so a hand cannot claim four fingers and be drawn with five, and
+   the checker renders all four and confirms every pair is visibly different.
+   The first attempt drew each thumb out to one side and then rotated it as
+   well, which left it floating next to the hand rather than attached to it —
+   visible in one render, invisible in the code.
+
 8. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that

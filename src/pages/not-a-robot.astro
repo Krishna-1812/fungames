@@ -1,6 +1,6 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
-import { STREET, GRAIN_RECT } from '../lib/robot-scene'
+import { STREET, GRAIN_RECT, HAND_DEFS } from '../lib/robot-scene'
 
 /**
  * I'm Not a Robot — thirteen checks that start like a CAPTCHA and end
@@ -24,7 +24,7 @@ import { STREET, GRAIN_RECT } from '../lib/robot-scene'
  * Nothing leaves the tab. There is no server on this site at all.
  */
 
-const sceneDefs = STREET.defs
+const sceneDefs = STREET.defs + HAND_DEFS
 const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
 ---
 
@@ -325,7 +325,7 @@ const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
   import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
-  import { STREET, ALPHABET, answerCells, coreCells, mark, warpedText } from '../lib/robot-scene'
+  import { STREET, ALPHABET, coreCells, mark, warpedText, hands } from '../lib/robot-scene'
 
   let shareCard: import('../lib/result-card').ResultCard | null = null
   onShare(() => shareCard, (c) => ({
@@ -823,41 +823,21 @@ const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
 
     /* 8 ------------------------------------------------------------- */
     {
-      head: { lead: 'Select the image showing', target: 'a human hand' },
+      head: {
+        lead: 'Select the image showing',
+        target: 'a human hand',
+        tail: 'One of these has the right number of parts',
+      },
       mount(host, api) {
-        // Palm plus digits. The wrong ones are wrong in the specific ways a
-        // picture of a hand goes wrong when nobody counted.
-        const hand = (fingers: number, thumbs: 1 | 2) => {
-          const span = Math.max(56, fingers * 15)
-          const x0 = 60 - span / 2
-          const digits = Array.from({ length: fingers }, (_, i) => {
-            const x = x0 + i * (span / fingers) + 2
-            const h = 34 + Math.sin((i / Math.max(1, fingers - 1)) * Math.PI) * 16
-            return `<rect x="${x.toFixed(1)}" y="${(78 - h).toFixed(1)}" width="${(span / fingers - 5).toFixed(1)}"
-                      height="${(h + 14).toFixed(1)}" rx="6" fill="#e5b48f" stroke="#b0805c" stroke-width="2"/>`
-          }).join('')
-          const thumb = (side: -1 | 1) =>
-            `<rect x="${side < 0 ? x0 - 17 : x0 + span - 4}" y="80" width="20" height="34" rx="10"
-               fill="#e5b48f" stroke="#b0805c" stroke-width="2"
-               transform="rotate(${side * -28} ${side < 0 ? x0 - 7 : x0 + span + 6} 92)"/>`
-          return `<svg viewBox="0 0 120 150" aria-hidden="true">
-            ${digits}
-            <rect x="${x0 - 4}" y="74" width="${span + 8}" height="54" rx="16" fill="#e9bd98" stroke="#b0805c" stroke-width="2"/>
-            ${thumb(-1)}${thumbs === 2 ? thumb(1) : ''}
-            <rect x="${x0 + 6}" y="124" width="${span - 12}" height="20" rx="7" fill="#dcae88" stroke="#b0805c" stroke-width="2"/>
-          </svg>`
-        }
-        const OPTIONS = [
-          { svg: hand(4, 1), ok: true, why: '' },
-          { svg: hand(5, 1), ok: false, why: 'Six digits.' },
-          { svg: hand(3, 1), ok: false, why: 'Four digits.' },
-          { svg: hand(4, 2), ok: false, why: 'Two thumbs.' },
-        ].sort(() => Math.random() - 0.5)
-
-        host.innerHTML = `<div class="hands">${OPTIONS.map((o, i) =>
-          `<button type="button" class="handbtn" data-i="${i}">
-             ${o.svg}<span class="visually-hidden">Hand ${i + 1}</span>
-           </button>`).join('')}</div>`
+        // Two by two, which is the other shape a real image challenge comes in,
+        // and four times the room to count fingers in.
+        const OPTIONS = hands().sort(() => Math.random() - 0.5)
+        host.innerHTML = `<div class="hands" role="group" aria-label="Four pictures of a hand">${
+          OPTIONS.map((o, i) =>
+            `<button type="button" class="handbtn" data-i="${i}">
+               <svg viewBox="0 0 120 140" aria-hidden="true">${o.svg}</svg>
+               <span class="visually-hidden">Hand ${i + 1}</span>
+             </button>`).join('')}</div>`
         host.querySelectorAll<HTMLButtonElement>('.handbtn').forEach((b) =>
           b.addEventListener('click', () => {
             const o = OPTIONS[Number(b.dataset.i)]
@@ -1695,15 +1675,17 @@ const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
 
   /* --- hands ---------------------------------------------------------------- */
 
-  .hands { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  /* Image tiles, like the street's, with the same four-pixel gutters. */
+  .hands { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
   .handbtn {
-    background: #fff; border: 1px solid #c6cbd4; border-radius: 2px; padding: 5px;
-    cursor: pointer; transition: transform 180ms var(--ease-bounce), border-color 140ms var(--ease);
+    position: relative; background: #fff; border: 0; padding: 0; overflow: hidden;
+    cursor: pointer; line-height: 0;
   }
-  .handbtn svg { width: 100%; height: auto; display: block; }
-  .handbtn:hover { border-color: var(--rc-blue-d); transform: translateY(-2px); }
-  .handbtn.right { border-color: #188038; box-shadow: 0 0 0 2px rgba(24, 128, 56, 0.3); }
-  .handbtn.wrong { border-color: var(--rc-err); }
+  .handbtn svg { width: 100%; height: auto; display: block; transition: filter 140ms var(--ease); }
+  .handbtn:hover svg { filter: brightness(1.06); }
+  .handbtn:focus-visible { outline: 3px solid var(--rc-blue-d); outline-offset: -3px; }
+  .handbtn.right { box-shadow: inset 0 0 0 4px #188038; }
+  .handbtn.wrong { box-shadow: inset 0 0 0 4px var(--rc-err); }
 
   /* --- drawing pad ---------------------------------------------------------- */
 
@@ -1835,7 +1817,7 @@ const sceneBody = STREET.ground + STREET.subject + GRAIN_RECT
   }
   @media (max-width: 460px) {
     .rc-target { font-size: 21px; }
-    .hands { gap: 4px; }
+    .hands { gap: 3px; }
     .host-page { padding-top: 40px; }
   }
 </style>
