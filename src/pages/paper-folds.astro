@@ -52,6 +52,24 @@ import { iconSvg } from '../lib/icons'
  */
 const START_MM = 0.1
 const MAX_FOLDS = 103
+
+/**
+ * A picture of each sheet, for the picker.
+ *
+ * Six buttons that differed only in their words made the reader parse a list
+ * every time; six that differ in shape are a rack of materials you choose
+ * from. Stroked rather than filled, at fifteen pixels, so they read as marks
+ * on the chip rather than as blobs.
+ */
+const SHEET_ICONS: Record<string, string> = {
+  a4: 'M5 2.6h6.6L15.4 6.4v11H5z M11.4 2.6v3.9h3.9',
+  note: 'M2.6 6.2h14.8v7.6H2.6z M10 12.1a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2z M5.2 10h.01 M14.8 10h.01',
+  tissue: 'M3.2 15.4c2-1.1 3 .7 5-.4s2.6.9 4.6-.2 2.9.6 4-.3V6.6c-1.1.9-2 .8-4 1.9s-2.6-.9-4.6.2-3-.7-5 .4z',
+  roll: 'M4.6 6.6c0-1.7 2.4-3 5.4-3s5.4 1.3 5.4 3v6.8c0 1.7-2.4 3-5.4 3s-5.4-1.3-5.4-3z '
+    + 'M10 8.1c1.5 0 2.7-.7 2.7-1.5S11.5 5.1 10 5.1 7.3 5.8 7.3 6.6 8.5 8.1 10 8.1z',
+  pitch: 'M2.6 5.4h14.8v9.2H2.6z M10 5.4v9.2 M10 12.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z',
+  leaf: 'M3.6 6.1 12 3.9l4.4 3.3v8L8 17.4l-4.4-3.3z M15 3.2l.55 1.3 1.3.55-1.3.55L15 6.9l-.55-1.3-1.3-.55 1.3-.55z',
+}
 ---
 
 <GameLayout slug="paper-folds" bar="#14100b" bodyClass="fold-body">
@@ -74,7 +92,10 @@ const MAX_FOLDS = 103
       <div class="rail" id="picker" role="radiogroup" aria-label="Which sheet">
         {SHEETS.map((s, i) => (
           <button type="button" class="chip" data-sheet={s.id} role="radio"
-                  aria-checked={i === 0 ? 'true' : 'false'}>{s.name}</button>
+                  aria-checked={i === 0 ? 'true' : 'false'}>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d={SHEET_ICONS[s.id]} /></svg>
+            <span>{s.name}</span>
+          </button>
         ))}
       </div>
 
@@ -96,6 +117,9 @@ const MAX_FOLDS = 103
             <canvas id="stage" role="application" tabindex="0"
               aria-label="The sheet on a desk. Drag its right edge to the left to fold it, or press the right arrow key."
             ></canvas>
+            <span class="grab" aria-hidden="true">
+              <svg viewBox="0 0 22 12"><path d="M8 1 2.5 6 8 11M20 6H3"/></svg>
+            </span>
             <div class="inset-hold" aria-hidden="true">
               <svg class="inset" id="inset" viewBox="0 0 132 78"></svg>
               <p class="inset-cap">true scale<span>, edge on</span></p>
@@ -105,7 +129,11 @@ const MAX_FOLDS = 103
           <p class="grip" id="grip">Drag the right-hand edge over to the left.</p>
 
           <div class="budget">
-            <div class="budget-bar"><i id="budgetFill"></i></div>
+            <div class="budget-bar">
+              <i class="b-used" id="bUsed"></i>
+              <i class="b-next" id="bNext"></i>
+              <b class="b-have" id="bHave"></b>
+            </div>
             <p class="budget-text" id="budgetText"></p>
           </div>
         </section>
@@ -116,9 +144,12 @@ const MAX_FOLDS = 103
             <p class="scale-name" id="scaleName">a grain of sand</p>
             <p class="scale-rel" id="scaleRel">20% of it</p>
           </div>
-          <canvas id="scale" role="img"
-            aria-label="A size comparison between the folded stack and something the same height."
-          ></canvas>
+          <div class="scale-hold">
+            <canvas id="scale" role="img"
+              aria-label="A size comparison between the folded stack and something the same height."
+            ></canvas>
+            <p class="passed" id="passedChip" aria-live="polite"></p>
+          </div>
           <div class="climb">
             <canvas id="rail" aria-hidden="true"></canvas>
             <p class="climb-text" id="climbText">fold 0 of 103</p>
@@ -175,7 +206,7 @@ const MAX_FOLDS = 103
   import { fold3d, fitCam, fitCorners } from '../lib/fold-scene'
   import { skyAt, starField, rgb, rgba, shade } from '../lib/fold-sky'
   import {
-    target as scaleTarget, passed as scalePassed, worldHeight,
+    REFS, target as scaleTarget, passed as scalePassed, worldHeight,
     relation, leadIn,
   } from '../lib/fold-scale'
 
@@ -188,6 +219,37 @@ const MAX_FOLDS = 103
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t
   const plural = (n: number, one: string, many = one + 's') => (n === 1 ? one : many)
 
+  /**
+   * Set a readout, rolling only the characters that actually changed.
+   *
+   * A game about doubling should let you watch the doubling happen, and
+   * `textContent = s` does not: the number is simply different afterwards. So
+   * each character is its own inline-block and the ones that moved get a short
+   * slide, staggered left to right, which reads as the figure being struck
+   * rather than swapped.
+   *
+   * Spaces stay as bare text nodes on purpose. Wrapped in a span they would be
+   * inline-blocks, and "107 billion light years" would then have nowhere to
+   * break.
+   */
+  function setDigits(node: HTMLElement, s: string) {
+    if (node.dataset.v === s) return
+    const prev = node.dataset.v ?? ''
+    node.dataset.v = s
+    if (prefersReducedMotion) { node.textContent = s; return }
+    const frag = document.createDocumentFragment()
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === ' ') { frag.append(' '); continue }
+      const c = document.createElement('span')
+      c.className = prev[i] === s[i] ? 'd' : 'd roll'
+      c.style.animationDelay = Math.min(260, i * 9) + 'ms'
+      c.textContent = s[i]
+      frag.append(c)
+    }
+    node.textContent = ''
+    node.append(frag)
+  }
+
   /* ---------------------------------------------------------------------- */
   /* State                                                                   */
   /* ---------------------------------------------------------------------- */
@@ -197,6 +259,14 @@ const MAX_FOLDS = 103
   let mode: 'alternate' | 'single' = 'alternate'
   let imaginary = false
   let lastMark: any = null
+  /** Whether this visitor has folded anything yet. Gates the drag hint. */
+  let everFolded = false
+  /** The rung being climbed towards, so the page can notice being overtaken. */
+  let aiming = ''
+  /** While this is in the future, the thing just passed is still lit. */
+  let overtookUntil = 0
+  let overtook: any = null
+  let chipTimer = 0
   let refusedAt = -1e9
   const limit = () => maxFolds(sheet, mode)
 
@@ -307,6 +377,10 @@ const MAX_FOLDS = 103
 
   const STARS = starField(300, 7)
   const GALAXIES = starField(16, 91)
+  /** Denser and dimmer, laid along the band of the Milky Way. */
+  const BAND_STARS = starField(340, 53)
+  /** What is floating in the lamplight, on the desk. */
+  const MOTES = starField(60, 17)
   /* A second, sparser field for the stage well, so the window the sheet sits
      in shows a *different* piece of sky from the one behind the console. Two
      views of the same 300 stars at different scales reads as a printing
@@ -341,6 +415,44 @@ const MAX_FOLDS = 103
         g.save(); g.translate(x, y); g.rotate(s.hue); g.scale(1, 0.42)
         g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill(); g.restore()
       }
+    }
+
+    /* The Milky Way, which is the one thing everybody has actually seen in a
+       dark sky and the one thing a field of evenly scattered dots never looks
+       like. A band, a dust lane down the middle of it, and its own much denser
+       star field pressed against the axis. */
+    if (sky.stars > 0.25) {
+      const a = (sky.stars - 0.25) / 0.75
+      g.save()
+      g.translate(w * 0.52, h * 0.4)
+      g.rotate(-0.46)
+      const reach = Math.hypot(w, h)
+      const band = g.createLinearGradient(0, -reach * 0.2, 0, reach * 0.2)
+      band.addColorStop(0, 'rgb(150 162 220 / 0)')
+      band.addColorStop(0.34, 'rgb(186 194 240 / ' + (0.055 * a).toFixed(3) + ')')
+      band.addColorStop(0.5, 'rgb(214 218 250 / ' + (0.085 * a).toFixed(3) + ')')
+      band.addColorStop(0.66, 'rgb(186 194 240 / ' + (0.055 * a).toFixed(3) + ')')
+      band.addColorStop(1, 'rgb(150 162 220 / 0)')
+      g.fillStyle = band
+      g.fillRect(-reach, -reach * 0.2, reach * 2, reach * 0.4)
+      const lane = g.createLinearGradient(0, -reach * 0.055, 0, reach * 0.055)
+      lane.addColorStop(0, 'rgb(4 4 10 / 0)')
+      lane.addColorStop(0.5, 'rgb(4 4 10 / ' + (0.5 * a).toFixed(3) + ')')
+      lane.addColorStop(1, 'rgb(4 4 10 / 0)')
+      g.fillStyle = lane
+      g.fillRect(-reach, -reach * 0.055, reach * 2, reach * 0.11)
+      for (const s of BAND_STARS) {
+        // Pressed towards the axis: cubing a centred value piles them up in
+        // the middle, which is what a galaxy seen edge-on does.
+        const off = Math.pow(s.y * 2 - 1, 3) * reach * 0.16
+        g.globalAlpha = s.a * a * 0.5
+        g.fillStyle = 'hsl(' + s.hue + ' 55% 92%)'
+        g.beginPath()
+        g.arc((s.x * 2 - 1) * reach, off, s.r * 0.62, 0, Math.PI * 2)
+        g.fill()
+      }
+      g.restore()
+      g.globalAlpha = 1
     }
 
     if (sky.stars > 0.01) {
@@ -386,6 +498,23 @@ const MAX_FOLDS = 103
       g.restore()
     }
 
+    /* A sun, while there is air for it to shine through. Off to the left,
+       where the lamp on the desk was, so the light does not jump sides on the
+       way up. */
+    if (sky.clouds > 0.1 && sky.stars < 0.4) {
+      const a = Math.min(1, sky.clouds) * (1 - sky.stars / 0.4)
+      const sx = w * 0.17, sy = h * 0.15
+      g.save()
+      for (const [k, al] of [[0.5, 0.1], [0.16, 0.34], [0.045, 0.85]] as [number, number][]) {
+        const gg = g.createRadialGradient(sx, sy, 0, sx, sy, Math.max(w, h) * k)
+        gg.addColorStop(0, 'rgb(255 250 226 / ' + (al * a).toFixed(3) + ')')
+        gg.addColorStop(1, 'rgb(255 232 176 / 0)')
+        g.fillStyle = gg
+        g.beginPath(); g.arc(sx, sy, Math.max(w, h) * k, 0, Math.PI * 2); g.fill()
+      }
+      g.restore()
+    }
+
     if (sky.clouds > 0.01) {
       g.save()
       g.globalAlpha = sky.clouds * 0.62
@@ -420,6 +549,18 @@ const MAX_FOLDS = 103
       pool.addColorStop(1, 'rgb(200 140 70 / 0)')
       g.fillStyle = pool
       g.fillRect(0, 0, w, h)
+      /* Dust. A lamp in a dim room always has something floating in it, and
+         sixty dots is the whole difference between a gradient and an evening.
+         Static, because they are drawn from the same seed every frame and the
+         loop only runs when something has moved. */
+      for (const m of MOTES) {
+        const mx = m.x * w, my = m.y * h * 0.86
+        const near = 1 - Math.min(1, Math.hypot(mx - w * 0.3, my - h * 0.3) / (w * 0.6))
+        if (near <= 0.02) continue
+        g.globalAlpha = sky.ground * m.a * near * 0.5
+        g.fillStyle = 'rgb(255 232 186)'
+        g.beginPath(); g.arc(mx, my, 0.5 + m.r * 0.7, 0, Math.PI * 2); g.fill()
+      }
       g.restore()
     }
 
@@ -439,18 +580,74 @@ const MAX_FOLDS = 103
   /** The camera eases between fits, so a commit is a move rather than a cut. */
   let camNow: { f: number; cx: number; cy: number } | null = null
 
-  /** Paper, by which face of it you are looking at. */
-  const PAPER: Record<string, [number, number, number]> = {
-    top: [253, 251, 246],
-    under: [216, 208, 192],
-    side: [238, 231, 215],
-    end: [232, 224, 207],
-    bend: [250, 245, 233],
-    desk: [200, 176, 132],
+  /**
+   * What each sheet is made of.
+   *
+   * Six sheets were being drawn as the same cream rectangle, which threw away
+   * the best thing in the picker: gold leaf is *gold*. A hundred nanometres of
+   * beaten metal folded on a desk should look like beaten metal, and a tissue
+   * should look like a tissue — softer, whiter, and with almost none of the
+   * specular that makes office paper read as office paper.
+   *
+   * `gloss` is how tight the highlight is (paper scatters, metal does not),
+   * `fibre` how much of the tooth shows, and `bloom` the colour of the light
+   * the sheet throws back onto the console around it.
+   */
+  type Material = {
+    top: [number, number, number]
+    under: [number, number, number]
+    side: [number, number, number]
+    end: [number, number, number]
+    bend: [number, number, number]
+    gloss: number
+    fibre: number
+    bloom: string
+    edge: string
+    seam: string
+    /** The comparison panel's column: shadow side, lit face, far side. */
+    col: [string, string, string]
   }
 
+  const MATERIALS: Record<string, Material> = {
+    a4: {
+      top: [253, 251, 246], under: [216, 208, 192], side: [238, 231, 215],
+      end: [232, 224, 207], bend: [250, 245, 233],
+      gloss: 0.42, fibre: 0.22, bloom: 'rgb(255 240 210)',
+      edge: 'rgb(255 246 224 / 0.55)', seam: 'rgb(96 78 48 / 0.4)',
+      col: ['rgb(212 200 174)', 'rgb(255 253 246)', 'rgb(204 190 162)'],
+    },
+    note: {
+      top: [226, 232, 214], under: [156, 168, 146], side: [204, 214, 194],
+      end: [196, 206, 186], bend: [232, 238, 220],
+      gloss: 0.3, fibre: 0.34, bloom: 'rgb(216 232 206)',
+      edge: 'rgb(232 246 220 / 0.5)', seam: 'rgb(66 84 60 / 0.42)',
+      col: ['rgb(158 172 148)', 'rgb(230 238 218)', 'rgb(150 164 142)'],
+    },
+    tissue: {
+      top: [255, 255, 255], under: [222, 226, 232], side: [244, 246, 250],
+      end: [238, 241, 246], bend: [252, 253, 255],
+      gloss: 0.16, fibre: 0.4, bloom: 'rgb(236 244 255)',
+      edge: 'rgb(255 255 255 / 0.6)', seam: 'rgb(120 130 146 / 0.3)',
+      col: ['rgb(206 212 222)', 'rgb(255 255 255)', 'rgb(198 204 216)'],
+    },
+    leaf: {
+      top: [255, 214, 118], under: [150, 100, 22], side: [222, 166, 58],
+      end: [204, 148, 46], bend: [255, 236, 172],
+      gloss: 0.98, fibre: 0, bloom: 'rgb(255 206 96)',
+      edge: 'rgb(255 244 196 / 0.9)', seam: 'rgb(110 64 8 / 0.5)',
+      col: ['rgb(158 106 26)', 'rgb(255 226 148)', 'rgb(184 128 34)'],
+    },
+  }
+  // The roll and the pitch are both tissue, and saying so once beats keeping
+  // three copies of the same numbers in step.
+  MATERIALS.roll = MATERIALS.tissue
+  MATERIALS.pitch = MATERIALS.tissue
+
+  const mat = () => MATERIALS[sheet.id] ?? MATERIALS.a4
+
   function faceFill(kind: string, sh: number) {
-    const b = PAPER[kind] ?? PAPER.top
+    const m: any = mat()
+    const b = m[kind] ?? m.top
     const k = 0.42 + 0.66 * sh
     return [
       clamp(Math.round(b[0] * k), 0, 255),
@@ -546,8 +743,8 @@ const MAX_FOLDS = 103
     if ('filter' in g) {
       g.save()
       g.filter = 'blur(' + (7 + Math.min(10, w * 0.02)).toFixed(1) + 'px)'
-      g.globalAlpha = 0.22
-      g.fillStyle = 'rgb(255 240 210)'
+      g.globalAlpha = 0.22 + mat().gloss * 0.14
+      g.fillStyle = mat().bloom
       sheetPath(g, scene.faces)
       g.fill()
       g.restore()
@@ -571,13 +768,14 @@ const MAX_FOLDS = 103
       g.fill()
     }
 
-    // Fibre, over the whole sheet at once, clipped to it.
-    if (fibre) {
+    // Fibre, over the whole sheet at once, clipped to it. Beaten gold has no
+    // tooth at all, which is most of why it does not read as paper.
+    if (fibre && mat().fibre > 0.01) {
       g.save()
       sheetPath(g, scene.faces)
       g.clip()
       g.globalCompositeOperation = 'overlay'
-      g.globalAlpha = 0.22
+      g.globalAlpha = mat().fibre
       g.fillStyle = fibre
       g.fillRect(0, 0, w, h)
       g.restore()
@@ -585,14 +783,14 @@ const MAX_FOLDS = 103
 
     // A hairline where two faces meet. Without it a folded stack is a blob.
     g.save()
-    g.strokeStyle = 'rgb(96 78 48 / 0.4)'
+    g.strokeStyle = mat().seam
     g.lineWidth = 0.6
     for (const f of scene.faces) { poly(g, f.pts); g.stroke() }
     g.restore()
 
     if (scene.laminations.length) {
       g.save()
-      g.strokeStyle = 'rgb(104 84 50 / 0.46)'
+      g.strokeStyle = mat().seam
       g.lineWidth = 0.55
       g.beginPath()
       for (const l of scene.laminations) {
@@ -611,9 +809,14 @@ const MAX_FOLDS = 103
       g.beginPath()
       for (const f of top) poly(g, f.pts, false)
       g.clip()
+      /* Gloss decides both how bright the highlight is and how quickly it
+         falls off. Paper scatters, so its sheen is a wide soft wash; metal
+         does not, so gold gets a narrow band that moves as the sheet turns. */
+      const gl = mat().gloss
       const sh = g.createLinearGradient(w * 0.1, h * 0.1, w * 0.85, h * 0.9)
-      sh.addColorStop(0, 'rgb(255 255 252 / 0.62)')
-      sh.addColorStop(0.42, 'rgb(255 252 244 / 0.14)')
+      sh.addColorStop(0, 'rgb(255 255 252 / ' + (0.3 + gl * 0.62).toFixed(2) + ')')
+      sh.addColorStop(0.2 + (1 - gl) * 0.24, 'rgb(255 252 244 / ' + (0.06 + gl * 0.3).toFixed(2) + ')')
+      sh.addColorStop(0.42 + (1 - gl) * 0.2, 'rgb(255 250 238 / ' + (0.04 + gl * 0.05).toFixed(2) + ')')
       sh.addColorStop(1, 'rgb(240 228 200 / 0)')
       g.fillStyle = sh
       g.fillRect(0, 0, w, h)
@@ -623,11 +826,22 @@ const MAX_FOLDS = 103
     // The lit edge. A one-pixel warm line along the silhouette is what stops
     // the paper looking like a cut-out on a dark ground.
     g.save()
-    g.strokeStyle = 'rgb(255 246 224 / 0.55)'
+    g.strokeStyle = mat().edge
     g.lineWidth = 1
     sheetPath(g, scene.faces)
     g.stroke()
     g.restore()
+
+    /* Where to put the hand.
+       Nothing on the page said the sheet could be dragged, and the sentence
+       under it is read by roughly nobody before they have already tried
+       something. The affordance is a DOM element rather than another canvas
+       pass so its pulse costs no frames: the loop here only runs when
+       something has changed, and a hint that stops moving stops being a hint. */
+    const hold = STAGE.c.parentElement as HTMLElement
+    hold.style.setProperty('--gx', Math.round(scene.bounds.x1 - 4) + 'px')
+    hold.style.setProperty('--gy', Math.round((scene.bounds.y0 + scene.bounds.y1) / 2) + 'px')
+    hold.classList.toggle('show-grab', !everFolded && !dragging && !imaginary && u < 0.02)
   }
 
   /**
@@ -1156,8 +1370,10 @@ const MAX_FOLDS = 103
       }
       let x = Math.max(6, (w - used) / 2)
       // Smallest first, so the row climbs towards the thing being chased.
+      const lit = performance.now() < overtookUntil ? overtook : null
       for (const b of back.reverse()) {
-        drawStand(g, b.ref, x + b.w / 2, groundY, b.h, 0.44)
+        drawStand(g, b.ref, x + b.w / 2, groundY, b.h,
+          lit && b.ref.id === lit.id ? 0.95 : 0.44)
         if (b.h > 16) backNamed = { name: b.ref.name, cx: x + b.w / 2 }
         x += b.w + gap * 0.8
       }
@@ -1215,19 +1431,36 @@ const MAX_FOLDS = 103
     if ('filter' in g) {
       g.filter = 'blur(9px)'
       g.globalAlpha = 0.5
-      g.fillStyle = 'rgb(255 240 208)'
+      g.fillStyle = mat().bloom
       g.fillRect(paperCx - paperW / 2, groundY - paperH, paperW, paperH)
       g.filter = 'none'
       g.globalAlpha = 1
     }
+    const cm = mat().col
     const col = g.createLinearGradient(paperCx - paperW / 2, 0, paperCx + paperW / 2, 0)
-    col.addColorStop(0, 'rgb(212 200 174)')
-    col.addColorStop(0.3, 'rgb(255 253 246)')
-    col.addColorStop(1, 'rgb(204 190 162)')
+    col.addColorStop(0, cm[0])
+    col.addColorStop(0.3, cm[1])
+    col.addColorStop(1, cm[2])
     g.fillStyle = col
     const foot = floorAt(paperCx)
     g.fillRect(paperCx - paperW / 2, groundY - paperH, paperW, Math.max(1.5, paperH) + (foot - groundY))
-    g.fillStyle = 'rgb(255 255 252)'
+    /* Striations down the cut edge. Not the layers — by fold twenty there are
+       a million of them and each is a millionth of a pixel — but the banding a
+       ream of paper actually shows from across a room, which is what stops the
+       column reading as a painted rectangle. */
+    if (paperH > 26) {
+      g.globalAlpha = 0.16
+      g.strokeStyle = cm[0]
+      g.lineWidth = 0.7
+      g.beginPath()
+      for (let y = groundY - paperH + 4; y < groundY - 2; y += 3.5) {
+        g.moveTo(paperCx - paperW / 2, Math.round(y) + 0.5)
+        g.lineTo(paperCx + paperW / 2, Math.round(y) + 0.5)
+      }
+      g.stroke()
+      g.globalAlpha = 1
+    }
+    g.fillStyle = cm[1]
     g.fillRect(paperCx - paperW / 2, groundY - paperH, paperW, Math.min(2, paperH))
     g.restore()
 
@@ -1314,6 +1547,7 @@ const MAX_FOLDS = 103
   /** Land the fold: halve one way, and in alternate mode turn the sheet. */
   function commit() {
     const wasMark = currentMark().at
+    everFolded = true
     n++
     u = 0
     geo = geoAt(n)
@@ -1322,7 +1556,7 @@ const MAX_FOLDS = 103
     if (mode === 'alternate' && !prefersReducedMotion) yaw = -Math.PI / 2
     unlock()
     tone({ freq: 180 * Math.pow(1.055, n), to: 120 * Math.pow(1.055, n), dur: 0.16, type: 'triangle', gain: 0.2 })
-    paint(1)
+    paint()
     const mk = currentMark()
     if (mk.at !== wasMark) {
       sfx.great()
@@ -1365,6 +1599,12 @@ const MAX_FOLDS = 103
     STAGE.c.classList.remove('refuse')
     void STAGE.c.offsetWidth
     STAGE.c.classList.add('refuse')
+    // The shake says no; the gauge says why. Flashing them together is the
+    // difference between a rejection and an explanation.
+    const bar = document.querySelector('.budget-bar') as HTMLElement
+    bar.classList.remove('deny')
+    void bar.offsetWidth
+    bar.classList.add('deny')
     paint()
   }
 
@@ -1422,6 +1662,8 @@ const MAX_FOLDS = 103
 
   function reset() {
     n = 0; u = 0; imaginary = false; lastMark = null
+    aiming = ''; overtook = null; overtookUntil = 0
+    el('passedChip').classList.remove('show')
     yaw = 0
     geo = geoAt(0)
     camNow = null
@@ -1460,7 +1702,7 @@ const MAX_FOLDS = 103
       unlock()
       tone({ freq: 180 * Math.pow(1.055, n), to: 120 * Math.pow(1.055, n), dur: 0.16, type: 'triangle', gain: 0.2 })
       const wasMark = currentMark().at
-      paint(1)
+      paint()
       const mk = currentMark()
       if (mk.at !== wasMark) {
         sfx.great()
@@ -1484,7 +1726,7 @@ const MAX_FOLDS = 103
     if (n <= limit()) imaginary = false
     geo = geoAt(n)
     unlock(); sfx.blip(Math.max(0, 6 - (n % 6)))
-    paint(-1)
+    paint()
   })
 
   addEventListener('keydown', (e) => {
@@ -1499,13 +1741,13 @@ const MAX_FOLDS = 103
   /* Paint                                                                   */
   /* ---------------------------------------------------------------------- */
 
-  function paintText(dir?: number) {
+  function paintText() {
     const lim = limit()
 
-    el('thick').textContent = fmt(START_MM * Math.pow(2, n))
-    el('folds').textContent = String(n)
+    setDigits(el('thick'), fmt(START_MM * Math.pow(2, n)))
+    setDigits(el('folds'), String(n))
     el('foldsLabel').textContent = plural(n, 'fold')
-    el('layers').textContent = bigInt(n)
+    setDigits(el('layers'), bigInt(n))
     el('layersLabel').textContent = plural(2 ** Math.min(n, 40), 'layer') + ' of paper'
     el('where').querySelector('span')!.textContent = sky.where
 
@@ -1513,6 +1755,25 @@ const MAX_FOLDS = 103
     // Tower" is the sentence the picture is making and a picture that needs
     // its sentence read out loud is only half a picture.
     const tgt = scaleTarget(heightM(n))
+    /* Overtaking the Eiffel Tower is the best thing that happens in this game
+       and the page used to let it go by in silence — the name simply became a
+       different name. Now the thing you have just left keeps its light for a
+       moment while the view pulls back off it, and it is named. */
+    if (aiming && aiming !== tgt.id) {
+      const was = REFS.find((r: any) => r.id === aiming)
+      if (was && was.metres < tgt.metres) {
+        overtook = was
+        overtookUntil = performance.now() + 1500
+        const chip = el('passedChip')
+        chip.textContent = 'past ' + was.name
+        chip.classList.remove('show')
+        void chip.offsetWidth
+        chip.classList.add('show')
+        clearTimeout(chipTimer)
+        chipTimer = window.setTimeout(() => chip.classList.remove('show'), 2600)
+      }
+    }
+    aiming = tgt.id
     el('scaleLead').textContent = leadIn(tgt)
     el('scaleName').textContent = tgt.name
     el('scaleRel').textContent = relation(heightM(n), tgt)
@@ -1526,16 +1787,36 @@ const MAX_FOLDS = 103
     el('sheetNote').textContent =
       sheet.note + ' Folded this way it goes ' + lim + ' time' + (lim === 1 ? '' : 's') + '.'
 
+    /* The length budget, drawn as a length.
+       This was a progress bar reading have/need, which is a number about the
+       game rather than a picture of it. What is actually happening is that
+       every fold takes a bite out of the strip and the bites grow like 4^n, so
+       the bar is now the strip: what the folds behind you have already spent,
+       what this one is about to take, and a hard mark at the end of the paper.
+       The fold that fails is the one whose bite crosses the mark, and with the
+       bite drawn you can see it coming two folds out. */
     const room = have(sheet, mode)
+    const spent = need(sheet, n, mode)
     const wanted = need(sheet, n + 1, mode)
-    const frac = clamp(room / wanted, 0, 1)
-    const fill = el('budgetFill') as HTMLElement
-    fill.style.width = (frac * 100).toFixed(1) + '%'
-    fill.classList.toggle('short', frac < 1)
+    const span = Math.max(room, wanted) * 1.04
+    const pc = (v: number) => (clamp(v / span, 0, 1) * 100).toFixed(2) + '%'
+    const short = wanted > room
+    ;(el('bUsed') as HTMLElement).style.width = pc(spent)
+    const nextBar = el('bNext') as HTMLElement
+    nextBar.style.left = pc(spent)
+    nextBar.style.width = pc(wanted - spent)
+    nextBar.classList.toggle('short', short)
+    const haveMark = el('bHave') as HTMLElement
+    haveMark.style.left = pc(room)
+    haveMark.classList.toggle('passed', short)
     el('budgetText').textContent = imaginary
       ? 'No sheet is involved any more.'
       : n >= MAX_FOLDS ? ''
-      : 'Fold ' + (n + 1) + ' needs ' + mm(wanted) + ' of paper. You have ' + mm(room) + '.'
+      : short
+        ? 'This fold alone wants ' + mm(wanted - spent) + ' of paper. There is ' +
+          mm(Math.max(0, room - spent)) + ' left.'
+        : 'The folds so far have spent ' + mm(spent) + ' of ' + mm(room) +
+          '. This one wants ' + mm(wanted - spent) + ' more.'
 
     el('grip').textContent =
       imaginary ? 'The sheet stopped a while ago.'
@@ -1552,6 +1833,8 @@ const MAX_FOLDS = 103
       el('markText').textContent = mk.text
       const gl = el('markGlyph')
       gl.classList.remove('jump'); void gl.offsetWidth; gl.classList.add('jump')
+      const row = el('mark')
+      row.classList.remove('lit'); void row.offsetWidth; row.classList.add('lit')
     }
 
     const fb = el('foldBtn') as HTMLButtonElement
@@ -1562,16 +1845,17 @@ const MAX_FOLDS = 103
       : n >= lim ? 'Carry on without the paper'
       : 'Fold in half'
     el('figures').classList.toggle('imaginary', imaginary)
+    // Past the sheet's limit the gauge is describing a sheet that is no longer
+    // there. It keeps its last real reading and steps back rather than going
+    // on asserting a shortfall in paper nobody is holding.
+    document.querySelector('.budget')!.classList.toggle('spent', imaginary)
     el('hint').textContent =
       n >= MAX_FOLDS ? 'There is nothing left to fold it through.'
       : imaginary ? 'From here on nothing is being folded. This is only what the doubling does.'
       : n >= lim ? 'That is as far as this sheet goes. The button carries on without it.'
       : 'Everything above is a sheet you could actually hold.'
 
-    if (dir) {
-      const t = el('thick')
-      t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump')
-    }
+
   }
 
   /**
@@ -1601,6 +1885,8 @@ const MAX_FOLDS = 103
     s.setProperty('--glow', rgba(sky.accent, 0.34))
     s.setProperty('--glow-soft', rgba(sky.accent, 0.14))
     s.setProperty('--rim-a', rgba(sky.rim, 0.55))
+    // The inset draws the sheet, so it draws it in the sheet's own colour.
+    s.setProperty('--paper-lit', mat().col[1])
     s.setProperty('--line-a', rgba(sky.line, 0.85))
   }
 
@@ -1637,12 +1923,13 @@ const MAX_FOLDS = 103
       dirty = true
     }
     const camMoving = !!camNow && Math.abs(camNow.f - 0) >= 0 && dirty
-    dirty = moved || zooming || yaw !== 0 || dragging || !!running
+    dirty = moved || zooming || yaw !== 0 || dragging || !!running ||
+      performance.now() < overtookUntil
     if (dirty || camMoving) loop = requestAnimationFrame(frame)
   }
 
-  function paint(dir?: number) {
-    paintText(dir)
+  function paint() {
+    paintText()
     drawInset()
     dirty = true
     if (!loop) loop = requestAnimationFrame(frame)
@@ -1797,14 +2084,22 @@ const MAX_FOLDS = 103
     border-bottom: 1px solid var(--line-a);
   }
   .chip {
-    border: 0; border-radius: 999px; padding: 8px 15px; min-height: 34px;
+    border: 0; border-radius: 999px; padding: 7px 15px 7px 11px; min-height: 34px;
+    display: inline-flex; align-items: center; gap: 7px;
     font-size: 13px; font-weight: 600; cursor: pointer;
     background: var(--well); color: var(--ink-soft);
     box-shadow: inset 0 0 0 1px var(--line-a);
     transition: transform 200ms var(--ease-bounce), color 160ms var(--ease),
                 background 260ms var(--ease), box-shadow 260ms var(--ease);
   }
+  .chip svg {
+    width: 16px; height: 16px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 1.5;
+    stroke-linecap: round; stroke-linejoin: round;
+    opacity: 0.62; transition: opacity 200ms var(--ease);
+  }
   .chip:hover { transform: translateY(-1px); color: var(--ink); }
+  .chip:hover svg, .chip[aria-checked='true'] svg { opacity: 1; }
   .chip[aria-checked='true'] {
     background: var(--accent); color: var(--on-accent);
     box-shadow: 0 0 0 1px var(--accent), 0 4px 18px -4px var(--glow);
@@ -1867,9 +2162,37 @@ const MAX_FOLDS = 103
     20% { transform: translateX(6px); } 50% { transform: translateX(-5px); }
     80% { transform: translateX(2px); }
   }
+  .budget-bar.deny { animation: deny 620ms var(--ease); }
+  @keyframes deny {
+    0%, 100% { box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(0 0 0 / 0.5); }
+    30% { box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.75), 0 0 0 3px rgb(244 132 82 / 0.34); }
+  }
 
   /* The honest diagram, on its own little plate so it reads as an instrument
      inside the instrument rather than as something spilled on the stage. */
+  /* The hand goes here.
+     Placed from the projected right edge of the sheet, which moves as the
+     sheet does, and animated in CSS so its pulse costs no frames. */
+  .grab {
+    position: absolute; left: var(--gx, 70%); top: var(--gy, 50%);
+    width: 34px; height: 34px; margin: -17px 0 0 -6px;
+    display: grid; place-items: center; pointer-events: none;
+    border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, var(--glow) 0%, transparent 68%);
+    transition: opacity 320ms var(--ease);
+  }
+  .grab svg {
+    width: 21px; height: 12px; fill: none;
+    stroke: rgb(255 250 238); stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+    filter: drop-shadow(0 0 5px rgb(0 0 0 / 0.7));
+  }
+  .show-grab .grab { opacity: 1; animation: grab-pull 2.1s var(--ease) infinite; }
+  @keyframes grab-pull {
+    0%, 68%, 100% { transform: translateX(0); }
+    82% { transform: translateX(-13px); }
+  }
+
   .inset-hold {
     position: absolute; right: 2px; top: 2px; width: 132px;
     padding: 3px 3px 4px; border-radius: 12px;
@@ -1883,7 +2206,7 @@ const MAX_FOLDS = 103
     font: 500 8.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--ink-soft); opacity: 0.7;
   }
-  .inset .in-block { fill: var(--accent); }
+  .inset .in-block { fill: var(--paper-lit); }
   .inset .in-ghost {
     fill: none; stroke: #ff8a5c; stroke-width: 1.1; stroke-dasharray: 3.5 3;
   }
@@ -1894,21 +2217,48 @@ const MAX_FOLDS = 103
     margin: 11px 0 0; font-size: 13px; color: var(--ink-soft);
     min-height: 34px; text-wrap: pretty;
   }
+  /* The strip of paper, and what is being taken out of it. */
   .budget-bar {
-    height: 6px; border-radius: 999px; overflow: hidden;
+    position: relative; height: 9px; border-radius: 5px;
     background: var(--sink);
-    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.7);
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(0 0 0 / 0.5);
   }
   .budget-bar i {
-    display: block; height: 100%; border-radius: 999px;
-    background: linear-gradient(90deg, #3f8f5e, #6fd08d);
-    box-shadow: 0 0 10px rgb(111 208 141 / 0.45);
-    transition: width 260ms var(--ease), background 260ms var(--ease);
+    position: absolute; top: 1.5px; height: 6px; border-radius: 3px;
+    transition: width 300ms var(--ease), left 300ms var(--ease),
+                background 260ms var(--ease);
   }
-  .budget-bar i.short {
-    background: linear-gradient(90deg, #a8452a, #ef7c4a);
-    box-shadow: 0 0 10px rgb(239 124 74 / 0.45);
+  /* Spent on the folds behind you. */
+  .b-used {
+    left: 0;
+    background: linear-gradient(90deg, rgb(84 100 126), rgb(124 146 176));
   }
+  /* What the next one wants. Striped, because it has not happened yet. */
+  .b-next {
+    background: repeating-linear-gradient(115deg,
+      rgb(111 208 141) 0 5px, rgb(58 138 90) 5px 10px);
+    box-shadow: 0 0 12px rgb(111 208 141 / 0.4);
+  }
+  .b-next.short {
+    background: repeating-linear-gradient(115deg,
+      rgb(244 132 82) 0 5px, rgb(158 62 32) 5px 10px);
+    box-shadow: 0 0 12px rgb(239 124 74 / 0.5);
+  }
+  /* The end of the paper. Nothing may cross it. */
+  .b-have {
+    position: absolute; top: -3px; width: 2px; height: 15px; border-radius: 1px;
+    background: var(--ink); transform: translateX(-1px);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.6);
+    transition: left 300ms var(--ease), background 260ms var(--ease);
+  }
+  /* Once the bite has crossed it the mark matters more, not less — so it
+     keeps the ink colour and gains a dark ring, rather than turning the same
+     orange as the stripe it is standing in and disappearing into it. */
+  .b-have.passed {
+    background: var(--ink);
+    box-shadow: 0 0 0 1.5px rgb(120 44 20), 0 0 12px rgb(244 132 82 / 0.9);
+  }
+  .budget.spent { opacity: 0.42; filter: saturate(0.4); }
   .budget-text {
     margin: 7px 0 0; font-size: 12px; color: var(--ink-soft);
     font-variant-numeric: tabular-nums; min-height: 17px;
@@ -1942,7 +2292,25 @@ const MAX_FOLDS = 103
     font: 700 12px/1.6 var(--mono); color: var(--accent);
     font-variant-numeric: tabular-nums;
   }
-  #scale { display: block; width: 100%; height: 216px; margin-top: 4px; }
+  .scale-hold { position: relative; margin-top: 4px; }
+  #scale { display: block; width: 100%; height: 216px; }
+  /* Named, once, where the thing being left behind is. */
+  .passed {
+    position: absolute; left: 50%; top: 10px; margin: 0;
+    transform: translate(-50%, -8px);
+    padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+    font: 700 11px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--on-accent); background: var(--accent);
+    box-shadow: 0 6px 22px -6px var(--glow);
+    opacity: 0; pointer-events: none;
+  }
+  .passed.show { animation: passed-by 2600ms var(--ease) both; }
+  @keyframes passed-by {
+    0% { opacity: 0; transform: translate(-50%, 6px) scale(0.9); }
+    9% { opacity: 1; transform: translate(-50%, -8px) scale(1); }
+    76% { opacity: 1; transform: translate(-50%, -8px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -20px) scale(0.98); }
+  }
 
   .climb {
     display: flex; align-items: center; gap: 10px;
@@ -1982,7 +2350,10 @@ const MAX_FOLDS = 103
   /* Hairlines between the readouts. An instrument panel divides its dials;
      three numbers in a row with nothing between them is a table. */
   .fig + .fig { border-left: 1px solid var(--line-a); padding-left: 14px; }
-  .fig span {
+  /* A direct child, not any descendant. The rolling digits are spans too,
+     and this rule was quietly setting them to ten-pixel uppercase mono inside
+     a thirty-eight-pixel number. */
+  .fig > span {
     display: block; margin-top: 4px;
     font: 600 10px/1.2 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--ink-soft);
@@ -1991,12 +2362,15 @@ const MAX_FOLDS = 103
     font-size: clamp(25px, 4.4vw, 38px); line-height: 1.04;
     filter: drop-shadow(0 0 22px var(--glow-soft));
   }
-  .fig-lead b.bump { animation: bump 340ms var(--ease); }
-  @keyframes bump {
-    0% { transform: translateY(6px) scale(0.96); opacity: 0.4; filter: none; }
+  .fig b .d { display: inline-block; }
+  .fig b .d.roll { animation: digit 400ms var(--ease) both; }
+  @keyframes digit {
+    0% { transform: translateY(0.44em) scale(0.86); opacity: 0; }
+    55% { opacity: 1; }
   }
 
   .mark {
+    position: relative; overflow: hidden;
     grid-column: 1 / -1;
     display: flex; align-items: center; gap: 12px;
     font-size: 16px; color: var(--ink); min-height: 44px;
@@ -2010,6 +2384,16 @@ const MAX_FOLDS = 103
   }
   .mark-glyph.jump { animation: jump-glyph 420ms var(--ease-bounce); }
   @keyframes jump-glyph { 40% { transform: translateY(-6px) scale(1.14) rotate(-8deg); } }
+  /* A light passes over the line when it changes, so a new one is noticed
+     even when the words are as short as "a person". */
+  .mark.lit::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 34%, var(--glow-soft) 50%, transparent 66%);
+    animation: mark-sweep 760ms var(--ease);
+  }
+  @keyframes mark-sweep {
+    0% { transform: translateX(-100%); } 100% { transform: translateX(100%); }
+  }
 
   /* --- actions ----------------------------------------------------------- */
 
@@ -2086,7 +2470,11 @@ const MAX_FOLDS = 103
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .console, .budget-bar i { transition: none; }
+    .console, .budget-bar i, .b-have { transition: none; }
     .console.pulse, .primary, .where i, #stage.refuse { animation: none; }
+    .show-grab .grab { animation: none; }
+    .passed.show { animation: none; opacity: 1; transform: translate(-50%, -8px); }
+    .budget-bar.deny, .mark.lit::after, .mark-glyph.jump { animation: none; }
+    .mark.lit::after { display: none; }
   }
 </style>

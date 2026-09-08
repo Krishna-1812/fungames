@@ -271,7 +271,11 @@ thing on the screen — which is the point, and which the first version got
 backwards. And beside it the page answers "how big is that?" by standing
 something real next to it: at fold twenty-one the stack is 64% of the way up
 the Eiffel Tower, at twenty-two it is past it and the view pulls back to
-Everest. *Fold 42 reaches the Moon, fold 103 exceeds the observable universe;
+Everest. Each of the six sheets is drawn in its own material, so gold leaf
+folds as beaten metal and a tissue as a tissue; and the length budget is drawn
+as a length — what the folds behind you have spent, what this one is about to
+take, and a hard mark at the end of the paper that the failing fold visibly
+crosses. *Fold 42 reaches the Moon, fold 103 exceeds the observable universe;
 the layer count uses BigInt so it stays exact. The limit is not typed in — it
 comes out of Gallivan's two equations, and `check-fold.mjs` holds them to what
 people have actually managed. A page whose background travels thirty orders of

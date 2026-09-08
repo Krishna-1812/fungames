@@ -957,7 +957,53 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     the windows of the house, and read as a gold hat. Lit and pale are now
     different materials.
 
-11. Then reassess against the depth work in Phases 1–2 above.
+11. ~~**Paper Folds, element by element**~~ — **done.** A pass over every
+    piece of the page asking what it could be rather than whether it worked.
+
+    **The sheet is made of something.** Six sheets were being drawn as the same
+    cream rectangle, which threw away the best thing in the picker: gold leaf
+    is *gold*. Each material now carries its own faces, gloss, tooth and bloom,
+    so beaten metal gets a tight specular and no fibre, a tissue is white and
+    soft with almost no highlight, and a banknote is green-grey cotton. The
+    comparison column and the true-scale inset draw from the same material, so
+    the whole page changes when you change the sheet.
+
+    **The length budget is drawn as a length.** It was a progress bar reading
+    have/need — a number about the game rather than a picture of it. What is
+    actually happening is that each fold takes a bite out of the strip and the
+    bites grow like 4^n, so the bar is now the strip: what the folds behind you
+    have spent, what this one is about to take, striped because it has not
+    happened yet, and a hard mark at the end of the paper. The fold that fails
+    is the one whose bite crosses the mark, and you can see it coming two folds
+    out. Refusing now flashes the gauge as well as shaking the stage — the
+    shake says no and the gauge says why, and they should be one event.
+
+    **Overtaking something is now an event.** Passing the Eiffel Tower is the
+    best thing that happens in this game and the page used to let it go by in
+    silence: the name simply became a different name. The thing you have just
+    left keeps its light for a second and a half while the view pulls back off
+    it, and it is named.
+
+    **The numbers roll.** Each character of the thickness and the layer count
+    is its own inline-block, and the ones that changed slide up, staggered left
+    to right. A game about doubling should let you watch the doubling happen.
+
+    Also: icons on the sheet picker, so six buttons are a rack of materials
+    rather than a list to parse; a pulsing hand at the sheet's right edge until
+    the first fold, because nothing said the thing was draggable; the Milky Way
+    as a real band with a dust lane and its own denser star field rather than
+    evenly scattered dots; a sun while there is still air to shine through; and
+    dust in the lamplight, which is the whole difference between a gradient and
+    an evening.
+
+    One bug worth recording, because it is the kind eyes are bad at: after the
+    rolling digits went in, the big readout looked *slightly* wrong and I could
+    not say why. Measuring it said why — `.fig span` was styling every span in
+    the figure, and the digits are spans, so a thirty-eight-pixel number was
+    being drawn at ten-pixel uppercase mono. A descendant selector where a
+    child selector was meant. It is now `.fig > span`.
+
+12. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run
