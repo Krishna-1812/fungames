@@ -21,105 +21,128 @@ import { iconSvg } from '../lib/icons'
  * is wider than the observable universe. Reaching it takes a button that says
  * what you are doing.
  *
- * What is new is that the page stopped *describing* the second half and
- * started going there. The backdrop is the altitude: fold zero is a warm desk,
- * by thirty you are past the Kármán line, and the last fold has nothing behind
- * it but other galaxies. lib/fold-sky.ts holds that journey and
- * check-fold-scene.mjs holds it to being readable at every one of the hundred
- * and four stops — a page whose background travels that far has exactly one
- * catastrophic failure mode, and it is that somewhere in the middle the ink
- * and the paper it sits on pass through the same grey.
+ * The backdrop is the altitude — fold zero is a lamplit desk, by thirty you
+ * are past the Kármán line, and the last fold has nothing behind it but other
+ * galaxies. lib/fold-sky.ts holds that journey.
  *
- * The sheet itself is drawn as an object on that desk rather than as a line in
- * a box, by lib/fold-scene.ts. The old edge-on diagram was and is the honest
- * picture — both axes to one scale, so the bend at the crease can be seen
- * outgrowing the paper — so it stays, as an inset, labelled.
+ * ---------------------------------------------------------------------------
+ * The design, in one sentence: **one dark instrument, and a sheet of paper
+ * that is the brightest thing on the screen.**
+ *
+ * This page used to be six cream cards floating on that sky. Two things were
+ * wrong with it and they were the same thing. Six panels of identical radius,
+ * fill and shadow read as a form rather than as an object, so nothing was the
+ * subject. And light panels put the one thing the game is about — a white
+ * sheet of paper — on a white background, so at fold sixty you were between
+ * the stars looking at two white index cards with the galaxies hidden behind
+ * them.
+ *
+ * So the six panels are one console, and the console is dark at every
+ * altitude. Everything else follows from that: the paper glows because it is
+ * the only light thing; the accent can be a real amber instead of the muddy
+ * brown that was the darkest gold still legible on cream; the star field is
+ * visible around the instrument rather than behind it; and the contrast
+ * argument gets *stronger*, because a dark surface with light ink cannot cross
+ * — see the note at the top of lib/fold-sky.ts.
+ *
+ * The sheet itself is drawn as an object on a desk by lib/fold-scene.ts. The
+ * old edge-on diagram was and is the honest picture — both axes to one scale,
+ * so the bend at the crease can be seen outgrowing the paper — so it stays, as
+ * an inset, labelled.
  */
 const START_MM = 0.1
 const MAX_FOLDS = 103
 ---
 
-<GameLayout slug="paper-folds" bar="#241b12" bodyClass="fold-body">
+<GameLayout slug="paper-folds" bar="#14100b" bodyClass="fold-body">
   <canvas class="sky" id="sky" aria-hidden="true"></canvas>
 
   <div class="wrap">
-    <header class="head card">
-      <p class="where" id="where">on the desk</p>
-      <h1>Paper Folds</h1>
-      <p class="lede">
-        A sheet of paper is a tenth of a millimetre thick. Every fold doubles
-        it — and every fold is harder than the last, for a reason that is not
-        the one everybody says.
-      </p>
-    </header>
+    <div class="console" id="console">
+      <span class="con-glare" aria-hidden="true"></span>
 
-    <div class="picker" id="picker" role="radiogroup" aria-label="Which sheet">
-      {SHEETS.map((s, i) => (
-        <button type="button" class="chip" data-sheet={s.id} role="radio"
-                aria-checked={i === 0 ? 'true' : 'false'}>{s.name}</button>
-      ))}
-    </div>
+      <header class="con-head">
+        <p class="where" id="where"><i aria-hidden="true"></i><span>on the desk</span></p>
+        <h1>Paper Folds</h1>
+        <p class="lede">
+          A sheet of paper is a tenth of a millimetre thick. Every fold doubles
+          it — and every fold is harder than the last, for a reason that is not
+          the one everybody says.
+        </p>
+      </header>
 
-    <div class="deck">
-      <section class="card stage-card">
-        <div class="card-top">
-          <p class="sheet-note" id="sheetNote"></p>
-          <div class="ways" role="radiogroup" aria-label="Which way you fold">
-            <button type="button" class="way" data-mode="alternate" role="radio" aria-checked="true">
-              Turning it
-            </button>
-            <button type="button" class="way" data-mode="single" role="radio" aria-checked="false">
-              Same way
-            </button>
+      <div class="rail" id="picker" role="radiogroup" aria-label="Which sheet">
+        {SHEETS.map((s, i) => (
+          <button type="button" class="chip" data-sheet={s.id} role="radio"
+                  aria-checked={i === 0 ? 'true' : 'false'}>{s.name}</button>
+        ))}
+      </div>
+
+      <div class="con-main">
+        <section class="bay">
+          <div class="bay-top">
+            <p class="sheet-note" id="sheetNote"></p>
+            <div class="ways" role="radiogroup" aria-label="Which way you fold">
+              <button type="button" class="way" data-mode="alternate" role="radio" aria-checked="true">
+                Turning it
+              </button>
+              <button type="button" class="way" data-mode="single" role="radio" aria-checked="false">
+                Same way
+              </button>
+            </div>
           </div>
+
+          <div class="stage-hold">
+            <canvas id="stage" role="application" tabindex="0"
+              aria-label="The sheet on a desk. Drag its right edge to the left to fold it, or press the right arrow key."
+            ></canvas>
+            <div class="inset-hold" aria-hidden="true">
+              <svg class="inset" id="inset" viewBox="0 0 132 78"></svg>
+              <p class="inset-cap">true scale<span>, edge on</span></p>
+            </div>
+          </div>
+
+          <p class="grip" id="grip">Drag the right-hand edge over to the left.</p>
+
+          <div class="budget">
+            <div class="budget-bar"><i id="budgetFill"></i></div>
+            <p class="budget-text" id="budgetText"></p>
+          </div>
+        </section>
+
+        <aside class="alt" aria-hidden="true">
+          <p class="alt-cap">altitude</p>
+          <canvas id="ladder"></canvas>
+        </aside>
+      </div>
+
+      <section class="read" id="figures">
+        <div class="fig fig-lead">
+          <b id="thick">0.1 millimetres</b>
+          <span>thick</span>
+        </div>
+        <div class="fig">
+          <b id="folds">0</b>
+          <span id="foldsLabel">folds</span>
+        </div>
+        <div class="fig">
+          <b id="layers">1</b>
+          <span id="layersLabel">layer of paper</span>
         </div>
 
-        <div class="stage-hold">
-          <canvas id="stage" role="application" tabindex="0"
-            aria-label="The sheet on a desk. Drag its right edge to the left to fold it, or press the right arrow key."
-          ></canvas>
-          <svg class="inset" id="inset" viewBox="0 0 132 86" aria-hidden="true"></svg>
-          <p class="inset-cap" aria-hidden="true">true scale, edge on</p>
-        </div>
-
-        <p class="grip" id="grip">Drag the right-hand edge over to the left.</p>
-
-        <div class="budget">
-          <div class="budget-bar"><i id="budgetFill"></i></div>
-          <p class="budget-text" id="budgetText"></p>
-        </div>
+        <p class="mark" id="mark">
+          <span class="mark-glyph" id="markGlyph" set:html={iconSvg(MARKS[0].icon)} />
+          <span id="markText">A single sheet of paper.</span>
+        </p>
       </section>
 
-      <aside class="card ladder-card" aria-hidden="true">
-        <canvas id="ladder"></canvas>
-      </aside>
+      <div class="act">
+        <button type="button" id="unfoldBtn" class="ghost">Unfold</button>
+        <button type="button" id="foldBtn" class="primary">Fold in half</button>
+      </div>
     </div>
 
-    <section class="figures card" id="figures">
-      <div class="fig fig-lead">
-        <b id="thick">0.1 millimetres</b>
-        <span>thick</span>
-      </div>
-      <div class="fig">
-        <b id="folds">0</b>
-        <span id="foldsLabel">folds</span>
-      </div>
-      <div class="fig">
-        <b id="layers">1</b>
-        <span id="layersLabel">layer of paper</span>
-      </div>
-
-      <p class="mark" id="mark">
-        <span class="mark-glyph" id="markGlyph" set:html={iconSvg(MARKS[0].icon)} />
-        <span id="markText">A single sheet of paper.</span>
-      </p>
-    </section>
-
-    <div class="actions">
-      <button type="button" id="unfoldBtn" class="ghost">Unfold</button>
-      <button type="button" id="foldBtn" class="primary">Fold in half</button>
-    </div>
-    <p class="hint card" id="hint">Everything above is a sheet you could actually hold.</p>
+    <p class="hint" id="hint">Everything above is a sheet you could actually hold.</p>
   </div>
 </GameLayout>
 
@@ -140,7 +163,7 @@ const MAX_FOLDS = 103
     thicknessAt, mm,
   } from '../lib/fold-paper'
   import { fold3d, fitCam, fitCorners } from '../lib/fold-scene'
-  import { skyAt, starField, rgb, rgba } from '../lib/fold-sky'
+  import { skyAt, starField, rgb, rgba, shade } from '../lib/fold-sky'
 
   const { START_MM, MAX_FOLDS, MARKS, ICONS } = JSON.parse(
     document.getElementById('game-data')!.textContent!,
@@ -169,7 +192,7 @@ const MAX_FOLDS = 103
 
   /** The turn the sheet is part way through, after an alternating fold. */
   let yaw = 0
-  /** Smoothed fold position, so the sky and the ladder move with the hand. */
+  /** Smoothed fold position, so the sky and the altimeter move with the hand. */
   let shown = 0
 
   /**
@@ -267,8 +290,13 @@ const MAX_FOLDS = 103
     fibre = STAGE.g.createPattern(c, 'repeat')
   }
 
-  const STARS = starField(260, 7)
-  const GALAXIES = starField(14, 91)
+  const STARS = starField(300, 7)
+  const GALAXIES = starField(16, 91)
+  /* A second, sparser field for the stage well, so the window the sheet sits
+     in shows a *different* piece of sky from the one behind the console. Two
+     views of the same 300 stars at different scales reads as a printing
+     error. */
+  const WELL_STARS = starField(70, 23)
 
   /* ---------------------------------------------------------------------- */
   /* The sky                                                                 */
@@ -289,9 +317,10 @@ const MAX_FOLDS = 103
     if (sky.galaxies > 0.01) {
       for (const s of GALAXIES) {
         const x = s.x * w, y = s.y * h * 0.9
-        const r = 30 + s.r * 90
+        const r = 34 + s.r * 110
         const gg = g.createRadialGradient(x, y, 0, x, y, r)
-        gg.addColorStop(0, 'rgb(150 160 210 / ' + (0.1 * sky.galaxies * s.a).toFixed(3) + ')')
+        gg.addColorStop(0, 'rgb(164 172 226 / ' + (0.13 * sky.galaxies * s.a).toFixed(3) + ')')
+        gg.addColorStop(0.55, 'rgb(132 140 204 / ' + (0.05 * sky.galaxies * s.a).toFixed(3) + ')')
         gg.addColorStop(1, 'rgb(120 130 190 / 0)')
         g.fillStyle = gg
         g.save(); g.translate(x, y); g.rotate(s.hue); g.scale(1, 0.42)
@@ -301,11 +330,21 @@ const MAX_FOLDS = 103
 
     if (sky.stars > 0.01) {
       for (const s of STARS) {
+        const x = s.x * w, y = s.y * h
         g.globalAlpha = s.a * sky.stars
-        g.fillStyle = 'hsl(' + s.hue + ' 60% 88%)'
+        g.fillStyle = 'hsl(' + s.hue + ' 62% 90%)'
         g.beginPath()
-        g.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2)
+        g.arc(x, y, s.r, 0, Math.PI * 2)
         g.fill()
+        // The big ones get a halo. Without it every star is the same star and
+        // the field reads as noise rather than as depth.
+        if (s.r > 1.35) {
+          const hg = g.createRadialGradient(x, y, 0, x, y, s.r * 5)
+          hg.addColorStop(0, 'hsl(' + s.hue + ' 70% 86% / 0.5)')
+          hg.addColorStop(1, 'hsl(' + s.hue + ' 70% 86% / 0)')
+          g.fillStyle = hg
+          g.beginPath(); g.arc(x, y, s.r * 5, 0, Math.PI * 2); g.fill()
+        }
       }
       g.globalAlpha = 1
     }
@@ -318,14 +357,15 @@ const MAX_FOLDS = 103
       g.save()
       g.globalAlpha = sky.curve
       const rim = g.createRadialGradient(w / 2, cy, R * 0.985, w / 2, cy, R * 1.05)
-      rim.addColorStop(0, 'rgb(120 178 236 / 0.85)')
+      rim.addColorStop(0, 'rgb(126 190 248 / 0.9)')
       rim.addColorStop(0.5, 'rgb(90 150 220 / 0.3)')
       rim.addColorStop(1, 'rgb(70 130 210 / 0)')
       g.fillStyle = rim
       g.beginPath(); g.arc(w / 2, cy, R * 1.05, 0, Math.PI * 2); g.fill()
       const ball = g.createLinearGradient(0, cy - R, 0, h)
-      ball.addColorStop(0, 'rgb(56 104 158)')
-      ball.addColorStop(1, 'rgb(22 46 78)')
+      ball.addColorStop(0, 'rgb(52 100 154)')
+      ball.addColorStop(0.5, 'rgb(34 68 112)')
+      ball.addColorStop(1, 'rgb(16 34 60)')
       g.fillStyle = ball
       g.beginPath(); g.arc(w / 2, cy, R, 0, Math.PI * 2); g.fill()
       g.restore()
@@ -333,42 +373,45 @@ const MAX_FOLDS = 103
 
     if (sky.clouds > 0.01) {
       g.save()
-      g.globalAlpha = sky.clouds * 0.6
-      for (let i = 0; i < 7; i++) {
+      g.globalAlpha = sky.clouds * 0.62
+      for (let i = 0; i < 8; i++) {
         const x = ((i * 137) % 100) / 100 * w
-        const y = h * (0.52 + ((i * 53) % 40) / 100)
-        const rx = w * (0.1 + ((i * 31) % 20) / 100)
+        const y = h * (0.48 + ((i * 53) % 44) / 100)
+        const rx = w * (0.1 + ((i * 31) % 22) / 100)
         const gg = g.createRadialGradient(x, y, 0, x, y, rx)
-        gg.addColorStop(0, 'rgb(255 255 255 / 0.5)')
+        gg.addColorStop(0, 'rgb(255 255 255 / 0.55)')
         gg.addColorStop(1, 'rgb(255 255 255 / 0)')
         g.fillStyle = gg
-        g.save(); g.translate(x, y); g.scale(1, 0.3)
+        g.save(); g.translate(x, y); g.scale(1, 0.28)
         g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill(); g.restore()
       }
       g.restore()
     }
 
-    // The room you started in: a warm floor and a pool of lamplight.
+    // The room you started in: a dim floor and one warm lamp off to the left.
+    // Dim on purpose — the sheet of paper is meant to be the brightest thing
+    // in the picture, and it cannot be if the room is.
     if (sky.ground > 0.01) {
       g.save()
       g.globalAlpha = sky.ground
-      const fl = g.createLinearGradient(0, h * 0.52, 0, h)
-      fl.addColorStop(0, 'rgb(196 172 128 / 0)')
-      fl.addColorStop(1, 'rgb(158 128 84 / 0.55)')
+      const fl = g.createLinearGradient(0, h * 0.46, 0, h)
+      fl.addColorStop(0, 'rgb(70 48 26 / 0)')
+      fl.addColorStop(1, 'rgb(48 31 16 / 0.62)')
       g.fillStyle = fl
-      g.fillRect(0, h * 0.52, w, h * 0.48)
-      const pool = g.createRadialGradient(w * 0.42, h * 0.42, 0, w * 0.42, h * 0.42, w * 0.7)
-      pool.addColorStop(0, 'rgb(255 244 214 / 0.4)')
-      pool.addColorStop(1, 'rgb(255 240 200 / 0)')
+      g.fillRect(0, h * 0.46, w, h * 0.54)
+      const pool = g.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.72)
+      pool.addColorStop(0, 'rgb(255 206 132 / 0.3)')
+      pool.addColorStop(0.5, 'rgb(226 160 84 / 0.1)')
+      pool.addColorStop(1, 'rgb(200 140 70 / 0)')
       g.fillStyle = pool
       g.fillRect(0, 0, w, h)
       g.restore()
     }
 
     // The corners of anything are darker than the middle.
-    const vig = g.createRadialGradient(w / 2, h * 0.44, 0, w / 2, h * 0.44, Math.max(w, h) * 0.78)
-    vig.addColorStop(0.55, 'rgb(0 0 0 / 0)')
-    vig.addColorStop(1, 'rgb(0 0 0 / 0.3)')
+    const vig = g.createRadialGradient(w / 2, h * 0.42, 0, w / 2, h * 0.42, Math.max(w, h) * 0.8)
+    vig.addColorStop(0.5, 'rgb(0 0 0 / 0)')
+    vig.addColorStop(1, 'rgb(0 0 0 / 0.46)')
     g.fillStyle = vig
     g.fillRect(0, 0, w, h)
   }
@@ -383,22 +426,28 @@ const MAX_FOLDS = 103
 
   /** Paper, by which face of it you are looking at. */
   const PAPER: Record<string, [number, number, number]> = {
-    top: [251, 247, 238],
-    under: [226, 217, 197],
-    side: [232, 223, 202],
-    end: [228, 218, 197],
-    bend: [244, 237, 220],
+    top: [253, 251, 246],
+    under: [216, 208, 192],
+    side: [238, 231, 215],
+    end: [232, 224, 207],
+    bend: [250, 245, 233],
     desk: [200, 176, 132],
   }
 
-  function faceFill(kind: string, shade: number) {
+  function faceFill(kind: string, sh: number) {
     const b = PAPER[kind] ?? PAPER.top
-    const k = 0.4 + 0.68 * shade
+    const k = 0.42 + 0.66 * sh
     return [
       clamp(Math.round(b[0] * k), 0, 255),
       clamp(Math.round(b[1] * k), 0, 255),
       clamp(Math.round(b[2] * k), 0, 255),
     ] as [number, number, number]
+  }
+
+  /** Trace every face of the sheet into one path. */
+  function sheetPath(g: CanvasRenderingContext2D, faces: any[]) {
+    g.beginPath()
+    for (const f of faces) poly(g, f.pts, false)
   }
 
   function drawStage() {
@@ -424,29 +473,67 @@ const MAX_FOLDS = 103
       halfW: a, halfD: d, height: hh, layers: 2 ** Math.min(n, 30),
       u, cam, grounded: sky.ground > 0.05,
     })
+    if (!scene.faces.length) return
     const topY = Math.min(...scene.faces.flatMap((f) => f.pts.map((q) => q[1])))
+    const midX = (scene.bounds.x0 + scene.bounds.x1) / 2
+    const baseY = scene.bounds.y1
 
-    // The desk: a soft pool of light under the sheet rather than a rectangle,
-    // so the sheet sits in a place instead of on a shape.
+    drawWell(g, w, h)
+
+    // The desk: a pool of lamplight rather than a rectangle, so the sheet sits
+    // in a place instead of on a shape.
     if (sky.ground > 0.02) {
       g.save()
       g.globalAlpha = sky.ground
-      const pool = g.createRadialGradient(w * 0.5, h * 0.66, 0, w * 0.5, h * 0.66, w * 0.62)
-      pool.addColorStop(0, 'rgb(226 202 158 / 0.55)')
-      pool.addColorStop(1, 'rgb(206 178 130 / 0)')
+      const pool = g.createRadialGradient(w * 0.44, h * 0.64, 0, w * 0.44, h * 0.64, w * 0.52)
+      pool.addColorStop(0, 'rgb(146 102 52 / 0.42)')
+      pool.addColorStop(0.5, 'rgb(96 66 34 / 0.14)')
+      pool.addColorStop(1, 'rgb(70 46 22 / 0)')
       g.fillStyle = pool
       g.fillRect(0, 0, w, h)
+      g.restore()
+    } else {
+      // Off the desk there is no desk, and a stack floating in a black
+      // rectangle reads as a mistake. One faint disc of the sky's own accent
+      // under it says "this is where the object is" without inventing a floor.
+      g.save()
+      const halo = g.createRadialGradient(midX, baseY, 0, midX, baseY, Math.max(60, w * 0.42))
+      halo.addColorStop(0, rgba(sky.accent, 0.16))
+      halo.addColorStop(1, rgba(sky.accent, 0))
+      g.fillStyle = halo
+      g.save(); g.translate(midX, baseY); g.scale(1, 0.34)
+      g.beginPath(); g.arc(0, 0, Math.max(60, w * 0.42), 0, Math.PI * 2); g.fill(); g.restore()
       g.restore()
     }
 
     if (imaginary) drawColumn(g, w, h, topY + 4)
 
+    // Two shadows, because one is either too tight to be soft or too soft to
+    // touch the paper: a wide ambient one and a close contact one.
     if (scene.shadow.length) {
       g.save()
-      if ('filter' in g) g.filter = 'blur(' + (6 + hh * 40).toFixed(1) + 'px)'
-      g.globalAlpha = 0.34 * (1 - 0.4 * u)
-      g.fillStyle = '#3a2a12'
+      if ('filter' in g) g.filter = 'blur(' + (10 + hh * 46).toFixed(1) + 'px)'
+      g.globalAlpha = 0.42 * (1 - 0.35 * u)
+      g.fillStyle = '#120b03'
       poly(g, scene.shadow)
+      g.fill()
+      if ('filter' in g) g.filter = 'blur(2.5px)'
+      g.globalAlpha = 0.34 * (1 - 0.6 * u)
+      poly(g, scene.shadow)
+      g.fill()
+      g.restore()
+    }
+
+    /* The bloom. The sheet is the brightest thing on a dark instrument, so it
+       spills a little light onto what is behind it — which is the difference
+       between a white polygon and a lit object. Drawn as a blurred copy of the
+       silhouette underneath the crisp one. */
+    if ('filter' in g) {
+      g.save()
+      g.filter = 'blur(' + (7 + Math.min(10, w * 0.02)).toFixed(1) + 'px)'
+      g.globalAlpha = 0.22
+      g.fillStyle = 'rgb(255 240 210)'
+      sheetPath(g, scene.faces)
       g.fill()
       g.restore()
     }
@@ -462,21 +549,20 @@ const MAX_FOLDS = 103
         y0 = Math.min(y0, py); y1 = Math.max(y1, py)
       }
       const gr = g.createLinearGradient(x0, y0, x1, y1)
-      gr.addColorStop(0, 'rgb(' + c.map((v) => clamp(Math.round(v * 1.045), 0, 255)).join(' ') + ')')
-      gr.addColorStop(1, 'rgb(' + c.map((v) => Math.round(v * 0.93)).join(' ') + ')')
+      gr.addColorStop(0, 'rgb(' + c.map((v) => clamp(Math.round(v * 1.05), 0, 255)).join(' ') + ')')
+      gr.addColorStop(1, 'rgb(' + c.map((v) => Math.round(v * 0.9)).join(' ') + ')')
       g.fillStyle = gr
       poly(g, f.pts)
       g.fill()
     }
 
     // Fibre, over the whole sheet at once, clipped to it.
-    if (fibre && scene.faces.length) {
+    if (fibre) {
       g.save()
-      g.beginPath()
-      for (const f of scene.faces) poly(g, f.pts, false)
+      sheetPath(g, scene.faces)
       g.clip()
       g.globalCompositeOperation = 'overlay'
-      g.globalAlpha = 0.2
+      g.globalAlpha = 0.22
       g.fillStyle = fibre
       g.fillRect(0, 0, w, h)
       g.restore()
@@ -484,14 +570,14 @@ const MAX_FOLDS = 103
 
     // A hairline where two faces meet. Without it a folded stack is a blob.
     g.save()
-    g.strokeStyle = 'rgb(120 100 66 / 0.34)'
+    g.strokeStyle = 'rgb(96 78 48 / 0.4)'
     g.lineWidth = 0.6
     for (const f of scene.faces) { poly(g, f.pts); g.stroke() }
     g.restore()
 
     if (scene.laminations.length) {
       g.save()
-      g.strokeStyle = 'rgb(126 104 62 / 0.4)'
+      g.strokeStyle = 'rgb(104 84 50 / 0.46)'
       g.lineWidth = 0.55
       g.beginPath()
       for (const l of scene.laminations) {
@@ -510,15 +596,56 @@ const MAX_FOLDS = 103
       g.beginPath()
       for (const f of top) poly(g, f.pts, false)
       g.clip()
-      const sx = w * 0.3, sy = h * 0.34
-      const sh = g.createRadialGradient(sx, sy, 0, sx, sy, Math.max(w, h) * 0.5)
-      sh.addColorStop(0, 'rgb(255 253 244 / 0.5)')
-      sh.addColorStop(1, 'rgb(255 250 235 / 0)')
+      const sh = g.createLinearGradient(w * 0.1, h * 0.1, w * 0.85, h * 0.9)
+      sh.addColorStop(0, 'rgb(255 255 252 / 0.62)')
+      sh.addColorStop(0.42, 'rgb(255 252 244 / 0.14)')
+      sh.addColorStop(1, 'rgb(240 228 200 / 0)')
       g.fillStyle = sh
       g.fillRect(0, 0, w, h)
       g.restore()
     }
 
+    // The lit edge. A one-pixel warm line along the silhouette is what stops
+    // the paper looking like a cut-out on a dark ground.
+    g.save()
+    g.strokeStyle = 'rgb(255 246 224 / 0.55)'
+    g.lineWidth = 1
+    sheetPath(g, scene.faces)
+    g.stroke()
+    g.restore()
+  }
+
+  /**
+   * What is behind the sheet.
+   *
+   * The stage is a recess cut into the console, and at fold zero a flat sheet
+   * of paper seen from a low angle covers about a fifth of it — so four fifths
+   * of the hero element was a plain dark rectangle. Giving the recess a back
+   * wall fixes that, and giving it the *right* back wall does something
+   * better: on the desk it is the dim room the lamp is standing in, and once
+   * the air runs out it is sky, with its own stars. The console stops being a
+   * box with a picture in it and starts being a box with a window in it.
+   */
+  function drawWell(g: CanvasRenderingContext2D, w: number, h: number) {
+    const wall = g.createLinearGradient(0, 0, 0, h)
+    wall.addColorStop(0, rgba(sky.top, 0.55 + 0.35 * (1 - sky.ground)))
+    wall.addColorStop(0.62, rgba(sky.bottom, 0.3 + 0.3 * (1 - sky.ground)))
+    wall.addColorStop(1, rgba(sky.bottom, 0))
+    g.fillStyle = wall
+    g.fillRect(0, 0, w, h)
+
+    if (sky.stars > 0.02) {
+      for (const s of WELL_STARS) {
+        // Held to the upper two thirds: stars below the object it is standing
+        // on would put the floor in front of the sky.
+        g.globalAlpha = s.a * sky.stars * 0.8
+        g.fillStyle = 'hsl(' + s.hue + ' 60% 90%)'
+        g.beginPath()
+        g.arc(s.x * w, s.y * h * 0.66, s.r * 0.85, 0, Math.PI * 2)
+        g.fill()
+      }
+      g.globalAlpha = 1
+    }
   }
 
   /**
@@ -529,28 +656,33 @@ const MAX_FOLDS = 103
    * is the only honest way to draw a number that does that: not smaller, gone.
    */
   function drawColumn(g: CanvasRenderingContext2D, w: number, h: number, baseY: number) {
-    const colW = Math.max(6, w * 0.055)
+    const colW = Math.max(7, w * 0.05)
     const x = w / 2 - colW / 2
     g.save()
-    const glow = g.createLinearGradient(x - colW, 0, x + colW * 2, 0)
-    glow.addColorStop(0, rgba(sky.accent, 0))
-    glow.addColorStop(0.5, rgba(sky.accent, 0.22))
-    glow.addColorStop(1, rgba(sky.accent, 0))
-    g.fillStyle = glow
-    g.fillRect(x - colW, 0, colW * 3, baseY)
+    // A wide bloom, then a narrow one, then the core. Three passes because a
+    // single gradient reads as a painted stripe and this has to read as light.
+    for (const [k, alpha] of [[7, 0.1], [2.6, 0.2]] as [number, number][]) {
+      const gl = g.createLinearGradient(x - colW * k, 0, x + colW * (k + 1), 0)
+      gl.addColorStop(0, rgba(sky.accent, 0))
+      gl.addColorStop(0.5, rgba(sky.accent, alpha))
+      gl.addColorStop(1, rgba(sky.accent, 0))
+      g.fillStyle = gl
+      g.fillRect(x - colW * k, 0, colW * (2 * k + 1), baseY)
+    }
     const body = g.createLinearGradient(x, 0, x + colW, 0)
-    body.addColorStop(0, rgba(sky.accent, 0.5))
-    body.addColorStop(0.35, 'rgb(255 250 236 / 0.92)')
-    body.addColorStop(1, rgba(sky.accent, 0.4))
+    body.addColorStop(0, rgba(sky.accent, 0.55))
+    body.addColorStop(0.34, 'rgb(255 252 242 / 0.96)')
+    body.addColorStop(0.62, 'rgb(255 248 232 / 0.8)')
+    body.addColorStop(1, rgba(sky.accent, 0.42))
     g.fillStyle = body
     g.fillRect(x, 0, colW, baseY)
     // It does not fade out at the top; it is cut off by the frame, which is
     // the whole point.
-    const fade = g.createLinearGradient(0, baseY - 26, 0, baseY)
+    const fade = g.createLinearGradient(0, baseY - 30, 0, baseY)
     fade.addColorStop(0, 'rgb(255 250 236 / 0)')
-    fade.addColorStop(1, rgba(sky.accent, 0.34))
+    fade.addColorStop(1, rgba(sky.accent, 0.38))
     g.fillStyle = fade
-    g.fillRect(x, baseY - 26, colW, 26)
+    g.fillRect(x, baseY - 30, colW, 30)
     g.restore()
   }
 
@@ -570,7 +702,7 @@ const MAX_FOLDS = 103
      circle is the turn the *next* fold has to make, and watching it swell past
      the paper is why there is no eighth fold. */
   function drawInset() {
-    const W = 132, H = 86, PAD = 9
+    const W = 132, H = 78, PAD = 9
     const flat = geo.halfW * 2
     // geo is clamped at the sheet's limit, and so is this: past it the stack
     // is still doubling but the *paper* is not, and printing a twenty-five
@@ -578,12 +710,11 @@ const MAX_FOLDS = 103
     const thick = thicknessAt(sheet.thickness, Math.min(n, limit()))
     const rNeed = thick / 2
     const s = Math.min((W - PAD * 2) / (flat + rNeed * 2), (H - PAD * 2 - 12) / Math.max(thick, rNeed * 2))
-    const bw = flat * s, bh = Math.max(1.1, thick * s)
+    const bw = flat * s, bh = Math.max(1.4, thick * s)
     const left = PAD + (W - PAD * 2 - bw) / 2
-    const cy = PAD + 6 + (H - PAD * 2 - 12) / 2
+    const cy = PAD + 4 + (H - PAD * 2 - 12) / 2
 
-    let out = '<rect class="in-bed" x="1" y="1" width="' + (W - 2) + '" height="' + (H - 2) + '" rx="7"/>'
-    out += '<rect class="in-block" x="' + left.toFixed(2) + '" y="' + (cy - bh / 2).toFixed(2) +
+    let out = '<rect class="in-block" x="' + left.toFixed(2) + '" y="' + (cy - bh / 2).toFixed(2) +
       '" width="' + bw.toFixed(2) + '" height="' + bh.toFixed(2) +
       '" rx="' + Math.min(bh / 2, bw / 2).toFixed(2) + '"/>'
     if (!imaginary && n < MAX_FOLDS) {
@@ -591,14 +722,14 @@ const MAX_FOLDS = 103
       out += '<circle class="in-ghost" cx="' + (left + bw).toFixed(2) + '" cy="' + cy.toFixed(2) +
         '" r="' + r.toFixed(2) + '"/>'
     }
-    out += '<path class="in-rule" d="M' + left.toFixed(2) + ' ' + (H - 15) + ' h' + bw.toFixed(2) + '"/>'
+    out += '<path class="in-rule" d="M' + left.toFixed(2) + ' ' + (H - 16) + ' h' + bw.toFixed(2) + '"/>'
     out += '<text class="in-t" x="' + (W / 2) + '" y="' + (H - 5) + '" text-anchor="middle">' +
       (imaginary ? 'the sheet stopped at ' + limit() : mm(flat) + ' × ' + mm(thick)) + '</text>'
     el('inset').innerHTML = out
   }
 
   /* ---------------------------------------------------------------------- */
-  /* The ladder: the whole climb, as one strip                               */
+  /* The altimeter: the whole climb, as one instrument                       */
   /* ---------------------------------------------------------------------- */
 
   const ANCHORS: [number, string][] = [
@@ -628,46 +759,99 @@ const MAX_FOLDS = 103
     ladderStrip = c
   }
 
+  const round = (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+    if ((g as any).roundRect) { g.beginPath(); (g as any).roundRect(x, y, w, h, r) }
+    else { g.beginPath(); g.rect(x, y, w, h) }
+  }
+
   function drawLadder() {
     const { g, w, h } = LADDER
     if (!ladderStrip || ladderStrip.height !== h) buildLadder()
     g.clearRect(0, 0, w, h)
-    const BAR = 22
-    const yOf = (f: number) => h - (f / MAX_FOLDS) * h
+    const BAR = 11
+    const PADY = 4
+    const inner = h - PADY * 2
+    const yOf = (f: number) => PADY + inner - (f / MAX_FOLDS) * inner
+    // Labels need about sixty pixels beside the track. Below that the altimeter
+    // is not a smaller altimeter, it is a glowing rail — which is the right
+    // thing on a phone, where the names are on the readout anyway.
+    const roomy = w - BAR > 58
 
+    // The groove the track sits in.
     g.save()
-    g.beginPath()
-    ;(g as any).roundRect ? (g as any).roundRect(0, 0, BAR, h, 5) : g.rect(0, 0, BAR, h)
-    g.clip()
-    g.drawImage(ladderStrip!, 0, 0, 1, ladderStrip!.height, 0, 0, BAR, h)
+    round(g, 0, 0, BAR + 4, h, (BAR + 4) / 2)
+    g.fillStyle = rgb(sky.well)
+    g.fill()
+    g.strokeStyle = 'rgb(0 0 0 / 0.6)'
+    g.lineWidth = 1
+    g.stroke()
     g.restore()
 
-    g.strokeStyle = rgba(sky.line, 0.9)
+    // The climb itself.
+    g.save()
+    round(g, 2, PADY, BAR, inner, BAR / 2)
+    g.clip()
+    g.drawImage(ladderStrip!, 0, 0, 1, ladderStrip!.height, 2, PADY, BAR, inner)
+    // Everything above where you are is dimmed, so the strip reads as progress
+    // rather than as decoration.
+    const yNow = clamp(yOf(shown), PADY, PADY + inner)
+    g.fillStyle = 'rgb(6 6 10 / 0.62)'
+    g.fillRect(0, 0, BAR + 4, yNow)
+    const soften = g.createLinearGradient(0, yNow - 26, 0, yNow)
+    soften.addColorStop(0, 'rgb(6 6 10 / 0)')
+    soften.addColorStop(1, 'rgb(6 6 10 / 0.34)')
+    g.fillStyle = soften
+    g.fillRect(0, yNow - 26, BAR + 4, 26)
+    g.restore()
+
+    // Ten-fold ticks down the side of the groove: the scale, quietly.
+    g.save()
+    g.strokeStyle = rgba(sky.inkSoft, 0.26)
     g.lineWidth = 1
-    for (const [at, label] of ANCHORS) {
-      const y = Math.round(yOf(at)) + 0.5
-      g.beginPath(); g.moveTo(BAR + 2, y); g.lineTo(BAR + 7, y); g.stroke()
-      g.fillStyle = rgb(sky.inkSoft)
-      g.font = '500 9px ui-sans-serif, system-ui, sans-serif'
+    for (let f = 10; f < MAX_FOLDS; f += 10) {
+      const y = Math.round(yOf(f)) + 0.5
+      g.beginPath(); g.moveTo(BAR + 6, y); g.lineTo(BAR + 9, y); g.stroke()
+    }
+    g.restore()
+
+    if (roomy) {
+      g.font = '600 9px ' + getComputedStyle(document.body).getPropertyValue('--mono')
       g.textBaseline = 'middle'
-      g.fillText(label, BAR + 11, clamp(y, 6, h - 6))
+      for (const [at, label] of ANCHORS) {
+        const y = clamp(Math.round(yOf(at)) + 0.5, 7, h - 7)
+        g.strokeStyle = rgba(sky.inkSoft, 0.5)
+        g.lineWidth = 1
+        g.beginPath(); g.moveTo(BAR + 6, y); g.lineTo(BAR + 12, y); g.stroke()
+        g.fillStyle = rgba(sky.inkSoft, 0.92)
+        g.fillText(label.toUpperCase(), BAR + 16, y)
+      }
     }
 
-    // Where you are: a bright line across the strip and a dot on it.
-    const y = clamp(yOf(shown), 1, h - 1)
-    g.strokeStyle = rgb(sky.ink)
-    g.lineWidth = 2
-    g.beginPath(); g.moveTo(0, y); g.lineTo(BAR, y); g.stroke()
+    // Where you are: a lit index across the track, and a bead beside it.
+    const y = clamp(yOf(shown), PADY + 1, PADY + inner - 1)
+    g.save()
+    if ('filter' in g) g.filter = 'blur(5px)'
+    g.fillStyle = rgba(sky.accent, 0.55)
+    g.fillRect(0, y - 3, BAR + 4, 6)
+    g.restore()
     g.fillStyle = rgb(sky.accent)
-    g.beginPath(); g.arc(BAR + 0.5, y, 3.2, 0, Math.PI * 2); g.fill()
+    g.fillRect(0, y - 1, BAR + 4, 2)
+    g.beginPath(); g.arc(BAR + 4, y, 3.4, 0, Math.PI * 2)
+    g.fill()
     g.strokeStyle = rgb(sky.surface)
-    g.lineWidth = 1.2
+    g.lineWidth = 1.4
     g.stroke()
   }
 
   /* ---------------------------------------------------------------------- */
   /* Folding                                                                 */
   /* ---------------------------------------------------------------------- */
+
+  /** A milestone lights the console's edge, once. */
+  function pulse() {
+    const c = el('console')
+    c.classList.remove('pulse'); void c.offsetWidth; c.classList.add('pulse')
+  }
 
   /** Land the fold: halve one way, and in alternate mode turn the sheet. */
   function commit() {
@@ -684,9 +868,10 @@ const MAX_FOLDS = 103
     const mk = currentMark()
     if (mk.at !== wasMark) {
       sfx.great()
+      pulse()
       const r = STAGE.c.getBoundingClientRect()
       burst(r.left + r.width / 2, r.top + r.height * 0.5, {
-        count: 24, colors: ['#e2c47a', '#f4e6bd', '#fff'],
+        count: 24, colors: ['#f5b242', '#ffe0a0', '#fff'],
         speed: 4.6, gravity: 0.14, life: 46, size: 4,
       })
       floatIcon(r.left + r.width / 2, r.top + r.height * 0.4, ICONS[mk.icon])
@@ -821,9 +1006,10 @@ const MAX_FOLDS = 103
       const mk = currentMark()
       if (mk.at !== wasMark) {
         sfx.great()
+        pulse()
         const r = el('figures').getBoundingClientRect()
         burst(r.left + r.width / 2, r.top, {
-          count: 22, colors: ['#e2c47a', '#f4e6bd', '#fff'],
+          count: 22, colors: ['#f5b242', '#ffe0a0', '#fff'],
           speed: 4.5, gravity: 0.14, life: 44, size: 4,
         })
         floatIcon(r.left + r.width / 2, r.top - 20, ICONS[mk.icon])
@@ -863,7 +1049,7 @@ const MAX_FOLDS = 103
     el('foldsLabel').textContent = plural(n, 'fold')
     el('layers').textContent = bigInt(n)
     el('layersLabel').textContent = plural(2 ** Math.min(n, 40), 'layer') + ' of paper'
-    el('where').textContent = sky.where
+    el('where').querySelector('span')!.textContent = sky.where
 
     for (const b of el('picker').querySelectorAll('.chip'))
       b.setAttribute('aria-checked', String((b as HTMLElement).dataset.sheet === sheet.id))
@@ -909,7 +1095,6 @@ const MAX_FOLDS = 103
       : n >= lim ? 'Carry on without the paper'
       : 'Fold in half'
     el('figures').classList.toggle('imaginary', imaginary)
-    document.body.classList.toggle('is-imaginary', imaginary)
     el('hint').textContent =
       n >= MAX_FOLDS ? 'There is nothing left to fold it through.'
       : imaginary ? 'From here on nothing is being folded. This is only what the doubling does.'
@@ -922,20 +1107,39 @@ const MAX_FOLDS = 103
     }
   }
 
-  /** The palette every panel on the page is drawn from. */
+  /**
+   * The palette every part of the console is drawn from.
+   *
+   * All of these are opaque `rgb()`. The tempting shorthand is `color-mix(...,
+   * transparent)` for the tints, and it computes to `color(srgb …)`, which a
+   * contrast auditor walking the DOM cannot read — so the audit goes quietly
+   * blind exactly where the design is doing something clever.
+   */
   function paintPalette() {
     const s = document.body.style
     s.setProperty('--surface', rgb(sky.surface))
+    s.setProperty('--well', rgb(sky.well))
     s.setProperty('--ink', rgb(sky.ink))
     s.setProperty('--ink-soft', rgb(sky.inkSoft))
     s.setProperty('--line', rgb(sky.line))
     s.setProperty('--accent', rgb(sky.accent))
-    s.setProperty('--glow', rgba(sky.accent, 0.28))
+    s.setProperty('--rim', rgb(sky.rim))
+    // The console's face is lit from above, so the top of it is nearer the rim
+    // colour than the bottom is.
+    s.setProperty('--lift', rgb(shade(sky.surface, 0.055)))
+    s.setProperty('--sink', rgb(shade(sky.well, -0.3)))
+    // The label on the amber button is the console's own recess colour, which
+    // is the darkest thing in the palette and therefore the safest ink on it.
+    s.setProperty('--on-accent', rgb(sky.well))
+    s.setProperty('--glow', rgba(sky.accent, 0.34))
+    s.setProperty('--glow-soft', rgba(sky.accent, 0.14))
+    s.setProperty('--rim-a', rgba(sky.rim, 0.55))
+    s.setProperty('--line-a', rgba(sky.line, 0.85))
   }
 
-  /* One loop. The sky, the ladder and the sheet all read the same eased fold
-     position, so dragging the paper halfway moves the sky halfway — which is
-     the only way the two halves of the page feel like one thing. */
+  /* One loop. The sky, the altimeter and the sheet all read the same eased
+     fold position, so dragging the paper halfway moves the sky halfway — which
+     is the only way the two halves of the page feel like one thing. */
   let loop = 0
   let dirty = true
   function frame() {
@@ -991,15 +1195,23 @@ const MAX_FOLDS = 103
      the element selector, and two rules of equal specificity are settled by
      order, which is not something a page should rely on. */
   .fold-body {
-    background: #0d1220;
+    background: #08080c;
     /* Set from lib/fold-sky.ts every frame. The values here are only what the
        page looks like for the instant before the first paint. */
-    --surface: #fffdf6;
-    --ink: #2a2010;
-    --ink-soft: #685834;
-    --line: #e8dbbd;
-    --accent: #b28428;
-    --glow: rgb(178 132 40 / 0.28);
+    --surface: #1e1812;
+    --well: #14100c;
+    --ink: #f8f0e2;
+    --ink-soft: #baaa8e;
+    --line: #3e3326;
+    --accent: #f5b242;
+    --rim: #604d36;
+    --lift: #2b241c;
+    --sink: #0e0b08;
+    --on-accent: #14100c;
+    --glow: rgb(245 178 66 / 0.34);
+    --glow-soft: rgb(245 178 66 / 0.14);
+    --rim-a: rgb(96 77 54 / 0.55);
+    --line-a: rgb(62 51 38 / 0.85);
   }
 
   .sky {
@@ -1010,81 +1222,149 @@ const MAX_FOLDS = 103
 
   .wrap {
     position: relative; z-index: 1;
-    max-width: 760px; margin: 0 auto; padding: 26px 20px 90px;
+    max-width: 780px; margin: 0 auto; padding: 24px 18px 84px;
     text-align: center;
   }
 
+  /* --- the console ------------------------------------------------------- */
+
+  /* One object, not six panels.
+     Six cards of identical radius, fill and shadow read as a form; the eye has
+     nothing to fix on and no idea what the subject is. So the head, the sheet
+     picker, the stage, the altimeter, the readout and the buttons are all one
+     instrument with hairlines between its parts, and the only other thing on
+     the page is one line of text below it.
+
+     Nothing sits directly on the sky. That was true when the panels were pale
+     and it is still true now they are dark: the backdrop passes through every
+     luminance there is on the way up, and no single text colour survives that.
+     Every word is on the console, and check-fold-scene.mjs holds the console
+     to 4.5:1 at every fold. */
+  .console {
+    position: relative;
+    overflow: hidden;
+    border-radius: 26px;
+    text-align: left;
+    background:
+      radial-gradient(120% 60% at 50% -18%, var(--glow-soft), transparent 62%),
+      linear-gradient(180deg, var(--lift) 0, var(--surface) 210px);
+    background-color: var(--surface);
+    box-shadow:
+      inset 0 1px 0 var(--rim-a),
+      inset 0 0 0 1px rgb(255 255 255 / 0.035),
+      0 0 0 1px rgb(0 0 0 / 0.6),
+      0 2px 6px rgb(0 0 0 / 0.4),
+      0 34px 90px -26px rgb(0 0 0 / 0.85);
+    transition: background-color 380ms var(--ease), box-shadow 500ms var(--ease);
+  }
+  /* A milestone lights the edge rather than shouting. */
+  .console.pulse { animation: con-pulse 900ms var(--ease); }
+  @keyframes con-pulse {
+    0%, 100% { box-shadow:
+      inset 0 1px 0 var(--rim-a), inset 0 0 0 1px rgb(255 255 255 / 0.035),
+      0 0 0 1px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.4),
+      0 34px 90px -26px rgb(0 0 0 / 0.85); }
+    30% { box-shadow:
+      inset 0 1px 0 var(--accent), inset 0 0 0 1px var(--glow),
+      0 0 0 1px var(--glow), 0 2px 6px rgb(0 0 0 / 0.4),
+      0 20px 70px -14px var(--glow); }
+  }
+
+  /* Grain and a raking sheen. Between them they turn a flat rounded rectangle
+     into something with a surface, for one gradient and one 140-pixel tile. */
+  .con-glare {
+    position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background:
+      linear-gradient(104deg, rgb(255 255 255 / 0.055) 0 22%, transparent 46%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+    background-blend-mode: normal, overlay;
+    opacity: 0.5;
+    mix-blend-mode: soft-light;
+  }
+  .console > *:not(.con-glare) { position: relative; z-index: 1; }
+
   /* --- head -------------------------------------------------------------- */
 
-  /* Nothing on this page sits directly on the sky.
-     It is tempting — a big title floating over deep space looks wonderful, and
-     it looks wonderful at exactly two of the hundred and four altitudes. In
-     between, the backdrop passes through every luminance there is, and no
-     single text colour survives that. So every word is on a surface, and
-     check-fold-scene.mjs holds that surface to 4.5:1 at every fold. */
-  .head { margin-bottom: 14px; padding: 20px 24px 22px; }
+  .con-head { padding: 30px 30px 22px; text-align: center; }
   .where {
-    margin: 0 0 8px; font: 600 11px/1 var(--mono);
-    letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent);
+    display: inline-flex; align-items: center; gap: 7px;
+    margin: 0 0 12px; padding: 5px 12px 5px 10px;
+    border-radius: 999px; background: var(--well);
+    box-shadow: inset 0 0 0 1px var(--line-a);
+    font: 600 10.5px/1 var(--mono);
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent);
   }
-  .head h1 {
-    font-size: clamp(34px, 6.4vw, 52px); letter-spacing: -0.035em; margin: 0;
-    color: var(--ink); line-height: 1;
+  .where i {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: blip 2.6s var(--ease) infinite;
+  }
+  @keyframes blip { 0%, 62%, 100% { opacity: 1; } 78% { opacity: 0.28; } }
+
+  .con-head h1 {
+    font-size: clamp(38px, 7.4vw, 62px); letter-spacing: -0.042em; margin: 0;
+    color: var(--ink); line-height: 0.96;
+    text-shadow: 0 0 46px var(--glow-soft);
   }
   .lede {
-    color: var(--ink-soft); margin: 12px auto 0; max-width: 46ch;
-    text-wrap: pretty;
+    color: var(--ink-soft); margin: 13px auto 0; max-width: 44ch;
+    font-size: 15px; line-height: 1.55; text-wrap: pretty;
   }
 
-  /* --- panels ------------------------------------------------------------ */
+  /* --- the sheet rail ---------------------------------------------------- */
 
-  .card {
-    background: var(--surface);
-    border-radius: 18px;
-    box-shadow:
-      0 1px 2px rgb(0 0 0 / 0.16),
-      0 14px 40px rgb(0 0 0 / 0.3),
-      0 0 0 1px rgb(255 255 255 / 0.04);
-    transition: background 400ms var(--ease);
-  }
-
-  .picker {
+  .rail {
     display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
-    margin: 0 0 14px;
+    padding: 0 22px 18px; margin: 0 22px 16px;
+    border-bottom: 1px solid var(--line-a);
   }
-  /* Unselected is ink on the surface; selected is the surface on ink. One
-     pair of colours, so one contrast ratio covers both states. */
   .chip {
     border: 0; border-radius: 999px; padding: 8px 15px; min-height: 34px;
     font-size: 13px; font-weight: 600; cursor: pointer;
-    background: var(--surface); color: var(--ink-soft);
-    box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+    background: var(--well); color: var(--ink-soft);
+    box-shadow: inset 0 0 0 1px var(--line-a);
     transition: transform 200ms var(--ease-bounce), color 160ms var(--ease),
-                background 300ms var(--ease);
+                background 260ms var(--ease), box-shadow 260ms var(--ease);
   }
   .chip:hover { transform: translateY(-1px); color: var(--ink); }
   .chip[aria-checked='true'] {
-    background: var(--ink); color: var(--surface);
-    box-shadow: 0 3px 14px rgb(0 0 0 / 0.32);
+    background: var(--accent); color: var(--on-accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 4px 18px -4px var(--glow);
   }
 
-  .deck {
-    display: grid; grid-template-columns: minmax(0, 1fr) 118px;
-    gap: 14px; align-items: stretch;
+  /* --- the bay ----------------------------------------------------------- */
+
+  .con-main {
+    display: grid; grid-template-columns: minmax(0, 1fr) 132px;
+    gap: 12px; align-items: stretch;
+    padding: 0 14px 14px;
   }
 
-  .stage-card { padding: 14px 14px 16px; text-align: left; overflow: hidden; }
-  .card-top {
+  /* Recesses, not cards: the stage and the altimeter are cut *into* the
+     console, which is why they are darker than it and lit along the bottom
+     edge rather than the top. */
+  .bay, .alt {
+    border-radius: 18px;
+    background: var(--well);
+    box-shadow:
+      inset 0 2px 5px rgb(0 0 0 / 0.55),
+      inset 0 0 0 1px rgb(0 0 0 / 0.5),
+      0 1px 0 var(--rim-a);
+  }
+
+  .bay { padding: 13px 14px 15px; overflow: hidden; }
+  .bay-top {
     display: flex; align-items: flex-start; gap: 12px;
-    padding-bottom: 10px; border-bottom: 1px solid var(--line);
+    padding-bottom: 11px; border-bottom: 1px solid var(--line-a);
   }
   .sheet-note {
-    flex: 1; margin: 0; font-size: 12.5px; line-height: 1.45;
+    flex: 1; margin: 0; font-size: 12.5px; line-height: 1.5;
     color: var(--ink-soft); text-wrap: pretty;
   }
   .ways {
     flex: none; display: flex; gap: 2px; padding: 3px; border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 7%, var(--surface));
+    background: var(--sink);
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.6);
   }
   .way {
     border: 0; background: none; cursor: pointer; color: var(--ink-soft);
@@ -1094,13 +1374,13 @@ const MAX_FOLDS = 103
   }
   .way:hover { color: var(--ink); }
   .way[aria-checked='true'] {
-    background: var(--surface); color: var(--ink);
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.16);
+    background: var(--lift); color: var(--ink);
+    box-shadow: 0 1px 0 var(--rim-a), 0 2px 6px rgb(0 0 0 / 0.45);
   }
 
   .stage-hold { position: relative; margin-top: 10px; }
   #stage {
-    display: block; width: 100%; height: 268px;
+    display: block; width: 100%; height: 296px;
     touch-action: none; cursor: ew-resize; border-radius: 12px;
   }
   #stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -1111,126 +1391,188 @@ const MAX_FOLDS = 103
     80% { transform: translateX(2px); }
   }
 
-  .inset {
-    position: absolute; right: 4px; bottom: 20px; width: 132px; height: 86px;
-    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.14));
+  /* The honest diagram, on its own little plate so it reads as an instrument
+     inside the instrument rather than as something spilled on the stage. */
+  .inset-hold {
+    position: absolute; right: 2px; top: 2px; width: 132px;
+    padding: 3px 3px 4px; border-radius: 12px;
+    background: var(--sink);
+    box-shadow: inset 0 0 0 1px var(--line-a), 0 6px 18px -6px rgb(0 0 0 / 0.8);
+    opacity: 0.94;
   }
+  .inset { display: block; width: 126px; height: 74px; margin: 0 auto; }
   .inset-cap {
-    position: absolute; right: 8px; bottom: 6px; margin: 0;
-    font: 500 9px/1 var(--mono); letter-spacing: 0.09em; text-transform: uppercase;
-    color: var(--ink-soft); opacity: 0.75;
+    margin: 0; text-align: center;
+    font: 500 8.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-soft); opacity: 0.7;
   }
-  .inset .in-bed { fill: color-mix(in srgb, var(--ink) 6%, var(--surface)); stroke: var(--line); }
   .inset .in-block { fill: var(--accent); }
   .inset .in-ghost {
-    fill: none; stroke: #c0603c; stroke-width: 1.1; stroke-dasharray: 3.5 3;
+    fill: none; stroke: #ff8a5c; stroke-width: 1.1; stroke-dasharray: 3.5 3;
   }
-  .inset .in-rule { stroke: var(--ink-soft); stroke-width: 0.8; opacity: 0.6; }
+  .inset .in-rule { stroke: var(--ink-soft); stroke-width: 0.8; opacity: 0.55; }
   .inset .in-t { fill: var(--ink-soft); font-size: 8px; }
 
   .grip {
-    margin: 10px 0 0; font-size: 13px; color: var(--ink-soft);
+    margin: 11px 0 0; font-size: 13px; color: var(--ink-soft);
     min-height: 34px; text-wrap: pretty;
   }
   .budget-bar {
     height: 6px; border-radius: 999px; overflow: hidden;
-    background: color-mix(in srgb, var(--ink) 9%, var(--surface));
+    background: var(--sink);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.7);
   }
   .budget-bar i {
-    display: block; height: 100%; border-radius: 999px; background: #4f8c52;
+    display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #3f8f5e, #6fd08d);
+    box-shadow: 0 0 10px rgb(111 208 141 / 0.45);
     transition: width 260ms var(--ease), background 260ms var(--ease);
   }
-  .budget-bar i.short { background: #b4562f; }
+  .budget-bar i.short {
+    background: linear-gradient(90deg, #a8452a, #ef7c4a);
+    box-shadow: 0 0 10px rgb(239 124 74 / 0.45);
+  }
   .budget-text {
-    margin: 6px 0 0; font-size: 12px; color: var(--ink-soft);
+    margin: 7px 0 0; font-size: 12px; color: var(--ink-soft);
     font-variant-numeric: tabular-nums; min-height: 17px;
   }
 
-  .ladder-card { padding: 10px 8px; }
-  #ladder { display: block; width: 100%; height: 100%; min-height: 260px; }
+  /* --- the altimeter ----------------------------------------------------- */
 
-  /* --- figures ----------------------------------------------------------- */
+  .alt { padding: 12px 8px 10px; display: flex; flex-direction: column; }
+  .alt-cap {
+    margin: 0 0 8px; text-align: center;
+    font: 600 8.5px/1 var(--mono); letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--ink-soft); opacity: 0.75;
+  }
+  #ladder { display: block; width: 100%; flex: 1; min-height: 300px; }
 
-  .figures {
-    display: grid; grid-template-columns: 1.6fr 0.7fr 1fr;
-    column-gap: 10px; row-gap: 4px;
+  /* --- the readout ------------------------------------------------------- */
+
+  .read {
+    display: grid; grid-template-columns: 1.65fr 0.62fr 1fr;
+    column-gap: 14px; row-gap: 4px;
     align-items: end; text-align: left;
-    margin-top: 14px; padding: 16px 18px 18px;
+    margin: 0 14px; padding: 16px 16px 18px;
+    border-top: 1px solid var(--line-a);
   }
-  /* Past the sheet's limit nothing is being measured, and the panel should
+  /* Past the sheet's limit nothing is being measured, and the readout should
      stop looking like a measurement. Marked with a ring rather than with
-     transparency: a see-through card over a sky that travels from daylight to
+     transparency: a see-through panel over a sky that travels from daylight to
      deep space has a different contrast at every fold. */
-  .figures.imaginary {
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.16), 0 14px 40px rgb(0 0 0 / 0.3),
-      inset 0 0 0 2px var(--line);
-  }
-  .figures.imaginary .mark { border-top-style: dashed; }
+  .read.imaginary { box-shadow: inset 0 0 0 1px var(--line-a); border-radius: 14px; }
+  .read.imaginary .mark { border-top-style: dashed; }
   .fig b {
     display: block; font-family: var(--display); font-weight: 800;
-    letter-spacing: -0.03em; color: var(--ink);
+    letter-spacing: -0.035em; color: var(--ink);
     font-variant-numeric: tabular-nums; line-height: 1.02;
     font-size: 20px; word-break: break-word;
   }
+  /* Hairlines between the readouts. An instrument panel divides its dials;
+     three numbers in a row with nothing between them is a table. */
+  .fig + .fig { border-left: 1px solid var(--line-a); padding-left: 14px; }
   .fig span {
-    display: block; margin-top: 3px;
-    font: 600 10.5px/1.2 var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+    display: block; margin-top: 4px;
+    font: 600 10px/1.2 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--ink-soft);
   }
-  .fig-lead b { font-size: clamp(26px, 5.2vw, 40px); }
-  .fig-lead b.bump { animation: bump 300ms var(--ease); }
-  @keyframes bump { 0% { transform: scale(0.94); opacity: 0.55; } }
+  .fig-lead b {
+    font-size: clamp(28px, 5.6vw, 44px);
+    filter: drop-shadow(0 0 22px var(--glow-soft));
+  }
+  .fig-lead b.bump { animation: bump 340ms var(--ease); }
+  @keyframes bump {
+    0% { transform: translateY(6px) scale(0.96); opacity: 0.4; filter: none; }
+  }
 
   .mark {
     grid-column: 1 / -1;
-    display: flex; align-items: center; gap: 11px;
-    font-size: 16px; color: var(--ink); min-height: 40px;
-    margin: 4px 0 0; padding-top: 14px; border-top: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px;
+    font-size: 16px; color: var(--ink); min-height: 44px;
+    margin: 8px 0 0; padding-top: 15px; border-top: 1px solid var(--line-a);
     text-wrap: pretty;
   }
-  .mark-glyph { width: 26px; height: 26px; flex: none; color: var(--accent); }
-  .mark-glyph.jump { animation: jump-glyph 380ms var(--ease-bounce); }
-  @keyframes jump-glyph { 40% { transform: translateY(-5px) scale(1.2) rotate(-8deg); } }
+  .mark-glyph {
+    width: 34px; height: 34px; flex: none; padding: 5px; box-sizing: border-box;
+    border-radius: 10px; color: var(--accent);
+    background: var(--well); box-shadow: inset 0 0 0 1px var(--line-a);
+  }
+  .mark-glyph.jump { animation: jump-glyph 420ms var(--ease-bounce); }
+  @keyframes jump-glyph { 40% { transform: translateY(-6px) scale(1.14) rotate(-8deg); } }
 
   /* --- actions ----------------------------------------------------------- */
 
-  .actions { display: flex; gap: 10px; justify-content: center; }
-  .actions button {
-    border-radius: 999px; padding: 14px 28px; font-weight: 700; font-size: 16px;
-    cursor: pointer; border: 0; min-height: 46px;
+  .act {
+    display: flex; gap: 10px; justify-content: center;
+    padding: 4px 14px 20px;
+  }
+  .act button {
+    border-radius: 999px; padding: 14px 30px; font-weight: 700; font-size: 16px;
+    cursor: pointer; border: 0; min-height: 48px;
     transition: transform 200ms var(--ease-bounce), filter 160ms var(--ease),
                 box-shadow 200ms var(--ease);
   }
-  .actions button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.05); }
-  .actions button:active:not(:disabled) { transform: scale(0.97); }
-  .actions button:disabled { cursor: default; opacity: 0.55; }
+  .act button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
+  .act button:active:not(:disabled) { transform: scale(0.97); }
+  .act button:disabled { cursor: default; opacity: 0.45; }
   .primary {
-    background: var(--surface); color: var(--ink);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.34), 0 0 0 6px var(--glow);
+    background: var(--accent); color: var(--on-accent);
+    box-shadow: 0 6px 26px -6px var(--glow), 0 0 0 1px var(--accent),
+                inset 0 1px 0 rgb(255 255 255 / 0.35);
+    animation: breathe 4.5s var(--ease) infinite;
   }
+  @keyframes breathe {
+    0%, 100% { box-shadow: 0 6px 26px -6px var(--glow), 0 0 0 1px var(--accent),
+      inset 0 1px 0 rgb(255 255 255 / 0.35); }
+    50% { box-shadow: 0 8px 34px -4px var(--glow), 0 0 0 5px var(--glow-soft),
+      inset 0 1px 0 rgb(255 255 255 / 0.35); }
+  }
+  .primary:disabled { animation: none; }
   .ghost {
-    background: var(--surface); color: var(--ink-soft);
-    box-shadow: 0 2px 10px rgb(0 0 0 / 0.22), inset 0 0 0 1px var(--line);
+    background: var(--well); color: var(--ink-soft);
+    box-shadow: inset 0 0 0 1px var(--line-a), 0 2px 8px rgb(0 0 0 / 0.4);
   }
+  .ghost:hover:not(:disabled) { color: var(--ink); }
 
   .hint {
     display: inline-block; color: var(--ink-soft); font-size: 13px;
-    margin: 16px auto 0; padding: 9px 16px; border-radius: 999px;
+    margin: 18px auto 0; padding: 9px 18px; border-radius: 999px;
+    background: var(--surface);
+    box-shadow: inset 0 1px 0 var(--rim-a), 0 0 0 1px rgb(0 0 0 / 0.5),
+                0 10px 30px -12px rgb(0 0 0 / 0.8);
     text-wrap: pretty;
   }
 
-  @media (max-width: 620px) {
-    .deck { grid-template-columns: minmax(0, 1fr) 92px; gap: 10px; }
-    .card-top { flex-direction: column; gap: 8px; }
+  @media (max-width: 660px) {
+    .wrap { padding: 16px 12px 72px; }
+    .console { border-radius: 20px; }
+    .con-head { padding: 24px 20px 18px; }
+    .rail { padding: 0 14px 16px; }
+    .con-main { grid-template-columns: minmax(0, 1fr) 34px; gap: 8px; padding: 0 10px 10px; }
+    .alt { padding: 10px 5px 8px; }
+    .alt-cap { display: none; }
+    .bay { padding: 11px 11px 13px; }
+    .bay-top { flex-direction: column; gap: 9px; }
     .ways { align-self: flex-start; }
-    #stage { height: 224px; }
-    .inset { width: 106px; height: 70px; bottom: 18px; }
-    .figures { grid-template-columns: 1fr 1fr; row-gap: 12px; }
+    #stage { height: 236px; }
+    #ladder { min-height: 240px; }
+    .inset-hold { width: 98px; }
+    .inset { width: 92px; height: 55px; }
+    /* The full caption is nineteen characters and the plate is ninety-two
+       pixels wide; the half that says something keeps its size. */
+    .inset-cap span { display: none; }
+    .read { grid-template-columns: 1fr 1fr; row-gap: 12px; margin: 0 10px; padding: 14px 8px 16px; }
     .fig-lead { grid-column: 1 / -1; }
+    /* Two per row now, so the divider belongs between them rather than after
+       every one — otherwise the first of each row is ruled off from nothing. */
+    .fig + .fig { border-left: 0; padding-left: 0; }
+    .read .fig:nth-of-type(3) { border-left: 1px solid var(--line-a); padding-left: 14px; }
+    .act { padding: 2px 10px 16px; }
+    .act button { padding: 13px 22px; font-size: 15px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .card, .where, .budget-bar i { transition: none; }
-    #stage.refuse { animation: none; }
+    .console, .budget-bar i { transition: none; }
+    .console.pulse, .primary, .where i, #stage.refuse { animation: none; }
   }
 </style>

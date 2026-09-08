@@ -30,7 +30,8 @@ import fs from 'node:fs'
 import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
-const { skyAt, starField, contrast, luminance } = await import('../src/lib/fold-sky.ts')
+const { skyAt, stops, starField, contrast, luminance, surfaceMax, inkMin } =
+  await import('../src/lib/fold-sky.ts')
 const { project, fitCam, fold3d, fitCorners, signedArea } = await import('../src/lib/fold-scene.ts')
 const { SHEETS, sheetById, maxFolds, have, footprint, thicknessAt, bendRadius } =
   await import('../src/lib/fold-paper.ts')
@@ -68,15 +69,74 @@ console.log('\nThe page stays readable all the way up')
   if (worstAccent < 4.5) fail('the accent falls to ' + worstAccent.toFixed(2) + ':1 on the surface')
   else ok('the accent holds ' + worstAccent.toFixed(1) + ':1 against the surface')
 
-  // A light card on a dark sky and a light card on a light sky both have to be
-  // findable, or it stops looking like a card and starts looking like a gap.
-  let worstEdge = Infinity
+  // The label on the primary button is the console's own recess colour sitting
+  // on the accent, so the accent is text *and* background and has to clear the
+  // threshold read both ways.
+  let worstBtn = Infinity
   for (let n = 0; n <= MAX_FOLDS; n++) {
     const s = skyAt(heightAt(n))
-    worstEdge = Math.min(worstEdge, contrast(s.surface, s.bottom))
+    worstBtn = Math.min(worstBtn, contrast(s.well, s.accent))
   }
-  if (worstEdge < 1.12) fail('the panel vanishes into the sky (' + worstEdge.toFixed(2) + ':1)')
-  else ok('the panel stays off the sky by at least ' + worstEdge.toFixed(2) + ':1')
+  if (worstBtn < 4.5) fail("the primary button's label falls to " + worstBtn.toFixed(2) + ':1')
+  else ok("the primary button's label holds " + worstBtn.toFixed(1) + ':1 on the accent')
+
+  /**
+   * The bands, checked at the stops rather than at samples.
+   *
+   * This is the check that replaced sampling-and-hoping. Every surface sits
+   * below `surfaceMax` and every ink above `inkMin`, at every one of the
+   * declared stops; luminance under a linear mix of two values in the same
+   * band stays in that band; so no fold *between* two stops can leave it
+   * either. The ratios above are then a consequence rather than an
+   * observation, which is what you want from a page whose background travels
+   * thirty orders of magnitude.
+   */
+  {
+    let bad = 0
+    for (const s of stops()) {
+      for (const k of ['surface', 'well'])
+        if (luminance(s[k]) > surfaceMax) {
+          fail('"' + s.where + '": ' + k + ' is lighter than the dark band allows')
+          bad++
+        }
+      for (const k of ['ink', 'inkSoft', 'accent', 'rim'])
+        if (luminance(s[k]) < inkMin) {
+          fail('"' + s.where + '": ' + k + ' is darker than the light band allows')
+          bad++
+        }
+    }
+    if (!bad) ok('every stop keeps its surfaces under ' + surfaceMax + ' and its inks over ' + inkMin)
+  }
+
+  /**
+   * And the separation a dark console cannot get from its value.
+   *
+   * The old test here asked that the panel stay off the sky by 1.12:1, and
+   * with a dark console it is not merely failing, it is *unsatisfiable*: the
+   * backdrop travels from daylight to black, so it must at some altitude pass
+   * through the panel's own luminance. Around fold thirty it does, and the
+   * face of the console and the sky behind it are the same value to within a
+   * hundredth.
+   *
+   * What actually keeps the panel findable there is its edge. The console is
+   * drawn as a lit rim over a dark face, two tones 2.2:1 apart, and one sky
+   * value cannot match both — so at every fold at least one of the two
+   * separates. That is the real invariant, and unlike the old one it is a
+   * statement about how the thing is drawn rather than a hope about where the
+   * colours happened to land.
+   */
+  let worstEdge = Infinity, worstEdgeAt = 0
+  for (let k = 0; k <= MAX_FOLDS * 10; k++) {
+    const s = skyAt(heightAt(k / 10))
+    const best = Math.max(contrast(s.rim, s.bottom), contrast(s.surface, s.bottom))
+    if (best < worstEdge) { worstEdge = best; worstEdgeAt = k / 10 }
+  }
+  if (worstEdge < 1.4)
+    fail('the console has no findable edge against the sky at fold ' +
+      worstEdgeAt.toFixed(1) + ' (' + worstEdge.toFixed(2) + ':1)')
+  else
+    ok('the console keeps an edge of at least ' + worstEdge.toFixed(2) +
+      ':1 against the sky (worst at fold ' + worstEdgeAt.toFixed(1) + ')')
 }
 
 /* -------------------------------------------------------------------------- */
@@ -92,7 +152,7 @@ console.log('\nThe sky moves rather than steps')
     const n = k / 10
     const s = skyAt(heightAt(n))
     if (prev) {
-      for (const key of ['top', 'bottom', 'surface', 'ink', 'inkSoft', 'accent'])
+      for (const key of ['top', 'bottom', 'surface', 'well', 'ink', 'inkSoft', 'accent', 'rim', 'line'])
         for (let c = 0; c < 3; c++) {
           const d = Math.abs(s[key][c] - prev[key][c])
           if (d > worst) { worst = d; worstAt = n }

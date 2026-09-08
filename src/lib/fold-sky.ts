@@ -6,18 +6,36 @@
  * "the observable universe" written next to the top of it. The number went up
  * and nothing else changed.
  *
- * So the page's own backdrop is the altitude. Fold zero is a warm desk; by
+ * So the page's own backdrop is the altitude. Fold zero is a lamplit desk; by
  * fold thirty the sheet is past the Kármán line and so is the page; by the
- * last fold there is nothing behind it but other galaxies. It is the same
- * claim the text makes, made by the thing the text is sitting on.
+ * last fold there is nothing behind it but other galaxies.
  *
- * One rule holds the whole file together: **the panels stay light.** The
- * obvious design has the cards darken along with the sky, which means that
- * somewhere around fold forty-eight the surface and the ink pass through the
- * same grey and the page is briefly unreadable. Keeping the surfaces light and
- * letting only the world behind them travel means there is no crossing to get
- * wrong — and scripts/check-fold-scene.mjs checks the contrast at every one of
- * the hundred and four folds rather than trusting that.
+ * ---------------------------------------------------------------------------
+ * The rule that shapes every colour in this file: **the instrument is dark and
+ * the paper is the brightest thing on the screen.**
+ *
+ * The first version of this had it the other way round — light cream panels,
+ * dark ink, held light the whole way up so the ink never had to cross the
+ * surface. It was safe and it was a mistake. At fold sixty you are between the
+ * stars and the page is two white index cards with the galaxies hidden behind
+ * them; and the sheet of paper, which is the only object the game is about, is
+ * a white shape on a white card. The thing that should glow was camouflaged
+ * against the furniture.
+ *
+ * Turning it over fixes the picture *and* the contrast argument at the same
+ * time, which is the tell that it is the right way round. The console is dark
+ * at every altitude and the ink is light at every altitude, so the crossing
+ * that the old rule was avoiding cannot happen — not "does not happen at the
+ * hundred and four points we sampled", cannot. `surfaceMax` and `inkMin` below
+ * state the two bands, check-fold-scene.mjs holds every stop to them, and the
+ * ratio is then guaranteed rather than observed.
+ *
+ * What a dark instrument costs is the *other* separation: a dark panel on a
+ * sky that travels from daylight to black must, somewhere in the middle, pass
+ * through the panel's own value. There is no palette that avoids that. So the
+ * panel is not found by its value — it is found by its edge, and `rim` is the
+ * colour of that edge. That is how dark interfaces have always worked, and it
+ * is checked in place of the old and now impossible test.
  */
 
 export type RGB = [number, number, number]
@@ -26,14 +44,26 @@ export type Sky = {
   /** Backdrop gradient, top and bottom of the viewport. */
   top: RGB
   bottom: RGB
-  /** Panel surface, and the two inks that have to stay legible on it. */
+  /** The console's face. Always dark — see the note above. */
   surface: RGB
+  /** Recesses cut into it: the stage well, the meter grooves, the altimeter track. */
+  well: RGB
+  /** The two inks. Always light. */
   ink: RGB
   inkSoft: RGB
+  /** Hairline dividers inside the console. Decorative; not held to a text ratio. */
   line: RGB
-  /** The one warm accent, cooling as the air runs out. It sets type — the line
-   * naming where you are — so it is held to the text threshold, not the 3:1 one. */
+  /**
+   * The one warm accent, cooling as the air runs out. It sets type — the line
+   * naming where you are — and it is also the fill behind the primary button's
+   * label, so it is checked in both directions.
+   */
   accent: RGB
+  /**
+   * The lit edge of the console. This is what separates the panel from the sky
+   * once the sky's value passes through the panel's, which it must.
+   */
+  rim: RGB
   /** How much of each layer to draw, 0 to 1. */
   ground: number
   clouds: number
@@ -44,23 +74,19 @@ export type Sky = {
   where: string
 }
 
-type Stop = {
-  /** log10 of the stack height in metres. */
-  at: number
-  where: string
-  top: RGB
-  bottom: RGB
-  surface: RGB
-  ink: RGB
-  inkSoft: RGB
-  line: RGB
-  accent: RGB
-  ground: number
-  clouds: number
-  curve: number
-  stars: number
-  galaxies: number
-}
+type Stop = Omit<Sky, 'where'> & { at: number; where: string }
+
+/**
+ * The two bands the whole palette lives inside.
+ *
+ * Every `surface` and `well` sits below the first; every `ink`, `inkSoft`,
+ * `accent` and `rim` sits above the second. Because both are convex in
+ * luminance under linear interpolation of the stops, nothing between two stops
+ * can leave its band either — which is why the contrast holds *everywhere*
+ * rather than at the points a checker happens to sample.
+ */
+export const surfaceMax = 0.03
+export const inkMin = 0.07
 
 /**
  * Nine places, and everything between them is interpolated.
@@ -73,65 +99,85 @@ type Stop = {
 const STOPS: Stop[] = [
   {
     at: -4, where: 'on the desk',
-    top: [238, 226, 200], bottom: [214, 195, 152],
-    surface: [255, 253, 246], ink: [42, 32, 16], inkSoft: [104, 88, 52], line: [232, 219, 189],
-    accent: [146, 104, 26],
+    top: [40, 29, 20], bottom: [124, 93, 58],
+    surface: [30, 24, 18], well: [20, 16, 12],
+    ink: [248, 240, 226], inkSoft: [186, 170, 142], line: [62, 51, 38],
+    accent: [245, 178, 66], rim: [96, 77, 54],
     ground: 1, clouds: 0, curve: 0, stars: 0, galaxies: 0,
   },
   {
     at: 0.6, where: 'in the room',
-    top: [223, 214, 192], bottom: [190, 176, 145],
-    surface: [255, 253, 246], ink: [42, 32, 16], inkSoft: [104, 88, 52], line: [232, 219, 189],
-    accent: [146, 104, 26],
+    top: [38, 29, 22], bottom: [110, 84, 54],
+    surface: [30, 24, 18], well: [20, 16, 12],
+    ink: [248, 240, 226], inkSoft: [186, 170, 142], line: [62, 51, 38],
+    accent: [245, 178, 66], rim: [96, 77, 54],
     ground: 1, clouds: 0, curve: 0, stars: 0, galaxies: 0,
   },
   {
-    at: 1.9, where: 'above the rooftops',
-    top: [138, 178, 216], bottom: [206, 224, 233],
-    surface: [255, 254, 250], ink: [34, 40, 30], inkSoft: [92, 92, 78], line: [226, 226, 216],
-    accent: [136, 102, 30],
+    // Between the lamplit room and full daylight the backdrop has to travel
+    // further than anywhere else on the climb, and it has only five folds to
+    // do it in. Without a stop here the sky steps rather than moves.
+    at: 1.2, where: 'out of the window',
+    top: [56, 58, 72], bottom: [150, 136, 112],
+    surface: [30, 25, 21], well: [20, 17, 14],
+    ink: [247, 241, 231], inkSoft: [184, 172, 152], line: [61, 52, 42],
+    accent: [246, 181, 75], rim: [96, 78, 60],
+    ground: 0.95, clouds: 0.25, curve: 0, stars: 0, galaxies: 0,
+  },
+  {
+    at: 2.3, where: 'above the rooftops',
+    top: [96, 140, 192], bottom: [208, 212, 202],
+    surface: [30, 26, 24], well: [20, 17, 16],
+    ink: [246, 242, 236], inkSoft: [182, 174, 162], line: [60, 53, 47],
+    accent: [246, 184, 84], rim: [96, 80, 66],
     ground: 0.75, clouds: 0.6, curve: 0, stars: 0, galaxies: 0,
   },
   {
     at: 3.4, where: 'up where the weather is',
-    top: [80, 132, 190], bottom: [176, 206, 226],
-    surface: [253, 253, 252], ink: [30, 38, 44], inkSoft: [86, 94, 102], line: [222, 226, 230],
-    accent: [126, 98, 36],
+    top: [58, 116, 186], bottom: [176, 206, 230],
+    surface: [28, 28, 30], well: [18, 18, 21],
+    ink: [244, 246, 250], inkSoft: [176, 180, 190], line: [56, 56, 61],
+    accent: [248, 190, 100], rim: [88, 88, 96],
     ground: 0.24, clouds: 1, curve: 0.15, stars: 0, galaxies: 0,
   },
   {
     at: 4.5, where: 'the top of the air',
-    top: [28, 56, 106], bottom: [104, 152, 194],
-    surface: [251, 252, 254], ink: [26, 34, 44], inkSoft: [82, 92, 104], line: [218, 224, 232],
-    accent: [116, 100, 52],
+    top: [18, 44, 96], bottom: [86, 138, 190],
+    surface: [26, 27, 32], well: [17, 18, 22],
+    ink: [242, 245, 252], inkSoft: [170, 176, 192], line: [54, 56, 63],
+    accent: [250, 198, 116], rim: [82, 86, 100],
     ground: 0, clouds: 0.5, curve: 0.6, stars: 0.25, galaxies: 0,
   },
   {
     at: 5.6, where: 'in orbit',
-    top: [7, 12, 30], bottom: [24, 44, 82],
-    surface: [249, 251, 254], ink: [22, 30, 42], inkSoft: [78, 90, 104], line: [214, 222, 232],
-    accent: [104, 100, 66],
+    top: [5, 9, 24], bottom: [16, 32, 66],
+    surface: [24, 26, 36], well: [15, 17, 24],
+    ink: [238, 242, 252], inkSoft: [162, 172, 194], line: [52, 56, 68],
+    accent: [252, 206, 132], rim: [78, 86, 106],
     ground: 0, clouds: 0.1, curve: 1, stars: 0.7, galaxies: 0,
   },
   {
     at: 9, where: 'out past the planets',
-    top: [4, 6, 18], bottom: [10, 16, 38],
-    surface: [247, 249, 253], ink: [20, 28, 40], inkSoft: [76, 88, 104], line: [212, 220, 232],
-    accent: [92, 102, 84],
+    top: [3, 4, 14], bottom: [8, 12, 30],
+    surface: [24, 26, 38], well: [15, 17, 25],
+    ink: [236, 240, 252], inkSoft: [158, 168, 192], line: [52, 56, 70],
+    accent: [250, 212, 150], rim: [76, 84, 108],
     ground: 0, clouds: 0, curve: 0.25, stars: 1, galaxies: 0.1,
   },
   {
     at: 17, where: 'between the stars',
-    top: [3, 4, 13], bottom: [7, 9, 26],
-    surface: [246, 248, 253], ink: [20, 28, 40], inkSoft: [76, 88, 104], line: [212, 220, 232],
-    accent: [84, 100, 104],
+    top: [2, 3, 11], bottom: [6, 8, 22],
+    surface: [24, 26, 40], well: [15, 17, 26],
+    ink: [234, 238, 252], inkSoft: [154, 166, 194], line: [52, 56, 72],
+    accent: [214, 206, 255], rim: [74, 82, 114],
     ground: 0, clouds: 0, curve: 0, stars: 1, galaxies: 0.55,
   },
   {
     at: 27, where: 'past everything there is',
-    top: [2, 3, 10], bottom: [5, 6, 20],
-    surface: [246, 248, 253], ink: [20, 28, 40], inkSoft: [76, 88, 104], line: [212, 220, 232],
-    accent: [80, 96, 110],
+    top: [2, 2, 9], bottom: [4, 5, 17],
+    surface: [25, 25, 42], well: [16, 16, 28],
+    ink: [234, 236, 252], inkSoft: [152, 164, 196], line: [52, 54, 74],
+    accent: [198, 200, 255], rim: [74, 80, 120],
     ground: 0, clouds: 0, curve: 0, stars: 1, galaxies: 1,
   },
 ]
@@ -150,15 +196,14 @@ export function skyAt(metres: number): Sky {
   while (i < STOPS.length - 2 && L >= STOPS[i + 1].at) i++
   const a = STOPS[i], b = STOPS[i + 1]
   const t = ease(Math.max(0, Math.min(1, (L - a.at) / (b.at - a.at))))
+  const c = (k: 'top' | 'bottom' | 'surface' | 'well' | 'ink' | 'inkSoft' | 'line' | 'accent' | 'rim') =>
+    mixRGB(a[k], b[k], t)
   const f = (k: 'ground' | 'clouds' | 'curve' | 'stars' | 'galaxies') => lerp(a[k], b[k], t)
   return {
-    top: mixRGB(a.top, b.top, t),
-    bottom: mixRGB(a.bottom, b.bottom, t),
-    surface: mixRGB(a.surface, b.surface, t),
-    ink: mixRGB(a.ink, b.ink, t),
-    inkSoft: mixRGB(a.inkSoft, b.inkSoft, t),
-    line: mixRGB(a.line, b.line, t),
-    accent: mixRGB(a.accent, b.accent, t),
+    top: c('top'), bottom: c('bottom'),
+    surface: c('surface'), well: c('well'),
+    ink: c('ink'), inkSoft: c('inkSoft'), line: c('line'),
+    accent: c('accent'), rim: c('rim'),
     ground: f('ground'), clouds: f('clouds'), curve: f('curve'),
     stars: f('stars'), galaxies: f('galaxies'),
     // The name of the place you are leaving until you are most of the way out
@@ -167,8 +212,22 @@ export function skyAt(metres: number): Sky {
   }
 }
 
+/** Every stop, for a checker that wants the corners rather than a sampling. */
+export const stops = (): readonly Stop[] => STOPS
+
 export const rgb = (c: RGB) => 'rgb(' + c[0] + ' ' + c[1] + ' ' + c[2] + ')'
 export const rgba = (c: RGB, a: number) => 'rgb(' + c[0] + ' ' + c[1] + ' ' + c[2] + ' / ' + a + ')'
+
+/** Nudge a colour towards black or white. Used for canvas-side shading only. */
+export function shade(c: RGB, k: number): RGB {
+  const t = k < 0 ? 0 : 255
+  const m = Math.abs(k)
+  return [
+    Math.round(c[0] + (t - c[0]) * m),
+    Math.round(c[1] + (t - c[1]) * m),
+    Math.round(c[2] + (t - c[2]) * m),
+  ]
+}
 
 /* -------------------------------------------------------------------------- */
 /* The star field                                                             */

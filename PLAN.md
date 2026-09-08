@@ -863,7 +863,50 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
    a band of empty road. Both were measuring how much was going on rather than
    what they claimed to measure.
 
-9. Then reassess against the depth work in Phases 1–2 above.
+9. ~~**Paper Folds, made beautiful**~~ — **done.** The page above was correct
+   and plain: six cream cards of identical radius, fill and shadow, floating on
+   the sky. Two things were wrong with it and they turned out to be the same
+   thing. Six identical panels read as a form rather than as an object, so
+   nothing on the page was the subject. And light panels put the one thing the
+   game is about — a white sheet of paper — on a white background, so at fold
+   sixty you were between the stars looking at two white index cards with the
+   galaxies hidden behind them.
+
+   So: **one dark instrument, and a sheet of paper that is the brightest thing
+   on the screen.** The head, the sheet picker, the stage, the altimeter, the
+   readout and the buttons are now one console with hairlines between its
+   parts; the stage and the altimeter are recesses cut into it rather than
+   cards laid on it; and the console is dark at every altitude. Everything else
+   followed from that. The paper glows because it is the only light thing, and
+   it got a bloom, a lit edge and two shadows to prove it. The accent could
+   become a real amber — the old one was the darkest gold still legible on
+   cream, which is to say mud. The stage well became a window with its own
+   sky in it rather than a hole. And the altimeter became an instrument: a lit
+   track, ten-fold ticks, dimmed above where you have got to.
+
+   The part worth writing down is that inverting it made the **contrast
+   argument stronger, not weaker**, and that is the tell that it was the right
+   way round. The old rule was "the panels stay light", held all the way up so
+   the ink never had to cross the surface — safe, sampled at a hundred and four
+   points, and paid for with the entire visual payoff of the journey. A dark
+   console with light ink cannot cross at all: `surfaceMax` and `inkMin` in
+   `fold-sky.ts` declare two luminance bands, every stop is checked against
+   them, and a linear mix of two values in one band stays in that band — so the
+   ratio holds at every fold rather than at the ones a checker happened to
+   look at.
+
+   What a dark console costs is the other separation, and this is the honest
+   half: a dark panel on a sky travelling from daylight to black **must**, at
+   some altitude, pass through the panel's own value. Around fold thirty it
+   does, to within a hundredth. The old check for that ("the panel stays off
+   the sky by 1.12:1") was not failing, it was *unsatisfiable*, and replacing
+   it with a looser number would have been the checker agreeing with the
+   design. What actually keeps the panel findable is its edge: a lit rim over a
+   dark face, two tones 2.2:1 apart, which one sky value cannot match at once.
+   That is now the test, and unlike the old one it is a statement about how the
+   thing is drawn rather than a hope about where the colours landed.
+
+10. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

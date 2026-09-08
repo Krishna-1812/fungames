@@ -103,7 +103,8 @@ src/
     fold-scene.ts       that sheet as an object on a desk: projection, one
                         light, and the lip the crease has to turn through
     fold-sky.ts         where you are, given how thick the stack is — a desk
-                        at fold zero, intergalactic space at a hundred and three
+                        at fold zero, intergalactic space at a hundred and
+                        three — and the dark palette the console is cut from
     sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
                         the Moon’s distance and how much of it is lit
     robot-scene.ts      the CAPTCHA's street, in perspective, with materials,
@@ -260,14 +261,18 @@ the 1,219-metre roll Britney Gallivan used in 2002. Then a button that says what
 it is doing carries the doubling on to 103 without any paper. The sheet is drawn
 as an object on a lit desk, and the rounded lip at the crease — the paper that
 went round the bend — grows until it is wider than the paper left to feed it.
-**The page's backdrop is the altitude**: fold zero is a warm desk, by thirty you
-are past the Kármán line, and the last fold has nothing behind it but other
-galaxies. *Fold 42 reaches the Moon, fold 103 exceeds the observable universe;
+**The page's backdrop is the altitude**: fold zero is a lamplit desk, by thirty
+you are past the Kármán line, and the last fold has nothing behind it but other
+galaxies. It is all one dark instrument, so the sheet of paper is the brightest
+thing on the screen — which is the point, and which the first version got
+backwards. *Fold 42 reaches the Moon, fold 103 exceeds the observable universe;
 the layer count uses BigInt so it stays exact. The limit is not typed in — it
 comes out of Gallivan's two equations, and `check-fold.mjs` holds them to what
-people have actually managed. A page whose background travels that far has one
-catastrophic failure mode, so `check-fold-scene.mjs` checks the contrast at all
-104 stops rather than at the two ends.*
+people have actually managed. A page whose background travels thirty orders of
+magnitude has one catastrophic failure mode — the ink and the surface passing
+through the same grey somewhere in the middle — and a dark console with light
+ink cannot: `check-fold-scene.mjs` checks the two luminance bands at the stops
+rather than sampling the ratio and hoping.*
 
 **Ambient Mix** — twelve soundscape layers, all synthesised live, eight
 presets worth arriving at, and the whole mix in the URL: every layer at once is
