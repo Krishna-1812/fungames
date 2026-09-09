@@ -227,7 +227,10 @@ export const UNITS: Unit[] = [
   {
     id: 'sun',
     name: "The Sun's life",
-    note: 'About five billion years of hydrogen left.',
+    /* Not "about five billion years left" — the row's own readout already says
+       that, and a note that repeats the line above it is furniture. The two
+       figures the percentage is made of are the thing that is not on screen. */
+    note: 'Fixed figures: 4.6 billion years in, about 10 billion in total.',
     // Fixed astronomical figures: ~4.6 Gyr in, ~10 Gyr total.
     fixed: { frac: 4.6 / 10, seconds: 10e9 * 365.2425 * 86_400, left: 'about 5 billion years left' },
   },

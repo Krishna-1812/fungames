@@ -16,7 +16,7 @@
  * dial on a phone is 346 pixels wide. Below about three pixels a channel stops
  * being a channel and the whole picture becomes a gradient, so the widths are
  * computed at the sizes the CSS can actually produce rather than admired at
- * 700 pixels on a desktop.
+ * 880 pixels on a desktop.
  *
  * **Three: the readout.** The aperture carries the only large number on the
  * page, and it sits on a surface a shader paints. `APERTURE_MAX_LUM` is what
@@ -66,9 +66,13 @@ assert.ok(DIAL.groove > 0 && DIAL.groove < 1, 'a band is part channel and part r
 
 /* The bezel has to be wide enough for the numerals stamped into it. They are
    10px, positioned by CSS at the middle of the bezel, and at the first pass's
-   width they landed eight pixels from the rim on top of the knurling. */
-const bezelPx = (DIAL.caseR - DIAL.bezelIn) * (700 / 2)
-assert.ok(bezelPx >= 24, `bezel is ${bezelPx.toFixed(1)}px at a 700px dial — the numerals need room`)
+   width they landed eight pixels from the rim on top of the knurling.
+   Measured at the *smallest* dial the CSS can produce, which is the case that
+   can actually fail — the first version of this asserted it at 700px, where
+   the bezel is 35px and nothing is in danger. */
+const bezelPx = (DIAL.caseR - DIAL.bezelIn) * (346 / 2)
+assert.ok(bezelPx >= 14,
+  `bezel is ${bezelPx.toFixed(1)}px on a phone — a 10px numeral will not sit in it`)
 
 /* -------------------------------------------------------------------------- */
 /* Rings, and the hit test that has to find them                              */
@@ -123,7 +127,7 @@ for (const n of [UNITS.length, UNITS.length - 1]) {
 /* -------------------------------------------------------------------------- */
 
 /* The widths the CSS can produce. 346 is a 390px phone, less the wrap's 22px
-   of padding either side; 700 is the desktop cap. A channel below ~3 CSS
+   of padding either side; 880 is the desktop cap. A channel below ~3 CSS
    pixels stops reading as a cut and the dial turns into a gradient — this is a
    threshold for how it *looks*, not for how easily it is tapped. Tapping is
    what the register is for: those rows are full-width buttons and they carry
@@ -138,7 +142,7 @@ const chord = Number((page.match(/width:\s*calc\(var\(--aper\)\s*\*\s*([\d.]+)\s
 assert.ok(Number.isFinite(cqw) && Number.isFinite(chord),
   'could not read the aperture type size out of the page')
 
-for (const [where_, w] of [['phone', 346], ['desktop', 700]]) {
+for (const [where_, w] of [['phone', 346], ['desktop', 880]]) {
   const half = w / 2
   const n = UNITS.length
   const g = ring(n, 0)
