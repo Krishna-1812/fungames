@@ -523,7 +523,22 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   /* ----------------------------------------------------------- register -- */
 
-  .progress-body .reg { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  /* One plate, not fifteen floating cards. The panel shares the plate's own
+     gradient — the same #1d1229 → #150d1f the readout sits on above — so the
+     list reads as another surface of the one instrument rather than a
+     separate widget parked underneath it. Rows keep a hairline gap, and what
+     shows through the gap is this background, which is what turns the gap
+     into a seam instead of a hole back to the page. */
+  .progress-body .reg {
+    list-style: none; margin: 0; padding: 7px;
+    display: grid; gap: 1px;
+    background: linear-gradient(180deg, #1d1229, #150d1f);
+    border-radius: 16px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      inset 0 -1px 0 rgb(0 0 0 / 0.45),
+      0 24px 60px -34px rgb(0 0 0 / 0.85);
+  }
 
   .progress-body .row {
     display: grid;
@@ -531,32 +546,54 @@ import GameLayout from '../layouts/GameLayout.astro'
     /* The name column is wider than it looks like it needs to be because of
        "The current lunar cycle", which wrapped to two lines and took its note
        to a third, making one row half again as tall as the other fourteen. */
-    grid-template-columns: 2.1rem minmax(0, 1.4fr) 1.7fr 4.9rem;
+    grid-template-columns: 2.3rem minmax(0, 1.4fr) 1.7fr 4.9rem;
     grid-template-areas: 'i n r p' '. l l l';
     align-items: center;
     gap: 4px 12px;
-    padding: 10px 12px;
-    border: 0; border-radius: 10px;
+    padding: 10px 12px 10px 9px;
+    border: 0; border-radius: 9px;
+    /* Reserved rather than added on .lit: a border that appears out of
+       nowhere nudges every column over by its width for one frame. Only the
+       colour changes when a row lights. */
+    border-left: 3px solid transparent;
     background: transparent;
     color: inherit; font: inherit; text-align: left;
     cursor: pointer;
-    transition: background 150ms var(--ease);
+    transition: background 150ms var(--ease), border-color 150ms var(--ease);
   }
-  .progress-body .row.lit { background: rgb(255 255 255 / 0.045); }
+  .progress-body .row.lit {
+    background: rgb(255 255 255 / 0.05);
+    border-left-color: var(--lume);
+  }
+  .progress-body .row:active { transform: scale(0.997); }
   .progress-body .row:focus-visible { outline: 2px solid #c79bff; outline-offset: -2px; }
 
   .progress-body .r-i {
     grid-area: i;
+    display: inline-flex; align-items: center; gap: 6px;
     font-family: var(--mono); font-size: 11px; font-weight: 500;
     /* #7c6796 was quieter and measured 3.89:1. */
     color: #8d78ab; letter-spacing: 0.04em;
   }
+  /* A permanent swatch of the ring's own colour, dim until the row is lit —
+     so the register carries the dial's one real fact (fast is hot, slow is
+     cold) even before anything is pointed at. Purely decorative: it carries
+     no text, so it needs no contrast of its own. */
+  .progress-body .r-i::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; flex: none;
+    background: var(--lume); opacity: 0.5;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.35);
+    transition: opacity 150ms var(--ease), box-shadow 150ms var(--ease);
+  }
+  .progress-body .row.lit .r-i::before { opacity: 1; box-shadow: 0 0 6px 1px var(--lume); }
   /* The lit row's index takes its ring's colour — but the *lifted* one. The
      lume as painted runs down to rgb(110 83 187) at the slow end, which is
      3.33:1 on this background: the moment you pointed at the Sun's row, its
      number stopped being readable. */
   .progress-body .row.lit .r-i { color: var(--lume-lit); }
-  .progress-body .r-name { grid-area: n; font-weight: 600; font-size: 15px; }
+  .progress-body .r-name {
+    grid-area: n; font-weight: 600; font-size: 15px; letter-spacing: -0.006em;
+  }
   .progress-body .r-name b { font-weight: inherit; }
   /* No grid-area: only three of the fifteen rows have a note, and naming an
      area would give the other twelve an empty row and its gap. Spanning the
@@ -571,25 +608,38 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   /* A scale rule engraved in the plate, not a progress bar: a hairline groove
-     with the travelled part filled in the ring's own colour. */
+     with the travelled part filled in the ring's own colour. Three faint
+     ticks at 25/50/75 repeat the dial bezel's own numerals in miniature, so
+     the two read as one measuring instrument rather than a gauge next to an
+     unrelated list. */
   .progress-body .r-rule {
     grid-area: r; position: relative;
     height: 4px; border-radius: 3px;
-    background: #1b1029;
+    background:
+      linear-gradient(90deg,
+        transparent 24.3%, rgb(255 255 255 / 0.07) 25%, transparent 25.7%,
+        transparent 49.3%, rgb(255 255 255 / 0.07) 50%, transparent 50.7%,
+        transparent 74.3%, rgb(255 255 255 / 0.07) 75%, transparent 75.7%),
+      #1b1029;
     box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.65), 0 1px 0 rgb(255 255 255 / 0.045);
     overflow: hidden;
   }
   .progress-body .r-rule i {
     position: relative;
     display: block; height: 100%; width: 0; border-radius: 3px;
-    background: linear-gradient(90deg, var(--lume-dim), var(--lume));
+    /* Brightest at the head rather than a flat fill: the same claim the dial
+       makes with its meniscus, that the leading edge is the part that is
+       actually happening. */
+    background: linear-gradient(90deg, var(--lume-dim), var(--lume) 72%, var(--lume-lit));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22);
   }
   /* The head, which is the only part of a gauge anyone watches. Positioned
      against the fill rather than the groove, or it would sit at the far end of
      the track and never move. */
   .progress-body .r-rule i::after {
     content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 2px;
-    background: #fff; opacity: 0.55;
+    background: #fff; opacity: 0.6;
+    box-shadow: 0 0 4px 1px rgb(255 255 255 / 0.55);
   }
 
   .progress-body .r-pct {
@@ -609,7 +659,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   @media (max-width: 620px) {
     .progress-body .row {
-      grid-template-columns: 1.9rem minmax(0, 1fr) 4.6rem;
+      grid-template-columns: 2.1rem minmax(0, 1fr) 4.6rem;
       grid-template-areas: 'i n p' 'i r r' 'i l l';
     }
     .progress-body .dial { width: min(100%, 560px, 90vh); }
@@ -617,5 +667,6 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   @media (prefers-reduced-motion: reduce) {
     .progress-body .row { transition: none; }
+    .progress-body .row:active { transform: none; }
   }
 </style>
