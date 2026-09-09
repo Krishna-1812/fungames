@@ -68,7 +68,7 @@ Ruthless, because that's what was asked for.
 | **Ambient Mix** | Quietly the most *finished* thing here. Twelve real synthesised layers. Just needs presets and a shareable mix. | **Medium** |
 | **Paper Folds** | A fact, not a game. You press one button 42 times. | **Low** |
 | **Progress** | ~~Thirteen identical bars for thirteen things that are not alike, and are not parallel either.~~ Fifteen concentric channels on one machined dial, ordered by span, plus a date model that survives a 23-hour day. | **Low — done** |
-| **Life in Weeks** | Same. Look once, feel dread, leave. Legitimately complete. | **Low (fine as-is)** |
+| **Life in Weeks** | ~~The grid got a real shader; the four cards and the form around it stayed the site's original flat template.~~ One instrument, materials pulled from the grid's own palette. | **Low — done** |
 
 ---
 
@@ -563,7 +563,15 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   Thirteen horizontal bars claimed these units were thirteen separate things,
   and they are not: this minute is inside this hour is inside today. Concentric
   channels say the true thing, and they were never more work than parallel
-  ones. Life in Weeks is genuinely still fine.
+  ones.
+
+  **Life in Weeks was reopened too, but for a narrower reason.** Its content
+  judgement also stands — one date, one grid, one screen, nothing to add. What
+  had aged was that the grid had already been given a real shader (a prior
+  pass: birth-blue to lived-in amber, a current week that pulses and bleeds
+  past its own edges) while the stat tiles, the ask form and the facts list
+  around it stayed the site's original flat card — a beautiful grid inside an
+  ordinary page. See item 14 below.
 
 ---
 
@@ -1057,7 +1065,40 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     once now and everything inside it sizes in `cqw` or a percentage of that
     box.
 
-14. Then reassess against the depth work in Phases 1–2 above.
+14. ~~**Life in Weeks, one instrument instead of a grid in a template**~~ —
+    **done.** The grid was already good — a prior pass gave it a real shader,
+    a birth-to-now gradient and a current week that visibly breathes — and
+    that was exactly the problem: the four stat tiles, the date form and the
+    facts list below it were still the site's original flat card, unrelated
+    in colour and material to the picture they were reporting on.
+
+    Every accent added is a colour the shader already uses, not a matching
+    palette invented beside it — the same discipline Progress's register took
+    from its dial. `--wk-young` and `--wk-old` are the exact sRGB values
+    `weeks-grid.ts` mixes a lived week's colour from; `--wk-now` is the
+    pulsing current week's own colour. The stat tiles became one seamed plate,
+    the same move the Progress register made; "weeks lived" and "weeks left"
+    each carry a hairline bar that always sums to a full width between them,
+    even though the two live in separate tiles; the submit button and the
+    Share button both carry the birth-to-now gradient as a fill rather than a
+    flat colour; the facts list gets a small lit dot per line instead of a
+    browser bullet.
+
+    One addition reaches past the cards entirely: the page's own backdrop
+    now carries a warm horizon at its foot that grows with how much of ninety
+    years is behind the visitor, and is exactly zero before a date is typed —
+    the grid's single claim, cool at birth and warm near now, made ambient
+    rather than confined to 4,680 squares.
+
+    The one real bug this pass found: the "weeks left" bar's fill and its own
+    empty track were both close enough to the plate's own colour that the two
+    measured as visually the same line — a bar that could not show where it
+    ended. Decorative, so no contrast checker was ever going to catch it;
+    caught by screenshotting it at a mid-life date and actually looking. Fixed
+    with a lifted fill colour and the same inset top highlight the fill
+    already carried, rather than by inventing a new hue.
+
+15. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

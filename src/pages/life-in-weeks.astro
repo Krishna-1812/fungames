@@ -98,20 +98,38 @@ const WEEKS = 52
   }
   el('decades').appendChild(dec)
 
-  // TDZ guard: the grid's uniforms() callback runs synchronously inside the
-  // ShaderSurface constructor (first paint never waits on rAF), so this must
-  // exist before that call.
+  // TDZ guard: both surfaces' uniforms() callbacks run synchronously inside
+  // the ShaderSurface constructor (first paint never waits on rAF), so these
+  // must exist before either call.
   let livedCount = 0
+  let livedPct = 0 // 0..1, read by the field's ambient horizon glow
   const gridSurface = new ShaderSurface(el('grid'), weeksGridFrag(YEARS, WEEKS), {
     uniforms: () => ({ u_lived: livedCount }),
   })
   if (gridSurface.canvas.isConnected) el('grid').classList.add('gl')
-  new ShaderSurface(el('field'), WEEKS_FIELD_FRAG, { still: true })
+  const fieldSurface = new ShaderSurface(el('field'), WEEKS_FIELD_FRAG, {
+    still: true,
+    uniforms: () => ({ u_pct: livedPct }),
+  })
 
   const nf = (n) => Math.round(n).toLocaleString('en-US')
 
-  function stat(value, label) {
-    return `<div class="stat"><b>${value}</b><span>${label}</span></div>`
+  /**
+   * A stat tile. `bar` is a share of the tile's own width, 0..100, drawn as a
+   * hairline underneath the number — the same device the register on
+   * Progress uses for its rows, at a fifth the size. Only two of the four
+   * tiles get one: "weeks lived" and "weeks left" are two readings of the
+   * same 4,680, and their bars always sum to a full width between them even
+   * though they sit in separate tiles. The other two — the percentage and the
+   * day count — are each already a single number with nothing beneath them to
+   * compare against, so a bar under either would be decoration rather than a
+   * second reading of the same fact.
+   */
+  function stat(value, label, bar) {
+    return `<div class="stat">` +
+      `<b>${value}</b><span>${label}</span>` +
+      (bar ? `<i class="stat-bar ${bar.cls}" style="--p:${bar.pct}"></i>` : '') +
+      `</div>`
   }
 
   function show(dobStr) {
@@ -125,6 +143,7 @@ const WEEKS = 52
     const days = Math.floor(ms / 86_400_000)
     const lived = Math.min(weeks, TOTAL)
     const pct = (weeks / TOTAL) * 100
+    const pctClamped = Math.min(100, pct) // someone past 90 does not overrun a bar
 
     for (let i = 0; i < TOTAL; i++) {
       const c = cells[i]
@@ -133,6 +152,8 @@ const WEEKS = 52
     }
     livedCount = lived
     gridSurface.redraw()
+    livedPct = pctClamped / 100
+    fieldSurface.redraw()
 
     // Exact years, accounting for the actual calendar rather than 365.25.
     let years = now.getFullYear() - dob.getFullYear()
@@ -141,8 +162,9 @@ const WEEKS = 52
     if (!had) years--
 
     el('stats').innerHTML =
-      stat(nf(weeks), 'weeks lived') +
-      stat(nf(Math.max(0, TOTAL - weeks)), 'weeks left, if you reach 90') +
+      stat(nf(weeks), 'weeks lived', { cls: 'lived', pct: pctClamped }) +
+      stat(nf(Math.max(0, TOTAL - weeks)), 'weeks left, if you reach 90',
+        { cls: 'left', pct: 100 - pctClamped }) +
       stat(pct.toFixed(1) + '%', 'of a 90-year life') +
       stat(nf(days), 'days')
 
@@ -195,8 +217,33 @@ const WEEKS = 52
 </script>
 
 <style is:global>
-  /* Stats, facts and grid cells are all built at runtime. */
-  .weeks-body { background: #101320; color: #e8ecf5; }
+  /* Stats, facts and grid cells are all built at runtime.
+
+     Every accent colour below is lifted from the grid's own shader rather
+     than invented to match it: --wk-young and --wk-old are the sRGB values
+     `weeks-grid.ts` mixes a lived week's colour from (birth-blue to
+     lived-in-amber), --wk-now is the exact colour of the pulsing current
+     week, and --wk-future/--wk-void are its unlived field and the page's own
+     backdrop. A card built from these five numbers cannot drift from the
+     picture above it, because they are not a second description of that
+     picture — they are the same one. */
+  .weeks-body {
+    background: #101320; color: #e8ecf5;
+    --wk-young: #6687bd;
+    --wk-old: #e8a94f;
+    --wk-now: #ffd166;
+    --wk-future: #21273d;
+    /* A lifted reading of --wk-future for the "weeks left" bar's fill. The
+       grid can afford the true, near-black future colour because a lived cell
+       sits right beside it in the same row; a bar has only its own empty
+       track to be read against, and at that low a contrast the fill and the
+       track measured as the same flat line. */
+    --wk-future-fill: #4a5678;
+    --wk-void: #090a12;
+    --wk-ink2: #9aa7c2;
+    --wk-ink3: #8f9cb8;
+    --wk-arc: linear-gradient(90deg, var(--wk-young), var(--wk-old));
+  }
 
   .weeks-body .field {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -209,58 +256,139 @@ const WEEKS = 52
   .weeks-body .wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 46px 22px 80px; }
   .weeks-body .head { text-align: center; margin-bottom: 28px; }
   .weeks-body .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .weeks-body .lede { color: #9aa7c2; margin: 10px auto 0; max-width: 44ch; }
+  .weeks-body .lede { color: var(--wk-ink2); margin: 10px auto 0; max-width: 44ch; }
+
+  /* --------------------------------------------------------------- ask -- */
 
   .weeks-body .ask {
-    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius-lg);
-    padding: 26px 22px; text-align: center; max-width: 460px; margin: 0 auto;
+    position: relative;
+    background: linear-gradient(180deg, #181c2d, #10131f);
+    border: 1px solid rgb(102 135 189 / 0.16);
+    border-radius: var(--radius-lg);
+    padding: 28px 24px; text-align: center; max-width: 460px; margin: 0 auto;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      inset 0 -1px 0 rgb(0 0 0 / 0.4),
+      0 30px 60px -34px rgb(0 0 0 / 0.8);
   }
   .weeks-body .ask label { display: block; font-weight: 600; margin-bottom: 12px; }
   .weeks-body .ask-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .weeks-body input[type='date'] {
-    background: #0d1120; border: 1px solid #333c5c; color: #e8ecf5;
+    /* A recessed slot rather than a raised field: it is the one thing on the
+       page you actually touch, so it is the one thing carved in rather than
+       stacked on. */
+    background: var(--wk-void);
+    border: 1px solid rgb(102 135 189 / 0.22);
+    color: #e8ecf5;
     border-radius: 10px; padding: 10px 12px; font-size: 15px;
+    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.55);
     color-scheme: dark;
+    transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+  }
+  .weeks-body input[type='date']:focus-visible {
+    outline: none;
+    border-color: var(--wk-now);
+    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.55), 0 0 0 3px rgb(255 209 102 / 0.22);
   }
   .weeks-body .primary {
-    background: #8fa2c4; color: #101320; border: 0; border-radius: 10px;
-    padding: 10px 22px; font-weight: 600; cursor: pointer;
-    transition: transform 180ms var(--ease-bounce);
+    /* The birth-to-now arc, baked into the one button that starts it. */
+    background: var(--wk-arc);
+    color: #16130a; border: 0; border-radius: 10px;
+    padding: 10px 22px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 8px 20px -10px rgb(232 169 79 / 0.55);
+    transition: transform 180ms var(--ease-bounce), box-shadow 180ms var(--ease);
   }
-  .weeks-body .primary:hover { transform: translateY(-2px) scale(1.03); }
+  .weeks-body .primary:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 12px 26px -10px rgb(232 169 79 / 0.7);
+  }
   .weeks-body .primary:active { transform: scale(0.96); }
-  .weeks-body .privacy { color: #99a5c0; font-size: 12.5px; margin: 12px 0 0; }
+  .weeks-body .privacy { color: var(--wk-ink3); font-size: 12.5px; margin: 12px 0 0; }
 
+  /* -------------------------------------------------------------- stats -- */
+
+  /* One plate, not four floating cards — the same move the register on
+     Progress makes: a shared background shows through the hairline gaps as a
+     seam rather than a hole back to the page, so four numbers read as one
+     instrument rather than four unrelated widgets. */
   .weeks-body .stats {
-    display: grid; gap: 12px; margin-bottom: 26px;
+    display: grid; gap: 1px; margin-bottom: 26px;
     grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    background: linear-gradient(180deg, #171b2b, #10131f);
+    border-radius: var(--radius-lg);
+    padding: 7px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      inset 0 -1px 0 rgb(0 0 0 / 0.4),
+      0 24px 50px -30px rgb(0 0 0 / 0.85);
   }
   .weeks-body .stat {
-    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius);
-    padding: 16px 14px; text-align: center;
+    position: relative;
+    background: transparent; border-radius: 9px;
+    padding: 16px 14px 20px; text-align: center;
   }
   .weeks-body .stat b {
     display: block; font-family: var(--display); font-size: clamp(22px, 3.4vw, 30px);
     font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
   }
-  .weeks-body .stat span { font-size: 12px; color: #8f9cb8; }
+  .weeks-body .stat span { font-size: 12px; color: var(--wk-ink3); }
+
+  /* A hairline underline standing in for a second bar chart. Two tiles carry
+     one each, always summing to a full width between them — see the note by
+     stat() in the script. */
+  .weeks-body .stat-bar {
+    position: absolute; left: 14px; right: 14px; bottom: 10px;
+    height: 3px; border-radius: 2px;
+    background: rgb(255 255 255 / 0.07);
+    overflow: hidden;
+  }
+  .weeks-body .stat-bar::after {
+    content: ''; display: block; height: 100%; width: calc(var(--p) * 1%);
+    border-radius: 2px;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22);
+  }
+  .weeks-body .stat-bar.lived::after { background: var(--wk-arc); }
+  .weeks-body .stat-bar.left::after { background: var(--wk-future-fill); }
+
+  /* --------------------------------------------------------------- chart -- */
 
   .weeks-body .chart {
-    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, #171b2b, #10131f);
+    border: 1px solid rgb(102 135 189 / 0.14);
+    border-radius: var(--radius-lg);
     padding: 20px 18px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      inset 0 -1px 0 rgb(0 0 0 / 0.45),
+      0 30px 70px -36px rgb(0 0 0 / 0.85);
   }
   .weeks-body .legend {
     display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
-    font-size: 12.5px; color: #9aa7c2; margin-bottom: 14px;
+    font-size: 12.5px; color: var(--wk-ink2); margin-bottom: 14px;
   }
   .weeks-body .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .weeks-body .legend i { width: 10px; height: 10px; border-radius: 2px; display: block; }
-  .weeks-body .k-lived { background: #8fa2c4; }
-  .weeks-body .k-now { background: #ffd166; }
-  .weeks-body .k-left { background: #2a3149; }
+  /* Swatches drawn from the same materials the grid paints with, not flat
+     restatements of them: the lived chip is the actual birth-to-now gradient,
+     the "left" chip carries one faint point the way an unlived week does. */
+  .weeks-body .k-lived { background: var(--wk-arc); }
+  .weeks-body .k-now {
+    background: var(--wk-now);
+    box-shadow: 0 0 5px 1px rgb(255 209 102 / 0.6);
+    animation: wk-pulse 2.6s ease-in-out infinite;
+  }
+  .weeks-body .k-left {
+    background:
+      radial-gradient(circle at 68% 32%, rgb(255 255 255 / 0.55) 0 0.5px, transparent 0.5px),
+      var(--wk-future);
+  }
+  @keyframes wk-pulse {
+    0%, 100% { box-shadow: 0 0 4px 0.5px rgb(255 209 102 / 0.45); }
+    50% { box-shadow: 0 0 7px 1.5px rgb(255 209 102 / 0.8); }
+  }
 
   .weeks-body .grid-wrap { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
-  .weeks-body .decades { position: relative; font-size: 10px; color: #99a5c0; }
+  .weeks-body .decades { position: relative; font-size: 10px; color: var(--wk-ink3); }
   .weeks-body .decades span {
     position: absolute; right: 0;
     /* Row height is derived from the same fraction the grid uses. */
@@ -276,34 +404,68 @@ const WEEKS = 52
   .weeks-body .grid .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .weeks-body .grid i {
     display: block; aspect-ratio: 1; border-radius: 1.5px;
-    background: #2a3149;
+    background: var(--wk-future);
     transition: background 260ms var(--ease);
   }
-  .weeks-body .grid i.lived { background: #8fa2c4; }
-  .weeks-body .grid i.now { background: #ffd166; box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.35); }
-  .weeks-body .grid i.decade { box-shadow: inset -1px 0 0 rgba(255,255,255,0.14); }
+  .weeks-body .grid i.lived { background: var(--wk-young); }
+  .weeks-body .grid i.now { background: var(--wk-now); box-shadow: 0 0 0 2px rgb(255 209 102 / 0.35); }
+  .weeks-body .grid i.decade { box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.14); }
   /* The DOM cells stay in the layout — their aspect-ratio squares are what
      give the canvas its size — but paint nothing once the shader is live. */
   .weeks-body .grid.gl i { visibility: hidden; }
 
-  .weeks-body .caption { text-align: center; color: #8f9cb8; font-size: 13px; margin: 14px 0 0; }
+  .weeks-body .caption { text-align: center; color: var(--wk-ink3); font-size: 13px; margin: 14px 0 0; }
+
+  /* -------------------------------------------------------------- facts -- */
 
   .weeks-body .facts {
-    background: #171b2b; border: 1px solid #29304a; border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, #171b2b, #10131f);
+    border: 1px solid rgb(102 135 189 / 0.14);
+    border-radius: var(--radius-lg);
     padding: 22px 20px; margin-top: 18px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      inset 0 -1px 0 rgb(0 0 0 / 0.45),
+      0 24px 55px -32px rgb(0 0 0 / 0.85);
   }
   .weeks-body .facts h2 { font-size: 22px; margin-bottom: 12px; }
-  .weeks-body .facts ul { margin: 0; padding-left: 20px; display: grid; gap: 7px; color: #c3cde0; }
-  .weeks-body .facts b { color: #fff; font-variant-numeric: tabular-nums; }
-  .weeks-body .facts .src { color: #99a5c0; font-size: 12.5px; margin: 14px 0 0; }
+  .weeks-body .facts ul {
+    margin: 0; padding: 0; list-style: none;
+    display: grid; gap: 9px; color: #c3cde0;
+  }
+  /* A small lit dot in place of a browser bullet — the same legend mark the
+     register uses for a channel, here standing for "since you were born"
+     rather than for a rate. */
+  .weeks-body .facts li { position: relative; padding-left: 18px; }
+  .weeks-body .facts li::before {
+    content: ''; position: absolute; left: 0; top: 0.55em;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--wk-old);
+    box-shadow: 0 0 4px 0.5px rgb(232 169 79 / 0.5);
+  }
+  .weeks-body .facts b { color: var(--wk-old); font-variant-numeric: tabular-nums; }
+  .weeks-body .facts .src { color: var(--wk-ink3); font-size: 12.5px; margin: 14px 0 0; }
+
+  /* ------------------------------------------------------------ actions -- */
 
   .weeks-body .actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
   .weeks-body .actions button {
-    border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600;
-    cursor: pointer; background: #8fa2c4; color: #101320;
-    transition: transform 180ms var(--ease-bounce);
+    border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 700;
+    cursor: pointer; background: var(--wk-arc); color: #16130a;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.3) inset;
+    transition: transform 180ms var(--ease-bounce), box-shadow 180ms var(--ease);
   }
-  .weeks-body .actions button:hover { transform: translateY(-2px) scale(1.04); }
+  .weeks-body .actions button:hover {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 10px 22px -12px rgb(232 169 79 / 0.6);
+  }
   .weeks-body .actions button:active { transform: scale(0.95); }
-  .weeks-body .actions .ghost { background: transparent; border: 1px solid #333c5c; color: #e8ecf5; }
+  .weeks-body .actions .ghost {
+    background: transparent; border: 1px solid rgb(102 135 189 / 0.3); color: #e8ecf5;
+    box-shadow: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .weeks-body .k-now { animation: none; box-shadow: 0 0 5px 1px rgb(255 209 102 / 0.6); }
+  }
 </style>

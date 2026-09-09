@@ -319,7 +319,15 @@ coordinate of every reference and checks it lands inside the box it is drawn
 over, arcs included — a wrong bounding box there is invisible in the source and
 obvious on screen.*
 
-**Life in Weeks** — ninety years as 4,680 squares from one typed date.
+**Life in Weeks** — ninety years as 4,680 squares from one typed date. The
+grid's own claim — cool at birth, warm as the years go by, and one square that
+still breathes — used to sit inside a page of plain flat cards. The stat tiles,
+the ask form and the facts list now share one plate each, built from the exact
+five colours the shader mixes with rather than a matching palette invented
+beside it, and the "weeks lived" / "weeks left" tiles carry a hairline bar each
+that always sums to a full width between them. The one thing that reaches
+past the grid: a warm horizon at the foot of the page that grows with how much
+of ninety years is behind you, nothing before a date is typed.
 
 **The Auction Game** — fourteen lots, five rivals with their own money and their
 own bad habits, and £12,000. Real bidding increments, a real 25% buyer's premium,
