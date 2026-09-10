@@ -37,7 +37,7 @@ import fs from 'node:fs'
 import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
-const { listedGames } = await import('../src/data/games.ts')
+const { listedGames, GAMES } = await import('../src/data/games.ts')
 const { ART, PRESERVE, SLOT_BOX, SLOT_FADE, fadeStops } = await import('../src/lib/tile-art.ts')
 
 let failures = 0
@@ -464,14 +464,20 @@ const games = listedGames()
 console.log('\ncoverage')
 {
   const slugs = games.map((g) => g.slug).sort()
+  // Orphan detection checks against every game, not just the ones the
+  // homepage grid shows — an unlisted game (Fusion, Powder: hidden from the
+  // grid but still routable, like neal.fun's archive pages) still owns its
+  // tile drawing even while nothing links to it, and the drawing is not
+  // orphaned just because the tile went quiet.
+  const allSlugs = new Set(GAMES.map((g) => g.slug))
   const drawn = Object.keys(ART).sort()
   check(
-    slugs.join() === drawn.join(),
+    slugs.every((s) => ART[s]) && drawn.every((s) => allSlugs.has(s)),
     `every listed game has its own drawing and no drawing is orphaned (${drawn.length})`,
   )
   const missing = slugs.filter((s) => !ART[s])
   if (missing.length) fail(`no drawing for: ${missing.join(', ')}`)
-  const orphan = drawn.filter((s) => !slugs.includes(s))
+  const orphan = drawn.filter((s) => !allSlugs.has(s))
   if (orphan.length) fail(`drawing with no game: ${orphan.join(', ')}`)
 }
 

@@ -723,6 +723,12 @@ Object.assign(TIME_ART, {
       // four legs and a humped back cannot be mistaken for anything else.
       `<path d="M42 40 q4 -12 20 -13 q18 -1 30 3 q10 3 14 10 q3 8 -2 13
                q-8 5 -22 5 q-16 1 -28 -2 q-13 -3 -12 -16Z" fill="${P.ember}"/>` +
+      // A charcoal contour, the way an actual Chauvet aurochs is drawn: the
+      // ochre fill and the rock behind it are close enough in value that the
+      // shape's own edge barely registered as one — real cave art has this
+      // exact line for the same reason a camera would have the same problem.
+      `<path d="M42 40 q4 -12 20 -13 q18 -1 30 3 q10 3 14 10 q3 8 -2 13
+               q-8 5 -22 5 q-16 1 -28 -2 q-13 -3 -12 -16Z" fill="none" stroke="${P.night}" stroke-width="1.1" opacity="0.8"/>` +
       // Head and horns at the right.
       `<path d="M92 30 q12 -2 18 6 q4 8 -2 14 q-8 5 -16 -2 q-5 -8 0 -18Z" fill="${P.ember}"/>` +
       `<path d="M96 28 q-4 -12 4 -16 q2 8 4 14Z" fill="${P.blood}"/>` +
@@ -869,14 +875,29 @@ Object.assign(TIME_ART, {
       `<rect width="${W}" height="${H}" fill="${P.night}"/>` +
       `<ellipse cx="54" cy="68" rx="20" ry="6" fill="${P.iron}"/>` +
       `<rect x="50" y="26" width="8" height="42" fill="${P.iron}"/>` +
+      // Banding on the shaft — cast iron was turned on a lathe, not extruded
+      // smooth, and a bare rectangle is most of why this one read as a
+      // backdrop with a mark on it rather than an object.
+      [32, 40, 48, 56, 62].map(
+        (y) => `<path d="M50 ${y} h8" stroke="${P.rock}" stroke-width="1" opacity="0.5"/>`,
+      ).join('') +
       `<path d="M44 26 q10 -8 20 0 q-10 6 -20 0Z" fill="${P.rock}"/>` +
       `<path d="M46 22 q8 -8 16 0 l-3 4 q-5 -5 -10 0Z" fill="${P.void}"/>` +
       `<path d="M58 34 q22 -14 30 4" fill="none" stroke="${P.soil}" stroke-width="2"/>` +
       `<rect x="82" y="30" width="10" height="22" rx="5" fill="${P.void}"/>` +
       `<circle cx="87" cy="34" r="3" fill="${P.rock}"/>` +
       `<path d="M54 68 q30 8 56 -4" fill="none" stroke="${P.soil}" stroke-width="2"/>` +
-      `<circle cx="34" cy="20" r="3" fill="${P.gold}" opacity="0.7"/>` +
-      `<circle cx="26" cy="28" r="2" fill="${P.gold}" opacity="0.5"/>`,
+      // Sound, drawn rather than implied: three widening arcs off the
+      // earpiece rather than two lone dots, which is the actual subject —
+      // "a voice arriving from nowhere" — made visible instead of gestured at.
+      [5, 9, 13].map(
+        (r, i) =>
+          `<path d="M${(24 - r).toFixed(1)} 22 a${r} ${r} 0 0 1 0 -${(
+            r * 1.6
+          ).toFixed(1)}" fill="none" stroke="${P.gold}" stroke-width="1.3" opacity="${(
+            0.7 - i * 0.18
+          ).toFixed(2)}"/>`,
+      ).join(''),
   },
 
   'Twelve seconds of powered flight': {
@@ -1037,6 +1058,99 @@ Object.assign(TIME_ART, {
       `<path d="M100 46 q8 -3 12 0" fill="none" stroke="${P.soil}" stroke-width="1.2" opacity="0.6"/>`,
   },
 } satisfies Record<string, Scene>)
+
+/**
+ * A scene's own colour, for the card it sits on.
+ *
+ * The cards used to be one flat tone regardless of what was drawn inside
+ * them — a molten Earth and a snowball Earth sat in identical charcoal boxes.
+ * This is not a second palette invented to fix that: it is computed by
+ * walking each scene's own SVG and finding which of `P`'s colours actually
+ * covers the most of it, so the card for the Cambrian explosion is lit by the
+ * same ember the animal is drawn in, and cannot go out of sync with a scene
+ * that gets redrawn later.
+ *
+ * Six tones are excluded from winning even when they cover the most area —
+ * `night`, `dusk`, `sky`, `deep`, `void`, `pale` — because in this set they
+ * are never the subject, only the sky, the sea or the page it happens on.
+ * `land()` alone spends a full-canvas rect on one of them in most scenes, so
+ * without the exclusion almost every card would be lit by whatever backdrop
+ * happened to be biggest rather than by the thing actually being shown. Found
+ * by printing every scene's computed mood and reading the list: without
+ * `pale` here, the Wright Flyer's own overcast sky beat the aircraft, and the
+ * first apes' dawn beat the apes.
+ *
+ * Shapes are weighted by real area where the markup gives one — a rect's
+ * width*height, a circle's πr², an ellipse's π·rx·ry — and by a nominal
+ * mid-size weight for filled paths, which carry most of the actual subjects
+ * here (an animal's body, a leaf, a hand) but have no closed-form area
+ * without a real path parser. Stroked paths and lines count for less: they
+ * draw ribs, ripples and cracks — real detail, but a thin one.
+ */
+const BACKDROP: Set<string> = new Set([P.night, P.dusk, P.sky, P.deep, P.void, P.pale])
+
+export function dominantMood(svg: string): string {
+  const weight = new Map<string, number>()
+  const add = (hex: string | undefined, area: number) => {
+    if (!hex || !hex.startsWith('#') || BACKDROP.has(hex)) return
+    weight.set(hex, (weight.get(hex) ?? 0) + area)
+  }
+  const num = (attrs: string, name: string) => {
+    const m = attrs.match(new RegExp(`${name}="(-?[\\d.]+)"`))
+    return m ? Number(m[1]) : undefined
+  }
+  const attr = (attrs: string, name: string) => attrs.match(new RegExp(`${name}="([^"]*)"`))?.[1]
+
+  for (const m of svg.matchAll(/<(rect|circle|ellipse|path|polygon|line)\s+([^>]*)\/?>/g)) {
+    const [, tag, attrs] = m
+    const fill = attr(attrs, 'fill')
+    const stroke = attr(attrs, 'stroke')
+    let area = 40 // a nominal floor, so even an unmeasured shape counts a little
+    if (tag === 'rect') {
+      const w = num(attrs, 'width'), h = num(attrs, 'height')
+      if (w && h) area = w * h
+    } else if (tag === 'circle') {
+      const r = num(attrs, 'r')
+      if (r) area = Math.PI * r * r
+    } else if (tag === 'ellipse') {
+      const rx = num(attrs, 'rx'), ry = num(attrs, 'ry')
+      if (rx && ry) area = Math.PI * rx * ry
+    } else if (tag === 'path' || tag === 'polygon') {
+      area = fill && fill !== 'none' ? 260 : 60
+    } else {
+      area = 60
+    }
+    if (fill && fill !== 'none') add(fill, area)
+    else if (stroke && stroke !== 'none') add(stroke, area * 0.3)
+  }
+
+  let best: string | null = null
+  let bestArea = 0
+  for (const [hex, area] of weight) if (area > bestArea) { best = hex; bestArea = area }
+  // Every scene draws at least one non-backdrop shape; this is a floor for
+  // the (never taken, in practice) case that somehow none did.
+  return best ?? P.stone
+}
+
+/**
+ * The one correction to the computed set, found by printing all forty-four
+ * and reading them. The steam engine's frame is wooden and really is drawn
+ * with more soil-brown area than iron — but a beam engine is the first power
+ * in this whole timeline that is not muscle, water or wind, and the metal is
+ * the entire reason it has a scene at all. Left as `soil` here it would be
+ * the only mid-Victorian machine on the page lit like a barn.
+ */
+const MOOD_OVERRIDE: Record<string, string> = {
+  'The steam engine': P.iron,
+}
+
+/** Every scene's own colour, keyed the same as TIME_ART. Computed once. */
+export const MOOD: Record<string, string> = Object.fromEntries(
+  Object.entries(TIME_ART).map(([title, s]) => [
+    title,
+    MOOD_OVERRIDE[title] ?? dominantMood(s.draw()),
+  ]),
+)
 
 /** Full standalone SVG, sized to fill whatever box the card gives it. */
 export function sceneSvg(title: string): string {

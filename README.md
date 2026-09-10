@@ -223,6 +223,21 @@ what you did.
 than hidden. Colliding cards move into side lanes and shed their notes, resolved
 at runtime against measured heights. *Zero overlaps at 375, 464 and 1280 px.*
 
+The forty-four scenes were always well drawn and always shown small — a
+116px thumbnail in a flat charcoal box with a plain white hairline, the one
+picture the page had reduced to an icon. Each card is now lit by `MOOD`, a
+colour computed from that scene's own drawing (an area-weighted walk of its
+fills, six backdrop tones excluded so the sky or sea a scene happens under
+can never outvote what is actually in it) rather than a palette chosen to
+match it after the fact — so the Cambrian explosion's card glows the same
+blood-red the animal is drawn in, and cannot drift from it later. The art
+itself grew with the frame: 172px at the widest lane, up from 116, with the
+eleven major turning points bigger again and a one-shot glow the instant one
+first centres in view. *`check-time-art.mjs` walks every scene's own SVG back
+out and confirms the colour it computes is the one the page actually shows,
+and that colour is really in the drawing — not a plausible guess sitting
+next to it.*
+
 **Scale** — a continuous logarithmic zoom from a proton to the observable
 universe. Scroll position sets how wide the screen is in metres; objects are
 drawn at their true size relative to that. *No blank stretch across 40 sampled
@@ -497,6 +512,17 @@ gradients at all** — the other modules prefix ids to keep forty-four, twenty-s
 and eighteen drawings from colliding in one document, and having none is a
 guarantee rather than a convention — and every colour must come from one
 twenty-one-entry palette, which the file enforces rather than asks for.
+
+It also covers `MOOD`, the colour each scene's own card is lit by. Two
+things could make that claim quietly stop being true: a computed colour that
+does not actually appear anywhere in the scene it is meant to represent, and
+the one hand-written correction — `The steam engine`, whose frame really is
+more soil-brown by area than iron, but which is the first power in the whole
+timeline that is not muscle, water or wind and should not be lit like a barn
+— drifting out of step with a scene that has since been redrawn. Both are
+checked directly: every `MOOD` value has to be found inside its own scene's
+markup, and re-deriving the whole set from nothing has to agree with what
+the module exports everywhere except that one documented exception.
 
 `check-trolley-scene.mjs` is the fourth, and the only one that checks a
 picture against a *claim*. Trolley's scene is the one place the player learns

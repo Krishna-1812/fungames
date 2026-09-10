@@ -5,7 +5,7 @@
  * The page's layout is the constraint here, and it is unusual. Cards are laid
  * out at their true depth on an honest scale, so where events cluster they are
  * pushed into two narrow lanes and then compacted — the note goes, then the
- * date. A scene that reads at 116 pixels wide and is mush at 52 would look
+ * date. A scene that reads at 172 pixels wide and is mush at 64 would look
  * fine everywhere on this page except the four or five places where history
  * gets busy, which are the interesting places.
  *
@@ -17,7 +17,7 @@
  *   2. No ids, no defs, no gradients. Forty-four of these inline into one
  *      document, and both of the other art modules on this site prefix ids to
  *      keep them apart. Having none at all is a guarantee rather than a
- *      convention, and at 52 pixels flat colour is the better drawing anyway.
+ *      convention, and at 64 pixels flat colour is the better drawing anyway.
  *   3. Is every colour from the one palette? This is the emoji lesson: what
  *      made a row of thirty of them look accidental was that each came from
  *      somewhere else.
@@ -29,6 +29,12 @@
  *      separate questions — see the note above that section, which is also
  *      where this file's own first attempt at them is written down.
  *   6. Are any two of them the same scene?
+ *   7. Each event's card is lit by `MOOD[title]` — a colour computed from the
+ *      scene's own drawing, not chosen beside it. Does every colour genuinely
+ *      come from that scene (so a card cannot end up lit by a hue that is not
+ *      even in the picture), and does re-deriving it from scratch agree with
+ *      what `time-art.ts` actually exports (so the one hand-written exception
+ *      cannot silently drift from the drawing it was written to correct)?
  *
  *   node scripts/check-time-art.mjs [--sheet out.png]
  */
@@ -38,7 +44,7 @@ import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
 const { EVENTS } = await import('../src/lib/time-events.ts')
-const { TIME_ART, P } = await import('../src/lib/time-art.ts')
+const { TIME_ART, P, MOOD, dominantMood } = await import('../src/lib/time-art.ts')
 
 let failures = 0
 const fail = (m) => {
@@ -53,11 +59,15 @@ const lum = (r, g, b) => 0.2126 * lin(r / 255) + 0.7152 * lin(g / 255) + 0.0722 
 
 /* The three widths the card can hand a scene, measured off the live page:
    the full-width centre lane, a narrow side lane, and the compacted lane a
-   dense cluster falls back to. Everything is 3:2. */
+   dense cluster falls back to. Everything is 3:2. (A fourth, narrower still
+   and square rather than 3:2, is what a dense cluster falls back to on a
+   phone — not tested here, since the aspect ratio itself changes rather than
+   just the size, and `slice` sizing means it is a crop of the same drawing
+   these three already have to survive being small.) */
 const WIDTHS = [
-  { name: 'centre', w: 116 },
-  { name: 'lane', w: 72 },
-  { name: 'compact', w: 52 },
+  { name: 'centre', w: 172 },
+  { name: 'lane', w: 104 },
+  { name: 'compact', w: 64 },
 ]
 
 const names = Object.keys(TIME_ART)
@@ -127,7 +137,7 @@ console.log('palette')
 
   // The palette itself has to work on the card, which is dark and translucent
   // over a sky that goes from near-black to daylight. Anything at the very
-  // ends of the range reads as a hole or a flashbulb at 52px.
+  // ends of the range reads as a hole or a flashbulb at 64px.
   const outliers = Object.entries(P).filter(([, c]) => {
     const n = parseInt(c.slice(1), 16)
     const l = lum((n >> 16) & 255, (n >> 8) & 255, n & 255)
@@ -154,7 +164,7 @@ console.log('\nevery scene owns its background')
   check(bad === 0, 'all forty-four are opaque edge to edge')
 }
 
-/* ---- 5. still a picture at 52 pixels ------------------------------------ */
+/* ---- 5. still a picture at 64 pixels ------------------------------------ */
 
 /* Two questions, and the split between them is the point.
  *
@@ -171,7 +181,7 @@ console.log('\nevery scene owns its background')
  *
  * **Subject**, at the width a compacted cluster gives. What fraction of the
  * frame is not the scene's own backdrop. That one is scale-free, and it is the
- * real worry about 52 pixels: not that the drawing gets rough, but that a
+ * real worry about 64 pixels: not that the drawing gets rough, but that a
  * scene which is 95% flat ground with one small mark on it becomes a coloured
  * rectangle down there. */
 console.log('\nstructure, at the width most cards get')
@@ -241,7 +251,7 @@ console.log('\nsubject, at the width a compacted cluster gives')
     const frac = 1 - best / (s.W * s.H)
     rows.push({ n, frac })
     if (frac < FLOOR) {
-      fail(`${n}: only ${(frac * 100).toFixed(0)}% of the frame is subject — at 52px that is a rectangle`)
+      fail(`${n}: only ${(frac * 100).toFixed(0)}% of the frame is subject — at 64px that is a rectangle`)
       bad++
     }
   }
@@ -303,7 +313,48 @@ console.log('\ndistinctness')
   )
 }
 
-/* ---- 7. determinism ----------------------------------------------------- */
+/* ---- 7. mood -------------------------------------------------------------
+
+   Every card on the page is lit by MOOD[title], a colour time-art.ts derives
+   from that scene's own drawing rather than one chosen to match it. Two ways
+   that guarantee could quietly stop being true: a colour could turn out not
+   to actually appear anywhere in the scene it is supposed to represent, or
+   the one hand-written correction (`The steam engine`) could drift from what
+   the scene underneath it now draws. Both are checked directly rather than
+   trusted. */
+
+console.log('\nmood')
+{
+  const paletteHex = new Set(Object.values(P).map((c) => c.toLowerCase()))
+  let missing = 0
+  let stray = 0
+  for (const n of names) {
+    const mood = (MOOD[n] || '').toLowerCase()
+    if (!paletteHex.has(mood)) { fail(`${n}: MOOD is ${mood || '(empty)'}, not a palette colour`); stray++; continue }
+    const svg = TIME_ART[n].draw()
+    const used = new Set(
+      [...svg.matchAll(/(?:fill|stroke)="([^"]+)"/g)].map((m) => m[1].toLowerCase()),
+    )
+    if (!used.has(mood)) { fail(`${n}: card is lit by ${mood}, which is not in its own drawing`); missing++ }
+  }
+  check(missing === 0, 'every card colour genuinely appears in its own scene')
+  check(stray === 0, 'every card colour is one of the palette colours')
+
+  // Re-derive the whole set from nothing and diff it against what the module
+  // exports. The only legitimate difference is the one documented override —
+  // if the scene it corrects has since been redrawn and the computed value
+  // has moved to agree with the override anyway, or moved somewhere else
+  // entirely, this is what would notice either.
+  const recomputed = Object.fromEntries(names.map((n) => [n, dominantMood(TIME_ART[n].draw())]))
+  const drifted = names.filter((n) => recomputed[n] !== MOOD[n])
+  check(
+    drifted.length <= 1 && (drifted.length === 0 || drifted[0] === 'The steam engine'),
+    `computed mood matches the exported set, past the one documented override` +
+      (drifted.length ? `: ${drifted.join(', ')}` : ''),
+  )
+}
+
+/* ---- 8. determinism ----------------------------------------------------- */
 
 console.log('\ndeterminism')
 {
@@ -312,7 +363,7 @@ console.log('\ndeterminism')
   check(drift === 0, 'every scene is the same twice')
 }
 
-/* ---- 8. no emoji -------------------------------------------------------- */
+/* ---- 9. no emoji -------------------------------------------------------- */
 
 console.log('\nno emoji')
 {

@@ -64,7 +64,7 @@ Ruthless, because that's what was asked for.
 | **Spend It** | Competent clone. Emoji instead of product images is the main tell. Receipt endgame is good. | **Medium** |
 | **Steady Hand** | ~~A 20-second toy with one challenge.~~ Four shapes and a combined rating. | **Medium — done** |
 | **Scale** | ~~Draws *circles* for a proton, a whale and a galaxy.~~ Twenty-six drawn objects, sized on both axes, and the shader keeps the seventeen things that really are spheres and rings. | **Medium — done** |
-| **Deep Time** | ~~A Wikipedia list on a gradient.~~ Forty-four events, forty-four scenes, and a layout that no longer spends the picture's budget on the picture. | **Medium — done** |
+| **Deep Time** | ~~A Wikipedia list on a gradient.~~ ~~Forty-four events, forty-four scenes, shown at 116px in a flat box.~~ Every card lit by its own scene's colour, and the art large enough to be the picture rather than the icon beside it. | **Medium — done** |
 | **Ambient Mix** | Quietly the most *finished* thing here. Twelve real synthesised layers. Just needs presets and a shareable mix. | **Medium** |
 | **Paper Folds** | A fact, not a game. You press one button 42 times. | **Low** |
 | **Progress** | ~~Thirteen identical bars for thirteen things that are not alike, and are not parallel either.~~ Fifteen concentric channels on one machined dial, ordered by span, plus a date model that survives a 23-hour day. | **Low — done** |
@@ -1098,7 +1098,47 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     with a lifted fill colour and the same inset top highlight the fill
     already carried, rather than by inventing a new hue.
 
-15. Then reassess against the depth work in Phases 1–2 above.
+15. ~~**Deep Time, lit by its own scenes**~~ — **done.** The gap here was
+    the same shape as Life in Weeks': the good work had already happened —
+    forty-four careful drawings, a five-world shader keyed to real geology,
+    a layout that measures its own cards and re-lanes them — and it was all
+    sitting behind a 116px thumbnail in a flat charcoal box with one plain
+    white hairline, regardless of what was actually drawn inside it.
+
+    `MOOD[title]` is a colour computed from each scene's own SVG rather than
+    a palette chosen beside it: an area-weighted walk of every fill, six
+    backdrop tones (`night`, `dusk`, `sky`, `deep`, `void`, and `pale` once
+    it turned up doing the same job under a different name) excluded so a
+    sky or a sea a scene merely happens under can never outvote the thing it
+    is actually about. Printing all forty-four and reading them by eye found
+    the two places the heuristic needed a hand: `pale` joining the exclusion
+    list after it beat both the Wright Flyer and the first apes, and one
+    documented override — the steam engine's frame really is more wooden by
+    area than its own iron, but iron is the entire reason it has a scene.
+    `check-time-art.mjs` now holds both guarantees directly rather than
+    trusting them: every mood colour has to be found inside its own scene's
+    markup, and re-deriving the set from nothing has to agree with what the
+    module exports everywhere except that one named exception.
+
+    The art itself grew from 116px to 172 at its widest, with the eleven
+    major turning points larger again and a one-shot glow the instant one
+    first centres in view, reusing the chime's own scroll observer rather
+    than adding a second one. Two real bugs came out of building that:
+    a `transform: scale()` step inside the glow's keyframes was overriding
+    the card's own `translateX(-50%)` centring rather than combining with
+    it — CSS animations replace the whole property, not just the part they
+    mention — and the Great Oxidation Event sat 220px off-centre until the
+    animation was rewritten to touch only `box-shadow`. And the bigger art
+    narrowed the text column enough to hit a grid track that had always been
+    a bare `1fr`: without `minmax(0, 1fr)` its implicit minimum is its own
+    content's width, so a phone's side lane took one long word as licence to
+    grow the whole page eight to sixty pixels past its own edge instead of
+    wrapping. Neither was visible in a screenshot of the card that triggered
+    it — one only showed up after the animation had already finished and
+    settled somewhere else, the other only at exactly the viewport width
+    that ran out of room.
+
+16. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run
