@@ -145,6 +145,7 @@ export const GAMES: Game[] = [
     description:
       'Start with four things. Drag one onto another and get something new. Every combination anyone has ever made is remembered forever.',
     accent: '#1e1a45', accent2: '#b44cf0',
+    unlisted: true,
     added: '2026-09-07',
   },
   {
