@@ -1182,7 +1182,39 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     used everywhere else on the site for "a bright thing" and "a dark
     hole," here doing that job in a physics diagram instead of a portrait.
 
-17. Then reassess against the depth work in Phases 1–2 above.
+17. ~~**Asteroid Launcher, on the real planet**~~ — **done.** The hand-drawn
+    world map (a Natural Earth 1:110m coastline traced into one SVG path,
+    with a manual `1/cos(latitude)` stretch to fake a circle on the ground)
+    was correct but was still a diagram. Requested explicitly: replace it
+    with something real, and make the two presets with genuinely famous
+    real-world craters — Meteor Crater and Chicxulub — actually show them.
+
+    The obvious tool is the Google Maps JavaScript API, and it was ruled out
+    for a concrete reason, not a style preference: it requires a Google
+    Cloud project with a billing account attached, no exception, and there
+    is no free tier that doesn't need one. Both maps run on Leaflet instead,
+    over two keyless, billing-free tile sources — Esri World Imagery for
+    satellite and OpenStreetMap for streets, toggled with a pill switch
+    styled into the page's own chrome rather than Leaflet's default
+    white-box layers control. Selecting the Meteor Crater preset flies the
+    target-picker to 35.03°N 111.02°W at zoom 14, where the satellite layer
+    shows the actual 1.2 km bowl, access road included; Chicxulub flies to
+    the Yucatán coast at zoom 8 for the regional context its crater rim
+    traces, phrased honestly in code and here — the cenote ring is a real,
+    documented feature, not something a casual satellite screenshot makes
+    obvious at a glance.
+
+    The damage-ring math got simpler, not more complex, in the swap: a
+    genuine geodesic `L.circle` sized in metres from the model's own radius
+    replaces the hand-projected ellipse and the stretch factor that used to
+    exist specifically to correct for it. Nearby cities are whichever real
+    ones `map.getBounds()` actually contains after `fitBounds`, not a
+    hand-measured pixel radius. The one thing kept off the real map
+    entirely: the entry streak, which has no genuine bearing in the model
+    (only an elevation angle) and is drawn in the result view's own
+    screen-pixel overlay rather than dressed up as geodata it isn't.
+
+18. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

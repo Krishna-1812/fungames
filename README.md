@@ -161,12 +161,17 @@ cost).
 | `/overstimulated/` | 19.8 KB |
 | `/powder/` | 25.2 KB |
 | `/orbit/` | **142.6 KB** |
+| `/asteroid/` | **158.4 KB** |
 
-Orbit is the one outlier: its WebGL renderer is built on three.js, and that
-library alone accounts for essentially all of the difference. Every other page
-stays under 26 KB total. No images, no audio files, no fonts beyond Google
-Fonts — every sound on the site is synthesised, and every visual is either
-drawn or is one of a handful of small hand-written shaders.
+Orbit and Asteroid Launcher are the two outliers, and both for the same
+reason: a real third-party library instead of a hand-written shader. Orbit's
+WebGL renderer is built on three.js; Asteroid Launcher's two maps are built
+on Leaflet, over free Esri/OpenStreetMap tiles rather than the API-keyed,
+billing-account-gated alternative. Every other page stays under 26 KB total.
+No images, no audio files, no fonts beyond Google Fonts — every sound on the
+site is synthesised, and every visual is either drawn, one of a handful of
+small hand-written shaders, or — now, twice — real map tiles fetched only
+when a visitor is actually looking at one.
 
 ---
 
@@ -205,6 +210,18 @@ statistical difference), that the projection is periodic and truly
 foreshortens, and — the check the file exists for — that each material reads
 as a picture with real surface structure rather than a shaded ball; a plain
 lit sphere run through the same harness is kept as the control that fails it.*
+
+Both maps are real, too — Leaflet over free, keyless tiles rather than a
+hand-drawn coastline. Esri's public World Imagery service supplies satellite
+photography and OpenStreetMap supplies a street map, toggled with a pill
+switch styled into the page's own chrome; neither needs an API key or a
+billing account, which matters, because Google Maps requires both and there
+is no free tier around that. Damage rings are genuine geodesic `L.circle`s
+sized in metres from the model's own output, replacing a hand-projected
+ellipse and its manual `1/cos(latitude)` stretch factor. Picking the Meteor
+Crater or Chicxulub preset flies the target-picker to the real coordinates at
+a preset-specific zoom — Meteor Crater's bowl is genuinely visible in the
+satellite layer, road and all.
 
 **Powder** — a falling-sand sandbox: a cellular automaton over typed arrays,
 rendered straight into an `ImageData` buffer. Thirty-one materials and

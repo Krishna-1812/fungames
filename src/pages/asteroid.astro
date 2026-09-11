@@ -11,11 +11,16 @@ import type { Composition } from '../lib/impact'
  * This page is the instrument panel around them: pick the thing, pick the
  * target, and read what the model says happens.
  *
- * The map is Natural Earth's 1:110m coastline in an equirectangular projection,
- * which means a circle on the ground is an ellipse on screen — wider the further
- * you get from the equator, by 1/cos(latitude). The rings are drawn as ellipses
- * for exactly that reason, which is why a strike on Svalbard looks stretched and
- * a strike on Ecuador does not.
+ * Both maps are real: Leaflet over free, keyless tiles (Esri World Imagery
+ * for satellite, OpenStreetMap for streets — see the SAT_URL/STREET_URL
+ * constants in the client script for why no API key is needed or wanted).
+ * The blast rings are genuine geodesic `L.circle`s sized in metres from the
+ * model's own output, not hand-projected ellipses, so a strike on Svalbard
+ * and a strike on Ecuador are both simply correct rather than needing a
+ * manual 1/cos(latitude) stretch factor to agree with each other. One
+ * consequence worth knowing: picking the Meteor Crater or Chicxulub preset
+ * flies the target-picker map to the real coordinates at a preset-specific
+ * zoom, and the satellite layer actually shows Meteor Crater's bowl.
  *
  * The rock itself is real geometry, not a texture — see lib/asteroid-art.ts.
  * It is server-rendered once here (so there is a real rock on first paint,
@@ -107,15 +112,11 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
         </div>
 
         <div class="mapwrap">
-          <svg id="map" viewBox="0 0 2000 1000" role="img"
-               aria-label="World map. Click to choose an impact site.">
-            <rect class="sea" x="0" y="0" width="2000" height="1000" />
-            <path class="land" id="land" />
-            <g id="marker" hidden>
-              <circle class="mk-ring" r="26" />
-              <circle class="mk-dot" r="7" />
-            </g>
-          </svg>
+          <div id="map" class="leafletMap" role="img" aria-label="World map, real satellite imagery. Click to choose an impact site."></div>
+          <div class="layerToggle" id="mapLayers">
+            <button type="button" data-layer="sat" aria-pressed="true">Satellite</button>
+            <button type="button" data-layer="street" aria-pressed="false">Street</button>
+          </div>
         </div>
 
         <p class="target" id="targetOut">Nowhere selected yet.</p>
@@ -130,13 +131,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
       </div>
 
       <div class="zoomwrap">
-        <svg id="zoom" role="img" aria-label="Damage rings around the impact site">
-          <rect class="sea" id="zoomSea" />
-          <path class="land" id="zoomLand" />
-          <g id="rings"></g>
-          <g id="places"></g>
-        </svg>
-        <p class="scalebar"><span id="scaleLine"></span><b id="scaleText"></b></p>
+        <div id="zoom" class="leafletMap" role="img" aria-label="Real satellite imagery of the impact site, with damage rings"></div>
+        <svg id="entryFx" class="entryFx" aria-hidden="true"></svg>
       </div>
 
       <div class="stats" id="stats"></div>
@@ -179,9 +175,11 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
 </GameLayout>
 
 <script>
+  import L from 'leaflet'
+  import 'leaflet/dist/leaflet.css'
   import { simulate, DENSITIES, type Composition } from '../lib/impact'
   import { estimateCasualties, cityRadius } from '../lib/casualties'
-  import { CITIES, LAND_PATH, MAP_W, MAP_H, isLand, type City } from '../data/world'
+  import { CITIES, isLand, type City } from '../data/world'
   import { sfx, unlock } from '../lib/audio'
   import { burst, shake, prefersReducedMotion } from '../lib/fx'
   import { onShare } from '../lib/share-card'
@@ -192,8 +190,17 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   const el = <T extends HTMLElement = HTMLElement>(id: string) =>
     document.getElementById(id) as T
 
-  /** Metres of ground per map unit along a meridian. Constant everywhere. */
-  const M_PER_UNIT_Y = (180 / MAP_H) * 111_320
+  /* Real tiles, no API key: Esri's public World Imagery service (satellite)
+     and OpenStreetMap's own tile server (street map), both free for
+     reasonable, attributed, non-bulk use — which is what a page that loads
+     tiles only when a visitor is actually looking at the map is. No key, no
+     billing account, and — unlike the old hand-rolled coastline — this is
+     the actual planet: Meteor Crater's bowl and Chicxulub's ring of cenotes
+     are really there to look at, not implied by a diagram. */
+  const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+  const STREET_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+  const SAT_ATTR = 'Tiles &copy; Esri — Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+  const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
 
   const nf = (n: number, d = 0) =>
     n.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d })
@@ -315,11 +322,34 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
 
   /* ----------------------------------------------------------- the map */
 
-  el('land').setAttribute('d', LAND_PATH)
-  el('zoomLand').setAttribute('d', LAND_PATH)
+  const satLayer = L.tileLayer(SAT_URL, { maxZoom: 19, attribution: SAT_ATTR })
+  const streetLayer = L.tileLayer(STREET_URL, { maxZoom: 19, attribution: OSM_ATTR, subdomains: 'abc' })
 
-  const lonToX = (lon: number) => ((lon + 180) / 360) * MAP_W
-  const latToY = (lat: number) => ((90 - lat) / 180) * MAP_H
+  const map = L.map('map', {
+    center: [51.507, -0.128], zoom: 5, layers: [satLayer], worldCopyJump: true,
+  })
+
+  let mapIsSat = true
+  el('mapLayers').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-layer]')
+    if (!btn) return
+    const wantSat = btn.dataset.layer === 'sat'
+    if (wantSat !== mapIsSat) {
+      map.removeLayer(wantSat ? streetLayer : satLayer)
+      map.addLayer(wantSat ? satLayer : streetLayer)
+      mapIsSat = wantSat
+    }
+    el('mapLayers')
+      .querySelectorAll<HTMLButtonElement>('[data-layer]')
+      .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
+    unlock(); sfx.click()
+  })
+
+  // A CircleMarker, not an L.marker — Leaflet's default pin is an image asset
+  // that needs its own bundler wiring to resolve under Vite, and a plain
+  // filled circle reads better against satellite imagery than a drop-shadow
+  // pin does anyway.
+  let targetMarker: L.CircleMarker | null = null
 
   function setTarget(lat: number, lon: number, name?: string) {
     const label =
@@ -329,11 +359,12 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
         : 'Open ocean')
     target = { lat, lon, name: label }
 
-    const marker = el('marker')
-    marker.hidden = false
-    for (const c of marker.querySelectorAll('circle')) {
-      c.setAttribute('cx', String(lonToX(lon)))
-      c.setAttribute('cy', String(latToY(lat)))
+    if (!targetMarker) {
+      targetMarker = L.circleMarker([lat, lon], {
+        radius: 9, color: '#ff7a33', weight: 3, fillColor: '#ff7a33', fillOpacity: 0.85, interactive: false,
+      }).addTo(map)
+    } else {
+      targetMarker.setLatLng([lat, lon])
     }
     el('targetOut').textContent = isLand(lat, lon)
       ? `Target: ${label}`
@@ -341,18 +372,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     el<HTMLButtonElement>('fire').disabled = false
   }
 
-  el('map').addEventListener('click', (e) => {
-    const svg = el<SVGSVGElement & HTMLElement>('map') as unknown as SVGSVGElement
-    const r = (svg as unknown as HTMLElement).getBoundingClientRect()
-    // The SVG is letterboxed by preserveAspectRatio, so map through the rendered
-    // box rather than assuming it fills the element.
-    const scale = Math.min(r.width / MAP_W, r.height / MAP_H)
-    const offX = (r.width - MAP_W * scale) / 2
-    const offY = (r.height - MAP_H * scale) / 2
-    const x = (e.clientX - r.left - offX) / scale
-    const y = (e.clientY - r.top - offY) / scale
-    if (x < 0 || x > MAP_W || y < 0 || y > MAP_H) return
-    setTarget(90 - (y / MAP_H) * 180, (x / MAP_W) * 360 - 180)
+  map.on('click', (e: L.LeafletMouseEvent) => {
+    setTarget(e.latlng.lat, e.latlng.lng)
     unlock(); sfx.click()
   })
 
@@ -382,6 +403,7 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     const pick = found[Number(btn.dataset.i)]
     if (!pick) return
     setTarget(pick[0], pick[1], `${pick[2]}, ${pick[3]}`)
+    map.flyTo([pick[0], pick[1]], Math.max(map.getZoom(), 9))
     cityInput.value = pick[2]
     hits.hidden = true
     unlock(); sfx.click()
@@ -389,11 +411,20 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
 
   /* ------------------------------------------------------------ presets */
 
-  const PRESETS: Record<string, { d: number; c: Composition; v: number; a: number; at?: [number, number, string] }> = {
-    chelyabinsk: { d: 19, c: 'rock', v: 19, a: 18, at: [55.15, 61.43, 'Chelyabinsk, Russia'] },
-    tunguska: { d: 55, c: 'rock', v: 17, a: 45, at: [60.89, 101.9, 'Tunguska, Siberia'] },
-    barringer: { d: 50, c: 'iron', v: 13, a: 45, at: [35.03, -111.02, 'Winslow, Arizona'] },
-    chicxulub: { d: 10_000, c: 'rock', v: 20, a: 60, at: [21.4, -89.51, 'Chicxulub, Mexico'] },
+  const PRESETS: Record<
+    string,
+    { d: number; c: Composition; v: number; a: number; at?: [number, number, string]; zoom?: number }
+  > = {
+    chelyabinsk: { d: 19, c: 'rock', v: 19, a: 18, at: [55.15, 61.43, 'Chelyabinsk, Russia'], zoom: 10 },
+    tunguska: { d: 55, c: 'rock', v: 17, a: 45, at: [60.89, 101.9, 'Tunguska, Siberia'], zoom: 8 },
+    // Zoomed in close enough that the satellite layer actually shows the
+    // real bowl — Meteor Crater is barely 1.2 km across.
+    barringer: { d: 50, c: 'iron', v: 13, a: 45, at: [35.03, -111.02, 'Winslow, Arizona'], zoom: 14 },
+    // Wide enough to hold the stretch of Yucatán coastline the crater's rim
+    // traces — a real ring of cenotes, documented in gravity and radar
+    // surveys, though not the kind of thing a casual satellite tile makes
+    // obvious at a glance the way Meteor Crater's bowl is.
+    chicxulub: { d: 10_000, c: 'rock', v: 20, a: 60, at: [21.4, -89.51, 'Chicxulub, Mexico'], zoom: 8 },
   }
 
   el('presets').addEventListener('click', (e) => {
@@ -409,7 +440,10 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
       .querySelectorAll<HTMLButtonElement>('[data-comp]')
       .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.comp === p.c)))
     drawRockFull()
-    if (p.at) setTarget(p.at[0], p.at[1], p.at[2])
+    if (p.at) {
+      setTarget(p.at[0], p.at[1], p.at[2])
+      map.flyTo([p.at[0], p.at[1]], p.zoom ?? map.getZoom())
+    }
     syncReadouts()
     unlock(); sfx.good()
   })
@@ -583,144 +617,137 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
 
   /* --------------------------------------------------------- zoom view */
 
+  // Fireball and crater are lit glows rather than a flat tint — the same
+  // radial-gradient technique the rest of the site uses for "a bright thing"
+  // and "a dark hole." They live in their own <defs>, seeded once into
+  // Leaflet's SVG renderer the moment it exists (see ensureZoomMap), because
+  // the renderer is created once for the map's lifetime and never rebuilds
+  // its <defs> on pan or zoom — only the rings' own d/transform change.
+  const ZOOM_DEFS = `<defs>
+    <radialGradient id="zoom-fire" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fffef2"/>
+      <stop offset="38%" stop-color="#ffe9a8" stop-opacity="0.95"/>
+      <stop offset="72%" stop-color="#ff9a3c" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#ff5f2e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="zoom-crater" cx="42%" cy="36%" r="68%">
+      <stop offset="0%" stop-color="#4a2115"/>
+      <stop offset="65%" stop-color="#2b0b06"/>
+      <stop offset="100%" stop-color="#140502"/>
+    </radialGradient>
+  </defs>`
+
+  let zoomMap: L.Map | null = null
+  let ringsGroup: L.LayerGroup | null = null
+
+  function ensureZoomMap() {
+    if (zoomMap) return
+    zoomMap = L.map('zoom', {
+      attributionControl: true, scrollWheelZoom: false, doubleClickZoom: false,
+    })
+    L.tileLayer(SAT_URL, { maxZoom: 19, attribution: SAT_ATTR }).addTo(zoomMap)
+    // Explicitly instantiates the SVG renderer (rather than waiting for the
+    // first vector layer) so ZOOM_DEFS can be seeded before any ring ever
+    // references it by url(#...).
+    L.svg().addTo(zoomMap)
+    const svg = (el('zoom') as HTMLElement).querySelector('svg')
+    if (svg && !svg.querySelector('#zoom-fire')) svg.insertAdjacentHTML('afterbegin', ZOOM_DEFS)
+    L.control.scale({ imperial: false, maxWidth: 110 }).addTo(zoomMap)
+    ringsGroup = L.layerGroup().addTo(zoomMap)
+  }
+
   function drawZoom(r: ReturnType<typeof simulate>) {
-    const svg = el('zoom') as unknown as SVGSVGElement
-    const box = (svg as unknown as HTMLElement).getBoundingClientRect()
-    const aspect = box.width / Math.max(box.height, 1)
+    ensureZoomMap()
+    const zmap = zoomMap!
+    ringsGroup!.clearLayers()
 
-    const lat = target!.lat
-    const cx = lonToX(target!.lon)
-    const cy = latToY(lat)
-    // Longitude compresses toward the poles, so a circle on the ground is this
-    // much wider than it is tall in map units.
-    const stretch = 1 / Math.max(Math.cos((lat * Math.PI) / 180), 0.05)
+    const center = L.latLng(target!.lat, target!.lon)
+    // A real geodesic bound around the centre, sized off the model's own
+    // largest radius — Leaflet's own projection handles the fact that a
+    // degree of longitude is shorter near the poles, which used to be a
+    // hand-written stretch factor here.
+    zmap.fitBounds(center.toBounds(r.maxRadius * 2 * 1.35), { animate: false })
+    zmap.invalidateSize()
 
-    const pad = 1.35
-    let hy = (r.maxRadius / M_PER_UNIT_Y) * pad
-    let hx = hy * stretch
-    // Grow whichever axis is short so the viewBox matches the element's shape
-    // and the ellipses keep their true proportions.
-    if (hx / hy < aspect) hx = hy * aspect
-    else hy = hx / aspect
-
-    svg.setAttribute('viewBox', `${cx - hx} ${cy - hy} ${hx * 2} ${hy * 2}`)
-    for (const id of ['zoomSea']) {
-      const n = el(id)
-      n.setAttribute('x', String(cx - hx))
-      n.setAttribute('y', String(cy - hy))
-      n.setAttribute('width', String(hx * 2))
-      n.setAttribute('height', String(hy * 2))
+    const ring = (metres: number, colour: string, i: number, dashed = false) => {
+      const c = L.circle(center, {
+        radius: metres, color: colour, weight: 1.6, opacity: 0.85,
+        fillColor: colour, fillOpacity: 0.13, className: 'ring', interactive: false,
+        dashArray: dashed ? '6 5' : undefined,
+      }).addTo(ringsGroup!)
+      ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(i))
     }
-    // Strokes are in user units, which the zoom scales — keep them hairline.
-    svg.style.setProperty('--u', String((hy * 2) / Math.max(box.height, 1)))
 
-    const toUnitsY = (m: number) => m / M_PER_UNIT_Y
-    const ring = (m: number, colour: string, i: number, dashed = false) =>
-      `<ellipse cx="${cx}" cy="${cy}" rx="${toUnitsY(m) * stretch}" ry="${toUnitsY(m)}" ` +
-      `fill="${colour}" fill-opacity="0.13" stroke="${colour}" ` +
-      `stroke-opacity="0.85" ${dashed ? 'stroke-dasharray="6 5"' : ''} ` +
-      `style="--i:${i}" />`
+    // Largest first so the small, hot rings paint on top.
+    const ordered = [...r.blast].sort((a, b) => b.radius - a.radius)
+    ordered.forEach((b, i) => ring(b.radius, RING_COLOURS[Math.min(i, 5)], i))
+    const burns = r.thermal.find((t) => t.effect === 'thirdDegreeBurns')
+    if (burns) ring(burns.radius, '#ffd166', ordered.length, true)
+    if (r.crater) {
+      const c = L.circle(center, {
+        radius: r.crater.final / 2, color: '#6b4231', weight: 1.6, opacity: 0.55,
+        fillColor: 'url(#zoom-crater)', fillOpacity: 0.95, className: 'ring', interactive: false,
+      }).addTo(ringsGroup!)
+      ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(ordered.length + 1))
+    }
+    {
+      const c = L.circle(center, {
+        radius: r.fireball, stroke: false, fillColor: 'url(#zoom-fire)', fillOpacity: 0.95,
+        className: 'ring', interactive: false,
+      }).addTo(ringsGroup!)
+      ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(ordered.length + 2))
+    }
 
-    // Fireball and crater as lit glows rather than a flat tint — the same
-    // radial-gradient technique the rest of the site uses for a lit sphere,
-    // here standing in for "impossibly bright" and "a hole with a shadowed
-    // wall" instead of a surface.
-    const defs = `<defs>
-      <radialGradient id="zoom-fire" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#fffef2"/>
-        <stop offset="38%" stop-color="#ffe9a8" stop-opacity="0.95"/>
-        <stop offset="72%" stop-color="#ff9a3c" stop-opacity="0.75"/>
-        <stop offset="100%" stop-color="#ff5f2e" stop-opacity="0"/>
-      </radialGradient>
-      <radialGradient id="zoom-crater" cx="42%" cy="36%" r="68%">
-        <stop offset="0%" stop-color="#4a2115"/>
-        <stop offset="65%" stop-color="#2b0b06"/>
-        <stop offset="100%" stop-color="#140502"/>
-      </radialGradient>
-      <linearGradient id="zoom-entry" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#ffedc2" stop-opacity="0"/>
-        <stop offset="100%" stop-color="#fff8e6"/>
-      </linearGradient>
-    </defs>`
+    // Nearby cities, so the rings have something real to sit next to —
+    // Leaflet's own bounds after fitBounds, not a hand-measured radius.
+    const bounds = zmap.getBounds()
+    const near = CITIES.filter((c) => bounds.contains([c.lat, c.lon]))
+      .sort((a, b) => b.p - a.p)
+      .slice(0, 12)
+    for (const c of near) {
+      L.circleMarker([c.lat, c.lon], {
+        radius: 4, color: '#9fd0ff', weight: 1, fillColor: '#9fd0ff', fillOpacity: 1, interactive: false,
+      })
+        .bindTooltip(c.n, { permanent: true, direction: 'right', offset: [6, 0], className: 'placeLabel' })
+        .addTo(ringsGroup!)
+    }
 
-    // The entry streak: a genuine trajectory, angled the way the user's own
-    // "angle" slider says it comes in, not a decorative flourish. Direction
-    // (cos, -sin) of that angle from the horizontal — steep means nearly
-    // straight down, shallow means nearly grazing — scaled out past the edge
-    // of the current view so it always enters from off-screen.
-    const theta = (r.input.angle * Math.PI) / 180
-    const reach = Math.max(hx, hy) * 1.6
-    const startX = cx + Math.cos(theta) * reach
-    const startY = cy - Math.sin(theta) * reach
+    // The entry streak lives in its own screen-space overlay, not on the
+    // map itself — there is no real bearing in the model to plot (only an
+    // elevation angle), so this is a cosmetic flourish and pixel space is
+    // the honest place to build one, rather than dressing it up as geodata.
+    const fx = el<SVGSVGElement & HTMLElement>('entryFx') as unknown as SVGSVGElement
+    const box = (el('zoom') as HTMLElement).getBoundingClientRect()
+    fx.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`)
     // A moving streak is exactly the motion prefers-reduced-motion asks this
     // site to skip, and — unlike a CSS animation — an SVG <animate> is not
     // silenced by global.css's blanket animation-duration override. Left out
     // entirely under reduced motion rather than freezing it full-length,
     // which would just leave a static line with no obvious reason to exist.
-    const streak = prefersReducedMotion
-      ? ''
-      : `<line x1="${startX}" y1="${startY}" x2="${startX}" y2="${startY}" ` +
-        `stroke="url(#zoom-entry)" stroke-width="${hy * 0.02}" stroke-linecap="round">` +
-        `<animate attributeName="x2" from="${startX}" to="${cx}" dur="${FLIGHT_MS / 1000}s" ` +
+    if (prefersReducedMotion) {
+      fx.innerHTML = ''
+    } else {
+      const targetPt = zmap.latLngToContainerPoint(center)
+      // Direction (cos, -sin) of the model's own "angle" input from the
+      // horizontal — steep means nearly straight down, shallow means nearly
+      // grazing — scaled out past the edge of the view.
+      const theta = (r.input.angle * Math.PI) / 180
+      const reach = Math.max(box.width, box.height) * 0.9
+      const startX = targetPt.x + Math.cos(theta) * reach
+      const startY = targetPt.y - Math.sin(theta) * reach
+      fx.innerHTML =
+        `<defs><linearGradient id="entry-grad" x1="0" y1="0" x2="1" y2="1">` +
+        `<stop offset="0%" stop-color="#ffedc2" stop-opacity="0"/>` +
+        `<stop offset="100%" stop-color="#fff8e6"/></linearGradient></defs>` +
+        `<line x1="${startX}" y1="${startY}" x2="${startX}" y2="${startY}" ` +
+        `stroke="url(#entry-grad)" stroke-width="4" stroke-linecap="round">` +
+        `<animate attributeName="x2" from="${startX}" to="${targetPt.x}" dur="${FLIGHT_MS / 1000}s" ` +
         `calcMode="spline" keySplines="0.3 0 0.7 1" fill="freeze"/>` +
-        `<animate attributeName="y2" from="${startY}" to="${cy}" dur="${FLIGHT_MS / 1000}s" ` +
+        `<animate attributeName="y2" from="${startY}" to="${targetPt.y}" dur="${FLIGHT_MS / 1000}s" ` +
         `calcMode="spline" keySplines="0.3 0 0.7 1" fill="freeze"/>` +
         `<animate attributeName="opacity" values="1;1;0" keyTimes="0;0.92;1" dur="${FLIGHT_MS / 1000}s" fill="freeze"/>` +
         `</line>`
-
-    const parts: string[] = [defs, streak]
-    // Largest first so the small, hot rings paint on top.
-    const ordered = [...r.blast].sort((a, b) => b.radius - a.radius)
-    ordered.forEach((b, i) => parts.push(ring(b.radius, RING_COLOURS[Math.min(i, 5)], i)))
-    const burns = r.thermal.find((t) => t.effect === 'thirdDegreeBurns')
-    if (burns) parts.push(ring(burns.radius, '#ffd166', ordered.length, true))
-    if (r.crater) {
-      const rr = toUnitsY(r.crater.final / 2) * stretch
-      const ry = toUnitsY(r.crater.final / 2)
-      parts.push(
-        `<ellipse cx="${cx}" cy="${cy}" rx="${rr}" ry="${ry}" fill="url(#zoom-crater)" ` +
-          `stroke="#6b4231" stroke-opacity="0.55" style="--i:${ordered.length + 1}"/>`,
-      )
     }
-    {
-      const rr = toUnitsY(r.fireball) * stretch
-      const ry = toUnitsY(r.fireball)
-      parts.push(
-        `<ellipse cx="${cx}" cy="${cy}" rx="${rr}" ry="${ry}" fill="url(#zoom-fire)" ` +
-          `style="--i:${ordered.length + 2}"/>`,
-      )
-    }
-    el('rings').innerHTML = parts.join('')
-
-    // Nearby cities, so the rings have something to be next to.
-    const near = CITIES.filter((c) => {
-      const dx = (lonToX(c.lon) - cx) / stretch
-      const dy = latToY(c.lat) - cy
-      return Math.hypot(dx, dy) < hy * 1.1
-    })
-      .sort((a, b) => b.p - a.p)
-      .slice(0, 12)
-    el('places').innerHTML = near
-      .map(
-        (c) =>
-          `<g class="place"><circle cx="${lonToX(c.lon)}" cy="${latToY(c.lat)}" r="${hy * 0.012}" />` +
-          `<text x="${lonToX(c.lon) + hy * 0.02}" y="${latToY(c.lat) - hy * 0.02}" ` +
-          `font-size="${hy * 0.055}">${c.n}</text></g>`,
-      )
-      .join('')
-
-    // Scale bar: a round number of kilometres, sized to about a quarter of the view.
-    const targetM = ((hy * 2) / 4) * M_PER_UNIT_Y
-    const pow = 10 ** Math.floor(Math.log10(targetM))
-    const niceM = [1, 2, 5, 10].map((k) => k * pow).reduce((a, b) =>
-      Math.abs(b - targetM) < Math.abs(a - targetM) ? b : a,
-    )
-    // A scale bar measures horizontally, and horizontal units are compressed by
-    // the projection — so it is the stretched width over the viewBox width, not
-    // the vertical extent. The bar's container spans the map for the percentage
-    // to mean anything.
-    el('scaleLine').style.width = `${((toUnitsY(niceM) * stretch) / (hx * 2)) * 100}%`
-    el('scaleText').textContent = dist(niceM)
   }
 
   /* --------------------------------------------------------------- boot */
@@ -827,12 +854,47 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   .rock-body .hits button:hover { background: #3a1a11; }
   .rock-body .hits span { color: #b1897b; font-size: 12.5px; white-space: nowrap; }
 
-  .rock-body .mapwrap { border-radius: var(--radius); overflow: hidden; background: #0b1522; }
-  .rock-body #map { width: 100%; height: auto; display: block; cursor: crosshair; }
-  .rock-body .sea { fill: #0d1a2b; }
-  .rock-body .land { fill: #33241c; stroke: #5c3f2e; stroke-width: 1; }
-  .rock-body .mk-ring { fill: none; stroke: #ff7a33; stroke-width: 5; opacity: 0.75; }
-  .rock-body .mk-dot { fill: #ff7a33; }
+  .rock-body .mapwrap { position: relative; border-radius: var(--radius); overflow: hidden; background: #0b1522; }
+  .rock-body .leafletMap { width: 100%; aspect-ratio: 16 / 10; background: #0b1522; }
+  .rock-body #map { cursor: crosshair; }
+
+  /* A small pill toggle in the corner, in the site's own button language
+     rather than Leaflet's built-in layers control, which is a plain white
+     checkbox list that would look like a different application entirely. */
+  .rock-body .layerToggle {
+    position: absolute; z-index: 1000; top: 10px; right: 10px;
+    display: flex; gap: 4px; background: rgb(10 6 4 / 0.72); padding: 4px;
+    border-radius: 999px; border: 1px solid #4d2619; backdrop-filter: blur(3px);
+  }
+  .rock-body .layerToggle button {
+    background: none; border: 0; color: #e8cfc2; border-radius: 999px;
+    padding: 5px 11px; font-size: 12px; cursor: pointer;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .rock-body .layerToggle button[aria-pressed='true'] { background: #ff7a33; color: #2a0d08; font-weight: 700; }
+
+  /* Leaflet's own chrome (zoom buttons, attribution, scale bar) ships styled
+     for a white basemap; restyled here to sit on this page rather than
+     looking like a different product was pasted in. */
+  .rock-body .leaflet-control-zoom a {
+    background: #21100c; border-color: #4d2619 !important; color: #f0d9cd;
+  }
+  .rock-body .leaflet-control-zoom a:hover { background: #3a1a11; }
+  .rock-body .leaflet-bar { border-color: #4d2619 !important; }
+  .rock-body .leaflet-control-attribution {
+    background: rgb(10 6 4 / 0.72); color: #b1897b; font-size: 10.5px;
+  }
+  .rock-body .leaflet-control-attribution a { color: #d9a98a; }
+  .rock-body .leaflet-control-scale-line {
+    background: rgb(10 6 4 / 0.72); border-color: #cfe4f7 !important;
+    color: #cfe4f7; border-width: 0 2px 2px !important;
+  }
+  .rock-body .leaflet-tooltip.placeLabel {
+    background: none; border: 0; box-shadow: none; color: #cfe4f7;
+    font-family: var(--font); font-size: 11.5px; padding: 0 0 0 2px;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.85);
+  }
+  .rock-body .leaflet-tooltip.placeLabel::before { display: none; }
 
   .rock-body .target { font-size: 13.5px; color: #c7a99c; margin: 12px 0 14px; min-height: 1.4em; }
   .rock-body .fire {
@@ -858,15 +920,13 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     background: #0b1522; border: 1px solid #3d1f16; border-radius: var(--radius-lg);
     overflow: hidden; position: relative;
   }
-  .rock-body #zoom { width: 100%; height: min(56vh, 460px); display: block; }
-  /* Natural Earth's 1:110m outline has vertices kilometres apart, so at a
-     50 km view the coast is visibly a polygon. Held at low contrast against the
-     water so it reads as context rather than as the subject — the rings and the
-     place names are what this picture is actually about. */
-  .rock-body #zoom .sea { fill: #141d28; }
-  .rock-body #zoom .land { fill: #241c17; stroke: #3a2c22; stroke-width: calc(var(--u, 1) * 1px); }
-  .rock-body #zoom ellipse {
-    stroke-width: calc(var(--u, 1) * 1.5px);
+  .rock-body .zoomwrap .leafletMap { aspect-ratio: auto; height: min(56vh, 460px); }
+  /* Real imagery, so the rings and the entry streak are what have to earn
+     their keep against it rather than a hand-drawn coastline held low
+     contrast on purpose. Weight is in screen pixels already (Leaflet paths
+     don't scale with zoom the way the old hand-projected ellipses did), so
+     there is no --u hairline hack to carry over. */
+  .rock-body #zoom path.ring {
     transform-box: fill-box; transform-origin: center;
     animation: ringOut 520ms var(--ease) backwards;
     /* 420ms base matches FLIGHT_MS in the page script — the rings wait for
@@ -874,19 +934,13 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     animation-delay: calc(420ms + var(--i, 0) * 45ms);
   }
   @keyframes ringOut { from { transform: scale(0.2); opacity: 0; } }
-  .rock-body #zoom line { filter: drop-shadow(0 0 calc(var(--u, 1) * 6px) rgba(255, 220, 150, 0.8)); }
-  .rock-body #zoom .place circle { fill: #9fd0ff; }
-  .rock-body #zoom .place text { fill: #cfe4f7; font-family: var(--font); }
 
-  /* Spans the map so the bar's width percentage is a percentage of the view. */
-  .rock-body .scalebar {
-    position: absolute; left: 14px; right: 14px; bottom: 12px; margin: 0;
-    display: flex; align-items: center; gap: 8px; font-size: 12px; color: #cfe4f7;
-    white-space: nowrap; pointer-events: none;
-  }
-  .rock-body .scalebar span {
-    display: block; height: 7px; flex: none;
-    border: 1px solid #cfe4f7; border-top: 0;
+  /* The entry streak's own screen-space overlay, on top of the map but
+     below Leaflet's UI chrome (zoom buttons etc. sit at z-index 1000). */
+  .rock-body .entryFx {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 500;
+    filter: drop-shadow(0 0 6px rgba(255, 220, 150, 0.8));
   }
 
   .rock-body .stats {

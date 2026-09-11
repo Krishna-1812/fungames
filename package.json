@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "@types/leaflet": "^1.9.22",
     "@types/three": "^0.185.4",
     "astro": "^5.14.1",
+    "leaflet": "^1.9.4",
     "sharp": "^0.34.5",
     "three": "^0.185.1"
   }
