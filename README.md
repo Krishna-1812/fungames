@@ -185,6 +185,27 @@ lethality ladder calibrated on Hiroshima and Chelyabinsk. *`scripts/check-impact
 reproduces Chelyabinsk, Tunguska, Meteor Crater and Chicxulub — the entry model,
 the airburst reflection and a crater-depth unit bug were all caught by it.*
 
+The rock you build is a real sphere, not a texture (`lib/asteroid-art.ts`).
+Craters sit at genuine points on a unit sphere and are projected with actual
+orthographic foreshortening — a crater's radius along the sphere's own radial
+direction shrinks by the cosine of its angle from the camera, which is why one
+nearing the limb draws as a correctly-oriented sliver rather than a smaller
+circle — so the rock visibly tumbles rather than sitting there full-on like a
+sticker. The five materials are grounded in real bodies: comet ice is drawn
+the pale blue-white of a fresh water-ice surface (Europa, Enceladus); porous
+rock is the near-charcoal of Bennu and Ryugu, the two rubble-pile asteroids we
+have close-up photographs of; dense rock is an ordinary chondrite's grey-brown;
+iron is a Canyon Diablo analogue — the Meteor Crater impactor — with rust
+streaks; solid gold is the game's one honest joke entry. Launching plays out as
+a real trajectory, too: the entry streak in the impact view is angled from the
+same "angle" slider the model itself uses, and the blast rings wait for it to
+actually land before they reveal. *`scripts/check-asteroid-art.mjs` proves the
+sphere is uniform (not just uniform in latitude — a real, checkable
+statistical difference), that the projection is periodic and truly
+foreshortens, and — the check the file exists for — that each material reads
+as a picture with real surface structure rather than a shaded ball; a plain
+lit sphere run through the same harness is kept as the control that fails it.*
+
 **Powder** — a falling-sand sandbox: a cellular automaton over typed arrays,
 rendered straight into an `ImageData` buffer. Thirty-one materials and
 forty-eight named reactions, and everything interesting is emergent. Oil floats
@@ -428,6 +449,7 @@ simulation:
 
 ```bash
 node scripts/check-impact.mjs      # Asteroid Launcher, vs four real impacts
+node scripts/check-asteroid-art.mjs # the rock: uniform on a sphere, a picture not a ball
 node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
 node scripts/check-robot-scene.mjs # the CAPTCHA street, and its answer key, in pixels
 node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots

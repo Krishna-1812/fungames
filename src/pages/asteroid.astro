@@ -1,5 +1,7 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { ROCK_MATERIAL, renderRock, starField, lt, dk } from '../lib/asteroid-art'
+import type { Composition } from '../lib/impact'
 
 /**
  * Asteroid Launcher — choose a rock, choose somewhere to put it.
@@ -14,7 +16,21 @@ import GameLayout from '../layouts/GameLayout.astro'
  * you get from the equator, by 1/cos(latitude). The rings are drawn as ellipses
  * for exactly that reason, which is why a strike on Svalbard looks stretched and
  * a strike on Ecuador does not.
+ *
+ * The rock itself is real geometry, not a texture — see lib/asteroid-art.ts.
+ * It is server-rendered once here (so there is a real rock on first paint,
+ * before any JS runs) and then the client script owns the same markup,
+ * turning it slowly and re-lighting it when the composition changes.
  */
+const COMP_ORDER: { key: Composition; label: string }[] = [
+  { key: 'ice', label: 'Comet ice' },
+  { key: 'porous', label: 'Porous rock' },
+  { key: 'rock', label: 'Dense rock' },
+  { key: 'iron', label: 'Iron' },
+  { key: 'gold', label: 'Solid gold' },
+]
+const ROCK_STARS = starField(51, 60)
+const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6, stars: ROCK_STARS })
 ---
 
 <GameLayout slug="asteroid" bar="#2a0d08" bodyClass="rock-body">
@@ -30,6 +46,10 @@ import GameLayout from '../layouts/GameLayout.astro'
     <div class="lab">
       <section class="panel build" aria-labelledby="buildH">
         <h2 id="buildH">The rock</h2>
+
+        <div class="rockStage" id="rockStage" aria-hidden="true">
+          <svg id="rockSvg" viewBox="0 0 200 200" set:html={INITIAL_ROCK} />
+        </div>
 
         <div class="presets" id="presets">
           <button type="button" data-preset="chelyabinsk">Chelyabinsk</button>
@@ -47,11 +67,16 @@ import GameLayout from '../layouts/GameLayout.astro'
         <fieldset class="comp">
           <legend>Made of</legend>
           <div class="comp-row" id="comp">
-            <button type="button" data-comp="ice" aria-pressed="false">Comet ice</button>
-            <button type="button" data-comp="porous" aria-pressed="false">Porous rock</button>
-            <button type="button" data-comp="rock" aria-pressed="true">Dense rock</button>
-            <button type="button" data-comp="iron" aria-pressed="false">Iron</button>
-            <button type="button" data-comp="gold" aria-pressed="false">Solid gold</button>
+            {COMP_ORDER.map(({ key, label }) => {
+              const m = ROCK_MATERIAL[key]
+              const style =
+                `--sw-lt:${lt(m.base, 0.5)}; --sw:${m.base}; --sw-dk:${dk(m.base, 0.55)};`
+              return (
+                <button type="button" data-comp={key} aria-pressed={key === 'rock' ? 'true' : 'false'} style={style}>
+                  <span class="swatch"></span>{label}
+                </button>
+              )
+            })}
           </div>
         </fieldset>
 
@@ -158,10 +183,11 @@ import GameLayout from '../layouts/GameLayout.astro'
   import { estimateCasualties, cityRadius } from '../lib/casualties'
   import { CITIES, LAND_PATH, MAP_W, MAP_H, isLand, type City } from '../data/world'
   import { sfx, unlock } from '../lib/audio'
-  import { burst, shake } from '../lib/fx'
+  import { burst, shake, prefersReducedMotion } from '../lib/fx'
   import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
+  import { rockStatic, rockFeatures, rockFeaturesInner, starField } from '../lib/asteroid-art'
 
   const el = <T extends HTMLElement = HTMLElement>(id: string) =>
     document.getElementById(id) as T
@@ -209,6 +235,51 @@ import GameLayout from '../layouts/GameLayout.astro'
     }
   }
 
+  /* ------------------------------------------------------------- the rock */
+
+  /* The rock is real geometry (lib/asteroid-art.ts), not a picture: the same
+     projection the checker verifies runs live here, at whatever rate the
+     display can afford. It is server-rendered once already (see INITIAL_ROCK
+     in the frontmatter) so there is something to look at before this script
+     even runs; from here on this owns it. */
+  const rockSvg = el<SVGSVGElement & HTMLElement>('rockSvg') as unknown as SVGSVGElement
+  const ROCK_ID = 'rock'
+  const ROCK_STARS = starField(51, 60) // same seed as the server render — identical field
+  let rockRotation = 0.6 // matches the server-rendered frame, so nothing jumps on hydration
+  let rockAcc = 0
+
+  function featuresGroup(): SVGGElement | null {
+    return rockSvg.querySelector<SVGGElement>('.ast-features')
+  }
+
+  /** Full redraw: defs, gradients and the sphere itself all depend on the
+   *  material, so a composition change has to rebuild everything — cheap,
+   *  since it only happens on a click, never per frame. */
+  function drawRockFull() {
+    rockSvg.innerHTML =
+      rockStatic({ id: ROCK_ID, composition, stars: ROCK_STARS }) +
+      rockFeatures({ id: ROCK_ID, composition, rotation: rockRotation })
+  }
+
+  if (!prefersReducedMotion) {
+    let lastT = performance.now()
+    const stepRock = (now: number) => {
+      requestAnimationFrame(stepRock)
+      const dt = Math.min((now - lastT) / 1000, 1 / 20)
+      lastT = now
+      rockRotation += dt * 0.32 // a slow tumble, not a spin
+      rockAcc += dt
+      // Throttled well below frame rate — the rock turns slowly enough that
+      // 18 updates a second is indistinguishable from 60, at a fraction of
+      // the DOM churn.
+      if (rockAcc < 1 / 18) return
+      rockAcc = 0
+      const g = featuresGroup()
+      if (g) g.innerHTML = rockFeaturesInner({ id: ROCK_ID, composition, rotation: rockRotation })
+    }
+    requestAnimationFrame(stepRock)
+  }
+
   function syncReadouts() {
     const i = currentInput()
     el('diameterOut').textContent = dist(i.diameter)
@@ -219,6 +290,11 @@ import GameLayout from '../layouts/GameLayout.astro'
       kg >= 1e12
         ? `Weighs about ${bigNumber(kg / 1e9)} tonnes.`
         : `Weighs about ${bigNumber(Math.round(kg / 1000))} tonnes.`
+    // The rock's own size follows the diameter slider — a scale transform on
+    // the stage, not a change to the sphere's own geometry, so the craters'
+    // projection math never has to know about it.
+    const f = Number(inputs.diameter.value) / 1000
+    el('rockStage').style.setProperty('--rockScale', (0.58 + f * 0.56).toFixed(3))
   }
 
   for (const input of Object.values(inputs)) {
@@ -232,6 +308,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     el('comp')
       .querySelectorAll<HTMLButtonElement>('[data-comp]')
       .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
+    drawRockFull()
     unlock(); sfx.blip(2)
     syncReadouts()
   })
@@ -331,6 +408,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     el('comp')
       .querySelectorAll<HTMLButtonElement>('[data-comp]')
       .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.comp === p.c)))
+    drawRockFull()
     if (p.at) setTarget(p.at[0], p.at[1], p.at[2])
     syncReadouts()
     unlock(); sfx.good()
@@ -339,6 +417,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* ------------------------------------------------------------- launch */
 
   const RING_COLOURS = ['#fff1c9', '#ffd166', '#ff9a3c', '#ff5f2e', '#e0341c', '#8d1f12']
+  /** How long the entry streak takes to fall, in ms. The blast rings' own
+   *  reveal (CSS) is delayed by exactly this much, and the boom/shake/spark
+   *  fire on this timer too, so every part of the impact lands together. */
+  const FLIGHT_MS = 420
 
   /* ---- the result, as a picture ----------------------------------------- */
 
@@ -400,14 +482,21 @@ import GameLayout from '../layouts/GameLayout.astro'
     const casualties = estimateCasualties(result, target.lat, target.lon)
     render(result, casualties)
     unlock()
-    sfx.boom()
-    shake(document.body, 10, 420)
-    const r = el('zoom').getBoundingClientRect()
-    burst(r.left + r.width / 2, r.top + r.height / 2, {
-      count: 30, colors: ['#ffd166', '#ff7a33', '#fff'], speed: 6,
-      gravity: 0.18, shape: 'streak', size: 3,
-    })
+    sfx.whoosh()
     el('result').scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // The boom lands when the entry streak drawn in drawZoom() actually
+    // reaches the target — not at the moment of the click — so the sound,
+    // the screen shake and the ring reveal all read as one event. There is
+    // no streak to wait for under reduced motion, so it lands immediately.
+    setTimeout(() => {
+      sfx.boom()
+      shake(document.body, 10, 420)
+      const r = el('zoom').getBoundingClientRect()
+      burst(r.left + r.width / 2, r.top + r.height / 2, {
+        count: 30, colors: ['#ffd166', '#ff7a33', '#fff'], speed: 6,
+        gravity: 0.18, shape: 'streak', size: 3,
+      })
+    }, prefersReducedMotion ? 0 : FLIGHT_MS)
   })
 
   function render(r: ReturnType<typeof simulate>, cas: ReturnType<typeof estimateCasualties>) {
@@ -532,14 +621,75 @@ import GameLayout from '../layouts/GameLayout.astro'
       `stroke-opacity="0.85" ${dashed ? 'stroke-dasharray="6 5"' : ''} ` +
       `style="--i:${i}" />`
 
-    const parts: string[] = []
+    // Fireball and crater as lit glows rather than a flat tint — the same
+    // radial-gradient technique the rest of the site uses for a lit sphere,
+    // here standing in for "impossibly bright" and "a hole with a shadowed
+    // wall" instead of a surface.
+    const defs = `<defs>
+      <radialGradient id="zoom-fire" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#fffef2"/>
+        <stop offset="38%" stop-color="#ffe9a8" stop-opacity="0.95"/>
+        <stop offset="72%" stop-color="#ff9a3c" stop-opacity="0.75"/>
+        <stop offset="100%" stop-color="#ff5f2e" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="zoom-crater" cx="42%" cy="36%" r="68%">
+        <stop offset="0%" stop-color="#4a2115"/>
+        <stop offset="65%" stop-color="#2b0b06"/>
+        <stop offset="100%" stop-color="#140502"/>
+      </radialGradient>
+      <linearGradient id="zoom-entry" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ffedc2" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#fff8e6"/>
+      </linearGradient>
+    </defs>`
+
+    // The entry streak: a genuine trajectory, angled the way the user's own
+    // "angle" slider says it comes in, not a decorative flourish. Direction
+    // (cos, -sin) of that angle from the horizontal — steep means nearly
+    // straight down, shallow means nearly grazing — scaled out past the edge
+    // of the current view so it always enters from off-screen.
+    const theta = (r.input.angle * Math.PI) / 180
+    const reach = Math.max(hx, hy) * 1.6
+    const startX = cx + Math.cos(theta) * reach
+    const startY = cy - Math.sin(theta) * reach
+    // A moving streak is exactly the motion prefers-reduced-motion asks this
+    // site to skip, and — unlike a CSS animation — an SVG <animate> is not
+    // silenced by global.css's blanket animation-duration override. Left out
+    // entirely under reduced motion rather than freezing it full-length,
+    // which would just leave a static line with no obvious reason to exist.
+    const streak = prefersReducedMotion
+      ? ''
+      : `<line x1="${startX}" y1="${startY}" x2="${startX}" y2="${startY}" ` +
+        `stroke="url(#zoom-entry)" stroke-width="${hy * 0.02}" stroke-linecap="round">` +
+        `<animate attributeName="x2" from="${startX}" to="${cx}" dur="${FLIGHT_MS / 1000}s" ` +
+        `calcMode="spline" keySplines="0.3 0 0.7 1" fill="freeze"/>` +
+        `<animate attributeName="y2" from="${startY}" to="${cy}" dur="${FLIGHT_MS / 1000}s" ` +
+        `calcMode="spline" keySplines="0.3 0 0.7 1" fill="freeze"/>` +
+        `<animate attributeName="opacity" values="1;1;0" keyTimes="0;0.92;1" dur="${FLIGHT_MS / 1000}s" fill="freeze"/>` +
+        `</line>`
+
+    const parts: string[] = [defs, streak]
     // Largest first so the small, hot rings paint on top.
     const ordered = [...r.blast].sort((a, b) => b.radius - a.radius)
     ordered.forEach((b, i) => parts.push(ring(b.radius, RING_COLOURS[Math.min(i, 5)], i)))
     const burns = r.thermal.find((t) => t.effect === 'thirdDegreeBurns')
     if (burns) parts.push(ring(burns.radius, '#ffd166', ordered.length, true))
-    if (r.crater) parts.push(ring(r.crater.final / 2, '#2b0b06', ordered.length + 1))
-    parts.push(ring(r.fireball, '#fff4d6', ordered.length + 2))
+    if (r.crater) {
+      const rr = toUnitsY(r.crater.final / 2) * stretch
+      const ry = toUnitsY(r.crater.final / 2)
+      parts.push(
+        `<ellipse cx="${cx}" cy="${cy}" rx="${rr}" ry="${ry}" fill="url(#zoom-crater)" ` +
+          `stroke="#6b4231" stroke-opacity="0.55" style="--i:${ordered.length + 1}"/>`,
+      )
+    }
+    {
+      const rr = toUnitsY(r.fireball) * stretch
+      const ry = toUnitsY(r.fireball)
+      parts.push(
+        `<ellipse cx="${cx}" cy="${cy}" rx="${rr}" ry="${ry}" fill="url(#zoom-fire)" ` +
+          `style="--i:${ordered.length + 2}"/>`,
+      )
+    }
     el('rings').innerHTML = parts.join('')
 
     // Nearby cities, so the rings have something to be next to.
@@ -599,6 +749,22 @@ import GameLayout from '../layouts/GameLayout.astro'
     color: #c98b6b; margin: 0 0 14px;
   }
 
+  /* The rock stage: a scrap of space to put the thing in, so "made of iron"
+     means something before a single number is read. --rockScale is set from
+     the diameter slider in the page script; the sphere's own geometry never
+     changes, only this transform, which is why the craters' projection math
+     stays simple. */
+  .rock-body .rockStage {
+    position: relative; border-radius: var(--radius); overflow: hidden;
+    background: radial-gradient(120% 140% at 50% 18%, #2a120a 0%, #1c0a06 55%, #120704 100%);
+    margin-bottom: 16px; aspect-ratio: 1 / 0.86;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rock-body .rockStage svg {
+    width: 62%; height: 62%; display: block; overflow: visible;
+    transform: scale(var(--rockScale, 0.85));
+    transition: transform 260ms var(--ease);
+  }
   .rock-body .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
   .rock-body .presets button {
     background: #2f1710; border: 1px solid #4d2619; color: #f0d9cd;
@@ -622,10 +788,19 @@ import GameLayout from '../layouts/GameLayout.astro'
   .rock-body .comp legend { font-size: 13px; color: #c7a99c; padding: 0; margin-bottom: 6px; }
   .rock-body .comp-row { display: flex; flex-wrap: wrap; gap: 6px; }
   .rock-body .comp-row button {
+    display: inline-flex; align-items: center; gap: 7px;
     background: #2f1710; border: 1px solid #4d2619; color: #e8cfc2;
-    border-radius: 8px; padding: 7px 11px; font-size: 12.5px; cursor: pointer;
+    border-radius: 8px; padding: 6px 11px 6px 8px; font-size: 12.5px; cursor: pointer;
     transition: background 140ms var(--ease), border-color 140ms var(--ease),
       transform 180ms var(--ease-bounce);
+  }
+  /* A little lit ball of the material itself — the same light direction as
+     the rock stage's own sphere, so a button reads as a tiny sample of the
+     real thing rather than a colour tag. */
+  .rock-body .comp-row button .swatch {
+    width: 15px; height: 15px; border-radius: 50%; flex: none;
+    background: radial-gradient(circle at 35% 28%, var(--sw-lt), var(--sw) 58%, var(--sw-dk));
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
   }
   .rock-body .comp-row button:hover { transform: translateY(-1px) scale(1.03); }
   .rock-body .comp-row button[aria-pressed='true'] {
@@ -694,9 +869,12 @@ import GameLayout from '../layouts/GameLayout.astro'
     stroke-width: calc(var(--u, 1) * 1.5px);
     transform-box: fill-box; transform-origin: center;
     animation: ringOut 520ms var(--ease) backwards;
-    animation-delay: calc(var(--i, 0) * 45ms);
+    /* 420ms base matches FLIGHT_MS in the page script — the rings wait for
+       the entry streak to actually land before they reveal. */
+    animation-delay: calc(420ms + var(--i, 0) * 45ms);
   }
   @keyframes ringOut { from { transform: scale(0.2); opacity: 0; } }
+  .rock-body #zoom line { filter: drop-shadow(0 0 calc(var(--u, 1) * 6px) rgba(255, 220, 150, 0.8)); }
   .rock-body #zoom .place circle { fill: #9fd0ff; }
   .rock-body #zoom .place text { fill: #cfe4f7; font-family: var(--font); }
 

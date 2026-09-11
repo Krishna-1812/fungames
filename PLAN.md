@@ -1138,7 +1138,51 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     settled somewhere else, the other only at exactly the viewport width
     that ran out of room.
 
-16. Then reassess against the depth work in Phases 1–2 above.
+16. ~~**Asteroid Launcher, an actual rock**~~ — **done.** The impact model
+    (Collins, Melosh & Marcus, checked against four real events) was never
+    the gap — the rock you were building to run it on was a flat pill
+    labelled "Iron" and a diagram of an explosion. Nothing about the page
+    said "you are building a thing and dropping it," which is the entire
+    fantasy neal.fun's version sells.
+
+    `lib/asteroid-art.ts` draws a real sphere: craters sit at genuine points
+    on a unit sphere (`craterField`, uniform by `asin(2u-1)`, not a naive
+    linear latitude that crowds the poles) and are projected every frame
+    with actual orthographic foreshortening — a crater's radius along the
+    sphere's own radial direction shrinks by the cosine of its angle from
+    the camera, so one nearing the limb draws as a correctly-oriented sliver
+    rather than a smaller circle. That is the one genuinely 3D piece of it;
+    everything else reuses the Moon's technique from `scale-art.ts` (a lit
+    gradient sphere, dark-shadow-plus-light-rim crater dimples). The five
+    materials are grounded in real bodies rather than invented to look
+    nice — comet ice as fresh water-ice (Europa, Enceladus), porous rock as
+    the near-charcoal of Bennu and Ryugu, dense rock as an ordinary
+    chondrite, iron as a Canyon Diablo analogue with rust streaks, solid
+    gold as the game's one admitted joke. Each composition button carries a
+    tiny rendering of its own material rather than a colour tag.
+
+    `check-asteroid-art.mjs` found two real problems before either shipped:
+    the closest two materials were only 35 RGB units apart (fixed by
+    separating iron and porous rock further), and two materials — porous
+    rock and iron — scored *below* a plain lit sphere on the "picture or a
+    blob" edge-density test, because gamma-decoded luminance compresses
+    differences between two dark colours far more than their sRGB values
+    suggest: a shadow drawn dark-on-dark reads as almost no edge at all.
+    Fixed by pushing the crater shadow/rim spread harder specifically for
+    darker materials, not by lowering the bar.
+
+    Launching now plays out as a real trajectory rather than an instant cut
+    to the result: the entry streak in the impact view is angled from the
+    same `angle` input the physics model itself uses (steep is nearly
+    vertical, shallow is nearly grazing), and the blast rings' own reveal
+    is held back until the streak actually lands, so the whoosh, the boom,
+    the screen shake and the rings read as one sequenced event instead of
+    four things that all happened at once. The fireball and crater switched
+    from flat tinted circles to lit radial gradients — the same technique
+    used everywhere else on the site for "a bright thing" and "a dark
+    hole," here doing that job in a physics diagram instead of a portrait.
+
+17. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run
