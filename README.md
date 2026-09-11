@@ -223,6 +223,20 @@ Crater or Chicxulub preset flies the target-picker to the real coordinates at
 a preset-specific zoom — Meteor Crater's bowl is genuinely visible in the
 satellite layer, road and all.
 
+The impact itself is a sequenced event, not four things firing on their own
+guessed timers. The entry streak runs on a hand-driven `requestAnimationFrame`
+loop rather than an SVG SMIL animation specifically so its own completion can
+call `impact()` directly — a screen flash, a camera-punch scale on the map,
+two staggered shockwave rings, and a debris burst tinted to the material
+actually dropped (iron throws rust-coloured sparks; gold throws its own glow)
+plus a heavier dust wave for ground impacts specifically. The blast rings'
+reveal is gated on a CSS class `impact()` adds at that same instant, not a
+hardcoded `animation-delay` guessing when the streak would land — the two
+could drift apart by construction before; now there is exactly one clock.
+Every part of this that is genuine motion (the streak, the flash, the camera
+punch) checks `prefers-reduced-motion` directly, because it is not the kind
+of animation the site's blanket CSS override can reach.
+
 **Powder** — a falling-sand sandbox: a cellular automaton over typed arrays,
 rendered straight into an `ImageData` buffer. Thirty-one materials and
 forty-eight named reactions, and everything interesting is emergent. Oil floats

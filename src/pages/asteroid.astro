@@ -39,6 +39,7 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
 ---
 
 <GameLayout slug="asteroid" bar="#2a0d08" bodyClass="rock-body">
+  <div class="impactFlash" id="impactFlash" aria-hidden="true"></div>
   <div class="wrap">
     <header class="head">
       <h1>Asteroid Launcher</h1>
@@ -181,11 +182,11 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   import { estimateCasualties, cityRadius } from '../lib/casualties'
   import { CITIES, isLand, type City } from '../data/world'
   import { sfx, unlock } from '../lib/audio'
-  import { burst, shake, prefersReducedMotion } from '../lib/fx'
+  import { burst, shake, ring as sparkRing, prefersReducedMotion } from '../lib/fx'
   import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
-  import { rockStatic, rockFeatures, rockFeaturesInner, starField } from '../lib/asteroid-art'
+  import { rockStatic, rockFeatures, rockFeaturesInner, starField, ROCK_MATERIAL, dk } from '../lib/asteroid-art'
 
   const el = <T extends HTMLElement = HTMLElement>(id: string) =>
     document.getElementById(id) as T
@@ -451,10 +452,11 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   /* ------------------------------------------------------------- launch */
 
   const RING_COLOURS = ['#fff1c9', '#ffd166', '#ff9a3c', '#ff5f2e', '#e0341c', '#8d1f12']
-  /** How long the entry streak takes to fall, in ms. The blast rings' own
-   *  reveal (CSS) is delayed by exactly this much, and the boom/shake/spark
-   *  fire on this timer too, so every part of the impact lands together. */
-  const FLIGHT_MS = 420
+  /** How long the entry streak takes to fall, in ms. Everything else about
+   *  the impact — the flash, the shockwave, the boom, the rings' own reveal —
+   *  fires from the streak's own animation-complete callback in drawZoom(),
+   *  not a second timer racing it, so they cannot drift out of sync. */
+  const FLIGHT_MS = 460
 
   /* ---- the result, as a picture ----------------------------------------- */
 
@@ -518,19 +520,6 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     unlock()
     sfx.whoosh()
     el('result').scrollIntoView({ behavior: 'smooth', block: 'start' })
-    // The boom lands when the entry streak drawn in drawZoom() actually
-    // reaches the target — not at the moment of the click — so the sound,
-    // the screen shake and the ring reveal all read as one event. There is
-    // no streak to wait for under reduced motion, so it lands immediately.
-    setTimeout(() => {
-      sfx.boom()
-      shake(document.body, 10, 420)
-      const r = el('zoom').getBoundingClientRect()
-      burst(r.left + r.width / 2, r.top + r.height / 2, {
-        count: 30, colors: ['#ffd166', '#ff7a33', '#fff'], speed: 6,
-        gravity: 0.18, shape: 'streak', size: 3,
-      })
-    }, prefersReducedMotion ? 0 : FLIGHT_MS)
   })
 
   function render(r: ReturnType<typeof simulate>, cas: ReturnType<typeof estimateCasualties>) {
@@ -691,9 +680,13 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
       ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(ordered.length + 1))
     }
     {
+      // Its own class, not just "ring" — the fireball gets a bouncier,
+      // overshooting reveal in CSS (a bright thing should punch past its
+      // final size and settle, not politely fade in like an information
+      // ring) that would look wrong on anything else in the set.
       const c = L.circle(center, {
         radius: r.fireball, stroke: false, fillColor: 'url(#zoom-fire)', fillOpacity: 0.95,
-        className: 'ring', interactive: false,
+        className: 'ring fireball', interactive: false,
       }).addTo(ringsGroup!)
       ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(ordered.length + 2))
     }
@@ -712,42 +705,149 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
         .addTo(ringsGroup!)
     }
 
+    // Rings are appended invisible (see the .rock-body #zoom path.ring CSS)
+    // and revealed by adding .impacted once the streak below actually lands
+    // — resetting it here means a second launch always starts from
+    // invisible again rather than a stale class popping the new rings in
+    // instantly.
+    const zoomEl = el('zoom') as HTMLElement
+    zoomEl.classList.remove('impacted')
+
     // The entry streak lives in its own screen-space overlay, not on the
     // map itself — there is no real bearing in the model to plot (only an
     // elevation angle), so this is a cosmetic flourish and pixel space is
     // the honest place to build one, rather than dressing it up as geodata.
     const fx = el<SVGSVGElement & HTMLElement>('entryFx') as unknown as SVGSVGElement
-    const box = (el('zoom') as HTMLElement).getBoundingClientRect()
+    const box = zoomEl.getBoundingClientRect()
     fx.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`)
+    const targetPt = zmap.latLngToContainerPoint(center)
+    const m = ROCK_MATERIAL[composition]
+
+    /**
+     * Fires once, whether the streak actually flew or (under reduced motion)
+     * was skipped outright — the single moment "impact" happens, and every
+     * effect keys off it instead of a second guessed timer racing the
+     * animation. `getBoundingClientRect()` is re-read here rather than
+     * reusing `box`: the page is still mid-`scrollIntoView` when this runs,
+     * so the map's screen position genuinely moves during the flight.
+     */
+    function impact() {
+      zoomEl.classList.add('impacted')
+      sfx.boom()
+      shake(document.body, 10, 420)
+
+      const live = zoomEl.getBoundingClientRect()
+      const sx = live.left + targetPt.x
+      const sy = live.top + targetPt.y
+
+      if (!prefersReducedMotion) {
+        const flash = el('impactFlash')
+        flash.style.setProperty('--fx', `${(sx / innerWidth) * 100}%`)
+        flash.style.setProperty('--fy', `${(sy / innerHeight) * 100}%`)
+        // Removing and re-adding the class restarts the CSS animation even
+        // on a second launch in a row, where it would otherwise still be
+        // "on" and not fire again.
+        flash.classList.remove('hit')
+        void (flash as HTMLElement).offsetWidth
+        flash.classList.add('hit')
+
+        const wrap = zoomEl.closest<HTMLElement>('.zoomwrap')
+        wrap?.classList.remove('impactPunch')
+        void wrap?.offsetWidth
+        wrap?.classList.add('impactPunch')
+
+        // A fast, forceful shockwave — distinct from the slower, informational
+        // blast rings on the map itself — read together as "something has
+        // actually happened here" a beat before the numbers do.
+        sparkRing(sx, sy, '#fff4d6', 20)
+        setTimeout(() => sparkRing(sx, sy, m.glow, 46), 70)
+      }
+
+      // Debris is tinted to the material actually dropped, not a fixed
+      // orange — the same ROCK_MATERIAL the build panel's rock and its
+      // composition swatches use, so an iron impact throws rust-coloured
+      // sparks and a gold one throws its own glow.
+      burst(sx, sy, {
+        count: 34, colors: [m.glow, m.fleck, '#fff4d6', '#ff7a33'], speed: 6.5,
+        gravity: 0.18, shape: 'streak', size: 3, life: 42,
+      })
+      // A ground impact throws a second, heavier wave of dust that falls
+      // back rather than streaking away — an airburst has nothing to dig up.
+      if (r.crater) {
+        burst(sx, sy, {
+          count: 22, colors: [dk(m.base, 0.3), m.base], speed: 3, gravity: 0.05,
+          drag: 0.94, shape: 'square', size: 4, life: 60,
+        })
+      }
+    }
+
     // A moving streak is exactly the motion prefers-reduced-motion asks this
-    // site to skip, and — unlike a CSS animation — an SVG <animate> is not
-    // silenced by global.css's blanket animation-duration override. Left out
-    // entirely under reduced motion rather than freezing it full-length,
-    // which would just leave a static line with no obvious reason to exist.
+    // site to skip. Left out entirely rather than freezing it full-length,
+    // which would just leave a static line with no obvious reason to exist
+    // — impact() still fires immediately, so nothing else about the result
+    // depends on the streak having played.
     if (prefersReducedMotion) {
       fx.innerHTML = ''
-    } else {
-      const targetPt = zmap.latLngToContainerPoint(center)
-      // Direction (cos, -sin) of the model's own "angle" input from the
-      // horizontal — steep means nearly straight down, shallow means nearly
-      // grazing — scaled out past the edge of the view.
-      const theta = (r.input.angle * Math.PI) / 180
-      const reach = Math.max(box.width, box.height) * 0.9
-      const startX = targetPt.x + Math.cos(theta) * reach
-      const startY = targetPt.y - Math.sin(theta) * reach
-      fx.innerHTML =
-        `<defs><linearGradient id="entry-grad" x1="0" y1="0" x2="1" y2="1">` +
-        `<stop offset="0%" stop-color="#ffedc2" stop-opacity="0"/>` +
-        `<stop offset="100%" stop-color="#fff8e6"/></linearGradient></defs>` +
-        `<line x1="${startX}" y1="${startY}" x2="${startX}" y2="${startY}" ` +
-        `stroke="url(#entry-grad)" stroke-width="4" stroke-linecap="round">` +
-        `<animate attributeName="x2" from="${startX}" to="${targetPt.x}" dur="${FLIGHT_MS / 1000}s" ` +
-        `calcMode="spline" keySplines="0.3 0 0.7 1" fill="freeze"/>` +
-        `<animate attributeName="y2" from="${startY}" to="${targetPt.y}" dur="${FLIGHT_MS / 1000}s" ` +
-        `calcMode="spline" keySplines="0.3 0 0.7 1" fill="freeze"/>` +
-        `<animate attributeName="opacity" values="1;1;0" keyTimes="0;0.92;1" dur="${FLIGHT_MS / 1000}s" fill="freeze"/>` +
-        `</line>`
+      impact()
+      return
     }
+
+    // Direction (cos, -sin) of the model's own "angle" input from the
+    // horizontal — steep means nearly straight down, shallow means nearly
+    // grazing — scaled out past the edge of the view.
+    const theta = (r.input.angle * Math.PI) / 180
+    const reach = Math.max(box.width, box.height) * 0.9
+    const startX = targetPt.x + Math.cos(theta) * reach
+    const startY = targetPt.y - Math.sin(theta) * reach
+
+    fx.innerHTML =
+      `<defs><linearGradient id="entry-core" x1="0" y1="0" x2="1" y2="1">` +
+      `<stop offset="0%" stop-color="${m.glow}" stop-opacity="0"/>` +
+      `<stop offset="100%" stop-color="#fffef2"/></linearGradient></defs>` +
+      `<line id="streakGlow" x1="${startX}" y1="${startY}" x2="${startX}" y2="${startY}" ` +
+      `stroke="${m.glow}" stroke-width="11" stroke-linecap="round" opacity="0.4"/>` +
+      `<line id="streakCore" x1="${startX}" y1="${startY}" x2="${startX}" y2="${startY}" ` +
+      `stroke="url(#entry-core)" stroke-width="3.5" stroke-linecap="round"/>`
+
+    const glowLine = fx.querySelector<SVGLineElement>('#streakGlow')!
+    const coreLine = fx.querySelector<SVGLineElement>('#streakCore')!
+    // A plain rAF loop rather than SMIL — driving it by hand is what lets
+    // embers spawn along the actual path each frame and lets `impact()` fire
+    // from the animation's own completion instead of a second timer.
+    const t0 = performance.now()
+    let lastEmber = 0
+
+    function frame(now: number) {
+      const t = Math.min(1, (now - t0) / FLIGHT_MS)
+      // t*t, not linear or eased-out — a falling body accelerates, so the
+      // streak should visibly speed up as it drops rather than travel at a
+      // constant rate.
+      const k = t * t
+      const cx = startX + (targetPt.x - startX) * k
+      const cy = startY + (targetPt.y - startY) * k
+      glowLine.setAttribute('x2', String(cx))
+      glowLine.setAttribute('y2', String(cy))
+      coreLine.setAttribute('x2', String(cx))
+      coreLine.setAttribute('y2', String(cy))
+
+      if (now - lastEmber > 24 && t < 0.96) {
+        lastEmber = now
+        const live = zoomEl.getBoundingClientRect()
+        burst(live.left + cx, live.top + cy, {
+          count: 2, colors: [m.glow, '#fff4d6'], speed: 1, gravity: 0.02,
+          shape: 'dot', size: 2, life: 20,
+        })
+      }
+
+      if (t < 1) requestAnimationFrame(frame)
+      else {
+        // The impact flash covers the same instant, so the line vanishing
+        // abruptly here reads as swallowed by the light rather than as a pop.
+        fx.innerHTML = ''
+        impact()
+      }
+    }
+    requestAnimationFrame(frame)
   }
 
   /* --------------------------------------------------------------- boot */
@@ -925,15 +1025,26 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
      their keep against it rather than a hand-drawn coastline held low
      contrast on purpose. Weight is in screen pixels already (Leaflet paths
      don't scale with zoom the way the old hand-projected ellipses did), so
-     there is no --u hairline hack to carry over. */
+     there is no --u hairline hack to carry over.
+
+     Revealed by a class (`#zoom.impacted`), not a blind animation-delay —
+     drawZoom() adds it from the entry streak's own animation-complete
+     callback, so the rings cannot drift out of sync with when the streak
+     actually lands the way two independent timers could. */
   .rock-body #zoom path.ring {
+    opacity: 0; transform: scale(0.2);
     transform-box: fill-box; transform-origin: center;
-    animation: ringOut 520ms var(--ease) backwards;
-    /* 420ms base matches FLIGHT_MS in the page script — the rings wait for
-       the entry streak to actually land before they reveal. */
-    animation-delay: calc(420ms + var(--i, 0) * 45ms);
+    transition: transform 520ms var(--ease), opacity 400ms var(--ease);
+    transition-delay: calc(var(--i, 0) * 45ms);
   }
-  @keyframes ringOut { from { transform: scale(0.2); opacity: 0; } }
+  .rock-body #zoom.impacted path.ring { opacity: 1; transform: scale(1); }
+  /* The fireball punches past its final size and settles rather than
+     politely fading in — a bright thing arriving should overshoot; an
+     information ring should not. The cubic-bezier's y-values above 1 are
+     what produce the overshoot. */
+  .rock-body #zoom.impacted path.ring.fireball {
+    transition: transform 640ms cubic-bezier(0.18, 1.6, 0.4, 1), opacity 260ms var(--ease);
+  }
 
   /* The entry streak's own screen-space overlay, on top of the map but
      below Leaflet's UI chrome (zoom buttons etc. sit at z-index 1000). */
@@ -941,6 +1052,36 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     position: absolute; inset: 0; width: 100%; height: 100%;
     pointer-events: none; z-index: 500;
     filter: drop-shadow(0 0 6px rgba(255, 220, 150, 0.8));
+  }
+  /* A brief camera "punch" at the moment of impact — the whole map box
+     bumps larger and settles, the way a hit lands weight in a game rather
+     than just appearing. */
+  .rock-body .zoomwrap.impactPunch { animation: camPunch 420ms cubic-bezier(0.22, 0.9, 0.34, 1); }
+  @keyframes camPunch {
+    0% { transform: scale(1); }
+    16% { transform: scale(1.045); }
+    100% { transform: scale(1); }
+  }
+
+  /* A full-viewport flash at the true impact point, not just within the map
+     box — the one cue big enough to read as "detonation" rather than "UI
+     update." mix-blend-mode: screen adds light onto the page instead of
+     covering it, which is what keeps a single flash from looking like a
+     white rectangle was pasted over everything. One clean fade, not a
+     strobe: a lone brightness change is not a photosensitivity concern the
+     way repeated flashing would be, and prefers-reduced-motion skips it
+     entirely regardless (see impact() in the page script). */
+  .rock-body .impactFlash {
+    position: fixed; inset: 0; z-index: 9400; pointer-events: none;
+    background: radial-gradient(circle at var(--fx, 50%) var(--fy, 50%),
+      #fff6df 0%, #ffb066 38%, transparent 72%);
+    opacity: 0; mix-blend-mode: screen;
+  }
+  .rock-body .impactFlash.hit { animation: flashPop 520ms ease-out; }
+  @keyframes flashPop {
+    0% { opacity: 0; }
+    6% { opacity: 0.92; }
+    100% { opacity: 0; }
   }
 
   .rock-body .stats {

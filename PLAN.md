@@ -1214,7 +1214,46 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     (only an elevation angle) and is drawn in the result view's own
     screen-pixel overlay rather than dressed up as geodata it isn't.
 
-18. Then reassess against the depth work in Phases 1–2 above.
+18. ~~**Asteroid Launcher, an impact that lands**~~ — **done.** Requested
+    explicitly: make the impact and explosion "look crazy good." The streak
+    and the ring reveal already existed; what they lacked was weight — a
+    single `setTimeout(FLIGHT_MS)` racing a separate SMIL animation, one
+    flat particle burst, and rings that faded in politely rather than
+    arriving.
+
+    The entry streak moved off SMIL onto a plain `requestAnimationFrame`
+    loop, which is what makes the rest of this possible: a callback fires
+    exactly when the streak's own animation completes, so `impact()` is the
+    one moment everything downstream keys off, not a second timer that could
+    drift from the first. The fall itself now eases as `t*t` — an
+    accelerating drop, not a constant-speed slide — and spawns real ember
+    particles along its own path every ~24ms rather than being a bare line.
+
+    `impact()` itself is new: a full-viewport screen flash (`mix-blend-mode:
+    screen`, so it adds light rather than pasting a white rectangle over the
+    page, and a single fade rather than a strobe — one brightness change is
+    not the photosensitivity risk repeated flashing is), a brief camera
+    "punch" scale on the map box, two staggered shockwave rings distinct
+    from the informational blast-radius circles, and a debris burst tinted
+    to the material actually dropped (`ROCK_MATERIAL`'s own colours — the
+    same table the build panel's rock and its swatches already use, so iron
+    throws rust-coloured sparks and gold throws its own glow) plus a second,
+    heavier dust wave specifically for ground impacts, since an airburst has
+    nothing to dig up. The blast rings switched from a hardcoded
+    `animation-delay` guessing when the streak would land to a CSS
+    transition gated on a class (`#zoom.impacted`) that `impact()` adds
+    directly — the two could never agree by construction before; now there
+    is only one clock. The fireball keeps its own overshoot curve (a
+    cubic-bezier with values past 1, so it punches past its final size and
+    settles) rather than the plain fade every other ring gets.
+
+    Every added effect is genuinely gated on `prefers-reduced-motion`, not
+    merely covered by the site's blanket CSS animation-duration override —
+    the streak's rAF loop, the flash, and the camera punch are all real
+    motion a CSS rule cannot reach, so `impact()` fires immediately with the
+    sound and the debris (which self-gate) but without any of the three.
+
+19. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run
