@@ -40,21 +40,6 @@ import { withBase } from '../lib/base'
     </p>
   </header>
 
-  <div class="dg-dock" id="dock">
-    <div class="bar" id="bar" role="img" aria-label="Your day, as a bar of coloured segments">
-      <div class="seg" data-key="morning"></div>
-      <div class="seg" data-key="commute"></div>
-      <div class="seg" data-key="work"></div>
-      <div class="seg" data-key="lunch"></div>
-      <div class="seg" data-key="home"></div>
-      <div class="seg" data-key="dinner"></div>
-      <div class="seg" data-key="sleep"></div>
-      <div class="cuts" id="cuts" aria-hidden="true"></div>
-    </div>
-    <div class="legend" id="legend"></div>
-    <p class="piececount" id="piececount">7 pieces.</p>
-  </div>
-
   <main class="dg-body-content">
     <section class="dg-sec" id="sec-basics">
       <h2>First, your typical day</h2>
@@ -71,7 +56,15 @@ import { withBase } from '../lib/base'
         <span class="dg-slider-label"><b>Sleep</b><i id="v-sleep">8h</i></span>
         <input type="range" id="sleepHours" min="0" max="12" step="0.5" value="8">
       </label>
-      <p class="dg-note">Look at that. A perfectly tidy day. Keep scrolling — it's about to get more honest.</p>
+      <p class="dg-note">Take your time and slide those. Done? Here's what your day looks like:</p>
+
+      <div class="daybar" data-cp="basics">
+        <p class="daybar-title">Your day</p>
+        <div class="daybar-frame"><div class="daybar-col"></div></div>
+        <div class="legend"></div>
+        <p class="piececount"></p>
+      </div>
+      <p class="dg-note">It's beautiful. Obviously it doesn't stay that way — keep scrolling.</p>
     </section>
 
     <section class="dg-sec" id="sec-morning">
@@ -85,6 +78,13 @@ import { withBase } from '../lib/base'
         <span class="dg-slider-label"><b>Morning routine</b><i id="v-morning">0m</i></span>
         <input type="range" id="morningMin" min="0" max="120" step="5" value="0">
       </label>
+
+      <div class="daybar" data-cp="morning">
+        <p class="daybar-title">Your day, updated</p>
+        <div class="daybar-frame"><div class="daybar-col"></div></div>
+        <div class="legend"></div>
+        <p class="piececount"></p>
+      </div>
     </section>
 
     <section class="dg-sec" id="sec-meals">
@@ -98,6 +98,13 @@ import { withBase } from '../lib/base'
         <span class="dg-slider-label"><b>Dinner</b><i id="v-dinner">0m</i></span>
         <input type="range" id="dinnerMin" min="0" max="90" step="5" value="0">
       </label>
+
+      <div class="daybar" data-cp="meals">
+        <p class="daybar-title">Your day, degrading nicely</p>
+        <div class="daybar-frame"><div class="daybar-col"></div></div>
+        <div class="legend"></div>
+        <p class="piececount"></p>
+      </div>
     </section>
 
     <section class="dg-sec" id="sec-commute">
@@ -107,6 +114,14 @@ import { withBase } from '../lib/base'
         <span class="dg-slider-label"><b>Commute, one way</b><i id="v-commute">0m</i></span>
         <input type="range" id="commuteMin" min="0" max="90" step="5" value="0">
       </label>
+
+      <div class="daybar" data-cp="commute">
+        <p class="daybar-title">Your day, fully honest so far</p>
+        <div class="daybar-frame"><div class="daybar-col"></div></div>
+        <div class="legend"></div>
+        <p class="piececount"></p>
+      </div>
+      <p class="dg-note">Not one of those sliders made the day any longer. Now for the part that actually does.</p>
     </section>
 
     <section class="dg-sec" id="sec-phone">
@@ -134,6 +149,13 @@ import { withBase } from '../lib/base'
         <li>A pet deciding this was the moment</li>
         <li>A thought about something completely unrelated</li>
       </ul>
+
+      <div class="daybar daybar-big" data-cp="phone">
+        <p class="daybar-title">Your day, shattered</p>
+        <div class="daybar-frame"><div class="daybar-col"></div></div>
+        <div class="legend"></div>
+        <p class="piececount"></p>
+      </div>
     </section>
 
     <section class="dg-sec dg-results" id="sec-results">
@@ -218,32 +240,92 @@ import { withBase } from '../lib/base'
   const fmtH = (h: number) => `${h.toFixed(1)}h`
   const fmtMin = (m: number) => (m >= 60 ? `${(m / 60).toFixed(m % 60 ? 1 : 0)}h` : `${Math.round(m)}m`)
 
-  const segEls = new Map<string, HTMLElement>()
-  document.querySelectorAll<HTMLElement>('.seg').forEach((el) => segEls.set(el.dataset.key!, el))
-  const cutsHost = $('cuts')
-  const legend = $('legend')
+  /* ------------------------------------------------------------------ */
+  /* Multiple day-bars, not one dock — each section gets its own fresh,   */
+  /* large reveal of the day as it stands once that section's sliders are */
+  /* folded in, echoing the way the real thing does this rather than      */
+  /* shrinking the one visual that matters into a corner widget.          */
+  /* ------------------------------------------------------------------ */
 
-  function render() {
-    const m = computeDay(state)
+  type Bar = { col: HTMLElement; legend: HTMLElement; piece: HTMLElement; segEls: Map<string, HTMLElement> }
 
+  const SEG_ORDER = ['morning', 'commute', 'work', 'lunch', 'home', 'dinner', 'sleep'] as const
+
+  function buildBar(root: HTMLElement): Bar {
+    const col = root.querySelector<HTMLElement>('.daybar-col')!
+    const segEls = new Map<string, HTMLElement>()
+    for (const key of SEG_ORDER) {
+      const seg = document.createElement('div')
+      seg.className = 'seg'
+      seg.dataset.key = key
+      const shine = document.createElement('i')
+      seg.appendChild(shine)
+      col.appendChild(seg)
+      segEls.set(key, seg)
+    }
+    const cuts = document.createElement('div')
+    cuts.className = 'cuts'
+    cuts.setAttribute('aria-hidden', 'true')
+    col.appendChild(cuts)
+    return { col, legend: root.querySelector('.legend')!, piece: root.querySelector('.piececount')!, segEls }
+  }
+
+  const BARS = new Map<string, Bar>()
+  document.querySelectorAll<HTMLElement>('.daybar').forEach((root) => {
+    BARS.set(root.dataset.cp!, buildBar(root))
+  })
+
+  function paintBar(bar: Bar, m: ReturnType<typeof computeDay>) {
     for (const seg of m.segments) {
-      const el = segEls.get(seg.key)!
+      const el = bar.segEls.get(seg.key)!
       const pct = m.totalHours > 0 ? (seg.hours / m.totalHours) * 100 : 0
-      el.style.width = `${pct}%`
+      el.style.height = `${pct}%`
       el.classList.toggle('is-empty', pct < 0.3)
     }
-
     const nonSleepPct = m.totalHours > 0 ? (m.nonSleepHours / m.totalHours) * 100 : 0
+    const cutsHost = bar.col.querySelector('.cuts')!
     cutsHost.innerHTML = m.cuts
-      .map((f) => `<i style="left:${(f * nonSleepPct).toFixed(2)}%"></i>`)
+      .map((f, i) => `<i style="top:${(f * nonSleepPct).toFixed(2)}%; animation-delay:${Math.min(i * 14, 900)}ms"></i>`)
       .join('')
-
-    legend.innerHTML = m.segments
+    bar.legend.innerHTML = m.segments
       .filter((s) => s.hours > 0.05)
       .map((s) => `<span class="chip" data-key="${s.key}"><i></i>${SEG_LABEL[s.key]} · ${fmtH(s.hours)}</span>`)
       .join('')
+    bar.piece.textContent = `${m.pieceCountAfter} piece${m.pieceCountAfter === 1 ? '' : 's'}.`
+  }
 
-    $('piececount').textContent = `${m.pieceCountAfter} piece${m.pieceCountAfter === 1 ? '' : 's'}.`
+  /** What each checkpoint has "found out about" so far — everything else is
+   *  forced to 0, so an early bar doesn't quietly know about a slider its
+   *  own section hasn't introduced yet, even if that slider already has a
+   *  value because a later section activated first. */
+  const CHECKPOINTS: { id: string; keys: (keyof DayInputs)[] }[] = [
+    { id: 'basics', keys: [] },
+    { id: 'morning', keys: ['morningMin'] },
+    { id: 'meals', keys: ['morningMin', 'lunchMin', 'dinnerMin'] },
+    { id: 'commute', keys: ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin'] },
+    { id: 'phone', keys: ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin', 'phoneIntervalMin', 'extraDistractionsPerDay'] },
+  ]
+
+  function partialState(keys: (keyof DayInputs)[]): DayInputs {
+    const only = new Set(keys)
+    return {
+      workHours: state.workHours, homeHours: state.homeHours, sleepHours: state.sleepHours,
+      morningMin: only.has('morningMin') ? state.morningMin : 0,
+      lunchMin: only.has('lunchMin') ? state.lunchMin : 0,
+      dinnerMin: only.has('dinnerMin') ? state.dinnerMin : 0,
+      commuteMin: only.has('commuteMin') ? state.commuteMin : 0,
+      phoneIntervalMin: only.has('phoneIntervalMin') ? state.phoneIntervalMin : 0,
+      extraDistractionsPerDay: only.has('extraDistractionsPerDay') ? state.extraDistractionsPerDay : 0,
+    }
+  }
+
+  function render() {
+    for (const cp of CHECKPOINTS) {
+      const bar = BARS.get(cp.id)
+      if (bar) paintBar(bar, computeDay(partialState(cp.keys)))
+    }
+
+    const m = computeDay(state)
     $('pieceLine').textContent =
       `Your day started as ${m.pieceCountBefore} piece${m.pieceCountBefore === 1 ? '' : 's'}. ` +
       `Right now it's ${m.pieceCountAfter}${m.totalInterruptions ? `, cut apart by ${m.totalInterruptions} interruption${m.totalInterruptions === 1 ? '' : 's'} a day` : ''}.`
@@ -300,24 +382,82 @@ import { withBase } from '../lib/base'
     }
   }
 
-  if ('IntersectionObserver' in window && !prefersReducedMotion) {
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) if (e.isIntersecting) { activate(e.target.id); io.unobserve(e.target) }
-      },
-      // Deliberately wide: the whole viewport, minus a small strip at the
-      // very bottom. A narrow band here (originally -30%/-50%, "activate
-      // only once centred") sounds nicer but a short section — this page's
-      // meals section is a heading and two sliders — can cross a narrow
-      // band entirely between two scroll events on a fast flick or a large
-      // wheel/trackpad jump, and never fire at all. Erring toward "fires a
-      // little early" beats "sometimes never fires".
-      { rootMargin: '0px 0px -10% 0px' },
-    )
-    for (const id of Object.keys(SECTION_KEYS)) io.observe(document.getElementById(id)!)
+  /* ------------------------------------------------------------------ */
+  /* One synchronous, scroll-driven check — not IntersectionObserver.     */
+  /*                                                                      */
+  /* An earlier version used IntersectionObserver for this (one instance  */
+  /* per pacing section, plus a second instance watching the results      */
+  /* section as a "did anything get skipped" safety net). Both instances  */
+  /* worked, but IntersectionObserver callbacks are asynchronous by spec — */
+  /* queued after layout rather than run inline — and jumping straight to */
+  /* the results section (a real path: a11y "skip to results" navigation, */
+  /* a fast trackpad flick, or simply this page's own `sec-results`       */
+  /* scrollIntoView safety net firing before the *other* four observers'  */
+  /* callbacks had been dispatched) could show the results section with   */
+  /* stale, half-activated numbers for one to a few hundred milliseconds  */
+  /* before the second observer's callback finally ran and corrected it.  */
+  /* A `getBoundingClientRect` check driven by `scroll` + `requestAnimationFrame`  */
+  /* is synchronous with the frame it runs in — there is no callback queue */
+  /* to be behind — so the results section can never render a number      */
+  /* before every earlier section has already been activated.             */
+  /* ------------------------------------------------------------------ */
+
+  const PACING_SECTIONS = Object.keys(SECTION_KEYS)
+  let recorded = false
+
+  /** Reads every slider's live DOM value straight into `state`, bypassing
+   *  the input-event round trip entirely. `activate()` sets `.value` and
+   *  dispatches a synthetic `input` event for the normal case (so typing in
+   *  a slider and a section merely scrolling into view go through the same
+   *  one code path) — but a *smooth* scroll (this site sets
+   *  `scroll-behavior: smooth` globally) fires a real `scroll` event on
+   *  nearly every animation frame of the scroll, and `checkSections` below
+   *  runs on each one. Several `activate()` calls landing across
+   *  consecutive frames, each synchronously dispatching and handling its
+   *  own `input` event, is exactly the kind of interleaving that is easy to
+   *  reason about wrong; reading the DOM directly has no such ordering to
+   *  get wrong. This is what the results section actually relies on. */
+  function syncStateFromDOM() {
+    for (const key of Object.keys(state) as (keyof DayInputs)[]) {
+      const el = document.getElementById(key) as HTMLInputElement | null
+      if (el) state[key] = Number(el.value)
+    }
+  }
+
+  function checkSections() {
+    for (const id of PACING_SECTIONS) {
+      const el = document.getElementById(id)
+      if (el && el.getBoundingClientRect().top < innerHeight * 0.9) activate(id)
+    }
+    const results = document.getElementById('sec-results')
+    if (!recorded && results && results.getBoundingClientRect().top < innerHeight) {
+      // Belt and suspenders: whatever might have kept an earlier section
+      // from activating on its own (this loop runs first every time, so in
+      // the ordinary case there is nothing left to do here) is caught here
+      // too, before the results section is allowed to compute anything.
+      for (const id of PACING_SECTIONS) activate(id)
+      recorded = true
+      syncStateFromDOM()
+      render()
+      updateShareCard()
+    }
+  }
+
+  if (prefersReducedMotion) {
+    for (const id of PACING_SECTIONS) activate(id)
+    recorded = true
   } else {
-    // Reduced motion, or no observer support: just start honest.
-    for (const id of Object.keys(SECTION_KEYS)) activate(id)
+    let ticking = false
+    addEventListener(
+      'scroll',
+      () => {
+        if (ticking) return
+        ticking = true
+        requestAnimationFrame(() => { ticking = false; checkSections() })
+      },
+      { passive: true },
+    )
+    checkSections() // in case the page loads already scrolled (a reload, a deep link)
   }
 
   /* ------------------------------------------------------------------ */
@@ -357,22 +497,6 @@ import { withBase } from '../lib/base'
   }
 
   render()
-  let recorded = false
-  const resultsObserver = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting || recorded) continue
-      recorded = true
-      // Belt and suspenders: whatever caused a section's own observer to
-      // miss it (a fast flick, a huge trackpad jump, a "skip to results"
-      // keyboard scroll), the results section is the one place that must
-      // never show numbers computed from a half-activated day. `activate`
-      // is a no-op for anything already touched, so this costs nothing in
-      // the normal case where every section fired on its own.
-      for (const id of Object.keys(SECTION_KEYS)) activate(id)
-      updateShareCard()
-    }
-  })
-  resultsObserver.observe(document.getElementById('sec-results')!)
 
   $('again').addEventListener('click', () => location.reload())
 </script>
@@ -388,31 +512,44 @@ import { withBase } from '../lib/base'
       radial-gradient(60vmax 60vmax at 90% 110%, rgba(255, 210, 122, 0.09), transparent 70%);
   }
   .day-body .game > * { position: relative; z-index: 1; }
-  /* The blanket rule above exists so page content sits above .dg-bg — but
-     .dg-dock needs to be a sticky element, and "relative" from a selector
-     later in cascade order silently wins over an earlier "sticky" of equal
-     specificity. Restated here, after it, so sticky actually sticks. */
-  .day-body .game > .dg-dock { position: sticky; z-index: 5; }
 
   .dg-head { max-width: 640px; margin: 8vh auto 0; padding: 0 22px; text-align: center; }
   .dg-eyebrow { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #7ec8ff; opacity: 0.85; margin: 0 0 12px; font-weight: 600; }
   .dg-head h1 { font-size: clamp(32px, 6.4vw, 50px); margin: 0 0 14px; letter-spacing: -0.03em; }
   .dg-head p { font-size: 16.5px; line-height: 1.65; opacity: 0.8; max-width: 54ch; margin: 0 auto; }
 
-  /* ---- the sticky instrument ------------------------------------------ */
-  .dg-dock {
-    position: sticky; top: 58px; z-index: 5;
-    max-width: 720px; margin: 6vh auto 0; padding: 16px 22px;
-    background: rgba(18, 9, 13, 0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.6);
+  /* ---- the day-bar itself: big, vertical, and the actual point ---------
+     A thin horizontal pill read as a footnote. A day is better read the way
+     it is lived — top to bottom, morning to sleep — and big enough that the
+     cuts later on genuinely register rather than needing a caption to
+     explain them. Each section gets its own fresh one instead of a single
+     shrunk dashboard that stays pinned the whole way down. */
+  .daybar { margin: 34px auto 0; max-width: 340px; text-align: center; }
+  .daybar-title {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #ffb066; opacity: 0.85; margin: 0 0 14px;
   }
-  .bar {
-    position: relative; display: flex; height: 34px; border-radius: 9px; overflow: hidden;
-    background: rgba(255, 255, 255, 0.05);
+  .daybar-frame {
+    padding: 14px; border-radius: 22px;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
-  .seg { height: 100%; width: 0; transition: width 480ms cubic-bezier(0.22, 0.61, 0.36, 1); }
-  .seg.is-empty { width: 0 !important; }
+  .daybar-col {
+    position: relative; display: flex; flex-direction: column;
+    height: clamp(260px, 40vh, 420px); border-radius: 13px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .daybar-big .daybar-col { height: clamp(300px, 52vh, 520px); }
+  .seg {
+    position: relative; width: 100%; height: 0;
+    transition: height 620ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .seg.is-empty { height: 0 !important; }
+  /* A soft top-edge highlight on every segment — the difference between a
+     flat swatch and something that reads as a material with real light on
+     it, without ever touching a real gradient fill (still flat colour). */
+  .seg > i { position: absolute; inset: 0 0 auto 0; height: 40%; background: rgba(255, 255, 255, 0.16); }
   .seg[data-key='morning'] { background: #ffd27a; }
   .seg[data-key='commute'] { background: #a7b6c9; }
   .seg[data-key='work'] { background: #7ec8ff; }
@@ -420,14 +557,22 @@ import { withBase } from '../lib/base'
   .seg[data-key='home'] { background: #8fe3c8; }
   .seg[data-key='dinner'] { background: #f0965c; }
   .seg[data-key='sleep'] { background: #1a2740; }
+  .seg[data-key='sleep'] > i { background: rgba(255, 255, 255, 0.05); }
+
   .cuts { position: absolute; inset: 0; pointer-events: none; }
   .cuts i {
-    position: absolute; top: 0; bottom: 0; width: 1.5px;
-    background: rgba(18, 9, 13, 0.55); transform: translateX(-50%);
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: rgba(18, 9, 13, 0.6);
+    box-shadow: 0 0 3px rgba(255, 255, 255, 0.35);
+    transform: translateY(-50%);
+    opacity: 0;
+    animation: dg-cut-in 260ms ease forwards;
   }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 12px 0 0; }
-  .legend .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; }
-  .legend .chip i { width: 8px; height: 8px; border-radius: 2px; }
+  @keyframes dg-cut-in { to { opacity: 1; } }
+
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 14px; margin: 16px 0 0; }
+  .legend .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; opacity: 0.82; }
+  .legend .chip i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
   .legend .chip[data-key='morning'] i { background: #ffd27a; }
   .legend .chip[data-key='commute'] i { background: #a7b6c9; }
   .legend .chip[data-key='work'] i { background: #7ec8ff; }
@@ -436,6 +581,10 @@ import { withBase } from '../lib/base'
   .legend .chip[data-key='dinner'] i { background: #f0965c; }
   .legend .chip[data-key='sleep'] i { background: #1a2740; border: 1px solid rgba(255,255,255,0.2); }
   .piececount { margin: 10px 0 0; font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seg, .cuts i { transition: none; animation: none; opacity: 1; }
+  }
 
   /* ---- sections -------------------------------------------------------- */
   .dg-body-content { max-width: 640px; margin: 0 auto; padding: 0 22px; }
