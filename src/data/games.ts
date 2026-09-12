@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'day-go',
+    title: 'Where Does The Day Go?',
+    blurb: 'Your day, cut into its real pieces',
+    description:
+      'Slide in your work, home and sleep hours and watch a perfectly tidy 24-hour bar — then carve your actual morning routine, meals and commute out of it, and watch your own phone-check habit cut what is left into dozens of pieces. The 23-minute refocus cost after each one is Gloria Mark’s real, published figure, not a guess.',
+    accent: '#301a10', accent2: '#7ec8ff',
+    category: 'you',
+    added: '2026-09-23',
+  },
+  {
     slug: 'dark-patterns',
     title: 'Dark Patterns',
     blurb: 'Eleven tricks, live, done to you',

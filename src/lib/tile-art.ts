@@ -63,6 +63,49 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
 export const ART: Record<string, Illustration> = {
+  /* ---- Where Does The Day Go? --------------------------------------------- */
+  'day-go': {
+    subject: 'a tidy day-bar, cut into far more pieces than it started with',
+    slot: 'corner-br',
+    viewBox: '0 0 140 100',
+    palette: ['#173049', '#5ecbe0', '#8fe3c8', '#ffd27a', '#0b1a2e', '#fdf4e3'],
+    draw: (seed) => {
+      const y = 46, h = 30, x0 = 6, w = 128
+      // The same four blocks the page itself carves a day into, in
+      // proportions that read clearly at thumbnail size rather than the
+      // page's own live numbers.
+      const blocks = [
+        { w: 0.15, fill: '#ffd27a' }, // morning
+        { w: 0.4, fill: '#5ecbe0' },  // work
+        { w: 0.2, fill: '#8fe3c8' },  // home
+        { w: 0.25, fill: '#173049' }, // sleep
+      ]
+      let x = x0
+      const bars = blocks
+        .map((b) => {
+          const bw = b.w * w
+          const r = `<rect x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${h}" fill="${b.fill}"/>`
+          x += bw
+          return r
+        })
+        .join('')
+      // Cut marks — the page's own visual metaphor for a day fragmented by
+      // interruptions, scattered over the waking (non-sleep) portion only.
+      const wakingW = w * 0.75
+      const cuts = range(11)
+        .map((i) => {
+          const cx = x0 + 6 + rnd(seed, i) * (wakingW - 12)
+          return `<rect x="${cx.toFixed(1)}" y="${y - 3}" width="1.6" height="${h + 6}" fill="#fdf4e3" opacity="0.9"/>`
+        })
+        .join('')
+      return (
+        `<rect x="${x0}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="#0b1a2e" stroke-width="1" opacity="0.4"/>` +
+        bars +
+        cuts
+      )
+    },
+  },
+
   /* ---- Dark Patterns ----------------------------------------------------- */
   'dark-patterns': {
     subject: 'an enormous friendly button, the honest way out hiding beneath it, and a cart taking on an extra item',

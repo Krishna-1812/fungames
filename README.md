@@ -225,7 +225,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty-two games
+## The twenty-three games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -361,6 +361,28 @@ rules: flat palette, no gradients, no ids — checked the same way.
 (coverage, palette, structure at 64px, distinctness, mood) plus a data-integrity
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
+
+**Where Does The Day Go?** — a live instrument, not a runner over stages: three
+sliders (work, home, sleep) draw a tidy day-bar, and every slider after that —
+morning routine, lunch, dinner, the commute — is carved out of "work" or
+"home" rather than added on top, so the bar never grows past the total you
+started with; it just gets honest about what was always inside it. The one
+number on the page that is not a slider is `REFOCUS_MINUTES`: Gloria Mark
+(UC Irvine) tracked real information workers through real interruptions and
+found an average of 23 minutes 15 seconds to fully return to a task
+afterwards — "The Cost of Interrupted Work: More Speed and Stress," CHI 2008.
+A phone-check-frequency slider applies that real cost to however many
+interruptions statistically land inside your work block, and "work you think
+you're doing" against "work you're actually doing" is the payoff. Each later
+section's slider activates to a sensible default the first time it scrolls
+into view — pacing, never a gate. *`scripts/check-day-model.mjs` proves the
+day-bar's arithmetic rather than trusting it: 500 random inputs confirm the
+segments always sum to exactly `workHours + homeHours + sleepHours`, however
+they get carved up, and a further sweep confirms more interruptions never
+*increase* actual work hours. It caught a real bug before shipping — the
+first version of `computeDay` let the day grow past 24 hours whenever a
+carved-out slice (say, an implausibly long morning routine) didn't fit inside
+the block it was supposed to come from, in 184 of 500 random trials.*
 
 **Dark Patterns** — eleven manipulative UI patterns, rebuilt as working fake
 websites rather than described in a bullet list: a basket that sneaks two

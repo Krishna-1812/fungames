@@ -1462,9 +1462,56 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     "nothing is orphaned in either direction" shape `check-deep-sea-art.mjs`
     uses for markers and scenes.
 
-24. Then reassess against the depth work in Phases 1–2 above.
+24. ~~**Where Does The Day Go?**~~ — **done.** A fourth pick from neal.fun's
+    own catalogue, picked as a genuinely different genre from anything else
+    here: not a scroll through facts, not a runner over discrete stages, but
+    a single live instrument — every slider feeds one pure function,
+    `src/lib/day-model.ts`'s `computeDay`, and the day-bar redraws from it on
+    every input event. The three headline sliders (work, home, sleep) always
+    summed to a tidy number; the entire point of the page is that morning
+    routine, lunch, dinner and the commute were always happening *inside*
+    that number, not on top of it — `computeDay` carves them out rather than
+    adding them on, so the bar can never grow past where it started, however
+    the sliders get dragged.
 
-**Where that leaves it.** Six new games, six checkers. The pattern that
+    The one number on the page that is not a slider is real, published
+    research rather than a guess: Gloria Mark (UC Irvine) tracked information
+    workers through genuine interruptions and found an average of 23 minutes
+    15 seconds to fully return to a task afterwards — "The Cost of
+    Interrupted Work: More Speed and Stress," CHI 2008. A phone-check
+    frequency slider is the only thing that actually multiplies the day into
+    more pieces; everything before it just relabels the same pieces
+    honestly, which is itself the page's argument.
+
+    Each later section's slider starts inert and activates to a sensible
+    default the first time its section scrolls into view — a pacing device
+    (the day looks fine until you scroll to what it left out), not a gate,
+    and proven not to be a trap: a raw `scrollIntoView` straight to the
+    results section, skipping every section in between, still lands on
+    numbers computed from fully-activated sliders, because the results
+    section itself force-activates anything a skipped section's own
+    `IntersectionObserver` missed.
+
+    `scripts/check-day-model.mjs` is a real property-based check, not a
+    fixed-input smoke test: 500 random inputs confirm the segments always
+    sum to exactly `workHours + homeHours + sleepHours`; a further sweep
+    confirms checking your phone more often, or adding more non-phone
+    distractions, never *increases* actual work hours; and a citation check
+    confirms `REFOCUS_MINUTES` is the real 23.25, not a rounded stand-in, and
+    that the source text actually names the researcher and institution. It
+    caught two real bugs before shipping: the first version of `computeDay`
+    let the day grow past 24 hours whenever a carved-out slice (an
+    implausibly long morning routine, say) didn't fit inside the block it
+    was meant to come from — in 184 of 500 random trials — and the first
+    version of the section-activation logic used a narrow
+    `IntersectionObserver` band tuned to fire only once a section was nicely
+    centred, which a short section (a heading and two sliders) could cross
+    entirely between two scroll events on a fast flick without ever firing
+    at all.
+
+25. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Seven new games, seven checkers. The pattern that
 worked every time: build the model as pure functions over plain data, run
 it headlessly against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
@@ -1473,8 +1520,11 @@ premium inverse, the one rival winning 70% of the room, a scene that rasterised
 as a flat backdrop, a tile drawing with the same ink footprint as an existing
 one, a live-simulation stylesheet rule that silently never applied, a report
 table whose "dodged"/"fell for it" colour rule targeted a table cell that
-could never be first-child and so never matched anything it drew — was found
-by running the thing and reading the output, not by re-reading the code.
+could never be first-child and so never matched anything it drew, a day-bar
+model that let the day grow past 24 hours whenever a carved-out slice didn't
+fit the block it came from, a section-activation observer tuned narrowly
+enough that a short section could cross it unfired on a fast scroll — was
+found by running the thing and reading the output, not by re-reading the code.
 
 Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade
 12 → 30 rules, Trolley 12 → 26 dilemmas, Powder 12 → 30 elements with a

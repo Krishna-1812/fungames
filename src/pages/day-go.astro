@@ -1,0 +1,499 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { withBase } from '../lib/base'
+
+/**
+ * Where Does The Day Go? — a live instrument, not a runner over stages.
+ *
+ * Every slider on this page feeds the same pure function,
+ * `src/lib/day-model.ts`'s `computeDay`, which the day-bar redraws from on
+ * every input event. The three headline sliders (work, home, sleep) always
+ * summed to a tidy number; the point of the rest of the page is that
+ * morning routine, meals and the commute were always happening *inside*
+ * that tidy number, not on top of it — `computeDay` carves them out rather
+ * than adding them on, so the bar never grows past where it started.
+ *
+ * Each later section's slider starts at 0 and animates in to a sensible
+ * default the first time that section scrolls into view — a deliberate
+ * pacing device (the day looks fine until you scroll to what it left out),
+ * not a gate: nothing is locked, and moving a slider before its section
+ * arrives works fine too.
+ *
+ * The one number on this whole page that is not a slider is
+ * `REFOCUS_MINUTES` — Gloria Mark's real, published 23-minutes-15-seconds
+ * figure for how long it takes to fully refocus after an interruption.
+ * `scripts/check-day-model.mjs` checks the arithmetic and the citation both.
+ */
+---
+
+<GameLayout slug="day-go" bar="#301a10" bodyClass="day-body">
+  <div class="dg-bg" aria-hidden="true"></div>
+
+  <header class="dg-head">
+    <p class="dg-eyebrow">A live instrument, not a quiz</p>
+    <h1>Where Does The Day Go?</h1>
+    <p>
+      Twenty-four hours felt like plenty this morning. Slide in what you
+      think your day looks like, then keep scrolling — we're going to find
+      everything that estimate left out, without ever making the day any
+      longer than it already is.
+    </p>
+  </header>
+
+  <div class="dg-dock" id="dock">
+    <div class="bar" id="bar" role="img" aria-label="Your day, as a bar of coloured segments">
+      <div class="seg" data-key="morning"></div>
+      <div class="seg" data-key="commute"></div>
+      <div class="seg" data-key="work"></div>
+      <div class="seg" data-key="lunch"></div>
+      <div class="seg" data-key="home"></div>
+      <div class="seg" data-key="dinner"></div>
+      <div class="seg" data-key="sleep"></div>
+      <div class="cuts" id="cuts" aria-hidden="true"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <p class="piececount" id="piececount">7 pieces.</p>
+  </div>
+
+  <main class="dg-body-content">
+    <section class="dg-sec" id="sec-basics">
+      <h2>First, your typical day</h2>
+      <p>Take your time. This is just a rough sense of things.</p>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Work / school</b><i id="v-work">8h</i></span>
+        <input type="range" id="workHours" min="0" max="16" step="0.5" value="8">
+      </label>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Home</b><i id="v-home">8h</i></span>
+        <input type="range" id="homeHours" min="0" max="16" step="0.5" value="8">
+      </label>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Sleep</b><i id="v-sleep">8h</i></span>
+        <input type="range" id="sleepHours" min="0" max="12" step="0.5" value="8">
+      </label>
+      <p class="dg-note">Look at that. A perfectly tidy day. Keep scrolling — it's about to get more honest.</p>
+    </section>
+
+    <section class="dg-sec" id="sec-morning">
+      <h2>The part before work even starts</h2>
+      <p>
+        Getting up, showering, getting dressed — none of that was ever
+        "home" time in the sense you meant it. It's being carved out of
+        your home block now, not added on top.
+      </p>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Morning routine</b><i id="v-morning">0m</i></span>
+        <input type="range" id="morningMin" min="0" max="120" step="5" value="0">
+      </label>
+    </section>
+
+    <section class="dg-sec" id="sec-meals">
+      <h2>And you have to eat. Twice.</h2>
+      <p>Lunch comes out of work. Dinner comes out of home.</p>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Lunch</b><i id="v-lunch">0m</i></span>
+        <input type="range" id="lunchMin" min="0" max="90" step="5" value="0">
+      </label>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Dinner</b><i id="v-dinner">0m</i></span>
+        <input type="range" id="dinnerMin" min="0" max="90" step="5" value="0">
+      </label>
+    </section>
+
+    <section class="dg-sec" id="sec-commute">
+      <h2>Unless you teleport to work</h2>
+      <p>Counted there and back — both trips happen, even if only one felt worth mentioning.</p>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Commute, one way</b><i id="v-commute">0m</i></span>
+        <input type="range" id="commuteMin" min="0" max="90" step="5" value="0">
+      </label>
+    </section>
+
+    <section class="dg-sec" id="sec-phone">
+      <h2>Now the part that actually does the damage</h2>
+      <p>
+        None of the above cut your day into more pieces — it just relabelled
+        the same pieces honestly. This is the first thing that actually
+        multiplies them.
+      </p>
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>How often you check your phone</b><i id="v-phone">off</i></span>
+        <input type="range" id="phoneIntervalMin" min="0" max="60" step="1" value="0">
+      </label>
+      <p class="dg-source">{'Published estimates of daily phone checks vary widely by study — roughly 80 to 200+ times a day. This page uses whichever interval you pick rather than asserting one.'}</p>
+
+      <label class="dg-slider">
+        <span class="dg-slider-label"><b>Other interruptions, in a typical day</b><i id="v-extra">0</i></span>
+        <input type="range" id="extraDistractionsPerDay" min="0" max="20" step="1" value="0">
+      </label>
+      <ul class="dg-common" aria-label="Common examples">
+        <li>A co-worker with a quick question</li>
+        <li>An email that wasn't actually urgent</li>
+        <li>A notification you didn't need to open</li>
+        <li>Someone else in the house needing something</li>
+        <li>A pet deciding this was the moment</li>
+        <li>A thought about something completely unrelated</li>
+      </ul>
+    </section>
+
+    <section class="dg-sec dg-results" id="sec-results">
+      <h2>So here's what's actually happening</h2>
+      <p class="dg-piece-line" id="pieceLine">Your day started as 7 pieces. Right now it's 7.</p>
+
+      <div class="dg-worklines">
+        <div class="dg-workline">
+          <span>Work you think you're doing</span>
+          <b id="perceivedWork">8.0h</b>
+        </div>
+        <div class="dg-workline dg-actual">
+          <span>Work you're actually doing</span>
+          <b id="actualWork">8.0h</b>
+        </div>
+      </div>
+      <p class="dg-lost" id="lostLine"></p>
+      <p class="dg-source" id="refocusSource"></p>
+
+      <p class="dg-clock" id="clockLine"></p>
+    </section>
+
+    <footer class="dg-outro">
+      <div class="acts">
+        <button type="button" data-share data-title="Where Does The Day Go?">Share this</button>
+        <button type="button" id="again">Start over</button>
+        <a href={withBase('/')}>try something else →</a>
+      </div>
+
+      <details class="how">
+        <summary>How this actually works</summary>
+        <p>
+          The three headline sliders — work, home, sleep — set a total.
+          Every slider after that (morning routine, lunch, dinner, commute)
+          is carved out of "work" or "home" rather than added on top, so the
+          bar never grows past the total you started with; it just gets
+          more honest about what was always inside it.
+        </p>
+        <p>
+          The interruption cost is a real, published figure rather than a
+          guess: Gloria Mark, at UC Irvine, tracked information workers
+          through real interruptions and found an average of 23 minutes 15
+          seconds to fully return to a task afterwards — "The Cost of
+          Interrupted Work: More Speed and Stress," CHI 2008. That number is
+          fixed on this page on purpose; the only thing you control is how
+          often the interruptions happen.
+        </p>
+        <p>
+          "Work you're actually doing" applies that cost to however many of
+          your interruptions statistically land inside your work block
+          (proportional to how much of your waking day work takes up), then
+          subtracts the total, floored at zero. It is a model, not a
+          measurement of your specific day — the citation above is real; the
+          way this page applies it to your sliders is this page's own.
+        </p>
+        <p>Related: <a href={withBase('/progress/')}>Progress</a> is the other page here about how much of something is already gone, computed live rather than looked up.</p>
+      </details>
+    </footer>
+  </main>
+</GameLayout>
+
+<script>
+  import { computeDay, hoursLeftToday, SOURCES, type DayInputs } from '../lib/day-model'
+  import { recordPlay } from '../lib/stats'
+  import { onShare } from '../lib/share-card'
+  import { SITE } from '../site.config'
+  import { prefersReducedMotion } from '../lib/fx'
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+
+  const SEG_LABEL: Record<string, string> = {
+    morning: 'Morning routine', commute: 'Commute', work: 'Work / school',
+    lunch: 'Lunch', home: 'Home', dinner: 'Dinner', sleep: 'Sleep',
+  }
+
+  const state: DayInputs = {
+    workHours: 8, homeHours: 8, sleepHours: 8,
+    morningMin: 0, lunchMin: 0, dinnerMin: 0, commuteMin: 0,
+    phoneIntervalMin: 0, extraDistractionsPerDay: 0,
+  }
+
+  const fmtH = (h: number) => `${h.toFixed(1)}h`
+  const fmtMin = (m: number) => (m >= 60 ? `${(m / 60).toFixed(m % 60 ? 1 : 0)}h` : `${Math.round(m)}m`)
+
+  const segEls = new Map<string, HTMLElement>()
+  document.querySelectorAll<HTMLElement>('.seg').forEach((el) => segEls.set(el.dataset.key!, el))
+  const cutsHost = $('cuts')
+  const legend = $('legend')
+
+  function render() {
+    const m = computeDay(state)
+
+    for (const seg of m.segments) {
+      const el = segEls.get(seg.key)!
+      const pct = m.totalHours > 0 ? (seg.hours / m.totalHours) * 100 : 0
+      el.style.width = `${pct}%`
+      el.classList.toggle('is-empty', pct < 0.3)
+    }
+
+    const nonSleepPct = m.totalHours > 0 ? (m.nonSleepHours / m.totalHours) * 100 : 0
+    cutsHost.innerHTML = m.cuts
+      .map((f) => `<i style="left:${(f * nonSleepPct).toFixed(2)}%"></i>`)
+      .join('')
+
+    legend.innerHTML = m.segments
+      .filter((s) => s.hours > 0.05)
+      .map((s) => `<span class="chip" data-key="${s.key}"><i></i>${SEG_LABEL[s.key]} · ${fmtH(s.hours)}</span>`)
+      .join('')
+
+    $('piececount').textContent = `${m.pieceCountAfter} piece${m.pieceCountAfter === 1 ? '' : 's'}.`
+    $('pieceLine').textContent =
+      `Your day started as ${m.pieceCountBefore} piece${m.pieceCountBefore === 1 ? '' : 's'}. ` +
+      `Right now it's ${m.pieceCountAfter}${m.totalInterruptions ? `, cut apart by ${m.totalInterruptions} interruption${m.totalInterruptions === 1 ? '' : 's'} a day` : ''}.`
+
+    $('perceivedWork').textContent = fmtH(m.perceivedWorkHours)
+    $('actualWork').textContent = fmtH(m.actualWorkHours)
+    $('lostLine').textContent =
+      m.lostWorkMinutes > 0.5
+        ? `That's ${Math.round(m.lostWorkMinutes)} minutes a day spent refocusing rather than working — about ${(m.lostWorkMinutes / 60).toFixed(1)} hours, or roughly ${Math.max(1, Math.round(m.lostWorkMinutes / 110))} average feature-length films, every single day.`
+        : 'At this rate, almost none of it is lost to refocusing. Try raising how often you check your phone.'
+    $('refocusSource').textContent = SOURCES.refocus
+  }
+
+  document.querySelectorAll<HTMLInputElement>('.dg-sec input[type="range"]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const key = input.id as keyof DayInputs
+      state[key] = Number(input.value)
+      if (key === 'workHours') $('v-work').textContent = fmtH(state.workHours)
+      if (key === 'homeHours') $('v-home').textContent = fmtH(state.homeHours)
+      if (key === 'sleepHours') $('v-sleep').textContent = fmtH(state.sleepHours)
+      if (key === 'morningMin') $('v-morning').textContent = fmtMin(state.morningMin)
+      if (key === 'lunchMin') $('v-lunch').textContent = fmtMin(state.lunchMin)
+      if (key === 'dinnerMin') $('v-dinner').textContent = fmtMin(state.dinnerMin)
+      if (key === 'commuteMin') $('v-commute').textContent = fmtMin(state.commuteMin)
+      if (key === 'phoneIntervalMin') $('v-phone').textContent = state.phoneIntervalMin > 0 ? `every ${Math.round(state.phoneIntervalMin)}m` : 'off'
+      if (key === 'extraDistractionsPerDay') $('v-extra').textContent = String(Math.round(state.extraDistractionsPerDay))
+      render()
+    })
+  })
+
+  /* ------------------------------------------------------------------ */
+  /* Each later section activates its slider to a real default the first */
+  /* time it scrolls into view — a pacing device, never a gate.          */
+  /* ------------------------------------------------------------------ */
+
+  const DEFAULTS: Partial<Record<keyof DayInputs, number>> = {
+    morningMin: 30, lunchMin: 30, dinnerMin: 30, commuteMin: 20,
+    phoneIntervalMin: 15, extraDistractionsPerDay: 4,
+  }
+  const SECTION_KEYS: Record<string, (keyof DayInputs)[]> = {
+    'sec-morning': ['morningMin'],
+    'sec-meals': ['lunchMin', 'dinnerMin'],
+    'sec-commute': ['commuteMin'],
+    'sec-phone': ['phoneIntervalMin', 'extraDistractionsPerDay'],
+  }
+
+  function activate(sectionId: string) {
+    for (const key of SECTION_KEYS[sectionId] ?? []) {
+      const el = document.getElementById(key) as HTMLInputElement | null
+      if (!el || Number(el.value) !== 0) continue
+      const target = DEFAULTS[key]!
+      el.value = String(target)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+
+  if ('IntersectionObserver' in window && !prefersReducedMotion) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) { activate(e.target.id); io.unobserve(e.target) }
+      },
+      // Deliberately wide: the whole viewport, minus a small strip at the
+      // very bottom. A narrow band here (originally -30%/-50%, "activate
+      // only once centred") sounds nicer but a short section — this page's
+      // meals section is a heading and two sliders — can cross a narrow
+      // band entirely between two scroll events on a fast flick or a large
+      // wheel/trackpad jump, and never fire at all. Erring toward "fires a
+      // little early" beats "sometimes never fires".
+      { rootMargin: '0px 0px -10% 0px' },
+    )
+    for (const id of Object.keys(SECTION_KEYS)) io.observe(document.getElementById(id)!)
+  } else {
+    // Reduced motion, or no observer support: just start honest.
+    for (const id of Object.keys(SECTION_KEYS)) activate(id)
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* The real clock                                                      */
+  /* ------------------------------------------------------------------ */
+
+  function paintClock() {
+    const h = hoursLeftToday()
+    const hh = Math.floor(h)
+    const mm = Math.round((h - hh) * 60)
+    $('clockLine').textContent = `You have ${hh}h ${mm}m left today, right now, for whatever this leaves you.`
+  }
+  paintClock()
+  setInterval(paintClock, 30_000)
+
+  /* ------------------------------------------------------------------ */
+  /* Share + record                                                      */
+  /* ------------------------------------------------------------------ */
+
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({ title: 'Where Does The Day Go?', text: `${c.headline}.` }))
+
+  function updateShareCard() {
+    const m = computeDay(state)
+    shareCard = {
+      slug: 'day-go',
+      siteName: SITE.name,
+      headline: `${fmtH(m.actualWorkHours)} of real work out of ${fmtH(m.perceivedWorkHours)}`,
+      sub: `${m.pieceCountAfter} pieces a day, ${m.totalInterruptions} interruptions.`,
+      stats: [
+        { label: 'Perceived work', value: fmtH(m.perceivedWorkHours) },
+        { label: 'Actual work', value: fmtH(m.actualWorkHours) },
+        { label: 'Pieces', value: `${m.pieceCountAfter}` },
+      ],
+    }
+    recordPlay('day-go', { actualWork: m.actualWorkHours, pieces: m.pieceCountAfter }, { actualWork: 'high' })
+  }
+
+  render()
+  let recorded = false
+  const resultsObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting || recorded) continue
+      recorded = true
+      // Belt and suspenders: whatever caused a section's own observer to
+      // miss it (a fast flick, a huge trackpad jump, a "skip to results"
+      // keyboard scroll), the results section is the one place that must
+      // never show numbers computed from a half-activated day. `activate`
+      // is a no-op for anything already touched, so this costs nothing in
+      // the normal case where every section fired on its own.
+      for (const id of Object.keys(SECTION_KEYS)) activate(id)
+      updateShareCard()
+    }
+  })
+  resultsObserver.observe(document.getElementById('sec-results')!)
+
+  $('again').addEventListener('click', () => location.reload())
+</script>
+
+<style is:global>
+  .day-body { background: #12090d; color: #fbeee0; }
+  .day-body .game { position: relative; }
+
+  .dg-bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(60vmax 60vmax at 15% -10%, rgba(126, 200, 255, 0.1), transparent 70%),
+      radial-gradient(60vmax 60vmax at 90% 110%, rgba(255, 210, 122, 0.09), transparent 70%);
+  }
+  .day-body .game > * { position: relative; z-index: 1; }
+  /* The blanket rule above exists so page content sits above .dg-bg — but
+     .dg-dock needs to be a sticky element, and "relative" from a selector
+     later in cascade order silently wins over an earlier "sticky" of equal
+     specificity. Restated here, after it, so sticky actually sticks. */
+  .day-body .game > .dg-dock { position: sticky; z-index: 5; }
+
+  .dg-head { max-width: 640px; margin: 8vh auto 0; padding: 0 22px; text-align: center; }
+  .dg-eyebrow { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #7ec8ff; opacity: 0.85; margin: 0 0 12px; font-weight: 600; }
+  .dg-head h1 { font-size: clamp(32px, 6.4vw, 50px); margin: 0 0 14px; letter-spacing: -0.03em; }
+  .dg-head p { font-size: 16.5px; line-height: 1.65; opacity: 0.8; max-width: 54ch; margin: 0 auto; }
+
+  /* ---- the sticky instrument ------------------------------------------ */
+  .dg-dock {
+    position: sticky; top: 58px; z-index: 5;
+    max-width: 720px; margin: 6vh auto 0; padding: 16px 22px;
+    background: rgba(18, 9, 13, 0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.6);
+  }
+  .bar {
+    position: relative; display: flex; height: 34px; border-radius: 9px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .seg { height: 100%; width: 0; transition: width 480ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+  .seg.is-empty { width: 0 !important; }
+  .seg[data-key='morning'] { background: #ffd27a; }
+  .seg[data-key='commute'] { background: #a7b6c9; }
+  .seg[data-key='work'] { background: #7ec8ff; }
+  .seg[data-key='lunch'] { background: #ffb3a1; }
+  .seg[data-key='home'] { background: #8fe3c8; }
+  .seg[data-key='dinner'] { background: #f0965c; }
+  .seg[data-key='sleep'] { background: #1a2740; }
+  .cuts { position: absolute; inset: 0; pointer-events: none; }
+  .cuts i {
+    position: absolute; top: 0; bottom: 0; width: 1.5px;
+    background: rgba(18, 9, 13, 0.55); transform: translateX(-50%);
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 12px 0 0; }
+  .legend .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; }
+  .legend .chip i { width: 8px; height: 8px; border-radius: 2px; }
+  .legend .chip[data-key='morning'] i { background: #ffd27a; }
+  .legend .chip[data-key='commute'] i { background: #a7b6c9; }
+  .legend .chip[data-key='work'] i { background: #7ec8ff; }
+  .legend .chip[data-key='lunch'] i { background: #ffb3a1; }
+  .legend .chip[data-key='home'] i { background: #8fe3c8; }
+  .legend .chip[data-key='dinner'] i { background: #f0965c; }
+  .legend .chip[data-key='sleep'] i { background: #1a2740; border: 1px solid rgba(255,255,255,0.2); }
+  .piececount { margin: 10px 0 0; font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+
+  /* ---- sections -------------------------------------------------------- */
+  .dg-body-content { max-width: 640px; margin: 0 auto; padding: 0 22px; }
+  .dg-sec { padding: 9vh 0; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .dg-sec:first-of-type { border-top: 0; }
+  .dg-sec h2 { font-size: clamp(22px, 4vw, 30px); margin: 0 0 10px; letter-spacing: -0.02em; }
+  .dg-sec > p { font-size: 15.5px; line-height: 1.6; opacity: 0.78; margin: 0 0 22px; max-width: 56ch; }
+  .dg-note { font-style: italic; opacity: 0.6 !important; }
+
+  .dg-slider { display: block; margin: 0 0 22px; }
+  .dg-slider-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 14.5px; margin-bottom: 8px; }
+  .dg-slider-label b { font-weight: 600; }
+  .dg-slider-label i { font-style: normal; font-variant-numeric: tabular-nums; opacity: 0.7; }
+  .dg-slider input[type='range'] { width: 100%; }
+
+  .dg-source { font-size: 12.5px; opacity: 0.5; line-height: 1.5; margin: -8px 0 20px; max-width: 56ch; }
+
+  .dg-common { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+  .dg-common li {
+    font-size: 13.5px; opacity: 0.7; padding-left: 16px; position: relative;
+  }
+  .dg-common li::before {
+    content: ''; position: absolute; left: 0; top: 0.55em; width: 6px; height: 6px;
+    border-radius: 50%; background: #7ec8ff; opacity: 0.6;
+  }
+
+  /* ---- results ----------------------------------------------------------- */
+  .dg-results { text-align: left; }
+  .dg-piece-line { font-size: 16px; opacity: 0.85; margin-bottom: 26px; }
+  .dg-worklines { display: grid; gap: 12px; margin-bottom: 14px; }
+  .dg-workline {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px; border-radius: 12px; background: rgba(255, 255, 255, 0.04);
+    font-size: 14.5px;
+  }
+  .dg-workline b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .dg-workline.dg-actual { background: rgba(126, 200, 255, 0.1); border: 1px solid rgba(126, 200, 255, 0.25); }
+  .dg-workline.dg-actual b { color: #7ec8ff; }
+  .dg-lost { font-size: 14.5px; line-height: 1.6; opacity: 0.82; margin: 4px 0 6px; }
+  .dg-clock { font-size: 14px; opacity: 0.55; margin-top: 20px; font-variant-numeric: tabular-nums; }
+
+  /* ---- outro --------------------------------------------------------- */
+  .dg-outro { padding: 6vh 0 14vh; }
+  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 24px; }
+  .acts button {
+    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  .acts button:first-child { background: linear-gradient(165deg, #a3ddff, #7ec8ff); color: #0c2033; border: 0; }
+  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
+  .acts a:hover { opacity: 1; }
+
+  .how { text-align: left; font-size: 14px; opacity: 0.8; }
+  .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; text-align: center; }
+  .how p { line-height: 1.6; margin: 10px 0; }
+  .how a { color: #7ec8ff; }
+
+  @media (max-width: 560px) {
+    .dg-dock { top: 48px; padding: 12px 16px; }
+  }
+</style>
