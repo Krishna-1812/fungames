@@ -24,9 +24,11 @@ import { withBase } from '../lib/base'
   <div class="sp-bg" aria-hidden="true"></div>
 
   <div class="sp-hud" id="hud">
-    <p class="sp-hud-time" id="hudTime">0.0s</p>
-    <p class="sp-hud-label">since you opened this page, you have travelled</p>
-    <p class="sp-hud-dist" id="hudDist">0 km</p>
+    <div class="sp-hud-inner">
+      <p class="sp-hud-time"><span id="hudTime">0.0s</span> since you opened this page</p>
+      <p class="sp-hud-dist"><span id="hudDist">0 km</span><i>travelled, that you know of</i></p>
+    </div>
+    <div class="sp-hud-glow" aria-hidden="true"></div>
   </div>
 
   <header class="sp-head">
@@ -44,14 +46,37 @@ import { withBase } from '../lib/base'
     <section class="sp-stage" id="stage-tectonic">
       <div class="sp-art">
         <svg viewBox="0 0 240 160" aria-hidden="true">
-          <rect width="240" height="160" fill="#141225"/>
-          <path d="M0 100 L100 92 L118 108 L130 90 L240 100 L240 160 L0 160Z" fill="#2a2440"/>
-          <path d="M0 112 L100 104 L118 120 L130 102 L240 112 L240 160 L0 160Z" fill="#1c1830"/>
-          <path d="M100 92 L118 108 L130 90" fill="none" stroke="#ff8a5c" stroke-width="2" stroke-dasharray="3 3"/>
-          <path d="M60 88 l-14 -3 l4 9Z" fill="#6ee7ff"/>
-          <path d="M180 96 l14 -3 l-4 9Z" fill="#6ee7ff"/>
-          <line x1="46" y1="85" x2="74" y2="85" stroke="#6ee7ff" stroke-width="2"/>
-          <line x1="166" y1="93" x2="194" y2="93" stroke="#6ee7ff" stroke-width="2"/>
+          <defs>
+            <radialGradient id="sp-tec-glow" cx="50%" cy="40%" r="75%">
+              <stop offset="0%" stop-color="#241f3d"/>
+              <stop offset="100%" stop-color="#0d0b18"/>
+            </radialGradient>
+            <linearGradient id="sp-plate-a" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#3a3260"/>
+              <stop offset="100%" stop-color="#221c3c"/>
+            </linearGradient>
+            <linearGradient id="sp-plate-b" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2a2444"/>
+              <stop offset="100%" stop-color="#161228"/>
+            </linearGradient>
+          </defs>
+          <rect width="240" height="160" fill="url(#sp-tec-glow)"/>
+          <g id="sp-stars-tectonic"></g>
+          <path d="M-4 96 L48 88 L70 98 L92 84 L114 100 L118 108 L130 90 L156 102 L180 92 L206 100 L244 90 L244 164 L-4 164Z" fill="url(#sp-plate-a)"/>
+          <path d="M-4 118 L60 108 L98 122 L118 108 L136 122 L172 106 L206 118 L244 108 L244 164 L-4 164Z" fill="url(#sp-plate-b)"/>
+          <path d="M48 88 L70 98 L92 84 L114 100 L118 108 L130 90 L156 102 L180 92 L206 100" fill="none" stroke="#ff8a5c" stroke-width="1.6" stroke-dasharray="1 4" stroke-linecap="round" opacity="0.85"/>
+          <g opacity="0.5" stroke="#151129" stroke-width="1">
+            <path d="M10 92 v70 M40 89 v70 M70 92 v70 M100 90 v70 M130 92 v70 M160 90 v70 M190 92 v70 M220 90 v70" stroke-dasharray="1 5"/>
+          </g>
+          <g fill="#6ee7ff">
+            <path d="M56 78 l-15 -3 l4 10Z"/>
+            <path d="M190 86 l15 -3 l-4 10Z"/>
+          </g>
+          <line x1="30" y1="75" x2="58" y2="75" stroke="#6ee7ff" stroke-width="2" stroke-linecap="round"/>
+          <line x1="178" y1="83" x2="206" y2="83" stroke="#6ee7ff" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="118" cy="106" r="3" fill="#ffd27a"/>
+          <circle cx="118" cy="106" r="3" fill="none" stroke="#ffd27a" stroke-width="1.4" class="sp-ping"/>
+          <text x="126" y="110" fill="#ffd27a" font-size="8.5" font-family="sans-serif" opacity="0.9">you're here</text>
         </svg>
       </div>
       <p class="sp-kicker">Stage 1 of 7</p>
@@ -64,6 +89,7 @@ import { withBase } from '../lib/base'
       </p>
       <p class="sp-fact" id="fact-tectonic"></p>
       <p class="sp-source" id="src-tectonic"></p>
+      <p class="sp-more">still not everything <span aria-hidden="true">↓</span></p>
     </section>
 
     <section class="sp-stage" id="stage-rotation">
@@ -71,18 +97,38 @@ import { withBase } from '../lib/base'
         <svg viewBox="0 0 240 160" aria-hidden="true">
           <defs>
             <radialGradient id="sp-earth-lit" cx="38%" cy="35%" r="75%">
-              <stop offset="0%" stop-color="#8fd8ff"/>
+              <stop offset="0%" stop-color="#9fe0ff"/>
               <stop offset="55%" stop-color="#2f6fb8"/>
-              <stop offset="100%" stop-color="#12233f"/>
+              <stop offset="100%" stop-color="#0d1c33"/>
             </radialGradient>
+            <radialGradient id="sp-earth-atmo" cx="50%" cy="50%" r="50%">
+              <stop offset="82%" stop-color="#6ee7ff" stop-opacity="0"/>
+              <stop offset="96%" stop-color="#6ee7ff" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#6ee7ff" stop-opacity="0"/>
+            </radialGradient>
+            <clipPath id="sp-earth-clip"><circle cx="120" cy="80" r="52"/></clipPath>
+            <linearGradient id="sp-earth-term" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#000" stop-opacity="0"/>
+              <stop offset="62%" stop-color="#000" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#000" stop-opacity="0.65"/>
+            </linearGradient>
           </defs>
           <rect width="240" height="160" fill="#0c0f22"/>
           <g id="sp-stars-rotation"></g>
+          <circle cx="120" cy="80" r="60" fill="url(#sp-earth-atmo)"/>
           <g class="sp-spin" style="transform-origin:120px 80px">
             <circle cx="120" cy="80" r="52" fill="url(#sp-earth-lit)"/>
-            <ellipse cx="120" cy="80" rx="52" ry="14" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.35"/>
-            <path d="M96 40 q24 -10 48 0" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.25"/>
-            <path d="M90 118 q30 12 60 0" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.25"/>
+            <g clip-path="url(#sp-earth-clip)" fill="#3fae6a" opacity="0.88">
+              <path d="M78 56 q10 -10 22 -4 q10 4 4 14 q-8 10 -20 8 q-12 -2 -6 -18Z"/>
+              <path d="M92 88 q16 -6 22 6 q4 10 -8 16 q-14 6 -20 -6 q-4 -10 6 -16Z"/>
+              <path d="M132 52 q14 -4 18 8 q3 8 -6 12 q-12 4 -16 -6 q-3 -8 4 -14Z"/>
+              <path d="M144 92 q12 -2 14 10 q1 8 -10 10 q-10 2 -12 -8 q-1 -8 8 -12Z"/>
+              <path d="M108 108 q8 -4 14 4 q3 6 -6 10 q-8 3 -11 -5 q-2 -6 3 -9Z"/>
+            </g>
+            <ellipse cx="120" cy="80" rx="52" ry="14" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.3"/>
+            <path d="M96 40 q24 -10 48 0" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.22"/>
+            <path d="M90 118 q30 12 60 0" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.22"/>
+            <circle cx="120" cy="80" r="52" fill="url(#sp-earth-term)"/>
           </g>
           <line id="sp-lat-line" x1="68" y1="80" x2="172" y2="80" stroke="#ffd27a" stroke-width="1.6" stroke-dasharray="2 3"/>
           <circle id="sp-lat-dot" cx="172" cy="80" r="3" fill="#ffd27a"/>
@@ -99,18 +145,40 @@ import { withBase } from '../lib/base'
       <button type="button" class="sp-geo" id="geoBtn">Use my real location</button>
       <p class="sp-fact" id="fact-rotation"></p>
       <p class="sp-source" id="src-rotation"></p>
+      <p class="sp-more">still not everything <span aria-hidden="true">↓</span></p>
     </section>
 
     <section class="sp-stage" id="stage-orbit">
       <div class="sp-art">
         <svg viewBox="0 0 240 160" aria-hidden="true">
+          <defs>
+            <radialGradient id="sp-sun-core" cx="50%" cy="45%" r="55%">
+              <stop offset="0%" stop-color="#fff6d8"/>
+              <stop offset="45%" stop-color="#ffd27a"/>
+              <stop offset="100%" stop-color="#ff9d4e"/>
+            </radialGradient>
+          </defs>
           <rect width="240" height="160" fill="#0c0f22"/>
           <g id="sp-stars-orbit"></g>
           <ellipse cx="120" cy="82" rx="86" ry="38" fill="none" stroke="#3a4a7a" stroke-width="1.4" stroke-dasharray="3 4"/>
-          <circle cx="120" cy="82" r="20" fill="#ffd27a"/>
-          <circle cx="120" cy="82" r="30" fill="#ffd27a" opacity="0.18"/>
+          <circle cx="120" cy="82" r="34" fill="#ffd27a" opacity="0.12"/>
+          <g class="sp-flare" style="transform-origin:120px 82px">
+            <g stroke="#ffd27a" stroke-width="1.4" opacity="0.5" stroke-linecap="round">
+              <line x1="120" y1="52" x2="120" y2="44"/>
+              <line x1="120" y1="112" x2="120" y2="120"/>
+              <line x1="90" y1="82" x2="82" y2="82"/>
+              <line x1="150" y1="82" x2="158" y2="82"/>
+              <line x1="99" y1="61" x2="93" y2="55"/>
+              <line x1="141" y1="103" x2="147" y2="109"/>
+              <line x1="141" y1="61" x2="147" y2="55"/>
+              <line x1="99" y1="103" x2="93" y2="109"/>
+            </g>
+          </g>
+          <circle cx="120" cy="82" r="20" fill="url(#sp-sun-core)"/>
           <g class="sp-orbit-dot" style="transform-origin:120px 82px">
-            <circle cx="206" cy="82" r="6" fill="#6ee7ff"/>
+            <circle cx="206" cy="82" r="7" fill="#2f6fb8"/>
+            <circle cx="206" cy="82" r="7" fill="url(#sp-earth-lit)" opacity="0.9"/>
+            <circle cx="211" cy="79" r="1.8" fill="#c9d4e6"/>
           </g>
         </svg>
       </div>
@@ -123,6 +191,7 @@ import { withBase } from '../lib/base'
       </p>
       <p class="sp-fact" id="fact-orbit"></p>
       <p class="sp-source" id="src-orbit"></p>
+      <p class="sp-more">still not everything <span aria-hidden="true">↓</span></p>
     </section>
 
     <section class="sp-stage" id="stage-apex">
@@ -130,8 +199,10 @@ import { withBase } from '../lib/base'
         <svg viewBox="0 0 240 160" aria-hidden="true">
           <rect width="240" height="160" fill="#0c0f22"/>
           <g id="sp-stars-apex"></g>
-          <circle cx="90" cy="88" r="16" fill="#ffd27a"/>
-          <circle cx="90" cy="88" r="24" fill="#ffd27a" opacity="0.16"/>
+          <path d="M40 96 Q64 90 86 88" fill="none" stroke="#ffd27a" stroke-width="10" opacity="0.06" stroke-linecap="round"/>
+          <path d="M40 96 Q64 90 86 88" fill="none" stroke="#ffd27a" stroke-width="4" opacity="0.14" stroke-linecap="round"/>
+          <circle cx="90" cy="88" r="16" fill="url(#sp-sun-core)"/>
+          <circle cx="90" cy="88" r="24" fill="#ffd27a" opacity="0.14"/>
           <path d="M108 88 L170 88" stroke="#6ee7ff" stroke-width="2"/>
           <path d="M162 80 L178 88 L162 96Z" fill="#6ee7ff"/>
           <g fill="#eaf6ff">
@@ -139,6 +210,11 @@ import { withBase } from '../lib/base'
             <circle cx="208" cy="82" r="1.6"/>
             <circle cx="200" cy="96" r="1.8"/>
             <circle cx="214" cy="62" r="1.4"/>
+          </g>
+          <g transform="translate(214 40)">
+            <circle r="10" fill="#dfe9ff" opacity="0.18"/>
+            <circle r="2.6" fill="#fff"/>
+            <path d="M0 -12 L0 12 M-12 0 L12 0" stroke="#fff" stroke-width="0.7" opacity="0.6"/>
           </g>
           <text x="188" y="112" fill="#9fb0d8" font-size="10" font-family="sans-serif">toward Vega</text>
         </svg>
@@ -152,20 +228,36 @@ import { withBase } from '../lib/base'
       </p>
       <p class="sp-fact" id="fact-apex"></p>
       <p class="sp-source" id="src-apex"></p>
+      <p class="sp-more">still not everything <span aria-hidden="true">↓</span></p>
     </section>
 
     <section class="sp-stage" id="stage-galactic">
       <div class="sp-art">
         <svg viewBox="0 0 240 160" aria-hidden="true">
+          <defs>
+            <radialGradient id="sp-gal-core" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff4d6"/>
+              <stop offset="40%" stop-color="#ffd27a"/>
+              <stop offset="100%" stop-color="#ffd27a" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
           <rect width="240" height="160" fill="#0a0c1c"/>
           <g id="sp-stars-galactic"></g>
-          <g style="transform-origin:120px 80px">
-            <path d="M120 80 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#5a5fa0" opacity="0.55"/>
-            <path d="M120 80 q-26 34 -4 50 q-34 -6 -30 -38 q4 -34 46 -34 q46 0 44 40 q-2 30 -34 34 q22 -20 -4 -46 q-14 -14 -18 -6Z" fill="#5a5fa0" opacity="0.4"/>
+          <g class="sp-gal-spin" style="transform-origin:120px 80px">
+            <path d="M120 80 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#5a5fa0" opacity="0.5"/>
+            <path d="M120 80 q-26 34 -4 50 q-34 -6 -30 -38 q4 -34 46 -34 q46 0 44 40 q-2 30 -34 34 q22 -20 -4 -46 q-14 -14 -18 -6Z" fill="#5a5fa0" opacity="0.38"/>
+            <path d="M120 80 q20 -26 3 -38 q26 5 23 29" fill="none" stroke="#8f7bff" stroke-width="3" opacity="0.35" stroke-linecap="round"/>
+            <path d="M120 80 q-20 26 -3 38 q-26 -5 -23 -29" fill="none" stroke="#8f7bff" stroke-width="3" opacity="0.3" stroke-linecap="round"/>
+            <g fill="#eaf0ff" opacity="0.7">
+              <circle cx="140" cy="52" r="0.9"/><circle cx="150" cy="64" r="0.7"/><circle cx="100" cy="108" r="0.9"/>
+              <circle cx="88" cy="94" r="0.7"/><circle cx="146" cy="98" r="0.8"/><circle cx="98" cy="58" r="0.7"/>
+            </g>
           </g>
-          <circle cx="120" cy="80" r="8" fill="#ffd27a"/>
+          <circle cx="120" cy="80" r="18" fill="url(#sp-gal-core)"/>
+          <circle cx="120" cy="80" r="6" fill="#fff8e6"/>
           <g class="sp-orbit-dot-slow" style="transform-origin:120px 80px">
             <circle cx="164" cy="80" r="4" fill="#6ee7ff"/>
+            <circle cx="164" cy="80" r="4" fill="none" stroke="#6ee7ff" stroke-width="1" class="sp-ping"/>
           </g>
         </svg>
       </div>
@@ -178,6 +270,7 @@ import { withBase } from '../lib/base'
       </p>
       <p class="sp-fact" id="fact-galactic"></p>
       <p class="sp-source" id="src-galactic"></p>
+      <p class="sp-more">still not everything <span aria-hidden="true">↓</span></p>
     </section>
 
     <section class="sp-stage" id="stage-andromeda">
@@ -185,11 +278,22 @@ import { withBase } from '../lib/base'
         <svg viewBox="0 0 240 160" aria-hidden="true">
           <rect width="240" height="160" fill="#0a0c1c"/>
           <g id="sp-stars-andromeda"></g>
-          <g transform="translate(70 80) scale(0.55)">
-            <path d="M0 0 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#6ee7ff" opacity="0.7"/>
+          <path d="M96 80 L144 80" stroke="url(#sp-close-beam)" stroke-width="3" opacity="0.6"/>
+          <defs>
+            <linearGradient id="sp-close-beam" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#6ee7ff" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#8f7bff" stop-opacity="0.7"/>
+            </linearGradient>
+          </defs>
+          <g class="sp-gal-spin" transform="translate(70 80) scale(0.6)" style="transform-origin:0 0">
+            <path d="M0 0 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#6ee7ff" opacity="0.65"/>
+            <path d="M0 0 q18 -22 3 -32" fill="none" stroke="#bff4ff" stroke-width="3" opacity="0.4" stroke-linecap="round"/>
+            <circle r="7" fill="#eaffff"/>
           </g>
-          <g transform="translate(168 80) scale(0.75) rotate(20)">
-            <path d="M0 0 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#8f7bff" opacity="0.75"/>
+          <g class="sp-gal-spin" transform="translate(168 80) scale(0.82) rotate(20)" style="transform-origin:0 0; animation-direction: reverse;">
+            <path d="M0 0 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#8f7bff" opacity="0.7"/>
+            <path d="M0 0 q-20 24 -3 34" fill="none" stroke="#d8ccff" stroke-width="3" opacity="0.4" stroke-linecap="round"/>
+            <circle r="8" fill="#f2ecff"/>
           </g>
           <path d="M110 80 L130 80" stroke="#ffd27a" stroke-width="1.6" stroke-dasharray="3 3"/>
           <path d="M116 74 L108 80 L116 86" fill="none" stroke="#ffd27a" stroke-width="1.6"/>
@@ -206,6 +310,7 @@ import { withBase } from '../lib/base'
       </p>
       <p class="sp-fact" id="fact-andromeda"></p>
       <p class="sp-source" id="src-andromeda"></p>
+      <p class="sp-more">still not everything <span aria-hidden="true">↓</span></p>
     </section>
 
     <section class="sp-stage" id="stage-cmb">
@@ -217,10 +322,12 @@ import { withBase } from '../lib/base'
               <stop offset="45%" stop-color="#7a5a8f"/>
               <stop offset="100%" stop-color="#3a5aa8"/>
             </radialGradient>
+            <clipPath id="sp-cmb-clip"><circle cx="120" cy="80" r="54"/></clipPath>
           </defs>
           <rect width="240" height="160" fill="#0a0c1c"/>
           <g id="sp-stars-cmb"></g>
           <circle cx="120" cy="80" r="54" fill="url(#sp-cmb)"/>
+          <g id="sp-cmb-speckle" clip-path="url(#sp-cmb-clip)" opacity="0.55"></g>
           <path d="M74 80 L166 80" stroke="#fff4d6" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.6"/>
           <text x="82" y="72" fill="#fff4d6" font-size="9" font-family="sans-serif" opacity="0.85">warmer</text>
           <text x="146" y="94" fill="#dfe8ff" font-size="9" font-family="sans-serif" opacity="0.85">cooler</text>
@@ -237,21 +344,29 @@ import { withBase } from '../lib/base'
       </p>
       <p class="sp-fact" id="fact-cmb"></p>
       <p class="sp-source" id="src-cmb"></p>
+      <p class="sp-more">and there's one more, past all seven <span aria-hidden="true">↓</span></p>
     </section>
 
     <section class="sp-stage sp-finale" id="stage-finale">
       <div class="sp-art sp-art-big">
         <svg viewBox="0 0 240 160" aria-hidden="true">
+          <defs>
+            <radialGradient id="sp-horizon-core" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#eaffff"/>
+              <stop offset="100%" stop-color="#6ee7ff"/>
+            </radialGradient>
+          </defs>
           <rect width="240" height="160" fill="#080a18"/>
           <g id="sp-stars-finale"></g>
-          <circle cx="120" cy="80" r="14" fill="#6ee7ff"/>
-          <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2"/>
-          <circle cx="120" cy="80" r="58" fill="none" stroke="#3a4a7a" stroke-width="1.2"/>
+          <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2" class="sp-horizon-ring" style="animation-delay:0s"/>
+          <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2" class="sp-horizon-ring" style="animation-delay:-1.3s"/>
+          <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2" class="sp-horizon-ring" style="animation-delay:-2.6s"/>
           <circle cx="120" cy="80" r="82" fill="none" stroke="#ff8a5c" stroke-width="1.6" stroke-dasharray="4 4"/>
+          <circle cx="120" cy="80" r="10" fill="url(#sp-horizon-core)"/>
           <text x="150" y="8" fill="#ff8a5c" font-size="10" font-family="sans-serif">faster than light, out here</text>
         </svg>
       </div>
-      <p class="sp-kicker">One more, past all seven</p>
+      <p class="sp-kicker">Past all seven, one thing left</p>
       <h2>The edge of everything we can see is retreating faster than light</h2>
       <p>
         This is where it stops being about motion <em>through</em> space at all.
@@ -349,22 +464,40 @@ import { withBase } from '../lib/base'
     const x = Math.sin(seed * 9301 + k * 49297) * 233280
     return x - Math.floor(x)
   }
-  function paintStars(hostId: string, seed: number, n = 26) {
+  function paintStars(hostId: string, seed: number, n = 46) {
     const host = document.getElementById(hostId)
     if (!host) return
     let markup = ''
     for (let i = 0; i < n; i++) {
       const x = rnd(seed, i) * 240
       const y = rnd(seed, i + 50) * 160
-      const r = 0.5 + rnd(seed, i + 90) * 1.1
-      const o = 0.3 + rnd(seed, i + 130) * 0.5
-      markup += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#eaf0ff" opacity="${o.toFixed(2)}"/>`
+      const r = 0.4 + rnd(seed, i + 90) * 1.3
+      const o = 0.25 + rnd(seed, i + 130) * 0.55
+      const dur = (2.4 + rnd(seed, i + 170) * 3.2).toFixed(2)
+      const delay = (rnd(seed, i + 210) * 4).toFixed(2)
+      markup += `<circle class="sp-star" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#eaf0ff" opacity="${o.toFixed(2)}" style="animation-duration:${dur}s;animation-delay:-${delay}s"/>`
     }
     host.innerHTML = markup
   }
-  ;['rotation', 'orbit', 'apex', 'galactic', 'andromeda', 'cmb', 'finale'].forEach((k, i) =>
-    paintStars(`sp-stars-${k}`, i + 1),
+  ;['tectonic', 'rotation', 'orbit', 'apex', 'galactic', 'andromeda', 'cmb', 'finale'].forEach((k, i) =>
+    paintStars(`sp-stars-${k}`, i + 1, k === 'tectonic' ? 14 : 46),
   )
+
+  /* A deterministic speckle field standing in for the CMB's own real */
+  /* anisotropy — the mottled texture the actual Planck sky maps are known for. */
+  const speckle = document.getElementById('sp-cmb-speckle')
+  if (speckle) {
+    let markup = ''
+    const colors = ['#ffe3c2', '#3a2f6e', '#ffb98a', '#26204a']
+    for (let i = 0; i < 90; i++) {
+      const x = 66 + rnd(99, i) * 108
+      const y = 26 + rnd(99, i + 60) * 108
+      const r = 1 + rnd(99, i + 120) * 3.4
+      const c = colors[Math.floor(rnd(99, i + 180) * colors.length)]
+      markup += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${c}"/>`
+    }
+    speckle.innerHTML = markup
+  }
 
   /* ---------------------------------------------------------------------- */
   /* Geolocation — optional, real, never leaves the tab.                    */
@@ -423,12 +556,23 @@ import { withBase } from '../lib/base'
   const STAGE_IDS = ['stage-tectonic', 'stage-rotation', 'stage-orbit', 'stage-apex', 'stage-galactic', 'stage-andromeda', 'stage-cmb']
   let activeCount = 0
   const t0 = performance.now()
+  let lastWholeKm = -1
+  const hud = $('hud')
 
   function tick(now: number) {
     const elapsed = (now - t0) / 1000
     const dist = cumulativeDistanceKm(stages, activeCount, elapsed)
     $('hudTime').textContent = fmtTime(elapsed)
-    $('hudDist').textContent = fmtKm(dist)
+    const distEl = $('hudDist')
+    distEl.textContent = fmtKm(dist)
+    const wholeKm = Math.floor(dist)
+    if (wholeKm !== lastWholeKm && lastWholeKm >= 0) {
+      distEl.classList.remove('sp-pulse')
+      void distEl.offsetWidth
+      distEl.classList.add('sp-pulse')
+    }
+    lastWholeKm = wholeKm
+    hud.style.setProperty('--sp-glow-x', `${10 + (activeCount / STAGE_IDS.length) * 80}%`)
     requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)
@@ -516,25 +660,42 @@ import { withBase } from '../lib/base'
   .speed-body .game > * { position: relative; z-index: 1; }
   .speed-body .game > .sp-hud { position: sticky; z-index: 5; }
 
-  /* ---- the live HUD ------------------------------------------------------ */
+  /* ---- the live HUD: the page's one persistent, undeniable fact ---------- */
   .sp-hud {
-    position: sticky; top: 58px; z-index: 5;
-    max-width: 420px; margin: 4vh auto 0; padding: 16px 22px;
-    text-align: center; border-radius: 18px;
-    background: rgba(10, 12, 28, 0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(110, 231, 255, 0.18);
-    box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.7), 0 0 40px -20px rgba(110, 231, 255, 0.3);
+    position: sticky; top: 48px; z-index: 5;
+    width: 100%; overflow: hidden;
+    background: linear-gradient(100deg, #131a3a, #1d1240 55%, #2a1240);
+    border-bottom: 1px solid rgba(110, 231, 255, 0.25);
+    box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.8);
+  }
+  .sp-hud-glow {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(38vw 100% at var(--sp-glow-x, 15%) 50%, rgba(110, 231, 255, 0.35), transparent 70%);
+    transition: background-position 0.2s linear;
+  }
+  .sp-hud-inner {
+    position: relative; max-width: 720px; margin: 0 auto; padding: 14px 20px;
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center;
+    column-gap: 14px; row-gap: 2px; text-align: center;
   }
   .sp-hud-time {
-    margin: 0; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
-    color: #6ee7ff; letter-spacing: 0.02em;
+    margin: 0; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: #9fe8ff; letter-spacing: 0.01em; opacity: 0.9; order: 2;
   }
-  .sp-hud-label { margin: 6px 0 4px; font-size: 11.5px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.08em; }
+  .sp-hud-time span { color: #fff; }
   .sp-hud-dist {
-    margin: 0; font-size: clamp(26px, 5vw, 36px); font-weight: 800; font-variant-numeric: tabular-nums;
-    background: linear-gradient(165deg, #fff, #8f7bff);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    letter-spacing: -0.01em;
+    margin: 0; order: 1; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; justify-content: center;
+  }
+  .sp-hud-dist span {
+    font-size: clamp(28px, 6vw, 44px); font-weight: 800; font-variant-numeric: tabular-nums;
+    color: #fff; letter-spacing: -0.01em; text-shadow: 0 0 30px rgba(110, 231, 255, 0.5);
+  }
+  .sp-hud-dist span.sp-pulse { animation: sp-pulse 0.5s ease-out; }
+  .sp-hud-dist i { font-style: normal; font-size: 12.5px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.08em; }
+  @keyframes sp-pulse { 0% { text-shadow: 0 0 0 rgba(110, 231, 255, 0); transform: scale(1.06); } 100% { text-shadow: 0 0 30px rgba(110, 231, 255, 0.5); transform: scale(1); } }
+  @media (max-width: 560px) {
+    .sp-hud-inner { padding: 11px 16px; }
+    .sp-hud-dist, .sp-hud-time { order: initial; width: 100%; }
   }
 
   .sp-head { max-width: 640px; margin: 7vh auto 0; padding: 0 22px; text-align: center; }
@@ -556,12 +717,20 @@ import { withBase } from '../lib/base'
     box-shadow: 0 24px 50px -26px rgba(0, 0, 0, 0.7);
   }
   .sp-art svg { display: block; width: 100%; height: auto; }
-  .sp-art-big { max-width: 460px; margin-inline: auto; margin-bottom: 22px; }
+  .sp-art-big { margin-bottom: 22px; }
+  .sp-horizon-ring { animation: sp-horizon 3.9s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes sp-horizon { 0% { transform: scale(0.4); opacity: 0; stroke: #6ee7ff; } 15% { opacity: 0.8; } 100% { transform: scale(2.5); opacity: 0; stroke: #3a4a7a; } }
 
   .sp-spin { animation: sp-rotate 26s linear infinite; }
   .sp-orbit-dot { animation: sp-rotate 14s linear infinite; }
   .sp-orbit-dot-slow { animation: sp-rotate 22s linear infinite; }
+  .sp-flare { animation: sp-rotate 40s linear infinite; transform-box: fill-box; }
+  .sp-gal-spin { animation: sp-rotate 90s linear infinite; }
   @keyframes sp-rotate { to { transform: rotate(360deg); } }
+  .sp-star { animation-name: sp-twinkle; animation-iteration-count: infinite; animation-timing-function: ease-in-out; transform-box: fill-box; transform-origin: center; }
+  @keyframes sp-twinkle { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+  .sp-ping { transform-box: fill-box; transform-origin: center; animation: sp-ping 1.8s ease-out infinite; }
+  @keyframes sp-ping { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(4.5); opacity: 0; } }
 
   .sp-geo {
     appearance: none; border: 1px solid rgba(110, 231, 255, 0.3); background: rgba(110, 231, 255, 0.08);
@@ -576,6 +745,12 @@ import { withBase } from '../lib/base'
     color: #ffd27a; margin: 0 0 8px;
   }
   .sp-source { font-size: 12.5px; opacity: 0.55; line-height: 1.55; margin: 0; }
+  .sp-more {
+    margin: 20px 0 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #8f7bff; opacity: 0.75; text-align: center;
+  }
+  .sp-more span { display: inline-block; animation: sp-bob 1.6s ease-in-out infinite; }
+  @keyframes sp-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
 
   .sp-finale h2 { color: #ff9d6e; }
   .sp-closer {
@@ -599,9 +774,8 @@ import { withBase } from '../lib/base'
   .how a { color: #6ee7ff; }
 
   @media (prefers-reduced-motion: reduce) {
-    .sp-spin, .sp-orbit-dot, .sp-orbit-dot-slow { animation: none; }
-  }
-  @media (max-width: 560px) {
-    .sp-hud { top: 48px; padding: 12px 16px; }
+    .sp-spin, .sp-orbit-dot, .sp-orbit-dot-slow, .sp-flare, .sp-gal-spin { animation: none; }
+    .sp-hud-dist span.sp-pulse { animation: none; }
+    .sp-star, .sp-ping, .sp-horizon-ring, .sp-more span { animation: none !important; }
   }
 </style>
