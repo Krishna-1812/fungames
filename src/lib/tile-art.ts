@@ -63,6 +63,48 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
 export const ART: Record<string, Illustration> = {
+  /* ---- How Fast Are You Moving? ------------------------------------------- */
+  speed: {
+    subject: 'orbits within orbits, a small bright world on the innermost one',
+    slot: 'corner-br',
+    viewBox: '0 0 140 100',
+    palette: ['#6ee7ff', '#3a4a7a', '#8f7bff', '#fff4d6', '#ffd27a'],
+    draw: (seed) => {
+      const cx = 90, cy = 58
+      const glow = `<circle cx="${cx}" cy="${cy}" r="60" fill="#3a4a7a" opacity="0.4"/>`
+      const rings = [26, 46, 66].map((r, i) => {
+        const opacity = 0.95 - i * 0.16
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#8f7bff" stroke-width="2.2" opacity="${opacity.toFixed(2)}"/>`
+      }).join('')
+      // A short comet-like trail on the outermost ring — motion, not a static diagram.
+      const trailA = ((seed * 47) % 360) * (Math.PI / 180)
+      const trail = Array.from({ length: 5 }, (_, i) => {
+        const a = trailA - i * 0.12
+        const r = 66
+        const x = cx + Math.cos(a) * r
+        const y = cy + Math.sin(a) * r * 0.6
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(3.2 - i * 0.5).toFixed(2)}" fill="#6ee7ff" opacity="${(0.85 - i * 0.15).toFixed(2)}"/>`
+      }).join('')
+      // A small bright world on the innermost ring, and a fainter one further out.
+      const bodyA = ((seed * 113) % 360) * (Math.PI / 180)
+      const bx = cx + Math.cos(bodyA) * 26
+      const by = cy + Math.sin(bodyA) * 26 * 0.6
+      const midA = bodyA + 2.1
+      const mx = cx + Math.cos(midA) * 46
+      const my = cy + Math.sin(midA) * 46 * 0.6
+      // A scatter of stars filling the rest of the frame.
+      const stars = range(22).map((i) => {
+        const x = rnd(seed, i) * 140
+        const y = rnd(seed, i + 40) * 90
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(0.8 + rnd(seed, i + 80) * 1.3).toFixed(1)}" fill="#fff4d6" opacity="${(0.45 + rnd(seed, i + 90) * 0.5).toFixed(2)}"/>`
+      }).join('')
+      return stars + glow + rings + trail +
+        `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4.4" fill="#ffd27a"/>` +
+        `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="6.8" fill="#6ee7ff"/>` +
+        `<circle cx="${(bx - 2).toFixed(1)}" cy="${(by - 2).toFixed(1)}" r="2.2" fill="#fff4d6" opacity="0.9"/>`
+    },
+  },
+
   /* ---- Where Does The Day Go? --------------------------------------------- */
   'day-go': {
     subject: 'a tidy day-bar, cut into far more pieces than it started with',

@@ -1,0 +1,607 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { withBase } from '../lib/base'
+
+/**
+ * How Fast Are You Moving? — seven real, cited speeds stacking live.
+ *
+ * `src/lib/speed-model.ts` is the entire model: seven real magnitudes (one
+ * of them — Earth's own rotation — computed from your real latitude rather
+ * than looked up) summed as plain magnitudes across however many seconds
+ * have actually elapsed since this page opened. `scripts/check-speed-model.mjs`
+ * checks the rotation formula against known real values, checks every
+ * constant sits in its real published range, and checks the arithmetic
+ * never goes backwards no matter how it's driven.
+ *
+ * Each section "counts" the moment it scrolls into view — not gated, just
+ * paced, the same scroll-driven mechanism `day-go.astro` proved out (a
+ * single synchronous scroll+rAF check, not IntersectionObserver, which is
+ * asynchronous by spec and let a fast jump show stale numbers there).
+ */
+---
+
+<GameLayout slug="speed" bar="#0a0e1e" bodyClass="speed-body">
+  <div class="sp-bg" aria-hidden="true"></div>
+
+  <div class="sp-hud" id="hud">
+    <p class="sp-hud-time" id="hudTime">0.0s</p>
+    <p class="sp-hud-label">since you opened this page, you have travelled</p>
+    <p class="sp-hud-dist" id="hudDist">0 km</p>
+  </div>
+
+  <header class="sp-head">
+    <p class="sp-eyebrow">Seven real speeds, stacking live</p>
+    <h1>How Fast Are You Moving?</h1>
+    <p>
+      Right now, doing nothing, you are moving. Not metaphorically — seven
+      real, measured motions, each one a real frame of reference nested
+      inside the last, and every one of them is happening to you at this
+      exact moment. Keep scrolling and watch them add up.
+    </p>
+  </header>
+
+  <main class="sp-body-content">
+    <section class="sp-stage" id="stage-tectonic">
+      <div class="sp-art">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <rect width="240" height="160" fill="#141225"/>
+          <path d="M0 100 L100 92 L118 108 L130 90 L240 100 L240 160 L0 160Z" fill="#2a2440"/>
+          <path d="M0 112 L100 104 L118 120 L130 102 L240 112 L240 160 L0 160Z" fill="#1c1830"/>
+          <path d="M100 92 L118 108 L130 90" fill="none" stroke="#ff8a5c" stroke-width="2" stroke-dasharray="3 3"/>
+          <path d="M60 88 l-14 -3 l4 9Z" fill="#6ee7ff"/>
+          <path d="M180 96 l14 -3 l-4 9Z" fill="#6ee7ff"/>
+          <line x1="46" y1="85" x2="74" y2="85" stroke="#6ee7ff" stroke-width="2"/>
+          <line x1="166" y1="93" x2="194" y2="93" stroke="#6ee7ff" stroke-width="2"/>
+        </svg>
+      </div>
+      <p class="sp-kicker">Stage 1 of 7</p>
+      <h2>The ground under you is drifting</h2>
+      <p>
+        You're standing on a tectonic plate, and tectonic plates never stop
+        moving — a few centimetres a year, about as fast as your fingernails
+        grow. It is the slowest thing on this page by an enormous margin, and
+        it is still real motion.
+      </p>
+      <p class="sp-fact" id="fact-tectonic"></p>
+      <p class="sp-source" id="src-tectonic"></p>
+    </section>
+
+    <section class="sp-stage" id="stage-rotation">
+      <div class="sp-art">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <defs>
+            <radialGradient id="sp-earth-lit" cx="38%" cy="35%" r="75%">
+              <stop offset="0%" stop-color="#8fd8ff"/>
+              <stop offset="55%" stop-color="#2f6fb8"/>
+              <stop offset="100%" stop-color="#12233f"/>
+            </radialGradient>
+          </defs>
+          <rect width="240" height="160" fill="#0c0f22"/>
+          <g id="sp-stars-rotation"></g>
+          <g class="sp-spin" style="transform-origin:120px 80px">
+            <circle cx="120" cy="80" r="52" fill="url(#sp-earth-lit)"/>
+            <ellipse cx="120" cy="80" rx="52" ry="14" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.35"/>
+            <path d="M96 40 q24 -10 48 0" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.25"/>
+            <path d="M90 118 q30 12 60 0" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.25"/>
+          </g>
+          <line id="sp-lat-line" x1="68" y1="80" x2="172" y2="80" stroke="#ffd27a" stroke-width="1.6" stroke-dasharray="2 3"/>
+          <circle id="sp-lat-dot" cx="172" cy="80" r="3" fill="#ffd27a"/>
+        </svg>
+      </div>
+      <p class="sp-kicker">Stage 2 of 7</p>
+      <h2>The Earth is turning beneath your feet</h2>
+      <p>
+        The planet makes one real rotation every 23 hours, 56 minutes and 4
+        seconds — a sidereal day, not the 24-hour clock day, which is
+        stretched slightly by the planet's own orbit. How fast that spin
+        carries you depends entirely on how far you are from the equator.
+      </p>
+      <button type="button" class="sp-geo" id="geoBtn">Use my real location</button>
+      <p class="sp-fact" id="fact-rotation"></p>
+      <p class="sp-source" id="src-rotation"></p>
+    </section>
+
+    <section class="sp-stage" id="stage-orbit">
+      <div class="sp-art">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <rect width="240" height="160" fill="#0c0f22"/>
+          <g id="sp-stars-orbit"></g>
+          <ellipse cx="120" cy="82" rx="86" ry="38" fill="none" stroke="#3a4a7a" stroke-width="1.4" stroke-dasharray="3 4"/>
+          <circle cx="120" cy="82" r="20" fill="#ffd27a"/>
+          <circle cx="120" cy="82" r="30" fill="#ffd27a" opacity="0.18"/>
+          <g class="sp-orbit-dot" style="transform-origin:120px 82px">
+            <circle cx="206" cy="82" r="6" fill="#6ee7ff"/>
+          </g>
+        </svg>
+      </div>
+      <p class="sp-kicker">Stage 3 of 7</p>
+      <h2>And the Earth is orbiting the Sun</h2>
+      <p>
+        29.78 kilometres every second — a precisely measured constant, and
+        the speed that made ancient astronomers argue for centuries about
+        whether the Earth could really be the thing doing the moving.
+      </p>
+      <p class="sp-fact" id="fact-orbit"></p>
+      <p class="sp-source" id="src-orbit"></p>
+    </section>
+
+    <section class="sp-stage" id="stage-apex">
+      <div class="sp-art">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <rect width="240" height="160" fill="#0c0f22"/>
+          <g id="sp-stars-apex"></g>
+          <circle cx="90" cy="88" r="16" fill="#ffd27a"/>
+          <circle cx="90" cy="88" r="24" fill="#ffd27a" opacity="0.16"/>
+          <path d="M108 88 L170 88" stroke="#6ee7ff" stroke-width="2"/>
+          <path d="M162 80 L178 88 L162 96Z" fill="#6ee7ff"/>
+          <g fill="#eaf6ff">
+            <circle cx="196" cy="70" r="2"/>
+            <circle cx="208" cy="82" r="1.6"/>
+            <circle cx="200" cy="96" r="1.8"/>
+            <circle cx="214" cy="62" r="1.4"/>
+          </g>
+          <text x="188" y="112" fill="#9fb0d8" font-size="10" font-family="sans-serif">toward Vega</text>
+        </svg>
+      </div>
+      <p class="sp-kicker">Stage 4 of 7</p>
+      <h2>The Sun itself is drifting</h2>
+      <p>
+        Against the average motion of the stars around it, the Sun is moving
+        toward a point in the sky near the bright star Vega — the "solar
+        apex." Every planet in the solar system is being dragged along.
+      </p>
+      <p class="sp-fact" id="fact-apex"></p>
+      <p class="sp-source" id="src-apex"></p>
+    </section>
+
+    <section class="sp-stage" id="stage-galactic">
+      <div class="sp-art">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <rect width="240" height="160" fill="#0a0c1c"/>
+          <g id="sp-stars-galactic"></g>
+          <g style="transform-origin:120px 80px">
+            <path d="M120 80 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#5a5fa0" opacity="0.55"/>
+            <path d="M120 80 q-26 34 -4 50 q-34 -6 -30 -38 q4 -34 46 -34 q46 0 44 40 q-2 30 -34 34 q22 -20 -4 -46 q-14 -14 -18 -6Z" fill="#5a5fa0" opacity="0.4"/>
+          </g>
+          <circle cx="120" cy="80" r="8" fill="#ffd27a"/>
+          <g class="sp-orbit-dot-slow" style="transform-origin:120px 80px">
+            <circle cx="164" cy="80" r="4" fill="#6ee7ff"/>
+          </g>
+        </svg>
+      </div>
+      <p class="sp-kicker">Stage 5 of 7</p>
+      <h2>The Sun is orbiting the galaxy</h2>
+      <p>
+        One full orbit of the Milky Way's centre takes the Sun about 220
+        million years — the last time we were here, there were no flowers on
+        Earth yet. The speed it takes to do that is anything but slow.
+      </p>
+      <p class="sp-fact" id="fact-galactic"></p>
+      <p class="sp-source" id="src-galactic"></p>
+    </section>
+
+    <section class="sp-stage" id="stage-andromeda">
+      <div class="sp-art">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <rect width="240" height="160" fill="#0a0c1c"/>
+          <g id="sp-stars-andromeda"></g>
+          <g transform="translate(70 80) scale(0.55)">
+            <path d="M0 0 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#6ee7ff" opacity="0.7"/>
+          </g>
+          <g transform="translate(168 80) scale(0.75) rotate(20)">
+            <path d="M0 0 q26 -34 4 -50 q34 6 30 38 q-4 34 -46 34 q-46 0 -44 -40 q2 -30 34 -34 q-22 20 4 46 q14 14 18 6Z" fill="#8f7bff" opacity="0.75"/>
+          </g>
+          <path d="M110 80 L130 80" stroke="#ffd27a" stroke-width="1.6" stroke-dasharray="3 3"/>
+          <path d="M116 74 L108 80 L116 86" fill="none" stroke="#ffd27a" stroke-width="1.6"/>
+          <path d="M124 74 L132 80 L124 86" fill="none" stroke="#ffd27a" stroke-width="1.6"/>
+        </svg>
+      </div>
+      <p class="sp-kicker">Stage 6 of 7</p>
+      <h2>And the whole galaxy is falling toward another one</h2>
+      <p>
+        The Milky Way and the Andromeda Galaxy are genuinely, measurably
+        closing the distance between them — tracked directly from a decade
+        of Hubble Space Telescope images of Andromeda's own real motion.
+        They're due to meet in about 4.5 billion years.
+      </p>
+      <p class="sp-fact" id="fact-andromeda"></p>
+      <p class="sp-source" id="src-andromeda"></p>
+    </section>
+
+    <section class="sp-stage" id="stage-cmb">
+      <div class="sp-art">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <defs>
+            <radialGradient id="sp-cmb" cx="34%" cy="45%" r="80%">
+              <stop offset="0%" stop-color="#ff9d6e"/>
+              <stop offset="45%" stop-color="#7a5a8f"/>
+              <stop offset="100%" stop-color="#3a5aa8"/>
+            </radialGradient>
+          </defs>
+          <rect width="240" height="160" fill="#0a0c1c"/>
+          <g id="sp-stars-cmb"></g>
+          <circle cx="120" cy="80" r="54" fill="url(#sp-cmb)"/>
+          <path d="M74 80 L166 80" stroke="#fff4d6" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.6"/>
+          <text x="82" y="72" fill="#fff4d6" font-size="9" font-family="sans-serif" opacity="0.85">warmer</text>
+          <text x="146" y="94" fill="#dfe8ff" font-size="9" font-family="sans-serif" opacity="0.85">cooler</text>
+        </svg>
+      </div>
+      <p class="sp-kicker">Stage 7 of 7</p>
+      <h2>Against the afterglow of the Big Bang itself</h2>
+      <p>
+        The cosmic microwave background is the oldest light there is — radiation
+        left over from 380,000 years after the Big Bang, filling every direction
+        of the sky almost perfectly evenly. Almost: our motion through it
+        blue-shifts it slightly warmer ahead of us and cooler behind, and that
+        lopsidedness is a real, measured speed.
+      </p>
+      <p class="sp-fact" id="fact-cmb"></p>
+      <p class="sp-source" id="src-cmb"></p>
+    </section>
+
+    <section class="sp-stage sp-finale" id="stage-finale">
+      <div class="sp-art sp-art-big">
+        <svg viewBox="0 0 240 160" aria-hidden="true">
+          <rect width="240" height="160" fill="#080a18"/>
+          <g id="sp-stars-finale"></g>
+          <circle cx="120" cy="80" r="14" fill="#6ee7ff"/>
+          <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2"/>
+          <circle cx="120" cy="80" r="58" fill="none" stroke="#3a4a7a" stroke-width="1.2"/>
+          <circle cx="120" cy="80" r="82" fill="none" stroke="#ff8a5c" stroke-width="1.6" stroke-dasharray="4 4"/>
+          <text x="150" y="8" fill="#ff8a5c" font-size="10" font-family="sans-serif">faster than light, out here</text>
+        </svg>
+      </div>
+      <p class="sp-kicker">One more, past all seven</p>
+      <h2>The edge of everything we can see is retreating faster than light</h2>
+      <p>
+        This is where it stops being about motion <em>through</em> space at all.
+        The Hubble constant — how fast distant space itself expands — is measured
+        two different ways that still don't agree: about 67.4 km/s for every
+        megaparsec of distance from the cosmic microwave background, or about
+        73.0 km/s/Mpc from nearby supernovae. Nobody has resolved why they
+        disagree; it's called the Hubble tension, and it's one of the open
+        problems in cosmology right now.
+      </p>
+      <p>
+        Multiply either figure across the roughly 46.5 billion light-years to
+        the edge of the observable universe, and the result is several times
+        the speed of light. That isn't a mistake, and it doesn't break
+        relativity — nothing is moving <em>through</em> space out there faster
+        than light. Space itself is doing the expanding, and there's no
+        speed limit on that.
+      </p>
+      <p class="sp-fact" id="fact-horizon"></p>
+      <p class="sp-source" id="src-hubble"></p>
+
+      <p class="sp-closer">
+        So: tectonic drift, a spinning planet, an orbit, a drifting star, a
+        galaxy in its own orbit, a galaxy falling toward another, and all of
+        it measured against the oldest light in the universe — and even that
+        last one is just a direction someone had to pick. Velocity only ever
+        means something relative to whatever you measure it against. Chosen
+        differently, every number on this page is zero.
+      </p>
+    </section>
+
+    <footer class="sp-outro">
+      <div class="acts">
+        <button type="button" data-share data-title="How Fast Are You Moving?">Share this</button>
+        <button type="button" id="again">Start over</button>
+        <a href={withBase('/')}>try something else →</a>
+      </div>
+
+      <details class="how">
+        <summary>How this actually works</summary>
+        <p>
+          Every speed on this page is real and cited — see the source line
+          under each one. The one exception is how they combine: added here
+          as plain magnitudes, the way most popular explanations of this
+          present it, not as a true instantaneous vector sum (which would
+          need this exact moment's direction of all seven motions, changes
+          constantly, and would rarely differ from this simple sum by more
+          than a small percentage anyway).
+        </p>
+        <p>
+          Earth's rotation is the one figure computed live rather than
+          looked up: real equatorial radius, real sidereal day, and your
+          real latitude if you share it (nothing leaves this tab — the
+          number is computed here and nowhere else).
+        </p>
+        <p>Related: <a href={withBase('/universe-forecast/')}>Universe Forecast</a> runs the same real orbital mechanics live, for eclipses and moon phases instead of speed.</p>
+      </details>
+    </footer>
+  </main>
+</GameLayout>
+
+<script>
+  import {
+    buildStages, cumulativeDistanceKm, horizonRecessionSpeedC,
+    HUBBLE_PLANCK_KM_S_MPC, HUBBLE_SH0ES_KM_S_MPC, SOURCES,
+    type Stage,
+  } from '../lib/speed-model'
+  import { recordPlay } from '../lib/stats'
+  import { onShare } from '../lib/share-card'
+  import { SITE } from '../site.config'
+  import { prefersReducedMotion } from '../lib/fx'
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+
+  let latitude = 40 // a reasonable default if geolocation is never granted
+  let stages: Stage[] = buildStages(latitude)
+
+  const fmtKm = (km: number) => {
+    if (km >= 1_000_000) return `${(km / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 2 })} million km`
+    if (km >= 1000) return `${km.toLocaleString('en-US', { maximumFractionDigits: 0 })} km`
+    if (km >= 1) return `${km.toFixed(1)} km`
+    return `${(km * 1000).toFixed(1)} m`
+  }
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60)
+    const sec = s - m * 60
+    return m > 0 ? `${m}m ${sec.toFixed(0)}s` : `${s.toFixed(1)}s`
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Starfields — one small scattered set of dots per scene, deterministic. */
+  /* ---------------------------------------------------------------------- */
+
+  const rnd = (seed: number, k: number) => {
+    const x = Math.sin(seed * 9301 + k * 49297) * 233280
+    return x - Math.floor(x)
+  }
+  function paintStars(hostId: string, seed: number, n = 26) {
+    const host = document.getElementById(hostId)
+    if (!host) return
+    let markup = ''
+    for (let i = 0; i < n; i++) {
+      const x = rnd(seed, i) * 240
+      const y = rnd(seed, i + 50) * 160
+      const r = 0.5 + rnd(seed, i + 90) * 1.1
+      const o = 0.3 + rnd(seed, i + 130) * 0.5
+      markup += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#eaf0ff" opacity="${o.toFixed(2)}"/>`
+    }
+    host.innerHTML = markup
+  }
+  ;['rotation', 'orbit', 'apex', 'galactic', 'andromeda', 'cmb', 'finale'].forEach((k, i) =>
+    paintStars(`sp-stars-${k}`, i + 1),
+  )
+
+  /* ---------------------------------------------------------------------- */
+  /* Geolocation — optional, real, never leaves the tab.                    */
+  /* ---------------------------------------------------------------------- */
+
+  $('geoBtn').addEventListener('click', () => {
+    const btn = $('geoBtn') as HTMLButtonElement
+    if (!('geolocation' in navigator)) { btn.textContent = 'Not available on this device'; return }
+    btn.textContent = 'Locating…'
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        latitude = pos.coords.latitude
+        stages = buildStages(latitude)
+        btn.textContent = `Using your real latitude, ${latitude.toFixed(1)}°`
+        btn.disabled = true
+        paintFacts()
+      },
+      () => { btn.textContent = "Couldn't get your location — using 40°N" },
+      { timeout: 8000 },
+    )
+  })
+
+  /* ---------------------------------------------------------------------- */
+  /* Facts — the real number under each stage, and the live HUD.            */
+  /* ---------------------------------------------------------------------- */
+
+  function paintFacts() {
+    const [tectonic, rotation, orbit, apex, galactic, andromeda, cmb] = stages
+    $('fact-tectonic').textContent = `About 2.3 cm a year — ${(tectonic.kmPerSec * 1000).toExponential(2)} mm/s.`
+    $('fact-rotation').textContent = `At ${latitude.toFixed(1)}° latitude, that's ${rotation.kmPerSec.toFixed(3)} km/s — ${(rotation.kmPerSec * 3600).toFixed(0)} km/h.`
+    $('fact-orbit').textContent = `${orbit.kmPerSec.toFixed(2)} km/s.`
+    $('fact-apex').textContent = `${apex.kmPerSec.toFixed(1)} km/s.`
+    $('fact-galactic').textContent = `${galactic.kmPerSec} km/s.`
+    $('fact-andromeda').textContent = `${andromeda.kmPerSec} km/s, closing.`
+    $('fact-cmb').textContent = `${cmb.kmPerSec} km/s toward the Hydra-Centaurus supercluster.`
+
+    const cPlanck = horizonRecessionSpeedC(HUBBLE_PLANCK_KM_S_MPC)
+    const cSH0ES = horizonRecessionSpeedC(HUBBLE_SH0ES_KM_S_MPC)
+    $('fact-horizon').textContent = `That works out to roughly ${cPlanck.toFixed(1)}c to ${cSH0ES.toFixed(1)}c, depending which measurement you use.`
+
+    $('src-tectonic').textContent = SOURCES.tectonic
+    $('src-rotation').textContent = SOURCES.rotation
+    $('src-orbit').textContent = SOURCES.orbit
+    $('src-apex').textContent = SOURCES.apex
+    $('src-galactic').textContent = SOURCES.galactic
+    $('src-andromeda').textContent = SOURCES.andromeda
+    $('src-cmb').textContent = SOURCES.cmb
+    $('src-hubble').textContent = SOURCES.hubble
+  }
+  paintFacts()
+
+  /* ---------------------------------------------------------------------- */
+  /* The live HUD — ticks every frame, independent of scroll.               */
+  /* ---------------------------------------------------------------------- */
+
+  const STAGE_IDS = ['stage-tectonic', 'stage-rotation', 'stage-orbit', 'stage-apex', 'stage-galactic', 'stage-andromeda', 'stage-cmb']
+  let activeCount = 0
+  const t0 = performance.now()
+
+  function tick(now: number) {
+    const elapsed = (now - t0) / 1000
+    const dist = cumulativeDistanceKm(stages, activeCount, elapsed)
+    $('hudTime').textContent = fmtTime(elapsed)
+    $('hudDist').textContent = fmtKm(dist)
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+
+  /* ---------------------------------------------------------------------- */
+  /* Share + record                                                         */
+  /*                                                                         */
+  /* Declared before the pacing block below on purpose: `checkStages` can   */
+  /* call `updateShareCard` synchronously the very first time it runs (a    */
+  /* page that loads already scrolled to the finale — a browser restoring  */
+  /* scroll position on reload or back/forward is a real, ordinary way      */
+  /* that happens), and a `let` referenced before its own declaration line  */
+  /* executes throws, even from inside an already-hoisted function.         */
+  /* ---------------------------------------------------------------------- */
+
+  let recorded = false
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({ title: 'How Fast Are You Moving?', text: `${c.headline}.` }))
+
+  function updateShareCard() {
+    const elapsed = (performance.now() - t0) / 1000
+    const dist = cumulativeDistanceKm(stages, STAGE_IDS.length, elapsed)
+    const combinedKmS = stages.reduce((s, x) => s + x.kmPerSec, 0)
+    shareCard = {
+      slug: 'speed',
+      siteName: SITE.name,
+      headline: `Moving at ${combinedKmS.toLocaleString('en-US', { maximumFractionDigits: 0 })} km/s, combined`,
+      sub: `${fmtKm(dist)} travelled just reading this.`,
+      stats: [
+        { label: 'Combined speed', value: `${Math.round(combinedKmS)} km/s` },
+        { label: 'Distance so far', value: fmtKm(dist) },
+        { label: 'Time', value: fmtTime(elapsed) },
+      ],
+    }
+    recordPlay('speed', { combinedKmS, distanceKm: dist }, { combinedKmS: 'high' })
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Scroll-driven pacing — proven pattern: synchronous, not               */
+  /* IntersectionObserver (see day-go.astro for why).                       */
+  /* ---------------------------------------------------------------------- */
+
+  function checkStages() {
+    let n = 0
+    for (const id of STAGE_IDS) {
+      const el = document.getElementById(id)
+      if (el && el.getBoundingClientRect().top < innerHeight * 0.85) n++
+    }
+    if (n > activeCount) activeCount = n
+    if (!recorded) {
+      const finale = document.getElementById('stage-finale')
+      if (finale && finale.getBoundingClientRect().top < innerHeight) {
+        activeCount = STAGE_IDS.length
+        recorded = true
+        updateShareCard()
+      }
+    }
+  }
+
+  if (prefersReducedMotion) {
+    activeCount = STAGE_IDS.length
+  } else {
+    let ticking = false
+    addEventListener('scroll', () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => { ticking = false; checkStages() })
+    }, { passive: true })
+    checkStages()
+  }
+
+  $('again').addEventListener('click', () => location.reload())
+</script>
+
+<style is:global>
+  .speed-body { background: #05060f; color: #eaf0ff; }
+  .speed-body .game { position: relative; }
+
+  .sp-bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(70vmax 70vmax at 20% -10%, rgba(110, 231, 255, 0.08), transparent 70%),
+      radial-gradient(70vmax 70vmax at 85% 105%, rgba(143, 123, 255, 0.09), transparent 70%);
+  }
+  .speed-body .game > * { position: relative; z-index: 1; }
+  .speed-body .game > .sp-hud { position: sticky; z-index: 5; }
+
+  /* ---- the live HUD ------------------------------------------------------ */
+  .sp-hud {
+    position: sticky; top: 58px; z-index: 5;
+    max-width: 420px; margin: 4vh auto 0; padding: 16px 22px;
+    text-align: center; border-radius: 18px;
+    background: rgba(10, 12, 28, 0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(110, 231, 255, 0.18);
+    box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.7), 0 0 40px -20px rgba(110, 231, 255, 0.3);
+  }
+  .sp-hud-time {
+    margin: 0; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: #6ee7ff; letter-spacing: 0.02em;
+  }
+  .sp-hud-label { margin: 6px 0 4px; font-size: 11.5px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.08em; }
+  .sp-hud-dist {
+    margin: 0; font-size: clamp(26px, 5vw, 36px); font-weight: 800; font-variant-numeric: tabular-nums;
+    background: linear-gradient(165deg, #fff, #8f7bff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    letter-spacing: -0.01em;
+  }
+
+  .sp-head { max-width: 640px; margin: 7vh auto 0; padding: 0 22px; text-align: center; }
+  .sp-eyebrow { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #8f7bff; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
+  .sp-head h1 { font-size: clamp(32px, 6.4vw, 50px); margin: 0 0 14px; letter-spacing: -0.03em; }
+  .sp-head p { font-size: 16.5px; line-height: 1.65; opacity: 0.8; max-width: 54ch; margin: 0 auto; }
+
+  .sp-body-content { max-width: 620px; margin: 0 auto; padding: 0 22px; }
+  .sp-stage { padding: 9vh 0; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .sp-stage:first-of-type { border-top: 0; }
+  .sp-kicker { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.5; margin: 0 0 8px; }
+  .sp-stage h2 { font-size: clamp(21px, 3.6vw, 28px); margin: 0 0 12px; letter-spacing: -0.02em; }
+  .sp-stage > p:not(.sp-fact):not(.sp-source) { font-size: 15.5px; line-height: 1.65; opacity: 0.82; margin: 0 0 16px; }
+  .sp-stage em { color: #6ee7ff; font-style: normal; }
+
+  .sp-art {
+    border-radius: 16px; overflow: hidden; margin: 0 0 22px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 50px -26px rgba(0, 0, 0, 0.7);
+  }
+  .sp-art svg { display: block; width: 100%; height: auto; }
+  .sp-art-big { max-width: 460px; margin-inline: auto; margin-bottom: 22px; }
+
+  .sp-spin { animation: sp-rotate 26s linear infinite; }
+  .sp-orbit-dot { animation: sp-rotate 14s linear infinite; }
+  .sp-orbit-dot-slow { animation: sp-rotate 22s linear infinite; }
+  @keyframes sp-rotate { to { transform: rotate(360deg); } }
+
+  .sp-geo {
+    appearance: none; border: 1px solid rgba(110, 231, 255, 0.3); background: rgba(110, 231, 255, 0.08);
+    color: #6ee7ff; padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    cursor: pointer; margin-bottom: 14px;
+  }
+  .sp-geo:hover { background: rgba(110, 231, 255, 0.16); }
+  .sp-geo:disabled { opacity: 0.7; cursor: default; }
+
+  .sp-fact {
+    font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: #ffd27a; margin: 0 0 8px;
+  }
+  .sp-source { font-size: 12.5px; opacity: 0.55; line-height: 1.55; margin: 0; }
+
+  .sp-finale h2 { color: #ff9d6e; }
+  .sp-closer {
+    font-size: 16px; line-height: 1.7; opacity: 0.9; margin-top: 26px;
+    padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .sp-outro { padding: 6vh 0 14vh; }
+  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 24px; }
+  .acts button {
+    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  .acts button:first-child { background: linear-gradient(165deg, #8fe3ff, #6ee7ff); color: #06202b; border: 0; }
+  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
+  .acts a:hover { opacity: 1; }
+
+  .how { text-align: left; font-size: 14px; opacity: 0.8; }
+  .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; text-align: center; }
+  .how p { line-height: 1.6; margin: 10px 0; }
+  .how a { color: #6ee7ff; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sp-spin, .sp-orbit-dot, .sp-orbit-dot-slow { animation: none; }
+  }
+  @media (max-width: 560px) {
+    .sp-hud { top: 48px; padding: 12px 16px; }
+  }
+</style>

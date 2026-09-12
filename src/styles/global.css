@@ -220,6 +220,7 @@ body.is-fixed {
 .cascade-body { --sb-a: #2f8a55; --sb-b: #0f3d2e; --sb-solid: #24784a; }
 .dp-body      { --sb-a: #ffb020; --sb-b: #ffd98a; --sb-solid: #f0a83a; }
 .day-body     { --sb-a: #7ec8ff; --sb-b: #ffd27a; --sb-solid: #8fc4e8; }
+.speed-body   { --sb-a: #6ee7ff; --sb-b: #8f7bff; --sb-solid: #7fb8e8; }
 
 
 /* ---------------------------------------------------------------------------

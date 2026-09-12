@@ -1509,9 +1509,46 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     entirely between two scroll events on a fast flick without ever firing
     at all.
 
-25. Then reassess against the depth work in Phases 1–2 above.
+25. ~~**How Fast Are You Moving?**~~ — **done.** A fifth pick from neal.fun's
+    own catalogue: seven real, cited speeds — tectonic drift, Earth's own
+    rotation, its orbit around the Sun, the Sun's drift toward Vega, the
+    galaxy's own orbit, the Milky Way's fall toward Andromeda, and the Local
+    Group's measured motion against the cosmic microwave background — stack
+    live as you scroll, each one nested inside the last. The rotation stage is
+    the one genuinely personal number on the page: it recomputes from the
+    visitor's real latitude via `navigator.geolocation`, with a graceful
+    40°N default when permission is denied or unavailable. The finale doesn't
+    reach for the real neal.fun page's "Multiverse Theory" joke ending —
+    instead it computes, from two real published Hubble constants (Planck's
+    67.4 and SH0ES's 73.0 km/s/Mpc, the actual live Hubble tension), that the
+    observable universe's edge recedes several times faster than light, a
+    real and unresolved consequence of metric expansion rather than a
+    relativity violation.
 
-**Where that leaves it.** Seven new games, seven checkers. The pattern that
+    `src/lib/speed-model.ts` states plainly that the seven speeds are summed
+    as plain magnitudes, not composed as true 3D vectors — a disclosed
+    simplification a true instantaneous vector sum would need live ephemeris
+    data to do properly. `scripts/check-speed-model.mjs` checks the rotation
+    formula against Earth's real equatorial radius and sidereal day at both
+    poles and the equator, confirms every one of the eight cited constants
+    falls inside its real published range (including that SH0ES's constant is
+    genuinely higher than Planck's — the tension itself, not a typo), and
+    confirms both Hubble constants put the horizon several times past light
+    speed.
+
+    Reused the same scroll-driven section-pacing pattern proven out in
+    *Where Does The Day Go?*, and in doing so caught a latent bug the same
+    pattern had already shipped there: a `let`-declared share-card variable
+    referenced by a function defined before its own declaration threw
+    `ReferenceError: Cannot access '...' before initialization` whenever the
+    page loaded already scrolled (a browser back/forward, or a reload that
+    restores scroll position) — real, common browser behaviour, not an edge
+    case. Fixed in both files by moving the declaration ahead of the code
+    that could call it.
+
+26. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Eight new games, eight checkers. The pattern that
 worked every time: build the model as pure functions over plain data, run
 it headlessly against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
@@ -1523,8 +1560,10 @@ table whose "dodged"/"fell for it" colour rule targeted a table cell that
 could never be first-child and so never matched anything it drew, a day-bar
 model that let the day grow past 24 hours whenever a carved-out slice didn't
 fit the block it came from, a section-activation observer tuned narrowly
-enough that a short section could cross it unfired on a fast scroll — was
-found by running the thing and reading the output, not by re-reading the code.
+enough that a short section could cross it unfired on a fast scroll, a
+temporal-dead-zone reference thrown only when a page loaded already
+scrolled — was found by running the thing and reading the output, not by
+re-reading the code.
 
 Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade
 12 → 30 rules, Trolley 12 → 26 dilemmas, Powder 12 → 30 elements with a

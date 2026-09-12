@@ -225,7 +225,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty-three games
+## The twenty-four games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -361,6 +361,24 @@ rules: flat palette, no gradients, no ids — checked the same way.
 (coverage, palette, structure at 64px, distinctness, mood) plus a data-integrity
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
+
+**How Fast Are You Moving?** — seven real, cited speeds stack live while you
+scroll: your tectonic plate drifting, the Earth turning beneath you (computed
+from your real latitude via `navigator.geolocation`, with a graceful 40°N
+default), its orbit around the Sun, the Sun's own drift toward Vega, its orbit
+around the galaxy, the Milky Way falling toward Andromeda, and the Local
+Group's real, measured motion against the cosmic microwave background — out
+past which the observable universe itself recedes faster than light, a real,
+unresolved consequence of the Hubble tension rather than a joke ending.
+`src/lib/speed-model.ts` sources every constant (solar apex velocity, the
+Andromeda approach speed from a 2012 Hubble Space Telescope proper-motion
+study, the 627 km/s CMB dipole) and states plainly that the seven speeds are
+summed as plain magnitudes, not true 3D vectors — a disclosed simplification,
+not a hidden one. *`scripts/check-speed-model.mjs` checks Earth's rotation
+speed against its real equatorial radius and sidereal day at the poles and
+equator, confirms every cited constant falls inside its real published range,
+and confirms both the Planck and SH0ES Hubble constants put the observable
+universe's edge several times past the speed of light.*
 
 **Where Does The Day Go?** — a live instrument, not a runner over stages: three
 sliders (work, home, sleep) draw a tidy day-bar, and every slider after that —
