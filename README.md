@@ -1,6 +1,6 @@
 # funsite
 
-A neal.fun-style site: one lean homepage and eighteen self-contained
+A neal.fun-style site: one lean homepage and nineteen self-contained
 interactive pages, each rendered with its own WebGL shader or 2D canvas and
 shipping only the script that page actually needs.
 
@@ -93,7 +93,7 @@ src/
     TileArt.astro       places one drawing on a tile, per lib/tile-art.ts
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
-    tile-art.ts         eighteen bespoke tile drawings, one per game slug
+    tile-art.ts         nineteen bespoke tile drawings, one per game slug
     scale-things.ts     what Scale draws, how big it is, and the sky behind it
     scale-art.ts        twenty-six of those drawn, with both their real axes
     time-events.ts      Deep Time's forty-four events and when they happened
@@ -158,6 +158,7 @@ cost).
 | `/spend-it/` | 16.6 KB |
 | `/from-memory/` | 16.9 KB |
 | `/scale/` | 17.9 KB |
+| `/deep-sea/` | 21.1 KB |
 | `/overstimulated/` | 19.8 KB |
 | `/powder/` | 25.2 KB |
 | `/orbit/` | **142.6 KB** |
@@ -218,7 +219,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The eighteen games
+## The nineteen games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -332,6 +333,28 @@ first centres in view. *`check-time-art.mjs` walks every scene's own SVG back
 out and confirms the colour it computes is the one the page actually shows,
 and that colour is really in the drawing — not a plausible guess sitting
 next to it.*
+
+**The Deep Sea** — a linear scroll from the sunlit surface to Challenger Deep,
+10,935 real metres down, through the five standard oceanographic zones rather
+than five invented ones. Every one of the twenty-two markers along the way is a
+real, cited depth: Ahmed Gabr's scuba record at 332m, the Titanic at 3,810m,
+the Mariana Trench's own deepest fish (a snailfish filmed in 2022, beating the
+2017 record by little more than a hundred metres), James Cameron's 2012 solo
+dive, and the surveyed 10,935m floor of Challenger Deep itself. Zone density
+falls with depth on purpose — the sunlight zone gets a thousand pixels for two
+hundred metres because that is where almost everything anyone has ever
+personally seen alive actually lives, and the trenches get the most total
+height of any zone despite being the emptiest, because they hold the back half
+of the real story. A single depth-driven shader carries the water column from
+bright surface cyan through a twilight blue-black to hadal black, with god rays
+that fade out exactly where the sunlight zone ends and bioluminescent sparks
+that only begin once the water is dark enough for them to be the only light
+left. Twenty-two hand-drawn scenes, one per marker, follow Deep Time's own
+rules: flat palette, no gradients, no ids — checked the same way.
+*`scripts/check-deep-sea-art.mjs` is `check-time-art.mjs`'s whole battery
+(coverage, palette, structure at 64px, distinctness, mood) plus a data-integrity
+pass of its own: markers stay sorted by real depth, zones stay contiguous, and
+every marker actually lands inside the zone it claims to.*
 
 **Scale** — a continuous logarithmic zoom from a proton to the observable
 universe. Scroll position sets how wide the screen is in metres; objects are
@@ -564,10 +587,10 @@ is the one thing here with no formula to check against. It rasterises every
 tile with resvg exactly as the page composites it — same gradient, same
 vignette, same slot geometry, same left-hand fade — and then measures the
 result: is the drawing visible at all, does white text still clear WCAG on the
-background *under its own letters*, and are the eighteen drawings actually
+background *under its own letters*, and are the nineteen drawings actually
 different from each other. It renders the title and blurb too, so contrast is
 judged where the type lands rather than over a rectangle that is mostly empty.
-Run it with `--sheet out.png` to get a contact sheet of all eighteen tiles
+Run it with `--sheet out.png` to get a contact sheet of all nineteen tiles
 from the same compositor.
 
 `check-icons.mjs` does the same job for the sixty-five drawn icons inside the
@@ -603,11 +626,11 @@ written down here rather than in a commit message.
 no measurement covers, which is whether it looks like the thing.
 
 `check-time-art.mjs` covers Deep Time's forty-four scenes. Two things make it
-different from the other two. Its drawings have **no ids, no defs and no
-gradients at all** — the other modules prefix ids to keep forty-four, twenty-six
-and eighteen drawings from colliding in one document, and having none is a
-guarantee rather than a convention — and every colour must come from one
-twenty-one-entry palette, which the file enforces rather than asks for.
+different from the tile and Scale checkers. Its drawings have **no ids, no defs
+and no gradients at all** — the other modules prefix ids to keep forty-four,
+twenty-six and nineteen drawings from colliding in one document, and having
+none is a guarantee rather than a convention — and every colour must come from
+one twenty-one-entry palette, which the file enforces rather than asks for.
 
 It also covers `MOOD`, the colour each scene's own card is lit by. Two
 things could make that claim quietly stop being true: a computed colour that
@@ -619,6 +642,16 @@ timeline that is not muscle, water or wind and should not be lit like a barn
 checked directly: every `MOOD` value has to be found inside its own scene's
 markup, and re-deriving the whole set from nothing has to agree with what
 the module exports everywhere except that one documented exception.
+
+`check-deep-sea-art.mjs` covers the Deep Sea's twenty-two, and follows
+`check-time-art.mjs`'s own rules rather than the tile checker's — no ids, no
+defs, no gradients, one thirty-one-colour palette, the same `MOOD` treatment,
+with no hand-written exception this time. It carries one battery
+`check-time-art.mjs` has no reason to: a data-integrity pass over
+`data/deep-sea.ts` itself, since every marker's depth is a real, citable fact
+rather than a chosen waypoint — it checks the markers stay sorted by real
+depth, that the five zones are contiguous with no gap or overlap between them,
+and that every marker actually falls inside the zone it claims to be in.
 
 `check-trolley-scene.mjs` is the fourth, and the only one that checks a
 picture against a *claim*. Trolley's scene is the one place the player learns

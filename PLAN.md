@@ -1318,15 +1318,57 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     a fixed near-white stand-in is an honest approximation rather than a
     guess).
 
-21. Then reassess against the depth work in Phases 1–2 above.
+21. ~~**The Deep Sea**~~ — **done.** A new game, picked from neal.fun's own
+    catalogue rather than a rebuild of something already on the site: "The
+    Deep Sea" is flagged in `docs/neal-fun-research.md` as the largest of
+    neal's deep-scroll pages and the format's own signature example, and
+    nothing here had done it yet. A linear scroll from the sunlit surface to
+    Challenger Deep, 10,935 real metres down, through the five standard
+    oceanographic zones. Every one of the twenty-two markers is a real, cited
+    depth — Ahmed Gabr's scuba record, the Titanic's surveyed wreck, the
+    Mariana Trench's own deepest-fish record (broken in 2022, and said so),
+    James Cameron's 2012 solo dive, Challenger Deep's own 2021-surveyed
+    floor — not an invented waypoint. Zone density falls with depth on
+    purpose: the sunlight zone is generous because that is where almost
+    everything anyone has ever personally seen alive lives, and the trenches
+    get the most total height of any zone despite being the emptiest,
+    because they hold the back half of the real story.
 
-**Where that leaves it.** Three new games, three checkers. The pattern that
-worked all three times: build the model as pure functions over plain data, run
+    Built on the same architecture as Deep Time and Scale — a scroll-linked
+    HUD, a zoned scale with the seams shown rather than hidden, cards lit by
+    `MOOD`, a colour computed from each scene's own drawing — because that
+    architecture already existed and reinventing it would have been the
+    thing the plan's own diagnosis warns against. The one new piece is the
+    background itself: a single depth-driven shader carries the water
+    column from bright surface cyan through a twilight blue-black to hadal
+    black, with god rays fading out exactly where the sunlight zone ends and
+    bioluminescent sparks that only begin once the water is dark enough for
+    them to be the only light left.
+
+    `scripts/check-deep-sea-art.mjs` is `check-time-art.mjs`'s whole battery
+    reused (coverage, no shared ids, one palette, structure at 64px,
+    distinctness, mood) plus a data-integrity pass of its own: markers stay
+    sorted by real depth, the five zones stay contiguous, and every marker
+    actually lands inside the zone it claims to. It caught two real problems
+    before either shipped: the first draft of several scenes read as a flat
+    backdrop with a small mark on it once actually rasterised at card size,
+    and the tile illustration's first slot choice (`edge-right`, matching
+    Deep Time's own) turned out to have the same ink footprint as Deep
+    Time's — full-height opaque bands — regardless of what colour either one
+    used, which is exactly the shared-template problem the checker exists to
+    catch.
+
+22. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Four new games, four checkers. The pattern that
+worked every time: build the model as pure functions over plain data, run
 it headlessly against answers somebody else already knows, and let the page be a
-thin layer on top. Every serious bug in all three — the entry model, the
+thin layer on top. Every serious bug across them — the entry model, the
 Mach-stem approximation, the crater-depth unit, the dodging checkbox, the
-premium inverse, the one rival winning 70% of the room — was found by running
-the thing and reading the output, not by re-reading the code.
+premium inverse, the one rival winning 70% of the room, a scene that rasterised
+as a flat backdrop, a tile drawing with the same ink footprint as an existing
+one — was found by running the thing and reading the output, not by re-reading
+the code.
 
 Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade
 12 → 30 rules, Trolley 12 → 26 dilemmas, Powder 12 → 30 elements with a

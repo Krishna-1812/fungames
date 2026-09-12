@@ -892,6 +892,47 @@ export const ART: Record<string, Illustration> = {
       <rect x="40" y="45" width="9" height="9" fill="url(#life-in-weeks-cell)" opacity="0.4"/>
       <circle cx="44.5" cy="49.5" r="7" fill="none" stroke="#ff6b6b" stroke-width="2.6"/>`,
   },
+
+  /* ---- The Deep Sea ------------------------------------------------------ */
+  'deep-sea': {
+    // edge-right was already at its cap of three (Deep Time, Life in Weeks,
+    // and one more) before this drawing existed, and check-art's "no shared
+    // template" pass counts slots across the whole registry, not per game —
+    // corner-tr had the most room left.
+    subject: 'a shaft of sunlight narrowing into the dark, one small light still descending under it',
+    slot: 'corner-tr',
+    viewBox: '0 0 90 120',
+    palette: ['#bdeaf5', '#3fa7c9', '#155073', '#7ff2d6', '#69c8ff', '#1c2026', '#8a94a0', '#ffe27a'],
+    draw: (seed) => {
+      const sparks = range(6)
+        .map((i) => {
+          const x = 6 + rnd(seed, i + 4) * 78
+          const y = 82 + rnd(seed, i + 40) * 36
+          const c = i % 2 ? '#69c8ff' : '#7ff2d6'
+          return (
+            `<circle cx="${n(x)}" cy="${n(y)}" r="3.8" fill="${c}" opacity="0.32"/>` +
+            `<circle cx="${n(x)}" cy="${n(y)}" r="1.6" fill="${c}" opacity="1"/>`
+          )
+        })
+        .join('')
+      return `
+        <defs>
+          <linearGradient id="deep-sea-shaft" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#bdeaf5"/>
+            <stop offset="45%" stop-color="#3fa7c9"/>
+            <stop offset="100%" stop-color="#155073"/>
+          </linearGradient>
+        </defs>
+        <path d="M0 0 L90 0 L74 72 Q45 88 16 72 Z" fill="url(#deep-sea-shaft)"/>
+        <path d="M10 4 L28 4 L23 58 Q16 68 9 58Z" fill="#bdeaf5" opacity="0.35"/>
+        <path d="M58 4 L78 4 L69 62 Q62 72 55 62Z" fill="#bdeaf5" opacity="0.26"/>
+        <line x1="45" y1="72" x2="45" y2="92" stroke="#8a94a0" stroke-width="1.6" opacity="0.65"/>
+        <circle cx="45" cy="98" r="7" fill="#1c2026"/>
+        <circle cx="45" cy="95.6" r="2.6" fill="#ffe27a" opacity="1"/>
+        <circle cx="45" cy="95.6" r="5.2" fill="#ffe27a" opacity="0.32"/>
+        ${sparks}`
+    },
+  },
 }
 
 /* ---- how each slot is cropped ------------------------------------------- */
