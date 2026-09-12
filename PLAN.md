@@ -1419,16 +1419,61 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     right hand-drawn blob" heuristic, and one a hand-drawn backdrop could
     never have earned.
 
-23. Then reassess against the depth work in Phases 1–2 above.
+    **The Deep Sea got a second, unprompted pass later in the same session
+    the lesson above was learned in** — proof the lesson actually stuck
+    rather than applying only to the page that taught it. The water shader
+    gained shallow-water caustics, a rising bubble trail near the surface,
+    and a depth-driven pressure vignette. All twenty-two creature scenes were
+    redrawn with real cel-shaded volume instead of flat single-tone shapes;
+    the giant and colossal squids' tentacles, which had rendered as a flat
+    fence of parallel lines since the game shipped, became real trailing,
+    varied arms, and the vampire squid's "cape" became an actual flared,
+    webbed silhouette instead of a plain blob. Card lighting was fixed to
+    exclude ground and sediment tones (sand, nodule, vent rock) from the
+    mood-colour calculation, so a card is lit by the creature standing on the
+    floor rather than by the floor itself — several cards that had all glowed
+    the same brown now read distinctly. The fixed HUD gained a soft top scrim
+    so a card scrolling underneath it fades out rather than being hard-clipped
+    by an opaque bar. `check-deep-sea-art.mjs` and the full suite still pass.
 
-**Where that leaves it.** Five new games, five checkers. The pattern that
+23. ~~**Dark Patterns**~~ — **done.** A third pick from neal.fun's own
+    catalogue, and a different genre from anything else here: eleven
+    documented manipulative UI patterns, each rebuilt as a small, convincing
+    fake website — its own invented domain, its own colours, its own reason
+    to exist — rather than described in a bullet list. Every one cites the
+    real taxonomy it comes from in `src/lib/dark-patterns.ts`: Harry
+    Brignull's original 2010 list (he coined "dark pattern" cataloguing
+    exactly these), the Princeton/CHI 2019 study that scraped eleven thousand
+    shopping sites for them, or the FTC's 2022 report to Congress. Nothing is
+    a puzzle with a hidden trick answer — every pattern can be beaten the
+    first time by noticing the same two things every time: which option is
+    loud and which is quiet, and what a sentence actually says once read
+    twice — which is also how the real ones work. A light scoring layer
+    (`dodged` vs `fell for it`, tallied into a report card and a share card)
+    is this site's own addition, not neal's; the original is a static list of
+    examples with nothing to measure.
+
+    `scripts/check-dark-patterns.mjs` checks the data file (real citations
+    against an allow-list of the three actual taxonomies, no two patterns
+    sharing a written sentence) and, more importantly, cross-checks it
+    against the page itself: every pattern's `id` must have a real, working
+    `id(host, api) { … }` mount function in `dark-patterns.astro`, and the
+    page may not mount an id the data file never introduced — the same
+    "nothing is orphaned in either direction" shape `check-deep-sea-art.mjs`
+    uses for markers and scenes.
+
+24. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Six new games, six checkers. The pattern that
 worked every time: build the model as pure functions over plain data, run
 it headlessly against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
 Mach-stem approximation, the crater-depth unit, the dodging checkbox, the
 premium inverse, the one rival winning 70% of the room, a scene that rasterised
 as a flat backdrop, a tile drawing with the same ink footprint as an existing
-one, a live-simulation stylesheet rule that silently never applied — was found
+one, a live-simulation stylesheet rule that silently never applied, a report
+table whose "dodged"/"fell for it" colour rule targeted a table cell that
+could never be first-child and so never matched anything it drew — was found
 by running the thing and reading the output, not by re-reading the code.
 
 Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade

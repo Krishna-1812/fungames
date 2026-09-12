@@ -1,0 +1,827 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { PATTERNS } from '../lib/dark-patterns'
+import { withBase } from '../lib/base'
+
+/**
+ * Dark Patterns — eleven manipulative UI tricks, reproduced as working fake
+ * websites rather than described in a bullet list.
+ *
+ * Every one of these is a documented pattern, not an invented vibe — see
+ * src/lib/dark-patterns.ts for the citation attached to each — and every
+ * fake site is its own small, convincing lie: its own name, its own colours,
+ * its own reason to exist, so this reads as eleven places rather than one
+ * template with the copy swapped. The one thing they all share on purpose is
+ * the visual grammar: the trick is always the loud, warm button; the honest
+ * way through is always the small, quiet one. That contrast is the actual
+ * lesson, and eleven repetitions of it are what make it recognisable
+ * afterwards, on a real site, without this page open next to it.
+ *
+ * Nothing here is graded on cleverness. `resolve('dodged' | 'fell', note)` is
+ * the whole verdict, and it is never hidden behind a puzzle — every pattern
+ * can be beaten the first time by anyone who happens to look closely, the
+ * same way the real ones can.
+ */
+---
+
+<GameLayout slug="dark-patterns" bar="#1a1206" bodyClass="dp-body">
+  <div class="intro" id="intro">
+    <h1>Dark Patterns</h1>
+    <p>
+      Eleven interfaces, each built to get something out of you that a plain
+      ask would not. Every one is real — catalogued by the researchers who
+      study this for a living — and every one is rebuilt here as a working
+      fake site rather than a screenshot. Look closely. Some of them are
+      genuinely hard to beat.
+    </p>
+    <button type="button" class="dp-begin" id="begin">Open the first one</button>
+  </div>
+
+  <section class="stage" id="stage" hidden>
+    <div class="dp-hud">
+      <p class="dp-stepline" id="stepline">Pattern 1 of {PATTERNS.length}</p>
+      <div class="dp-rail"><i id="bar"></i></div>
+    </div>
+
+    <div class="frame">
+      <div class="framebar">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="url" id="url">example.com</span>
+      </div>
+      <div class="frametop">
+        <p class="ptitle" id="ptitle">Pattern</p>
+        <p class="lede" id="lede">Setup line.</p>
+      </div>
+      <div class="slot" id="slot"></div>
+    </div>
+
+    <div class="reveal" id="reveal" hidden>
+      <p class="outcome" id="outcome">You spotted it.</p>
+      <p class="revealtext" id="revealtext"></p>
+      <p class="citation" id="citation"></p>
+      <button type="button" class="dp-begin" id="next">Next pattern</button>
+    </div>
+  </section>
+
+  <section class="verdict" id="verdict" hidden>
+    <p class="stamp" id="stamp">6 of 11</p>
+    <p class="score"><span id="scoreline">You dodged 6 of 11.</span></p>
+    <p class="detail" id="detail"></p>
+
+    <table class="card">
+      <caption>Every pattern, and which way you went</caption>
+      <thead>
+        <tr><th scope="col">Pattern</th><th scope="col">You</th><th scope="col">Catalogued as</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div class="acts">
+      <button type="button" data-share data-title="Dark Patterns">Share this</button>
+      <button type="button" id="again">Run it again</button>
+      <a href={withBase('/')}>try something else →</a>
+    </div>
+
+    <details class="how">
+      <summary>How this actually works</summary>
+      <p>
+        Nothing here is randomised against you and nothing is a puzzle with a
+        trick answer — every pattern can be beaten the first time by looking
+        closely at the same two things every time: which option is loud and
+        which one is quiet, and what a sentence actually says once you read
+        it twice. That is also exactly how the real ones work.
+      </p>
+      <p>
+        The name under "Catalogued as" is not this site's invention. Most of
+        these come from Harry Brignull's original 2010 list — he coined the
+        term "dark pattern" cataloguing exactly these — and the newer ones
+        from a 2019 Princeton/CHI study that scraped eleven thousand shopping
+        sites looking for them, or the FTC's 2022 report to Congress on the
+        same subject.
+      </p>
+      <p>Related: <a href={withBase('/not-a-robot/')}>I'm Not a Robot</a> is the other page here built out of real interface conventions rather than a metaphor for them.</p>
+    </details>
+  </section>
+</GameLayout>
+
+<script type="application/json" id="game-data" set:html={JSON.stringify(PATTERNS)} />
+
+<script>
+  import { burst, shake, prefersReducedMotion } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
+
+  type Pattern = { id: string; title: string; site: string; real: string; lede: string; reveal: string }
+  const PATTERNS = JSON.parse(document.getElementById('game-data')!.textContent!) as Pattern[]
+
+  const $ = (id: string) => document.getElementById(id)!
+  const intro = $('intro'), stage = $('stage')
+  const stepline = $('stepline'), bar = $('bar')
+  const url = $('url'), ptitle = $('ptitle'), lede = $('lede'), slot = $('slot')
+  const revealBox = $('reveal'), outcomeEl = $('outcome'), revealText = $('revealtext'), citation = $('citation')
+  const nextBtn = $('next') as HTMLButtonElement
+
+  type Outcome = 'dodged' | 'fell'
+  type Api = { resolve: (outcome: Outcome, note: string) => void }
+  type Mount = (host: HTMLElement, api: Api) => void
+
+  type Result = { id: string; title: string; real: string; outcome: Outcome; note: string }
+  const results: Result[] = []
+
+  /* ---------------------------------------------------------------------- */
+  /* Small shared building blocks every mount() below reaches for            */
+  /* ---------------------------------------------------------------------- */
+
+  /** A short-lived toast — used only by the social-proof pattern, which is
+   *  the one place a notification is supposed to feel like it is piling up. */
+  function toast(host: HTMLElement, text: string) {
+    const layer = host.querySelector('.toasts')
+    if (!layer) return
+    const el = document.createElement('div')
+    el.className = 'toast'
+    el.textContent = text
+    layer.prepend(el)
+    setTimeout(() => el.remove(), 2400)
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* The eleven patterns                                                     */
+  /* ---------------------------------------------------------------------- */
+
+  const MOUNTS: Record<string, Mount> = {
+    basket(host, api) {
+      host.innerHTML = `
+        <div class="store">
+          <h3>Fenwick &amp; Oates</h3>
+          <div class="products">
+            <div class="product"><span>Wool Scarf</span><b>$28</b>
+              <button type="button" class="dp-trap buy" data-item="Wool Scarf">Add to Basket</button></div>
+            <div class="product"><span>Reading Lamp</span><b>$44</b>
+              <button type="button" class="dp-trap buy" data-item="Reading Lamp">Add to Basket</button></div>
+            <div class="product"><span>Ceramic Mug</span><b>$14</b>
+              <button type="button" class="dp-trap buy" data-item="Ceramic Mug">Add to Basket</button></div>
+          </div>
+        </div>`
+      host.querySelectorAll<HTMLButtonElement>('.buy').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          sfx.tick()
+          const item = btn.dataset.item
+          host.innerHTML = `
+            <div class="cart">
+              <h3>Your Basket</h3>
+              <label class="line"><input type="checkbox" checked disabled> ${item} — $${btn.parentElement?.querySelector('b')?.textContent?.slice(1) ?? ''}</label>
+              <label class="line sneaky"><input type="checkbox" checked class="extra"> Extended Protection Plan — $4.99</label>
+              <label class="line sneaky"><input type="checkbox" checked class="extra"> Fenwick Rewards Membership — $2.99</label>
+              <button type="button" class="dp-trap" id="checkout">Complete Purchase</button>
+            </div>`
+          host.querySelector('#checkout')!.addEventListener('click', () => {
+            sfx.click()
+            const extras = host.querySelectorAll<HTMLInputElement>('.extra:checked').length
+            if (extras === 0) api.resolve('dodged', 'You unchecked both extras before paying for anything you never chose.')
+            else api.resolve('fell', `You paid for ${extras} thing${extras > 1 ? 's' : ''} that rode along with your actual order.`)
+          })
+        }),
+      )
+    },
+
+    confirmshame(host, api) {
+      host.innerHTML = `
+        <div class="modal">
+          <p class="modal-q">Join the Fenwick Circle for 15% off your next order?</p>
+          <div class="modal-acts">
+            <button type="button" class="dp-trap" id="yes">Yes, sign me up</button>
+            <button type="button" class="dp-honest" id="no">No thanks, I like paying full price</button>
+          </div>
+        </div>`
+      host.querySelector('#yes')!.addEventListener('click', () => {
+        sfx.bad()
+        api.resolve('fell', 'You signed up rather than click a sentence written to make declining feel foolish.')
+      })
+      host.querySelector('#no')!.addEventListener('click', () => {
+        sfx.good()
+        api.resolve('dodged', 'You clicked past the guilt trip without it changing your answer.')
+      })
+    },
+
+    roach(host, api) {
+      const step0 = () => {
+        host.innerHTML = `
+          <div class="panel">
+            <p>Chorus+ — Manage your plan</p>
+            <button type="button" class="dp-trap" id="cancel">Cancel Subscription</button>
+          </div>`
+        host.querySelector('#cancel')!.addEventListener('click', () => { sfx.click(); step1() })
+      }
+      const step1 = () => {
+        shake(host, 4, 180)
+        host.innerHTML = `
+          <div class="panel stall">
+            <p>Wait — before you go, here's 50% off for the next 3 months.</p>
+            <div class="modal-acts">
+              <button type="button" class="dp-trap" id="keep">Keep My Discount</button>
+              <button type="button" class="dp-honest" id="go">No, cancel anyway</button>
+            </div>
+          </div>`
+        host.querySelector('#keep')!.addEventListener('click', () => {
+          sfx.bad(); api.resolve('fell', 'The first retention offer was enough to keep the subscription running.')
+        })
+        host.querySelector('#go')!.addEventListener('click', () => { sfx.tick(); step2() })
+      }
+      const step2 = () => {
+        shake(host, 4, 180)
+        host.innerHTML = `
+          <div class="panel stall">
+            <p>You will lose offline downloads, 4K streaming, and a watchlist of 214 titles.</p>
+            <div class="modal-acts">
+              <button type="button" class="dp-trap" id="stay">Stay Subscribed</button>
+              <button type="button" class="dp-honest" id="go2">Continue cancelling</button>
+            </div>
+          </div>`
+        host.querySelector('#stay')!.addEventListener('click', () => {
+          sfx.bad(); api.resolve('fell', 'The list of what you would lose was the second wall, and it worked.')
+        })
+        host.querySelector('#go2')!.addEventListener('click', () => { sfx.tick(); step3() })
+      }
+      const step3 = () => {
+        shake(host, 4, 180)
+        host.innerHTML = `
+          <div class="panel stall">
+            <p>Final step: call 1-800-555-0199, Monday to Friday, 9am to 5pm, to complete cancellation.</p>
+            <div class="modal-acts">
+              <button type="button" class="dp-honest" id="fine">...that's the final step?</button>
+            </div>
+          </div>`
+        host.querySelector('#fine')!.addEventListener('click', () => {
+          sfx.good()
+          api.resolve('dodged', 'You made it through every wall, including the one that demands a phone call during business hours.')
+        })
+      }
+      step0()
+    },
+
+    urgency(host, api) {
+      let remaining = 12
+      let resets = 0
+      let timer = 0
+      host.innerHTML = `
+        <div class="deal">
+          <p>Sale ends in <b id="clock">00:12</b></p>
+          <button type="button" class="dp-trap" id="buy">Buy Now</button>
+          <button type="button" class="dp-honest" id="watch">Just watch the clock</button>
+          <p class="dp-note" id="note"></p>
+        </div>`
+      const clock = host.querySelector('#clock')!
+      const note = host.querySelector('#note')!
+      timer = window.setInterval(() => {
+        remaining--
+        if (remaining < 0) {
+          remaining = 12
+          resets++
+          clock.parentElement?.classList.add('flicker')
+          setTimeout(() => clock.parentElement?.classList.remove('flicker'), 220)
+        }
+        clock.textContent = `00:${String(remaining).padStart(2, '0')}`
+      }, 260)
+      host.querySelector('#buy')!.addEventListener('click', () => {
+        clearInterval(timer)
+        sfx.click()
+        if (resets > 0) api.resolve('dodged', `You waited long enough to see the clock reset ${resets} time${resets > 1 ? 's' : ''} before buying anything.`)
+        else api.resolve('fell', 'You bought before the clock ever finished a single lap — the exact window this pattern is built for.')
+      })
+      host.querySelector('#watch')!.addEventListener('click', () => {
+        if (resets > 0) {
+          clearInterval(timer)
+          sfx.good()
+          api.resolve('dodged', `You watched it reset ${resets} time${resets > 1 ? 's' : ''} instead of buying under the clock.`)
+        } else {
+          sfx.tick()
+          note.textContent = 'Keep watching…'
+        }
+      })
+    },
+
+    ads(host, api) {
+      const decoys = ['DirectDownload Pro', 'FastGet Installer', 'SafeFile Setup']
+      host.innerHTML = `
+        <div class="dl">
+          <p>Download PhotoTrim 4</p>
+          <div class="dlgrid">
+            ${decoys.map((d, i) => `<button type="button" class="dp-trap decoy" data-i="${i}">${d}<small>Advertisement</small></button>`).join('')}
+            <button type="button" class="dp-honest real" id="real">Download<small>PhotoTrim 4 — 2.1 MB</small></button>
+          </div>
+        </div>`
+      host.querySelectorAll<HTMLButtonElement>('.decoy').forEach((b) =>
+        b.addEventListener('click', () => {
+          sfx.bad()
+          api.resolve('fell', 'That button was an advertisement styled to match the download you actually came for.')
+        }),
+      )
+      host.querySelector('#real')!.addEventListener('click', () => {
+        sfx.good()
+        api.resolve('dodged', 'You found the real, plainest button on the page, sitting last and smallest.')
+      })
+    },
+
+    drip(host, api) {
+      let peeked = false
+      host.innerHTML = `
+        <div class="ticket">
+          <p>General Admission — Friday</p>
+          <p class="price">$45.00</p>
+          <button type="button" class="dp-trap" id="continue">Continue</button>
+        </div>`
+      host.querySelector('#continue')!.addEventListener('click', () => {
+        sfx.tick()
+        host.innerHTML = `
+          <div class="ticket review">
+            <p class="revtitle">Order Review</p>
+            <div class="line"><span>Ticket</span><b>$45.00</b></div>
+            <div class="line"><span>Service Fee</span><b>$9.50</b></div>
+            <div class="line"><span>Facility Fee</span><b>$6.00</b></div>
+            <div class="line"><span>Order Processing Fee</span><b>$3.25</b></div>
+            <div class="line total"><span>Total</span><b>$63.75</b></div>
+            <button type="button" class="dp-honest" id="peek">Wait, let me check that</button>
+            <button type="button" class="dp-trap" id="confirm">Confirm $63.75</button>
+          </div>`
+        host.querySelector('#peek')!.addEventListener('click', (e) => {
+          peeked = true
+          sfx.tick()
+          ;(e.currentTarget as HTMLButtonElement).textContent = "That's 42% more than the price you compared."
+        })
+        host.querySelector('#confirm')!.addEventListener('click', () => {
+          sfx.click()
+          if (peeked) api.resolve('dodged', 'You stopped to add up the fees before confirming anything.')
+          else api.resolve('fell', 'You confirmed a total 42% above the price you started with, without adding it up first.')
+        })
+      })
+    },
+
+    continuity(host, api) {
+      let expanded = false
+      host.innerHTML = `
+        <div class="signup">
+          <p>Start your free trial of Loomline Pro</p>
+          <input type="text" class="dp-field" placeholder="Card number" inputmode="numeric" autocomplete="off">
+          <button type="button" class="dp-honest fine" id="fine">+ after your trial ends…</button>
+          <label class="line"><input type="checkbox" checked disabled> I agree to the trial terms</label>
+          <button type="button" class="dp-trap" id="start">Start Free Trial</button>
+        </div>`
+      host.querySelector('#fine')!.addEventListener('click', (e) => {
+        expanded = true
+        sfx.tick()
+        ;(e.currentTarget as HTMLButtonElement).textContent = '$89.99/month, automatically, unless cancelled first.'
+      })
+      host.querySelector('#start')!.addEventListener('click', () => {
+        sfx.click()
+        if (expanded) api.resolve('dodged', 'You opened the fine print before handing over a card number.')
+        else api.resolve('fell', 'You started the trial without reading what it quietly turns into.')
+      })
+    },
+
+    trick(host, api) {
+      host.innerHTML = `
+        <div class="settings">
+          <p>Update your privacy settings, then save.</p>
+          <label class="line"><input type="checkbox" id="a" checked> Don't disable anonymous usage tracking</label>
+          <label class="line"><input type="checkbox" id="b"> Send me occasional product emails</label>
+          <button type="button" class="dp-trap" id="save">Save Settings</button>
+        </div>`
+      host.querySelector('#save')!.addEventListener('click', () => {
+        sfx.click()
+        const stillOn = (host.querySelector('#a') as HTMLInputElement).checked
+        if (!stillOn) api.resolve('dodged', 'Unchecking "don’t disable" is what actually disables it, and you worked that out.')
+        else api.resolve('fell', 'The box stayed checked — read literally, "don’t disable" checked means tracking stayed on.')
+      })
+    },
+
+    zuckering(host, api) {
+      host.innerHTML = `
+        <div class="privacy">
+          <button type="button" class="dp-trap big" id="shareall">Share Everything (Recommended)</button>
+          <p class="tiny"><button type="button" class="dp-honest" id="custom">Customise individual settings</button></p>
+        </div>`
+      host.querySelector('#shareall')!.addEventListener('click', () => { sfx.tick(); confirmA() })
+      host.querySelector('#custom')!.addEventListener('click', () => {
+        sfx.good()
+        api.resolve('dodged', 'You went straight past the big green button to the grey link that actually does what you want.')
+      })
+      function confirmA() {
+        host.innerHTML = `
+          <div class="privacy">
+            <p>Also share your contacts, so we can find your friends?</p>
+            <div class="modal-acts">
+              <button type="button" class="dp-trap" id="y1">Yes, share contacts</button>
+              <button type="button" class="dp-honest" id="n1">Ask me later</button>
+            </div>
+          </div>`
+        host.querySelector('#y1')!.addEventListener('click', () => { sfx.tick(); confirmB() })
+        host.querySelector('#n1')!.addEventListener('click', () => {
+          sfx.bad()
+          api.resolve('fell', 'You still ended up on "Share Everything" — declining one follow-up does not undo the button already pressed.')
+        })
+      }
+      function confirmB() {
+        host.innerHTML = `
+          <div class="privacy">
+            <p>Last thing — share your activity with advertising partners too?</p>
+            <div class="modal-acts">
+              <button type="button" class="dp-trap" id="y2">Yes, share activity</button>
+              <button type="button" class="dp-honest" id="n2">Ask me later</button>
+            </div>
+          </div>`
+        ;['y2', 'n2'].forEach((id) =>
+          host.querySelector('#' + id)!.addEventListener('click', () => {
+            sfx.bad()
+            api.resolve('fell', 'Every path out of "Share Everything" turned out to be another version of yes.')
+          }),
+        )
+      }
+    },
+
+    social(host, api) {
+      const names = ['Jordan in Austin', 'Casey in Denver', 'Morgan in Miami']
+      let count = 0
+      let iv = 0
+      host.innerHTML = `
+        <div class="product2">
+          <p>Weekender Duffel — $68</p>
+          <button type="button" class="dp-trap" id="buy">Buy Now — Almost Gone</button>
+          <button type="button" class="dp-honest" id="watch">Just watch the corner for a bit</button>
+          <div class="toasts"></div>
+        </div>`
+      const spawn = () => {
+        count++
+        toast(host, `${names[count % names.length]} just bought this — 2 minutes ago`)
+      }
+      host.querySelector('#watch')!.addEventListener('click', (e) => {
+        const btn = e.currentTarget as HTMLButtonElement
+        btn.disabled = true
+        btn.textContent = 'Watching…'
+        iv = window.setInterval(spawn, 650)
+        setTimeout(() => {
+          clearInterval(iv)
+          sfx.good()
+          api.resolve('dodged', `You watched ${count} of them cycle through the same three names and the same three cities, always "2 minutes ago".`)
+        }, 3200)
+      })
+      host.querySelector('#buy')!.addEventListener('click', () => {
+        clearInterval(iv)
+        sfx.bad()
+        api.resolve('fell', 'You bought under the pressure of activity that was never real.')
+      })
+    },
+
+    nagging(host, api) {
+      let asks = 0
+      const MAX = 3
+      const render = () => {
+        asks++
+        if (asks > MAX) {
+          host.innerHTML = `
+            <div class="nag">
+              <p>Enable notifications?</p>
+              <div class="modal-acts">
+                <button type="button" class="dp-trap" id="allow">Allow</button>
+                <button type="button" class="dp-honest" id="never">Never ask again</button>
+              </div>
+            </div>`
+          host.querySelector('#allow')!.addEventListener('click', () => {
+            sfx.bad()
+            api.resolve('fell', `You said no ${MAX} times, and said yes the moment it finally offered to stop asking.`)
+          })
+          host.querySelector('#never')!.addEventListener('click', () => {
+            sfx.good()
+            api.resolve('dodged', `You said no ${MAX + 1} times in a row rather than give in.`)
+          })
+          return
+        }
+        shake(host, 3, 150)
+        host.innerHTML = `
+          <div class="nag">
+            <p>Enable notifications?</p>
+            <div class="modal-acts">
+              <button type="button" class="dp-trap" id="allow">Allow</button>
+              <button type="button" class="dp-honest" id="not">Not now</button>
+            </div>
+          </div>`
+        host.querySelector('#allow')!.addEventListener('click', () => {
+          sfx.bad()
+          api.resolve('fell', `You gave in on ask number ${asks}.`)
+        })
+        host.querySelector('#not')!.addEventListener('click', () => { sfx.tick(); setTimeout(render, 480) })
+      }
+      render()
+    },
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Runner                                                                  */
+  /* ---------------------------------------------------------------------- */
+
+  let idx = 0
+
+  const api: Api = {
+    resolve(outcome, note) {
+      const p = PATTERNS[idx]
+      results.push({ id: p.id, title: p.title, real: p.real, outcome, note })
+      outcomeEl.textContent = outcome === 'dodged' ? 'You spotted it.' : 'You fell for it.'
+      outcomeEl.dataset.tone = outcome
+      revealText.textContent = p.reveal
+      citation.textContent = `Catalogued as: ${p.title} — ${p.real}`
+      revealBox.hidden = false
+      revealBox.classList.remove('in')
+      void (revealBox as HTMLElement).offsetWidth
+      revealBox.classList.add('in')
+      if (outcome === 'dodged') sfx.good()
+      revealBox.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' })
+    },
+  }
+
+  function show(i: number) {
+    if (i >= PATTERNS.length) return finish()
+    idx = i
+    const p = PATTERNS[i]
+    url.textContent = p.site
+    ptitle.textContent = p.title
+    lede.textContent = p.lede
+    stepline.textContent = `Pattern ${i + 1} of ${PATTERNS.length}`
+    bar.style.width = `${((i + 1) / PATTERNS.length) * 100}%`
+    revealBox.hidden = true
+    slot.innerHTML = ''
+    MOUNTS[p.id](slot, api)
+  }
+
+  nextBtn.addEventListener('click', () => { sfx.click(); show(idx + 1) })
+
+  $('begin').addEventListener('click', () => {
+    unlock()
+    sfx.click()
+    intro.hidden = true
+    stage.hidden = false
+    show(0)
+  })
+
+  /* ---------------------------------------------------------------------- */
+  /* Verdict                                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({
+    title: 'Dark Patterns',
+    text: `${c.headline}.`,
+  }))
+
+  function finish() {
+    const dodged = results.filter((r) => r.outcome === 'dodged').length
+    const fell = results.length - dodged
+
+    $('stamp').textContent = `${dodged} / ${results.length}`
+    $('stamp').dataset.tone = dodged === results.length ? 'good' : dodged === 0 ? 'bad' : 'mid'
+    $('scoreline').textContent = `You dodged ${dodged} of ${results.length}${fell ? `, and fell for ${fell}` : ''}.`
+    $('detail').textContent =
+      fell === 0
+        ? 'Every single one, and the real versions of these are built by people paid to make that hard.'
+        : `The ${fell} you fell for are exactly the ones worth re-reading — the mechanism is named right below.`
+    $('rows').innerHTML = results
+      .map(
+        (r) =>
+          `<tr class="${r.outcome === 'dodged' ? 'yes' : 'no'}">
+             <th scope="row">${r.title}</th>
+             <td>${r.outcome === 'dodged' ? 'Dodged' : 'Fell for it'}</td>
+             <td>${r.real}</td>
+           </tr>`,
+      )
+      .join('')
+
+    recordPlay('dark-patterns', { dodged, fell, total: results.length }, { dodged: 'high' })
+
+    shareCard = {
+      slug: 'dark-patterns',
+      siteName: SITE.name,
+      headline: `Dodged ${dodged} of ${results.length} dark patterns`,
+      sub: fell ? `Fell for ${fell} — see which ones.` : 'Every single one.',
+      stats: [
+        { label: 'Dodged', value: `${dodged}` },
+        { label: 'Fell for it', value: `${fell}` },
+        { label: 'Total', value: `${results.length}` },
+      ],
+    }
+
+    stage.hidden = true
+    $('verdict').hidden = false
+    sfx.great()
+    if (dodged === results.length)
+      for (let k = 0; k < 3; k++)
+        setTimeout(
+          () =>
+            burst(innerWidth * (0.3 + Math.random() * 0.4), innerHeight * 0.35, {
+              count: 16, colors: ['#ffb020', '#fff3d6', '#5cd6a0'], speed: 6, gravity: 0.2, life: 58, size: 5,
+            }),
+          k * 120,
+        )
+    $('verdict').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  $('again').addEventListener('click', () => location.reload())
+</script>
+
+<style is:global>
+  .dp-body {
+    background: #120b05;
+    color: #f3ead9;
+  }
+
+  .dp-body .game { padding-bottom: 14vh; }
+
+  /* ---- intro -------------------------------------------------------- */
+  .intro {
+    max-width: 640px;
+    margin: 12vh auto 8vh;
+    padding: 0 22px;
+    text-align: center;
+  }
+  .intro h1 { font-size: clamp(34px, 7vw, 56px); margin: 0 0 16px; letter-spacing: -0.03em; }
+  .intro p { font-size: 17px; line-height: 1.6; opacity: 0.82; margin: 0 auto 28px; max-width: 52ch; }
+
+  .dp-begin {
+    appearance: none; border: 0; cursor: pointer;
+    background: linear-gradient(165deg, #ffc94d, #f0a020);
+    color: #241505; font-weight: 700; font-size: 16px;
+    padding: 14px 26px; border-radius: 999px;
+    box-shadow: 0 10px 26px -10px rgba(255, 176, 32, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition: transform 180ms var(--ease-bounce, ease), box-shadow 180ms ease;
+  }
+  .dp-begin:hover { transform: translateY(-2px) scale(1.03); }
+  .dp-begin:active { transform: translateY(0) scale(0.98); }
+
+  /* ---- HUD ------------------------------------------------------------ */
+  .stage { max-width: 620px; margin: 6vh auto 0; padding: 0 20px 12vh; }
+  .dp-hud { text-align: center; margin-bottom: 18px; }
+  .dp-stepline { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.65; margin: 0 0 8px; }
+  .dp-rail { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+  .dp-rail i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb020, #ffe08a); transition: width 260ms ease; }
+
+  /* ---- the fake browser window ------------------------------------- */
+  .frame {
+    background: #1d140a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .framebar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; background: #150e06; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); }
+  .url {
+    flex: 1; text-align: center; font-size: 12.5px; opacity: 0.55;
+    font-family: var(--mono, monospace); letter-spacing: 0.01em;
+  }
+  .frametop { padding: 18px 20px 6px; }
+  .ptitle { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .lede { margin: 6px 0 0; opacity: 0.7; font-size: 14.5px; }
+  .slot { padding: 18px 20px 26px; min-height: 140px; }
+
+  /* ---- shared widget vocabulary --------------------------------------- */
+  .dp-trap, .dp-honest {
+    appearance: none; border: 0; cursor: pointer; font: inherit; text-align: center;
+  }
+  .dp-trap {
+    background: linear-gradient(165deg, #ffc94d, #f0a020);
+    color: #241505; font-weight: 700; font-size: 14.5px;
+    padding: 12px 18px; border-radius: 11px;
+    box-shadow: 0 8px 20px -8px rgba(255, 176, 32, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition: transform 150ms ease;
+  }
+  .dp-trap:hover { transform: translateY(-1px); }
+  .dp-honest {
+    background: none; color: #cabb9a; font-size: 12.5px; opacity: 0.75;
+    text-decoration: underline; text-underline-offset: 3px; padding: 6px;
+  }
+  .dp-honest:hover { opacity: 1; }
+  .dp-note { font-size: 12.5px; opacity: 0.55; min-height: 1.4em; margin: 10px 0 0; }
+
+  .modal-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; }
+  .line { display: flex; align-items: center; gap: 9px; font-size: 14px; margin: 12px 0; cursor: pointer; }
+  .line input { width: 16px; height: 16px; accent-color: #ffb020; }
+
+  /* Sneak into Basket */
+  .store h3, .cart h3 { margin: 0 0 12px; font-size: 15px; opacity: 0.6; font-weight: 600; }
+  .products { display: grid; gap: 10px; }
+  .product {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.04);
+  }
+  .product span { flex: 1; font-size: 14px; }
+  .product b { opacity: 0.6; font-size: 13px; }
+  .cart .line.sneaky { background: rgba(255, 176, 32, 0.08); padding: 8px 10px; border-radius: 8px; }
+
+  /* Confirmshaming / privacy / nag modals */
+  .modal-q, .privacy p, .nag p { font-size: 15.5px; margin: 0; }
+
+  /* Roach Motel */
+  .panel p { font-size: 15px; margin: 0 0 4px; }
+  .panel.stall { animation: dp-pop 260ms ease; }
+  @keyframes dp-pop { from { opacity: 0; transform: scale(0.96); } }
+
+  /* False Urgency */
+  .deal p { font-size: 15px; margin: 0 0 14px; }
+  .deal b { font-variant-numeric: tabular-nums; font-size: 20px; color: #ffb020; }
+  .deal.flicker, .deal p.flicker { animation: none; }
+  #clock.flicker, .flicker b { color: #ff5a5a; }
+  .deal .dp-trap, .deal .dp-honest { display: block; margin-top: 10px; }
+
+  /* Disguised Ads */
+  .dl p { font-size: 15px; margin: 0 0 14px; opacity: 0.75; }
+  .dlgrid { display: grid; gap: 10px; }
+  .dlgrid button { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .dlgrid small { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.55; font-weight: 500; }
+  .decoy:nth-of-type(1) { background: linear-gradient(165deg, #6fe0a0, #2f9e5c); color: #06210f; }
+  .decoy:nth-of-type(2) { background: linear-gradient(165deg, #7ec2ff, #2f7fd6); color: #061a30; }
+  .decoy:nth-of-type(3) { background: linear-gradient(165deg, #ff9a7e, #e0563a); color: #300c06; }
+  .real { background: rgba(255, 255, 255, 0.06); color: #cabb9a; box-shadow: none; border: 1px dashed rgba(255, 255, 255, 0.18); }
+
+  /* Drip Pricing */
+  .ticket p.price { font-size: 26px; font-weight: 700; margin: 0 0 16px; }
+  .ticket .revtitle { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.55; margin-bottom: 10px; }
+  .ticket .line { display: flex; justify-content: space-between; font-size: 14px; opacity: 0.85; margin: 6px 0; }
+  .ticket .line.total { border-top: 1px solid rgba(255, 255, 255, 0.14); margin-top: 10px; padding-top: 10px; font-size: 16px; font-weight: 700; opacity: 1; }
+  .ticket .dp-honest, .ticket .dp-trap { display: inline-block; margin: 14px 12px 0 0; }
+
+  /* Forced Continuity */
+  .dp-field {
+    width: 100%; padding: 11px 13px; border-radius: 9px; margin: 12px 0;
+    border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: inherit; font-size: 14px;
+  }
+  .signup .fine { display: block; margin: 0 0 6px; }
+
+  /* Fake Social Proof */
+  .toasts { position: relative; height: 74px; margin-top: 14px; }
+  .toast {
+    position: absolute; left: 0; right: 0; top: 0;
+    background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px; padding: 9px 12px; font-size: 12.5px; opacity: 0.9;
+    animation: dp-toast-in 220ms ease;
+  }
+  @keyframes dp-toast-in { from { opacity: 0; transform: translateY(-6px); } }
+  .product2 p { font-size: 15px; margin: 0 0 12px; }
+  .product2 .dp-trap, .product2 .dp-honest { display: block; margin-top: 8px; }
+
+  /* Privacy Zuckering */
+  .privacy .big { display: block; width: 100%; padding: 18px; font-size: 16px; background: linear-gradient(165deg, #6fe0a0, #2f9e5c); color: #06210f; }
+  .privacy .tiny { text-align: center; margin-top: 10px; }
+
+  /* reveal panel */
+  .reveal {
+    max-width: 620px; margin: 18px auto 0; padding: 20px 22px;
+    background: #1d140a; border: 1px solid rgba(255, 176, 32, 0.24); border-radius: 14px;
+    opacity: 0; transform: translateY(6px);
+  }
+  .reveal.in { animation: dp-reveal-in 320ms ease forwards; }
+  @keyframes dp-reveal-in { to { opacity: 1; transform: none; } }
+  .outcome { margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .outcome[data-tone='dodged'] { color: #5cd6a0; }
+  .outcome[data-tone='fell'] { color: #ff8a6a; }
+  .revealtext { margin: 0; font-size: 15px; line-height: 1.6; opacity: 0.9; }
+  .citation { margin: 12px 0 18px; font-size: 12.5px; opacity: 0.5; font-style: italic; }
+
+  /* ---- verdict --------------------------------------------------------- */
+  .verdict { max-width: 640px; margin: 8vh auto 10vh; padding: 0 22px; text-align: center; }
+  .verdict .stamp { font-size: clamp(38px, 8vw, 58px); font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+  .verdict .stamp[data-tone='good'] { color: #5cd6a0; }
+  .verdict .stamp[data-tone='mid'] { color: #ffc94d; }
+  .verdict .stamp[data-tone='bad'] { color: #ff8a6a; }
+  .verdict .score { font-size: 17px; opacity: 0.85; margin: 10px 0 6px; }
+  .verdict .detail { font-size: 14.5px; opacity: 0.65; max-width: 46ch; margin: 0 auto 26px; }
+
+  .card { width: 100%; border-collapse: collapse; text-align: left; margin: 0 0 26px; font-size: 13.5px; }
+  .card caption { caption-side: top; text-align: left; font-size: 12px; opacity: 0.5; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .card th, .card td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+  .card thead th { opacity: 0.55; font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .card tbody th { font-weight: 500; }
+  .card tr.yes td:nth-child(2) { color: #5cd6a0; font-weight: 600; }
+  .card tr.no td:nth-child(2) { color: #ff8a6a; font-weight: 600; }
+
+  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 20px; }
+  .acts button {
+    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  .acts button:first-child { background: linear-gradient(165deg, #ffc94d, #f0a020); color: #241505; border: 0; }
+  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
+  .acts a:hover { opacity: 1; }
+
+  .how { text-align: left; font-size: 14px; opacity: 0.8; }
+  .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; }
+  .how p { line-height: 1.6; margin: 10px 0; }
+  .how a { color: #ffc94d; }
+
+  @media (max-width: 520px) {
+    .frametop { padding: 16px 16px 4px; }
+    .slot { padding: 14px 16px 20px; }
+  }
+</style>

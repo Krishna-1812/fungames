@@ -225,7 +225,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty games
+## The twenty-two games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -361,6 +361,24 @@ rules: flat palette, no gradients, no ids — checked the same way.
 (coverage, palette, structure at 64px, distinctness, mood) plus a data-integrity
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
+
+**Dark Patterns** — eleven manipulative UI patterns, rebuilt as working fake
+websites rather than described in a bullet list: a basket that sneaks two
+pre-checked extras onto whatever you actually bought, a countdown that
+silently resets itself instead of ever reaching zero, a subscription
+cancellation flow with three stalling screens and a phone-only final step, a
+download page where three of four buttons are adverts. Every one is a
+documented pattern, not an invented vibe — Harry Brignull's original 2010
+taxonomy (he coined the term), the Princeton/CHI 2019 study that scraped
+eleven thousand shopping sites for them, or the FTC's 2022 report — cited by
+name against each one, in `src/lib/dark-patterns.ts`. The visual grammar is
+the same in all eleven on purpose: the trick is always the loud, warm button;
+the honest way through is always the small, quiet one. *`scripts/check-dark-
+patterns.mjs` proves every pattern cites one of the three real taxonomies,
+that no two share a written sentence, and — the cross-file check that
+actually matters — that every pattern in the data file has a real, working
+mount function in the page and nothing in the page mounts an id the data file
+never introduced.*
 
 **Every Second, Somewhere** — a live simulation, not a live feed, on a real
 map. Every one of the 176 countries and territories drawn is Natural Earth's

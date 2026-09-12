@@ -218,6 +218,7 @@ body.is-fixed {
 .fold-body    { --sb-a: #d3a733; --sb-b: #8a6f2e; --sb-solid: #b08c2f; }
 .spend-body   { --sb-a: #3fb98f; --sb-b: #0f3d3e; --sb-solid: #2a8a72; }
 .cascade-body { --sb-a: #2f8a55; --sb-b: #0f3d2e; --sb-solid: #24784a; }
+.dp-body      { --sb-a: #ffb020; --sb-b: #ffd98a; --sb-solid: #f0a83a; }
 
 
 /* ---------------------------------------------------------------------------

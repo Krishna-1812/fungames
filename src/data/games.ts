@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'dark-patterns',
+    title: 'Dark Patterns',
+    blurb: 'Eleven tricks, live, done to you',
+    description:
+      'Eleven manipulative UI patterns — sneaking items into your basket, a countdown that never runs out, a cancellation flow built to exhaust you — reproduced as working fake websites so you feel each one rather than just read about it. Every trick is named the way researchers actually catalogue it.',
+    accent: '#1a1206', accent2: '#ffb020',
+    category: 'you',
+    added: '2026-09-22',
+  },
+  {
     slug: 'every-second',
     title: 'Every Second, Somewhere',
     blurb: 'A live world, seeded with real numbers',

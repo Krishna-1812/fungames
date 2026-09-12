@@ -31,6 +31,7 @@ export type Slot =
   | 'band-bottom'  // a strip across the full width, on the bottom edge
   | 'corner-tr'    // tucked into the top-right corner
   | 'edge-right'   // full height, narrow, against the right edge
+  | 'corner-br'    // tucked into the bottom-right corner, mirroring corner-tr
 
 export type Illustration = {
   /** What it depicts. For check-art's report, and for whoever edits it next. */
@@ -62,6 +63,45 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
 export const ART: Record<string, Illustration> = {
+  /* ---- Dark Patterns ----------------------------------------------------- */
+  'dark-patterns': {
+    subject: 'an enormous friendly button, the honest way out hiding beneath it, and a cart taking on an extra item',
+    slot: 'corner-br',
+    viewBox: '0 0 140 100',
+    palette: ['#1a1206', '#ffb020', '#fff3d6', '#cabb9a', '#ff5a5a', '#ffffff'],
+    draw: () => {
+      // Everything sits low in its own frame on purpose: this slot's box
+      // starts roughly where the title and blurb end, and the higher a bright
+      // shape reaches, the worse it reads under the type above it.
+      // The button every one of these pages wants you to press: rounded,
+      // glowing, and the only thing in reach of a lazy thumb.
+      const button =
+        `<rect x="4" y="26" width="106" height="30" rx="11" fill="#ffb020"/>` +
+        `<rect x="18" y="38" width="48" height="6" rx="3" fill="#1a1206" opacity="0.72"/>` +
+        `<rect x="70" y="38" width="18" height="6" rx="3" fill="#1a1206" opacity="0.42"/>`
+      // The way out: a sentence-sized link, low contrast on purpose, tucked
+      // where a thumb has to go looking for it.
+      const escape =
+        `<rect x="12" y="74" width="44" height="5" rx="2.5" fill="#cabb9a" opacity="0.85"/>` +
+        `<rect x="12" y="81" width="28" height="4" rx="2" fill="#cabb9a" opacity="0.5"/>`
+      // A cursor drifting toward the honest option rather than the loud one —
+      // this drawing is the one moment in the game where dodging is shown
+      // actually working.
+      const cursor =
+        `<g transform="translate(56 80) rotate(-14)">` +
+        `<path d="M0 0 L0 17 L4 13.2 L7 20 L10.4 18.5 L7.4 11.7 L12.4 11.2 Z" fill="#ffffff" stroke="#1a1206" stroke-width="1.4" stroke-linejoin="round"/>` +
+        `</g>`
+      // A basket that just gained something nobody asked for.
+      const cart =
+        `<g transform="translate(96 68)">` +
+        `<path d="M0 0 L4 0 L8 18 L26 18 L30 5 L6 5" fill="none" stroke="#fff3d6" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>` +
+        `<circle cx="10" cy="23" r="2.3" fill="#fff3d6"/><circle cx="22" cy="23" r="2.3" fill="#fff3d6"/>` +
+        `<circle cx="28" cy="1" r="6.4" fill="#ff5a5a"/>` +
+        `<path d="M25.2 1 h5.6 M28 -2.2 v6.4" stroke="#1a1206" stroke-width="1.5" stroke-linecap="round"/>` +
+        `</g>`
+      return button + escape + cursor + cart
+    },
+  },
   /* ---- Universe Forecast ----------------------------------------------- */
   'universe-forecast': {
     subject: 'totality, corona and prominences, with the lunar month running beneath it',
@@ -999,6 +1039,7 @@ export const PRESERVE: Record<Slot, string> = {
   'band-bottom': 'xMidYMax slice',
   'corner-tr': 'xMaxYMin meet',
   'edge-right': 'xMaxYMid meet',
+  'corner-br': 'xMaxYMax meet',
 }
 
 /** Every slug that has a drawing. */
@@ -1033,6 +1074,12 @@ export const SLOT_BOX: Record<Slot, { l: number; t: number; w: number; h: number
   'band-bottom': { l: 0, t: 22, w: 100, h: 78 },
   'corner-tr': { l: 55, t: -8, w: 48, h: 72 },
   'edge-right': { l: 61, t: 0, w: 39, h: 100 },
+  // Mirrors corner-tr vertically: bottom-right instead of top-right, bleeding
+  // off the bottom the same 8% corner-tr bleeds off the top. Stays on the
+  // right — the side away from the title and blurb, same as every other
+  // non-full-bleed slot — rather than mirroring corner-tr horizontally too,
+  // which would park the drawing directly under the text.
+  'corner-br': { l: 55, t: 36, w: 48, h: 72 },
 }
 
 /**
@@ -1060,6 +1107,7 @@ export const SLOT_FADE: Record<Slot, [number, number] | null> = {
   right: [0.5, 0.7],
   'centre-right': [0.54, 0.72],
   'corner-tr': null,
+  'corner-br': null,
 }
 
 /**
