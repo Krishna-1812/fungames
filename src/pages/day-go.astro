@@ -357,6 +357,36 @@ import { withBase } from '../lib/base'
   })
 
   /* ------------------------------------------------------------------ */
+  /* Share + record                                                      */
+  /*                                                                      */
+  /* Declared before the pacing block below on purpose: `checkSections`   */
+  /* can call `updateShareCard` synchronously the moment it first runs    */
+  /* (a page that loads already scrolled down — a browser restoring       */
+  /* scroll position on reload or back/forward is a real, common way      */
+  /* that happens), and a `let` referenced before its own declaration      */
+  /* line executes throws, even from inside an already-hoisted function.  */
+  /* ------------------------------------------------------------------ */
+
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({ title: 'Where Does The Day Go?', text: `${c.headline}.` }))
+
+  function updateShareCard() {
+    const m = computeDay(state)
+    shareCard = {
+      slug: 'day-go',
+      siteName: SITE.name,
+      headline: `${fmtH(m.actualWorkHours)} of real work out of ${fmtH(m.perceivedWorkHours)}`,
+      sub: `${m.pieceCountAfter} pieces a day, ${m.totalInterruptions} interruptions.`,
+      stats: [
+        { label: 'Perceived work', value: fmtH(m.perceivedWorkHours) },
+        { label: 'Actual work', value: fmtH(m.actualWorkHours) },
+        { label: 'Pieces', value: `${m.pieceCountAfter}` },
+      ],
+    }
+    recordPlay('day-go', { actualWork: m.actualWorkHours, pieces: m.pieceCountAfter }, { actualWork: 'high' })
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Each later section activates its slider to a real default the first */
   /* time it scrolls into view — a pacing device, never a gate.          */
   /* ------------------------------------------------------------------ */
@@ -472,29 +502,6 @@ import { withBase } from '../lib/base'
   }
   paintClock()
   setInterval(paintClock, 30_000)
-
-  /* ------------------------------------------------------------------ */
-  /* Share + record                                                      */
-  /* ------------------------------------------------------------------ */
-
-  let shareCard: import('../lib/result-card').ResultCard | null = null
-  onShare(() => shareCard, (c) => ({ title: 'Where Does The Day Go?', text: `${c.headline}.` }))
-
-  function updateShareCard() {
-    const m = computeDay(state)
-    shareCard = {
-      slug: 'day-go',
-      siteName: SITE.name,
-      headline: `${fmtH(m.actualWorkHours)} of real work out of ${fmtH(m.perceivedWorkHours)}`,
-      sub: `${m.pieceCountAfter} pieces a day, ${m.totalInterruptions} interruptions.`,
-      stats: [
-        { label: 'Perceived work', value: fmtH(m.perceivedWorkHours) },
-        { label: 'Actual work', value: fmtH(m.actualWorkHours) },
-        { label: 'Pieces', value: `${m.pieceCountAfter}` },
-      ],
-    }
-    recordPlay('day-go', { actualWork: m.actualWorkHours, pieces: m.pieceCountAfter }, { actualWork: 'high' })
-  }
 
   render()
 
