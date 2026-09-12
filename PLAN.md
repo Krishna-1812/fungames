@@ -1358,17 +1358,54 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     used, which is exactly the shared-template problem the checker exists to
     catch.
 
-22. Then reassess against the depth work in Phases 1–2 above.
+22. ~~**Every Second, Somewhere**~~ — **done.** A second pick from neal.fun's
+    own catalogue: "Baby Map" is real-time births only; this one adds real
+    deaths and a net-population counter, which is why it carries an original
+    title rather than the borrowed one. Forty real countries, each seeded
+    with its own real population and its own real published crude birth and
+    death rate, running as a genuine Poisson process — not a fixed animation
+    loop tuned to look about right, an actual statistical model of events
+    that happen independently at a known average rate. A dot on the map
+    lights up gold for a birth and violet for a death roughly as often as it
+    really would: India and Nigeria almost constantly, Saudi Arabia and
+    Poland rarely, because the model is the real rate rather than a director
+    deciding what looks lively. Click any dot for that country's own numbers.
+    Everywhere not in the forty is folded into the running totals at the
+    global average rate and never given a fake coordinate on the map — the
+    one dishonest thing this page could have done and did not.
 
-**Where that leaves it.** Four new games, four checkers. The pattern that
+    The one real engineering risk in a Poisson simulation is silent: code
+    that produces the right *average* rate while being the wrong
+    *distribution* looks identical at a glance and is wrong in a way that
+    would never surface by watching the page. `scripts/check-population-live.mjs`
+    checks the data (every rate in a plausible real-world band, the derived
+    global total close to the commonly-cited ~4.3 births and ~2 deaths a
+    second) and then the shape of the maths itself: two hundred thousand
+    simulated draws confirm not just that the mean interval matches 1/rate,
+    but that P(interval > mean) lands on the exponential distribution's own
+    signature, 1/e — proof of memorylessness, which a merely-correct-on-average
+    fake could not produce by accident.
+
+    It also caught a real layout bug before shipping: `.pop-body .stage`'s
+    height rule silently failed to apply, because `.pop-body` lives on
+    `<body>` (rendered by a different component) while `.stage` is scoped to
+    this page, and Astro's scoped CSS does not bridge that gap without
+    `:global()` on the half of the selector that needs to cross it — every
+    other fixed-viewport game on the site had already hit this and marked its
+    whole stylesheet `is:global` to avoid it; this one is the first to use
+    the narrower, correct fix of wrapping only the `.pop-body` half.
+
+23. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Five new games, five checkers. The pattern that
 worked every time: build the model as pure functions over plain data, run
 it headlessly against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
 Mach-stem approximation, the crater-depth unit, the dodging checkbox, the
 premium inverse, the one rival winning 70% of the room, a scene that rasterised
 as a flat backdrop, a tile drawing with the same ink footprint as an existing
-one — was found by running the thing and reading the output, not by re-reading
-the code.
+one, a live-simulation stylesheet rule that silently never applied — was found
+by running the thing and reading the output, not by re-reading the code.
 
 Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade
 12 → 30 rules, Trolley 12 → 26 dilemmas, Powder 12 → 30 elements with a

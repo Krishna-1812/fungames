@@ -1,0 +1,341 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { COUNTRIES, REST, annualBirths, annualDeaths, perSecond, globalTotals, WORLD_POPULATION } from '../data/population-live'
+import { CONTINENTS, project, continentPath, MAP_W, MAP_H } from '../lib/population-map'
+
+/**
+ * Every Second, Somewhere — a live simulation of real birth and death rates,
+ * forty real countries at a time.
+ *
+ * Nothing here is a live feed: there is no backend, and no page on this site
+ * has one. What runs instead is a genuine Poisson process — the standard
+ * model for events that happen independently at a known average rate — seeded
+ * with each country's real population and its real published crude birth and
+ * death rate. `lib/population-map.ts` carries the one function both the page
+ * and `scripts/check-population-live.mjs` call: given a rate and a random
+ * draw, how many seconds until the next event. The maths is checked directly
+ * — not just "does it average out right" but "is it really the exponential
+ * distribution a Poisson process has, and not merely a right mean wearing a
+ * wrong shape."
+ *
+ * The forty countries are real, cited data (see data/population-live.ts for
+ * sources). What is deliberately not real: the continent outlines, drawn from
+ * twenty-odd hand-placed points per landmass rather than a real coastline
+ * dataset. They exist to show the real dots roughly where they belong, not to
+ * be looked at as a map in their own right.
+ */
+
+const dots = COUNTRIES.map((c) => {
+  const [x, y] = project(c.lat, c.lon)
+  return {
+    name: c.name,
+    x, y,
+    population: c.population,
+    birthRate: c.birthRate,
+    deathRate: c.deathRate,
+    bps: perSecond(annualBirths(c)),
+    dps: perSecond(annualDeaths(c)),
+  }
+})
+
+const sqrts = dots.map((d) => Math.sqrt(d.population))
+const minS = Math.min(...sqrts)
+const maxS = Math.max(...sqrts)
+const radius = (pop: number) => 1.5 + ((Math.sqrt(pop) - minS) / (maxS - minS)) * 4.4
+const withRadius = dots.map((d) => ({ ...d, r: Number(radius(d.population).toFixed(2)) }))
+
+const totals = globalTotals()
+const restBps = perSecond(annualBirths(REST))
+const restDps = perSecond(annualDeaths(REST))
+
+const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
+const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
+---
+
+<GameLayout slug="every-second" bar="#0a1420" fixed bodyClass="pop-body">
+  <div class="stage" id="stage">
+    <h1 class="visually-hidden">Every Second, Somewhere</h1>
+
+    <div class="mapwrap">
+      <svg id="map" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet">
+        <rect class="ocean" width={MAP_W} height={MAP_H} />
+        {continentPaths.map((d) => <path class="land" d={d} />)}
+        {
+          withRadius.map((d, i) => (
+            <circle
+              class="dot"
+              data-i={i}
+              cx={d.x} cy={d.y} r={d.r}
+              tabindex="0" role="button"
+              aria-label={`${d.name}. Population ${fmt(d.population)}. ${d.birthRate} births and ${d.deathRate} deaths per thousand people a year.`}
+            />
+          ))
+        }
+      </svg>
+    </div>
+
+    <div class="hud">
+      <div class="pop-label">world population, estimated live</div>
+      <div class="pop-value" id="popValue">{fmt(WORLD_POPULATION)}</div>
+      <div class="rate-row">
+        <span class="rate birth"><i aria-hidden="true"></i><b id="birthCount">0</b> births</span>
+        <span class="rate death"><i aria-hidden="true"></i><b id="deathCount">0</b> deaths</span>
+        <span class="rate net">net <b id="netCount">+0</b></span>
+      </div>
+      <div class="since">since you opened this page</div>
+    </div>
+
+    <div class="speed" role="radiogroup" aria-label="Playback speed">
+      <button type="button" class="opt" data-speed="1" aria-checked="true" role="radio">Live</button>
+      <button type="button" class="opt" data-speed="60" aria-checked="false" role="radio">1 min = 1 hour</button>
+      <button type="button" class="opt" data-speed="1440" aria-checked="false" role="radio">1 min = 1 day</button>
+    </div>
+
+    <section class="inspector" id="inspector" hidden aria-labelledby="inspectorName">
+      <button type="button" class="close" id="inspectorClose" aria-label="Close">×</button>
+      <h2 id="inspectorName"></h2>
+      <dl>
+        <dt>Population</dt><dd id="inspectorPop"></dd>
+        <dt>Births</dt><dd id="inspectorBirth"></dd>
+        <dt>Deaths</dt><dd id="inspectorDeath"></dd>
+        <dt>A birth here, on average</dt><dd id="inspectorBirthAvg"></dd>
+        <dt>A death here, on average</dt><dd id="inspectorDeathAvg"></dd>
+      </dl>
+    </section>
+
+    <p class="hint" id="hint">Click any dot for that country's own numbers.</p>
+  </div>
+
+  {/* Text alternative for anyone who cannot use the live map. */}
+  <ul class="visually-hidden">
+    <li>World population, estimated: {fmt(WORLD_POPULATION)}</li>
+    <li>Real global rate: {totals.birthsPerSecond.toFixed(2)} births and {totals.deathsPerSecond.toFixed(2)} deaths per second</li>
+    {withRadius.map((d) => (
+      <li>{d.name}: population {fmt(d.population)}, {d.birthRate} births and {d.deathRate} deaths per 1,000 people a year</li>
+    ))}
+  </ul>
+</GameLayout>
+
+  <script type="application/json" id="game-data" set:html={JSON.stringify({
+    dots: withRadius, restBps, restDps, worldPopulation: WORLD_POPULATION,
+  })} />
+
+  <script>
+  import { ring } from '../lib/fx'
+  import { nextInterval } from '../lib/population-map'
+  import { prefersReducedMotion } from '../lib/gl'
+  import { unlock } from '../lib/audio'
+
+  const { dots, restBps, restDps, worldPopulation } = JSON.parse(
+    document.getElementById('game-data')!.textContent!,
+  ) as any
+
+  const svg = document.getElementById('map') as unknown as SVGSVGElement
+  const circles = [...document.querySelectorAll<SVGCircleElement>('.dot')]
+
+  type Live = { d: any, el: SVGCircleElement, nextBirthAt: number, nextDeathAt: number }
+  const live: Live[] = dots.map((d: any, i: number) => ({
+    d, el: circles[i],
+    nextBirthAt: d.bps > 0 ? nextInterval(d.bps, Math.random()) : Infinity,
+    nextDeathAt: d.dps > 0 ? nextInterval(d.dps, Math.random()) : Infinity,
+  }))
+
+  const BIRTH_COLOR = '#f3c667'
+  const DEATH_COLOR = '#8892e8'
+
+  function pulse(el: SVGCircleElement, kind: 'birth' | 'death') {
+    const r = el.getBoundingClientRect()
+    ring(r.left + r.width / 2, r.top + r.height / 2, kind === 'birth' ? BIRTH_COLOR : DEATH_COLOR, 10)
+    el.classList.remove('flash-birth', 'flash-death')
+    // Forces the animation to restart even if this same dot just fired.
+    void el.getBoundingClientRect()
+    el.classList.add(kind === 'birth' ? 'flash-birth' : 'flash-death')
+  }
+
+  let births = 0
+  let deaths = 0
+  let restBirthAccum = 0
+  let restDeathAccum = 0
+  let speed = 1
+  let simNow = 0
+  let lastReal = performance.now()
+  let visualBudget = 0
+
+  const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
+  const popValue = document.getElementById('popValue')!
+  const birthCount = document.getElementById('birthCount')!
+  const deathCount = document.getElementById('deathCount')!
+  const netCount = document.getElementById('netCount')!
+
+  const startedAtSim = 0
+  function frame(now: number) {
+    requestAnimationFrame(frame)
+    // Clamped so a backgrounded tab does not resume with an enormous dt and
+    // spend the next frame processing a day of events at once.
+    const dtReal = Math.min((now - lastReal) / 1000, 0.25)
+    lastReal = now
+    const dtSim = dtReal * speed
+    simNow += dtSim
+    visualBudget = 24 // per-frame cap on how many dots actually flash; the counters below are exact regardless.
+
+    for (const c of live) {
+      while (c.nextBirthAt <= simNow) {
+        births++
+        if (visualBudget-- > 0) pulse(c.el, 'birth')
+        c.nextBirthAt += nextInterval(c.d.bps, Math.random())
+      }
+      while (c.nextDeathAt <= simNow) {
+        deaths++
+        if (visualBudget-- > 0) pulse(c.el, 'death')
+        c.nextDeathAt += nextInterval(c.d.dps, Math.random())
+      }
+    }
+    restBirthAccum += restBps * dtSim
+    restDeathAccum += restDps * dtSim
+
+    const shownBirths = births + Math.floor(restBirthAccum)
+    const shownDeaths = deaths + Math.floor(restDeathAccum)
+    const net = shownBirths - shownDeaths
+    const elapsedSim = simNow
+    const worldNow = worldPopulation + (restBps + live.reduce((s: number, c: any) => s + c.d.bps, 0)
+      - restDps - live.reduce((s: number, c: any) => s + c.d.dps, 0)) * elapsedSim
+
+    popValue.textContent = fmt(worldNow)
+    birthCount.textContent = fmt(shownBirths)
+    deathCount.textContent = fmt(shownDeaths)
+    netCount.textContent = (net >= 0 ? '+' : '') + fmt(net)
+
+    if (prefersReducedMotion) return
+  }
+  requestAnimationFrame(frame)
+
+  /* ---- speed toggle -------------------------------------------------- */
+  const speedBtns = [...document.querySelectorAll<HTMLButtonElement>('.speed .opt')]
+  for (const b of speedBtns) {
+    b.addEventListener('click', () => {
+      speed = Number(b.dataset.speed)
+      for (const o of speedBtns) o.setAttribute('aria-checked', String(o === b))
+    })
+  }
+
+  /* ---- inspector ------------------------------------------------------- */
+  const inspector = document.getElementById('inspector')!
+  const inspectorName = document.getElementById('inspectorName')!
+  const inspectorPop = document.getElementById('inspectorPop')!
+  const inspectorBirth = document.getElementById('inspectorBirth')!
+  const inspectorDeath = document.getElementById('inspectorDeath')!
+  const inspectorBirthAvg = document.getElementById('inspectorBirthAvg')!
+  const inspectorDeathAvg = document.getElementById('inspectorDeathAvg')!
+  const hint = document.getElementById('hint')!
+
+  function fmtInterval(seconds: number) {
+    if (!Number.isFinite(seconds)) return 'never, in this data'
+    if (seconds < 60) return `every ${seconds.toFixed(1)} seconds`
+    if (seconds < 3600) return `every ${(seconds / 60).toFixed(1)} minutes`
+    if (seconds < 86400) return `every ${(seconds / 3600).toFixed(1)} hours`
+    return `every ${(seconds / 86400).toFixed(1)} days`
+  }
+
+  function openInspector(i: number) {
+    const d = dots[i]
+    inspectorName.textContent = d.name
+    inspectorPop.textContent = fmt(d.population) + ' people'
+    inspectorBirth.textContent = `${d.birthRate} per 1,000 people a year`
+    inspectorDeath.textContent = `${d.deathRate} per 1,000 people a year`
+    inspectorBirthAvg.textContent = d.bps > 0 ? fmtInterval(1 / d.bps) : 'never, in this data'
+    inspectorDeathAvg.textContent = d.dps > 0 ? fmtInterval(1 / d.dps) : 'never, in this data'
+    inspector.hidden = false
+    hint.hidden = true
+  }
+  circles.forEach((el, i) => {
+    el.addEventListener('click', () => openInspector(i))
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInspector(i) } })
+  })
+  document.getElementById('inspectorClose')!.addEventListener('click', () => {
+    inspector.hidden = true
+    hint.hidden = false
+  })
+
+  addEventListener('pointerdown', unlock, { once: true })
+</script>
+
+<style>
+  :global(.pop-body) { background: #060c14; color: #fff; }
+  :global(.pop-body) .stage { position: relative; height: 100%; display: grid; place-items: center; padding: 54px 14px 14px; }
+
+  .mapwrap { width: 100%; max-width: 1100px; }
+  #map { width: 100%; height: auto; display: block; overflow: visible; }
+  .ocean { fill: #0a1420; }
+  .land { fill: #182a3a; stroke: #24384a; stroke-width: 0.4; }
+
+  .dot {
+    fill: #3a4d5e;
+    stroke: rgba(255, 255, 255, 0.18);
+    stroke-width: 0.3;
+    cursor: pointer;
+    transition: fill 160ms linear;
+  }
+  .dot:hover, .dot:focus-visible { fill: #5a7186; outline: none; }
+  .dot.flash-birth { animation: flashBirth 650ms ease-out; }
+  .dot.flash-death { animation: flashDeath 900ms ease-out; }
+  @keyframes flashBirth {
+    0% { fill: #fff6df; r: calc(var(--r, 3) * 1.9); }
+    100% { fill: #3a4d5e; }
+  }
+  @keyframes flashDeath {
+    0% { fill: #cdd3ff; }
+    100% { fill: #3a4d5e; }
+  }
+
+  .hud {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    text-align: center; pointer-events: none; width: max-content; max-width: 92vw;
+    background: rgba(0, 0, 0, 0.5); border-radius: 14px; padding: 10px 20px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .pop-label { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; }
+  .pop-value { font-size: clamp(22px, 4.4vw, 34px); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rate-row { display: flex; gap: 14px; justify-content: center; margin-top: 6px; font-size: 13px; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+  .rate i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .rate.birth i { background: #f3c667; }
+  .rate.death i { background: #8892e8; }
+  .since { font-size: 10.5px; opacity: 0.6; margin-top: 3px; }
+
+  .speed {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; background: rgba(0, 0, 0, 0.5); border-radius: 999px;
+    padding: 5px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .speed .opt {
+    font: inherit; font-size: 12.5px; color: #fff; background: transparent;
+    border: none; border-radius: 999px; padding: 7px 13px; cursor: pointer; opacity: 0.68;
+  }
+  .speed .opt[aria-checked='true'] { background: rgba(255, 255, 255, 0.16); opacity: 1; }
+
+  .hint {
+    position: absolute; bottom: 62px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; opacity: 0.55; margin: 0;
+  }
+
+  .inspector {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(88vw, 320px); background: rgba(8, 14, 22, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px;
+    padding: 20px 22px; box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.7);
+  }
+  .inspector h2 { margin: 0 0 12px; font-size: 22px; }
+  .inspector dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+  .inspector dt { opacity: 0.65; }
+  .inspector dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .inspector .close {
+    position: absolute; top: 10px; right: 12px; font: inherit; font-size: 20px;
+    color: #fff; opacity: 0.6; background: none; border: none; cursor: pointer; line-height: 1;
+  }
+  .inspector .close:hover { opacity: 1; }
+
+  @media (max-width: 620px) {
+    .rate-row { gap: 9px; font-size: 11.5px; }
+    .speed .opt { padding: 6px 9px; font-size: 11px; }
+    :global(.pop-body) .stage { padding-top: 64px; }
+  }
+</style>

@@ -1,6 +1,6 @@
 # funsite
 
-A neal.fun-style site: one lean homepage and nineteen self-contained
+A neal.fun-style site: one lean homepage and twenty self-contained
 interactive pages, each rendered with its own WebGL shader or 2D canvas and
 shipping only the script that page actually needs.
 
@@ -93,7 +93,7 @@ src/
     TileArt.astro       places one drawing on a tile, per lib/tile-art.ts
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
-    tile-art.ts         nineteen bespoke tile drawings, one per game slug
+    tile-art.ts         twenty bespoke tile drawings, one per game slug
     scale-things.ts     what Scale draws, how big it is, and the sky behind it
     scale-art.ts        twenty-six of those drawn, with both their real axes
     time-events.ts      Deep Time's forty-four events and when they happened
@@ -159,6 +159,7 @@ cost).
 | `/from-memory/` | 16.9 KB |
 | `/scale/` | 17.9 KB |
 | `/deep-sea/` | 21.1 KB |
+| `/every-second/` | 10.7 KB |
 | `/overstimulated/` | 19.8 KB |
 | `/powder/` | 25.2 KB |
 | `/orbit/` | **142.6 KB** |
@@ -219,7 +220,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The nineteen games
+## The twenty games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -355,6 +356,27 @@ rules: flat palette, no gradients, no ids — checked the same way.
 (coverage, palette, structure at 64px, distinctness, mood) plus a data-integrity
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
+
+**Every Second, Somewhere** — a live simulation, not a live feed: forty real
+countries, each seeded with its own real population and its own real published
+crude birth and death rate (CIA World Factbook and UN/World Bank, 2023–24), run
+as a genuine Poisson process. A country's dot on the map lights up gold for a
+birth and violet for a death roughly as often as it statistically really
+would — India and Nigeria almost constantly, Poland and Saudi Arabia rarely —
+because the model is the real rate, not a fixed animation loop. A live-updating
+world population counter extrapolates forward from a mid-2026 baseline using
+the same net rate, clearly labelled as an estimate rather than a census. Click
+any dot for that country's own numbers: population, both real rates, and how
+often a birth or death there actually happens on average. Everywhere not in the
+forty is folded into the running totals at the global average rate and never
+invented a coordinate on the map. *`scripts/check-population-live.mjs` checks
+the data (every rate in a plausible real-world band, the global totals close to
+the commonly-published ~4.3 births and ~2 deaths per second) and the maths: two
+hundred thousand simulated draws confirm the shared `nextInterval` function
+both the page and the checker call produces not just the right mean interval
+but the exponential distribution's actual signature, P(interval > mean) ≈ 1/e —
+proof it is really a Poisson process and not a distribution with a
+coincidentally correct average.*
 
 **Scale** — a continuous logarithmic zoom from a proton to the observable
 universe. Scroll position sets how wide the screen is in metres; objects are
@@ -587,10 +609,10 @@ is the one thing here with no formula to check against. It rasterises every
 tile with resvg exactly as the page composites it — same gradient, same
 vignette, same slot geometry, same left-hand fade — and then measures the
 result: is the drawing visible at all, does white text still clear WCAG on the
-background *under its own letters*, and are the nineteen drawings actually
+background *under its own letters*, and are the twenty drawings actually
 different from each other. It renders the title and blurb too, so contrast is
 judged where the type lands rather than over a rectangle that is mostly empty.
-Run it with `--sheet out.png` to get a contact sheet of all nineteen tiles
+Run it with `--sheet out.png` to get a contact sheet of all twenty tiles
 from the same compositor.
 
 `check-icons.mjs` does the same job for the sixty-five drawn icons inside the
@@ -628,7 +650,7 @@ no measurement covers, which is whether it looks like the thing.
 `check-time-art.mjs` covers Deep Time's forty-four scenes. Two things make it
 different from the tile and Scale checkers. Its drawings have **no ids, no defs
 and no gradients at all** — the other modules prefix ids to keep forty-four,
-twenty-six and nineteen drawings from colliding in one document, and having
+twenty-six and twenty drawings from colliding in one document, and having
 none is a guarantee rather than a convention — and every colour must come from
 one twenty-one-entry palette, which the file enforces rather than asks for.
 
@@ -683,6 +705,23 @@ than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck
 the game. `scripts/build-world-data.mjs`
 regenerates `src/data/world.ts` (coastline and cities) and only needs running if
 those sources change.
+
+`check-population-live.mjs` is not one of these at all — Every Second, Somewhere
+has no art to rasterise, only a simulation, and the thing worth getting wrong
+is the maths rather than a drawing. It checks the data first (every one of the
+forty countries' birth and death rates sits in a plausible real-world band, the
+forty sum to under the whole world's population, the derived global rate lands
+close to the commonly-published ~4.3 births and ~2 deaths a second), then the
+simulation itself. `nextInterval`, the one function both the page and the
+checker call, turns a rate and a random draw into real seconds until the next
+event — and a wrong implementation could easily still average out correctly
+while being the wrong shape entirely, the way a distribution clustered tightly
+around the mean would. So the checker draws two hundred thousand samples with
+the site's shared deterministic generator and checks two things a coincidence
+could not fake at once: the mean interval is within 1% of the real 1/rate, and
+P(interval > mean) is within a hair of 1/e ≈ 0.368 — the exponential
+distribution's own signature, and proof this is really memoryless rather than
+merely correct on average.
 
 QA against `npm run preview`. Astro's dev server caches component CSS
 aggressively and will happily serve you a stale stylesheet after an edit; if

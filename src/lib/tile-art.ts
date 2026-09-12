@@ -893,6 +893,47 @@ export const ART: Record<string, Illustration> = {
       <circle cx="44.5" cy="49.5" r="7" fill="none" stroke="#ff6b6b" stroke-width="2.6"/>`,
   },
 
+  /* ---- Every Second, Somewhere ------------------------------------------- */
+  'every-second': {
+    subject: 'a scatter of real places, lighting up gold or violet at random',
+    slot: 'scatter',
+    viewBox: '0 14 240 108',
+    palette: ['#182a3a', '#24384a', '#3a4d5e', '#f3c667', '#8892e8', '#fff6df'],
+    draw: (seed) => {
+      // Two soft landmasses, not a real coastline — the tile's job is to read
+      // as "a world", the same honesty the game's own continent blobs keep.
+      const blob = (cx: number, cy: number, rx: number, ry: number, s: number) => {
+        const pts = range(9).map((i) => {
+          const a = (i / 9) * Math.PI * 2
+          const rr = 0.75 + rnd(s, i) * 0.35
+          return [cx + Math.cos(a) * rx * rr, cy + Math.sin(a) * ry * rr]
+        })
+        const mid = (p: number[], q: number[]) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]
+        let d = `M${n(mid(pts[8], pts[0])[0])} ${n(mid(pts[8], pts[0])[1])} `
+        for (let i = 0; i < pts.length; i++) {
+          const nx = pts[(i + 1) % pts.length]
+          const m = mid(pts[i], nx)
+          d += `Q${n(pts[i][0])} ${n(pts[i][1])} ${n(m[0])} ${n(m[1])} `
+        }
+        return `<path d="${d}Z" fill="#182a3a" stroke="#24384a" stroke-width="1"/>`
+      }
+      const land = blob(150, 50, 46, 26, 1) + blob(206, 82, 30, 20, 2)
+      const dots = range(16)
+        .map((i) => {
+          const x = 140 + rnd(seed, i) * 96
+          const y = 20 + rnd(seed, i + 30) * 84
+          const lit = rnd(seed, i + 60) > 0.62
+          const gold = rnd(seed, i + 90) > 0.4
+          const r = 2.2 + rnd(seed, i + 15) * 2.6
+          const fill = lit ? (gold ? '#fff6df' : '#fff6df') : '#3a4d5e'
+          const glow = lit ? `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r * 2.1)}" fill="${gold ? '#f3c667' : '#8892e8'}" opacity="0.35"/>` : ''
+          return `${glow}<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="${fill}"/>`
+        })
+        .join('')
+      return land + dots
+    },
+  },
+
   /* ---- The Deep Sea ------------------------------------------------------ */
   'deep-sea': {
     // edge-right was already at its cap of three (Deep Time, Life in Weeks,

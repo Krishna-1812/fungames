@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'every-second',
+    title: 'Every Second, Somewhere',
+    blurb: 'A live world, seeded with real numbers',
+    description:
+      'A genuine Poisson process runs on forty countries’ real population and their real published birth and death rates, so a dot lights up on the map roughly as often as it really would. Watch it at real speed, or fast-forward a day.',
+    accent: '#0a1420', accent2: '#f3c667',
+    category: 'science',
+    added: '2026-09-21',
+  },
+  {
     slug: 'deep-sea',
     title: 'The Deep Sea',
     blurb: 'Scroll to the bottom of the ocean',
