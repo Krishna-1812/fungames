@@ -804,6 +804,21 @@ optional API for a public audience.
 Static output — any host. `netlify.toml` and `public/_headers` are included;
 Cloudflare Pages reads both.
 
+**Currently deployed to GitHub Pages** via `.github/workflows/deploy.yml`,
+which builds and publishes straight from Actions on every push to `main` —
+no `gh-pages` branch to keep in sync. That is also the one host here that
+needed real code to work at all: a repo called `fungames` is not the special
+`<user>.github.io` repo GitHub serves at a domain root, so it publishes to
+`https://<user>.github.io/fungames/`, a subpath. `astro.config.mjs`'s `base`
+carries that; `src/lib/base.ts`'s `withBase()` is what every hand-written
+root-relative link in the codebase (a tile's own href, the chrome bar's home
+link, a cross-game "related" link, an OG image path, the sitemap) is prefixed
+with, because none of that is rewritten automatically — only Astro's own
+generated asset tags and `Astro.url` are. Moving to a custom domain, or to a
+literal `<user>.github.io` repo, means setting `base` back to `'/'`; nothing
+else needs to change, since every one of those links already goes through the
+one function.
+
 The Fusion backend is optional (the game works without it):
 
 ```bash

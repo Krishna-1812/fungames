@@ -1,6 +1,7 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
 import { HAND_DEFS } from '../lib/robot-scene'
+import { withBase } from '../lib/base'
 
 /**
  * I'm Not a Robot — thirteen checks that start like a CAPTCHA and end
@@ -284,7 +285,7 @@ const sceneDefs = HAND_DEFS
     <div class="acts">
       <button type="button" data-share data-title="I'm Not a Robot">Share this</button>
       <button type="button" id="again">Run it again</button>
-      <a href="/">try something else →</a>
+      <a href={withBase('/')}>try something else →</a>
     </div>
 
     <details class="how">
@@ -312,7 +313,7 @@ const sceneDefs = HAND_DEFS
         None of it is transmitted. This site is static files; there is no server
         to send it to, and nothing is written to storage.
       </p>
-      <p>Related: <a href="/steady-hand/">Steady Hand</a> measures a single stroke properly, and <a href="/from-memory/">From Memory</a> is the other game here that grades your drawing.</p>
+      <p>Related: <a href={withBase('/steady-hand/')}>Steady Hand</a> measures a single stroke properly, and <a href={withBase('/from-memory/')}>From Memory</a> is the other game here that grades your drawing.</p>
     </details>
   </section>
 </GameLayout>

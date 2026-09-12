@@ -1,6 +1,7 @@
 ---
 import TileArt from './TileArt.astro'
 import type { Game } from '../data/games'
+import { withBase } from '../lib/base'
 
 interface Props { game: Game; index?: number }
 const { game, index = 0 } = Astro.props
@@ -13,7 +14,7 @@ const rot = ((index * 31) % 9) - 4
 
 <a
   class="tile"
-  href={`/${game.slug}/`}
+  href={withBase(`/${game.slug}/`)}
   style={`--a:${game.accent}; --b:${game.accent2}; --ink:${ink}; --i:${index}; --rot:${rot}deg`}
 >
   <span class="art-wrap" aria-hidden="true"><TileArt slug={game.slug} seed={index + 1} /></span>

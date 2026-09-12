@@ -1,5 +1,6 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { withBase } from '../lib/base'
 
 /**
  * The Auction Game — fourteen lots, five rivals, twelve thousand pounds.
@@ -114,7 +115,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     <div class="acts">
       <button type="button" id="shareAuction">Share your result</button>
       <button type="button" id="again">New sale</button>
-      <a href="/">try something else →</a>
+      <a href={withBase('/')}>try something else →</a>
     </div>
 
     <details class="how">
@@ -147,8 +148,8 @@ import GameLayout from '../layouts/GameLayout.astro'
         the top of the range is a real gamble rather than a safe move.
       </p>
       <p>
-        Related: <a href="/spend-it/">Spend It</a> is the other game here about
-        money going somewhere, and <a href="/asteroid/">Asteroid Launcher</a> is
+        Related: <a href={withBase('/spend-it/')}>Spend It</a> is the other game here about
+        money going somewhere, and <a href={withBase('/asteroid/')}>Asteroid Launcher</a> is
         the other one built on a model with a checker behind it.
       </p>
     </details>

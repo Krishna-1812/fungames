@@ -3,6 +3,7 @@ import { iconSvg } from '../lib/icons'
 import Base from '../layouts/Base.astro'
 import Backdrop from '../components/Backdrop.astro'
 import { SITE } from '../site.config'
+import { withBase } from '../lib/base'
 ---
 
 <Base title={`Lost — ${SITE.name}`} favicon="compass" noindex>
@@ -11,7 +12,7 @@ import { SITE } from '../site.config'
     <span class="glyph" aria-hidden="true" set:html={iconSvg('compass')} />
     <h1>Nothing here</h1>
     <p>That page does not exist, or it was retired.</p>
-    <a class="btn" href="/">Back to the games →</a>
+    <a class="btn" href={withBase('/')}>Back to the games →</a>
   </div>
 </Base>
 

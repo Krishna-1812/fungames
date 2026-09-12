@@ -3,6 +3,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 import { EVENTS } from '../lib/time-events'
 import type { Event } from '../lib/time-events'
 import { TIME_ART, MOOD, sceneSvg } from '../lib/time-art'
+import { withBase } from '../lib/base'
 
 /** "#rrggbb" -> "r, g, b", for building rgba() strings without color-mix() —
  *  color-mix() renders as a `color(srgb …)` function, which several of this
@@ -138,7 +139,7 @@ const fmt = (y: number) =>
 
   <footer class="outro">
     <p>Scroll back up. It is a long way.</p>
-    <a href="/">← more things like this</a>
+    <a href={withBase('/')}>← more things like this</a>
   </footer>
 </GameLayout>
 

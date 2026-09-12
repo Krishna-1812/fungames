@@ -3,6 +3,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 import { MARKERS, ZONES, TOTAL_DEPTH } from '../data/deep-sea'
 import type { Marker } from '../data/deep-sea'
 import { DEEP_SEA_ART, MOOD, sceneSvg } from '../lib/deep-sea-art'
+import { withBase } from '../lib/base'
 
 /**
  * The Deep Sea — a linear scroll from the surface to Challenger Deep, the
@@ -120,7 +121,7 @@ const fmtPressure = (m: number) => {
 
   <footer class="outro">
     <p>10,935 metres. The deepest the ocean, or this page, goes.</p>
-    <a href="/">← more things like this</a>
+    <a href={withBase('/')}>← more things like this</a>
   </footer>
 </GameLayout>
 

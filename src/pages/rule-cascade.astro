@@ -1,5 +1,6 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
+import { withBase } from '../lib/base'
 
 /**
  * Rule Cascade — you are just picking a username, and the requirements keep
@@ -55,7 +56,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       <h2>Fine. That is a username.</h2>
       <p id="winStat"></p>
       <button type="button" data-share data-title="Rule Cascade">Share this</button>
-      <a href="/">try something else →</a>
+      <a href={withBase('/')}>try something else →</a>
     </div>
   </div>
 </GameLayout>

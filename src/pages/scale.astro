@@ -2,6 +2,7 @@
 import GameLayout from '../layouts/GameLayout.astro'
 import { THINGS } from '../lib/scale-things'
 import { SCALE_ART, artSvg } from '../lib/scale-art'
+import { withBase } from '../lib/base'
 
 /**
  * Scale — a continuous logarithmic zoom from a proton to the observable
@@ -90,7 +91,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   <footer class="outro">
     <p>That was forty-two orders of magnitude.</p>
-    <a href="/">← more things like this</a>
+    <a href={withBase('/')}>← more things like this</a>
   </footer>
 
   {/* Text alternative for anyone who cannot use the scroll interaction. */}

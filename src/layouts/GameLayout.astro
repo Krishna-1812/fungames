@@ -2,6 +2,7 @@
 import Base from './Base.astro'
 import { SITE } from '../site.config'
 import { gameBySlug } from '../data/games'
+import { withBase } from '../lib/base'
 
 interface Props {
   slug: string
@@ -24,9 +25,10 @@ const barColor = bar ?? game.accent
 
 // Same URL-resolution Base.astro uses for its canonical tag, so these agree
 // with it exactly regardless of trailing-slash config.
-const homeUrl = new URL('/', Astro.site ?? SITE.url).href
+const homeUrl = new URL(withBase('/'), Astro.site ?? SITE.url).href
 const gameUrl = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
-const imageUrl = new URL(`/og/${game.slug}.png`, Astro.site ?? SITE.url).href
+const ogImagePath = withBase(`/og/${game.slug}.png`)
+const imageUrl = new URL(ogImagePath, Astro.site ?? SITE.url).href
 
 const breadcrumbLd = {
   '@context': 'https://schema.org',
@@ -52,7 +54,7 @@ const videoGameLd = {
 <Base
   title={`${game.title} — ${SITE.name}`}
   description={game.description}
-  image={`/og/${game.slug}.png`}
+  image={ogImagePath}
   glyph={game.glyph}
   fixed={fixed}
   themeColor={barColor}
@@ -66,7 +68,7 @@ const videoGameLd = {
         <nav class="crumbs" aria-label="Breadcrumb">
           <ol>
             <li>
-              <a class="chrome-home" href="/">
+              <a class="chrome-home" href={withBase('/')}>
                 <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                   <path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>

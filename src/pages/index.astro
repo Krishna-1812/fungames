@@ -7,6 +7,7 @@ import AdSlot from '../components/AdSlot.astro'
 import { SITE } from '../site.config'
 import { listedGames, gamesByCategory } from '../data/games'
 import { iconSvg } from '../lib/icons'
+import { withBase } from '../lib/base'
 
 // Newest first, the same ordering neal.fun uses.
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
@@ -41,7 +42,7 @@ const confetti = games.map((g, i) => ({
 }))
 ---
 
-<Base title={SITE.name} description={SITE.description} image="/og-home.png">
+<Base title={SITE.name} description={SITE.description} image={withBase('/og-home.png')}>
   <Backdrop variant="paper" />
   <div class="wrap">
     <header class="masthead">
@@ -75,7 +76,7 @@ const confetti = games.map((g, i) => ({
               <h2>{game.title}</h2>
               <p class="hero-description">{game.description}</p>
               <div class="hero-links">
-                <a class="hero-play" href={`/${game.slug}/`}>Play {game.title} <span aria-hidden="true">↗</span></a>
+                <a class="hero-play" href={withBase(`/${game.slug}/`)}>Play {game.title} <span aria-hidden="true">↗</span></a>
                 <a href="#collection">Explore all {games.length} games <span aria-hidden="true">↓</span></a>
               </div>
             </div>
