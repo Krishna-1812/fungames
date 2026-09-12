@@ -1253,7 +1253,49 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     motion a CSS rule cannot reach, so `impact()` fires immediately with the
     sound and the debris (which self-gate) but without any of the three.
 
-19. Then reassess against the depth work in Phases 1–2 above.
+19. ~~**The homepage, redesigned**~~ — **done.** Requested explicitly: change
+    the whole layout and the way the games are shown, make it "crazy
+    amazing." The grid itself — the sticker tiles, the gloss, the grain, the
+    pointer-tracked tilt — was already the strongest instrument on the
+    page; what surrounded it was one flat newest-first list under a hero
+    that named a single game (Orbit) directly in the markup, unrelated to
+    whatever was actually newest.
+
+    Three real changes, deliberately none of them touching a tile's own
+    shape or dimensions:
+
+    A rotating hero (`hero = games.slice(0, 3)`) replaced the hardcoded
+    one — the three most recent, the same ordering the grid already used,
+    so it goes stale precisely never. Crossfades on a timer, pauses on
+    hover/focus/an unfocused tab, and — because a carousel that keeps
+    moving on its own is exactly the motion `prefers-reduced-motion` asks
+    for less of — never autoplays there at all, advancing only on a
+    deliberate dot click. The dots were first built as `role="tab"` inside
+    a `role="tablist"`, which is the ARIA authoring-practices pattern for
+    arrow-key-navigable tabs; caught before shipping that nothing here
+    implements arrow-key navigation, so claiming that role would be a worse
+    lie than having none. Plain buttons with `aria-pressed` instead.
+
+    The flat list became four sections (`CATEGORIES` /
+    `gamesByCategory()` in `data/games.ts`), grouped by a real mechanism
+    each game actually has rather than a vibe: real science computed live,
+    games that measure real input, money spent unwisely (exactly two — the
+    honest count, not rounded up by moving something in to make three
+    sections even), and everything else. `check-art.mjs` gained a
+    `categories` section that checks this the way the rest of the file
+    checks everything else: every category is one of the declared four, the
+    four account for all seventeen listed games with none counted twice,
+    and the real split is printed rather than asserted.
+
+    A live search box, styled into the same sticker chrome as everything
+    else, filters by title, blurb *and* description — searching "money"
+    finds Spend It on the strength of its description alone — and collapses
+    a section to nothing instead of leaving a heading over an empty grid.
+    "Surprise me" now draws only from whatever the current search is
+    actually showing, so it can no longer send you somewhere the search box
+    disagrees with.
+
+20. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

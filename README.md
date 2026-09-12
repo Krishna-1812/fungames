@@ -175,6 +175,49 @@ when a visitor is actually looking at one.
 
 ---
 
+## The homepage
+
+The grid used to be one flat list, newest first, under one static hero
+naming a single game in the markup itself. Three real changes, none of them
+decoration:
+
+**A hero that rotates through real data, not a hardcoded favourite.**
+`hero = games.slice(0, 3)` — the three most recently added, the same
+"newest first" ordering the grid already used. Crossfades on a 5.2s timer,
+pauses on hover, focus, or an unfocused tab, and never autoplays at all
+under `prefers-reduced-motion` — a carousel that keeps moving on its own is
+exactly the motion that preference asks for less of, so it only advances on
+a deliberate dot click there.
+
+**Games grouped into four sections that describe a real mechanism, not a
+vibe** (`CATEGORIES` and `gamesByCategory()` in `data/games.ts`): *Real
+science, worked out live* (five games that compute their answer from the
+same equations the real thing runs on — Orbit's gravity, Asteroid
+Launcher's impact model, Scale, Deep Time, Universe Forecast), *Measures
+the actual you* (five games that score real input rather than a
+pre-written outcome), *Money, spent unwisely* (exactly two — nobody was
+moved in to round the number up), and *Just because*. `check-art.mjs` now
+has a `categories` section proving every game's category is real, the four
+sections account for all seventeen listed games between them with none
+counted twice, and prints the real split so a category that quietly
+absorbed everything (or emptied out) is a diff away from being caught.
+
+**A live filter**, typed into a search box styled like the rest of the
+site's sticker chrome: matches against each game's title, blurb *and*
+description (searching "money" finds Spend It even though only its
+description, not its blurb, uses the word), collapses a section to nothing
+rather than leaving an empty heading over a blank grid, and the existing
+"Surprise me" button now picks only from whatever the current search
+actually shows.
+
+Every tile keeps the sticker treatment underneath all of this exactly as
+it was — the gloss, the film-grain, the rim light, the pointer-driven tilt
+and art parallax — because none of the three changes above touch a tile's
+shape or dimensions, which is what lets `check-art.mjs`'s three measured
+card shapes stay valid without needing their own rewrite.
+
+---
+
 ## The eighteen games
 
 Four of them carry the site. The rest are one good idea each.

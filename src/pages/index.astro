@@ -5,10 +5,23 @@ import GameTile from '../components/GameTile.astro'
 import TileArt from '../components/TileArt.astro'
 import AdSlot from '../components/AdSlot.astro'
 import { SITE } from '../site.config'
-import { listedGames } from '../data/games'
+import { listedGames, gamesByCategory } from '../data/games'
 
 // Newest first, the same ordering neal.fun uses.
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
+const sections = gamesByCategory()
+
+// The hero spotlight used to be one hardcoded game (Orbit, named in the
+// markup itself). It rotates through the three newest instead now, so it
+// stays current the moment a new game is added rather than on the next
+// person who remembers to update a string.
+const hero = games.slice(0, 3)
+
+// A running index across every section combined, not reset per category —
+// GameTile uses it to seed each tile's toss angle and stagger delay, and
+// resetting per section would give the first card of every section the
+// same angle and the same animation timing.
+let tileIndex = 0
 
 // Four hand-drawn confetti shapes, cycled by index rather than authored once
 // per game — the point is variety in the scatter, not a meaningful mapping.
@@ -49,26 +62,63 @@ const confetti = games.map((g, i) => ({
     </header>
 
     <main id="main">
-      <section class="orbit-feature" aria-labelledby="featureTitle">
-        <div class="feature-copy">
-          <p class="feature-label">THE PLAYGROUND SPOTLIGHT <span>01 / ORBIT</span></p>
-          <h2 id="featureTitle">Make a universe.<br />See what holds.</h2>
-          <p class="feature-description">A sideways launch. A near miss. A moon that finds its way home. Discover gravity one little experiment at a time.</p>
-          <div class="feature-links">
-            <a class="feature-play" href="/orbit/">Play Orbit <span aria-hidden="true">↗</span></a>
-            <a href="#collection">Explore all {games.length} games <span aria-hidden="true">↓</span></a>
-          </div>
-          <p class="feature-footnote">A guided first launch · Save your scene · Share your universe</p>
+      {/* The spotlight used to be one game, named in the markup. It cycles
+          through the three newest instead — real data, not a hardcoded
+          favourite — crossfading on a timer and pausable by hovering,
+          focusing, or just clicking a dot. */}
+      <section class="hero" aria-roledescription="carousel" aria-label="Featured games" id="hero">
+        {hero.map((game, i) => (
+          <article class="hero-slide" data-i={i} aria-hidden={i === 0 ? 'false' : 'true'}>
+            <div class="hero-copy">
+              <p class="hero-label">JUST ADDED <span>{i + 1} / {hero.length}</span></p>
+              <h2>{game.title}</h2>
+              <p class="hero-description">{game.description}</p>
+              <div class="hero-links">
+                <a class="hero-play" href={`/${game.slug}/`}>Play {game.title} <span aria-hidden="true">↗</span></a>
+                <a href="#collection">Explore all {games.length} games <span aria-hidden="true">↓</span></a>
+              </div>
+            </div>
+            <div class="hero-art" aria-hidden="true"><TileArt slug={game.slug} seed={i + 1} /></div>
+          </article>
+        ))}
+        <div class="hero-dots" aria-label="Choose a featured game">
+          {hero.map((game, i) => (
+            <button type="button" data-i={i} aria-pressed={i === 0 ? 'true' : 'false'} aria-label={`Show ${game.title}`}></button>
+          ))}
         </div>
-        <div class="feature-art" aria-hidden="true"><TileArt slug="orbit" seed={1} /></div>
       </section>
+
       <div class="collection-head" id="collection">
         <h2>Follow your curiosity.</h2>
-        <p>{games.length} little worlds. No right place to start.</p>
+        <p>{games.length} little worlds, sorted by what they actually do — no right place to start.</p>
+        <label class="filter">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13.3 13.3 18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input type="search" id="gameSearch" autocomplete="off" spellcheck="false" placeholder="Search by name or idea…" aria-label="Filter the games below" />
+          <span id="filterCount" aria-live="polite">{games.length} of {games.length}</span>
+        </label>
       </div>
-      <div class="grid">
-        {games.map((game, i) => <GameTile game={game} index={i} />)}
-      </div>
+
+      {sections.map((section) => (
+        <section class="category" data-category={section.key}>
+          <div class="category-head">
+            <span class="category-tab">{section.label}</span>
+            <p>{section.note}</p>
+          </div>
+          <div class="grid">
+            {section.games.map((game) => {
+              const i = tileIndex++
+              return (
+                <div
+                  class="tile-slot"
+                  data-search={`${game.title} ${game.blurb} ${game.description}`.toLowerCase()}
+                >
+                  <GameTile game={game} index={i} />
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ))}
     </main>
 
     <script>
@@ -90,8 +140,8 @@ const confetti = games.map((g, i) => ({
 
          Writes are batched into a rAF so a fast sweep across the grid cannot
          force more than one style recalculation per frame. */
-      const grid = document.querySelector<HTMLElement>('.grid')
-      if (grid) {
+      const grids = document.querySelectorAll<HTMLElement>('.grid')
+      for (const grid of grids) {
         let pending: { el: HTMLElement; x: number; y: number } | null = null
         let queued = false
 
@@ -146,6 +196,72 @@ const confetti = games.map((g, i) => ({
           { passive: true },
         )
       }
+
+      /* ------------------------------------------------------------- hero */
+
+      const heroEl = document.getElementById('hero')
+      if (heroEl) {
+        const slides = [...heroEl.querySelectorAll<HTMLElement>('.hero-slide')]
+        const dots = [...heroEl.querySelectorAll<HTMLButtonElement>('.hero-dots button')]
+        let active = 0
+        let timer = 0
+
+        function show(i: number) {
+          active = (i + slides.length) % slides.length
+          slides.forEach((s, j) => {
+            s.classList.toggle('active', j === active)
+            s.setAttribute('aria-hidden', j === active ? 'false' : 'true')
+          })
+          dots.forEach((d, j) => d.setAttribute('aria-pressed', j === active ? 'true' : 'false'))
+        }
+        slides[0]?.classList.add('active')
+
+        function restart() {
+          clearInterval(timer)
+          // A carousel that keeps moving on its own is exactly the motion
+          // prefers-reduced-motion asks for less of — it still responds to a
+          // deliberate click on a dot, it just never advances by itself.
+          if (prefersReducedMotion || slides.length < 2) return
+          timer = window.setInterval(() => show(active + 1), 5200)
+        }
+
+        dots.forEach((d, i) => d.addEventListener('click', () => { show(i); restart(); unlock(); sfx.click() }))
+        heroEl.addEventListener('pointerenter', () => clearInterval(timer))
+        heroEl.addEventListener('pointerleave', restart)
+        heroEl.addEventListener('focusin', () => clearInterval(timer))
+        heroEl.addEventListener('focusout', restart)
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) clearInterval(timer)
+          else restart()
+        })
+        restart()
+      }
+
+      /* ----------------------------------------------------------- filter */
+
+      const search = document.getElementById('gameSearch') as HTMLInputElement | null
+      const countEl = document.getElementById('filterCount')
+      const slots = [...document.querySelectorAll<HTMLElement>('.tile-slot')]
+      const categorySections = [...document.querySelectorAll<HTMLElement>('.category')]
+      const TOTAL = slots.length
+
+      function applyFilter() {
+        const q = (search?.value ?? '').trim().toLowerCase()
+        let shown = 0
+        for (const slot of slots) {
+          const hit = !q || (slot.dataset.search ?? '').includes(q)
+          slot.hidden = !hit
+          if (hit) shown++
+        }
+        // A section with nothing left in it is a heading over an empty grid,
+        // which reads as broken rather than as "no matches here."
+        for (const section of categorySections) {
+          const anyVisible = section.querySelectorAll('.tile-slot:not([hidden])').length > 0
+          section.hidden = !anyVisible
+        }
+        if (countEl) countEl.textContent = q ? `${shown} of ${TOTAL}` : `${TOTAL} of ${TOTAL}`
+      }
+      search?.addEventListener('input', applyFilter)
     </script>
 
     <section class="about">
@@ -166,10 +282,13 @@ const confetti = games.map((g, i) => ({
     <AdSlot slot="" />
 
     <script>
-      // "Surprise me" is the neal.fun move: no menus, just take me somewhere.
-      const tiles = [...document.querySelectorAll<HTMLAnchorElement>('.tile')]
+      // "Surprise me" is the neal.fun move: no menus, just take me somewhere —
+      // but only somewhere the current search would actually show, so it
+      // never contradicts what you just typed.
       document.getElementById('lucky')?.addEventListener('click', () => {
-        const t = tiles[(Math.random() * tiles.length) | 0]
+        const visible = [...document.querySelectorAll<HTMLElement>('.tile-slot:not([hidden]) .tile')] as HTMLAnchorElement[]
+        const pool = visible.length ? visible : [...document.querySelectorAll<HTMLAnchorElement>('.tile')]
+        const t = pool[(Math.random() * pool.length) | 0]
         if (t) location.href = t.getAttribute('href')!
       })
     </script>
@@ -183,34 +302,6 @@ const confetti = games.map((g, i) => ({
 </Base>
 
 <style>
-  .orbit-feature {
-    position: relative; isolation: isolate; overflow: hidden; min-height: 390px;
-    border-radius: 26px; padding: clamp(28px, 4vw, 48px); margin: 0 0 58px;
-    background: #101d36; color: #f2f5ff;
-    box-shadow: 0 18px 40px #10203b22;
-  }
-  .feature-copy { position: relative; z-index: 1; width: 55%; }
-  .feature-label { display: flex; flex-wrap: wrap; gap: 12px; font-size: 10px; font-weight: 650; letter-spacing: .16em; color: #a7c8f5; margin: 0 0 28px; }
-  .feature-label span { color: #c5d1e4; }
-  .orbit-feature h2 { margin: 0; font-size: clamp(30px, 4.2vw, 52px); letter-spacing: -.035em; line-height: 1.04; }
-  .feature-description { max-width: 370px; color: #bbcce5; font-size: 15px; line-height: 1.75; margin: 22px 0; }
-  .feature-links { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
-  .feature-links a { color: #e4edfb; font-size: 13px; text-underline-offset: 5px; }
-  .feature-links .feature-play { display: inline-flex; align-items: center; gap: 26px; background: #d7e8ff; color: #15243e; padding: 13px 18px; border-radius: 11px; text-decoration: none; font-weight: 700; }
-  .feature-play:hover { background: #fff; }
-  .feature-footnote { font-size: 11px; line-height: 1.6; color: #a8bddb; margin: 23px 0 0; }
-  .feature-art { position: absolute; right: -4%; top: 6%; width: 64%; height: 90%; pointer-events: none; }
-  .collection-head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin: 0 0 26px; scroll-margin-top: 24px; }
-  .collection-head h2 { margin: 0; font-size: clamp(23px, 3vw, 30px); letter-spacing: -.025em; }
-  .collection-head p { margin: 0; color: var(--ink-soft); font-size: 13px; }
-  @media (max-width: 660px) {
-    .orbit-feature { min-height: 0; padding-bottom: 230px; margin-bottom: 36px; }
-    .feature-copy { width: 100%; }
-    .feature-art { width: 100%; right: 0; height: 250px; top: auto; bottom: -12px; }
-    .feature-label { margin-bottom: 20px; }
-    .collection-head { display: block; }
-    .collection-head p { margin-top: 8px; }
-  }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 22px 72px; }
 
   .masthead { text-align: center; margin-bottom: 46px; }
@@ -273,6 +364,78 @@ const confetti = games.map((g, i) => ({
   .confetti span svg { display: block; width: 100%; height: 100%; }
   @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
 
+  /* ------------------------------------------------------------ hero ---- */
+
+  .hero {
+    position: relative; isolation: isolate; overflow: hidden; min-height: 390px;
+    border-radius: 26px; margin: 0 0 58px;
+    background: #101d36; color: #f2f5ff;
+    box-shadow: 0 18px 40px #10203b22;
+  }
+  .hero-slide {
+    position: absolute; inset: 0; padding: clamp(28px, 4vw, 48px);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 480ms var(--ease);
+  }
+  .hero-slide.active { position: relative; opacity: 1; visibility: visible; pointer-events: auto; }
+  .hero-copy { position: relative; z-index: 1; width: 55%; }
+  .hero-label { display: flex; flex-wrap: wrap; gap: 12px; font-size: 10px; font-weight: 650; letter-spacing: .16em; color: #a7c8f5; margin: 0 0 28px; }
+  .hero-label span { color: #c5d1e4; }
+  .hero-slide h2 { margin: 0; font-size: clamp(30px, 4.2vw, 52px); letter-spacing: -.035em; line-height: 1.04; }
+  .hero-description { max-width: 400px; color: #bbcce5; font-size: 15px; line-height: 1.75; margin: 22px 0; }
+  .hero-links { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
+  .hero-links a { color: #e4edfb; font-size: 13px; text-underline-offset: 5px; }
+  .hero-links .hero-play { display: inline-flex; align-items: center; gap: 26px; background: #d7e8ff; color: #15243e; padding: 13px 18px; border-radius: 11px; text-decoration: none; font-weight: 700; }
+  .hero-play:hover { background: #fff; }
+  .hero-art { position: absolute; right: -4%; top: 6%; width: 64%; height: 90%; pointer-events: none; }
+
+  .hero-dots {
+    position: absolute; z-index: 2; left: 50%; bottom: 18px; transform: translateX(-50%);
+    display: flex; gap: 9px;
+  }
+  .hero-dots button {
+    width: 9px; height: 9px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
+    background: rgba(255, 255, 255, 0.32);
+    transition: background 200ms var(--ease), transform 200ms var(--ease-bounce);
+  }
+  .hero-dots button[aria-pressed='true'] { background: #fff; transform: scale(1.3); }
+  .hero-dots button:hover { background: rgba(255, 255, 255, 0.6); }
+
+  .collection-head { margin: 0 0 30px; scroll-margin-top: 24px; }
+  .collection-head h2 { margin: 0; font-size: clamp(23px, 3vw, 30px); letter-spacing: -.025em; }
+  .collection-head p { margin: 8px 0 0; color: var(--ink-soft); font-size: 13px; }
+
+  /* A sticker-sheet search box, not a plain form input — thick "cut" border
+     and the same rounded pill language as the site's own buttons. */
+  .filter {
+    display: flex; align-items: center; gap: 10px; margin-top: 18px;
+    max-width: 420px; padding: 10px 16px; border-radius: 999px;
+    border: var(--sticker-border); background: var(--card); box-shadow: var(--sticker-shadow);
+  }
+  .filter svg { flex: none; width: 17px; height: 17px; color: var(--ink-faint); }
+  .filter input {
+    flex: 1; border: 0; background: none; font: inherit; font-size: 15px;
+    color: var(--ink); min-width: 0;
+  }
+  .filter input:focus { outline: none; }
+  .filter input::placeholder { color: var(--ink-faint); }
+  #filterCount { flex: none; font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* --------------------------------------------------------- categories - */
+
+  .category { margin-bottom: 42px; }
+  .category-head { margin-bottom: 18px; }
+  /* A torn sticky-note tab rather than a plain heading — the same "someone
+     stuck this here" language as the about section's tape, so the grouping
+     reads as curated rather than templated. */
+  .category-tab {
+    display: inline-block; font-size: clamp(17px, 2.2vw, 22px); font-weight: 800;
+    letter-spacing: -0.015em; padding: 5px 16px 7px; border-radius: 8px 8px 8px 2px;
+    background: var(--card); border: var(--sticker-border); box-shadow: var(--sticker-shadow);
+    transform: rotate(-1deg);
+  }
+  .category-head p { margin: 10px 2px 0; color: var(--ink-soft); font-size: 13px; max-width: 62ch; }
+
   .grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -283,6 +446,15 @@ const confetti = games.map((g, i) => ({
   }
   @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 660px) { .grid { grid-template-columns: 1fr; gap: 14px; } }
+
+  @media (max-width: 660px) {
+    .hero { min-height: 0; }
+    .hero-slide { padding-bottom: 230px; }
+    .hero-copy { width: 100%; }
+    .hero-art { width: 100%; right: 0; height: 250px; top: auto; bottom: -12px; }
+    .hero-label { margin-bottom: 20px; }
+    .filter { max-width: none; }
+  }
 
   .about {
     position: relative;
@@ -343,5 +515,9 @@ const confetti = games.map((g, i) => ({
   .foot {
     display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
     margin-top: 34px; color: var(--ink-faint); font-size: 13.5px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-slide { transition: none; }
   }
 </style>

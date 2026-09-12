@@ -37,7 +37,7 @@ import fs from 'node:fs'
 import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
-const { listedGames, GAMES } = await import('../src/data/games.ts')
+const { listedGames, GAMES, CATEGORIES, gamesByCategory } = await import('../src/data/games.ts')
 const { ART, PRESERVE, SLOT_BOX, SLOT_FADE, fadeStops } = await import('../src/lib/tile-art.ts')
 
 let failures = 0
@@ -479,6 +479,29 @@ console.log('\ncoverage')
   if (missing.length) fail(`no drawing for: ${missing.join(', ')}`)
   const orphan = drawn.filter((s) => !allSlugs.has(s))
   if (orphan.length) fail(`drawing with no game: ${orphan.join(', ')}`)
+}
+
+/* The homepage groups the grid into sections by `category`. A typo'd or
+   stale category is invisible in the data — TypeScript's union type catches
+   a literal misspelling, but not a game silently missing from every section
+   because gamesByCategory() and listedGames() disagree on count. */
+console.log('\ncategories')
+{
+  const keys = new Set(CATEGORIES.map((c) => c.key))
+  const bad = GAMES.filter((g) => !keys.has(g.category))
+  check(bad.length === 0, `every game's category is one of the ${keys.size} declared ones${bad.length ? ': ' + bad.map((g) => g.slug).join(', ') : ''}`)
+
+  const grouped = gamesByCategory()
+  const total = grouped.reduce((n, c) => n + c.games.length, 0)
+  check(
+    total === listedGames().length,
+    `gamesByCategory accounts for all ${listedGames().length} listed games (got ${total})`,
+  )
+  const seen = new Set()
+  let duped = false
+  for (const c of grouped) for (const g of c.games) { if (seen.has(g.slug)) duped = true; seen.add(g.slug) }
+  check(!duped, 'no game appears in two sections')
+  ok(grouped.map((c) => `${c.label}: ${c.games.length}`).join(' · '))
 }
 
 console.log('\nno shared template')
