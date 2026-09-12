@@ -72,6 +72,8 @@ const fmtPressure = (m: number) => {
       the fallback for anything without WebGL2. */}
   <div class="skygl" id="skygl" aria-hidden="true"></div>
 
+  <div class="hud-scrim" aria-hidden="true"></div>
+
   <div class="hud">
     <div class="hud-label" id="hudZone">the sunlight zone</div>
     <div class="hud-depth" id="hudDepth">0m</div>
@@ -297,6 +299,15 @@ const fmtPressure = (m: number) => {
     transition: background 260ms linear;
   }
   :global(.night-body) { background: #04101c; color: #fff; }
+
+  /* A soft fade at the very top of the viewport, under the HUD but over the
+     reel, so a card sliding up to meet the HUD loses contrast gradually
+     instead of vanishing behind a hard-edged bar. */
+  .hud-scrim {
+    position: fixed; inset: 0 0 auto 0; height: 172px; z-index: 39;
+    pointer-events: none;
+    background: linear-gradient(rgba(0, 4, 8, 0.5), rgba(0, 4, 8, 0));
+  }
 
   .hud {
     position: fixed; top: 58px; left: 50%; transform: translateX(-50%);

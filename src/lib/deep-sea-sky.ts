@@ -6,10 +6,19 @@
  * to black, on the same schedule real seawater actually loses its light —
  * most of it is gone by two hundred metres, all of it well before a
  * thousand. God rays exist only near the surface and fade out exactly where
- * the sunlight zone ends. Marine snow drifts at every depth. Bioluminescent
- * sparks only start appearing once the water is dark enough for them to be
- * the only light left, and thin out again in the emptiest stretches of the
- * abyss before the trenches bring the last hadal life back.
+ * the sunlight zone ends. Caustics — the rippling net of light a real
+ * surface throws through shallow water — live in that same narrow band,
+ * because they are sunlight doing the same thing rays are, just refracted
+ * through real wave shapes instead of scattered by the water itself. Rising
+ * bubbles exist only that close to the surface too: past a few dozen metres
+ * there is nothing left making them. Marine snow drifts at every depth.
+ * Bioluminescent sparks only start appearing once the water is dark enough
+ * for them to be the only light left, and thin out again in the emptiest
+ * stretches of the abyss before the trenches bring the last hadal life back.
+ * A faint pressure vignette closes in on the frame as depth climbs into the
+ * thousands — nothing physically dims down there, but nothing but a probe's
+ * own light reaches that far either, and the shrinking frame is the honest
+ * way to say so without inventing a light source no real trench has.
  *
  * The CSS gradient underneath stays in place for anything without WebGL2.
  */
@@ -68,6 +77,40 @@ void main() {
     col += vec3(0.55, 0.82, 0.88) * rays * rayMask * (1.0 - uv.y) * 0.55;
   }
 
+  // Caustics — the rippling net a real wavy surface throws through shallow
+  // water. Two ridged layers, sheared past each other and drifting at
+  // different speeds so the crossing pattern never repeats, faster than the
+  // rays above it because that is what a real chop on the surface looks
+  // like from underneath. Gone by 60m — this is a shallow-water effect only.
+  float causticMask = smoothstep(70.0, 4.0, d);
+  if (causticMask > 0.001) {
+    vec2 cp = p * vec2(3.2, 2.1) + vec2(t * 0.09, t * 0.05);
+    vec2 cq = p * vec2(2.4, 3.0) - vec2(t * 0.06, t * 0.11);
+    float ca = ridge(cp, 3);
+    float cb = ridge(cq, 3);
+    float caustic = pow(clamp(ca * cb * 2.2, 0.0, 1.0), 2.4);
+    col += vec3(0.5, 0.85, 0.85) * caustic * causticMask * (1.0 - uv.y * 0.6) * 0.5;
+  }
+
+  // Rising bubbles — small, bright, only ever moving up, only ever near the
+  // surface. A thin column so they read as a rising trail rather than a
+  // uniform field, drifting sideways a little as they climb.
+  float bubbleMask = smoothstep(260.0, 20.0, d);
+  if (bubbleMask > 0.001) {
+    vec2 bp = p;
+    bp.x += sin(bp.y * 3.0 + t * 0.6) * 0.05;
+    bp.y -= t * 0.22;
+    vec2 bid = floor(bp * vec2(11.0, 7.0));
+    vec2 bf = fract(bp * vec2(11.0, 7.0));
+    float bh = hash21(bid);
+    if (bh > 0.9) {
+      vec2 bc = vec2(hash21(bid + 3.1), hash21(bid + 8.4));
+      float bd = length(bf - bc);
+      float bubble = smoothstep(0.05, 0.0, bd) + smoothstep(0.09, 0.05, bd) * 0.3;
+      col += vec3(0.7, 0.9, 0.95) * bubble * bubbleMask * 0.5;
+    }
+  }
+
   // Marine snow — present at every depth, the one constant of the whole page.
   float driftT = t * 0.02 + d * 0.00035;
   float snowNear = speckField(p, 9.0, driftT * 1.6, 0.986);
@@ -88,6 +131,13 @@ void main() {
     vec3 bio = mix(vec3(0.35, 0.95, 0.78), vec3(0.3, 0.75, 0.98), step(0.5, hash21(floor(p * 6.0))));
     col += bio * spB * bioRamp * twinkle * 1.4;
   }
+
+  // Pressure vignette. Nothing really dims down here — this is the one
+  // honest way to show a frame narrowing under weight nothing but a probe's
+  // own light has ever pushed back against. Starts past the midnight zone,
+  // never closes in enough to read as a hard circle.
+  float vig = smoothstep(1000.0, 7000.0, d) * 0.4;
+  col *= 1.0 - vig * dot(p, p) * 0.5;
 
   col = aces(col * 1.05);
   col = toSRGB(col);
