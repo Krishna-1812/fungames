@@ -159,21 +159,26 @@ cost).
 | `/from-memory/` | 16.9 KB |
 | `/scale/` | 17.9 KB |
 | `/deep-sea/` | 21.1 KB |
-| `/every-second/` | 10.7 KB |
+| `/every-second/` | 57.4 KB |
 | `/overstimulated/` | 19.8 KB |
 | `/powder/` | 25.2 KB |
+| `/every-second/` | 57.4 KB |
 | `/orbit/` | **142.6 KB** |
 | `/asteroid/` | **158.4 KB** |
 
-Orbit and Asteroid Launcher are the two outliers, and both for the same
-reason: a real third-party library instead of a hand-written shader. Orbit's
-WebGL renderer is built on three.js; Asteroid Launcher's two maps are built
-on Leaflet, over free Esri/OpenStreetMap tiles rather than the API-keyed,
-billing-account-gated alternative. Every other page stays under 26 KB total.
-No images, no audio files, no fonts beyond Google Fonts — every sound on the
-site is synthesised, and every visual is either drawn, one of a handful of
-small hand-written shaders, or — now, twice — real map tiles fetched only
-when a visitor is actually looking at one.
+Orbit and Asteroid Launcher are the two outliers by real third-party library
+weight: Orbit's WebGL renderer is built on three.js, Asteroid Launcher's two
+maps on Leaflet over free Esri/OpenStreetMap tiles rather than the API-keyed,
+billing-account-gated alternative. Every Second, Somewhere is heavier than the
+rest for a different reason and carries no library at all: its own real
+country geometry — 176 countries' worth of Natural Earth boundary paths — is
+generated at build time and inlined straight into the HTML, precisely so the
+page needs neither a runtime map library nor a live tile server to draw a real
+map. Every other page stays under 26 KB total. No images, no audio files, no
+fonts beyond Google Fonts — every sound on the site is synthesised, and every
+visual is either drawn, one of a handful of small hand-written shaders, real
+map tiles fetched only when a visitor is actually looking at one, or — once —
+real map geometry baked in at author time.
 
 ---
 
@@ -357,26 +362,37 @@ rules: flat palette, no gradients, no ids — checked the same way.
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
 
-**Every Second, Somewhere** — a live simulation, not a live feed: forty real
-countries, each seeded with its own real population and its own real published
-crude birth and death rate (CIA World Factbook and UN/World Bank, 2023–24), run
-as a genuine Poisson process. A country's dot on the map lights up gold for a
-birth and violet for a death roughly as often as it statistically really
-would — India and Nigeria almost constantly, Poland and Saudi Arabia rarely —
-because the model is the real rate, not a fixed animation loop. A live-updating
-world population counter extrapolates forward from a mid-2026 baseline using
-the same net rate, clearly labelled as an estimate rather than a census. Click
-any dot for that country's own numbers: population, both real rates, and how
-often a birth or death there actually happens on average. Everywhere not in the
-forty is folded into the running totals at the global average rate and never
-invented a coordinate on the map. *`scripts/check-population-live.mjs` checks
-the data (every rate in a plausible real-world band, the global totals close to
-the commonly-published ~4.3 births and ~2 deaths per second) and the maths: two
-hundred thousand simulated draws confirm the shared `nextInterval` function
-both the page and the checker call produces not just the right mean interval
-but the exponential distribution's actual signature, P(interval > mean) ≈ 1/e —
-proof it is really a Poisson process and not a distribution with a
-coincidentally correct average.*
+**Every Second, Somewhere** — a live simulation, not a live feed, on a real
+map. Every one of the 176 countries and territories drawn is Natural Earth's
+own admin-0 political geometry (`scripts/build-population-geo.mjs`, the same
+family of public-domain data `build-world-data.mjs` already draws Asteroid
+Launcher's coastline from), projected equirectangular — not a hand-placed
+approximation. The first version of this page drew its own continent blobs,
+twenty-odd guessed points per landmass; it looked exactly like what it was; it
+is gone.
+
+Forty of those real countries are seeded with their own real population and
+real published crude birth and death rate (CIA World Factbook and UN/World
+Bank, 2023–24), and run as a genuine Poisson process. A birth or a death lights
+up that country's own real outline — gold for a birth, violet for a death —
+roughly as often as it statistically really would: India and Nigeria almost
+constantly, Poland and Saudi Arabia rarely, because the model is the real
+rate, not a fixed animation loop. A live-updating world population counter
+extrapolates forward from a mid-2026 baseline using the same net rate, clearly
+labelled as an estimate rather than a census. Click any lit country for its own
+numbers: population, both real rates, and how often a birth or death there
+actually happens on average. Everywhere not in the forty is folded into the
+running totals at the global average rate and never given a fake coordinate.
+*`scripts/check-population-live.mjs` checks the data (every rate in a
+plausible real-world band, the global totals close to the commonly-published
+~4.3 births and ~2 deaths per second), that all forty countries actually
+resolve to a real shape in the atlas, that every one of their real capital
+coordinates projects inside that same country's own real outline — not a
+guessed bounding shape — and the maths: two hundred thousand simulated draws
+confirm the shared `nextInterval` function both the page and the checker call
+produces not just the right mean interval but the exponential distribution's
+actual signature, P(interval > mean) ≈ 1/e — proof it is really a Poisson
+process and not a distribution with a coincidentally correct average.*
 
 **Scale** — a continuous logarithmic zoom from a proton to the observable
 universe. Scroll position sets how wide the screen is in metres; objects are
@@ -704,14 +720,22 @@ auction checker also guards the *balance*: it fails if any one rival wins more
 than 45% of the room or less than 5%, so tuning a bidder cannot quietly wreck
 the game. `scripts/build-world-data.mjs`
 regenerates `src/data/world.ts` (coastline and cities) and only needs running if
-those sources change.
+those sources change. `scripts/build-population-geo.mjs` does the same job for
+Every Second, Somewhere: it fetches Natural Earth's real admin-0 country
+boundaries once, projects all 176 of them, and writes `src/data/population-geo.ts` —
+so the page ships a real map with no runtime dependency on a tile server, the
+same reasoning that keeps the coastline generated rather than fetched live.
 
 `check-population-live.mjs` is not one of these at all — Every Second, Somewhere
-has no art to rasterise, only a simulation, and the thing worth getting wrong
-is the maths rather than a drawing. It checks the data first (every one of the
-forty countries' birth and death rates sits in a plausible real-world band, the
-forty sum to under the whole world's population, the derived global rate lands
-close to the commonly-published ~4.3 births and ~2 deaths a second), then the
+has no art to rasterise, only a real map and a simulation, and the thing worth
+getting wrong is the geometry and the maths rather than a drawing. It checks
+the data first (every one of the forty countries' birth and death rates sits
+in a plausible real-world band, the forty sum to under the whole world's
+population, the derived global rate lands close to the commonly-published
+~4.3 births and ~2 deaths a second), then that the map is genuinely real: all
+forty countries resolve to an actual shape in the Natural Earth atlas, and
+every one of their real capital-city coordinates projects inside that same
+country's own real outline rather than merely near a guessed one. Then the
 simulation itself. `nextInterval`, the one function both the page and the
 checker call, turns a rate and a random draw into real seconds until the next
 event — and a wrong implementation could easily still average out correctly

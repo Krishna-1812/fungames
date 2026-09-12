@@ -1,11 +1,12 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
 import { COUNTRIES, REST, annualBirths, annualDeaths, perSecond, globalTotals, WORLD_POPULATION } from '../data/population-live'
-import { CONTINENTS, project, continentPath, MAP_W, MAP_H } from '../lib/population-map'
+import { COUNTRY_SHAPES, MAP_W, MAP_H } from '../data/population-geo'
+import { project } from '../lib/population-map'
 
 /**
  * Every Second, Somewhere — a live simulation of real birth and death rates,
- * forty real countries at a time.
+ * forty real countries at a time, drawn on their own real borders.
  *
  * Nothing here is a live feed: there is no backend, and no page on this site
  * has one. What runs instead is a genuine Poisson process — the standard
@@ -18,38 +19,45 @@ import { CONTINENTS, project, continentPath, MAP_W, MAP_H } from '../lib/populat
  * distribution a Poisson process has, and not merely a right mean wearing a
  * wrong shape."
  *
- * The forty countries are real, cited data (see data/population-live.ts for
- * sources). What is deliberately not real: the continent outlines, drawn from
- * twenty-odd hand-placed points per landmass rather than a real coastline
- * dataset. They exist to show the real dots roughly where they belong, not to
- * be looked at as a map in their own right.
+ * The map itself is real: every one of the 176 shapes drawn here is Natural
+ * Earth's own admin-0 country geometry (`scripts/build-population-geo.mjs`,
+ * `data/population-geo.ts`), projected equirectangular — not a hand-drawn
+ * approximation. The forty simulated countries get their own real outline
+ * lit up on a birth or death, the same way the real thing this is modelled
+ * after does it.
  */
 
-const dots = COUNTRIES.map((c) => {
-  const [x, y] = project(c.lat, c.lon)
+const shapeByName = new Map(COUNTRY_SHAPES.map((s) => [s.name, s]))
+
+type Layer = { name: string; path: string; cx: number; cy: number; simIndex: number }
+const layers: Layer[] = COUNTRY_SHAPES.filter((s) => s.name !== 'Antarctica').map((s) => ({
+  name: s.name,
+  path: s.path,
+  cx: s.cx,
+  cy: s.cy,
+  simIndex: COUNTRIES.findIndex((c) => (c.atlasName ?? c.name) === s.name),
+}))
+
+const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
+
+const simData = COUNTRIES.map((c) => {
+  const shape = shapeByName.get(c.atlasName ?? c.name)
+  const [capX, capY] = project(c.lat, c.lon)
   return {
     name: c.name,
-    x, y,
     population: c.population,
     birthRate: c.birthRate,
     deathRate: c.deathRate,
     bps: perSecond(annualBirths(c)),
     dps: perSecond(annualDeaths(c)),
+    cx: shape?.cx ?? capX,
+    cy: shape?.cy ?? capY,
   }
 })
-
-const sqrts = dots.map((d) => Math.sqrt(d.population))
-const minS = Math.min(...sqrts)
-const maxS = Math.max(...sqrts)
-const radius = (pop: number) => 1.5 + ((Math.sqrt(pop) - minS) / (maxS - minS)) * 4.4
-const withRadius = dots.map((d) => ({ ...d, r: Number(radius(d.population).toFixed(2)) }))
 
 const totals = globalTotals()
 const restBps = perSecond(annualBirths(REST))
 const restDps = perSecond(annualDeaths(REST))
-
-const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
-const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
 ---
 
 <GameLayout slug="every-second" bar="#0a1420" fixed bodyClass="pop-body">
@@ -59,16 +67,24 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
     <div class="mapwrap">
       <svg id="map" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet">
         <rect class="ocean" width={MAP_W} height={MAP_H} />
-        {continentPaths.map((d) => <path class="land" d={d} />)}
         {
-          withRadius.map((d, i) => (
-            <circle
-              class="dot"
-              data-i={i}
-              cx={d.x} cy={d.y} r={d.r}
-              tabindex="0" role="button"
-              aria-label={`${d.name}. Population ${fmt(d.population)}. ${d.birthRate} births and ${d.deathRate} deaths per thousand people a year.`}
-            />
+          layers.map((l) =>
+            l.simIndex >= 0 ? (
+              <path
+                class="country sim"
+                data-i={l.simIndex}
+                d={l.path}
+                tabindex="0" role="button"
+                aria-label={`${l.name}. Population ${fmt(simData[l.simIndex].population)}. ${simData[l.simIndex].birthRate} births and ${simData[l.simIndex].deathRate} deaths per thousand people a year.`}
+              />
+            ) : (
+              <path class="country" d={l.path} aria-hidden="true" />
+            )
+          )
+        }
+        {
+          simData.map((d, i) => (
+            <circle class="marker" data-i={i} cx={d.cx} cy={d.cy} r="1.3" aria-hidden="true" />
           ))
         }
       </svg>
@@ -103,21 +119,21 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
       </dl>
     </section>
 
-    <p class="hint" id="hint">Click any dot for that country's own numbers.</p>
+    <p class="hint" id="hint">Click any lit-up country for its own numbers.</p>
   </div>
 
   {/* Text alternative for anyone who cannot use the live map. */}
   <ul class="visually-hidden">
     <li>World population, estimated: {fmt(WORLD_POPULATION)}</li>
     <li>Real global rate: {totals.birthsPerSecond.toFixed(2)} births and {totals.deathsPerSecond.toFixed(2)} deaths per second</li>
-    {withRadius.map((d) => (
+    {simData.map((d) => (
       <li>{d.name}: population {fmt(d.population)}, {d.birthRate} births and {d.deathRate} deaths per 1,000 people a year</li>
     ))}
   </ul>
 </GameLayout>
 
   <script type="application/json" id="game-data" set:html={JSON.stringify({
-    dots: withRadius, restBps, restDps, worldPopulation: WORLD_POPULATION,
+    simData, restBps, restDps, worldPopulation: WORLD_POPULATION,
   })} />
 
   <script>
@@ -126,16 +142,21 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
   import { prefersReducedMotion } from '../lib/gl'
   import { unlock } from '../lib/audio'
 
-  const { dots, restBps, restDps, worldPopulation } = JSON.parse(
+  const { simData, restBps, restDps, worldPopulation } = JSON.parse(
     document.getElementById('game-data')!.textContent!,
   ) as any
 
-  const svg = document.getElementById('map') as unknown as SVGSVGElement
-  const circles = [...document.querySelectorAll<SVGCircleElement>('.dot')]
+  const countryEls = [...document.querySelectorAll<SVGPathElement>('.country.sim')]
+  const markerEls = [...document.querySelectorAll<SVGCircleElement>('.marker')]
+  // Both are indexed by the same data-i as simData, so a country's shape and
+  // its marker are always found together.
+  const byIndex = new Map<number, { country: SVGPathElement; marker: SVGCircleElement }>()
+  countryEls.forEach((el) => byIndex.set(Number(el.dataset.i), { country: el, marker: null as any }))
+  markerEls.forEach((el) => (byIndex.get(Number(el.dataset.i))!.marker = el))
 
-  type Live = { d: any, el: SVGCircleElement, nextBirthAt: number, nextDeathAt: number }
-  const live: Live[] = dots.map((d: any, i: number) => ({
-    d, el: circles[i],
+  type Live = { d: any, els: { country: SVGPathElement; marker: SVGCircleElement }, nextBirthAt: number, nextDeathAt: number }
+  const live: Live[] = simData.map((d: any, i: number) => ({
+    d, els: byIndex.get(i)!,
     nextBirthAt: d.bps > 0 ? nextInterval(d.bps, Math.random()) : Infinity,
     nextDeathAt: d.dps > 0 ? nextInterval(d.dps, Math.random()) : Infinity,
   }))
@@ -143,13 +164,14 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
   const BIRTH_COLOR = '#f3c667'
   const DEATH_COLOR = '#8892e8'
 
-  function pulse(el: SVGCircleElement, kind: 'birth' | 'death') {
-    const r = el.getBoundingClientRect()
-    ring(r.left + r.width / 2, r.top + r.height / 2, kind === 'birth' ? BIRTH_COLOR : DEATH_COLOR, 10)
-    el.classList.remove('flash-birth', 'flash-death')
-    // Forces the animation to restart even if this same dot just fired.
-    void el.getBoundingClientRect()
-    el.classList.add(kind === 'birth' ? 'flash-birth' : 'flash-death')
+  function pulse(els: { country: SVGPathElement; marker: SVGCircleElement }, kind: 'birth' | 'death') {
+    const r = els.marker.getBoundingClientRect()
+    ring(r.left + r.width / 2, r.top + r.height / 2, kind === 'birth' ? BIRTH_COLOR : DEATH_COLOR, 11)
+    for (const el of [els.country, els.marker] as (SVGPathElement | SVGCircleElement)[]) {
+      el.classList.remove('flash-birth', 'flash-death')
+      void el.getBoundingClientRect() // restarts the animation even if it just fired
+      el.classList.add(kind === 'birth' ? 'flash-birth' : 'flash-death')
+    }
   }
 
   let births = 0
@@ -159,7 +181,6 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
   let speed = 1
   let simNow = 0
   let lastReal = performance.now()
-  let visualBudget = 0
 
   const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
   const popValue = document.getElementById('popValue')!
@@ -167,7 +188,6 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
   const deathCount = document.getElementById('deathCount')!
   const netCount = document.getElementById('netCount')!
 
-  const startedAtSim = 0
   function frame(now: number) {
     requestAnimationFrame(frame)
     // Clamped so a backgrounded tab does not resume with an enormous dt and
@@ -176,17 +196,17 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
     lastReal = now
     const dtSim = dtReal * speed
     simNow += dtSim
-    visualBudget = 24 // per-frame cap on how many dots actually flash; the counters below are exact regardless.
+    let visualBudget = 24 // per-frame cap on how many countries actually flash; the counters below are exact regardless.
 
     for (const c of live) {
       while (c.nextBirthAt <= simNow) {
         births++
-        if (visualBudget-- > 0) pulse(c.el, 'birth')
+        if (visualBudget-- > 0) pulse(c.els, 'birth')
         c.nextBirthAt += nextInterval(c.d.bps, Math.random())
       }
       while (c.nextDeathAt <= simNow) {
         deaths++
-        if (visualBudget-- > 0) pulse(c.el, 'death')
+        if (visualBudget-- > 0) pulse(c.els, 'death')
         c.nextDeathAt += nextInterval(c.d.dps, Math.random())
       }
     }
@@ -196,16 +216,13 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
     const shownBirths = births + Math.floor(restBirthAccum)
     const shownDeaths = deaths + Math.floor(restDeathAccum)
     const net = shownBirths - shownDeaths
-    const elapsedSim = simNow
     const worldNow = worldPopulation + (restBps + live.reduce((s: number, c: any) => s + c.d.bps, 0)
-      - restDps - live.reduce((s: number, c: any) => s + c.d.dps, 0)) * elapsedSim
+      - restDps - live.reduce((s: number, c: any) => s + c.d.dps, 0)) * simNow
 
     popValue.textContent = fmt(worldNow)
     birthCount.textContent = fmt(shownBirths)
     deathCount.textContent = fmt(shownDeaths)
     netCount.textContent = (net >= 0 ? '+' : '') + fmt(net)
-
-    if (prefersReducedMotion) return
   }
   requestAnimationFrame(frame)
 
@@ -237,7 +254,7 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
   }
 
   function openInspector(i: number) {
-    const d = dots[i]
+    const d = simData[i]
     inspectorName.textContent = d.name
     inspectorPop.textContent = fmt(d.population) + ' people'
     inspectorBirth.textContent = `${d.birthRate} per 1,000 people a year`
@@ -247,10 +264,11 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
     inspector.hidden = false
     hint.hidden = true
   }
-  circles.forEach((el, i) => {
-    el.addEventListener('click', () => openInspector(i))
-    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInspector(i) } })
-  })
+  for (const [i, els] of byIndex) {
+    els.country.addEventListener('click', () => openInspector(i))
+    els.country.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInspector(i) } })
+    els.marker.addEventListener('click', () => openInspector(i))
+  }
   document.getElementById('inspectorClose')!.addEventListener('click', () => {
     inspector.hidden = true
     hint.hidden = false
@@ -263,28 +281,44 @@ const continentPaths = CONTINENTS.map((c) => continentPath(c.points))
   :global(.pop-body) { background: #060c14; color: #fff; }
   :global(.pop-body) .stage { position: relative; height: 100%; display: grid; place-items: center; padding: 54px 14px 14px; }
 
-  .mapwrap { width: 100%; max-width: 1100px; }
+  .mapwrap { width: 100%; max-width: 1200px; }
   #map { width: 100%; height: auto; display: block; overflow: visible; }
   .ocean { fill: #0a1420; }
-  .land { fill: #182a3a; stroke: #24384a; stroke-width: 0.4; }
 
-  .dot {
-    fill: #3a4d5e;
-    stroke: rgba(255, 255, 255, 0.18);
-    stroke-width: 0.3;
+  .country {
+    fill: #16232e;
+    stroke: #223140;
+    stroke-width: 0.25;
+  }
+  .country.sim {
+    fill: #1e3345;
+    stroke: #2f4a60;
     cursor: pointer;
-    transition: fill 160ms linear;
+    transition: fill 220ms ease-out;
   }
-  .dot:hover, .dot:focus-visible { fill: #5a7186; outline: none; }
-  .dot.flash-birth { animation: flashBirth 650ms ease-out; }
-  .dot.flash-death { animation: flashDeath 900ms ease-out; }
-  @keyframes flashBirth {
-    0% { fill: #fff6df; r: calc(var(--r, 3) * 1.9); }
-    100% { fill: #3a4d5e; }
+  .country.sim:hover, .country.sim:focus-visible { fill: #2a4a63; outline: none; }
+  .country.sim.flash-birth { animation: flashCountryBirth 900ms ease-out; }
+  .country.sim.flash-death { animation: flashCountryDeath 1100ms ease-out; }
+  @keyframes flashCountryBirth {
+    0% { fill: #6b5a34; } 100% { fill: #1e3345; }
   }
-  @keyframes flashDeath {
-    0% { fill: #cdd3ff; }
-    100% { fill: #3a4d5e; }
+  @keyframes flashCountryDeath {
+    0% { fill: #3d4270; } 100% { fill: #1e3345; }
+  }
+
+  .marker {
+    fill: #6e879c;
+    stroke: rgba(255, 255, 255, 0.25);
+    stroke-width: 0.2;
+    pointer-events: none;
+  }
+  .marker.flash-birth { animation: flashMarkerBirth 650ms ease-out; }
+  .marker.flash-death { animation: flashMarkerDeath 900ms ease-out; }
+  @keyframes flashMarkerBirth {
+    0% { fill: #fff6df; r: 3.4; } 100% { fill: #6e879c; r: 1.3; }
+  }
+  @keyframes flashMarkerDeath {
+    0% { fill: #dfe3ff; r: 3; } 100% { fill: #6e879c; r: 1.3; }
   }
 
   .hud {

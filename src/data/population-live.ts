@@ -19,7 +19,7 @@
  */
 export type Country = {
   name: string
-  /** Capital city, decimal degrees — the real point this country's dot sits at. */
+  /** Capital city, decimal degrees — the real point this country's label anchors near. */
   lat: number
   lon: number
   population: number
@@ -27,12 +27,16 @@ export type Country = {
   birthRate: number
   /** Crude death rate, per 1,000 people per year. */
   deathRate: number
+  /** Set only where the real country name differs from this game's own —
+   *  the name `COUNTRY_SHAPES` (src/data/population-geo.ts, generated from
+   *  Natural Earth) uses for the same country. */
+  atlasName?: string
 }
 
 export const COUNTRIES: Country[] = [
   { name: 'China', lat: 39.9, lon: 116.4, population: 1_422_584_933, birthRate: 9.7, deathRate: 7.82 },
   { name: 'India', lat: 28.61, lon: 77.21, population: 1_438_069_596, birthRate: 16.53, deathRate: 9.65 },
-  { name: 'United States', lat: 38.9, lon: -77.04, population: 343_477_335, birthRate: 12.21, deathRate: 8.42 },
+  { name: 'United States', lat: 38.9, lon: -77.04, population: 343_477_335, birthRate: 12.21, deathRate: 8.42, atlasName: 'United States of America' },
   { name: 'Indonesia', lat: -6.21, lon: 106.85, population: 281_190_067, birthRate: 15.05, deathRate: 6.77 },
   { name: 'Pakistan', lat: 33.68, lon: 73.05, population: 247_504_495, birthRate: 26.01, deathRate: 5.94 },
   { name: 'Nigeria', lat: 9.08, lon: 7.4, population: 227_882_945, birthRate: 34.0, deathRate: 8.52 },
@@ -44,7 +48,7 @@ export const COUNTRIES: Country[] = [
   { name: 'Japan', lat: 35.68, lon: 139.65, population: 124_370_947, birthRate: 6.9, deathRate: 11.74 },
   { name: 'Philippines', lat: 14.6, lon: 120.98, population: 114_891_199, birthRate: 22.17, deathRate: 6.1 },
   { name: 'Egypt', lat: 30.04, lon: 31.24, population: 114_535_772, birthRate: 20.48, deathRate: 4.32 },
-  { name: 'DR Congo', lat: -4.32, lon: 15.31, population: 105_789_731, birthRate: 39.64, deathRate: 7.74 },
+  { name: 'DR Congo', lat: -4.32, lon: 15.31, population: 105_789_731, birthRate: 39.64, deathRate: 7.74, atlasName: 'Dem. Rep. Congo' },
   { name: 'Vietnam', lat: 21.03, lon: 105.85, population: 100_352_192, birthRate: 15.29, deathRate: 5.77 },
   { name: 'Iran', lat: 35.69, lon: 51.39, population: 90_608_707, birthRate: 14.79, deathRate: 5.2 },
   { name: 'Turkey', lat: 39.93, lon: 32.86, population: 87_270_501, birthRate: 14.04, deathRate: 6.09 },

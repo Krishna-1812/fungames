@@ -1395,6 +1395,30 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     whole stylesheet `is:global` to avoid it; this one is the first to use
     the narrower, correct fix of wrapping only the `.pop-body` half.
 
+    **The first version of the map was not good enough, and shipping it
+    anyway was the actual mistake.** It drew its continents as twenty-odd
+    hand-placed points per landmass, smoothed into a blob, reasoned about in
+    the code comments as "honestly simplified" — and it looked exactly like
+    what it was: guessed shapes with dots floating near them, next to neal.fun's
+    own real, recognisable country borders. Being told so directly is what
+    fixed it, not a self-review; the lesson is to hold every visual to that bar
+    *before* shipping, not to wait for the comparison to be made for me.
+
+    The fix is real Natural Earth admin-0 country geometry —
+    `scripts/build-population-geo.mjs`, the same public-domain family of data
+    `build-world-data.mjs` already draws Asteroid Launcher's coastline from —
+    projected into the exact same coordinate space a capital city's real
+    lat/lon already used, so the two agree by construction rather than by
+    eye. All 176 real countries are drawn; the forty simulated ones sit on
+    their own real outline, which is what actually lights up gold or violet
+    now, the way the real thing this is modelled after does it, rather than a
+    small dot near an approximate shape. `check-population-live.mjs` grew a
+    matching check: every one of the forty resolves to a real atlas shape,
+    and every real capital coordinate lands inside that same country's own
+    real outline — a stronger, geometry-based version of the old "near the
+    right hand-drawn blob" heuristic, and one a hand-drawn backdrop could
+    never have earned.
+
 23. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Five new games, five checkers. The pattern that

@@ -11,8 +11,8 @@ register('./resolve-ts.mjs', import.meta.url)
 
 const { COUNTRIES, REST, WORLD_POPULATION, annualBirths, annualDeaths, globalTotals, SECONDS_PER_YEAR } =
   await import('../src/data/population-live.ts')
-const { CONTINENTS, project, nextInterval, rnd, LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, MAP_W, MAP_H } =
-  await import('../src/lib/population-map.ts')
+const { project, nextInterval, rnd, MAP_W, MAP_H } = await import('../src/lib/population-map.ts')
+const { COUNTRY_SHAPES } = await import('../src/data/population-geo.ts')
 
 let failures = 0
 const fail = (m) => { failures++; console.log(`  FAIL  ${m}`) }
@@ -65,7 +65,28 @@ console.log('data')
   )
 }
 
-/* ---- projection ----------------------------------------------------------- */
+/* ---- the map is real geometry, not a guess --------------------------------- */
+
+console.log('\nreal geometry')
+{
+  check(COUNTRY_SHAPES.length > 150, `${COUNTRY_SHAPES.length} real country shapes loaded from Natural Earth`)
+  const shapeNames = new Set(COUNTRY_SHAPES.map((s) => s.name))
+  const dupeShapes = COUNTRY_SHAPES.map((s) => s.name).filter((n, i, a) => a.indexOf(n) !== i)
+  check(dupeShapes.length === 0, `no duplicate shape names${dupeShapes.length ? ': ' + dupeShapes : ''}`)
+
+  // Every one of the forty has to actually resolve to a real shape — this is
+  // what the `atlasName` field on the two countries whose display name
+  // differs from Natural Earth's own (`United States`, `DR Congo`) exists to
+  // guarantee, and what would break silently if either name ever drifted.
+  let missing = 0
+  for (const c of COUNTRIES) {
+    if (!shapeNames.has(c.atlasName ?? c.name)) {
+      fail(`${c.name}: no real shape named "${c.atlasName ?? c.name}" in the atlas`)
+      missing++
+    }
+  }
+  check(missing === 0, 'every one of the forty countries resolves to a real Natural Earth shape')
+}
 
 console.log('\nprojection')
 {
@@ -79,42 +100,36 @@ console.log('\nprojection')
   }
   check(outOfFrame === 0, 'every country projects inside the map frame')
 
-  // A coarse sanity check on continent assignment: catches a sign error on
-  // longitude (the single most common way a real place ends up in the wrong
-  // hemisphere) far more reliably than staring at a list of numbers does.
-  const CONTINENT_OF = {
-    China: 'Asia', India: 'Asia', 'United States': 'North America', Indonesia: 'Asia',
-    Pakistan: 'Asia', Nigeria: 'Africa', Brazil: 'South America', Bangladesh: 'Asia',
-    Russia: 'Asia', Mexico: 'North America', Ethiopia: 'Africa', Japan: 'Asia',
-    Philippines: 'Asia', Egypt: 'Africa', 'DR Congo': 'Africa', Vietnam: 'Asia',
-    Iran: 'Asia', Turkey: 'Asia', Germany: 'Europe', Thailand: 'Asia',
-    'United Kingdom': 'Europe', France: 'Europe', Tanzania: 'Africa', 'South Africa': 'Africa',
-    Italy: 'Europe', Kenya: 'Africa', Colombia: 'South America', 'South Korea': 'Asia',
-    Sudan: 'Africa', Uganda: 'Africa', Spain: 'Europe', Algeria: 'Africa',
-    Argentina: 'South America', Iraq: 'Asia', Afghanistan: 'Asia', Canada: 'North America',
-    Poland: 'Europe', Ukraine: 'Europe', Morocco: 'Africa', 'Saudi Arabia': 'Asia',
+  // The real check a hand-drawn backdrop could never offer: does a country's
+  // real capital-city coordinate actually land inside (or very near) that
+  // same country's own real, surveyed outline? A sign error on longitude —
+  // the single most common way a real place ends up in the wrong hemisphere
+  // — fails this immediately, against real geometry rather than a guessed
+  // bounding shape.
+  const shapeByName = new Map(COUNTRY_SHAPES.map((s) => [s.name, s]))
+  const bboxOf = (path) => {
+    const nums = path.match(/-?\d+\.?\d*/g).map(Number)
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (let i = 0; i < nums.length; i += 2) {
+      minX = Math.min(minX, nums[i]); maxX = Math.max(maxX, nums[i])
+      minY = Math.min(minY, nums[i + 1]); maxY = Math.max(maxY, nums[i + 1])
+    }
+    return { minX, maxX, minY, maxY }
   }
-  const bounds = Object.fromEntries(
-    CONTINENTS.map((c) => {
-      const lats = c.points.map((p) => p[0])
-      const lons = c.points.map((p) => p[1])
-      return [c.name, { latMin: Math.min(...lats), latMax: Math.max(...lats), lonMin: Math.min(...lons), lonMax: Math.max(...lons) }]
-    }),
-  )
-  const MARGIN = 14
+  const MARGIN = 3 // degrees, i.e. map units here — a capital is not always the geometric middle
   let misplaced = 0
   for (const c of COUNTRIES) {
-    const want = CONTINENT_OF[c.name]
-    if (!want) continue
-    const b = bounds[want]
-    const inside =
-      c.lat >= b.latMin - MARGIN && c.lat <= b.latMax + MARGIN && c.lon >= b.lonMin - MARGIN && c.lon <= b.lonMax + MARGIN
+    const shape = shapeByName.get(c.atlasName ?? c.name)
+    if (!shape) continue // already reported above
+    const [x, y] = project(c.lat, c.lon)
+    const b = bboxOf(shape.path)
+    const inside = x >= b.minX - MARGIN && x <= b.maxX + MARGIN && y >= b.minY - MARGIN && y <= b.maxY + MARGIN
     if (!inside) {
-      fail(`${c.name}: (${c.lat}, ${c.lon}) is nowhere near the ${want} outline`)
+      fail(`${c.name}: capital projects to (${x.toFixed(1)}, ${y.toFixed(1)}), outside its own real outline's box (${b.minX.toFixed(1)}-${b.maxX.toFixed(1)}, ${b.minY.toFixed(1)}-${b.maxY.toFixed(1)})`)
       misplaced++
     }
   }
-  check(misplaced === 0, `all thirty-nine assigned countries land near their own continent's outline (±${MARGIN}°)`)
+  check(misplaced === 0, `all forty capitals land inside their own country's real outline (±${MARGIN} map units)`)
 }
 
 /* ---- the simulation's maths ------------------------------------------------ */
@@ -167,7 +182,7 @@ console.log('\ndeterminism')
 console.log('\nno emoji')
 {
   const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u
-  for (const f of ['src/data/population-live.ts', 'src/lib/population-map.ts', 'src/pages/every-second.astro']) {
+  for (const f of ['src/data/population-live.ts', 'src/lib/population-map.ts', 'src/pages/every-second.astro', 'src/data/population-geo.ts']) {
     check(!EMOJI.test(fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8')), `${f} has no emoji`)
   }
 }
