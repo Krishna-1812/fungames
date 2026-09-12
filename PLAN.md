@@ -1295,7 +1295,30 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     actually showing, so it can no longer send you somewhere the search box
     disagrees with.
 
-20. Then reassess against the depth work in Phases 1–2 above.
+20. ~~**A "Buy me a coffee" button**~~ — **done.** Requested with "integrate
+    payment and everything" — worth being explicit about what that turned
+    out to mean. The button links out to Buy Me a Coffee's own hosted
+    checkout; that service is the merchant of record and the entire payment
+    integration, and nothing on this site ever sees a card number or needs
+    a backend of its own to make that true. `SITE.buyMeACoffee` follows the
+    exact pattern `adsenseClient`/`plausibleDomain` already established —
+    a handle, not a URL, `''` disables the button — with a placeholder
+    handle (`'yourhandle'`) committed until a real account exists, the same
+    status `name`/`domain`/`email` are already in.
+
+    The icon is the drawn coffee mug already sitting unused in
+    `lib/icons.ts` — not a new drawing, and not the emoji every other coffee
+    button on the web reaches for. Its placement is registered in
+    `icon-uses.ts` (`home: ['coffee']`, a new `PAGES.home` entry) exactly
+    like every other icon's placement, which is what let `check-icons.mjs`
+    actually verify contrast here rather than trusting it by eye — 3.9:1 at
+    the 20px it renders at, over the `.about` card's approximate composited
+    colour (a translucent blur over the paper backdrop shader, whose own
+    luminance swing is kept within a few percent of `--paper` by design, so
+    a fixed near-white stand-in is an honest approximation rather than a
+    guess).
+
+21. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Three new games, three checkers. The pattern that
 worked all three times: build the model as pure functions over plain data, run

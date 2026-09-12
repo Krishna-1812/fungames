@@ -727,6 +727,14 @@ Everything user-facing is in `src/site.config.ts` — name, domain, tagline,
 contact, socials, Plausible domain, AdSense id. Analytics and ads render nothing
 until those are filled in.
 
+The homepage's "Buy me a coffee" button reads `SITE.buyMeACoffee` the same
+way — a Buy Me a Coffee handle, not a full URL, `''` to hide the button
+entirely. Buy Me a Coffee is the merchant of record: the button only ever
+links out to its hosted checkout, so nothing on this site touches a card
+number or needs its own payment backend. The placeholder handle in the
+committed config (`'yourhandle'`) needs swapping for a real account before
+the button goes anywhere useful — same as `name`/`domain`/`email` above.
+
 ## What neal.fun has that this does not
 
 - Hand-drawn tile art. Every tile here has its own illustration rather than a

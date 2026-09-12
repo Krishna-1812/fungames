@@ -30,4 +30,17 @@ export const SITE = {
 
   /** Origin of the deployed Cloudflare Worker that backs /fusion/. */
   fusionApi: '/api/fusion/pair',
+
+  /**
+   * Buy Me a Coffee handle — the part of buymeacoffee.com/<handle> after the
+   * slash, not a full URL. '' hides the button entirely, same as
+   * adsenseClient above. The payment itself is never this site's problem:
+   * Buy Me a Coffee is the merchant of record and runs its own hosted
+   * checkout, so nothing here ever touches a card number.
+   *
+   * 'yourhandle' is a placeholder — swap it for a real account before this
+   * goes live, the same way `name`/`domain`/`email` above are placeholders
+   * until a real brand is picked.
+   */
+  buyMeACoffee: 'yourhandle',
 } as const

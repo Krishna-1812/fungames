@@ -6,6 +6,7 @@ import TileArt from '../components/TileArt.astro'
 import AdSlot from '../components/AdSlot.astro'
 import { SITE } from '../site.config'
 import { listedGames, gamesByCategory } from '../data/games'
+import { iconSvg } from '../lib/icons'
 
 // Newest first, the same ordering neal.fun uses.
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
@@ -271,6 +272,17 @@ const confetti = games.map((g, i) => ({
         Everything here is free, works without an account, and fits on one page.
       </p>
       <div class="links">
+        {SITE.buyMeACoffee && (
+          <a
+            class="btn coffee-btn"
+            href={`https://www.buymeacoffee.com/${SITE.buyMeACoffee}`}
+            target="_blank"
+            rel="noopener"
+          >
+            <span class="coffee-icon" set:html={iconSvg('coffee')} />
+            Buy me a coffee
+          </a>
+        )}
         <button type="button" class="btn" id="lucky">Surprise me</button>
         {SITE.social.twitter && <a class="btn" href={SITE.social.twitter}>Twitter</a>}
         {SITE.social.instagram && <a class="btn" href={SITE.social.instagram}>Instagram</a>}
@@ -511,6 +523,20 @@ const confetti = games.map((g, i) => ({
     box-shadow: var(--sticker-shadow-hover);
   }
   .btn:active { transform: translateY(0) rotate(0deg); box-shadow: 1px 2px 0 rgba(22, 21, 26, 0.18); }
+
+  /* Buy Me a Coffee's own yellow rather than the site's neutral sticker
+     tone — the one button here that is a real, named external service
+     deserves to look like it, the same reasoning the "Twitter"/"Instagram"
+     links already act on by naming themselves plainly rather than as
+     "Socials". The drawn mug (lib/icons.ts, on the same 24-unit grid as
+     every other icon on the site) replaces the emoji every other coffee
+     button on the web uses. */
+  .coffee-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: #2a1a05; border-color: #caa100;
+    background: linear-gradient(180deg, #ffe066 0%, #ffc93c 100%);
+  }
+  .coffee-icon { width: 20px; height: 20px; display: inline-flex; flex: none; }
 
   .foot {
     display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
