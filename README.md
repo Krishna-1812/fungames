@@ -747,6 +747,21 @@ P(interval > mean) is within a hair of 1/e ≈ 0.368 — the exponential
 distribution's own signature, and proof this is really memoryless rather than
 merely correct on average.
 
+`check-result-card.mjs` — the share card every game's result screen can
+generate — found a bug in itself rather than in any game. It renders each
+card's text with `resvg` to measure whether the layout's own width estimate
+actually holds, and the first version left the font unspecified beyond
+`"Arial, Helvetica, sans-serif"`, the same string the real card's SVG uses.
+That resolves to whatever font resvg finds installed on the machine running
+the check — real Arial on a Windows dev box, something else (wider, in
+practice) on a bare Linux CI runner with neither Arial nor Helvetica
+installed — so the exact same code passed locally and failed in CI, on every
+commit, for a reason with nothing to do with any actual layout bug. The fix
+is `scripts/fonts/`: Arimo, Google's own metric-compatible substitute for
+Arial, fetched once and committed, loaded explicitly with system font
+discovery turned off — so the checker's answer is the same on every machine
+that runs it, which is the one property a checker cannot work without.
+
 QA against `npm run preview`. Astro's dev server caches component CSS
 aggressively and will happily serve you a stale stylesheet after an edit; if
 styles look wrong in dev, stop the server, `rm -rf node_modules/.vite .astro`,

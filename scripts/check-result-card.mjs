@@ -39,8 +39,27 @@
  */
 import { Resvg } from '@resvg/resvg-js'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
+
+/**
+ * Every `new Resvg(...)` call below passes this. Without it, resvg falls back
+ * to whatever "Arial, Helvetica, sans-serif" resolves to on the machine
+ * actually running the check — real Arial on a dev machine that has it
+ * installed, something else (wider, in practice) on a bare CI runner that
+ * does not. That made every assertion in this file about whether text fits
+ * pass locally and fail in CI, for a reason with nothing to do with any
+ * actual layout bug. Arimo is Google's own metric-compatible substitute for
+ * Arial — see scripts/fonts/README.md — loaded explicitly and with system
+ * font discovery turned off, so the answer is the same everywhere.
+ */
+const FONT_DIR = fileURLToPath(new URL('./fonts/', import.meta.url))
+const FONT = {
+  loadSystemFonts: false,
+  fontFiles: [`${FONT_DIR}Arimo-Regular.ttf`, `${FONT_DIR}Arimo-Bold.ttf`],
+  sansSerifFamily: 'Arimo',
+}
 
 const { listedGames } = await import('../src/data/games.ts')
 const { resultCardSvg, CARD, emWidth, layout, WIDTH_TOLERANCE } = await import('../src/lib/result-card.ts')
@@ -193,6 +212,7 @@ function render(card) {
   if (hit) return hit
   const img = new Resvg(resultCardSvg(card), {
     fitTo: { mode: 'width', value: Math.round(CARD.W * SCALE) },
+    font: FONT,
   }).render()
   // `.pixels` allocates a fresh buffer on every read.
   const out = { px: img.pixels, W: img.width, H: img.height }
@@ -506,7 +526,7 @@ console.log('\nthe width estimate against what actually sets')
       `<rect width="1400" height="200" fill="#fff"/>` +
       `<text x="20" y="140" font-family="Arial, Helvetica, sans-serif" font-size="${SIZE}" ` +
       `font-weight="700" fill="#000">${word.replace(/&/g, '&amp;')}</text></svg>`
-    const img = new Resvg(svg, { fitTo: { mode: 'width', value: 1400 } }).render()
+    const img = new Resvg(svg, { fitTo: { mode: 'width', value: 1400 }, font: FONT }).render()
     const px = img.pixels
     let maxX = 20
     for (let y = 0; y < img.height; y++)
@@ -538,6 +558,7 @@ if (sheetAt >= 0) {
   const parts = shown.map((g, i) =>
     new Resvg(resultCardSvg({ slug: g.slug, siteName: SITE, ...SAMPLES[i % SAMPLES.length] }), {
       fitTo: { mode: 'width', value: 600 },
+      font: FONT,
     }).render(),
   )
   const strip = parts
