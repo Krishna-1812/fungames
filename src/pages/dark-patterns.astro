@@ -25,7 +25,14 @@ import { withBase } from '../lib/base'
 ---
 
 <GameLayout slug="dark-patterns" bar="#1a1206" bodyClass="dp-body">
+  <div class="dp-bg" aria-hidden="true">
+    <div class="dp-spot dp-spot-a"></div>
+    <div class="dp-spot dp-spot-b"></div>
+    <div class="dp-grain"></div>
+  </div>
+
   <div class="intro" id="intro">
+    <p class="dp-eyebrow">Eleven fake websites · one real lesson</p>
     <h1>Dark Patterns</h1>
     <p>
       Eleven interfaces, each built to get something out of you that a plain
@@ -34,7 +41,13 @@ import { withBase } from '../lib/base'
       fake site rather than a screenshot. Look closely. Some of them are
       genuinely hard to beat.
     </p>
-    <button type="button" class="dp-begin" id="begin">Open the first one</button>
+    <button type="button" class="dp-begin" id="begin">
+      <span>Open the first one</span>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <ol class="dp-preview" aria-hidden="true">
+      {PATTERNS.map((p) => <li title={p.title}></li>)}
+    </ol>
   </div>
 
   <section class="stage" id="stage" hidden>
@@ -44,9 +57,14 @@ import { withBase } from '../lib/base'
     </div>
 
     <div class="frame">
+      <i class="dp-load" id="load" aria-hidden="true"></i>
       <div class="framebar">
         <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="url" id="url">example.com</span>
+        <span class="addr">
+          <i class="favicon" id="favicon" aria-hidden="true"></i>
+          <span class="url" id="url">example.com</span>
+        </span>
+        <span class="framebar-spacer" aria-hidden="true"></span>
       </div>
       <div class="frametop">
         <p class="ptitle" id="ptitle">Pattern</p>
@@ -56,15 +74,25 @@ import { withBase } from '../lib/base'
     </div>
 
     <div class="reveal" id="reveal" hidden>
-      <p class="outcome" id="outcome">You spotted it.</p>
+      <p class="outcome" id="outcome"><i class="outcome-icon" id="outcomeIcon" aria-hidden="true"></i><span id="outcomeText">You spotted it.</span></p>
       <p class="revealtext" id="revealtext"></p>
       <p class="citation" id="citation"></p>
-      <button type="button" class="dp-begin" id="next">Next pattern</button>
+      <button type="button" class="dp-begin" id="next">
+        <span>Next pattern</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </div>
   </section>
 
   <section class="verdict" id="verdict" hidden>
-    <p class="stamp" id="stamp">6 of 11</p>
+    <div class="dp-ring">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10"/>
+        <circle id="ringFill" cx="60" cy="60" r="52" fill="none" stroke="#5cd6a0" stroke-width="10"
+          stroke-linecap="round" transform="rotate(-90 60 60)"/>
+      </svg>
+      <p class="stamp" id="stamp">6/11</p>
+    </div>
     <p class="score"><span id="scoreline">You dodged 6 of 11.</span></p>
     <p class="detail" id="detail"></p>
 
@@ -120,8 +148,16 @@ import { withBase } from '../lib/base'
   const intro = $('intro'), stage = $('stage')
   const stepline = $('stepline'), bar = $('bar')
   const url = $('url'), ptitle = $('ptitle'), lede = $('lede'), slot = $('slot')
-  const revealBox = $('reveal'), outcomeEl = $('outcome'), revealText = $('revealtext'), citation = $('citation')
+  const favicon = $('favicon'), loadBar = $('load')
+  const revealBox = $('reveal'), outcomeEl = $('outcome'), outcomeIcon = $('outcomeIcon'), outcomeText = $('outcomeText')
+  const revealText = $('revealtext'), citation = $('citation')
   const nextBtn = $('next') as HTMLButtonElement
+
+  const TICK = '<svg viewBox="0 0 24 24"><path d="m5 12.5 5 5 9-11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  const CROSS = '<svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>'
+  // A different hue per fake site, cycling — the one thing that stays
+  // constant is that every site gets a confident, branded-looking dot.
+  const FAVICON_HUES = ['#ffb020', '#6fe0a0', '#7ec2ff', '#ff9a7e', '#e0a4ff']
 
   type Outcome = 'dodged' | 'fell'
   type Api = { resolve: (outcome: Outcome, note: string) => void }
@@ -526,7 +562,8 @@ import { withBase } from '../lib/base'
     resolve(outcome, note) {
       const p = PATTERNS[idx]
       results.push({ id: p.id, title: p.title, real: p.real, outcome, note })
-      outcomeEl.textContent = outcome === 'dodged' ? 'You spotted it.' : 'You fell for it.'
+      outcomeText.textContent = outcome === 'dodged' ? 'You spotted it.' : 'You fell for it.'
+      outcomeIcon.innerHTML = outcome === 'dodged' ? TICK : CROSS
       outcomeEl.dataset.tone = outcome
       revealText.textContent = p.reveal
       citation.textContent = `Catalogued as: ${p.title} — ${p.real}`
@@ -550,6 +587,16 @@ import { withBase } from '../lib/base'
     bar.style.width = `${((i + 1) / PATTERNS.length) * 100}%`
     revealBox.hidden = true
     slot.innerHTML = ''
+
+    // A new "site" gets its own favicon monogram and a brief loading sweep
+    // across the top of the frame — the small tell that this is a different
+    // place loading, not the same page relabelled.
+    favicon.textContent = p.site[0].toUpperCase()
+    ;(favicon as HTMLElement).style.background = FAVICON_HUES[i % FAVICON_HUES.length]
+    loadBar.classList.remove('go')
+    void (loadBar as HTMLElement).offsetWidth
+    loadBar.classList.add('go')
+
     MOUNTS[p.id](slot, api)
   }
 
@@ -577,8 +624,34 @@ import { withBase } from '../lib/base'
     const dodged = results.filter((r) => r.outcome === 'dodged').length
     const fell = results.length - dodged
 
-    $('stamp').textContent = `${dodged} / ${results.length}`
-    $('stamp').dataset.tone = dodged === results.length ? 'good' : dodged === 0 ? 'bad' : 'mid'
+    const tone = dodged === results.length ? 'good' : dodged === 0 ? 'bad' : 'mid'
+    const stampEl = $('stamp')
+    stampEl.dataset.tone = tone
+    const ringFill = $('ringFill') as unknown as SVGCircleElement
+    const CIRC = 2 * Math.PI * 52
+    ringFill.style.strokeDasharray = String(CIRC)
+    ringFill.style.strokeDashoffset = String(CIRC)
+    ringFill.style.stroke = tone === 'good' ? '#5cd6a0' : tone === 'bad' ? '#ff8a6a' : '#ffc94d'
+
+    // Count up rather than just appear — the number is the one thing on this
+    // whole page worth a beat of suspense.
+    if (prefersReducedMotion) {
+      stampEl.textContent = `${dodged}/${results.length}`
+      ringFill.style.strokeDashoffset = String(CIRC * (1 - dodged / results.length))
+    } else {
+      const t0 = performance.now()
+      const DUR = 900
+      const step = (t: number) => {
+        const p = Math.min(1, (t - t0) / DUR)
+        const eased = 1 - Math.pow(1 - p, 3)
+        const shown = Math.round(eased * dodged)
+        stampEl.textContent = `${shown}/${results.length}`
+        ringFill.style.strokeDashoffset = String(CIRC * (1 - eased * (dodged / results.length)))
+        if (p < 1) requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    }
+
     $('scoreline').textContent = `You dodged ${dodged} of ${results.length}${fell ? `, and fell for ${fell}` : ''}.`
     $('detail').textContent =
       fell === 0
@@ -633,7 +706,36 @@ import { withBase } from '../lib/base'
     color: #f3ead9;
   }
 
-  .dp-body .game { padding-bottom: 14vh; }
+  .dp-body .game { padding-bottom: 14vh; position: relative; }
+
+  /* ---- ambient background -------------------------------------------- */
+  .dp-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .dp-spot {
+    position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%;
+    filter: blur(60px); opacity: 0.16;
+  }
+  .dp-spot-a {
+    top: -20vmax; left: -10vmax; background: radial-gradient(circle, #ffb020, transparent 70%);
+    animation: dp-drift-a 26s ease-in-out infinite;
+  }
+  .dp-spot-b {
+    bottom: -25vmax; right: -15vmax; background: radial-gradient(circle, #5c3fd6, transparent 70%);
+    opacity: 0.14;
+    animation: dp-drift-b 32s ease-in-out infinite;
+  }
+  @keyframes dp-drift-a {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(6vmax, 4vmax) scale(1.12); }
+  }
+  @keyframes dp-drift-b {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-5vmax, -6vmax) scale(1.08); }
+  }
+  .dp-grain {
+    position: absolute; inset: -50%; opacity: 0.05; mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .dp-body .intro, .dp-body .stage, .dp-body .verdict, .dp-body .chrome { position: relative; z-index: 1; }
 
   /* ---- intro -------------------------------------------------------- */
   .intro {
@@ -642,19 +744,48 @@ import { withBase } from '../lib/base'
     padding: 0 22px;
     text-align: center;
   }
-  .intro h1 { font-size: clamp(34px, 7vw, 56px); margin: 0 0 16px; letter-spacing: -0.03em; }
+  .dp-eyebrow {
+    font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #ffc94d; opacity: 0.85; margin: 0 0 14px; font-weight: 600;
+  }
+  .intro h1 {
+    font-size: clamp(34px, 7vw, 56px); margin: 0 0 16px; letter-spacing: -0.03em;
+    background: linear-gradient(165deg, #fff8ea, #ffc94d 130%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
   .intro p { font-size: 17px; line-height: 1.6; opacity: 0.82; margin: 0 auto 28px; max-width: 52ch; }
 
   .dp-begin {
     appearance: none; border: 0; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 9px;
     background: linear-gradient(165deg, #ffc94d, #f0a020);
     color: #241505; font-weight: 700; font-size: 16px;
-    padding: 14px 26px; border-radius: 999px;
+    padding: 14px 22px 14px 26px; border-radius: 999px;
     box-shadow: 0 10px 26px -10px rgba(255, 176, 32, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     transition: transform 180ms var(--ease-bounce, ease), box-shadow 180ms ease;
   }
+  .dp-begin svg { transition: transform 180ms var(--ease-bounce, ease); }
   .dp-begin:hover { transform: translateY(-2px) scale(1.03); }
+  .dp-begin:hover svg { transform: translateX(3px); }
   .dp-begin:active { transform: translateY(0) scale(0.98); }
+
+  .dp-preview {
+    display: flex; justify-content: center; gap: 7px; flex-wrap: wrap;
+    list-style: none; margin: 34px 0 0; padding: 0;
+  }
+  .dp-preview li {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: linear-gradient(165deg, #ffc94d, #f0a020);
+    opacity: 0.4;
+    animation: dp-twinkle 2.4s ease-in-out infinite;
+  }
+  .dp-preview li:nth-child(odd) { animation-delay: -1.2s; }
+  .dp-preview li:nth-child(3n) { animation-delay: -0.6s; }
+  @keyframes dp-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dp-spot, .dp-preview li { animation: none; }
+  }
 
   /* ---- HUD ------------------------------------------------------------ */
   .stage { max-width: 620px; margin: 6vh auto 0; padding: 0 20px 12vh; }
@@ -665,11 +796,25 @@ import { withBase } from '../lib/base'
 
   /* ---- the fake browser window ------------------------------------- */
   .frame {
+    position: relative;
     background: #1d140a;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  /* A thin bright line that sweeps across the top the instant a new "site"
+     loads — browsers have trained everyone to read this as a page arriving. */
+  .dp-load {
+    position: absolute; top: 0; left: 0; height: 2.5px; width: 40%;
+    background: linear-gradient(90deg, transparent, #ffe08a, transparent);
+    opacity: 0; z-index: 2;
+  }
+  .dp-load.go { animation: dp-sweep 620ms ease-out; }
+  @keyframes dp-sweep {
+    0% { opacity: 1; transform: translateX(-40%); }
+    85% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(250%); }
   }
   .framebar {
     display: flex; align-items: center; gap: 10px;
@@ -677,10 +822,21 @@ import { withBase } from '../lib/base'
   }
   .dots { display: flex; gap: 6px; }
   .dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); }
+  .addr {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    background: rgba(0, 0, 0, 0.22); border-radius: 999px; padding: 5px 14px;
+  }
+  .favicon {
+    width: 14px; height: 14px; border-radius: 4px; flex: none;
+    display: grid; place-items: center; font-style: normal;
+    font-size: 9px; font-weight: 800; color: #241505;
+    transition: background 200ms ease;
+  }
   .url {
-    flex: 1; text-align: center; font-size: 12.5px; opacity: 0.55;
+    text-align: center; font-size: 12.5px; opacity: 0.6;
     font-family: var(--mono, monospace); letter-spacing: 0.01em;
   }
+  .framebar-spacer { width: 27px; }
   .frametop { padding: 18px 20px 6px; }
   .ptitle { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
   .lede { margin: 6px 0 0; opacity: 0.7; font-size: 14.5px; }
@@ -695,14 +851,27 @@ import { withBase } from '../lib/base'
     color: #241505; font-weight: 700; font-size: 14.5px;
     padding: 12px 18px; border-radius: 11px;
     box-shadow: 0 8px 20px -8px rgba(255, 176, 32, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    transition: transform 150ms ease;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+    animation: dp-breathe 2.6s ease-in-out infinite;
   }
-  .dp-trap:hover { transform: translateY(-1px); }
+  /* The one continuous animation every trap button shares — a slow, gentle
+     glow-pulse, because a real "act now" button is never quite still either.
+     Subtle on purpose: the joke is that this barely registers consciously. */
+  @keyframes dp-breathe {
+    0%, 100% { box-shadow: 0 8px 20px -8px rgba(255, 176, 32, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+    50% { box-shadow: 0 8px 26px -6px rgba(255, 176, 32, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+  }
+  .dp-trap:hover { transform: translateY(-1px) scale(1.015); animation-play-state: paused; }
+  .dp-trap:active { transform: translateY(0) scale(0.98); }
   .dp-honest {
-    background: none; color: #cabb9a; font-size: 12.5px; opacity: 0.75;
-    text-decoration: underline; text-underline-offset: 3px; padding: 6px;
+    background: none; color: #cabb9a; font-size: 12.5px; opacity: 0.7;
+    text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; padding: 6px;
+    transition: opacity 150ms ease, text-decoration-color 150ms ease;
   }
-  .dp-honest:hover { opacity: 1; }
+  .dp-honest:hover { opacity: 1; text-decoration-color: currentColor; }
+  @media (prefers-reduced-motion: reduce) {
+    .dp-trap { animation: none; }
+  }
   .dp-note { font-size: 12.5px; opacity: 0.55; min-height: 1.4em; margin: 10px 0 0; }
 
   .modal-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; }
@@ -777,21 +946,48 @@ import { withBase } from '../lib/base'
 
   /* reveal panel */
   .reveal {
-    max-width: 620px; margin: 18px auto 0; padding: 20px 22px;
+    position: relative;
+    max-width: 620px; margin: 18px auto 0; padding: 20px 22px 20px 26px;
     background: #1d140a; border: 1px solid rgba(255, 176, 32, 0.24); border-radius: 14px;
     opacity: 0; transform: translateY(6px);
+    overflow: hidden;
   }
+  .reveal::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: currentColor; color: #ffc94d;
+  }
+  .reveal:has(.outcome[data-tone='dodged'])::before { color: #5cd6a0; }
+  .reveal:has(.outcome[data-tone='fell'])::before { color: #ff8a6a; }
   .reveal.in { animation: dp-reveal-in 320ms ease forwards; }
   @keyframes dp-reveal-in { to { opacity: 1; transform: none; } }
-  .outcome { margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .outcome {
+    display: flex; align-items: center; gap: 9px;
+    margin: 0 0 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .outcome-icon {
+    display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none;
+  }
+  .outcome-icon svg { width: 13px; height: 13px; }
   .outcome[data-tone='dodged'] { color: #5cd6a0; }
+  .outcome[data-tone='dodged'] .outcome-icon { background: rgba(92, 214, 160, 0.16); }
   .outcome[data-tone='fell'] { color: #ff8a6a; }
+  .outcome[data-tone='fell'] .outcome-icon { background: rgba(255, 138, 106, 0.16); }
   .revealtext { margin: 0; font-size: 15px; line-height: 1.6; opacity: 0.9; }
   .citation { margin: 12px 0 18px; font-size: 12.5px; opacity: 0.5; font-style: italic; }
 
   /* ---- verdict --------------------------------------------------------- */
   .verdict { max-width: 640px; margin: 8vh auto 10vh; padding: 0 22px; text-align: center; }
-  .verdict .stamp { font-size: clamp(38px, 8vw, 58px); font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+  .dp-ring { position: relative; width: 156px; height: 156px; margin: 0 auto; }
+  .dp-ring svg { width: 100%; height: 100%; }
+  #ringFill {
+    transition: stroke-dashoffset 120ms linear, stroke 200ms ease;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+  .dp-ring .stamp {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .verdict .stamp { font-size: clamp(30px, 6vw, 42px); font-weight: 800; margin: 0; letter-spacing: -0.02em; }
   .verdict .stamp[data-tone='good'] { color: #5cd6a0; }
   .verdict .stamp[data-tone='mid'] { color: #ffc94d; }
   .verdict .stamp[data-tone='bad'] { color: #ff8a6a; }
