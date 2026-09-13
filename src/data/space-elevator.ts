@@ -69,6 +69,14 @@ export const TOTAL_ALTITUDE = ZONES[ZONES.length - 1].to
 
 export const MARKERS: Marker[] = [
   {
+    altitude: 600, title: 'A grey, overcast sky',
+    note: 'Stratus clouds — the flat, featureless blanket that turns a whole sky one colour — sit unusually low, typically under 2,000 metres. This is the cloud that makes a ceiling feel close enough to touch.',
+  },
+  {
+    altitude: 1_500, title: 'A fair-weather cumulus',
+    note: 'The cartoon cloud — flat-bottomed, cauliflower-topped — forms where a rising bubble of warm, moist air cools past its dew point. That almost always happens within the lowest two kilometres.',
+  },
+  {
     altitude: 8_848.86, title: 'Mount Everest’s summit',
     note: 'Officially remeasured by Nepal and China together in December 2020 — the first time both countries agreed on one number.',
   },
@@ -83,6 +91,11 @@ export const MARKERS: Marker[] = [
   {
     altitude: 11_300, title: 'The highest a bird has ever been confirmed flying',
     note: 'A Rüppell’s griffon vulture, struck by a commercial aircraft over Abidjan, Ivory Coast, on 29 November 1973. Feather remains let the American Museum of Natural History identify it. The species is rarely seen above 6,000 metres.',
+    big: true,
+  },
+  {
+    altitude: 11_600, title: 'A cumulonimbus, flattening into an anvil',
+    note: 'A storm strong enough to reach here stops climbing and spreads sideways — the stable stratosphere above is too stiff to push through, and that flat top is the collision.',
     big: true,
   },
   {

@@ -366,24 +366,31 @@ every marker actually lands inside the zone it claims to.*
 instead of descending: sea level to the Kármán line, the internationally
 recognised edge of space, 100,000 real metres up, zoned by the real
 atmospheric layers (troposphere, stratosphere, mesosphere, thermosphere)
-rather than an invented scale. Every one of its twenty markers is a genuine
-altitude record — Mount Everest, the highest bird ever confirmed flying,
-Concorde's cruising altitude, the SR-71's speed record, three real
-stratospheric skydives (Kittinger, Baumgartner, Eustace), Tsar Bomba's
-mushroom cloud, and the Kármán line itself. The one number computed live
-rather than looked up is the outside air temperature, from the real US
-Standard Atmosphere 1976 formula — the same seven-layer model aviation uses,
-faithful enough that it reproduces the model's own textbook reference points
-(15°C at sea level, -56.5°C at the tropopause, -2.5°C at the stratopause) on
-the nose, and honest enough to say "no single temperature" once you climb
-past its real 86km ceiling rather than fake one. The closing section doesn't
-reach for a joke ending: it explains, in real materials-science terms, why
-nobody has actually built a space elevator to geostationary orbit yet — not
+rather than an invented scale. Every one of its twenty-three markers is a
+genuine altitude record — Mount Everest, the highest bird ever confirmed
+flying, three real cloud genera at their real altitudes (a cumulonimbus
+flattening into its anvil right at the tropopause), Concorde's cruising
+altitude, the SR-71's speed record, three real stratospheric skydives
+(Kittinger, Baumgartner, Eustace), Tsar Bomba's mushroom cloud, and the
+Kármán line itself — every one now drawn, not just described. A single
+cable and elevator car climb continuously from a hand-drawn mountain
+horizon at the very start all the way to the edge of space, its position
+tied directly to real scroll altitude; a deterministic starfield fades in
+through the upper stratosphere; the HUD glows and pulses with the current
+zone's own sky colour. The one number computed live rather than looked up
+is the outside air temperature, from the real US Standard Atmosphere 1976
+formula — the same seven-layer model aviation uses, faithful enough that it
+reproduces the model's own textbook reference points (15°C at sea level,
+-56.5°C at the tropopause, -2.5°C at the stratopause) on the nose, and
+honest enough to say "no single temperature" once you climb past its real
+86km ceiling rather than fake one. The closing section doesn't reach for a
+joke ending: it explains, in real materials-science terms, why nobody has
+actually built a space elevator to geostationary orbit yet — not
 imagination, a genuine unsolved cable-strength problem. *`scripts/check-
 space-elevator.mjs` checks the temperature formula against those textbook
 values and for continuity across every layer seam, and checks that all
-twenty markers are sorted by real altitude and land inside the zone their
-altitude claims.*
+twenty-three markers are sorted by real altitude and land inside the zone
+their altitude claims.*
 
 **How Fast Are You Moving?** — seven real, cited speeds stack live while you
 scroll: your tectonic plate drifting, the Earth turning beneath you (computed

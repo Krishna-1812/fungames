@@ -1554,8 +1554,8 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     after. Reuses *The Deep Sea*'s proven architecture — real zone boundaries,
     markers placed at their true position rather than spaced out to look
     nice, a scroll-linked HUD — climbing from sea level to the Kármán line
-    instead of descending to Challenger Deep. All twenty markers are genuine
-    altitude records, independently verified: Mount Everest's 2020-remeasured
+    instead of descending to Challenger Deep. All twenty-three markers are
+    genuine altitude records, independently verified: Mount Everest's 2020-remeasured
     summit, the 1973 vulture/aircraft collision that still holds the
     highest-confirmed-bird-flight record, three real stratospheric skydives
     fifty-four years apart (Kittinger 1960, Baumgartner 2012, Eustace 2014),
