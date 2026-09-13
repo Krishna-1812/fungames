@@ -712,6 +712,34 @@ name doesn't get "translated," which is exactly why Apus ("Bird of
 Paradise") does. Both surfaced as checker failures against an assumption
 that turned out to be the wrong one, not the data.
 
+Requested the same hyper-realistic pass one turn after shipping, and
+neal.fun's own page again turned up specific, structural things the first
+build didn't have: its brightest stars bloom a soft coloured halo and the
+handful of very brightest throw a real four-point diffraction spike, real
+constellation names float directly over their own line figures rather than
+waiting for a click, and the toolbar is icon-only, a tooltip per icon,
+with the colour picker opening as a floating popover instead of sitting
+inline. All four are real now — `drawStar()`'s radial-gradient halo skips
+anything dimmer than magnitude 4.2 (sub-pixel anyway, and skipping it keeps
+~8,900 stars a frame cheap), `drawConstellationLabels()` finds each visible
+constellation's topmost on-screen point every frame and labels it there,
+three new drawn icons (undo, trash, a link glyph) replace the old text
+buttons, and the coordinate readout now matches the real page's own
+precision — seconds of RA, arcminutes of Dec. One bug came out of measuring
+rather than reading: the hint text below the toolbar wrapped to two lines
+on an ordinary-width screen despite its own `max-width` leaving room, because
+an absolutely-positioned box anchored by `left: 50%` with no `right` sizes
+itself against the space from that edge to the container's far edge — half
+the viewport — regardless of the centring transform layered on top;
+`getComputedStyle` plus `offsetWidth`/`scrollWidth` on the live element is
+what showed it, and `width: max-content` alongside the existing `max-width`
+fixed it. A second, unrelated cascade lesson: giving the colour popover its
+own `display: flex` also beat the browser's default `[hidden] { display:
+none }` on the same element, since author rules always outrank the
+user-agent stylesheet regardless of the `hidden` attribute being present —
+fixed with an explicit `.swatches[hidden] { display: none }`, not by
+removing the rule that made the popover work in the first place.
+
 ---
 
 ## Sound

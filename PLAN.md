@@ -1745,7 +1745,54 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     needed `:global` to reach the `set:html`-injected markup at all — the
     same trap for the fourth real time on this site.
 
-32. Then reassess against the depth work in Phases 1–2 above.
+32. ~~**Constellation Draw — hyper-realistic pass.**~~ **done.** The same
+    proactive follow-up the last two new games got, one turn after shipping,
+    with the same discipline: actually open neal.fun's own `/constellation-draw/`
+    page and look, rather than redesign from memory of the first pass. It
+    turned up a real, specific visual gap the first build's flat 0.5–2.6px
+    dots never had — the real page's brightest stars bloom a soft coloured
+    halo and the very brightest throw a four-point diffraction spike, real
+    constellation names float directly over their own line figures rather
+    than only appearing on click, and the whole toolbar is icon-only with a
+    tooltip per icon and a colour swatch that opens its palette in a
+    floating popover instead of a fixed inline row.
+
+    All four became real changes, not cosmetic ones: `drawStar()` in
+    `constellation-draw.astro` adds a radial-gradient halo (skipped below
+    magnitude 4.2, where it would be sub-pixel anyway, to keep ~8,900
+    stars/frame cheap) and a linear-gradient diffraction cross for anything
+    brighter than magnitude 1.5; `drawConstellationLabels()` finds each
+    visible constellation's topmost on-screen point every frame and labels
+    it there; three new icons (`undo`, `trash`, `link`) were drawn for
+    `lib/icons.ts` to make the toolbar icon-only at all, `star-color.ts`
+    gained a `starRgb()` export returning `[r,g,b]` numbers (the halo
+    gradient needs to vary alpha per stop; re-parsing the existing `rgb()`
+    string every star every frame would have been needless work); and the
+    real page's own coordinate readout — seconds of RA, arcminutes of Dec,
+    not just whole degrees — was matched exactly.
+
+    One real layout bug came out of it, the kind that only shows up by
+    measuring, not reading: the hint text below the toolbar was wrapping to
+    two lines on a perfectly ordinary width, even though its own `max-width`
+    left more than enough room. `getComputedStyle` plus `offsetWidth`/
+    `scrollWidth` on the live element showed why — an absolutely positioned
+    block with `left: 50%` and no `right` sizes itself by shrink-to-fit
+    against the space from that `left` edge to the container's far edge
+    (a CSS spec rule, not a bug in the browser), which here was only half
+    the viewport; the `translateX(-50%)` centring trick repositions the box
+    visually but never changes that width calculation. Fixed with an
+    explicit `width: max-content` alongside the existing `max-width`. And a
+    real CSS-cascade lesson, distinct from the `:global()` trap this file
+    already tracks: giving `.swatches` its own `display: flex` for the open
+    state meant that same rule *also* beat the browser's default
+    `[hidden] { display: none }` when the element carried the `hidden`
+    attribute, because author styles always outrank the user-agent
+    stylesheet regardless of selector specificity or the attribute being
+    present — the popover rendered open on page load. The fix was an
+    explicit `.swatches[hidden] { display: none }`, not deleting the
+    `display: flex` rule.
+
+33. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Eleven new games, eleven checkers (fifteen,
 counting Constellation Draw's own four). The pattern that worked every

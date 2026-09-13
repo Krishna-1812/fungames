@@ -56,5 +56,5 @@ export const USES: Record<string, string[]> = {
   chrome: ['die', 'compass'],
   home: ['coffee'],
   'days-since-incident': ['quake', 'solar-flare', 'geostorm', 'shock'],
-  'constellation-draw': ['star', 'compass'],
+  'constellation-draw': ['star', 'compass', 'undo', 'trash', 'link'],
 }

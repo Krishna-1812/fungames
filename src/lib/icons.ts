@@ -738,6 +738,30 @@ export const ICONS: Record<IconKey, Icon> = {
         <circle cx="8.2" cy="15.8" r="1.9"/><circle cx="15.8" cy="15.8" r="1.9"/>
       </g>`,
   },
+  undo: {
+    subject: 'a hooked arrow curling back to the left',
+    draw: () => `
+      <path d="M20 16.4a8 8 0 0 0-13.6-6" fill="none" stroke="${P.slate}" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M3.6 6.2 5.2 12.6 11.6 10.4Z" fill="${P.slate}"/>`,
+  },
+  trash: {
+    subject: 'an open trash can, lid off',
+    draw: () => `
+      <path d="M5.6 8.4h12.8l-1.2 11.2a2 2 0 0 1-2 1.8H8.8a2 2 0 0 1-2-1.8Z" fill="${P.brick}"/>
+      <path d="M3.4 6.2h17.2" stroke="${P.brick}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M9.4 6.2 10.2 3.2h3.6l.8 3Z" fill="${P.brick}"/>
+      <g stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5">
+        <path d="M10 11.4v6.4"/><path d="M14 11.4v6.4"/>
+      </g>`,
+  },
+  link: {
+    subject: 'two linked rings, for a shared link',
+    draw: () => `
+      <g fill="none" stroke="${P.gold}" stroke-width="3.6" stroke-linecap="round">
+        <path d="M9.8 14.2a4 4 0 0 1 0-6.2l1.8-1.8a4 4 0 0 1 6.2 6.2l-1 1"/>
+        <path d="M14.2 9.8a4 4 0 0 1 0 6.2l-1.8 1.8a4 4 0 0 1-6.2-6.2l1-1"/>
+      </g>`,
+  },
   compass: {
     subject: 'a field compass in a square case',
     draw: () => `

@@ -26,10 +26,8 @@ import { DRAW_COLORS } from '../lib/constellation-code'
   <canvas id="sky" aria-label="A real, navigable map of the night sky"></canvas>
 
   <div class="chrome" aria-hidden="true">
-    <div class="panel top">
-      <p class="hint" id="hint">Drag to look around. Click two stars to connect them.</p>
-      <div class="coords" id="coords">RA 00h00m Dec +00°</div>
-    </div>
+    <div class="coords" id="coords">RA 00h 00m 00s Dec +00° 00&prime;</div>
+    <p class="hint" id="hint">Drag to look around. Click two stars to connect them.</p>
 
     <div class="search-wrap">
       <input id="search" type="text" placeholder="Fly to a star or constellation…" autocomplete="off" />
@@ -44,20 +42,30 @@ import { DRAW_COLORS } from '../lib/constellation-code'
     </div>
 
     <div class="toolbar">
-      <div class="swatches" id="swatches">
-        {DRAW_COLORS.map((c, i) => (
-          <button class="swatch" data-color={c.key} style={`--sw:${c.css}`} aria-label={`Draw in this colour`} aria-pressed={i === 0 ? 'true' : 'false'}></button>
-        ))}
+      <div class="swatch-wrap">
+        <button class="swatch-btn" id="swatchBtn" type="button" style={`--sw:${DRAW_COLORS[0].css}`} aria-label="Choose a draw colour"></button>
+        <div class="swatches" id="swatches" hidden>
+          {DRAW_COLORS.map((c, i) => (
+            <button class="swatch" data-color={c.key} style={`--sw:${c.css}`} aria-label="Draw in this colour" aria-pressed={i === 0 ? 'true' : 'false'}></button>
+          ))}
+        </div>
       </div>
-      <button class="tbtn" id="toggleReal" type="button" aria-pressed="true">
-        <span class="tbtn-icon" set:html={iconSvg('star')} /> Real constellations
+      <span class="tsep" aria-hidden="true"></span>
+      <button class="tbtn" id="toggleReal" type="button" aria-pressed="true" data-tip="Real constellations">
+        <span class="tbtn-icon" set:html={iconSvg('star')} />
       </button>
-      <button class="tbtn" id="randomBtn" type="button">
-        <span class="tbtn-icon" set:html={iconSvg('compass')} /> Surprise me
+      <button class="tbtn" id="randomBtn" type="button" data-tip="Surprise me">
+        <span class="tbtn-icon" set:html={iconSvg('compass')} />
       </button>
-      <button class="tbtn" id="undoBtn" type="button">Undo</button>
-      <button class="tbtn" id="clearBtn" type="button">Clear</button>
-      <button class="tbtn primary" id="saveBtn" type="button">Name &amp; save</button>
+      <button class="tbtn" id="undoBtn" type="button" data-tip="Undo">
+        <span class="tbtn-icon" set:html={iconSvg('undo')} />
+      </button>
+      <button class="tbtn" id="clearBtn" type="button" data-tip="Clear">
+        <span class="tbtn-icon" set:html={iconSvg('trash')} />
+      </button>
+      <button class="tbtn primary" id="saveBtn" type="button" data-tip="Name &amp; save">
+        <span class="tbtn-icon" set:html={iconSvg('link')} />
+      </button>
     </div>
   </div>
 
@@ -75,7 +83,7 @@ import { DRAW_COLORS } from '../lib/constellation-code'
 <script>
   import { STARS, CONSTELLATIONS, constellationName, starLabel, brightestIn, nearestStar, searchStars, type Star } from '../lib/star-catalog'
   import { project, unproject, angularSeparationDeg, wrapRa, clampDec } from '../lib/sky-projection'
-  import { starColor } from '../lib/star-color'
+  import { starRgb } from '../lib/star-color'
   import { encodeStrokes, decodeStrokes, colorCss, DRAW_COLORS, type Stroke } from '../lib/constellation-code'
   import { sfx } from '../lib/audio'
 
@@ -128,6 +136,79 @@ import { DRAW_COLORS } from '../lib/constellation-code'
 
   /* ---- rendering -------------------------------------------------------- */
 
+  // A real astrophoto's brightest stars aren't flat dots: the optics bloom a
+  // soft halo around them and throw a four-point diffraction spike off the
+  // very brightest. Below this magnitude a halo would be sub-pixel anyway —
+  // skipping it there keeps ~8,900 stars/frame cheap.
+  const HALO_MAG = 4.2
+  const SPIKE_MAG = 1.5
+
+  function drawStar(star: Star, sx: number, sy: number) {
+    const r = Math.max(0.5, 2.6 - star.mag * 0.35)
+    const [cr, cg, cb] = starRgb(star.ci)
+    const rgb = `${cr},${cg},${cb}`
+
+    if (star.mag < HALO_MAG) {
+      const haloR = r * (star.mag < 0 ? 9 : star.mag < 1.5 ? 7 : star.mag < 3 ? 4.5 : 2.6)
+      const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, haloR)
+      glow.addColorStop(0, `rgba(${rgb},0.55)`)
+      glow.addColorStop(0.4, `rgba(${rgb},0.16)`)
+      glow.addColorStop(1, `rgba(${rgb},0)`)
+      ctx.fillStyle = glow
+      ctx.beginPath()
+      ctx.arc(sx, sy, haloR, 0, Math.PI * 2)
+      ctx.fill()
+
+      if (star.mag < SPIKE_MAG) {
+        const spikeLen = haloR * 2.6
+        const spike = ctx.createLinearGradient(sx - spikeLen, sy, sx + spikeLen, sy)
+        spike.addColorStop(0, `rgba(${rgb},0)`)
+        spike.addColorStop(0.5, `rgba(${rgb},0.65)`)
+        spike.addColorStop(1, `rgba(${rgb},0)`)
+        ctx.strokeStyle = spike
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(sx - spikeLen, sy); ctx.lineTo(sx + spikeLen, sy); ctx.stroke()
+        const spikeV = ctx.createLinearGradient(sx, sy - spikeLen, sx, sy + spikeLen)
+        spikeV.addColorStop(0, `rgba(${rgb},0)`)
+        spikeV.addColorStop(0.5, `rgba(${rgb},0.65)`)
+        spikeV.addColorStop(1, `rgba(${rgb},0)`)
+        ctx.strokeStyle = spikeV
+        ctx.beginPath(); ctx.moveTo(sx, sy - spikeLen); ctx.lineTo(sx, sy + spikeLen); ctx.stroke()
+      }
+    }
+
+    ctx.beginPath()
+    ctx.fillStyle = `rgb(${rgb})`
+    ctx.arc(sx, sy, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // A constellation's name, floating over its own figure — the same way a
+  // planetarium labels one — rather than only on click. Anchored to whichever
+  // of its projected points lands highest on screen this frame.
+  function drawConstellationLabels() {
+    ctx.font = '500 12.5px "Bricolage Grotesque", sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillStyle = 'rgba(229,219,250,0.62)'
+    for (const c of CONSTELLATIONS) {
+      let top: { sx: number; sy: number } | null = null
+      let visiblePoints = 0
+      for (const seg of c.segments) {
+        for (const [ra, dec] of seg) {
+          const p = project(ra, dec, ra0, dec0)
+          if (!p.visible) continue
+          const [sx, sy] = toScreen(p.x, p.y)
+          if (sx < 0 || sx > W || sy < 0 || sy > H) continue
+          visiblePoints++
+          if (!top || sy < top.sy) top = { sx, sy }
+        }
+      }
+      if (!top || visiblePoints < 2) continue
+      const meta = constellationName(c.id)
+      ctx.fillText((meta?.name ?? c.id).toUpperCase(), top.sx, top.sy - 10)
+    }
+  }
+
   function render() {
     ctx.clearRect(0, 0, W, H)
     ctx.fillStyle = '#05040a'
@@ -149,16 +230,13 @@ import { DRAW_COLORS } from '../lib/constellation-code'
           ctx.stroke()
         }
       }
+      drawConstellationLabels()
     }
 
     for (const star of STARS) {
       const p = project2(star)
       if (!p) continue
-      const r = Math.max(0.5, 2.6 - star.mag * 0.35)
-      ctx.beginPath()
-      ctx.fillStyle = starColor(star.ci)
-      ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2)
-      ctx.fill()
+      drawStar(star, p.sx, p.sy)
     }
 
     // the visitor's own strokes
@@ -190,10 +268,16 @@ import { DRAW_COLORS } from '../lib/constellation-code'
       }
     }
 
-    const h = String(Math.floor(wrapRa(ra0) / 15)).padStart(2, '0')
-    const m = String(Math.floor((wrapRa(ra0) / 15) % 1 * 60)).padStart(2, '0')
+    const raHours = wrapRa(ra0) / 15
+    const h = String(Math.floor(raHours)).padStart(2, '0')
+    const raMinFull = (raHours % 1) * 60
+    const m = String(Math.floor(raMinFull)).padStart(2, '0')
+    const s = String(Math.floor((raMinFull % 1) * 60)).padStart(2, '0')
     const decSign = dec0 >= 0 ? '+' : '−'
-    coordsEl.textContent = `RA ${h}h${m}m Dec ${decSign}${Math.abs(dec0).toFixed(0)}°`
+    const decAbs = Math.abs(dec0)
+    const decDeg = String(Math.floor(decAbs)).padStart(2, '0')
+    const decMin = String(Math.floor((decAbs % 1) * 60)).padStart(2, '0')
+    coordsEl.textContent = `RA ${h}h ${m}m ${s}s Dec ${decSign}${decDeg}° ${decMin}′`
   }
 
   let raf = 0
@@ -289,11 +373,19 @@ import { DRAW_COLORS } from '../lib/constellation-code'
     armedStar = null
     hint.textContent = 'Drag to look around. Click two stars to connect them.'
   })
+  const swatchBtn = document.getElementById('swatchBtn') as HTMLButtonElement
+  const swatchesEl = document.getElementById('swatches') as HTMLElement
+  swatchBtn.addEventListener('click', () => { swatchesEl.hidden = !swatchesEl.hidden })
   document.querySelectorAll<HTMLButtonElement>('.swatch').forEach((btn) => {
     btn.addEventListener('click', () => {
       drawColor = colorCss(btn.dataset.color!)
+      swatchBtn.style.setProperty('--sw', drawColor)
       document.querySelectorAll('.swatch').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
+      swatchesEl.hidden = true
     })
+  })
+  document.addEventListener('click', (e) => {
+    if (!swatchesEl.hidden && !(e.target as HTMLElement).closest('.swatch-wrap')) swatchesEl.hidden = true
   })
 
   /* ---- info card: constellation facts, and "surprise me" ------------------- */
@@ -417,13 +509,18 @@ import { DRAW_COLORS } from '../lib/constellation-code'
   .chrome { position: fixed; inset: 0; pointer-events: none; font-family: 'Bricolage Grotesque', sans-serif; }
   .chrome > * { pointer-events: auto; }
 
-  .panel.top {
-    position: absolute; top: 58px; left: 16px; right: 16px;
-    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
-    color: #d8cdf0;
+  .coords {
+    position: absolute; top: 58px; right: 16px;
+    font-family: 'Space Mono', monospace; font-size: 12px; color: #d8cdf0;
+    opacity: 0.55; white-space: nowrap; letter-spacing: 0.01em;
   }
-  .hint { margin: 0; font-size: 13px; opacity: 0.85; }
-  .coords { font-family: 'Space Mono', monospace; font-size: 12px; opacity: 0.6; white-space: nowrap; }
+  .hint {
+    position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%);
+    margin: 0; width: max-content; max-width: min(560px, calc(100vw - 40px)); text-align: center;
+    color: #f1ecfb; font-size: 15px; letter-spacing: 0.01em;
+    text-shadow: 0 1px 10px rgba(0,0,0,0.7), 0 0 26px rgba(0,0,0,0.5);
+    opacity: 0.92; transition: opacity 200ms var(--ease, ease);
+  }
 
   .search-wrap { position: absolute; top: 92px; left: 16px; width: min(280px, calc(100vw - 32px)); }
   #search {
@@ -452,29 +549,57 @@ import { DRAW_COLORS } from '../lib/constellation-code'
 
   .toolbar {
     position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
-    max-width: calc(100vw - 24px); padding: 8px; border-radius: 14px;
-    background: rgba(10,6,18,0.8); border: 1px solid rgba(201,184,255,0.18); backdrop-filter: blur(8px);
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px; border-radius: 999px;
+    background: rgba(10,6,18,0.82); border: 1px solid rgba(201,184,255,0.18); backdrop-filter: blur(10px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.45);
   }
-  .swatches { display: flex; gap: 5px; padding-right: 6px; border-right: 1px solid rgba(201,184,255,0.18); }
+  .swatch-wrap { position: relative; }
+  .swatch-btn {
+    width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5);
+    background: var(--sw); cursor: pointer; padding: 0; flex: none;
+    transition: transform 140ms var(--ease-bounce, ease);
+  }
+  .swatch-btn:hover { transform: scale(1.08); }
+  .swatches {
+    position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; padding: 8px; border-radius: 999px;
+    background: rgba(10,6,18,0.92); border: 1px solid rgba(201,184,255,0.22); backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  }
+  .swatches[hidden] { display: none; }
   .swatch {
     width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent;
     background: var(--sw); cursor: pointer; padding: 0;
   }
   .swatch[aria-pressed="true"] { border-color: #fff; }
+  .tsep { width: 1px; height: 22px; background: rgba(201,184,255,0.2); flex: none; margin: 0 2px; }
   .tbtn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(201,184,255,0.2);
-    background: rgba(255,255,255,0.04); color: #e5dbfa; font: inherit; font-size: 12.5px; cursor: pointer;
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(201,184,255,0.2);
+    background: rgba(255,255,255,0.04); color: #e5dbfa; cursor: pointer; padding: 0; flex: none;
+    transition: background 140ms var(--ease, ease), transform 140ms var(--ease-bounce, ease);
   }
   /* iconSvg() draws to fill whatever box it's given (width/height:100% is
      inline on the svg itself, so only sizing the wrapper span works — see
      lib/icons.ts's own iconSvg doc comment). */
-  .tbtn-icon { width: 15px; height: 15px; flex: none; display: inline-block; }
-  .tbtn:hover { background: rgba(255,255,255,0.09); }
-  .tbtn[aria-pressed="false"] { opacity: 0.55; }
-  .tbtn.primary { background: #c9b8ff; color: #1a0f2e; border-color: #c9b8ff; font-weight: 600; }
+  .tbtn-icon { width: 16px; height: 16px; flex: none; display: inline-block; }
+  .tbtn:hover { background: rgba(255,255,255,0.1); transform: scale(1.06); }
+  .tbtn[aria-pressed="false"] { opacity: 0.5; }
+  .tbtn.primary { background: #c9b8ff; color: #1a0f2e; border-color: #c9b8ff; }
   .tbtn.primary:hover { background: #d8ccff; }
+
+  /* A tooltip label above each icon button, the same way the real thing
+     names an icon-only control only once you're actually pointing at it. */
+  .tbtn[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+    white-space: nowrap; padding: 6px 10px; border-radius: 8px;
+    background: #eee5ff; color: #1a0f2e; font-size: 12px; font-weight: 600;
+    opacity: 0; pointer-events: none; transition: opacity 120ms var(--ease, ease);
+  }
+  .tbtn[data-tip]:hover::after, .tbtn[data-tip]:focus-visible::after { opacity: 1; }
 
   .save-dialog {
     margin: auto; width: min(360px, calc(100vw - 32px)); padding: 22px;
@@ -493,7 +618,8 @@ import { DRAW_COLORS } from '../lib/constellation-code'
   .save-status { min-height: 1.2em; margin: 10px 0 0; font-size: 12px; color: #b7a6dd; word-break: break-all; }
 
   @media (max-width: 640px) {
-    .panel.top { top: 54px; }
+    .coords { top: 54px; font-size: 11px; }
+    .hint { font-size: 13px; bottom: 86px; }
     .card { left: 16px; right: 16px; width: auto; }
   }
 </style>

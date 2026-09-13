@@ -44,8 +44,14 @@ export function kelvinToRgb(kelvinIn: number): [number, number, number] {
 /** The Sun's own real B-V index — the fallback for a star with none recorded. */
 export const SUN_BV = 0.65
 
+/** A star's real apparent colour as [r,g,b] 0-255, from its B-V index — the
+ *  numeric form, for canvas gradients that need to vary the alpha channel. */
+export function starRgb(ci: number | null): [number, number, number] {
+  return kelvinToRgb(bvToKelvin(ci ?? SUN_BV))
+}
+
 /** A star's real apparent colour as a CSS `rgb()` string, from its B-V index. */
 export function starColor(ci: number | null): string {
-  const [r, g, b] = kelvinToRgb(bvToKelvin(ci ?? SUN_BV))
+  const [r, g, b] = starRgb(ci)
   return `rgb(${r},${g},${b})`
 }
