@@ -32,6 +32,7 @@ export type Slot =
   | 'corner-tr'    // tucked into the top-right corner
   | 'edge-right'   // full height, narrow, against the right edge
   | 'corner-br'    // tucked into the bottom-right corner, mirroring corner-tr
+  | 'column-right' // full-bleed vertical column against the right edge, taller than edge-right
 
 export type Illustration = {
   /** What it depicts. For check-art's report, and for whoever edits it next. */
@@ -63,6 +64,49 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
 export const ART: Record<string, Illustration> = {
+  /* ---- Space Elevator ----------------------------------------------------- */
+  'space-elevator': {
+    subject: 'a cable rising from green ground through blue sky into starlit black',
+    slot: 'column-right',
+    viewBox: '0 0 100 260',
+    palette: ['#2a5a2e', '#8fcaf0', '#2a5a86', '#0d1f38', '#050b18', '#eaf3ff', '#ffd27a', '#dfe6ee'],
+    draw: (seed) => {
+      const defs = `<defs>
+        <linearGradient id="space-elevator-sky" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="#8fcaf0"/>
+          <stop offset="30%" stop-color="#2a5a86"/>
+          <stop offset="58%" stop-color="#0d1f38"/>
+          <stop offset="82%" stop-color="#050b18"/>
+          <stop offset="100%" stop-color="#03050e"/>
+        </linearGradient>
+      </defs>`
+      const sky = `<rect x="0" y="0" width="100" height="230" fill="url(#space-elevator-sky)"/>`
+      // A jagged ridge rather than a flat band — the one thing that keeps this
+      // composition's ink footprint from reading as a plain solid rectangle
+      // against check-art's silhouette comparison.
+      const peaks = [22, 9, 34, 4, 30].map((h, i) => `${18 + i * 20},${228 - h}`).join(' L')
+      const ground = `<path d="M0,260 L0,228 L${peaks} L100,228 L100,260Z" fill="#1e4224"/>` +
+        `<path d="M0,228 L${peaks}" fill="none" stroke="#3a7a3e" stroke-width="1.6" opacity="0.7"/>`
+      // Stars only in the top, dark third, deliberately clustered off-centre
+      // rather than spread evenly — an even scatter is the generic choice.
+      const stars = range(20).map((i) => {
+        const x = (rnd(seed, i) * 0.7 + 0.15) * 100
+        const y = rnd(seed, i + 40) * 60
+        const r = 0.5 + rnd(seed, i + 80) * 0.9
+        return `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="#eaf3ff" opacity="${n(0.4 + rnd(seed, i + 120) * 0.5)}"/>`
+      }).join('')
+      // The cable itself, and a small car two-thirds of the way up.
+      const cable = `<line x1="50" y1="228" x2="50" y2="10" stroke="#dfe6ee" stroke-width="1.4" opacity="0.55"/>`
+      const carY = 96
+      const car = `<rect x="41" y="${carY}" width="18" height="24" rx="3" fill="#0d1f38" stroke="#eaf3ff" stroke-width="1.2"/>` +
+        `<rect x="45" y="${carY + 5}" width="10" height="7" fill="#ffd27a" opacity="0.85"/>`
+      // The Kármán line, marked but not labelled — a dashed rule is enough at
+      // this size, the same restraint every other tile in this file uses.
+      const karman = `<line x1="10" y1="34" x2="90" y2="34" stroke="#ff9d5c" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>`
+      return defs + sky + stars + karman + ground + cable + car
+    },
+  },
+
   /* ---- How Fast Are You Moving? ------------------------------------------- */
   speed: {
     subject: 'orbits within orbits, a small bright world on the innermost one',
@@ -1125,6 +1169,7 @@ export const PRESERVE: Record<Slot, string> = {
   'corner-tr': 'xMaxYMin meet',
   'edge-right': 'xMaxYMid meet',
   'corner-br': 'xMaxYMax meet',
+  'column-right': 'xMidYMid meet',
 }
 
 /** Every slug that has a drawing. */
@@ -1165,6 +1210,11 @@ export const SLOT_BOX: Record<Slot, { l: number; t: number; w: number; h: number
   // non-full-bleed slot — rather than mirroring corner-tr horizontally too,
   // which would park the drawing directly under the text.
   'corner-br': { l: 55, t: 36, w: 48, h: 72 },
+  // A tall vertical panel to the right of the text column — narrower and
+  // further right than edge-right, `meet`-fit rather than `slice`-cropped so
+  // a very tall, narrow viewBox (a climb) never risks resvg's empty-visible-
+  // box panic on the more extreme card aspect ratios.
+  'column-right': { l: 64, t: 2, w: 34, h: 96 },
 }
 
 /**
@@ -1193,6 +1243,7 @@ export const SLOT_FADE: Record<Slot, [number, number] | null> = {
   'centre-right': [0.54, 0.72],
   'corner-tr': null,
   'corner-br': null,
+  'column-right': null,
 }
 
 /**

@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'space-elevator',
+    title: 'Space Elevator',
+    blurb: 'A real climb to the edge of space',
+    description:
+      'A linear scroll from sea level to the Kármán line, 100,000 real metres up — every marker along the way is a genuine altitude record: Mount Everest, the highest bird ever confirmed flying, Concorde’s cruising altitude, the SR-71’s speed record, three real stratospheric skydives, Tsar Bomba’s mushroom cloud, and the internationally recognised edge of space itself. The one number computed live rather than looked up is the outside air temperature, from the real US Standard Atmosphere 1976 formula — and the closing section explains, in real materials-science terms, why nobody has actually built one of these yet.',
+    accent: '#132939', accent2: '#f79564',
+    category: 'science',
+    added: '2026-09-25',
+  },
+  {
     slug: 'speed',
     title: 'How Fast Are You Moving?',
     blurb: 'Seven real speeds, stacking, live',

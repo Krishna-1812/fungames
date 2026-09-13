@@ -1546,9 +1546,44 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     case. Fixed in both files by moving the declaration ahead of the code
     that could call it.
 
-26. Then reassess against the depth work in Phases 1–2 above.
+26. ~~**Space Elevator**~~ — **done.** A sixth pick from neal.fun's own
+    catalogue, picked without being asked for specifics beyond "make it look
+    crazy cool" — and, per the standing quality-bar rule, its real neal.fun
+    page was opened and studied (a persistent bold banner, real photographs,
+    a punchy "But wait..." rhythm) before a line of this one was written, not
+    after. Reuses *The Deep Sea*'s proven architecture — real zone boundaries,
+    markers placed at their true position rather than spaced out to look
+    nice, a scroll-linked HUD — climbing from sea level to the Kármán line
+    instead of descending to Challenger Deep. All twenty markers are genuine
+    altitude records, independently verified: Mount Everest's 2020-remeasured
+    summit, the 1973 vulture/aircraft collision that still holds the
+    highest-confirmed-bird-flight record, three real stratospheric skydives
+    fifty-four years apart (Kittinger 1960, Baumgartner 2012, Eustace 2014),
+    and the Kármán line itself.
 
-**Where that leaves it.** Eight new games, eight checkers. The pattern that
+    The one number computed live rather than looked up is the outside air
+    temperature, from the real seven-layer US Standard Atmosphere 1976
+    formula — the same model aviation actually uses — rather than a single
+    invented lapse rate. `scripts/check-space-elevator.mjs` checks it against
+    the model's own textbook reference points (15°C at sea level, -56.5°C at
+    the tropopause, -2.5°C at the stratopause), checks temperature is
+    continuous across every layer seam, and — because the real thermosphere
+    has no single meaningful temperature at all, swinging from roughly 500K
+    to over 2,000K with solar activity — checks that the model honestly
+    returns nothing rather than a fabricated number above its real 86km
+    ceiling.
+
+    It caught one real bug before shipping, in the tile art rather than the
+    model: the first version of the new `column-right` tile slot used
+    `slice`-cropping with an extremely tall, narrow viewBox, which crashed
+    check-art's resvg rasteriser outright on the widest card ratio — an
+    empty-visible-box panic the tool's own comments warn is "easy to produce
+    by accident in a `slice` slot." Switched to `meet`-fit, which cannot
+    produce an empty box by construction, and the crash could not recur.
+
+27. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Nine new games, nine checkers. The pattern that
 worked every time: build the model as pure functions over plain data, run
 it headlessly against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
@@ -1562,8 +1597,9 @@ model that let the day grow past 24 hours whenever a carved-out slice didn't
 fit the block it came from, a section-activation observer tuned narrowly
 enough that a short section could cross it unfired on a fast scroll, a
 temporal-dead-zone reference thrown only when a page loaded already
-scrolled — was found by running the thing and reading the output, not by
-re-reading the code.
+scrolled, a slice-cropped tile slot whose geometry could rasterise to an
+empty box on the widest card — was found by running the thing and reading
+the output, not by re-reading the code.
 
 Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade
 12 → 30 rules, Trolley 12 → 26 dilemmas, Powder 12 → 30 elements with a

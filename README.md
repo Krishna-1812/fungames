@@ -225,7 +225,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty-four games
+## The twenty-five games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -361,6 +361,29 @@ rules: flat palette, no gradients, no ids — checked the same way.
 (coverage, palette, structure at 64px, distinctness, mood) plus a data-integrity
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
+
+**Space Elevator** — the same linear-scroll instrument as The Deep Sea, climbing
+instead of descending: sea level to the Kármán line, the internationally
+recognised edge of space, 100,000 real metres up, zoned by the real
+atmospheric layers (troposphere, stratosphere, mesosphere, thermosphere)
+rather than an invented scale. Every one of its twenty markers is a genuine
+altitude record — Mount Everest, the highest bird ever confirmed flying,
+Concorde's cruising altitude, the SR-71's speed record, three real
+stratospheric skydives (Kittinger, Baumgartner, Eustace), Tsar Bomba's
+mushroom cloud, and the Kármán line itself. The one number computed live
+rather than looked up is the outside air temperature, from the real US
+Standard Atmosphere 1976 formula — the same seven-layer model aviation uses,
+faithful enough that it reproduces the model's own textbook reference points
+(15°C at sea level, -56.5°C at the tropopause, -2.5°C at the stratopause) on
+the nose, and honest enough to say "no single temperature" once you climb
+past its real 86km ceiling rather than fake one. The closing section doesn't
+reach for a joke ending: it explains, in real materials-science terms, why
+nobody has actually built a space elevator to geostationary orbit yet — not
+imagination, a genuine unsolved cable-strength problem. *`scripts/check-
+space-elevator.mjs` checks the temperature formula against those textbook
+values and for continuity across every layer seam, and checks that all
+twenty markers are sorted by real altitude and land inside the zone their
+altitude claims.*
 
 **How Fast Are You Moving?** — seven real, cited speeds stack live while you
 scroll: your tectonic plate drifting, the Earth turning beneath you (computed

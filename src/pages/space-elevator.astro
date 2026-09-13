@@ -1,0 +1,511 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { ZONES, MARKERS, TOTAL_ALTITUDE, fmtAltitude } from '../data/space-elevator'
+import type { Marker } from '../data/space-elevator'
+import { withBase } from '../lib/base'
+
+/**
+ * Space Elevator — a linear scroll from sea level to the Kármán line, the
+ * internationally recognised edge of space, 100,000 real metres up.
+ *
+ * Same shape as `deep-sea.astro`, climbing instead of descending: real
+ * atmospheric-layer zones rather than an invented scale, a scroll-linked HUD,
+ * and every marker placed at its true altitude rather than spaced out to
+ * look nice. The one number computed live rather than looked up is the air
+ * temperature, from the real US Standard Atmosphere 1976 formula
+ * (`src/lib/space-elevator-model.ts`) — the same model aviation uses.
+ */
+
+const rgb = (hex: string) =>
+  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')
+
+let cursor = 0
+const zones = ZONES.map((z) => {
+  const height = Math.round((z.to - z.from) * z.pxPerMetre)
+  const laid = { ...z, height, offset: cursor }
+  cursor += height
+  return laid
+})
+const totalHeight = cursor
+const REEL_TAIL = 520
+const reelHeight = totalHeight + REEL_TAIL
+
+const CARD_H = 96
+
+type Placed = ReturnType<typeof at> & { lane: 'center' | 'left' | 'right' }
+function at(m: Marker) {
+  const zone = zones.find((z) => m.altitude >= z.from && m.altitude <= z.to) ?? zones[zones.length - 1]
+  return { ...m, top: zone.offset + Math.round((m.altitude - zone.from) * zone.pxPerMetre) }
+}
+
+const rough = MARKERS.map(at)
+const placed: Placed[] = []
+for (let i = 0; i < rough.length; ) {
+  let j = i + 1
+  while (j < rough.length && rough[j].top < rough[j - 1].top + CARD_H) j++
+  const group = rough.slice(i, j)
+  if (group.length === 1) {
+    placed.push({ ...group[0], lane: 'center' })
+  } else {
+    group.forEach((g, k) => placed.push({ ...g, lane: k % 2 === 0 ? 'left' : 'right' }))
+  }
+  i = j
+}
+
+// Small icon art for the handful of true turning points. Everything else is
+// text — the same choice Deep Sea makes, where only some markers carry art.
+const ICON: Record<string, string> = {
+  'The highest a bird has ever been confirmed flying': `
+    <rect width="120" height="120" fill="#12283e"/>
+    <path d="M20 78 Q40 52 60 70 Q80 52 100 78" fill="none" stroke="#eaf3ff" stroke-width="5" stroke-linecap="round"/>
+    <path d="M60 70 L60 92" stroke="#eaf3ff" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="60" cy="60" r="3" fill="#ffd27a"/>`,
+  'The highest a glider has ever flown': `
+    <rect width="120" height="120" fill="#0f2440"/>
+    <path d="M18 62 L102 62 L60 50Z" fill="#d7e6ff"/>
+    <path d="M60 50 L60 90" stroke="#d7e6ff" stroke-width="4"/>
+    <path d="M60 90 L48 100 M60 90 L72 100" stroke="#d7e6ff" stroke-width="4" stroke-linecap="round"/>
+    <path d="M10 66 Q60 78 110 66" fill="none" stroke="#5aa9e8" stroke-width="2" opacity="0.6"/>`,
+  'Felix Baumgartner’s jump': `
+    <rect width="120" height="120" fill="#0d1f3a"/>
+    <circle cx="60" cy="40" r="9" fill="#ffe3c2"/>
+    <path d="M60 49 L60 78 M60 55 L40 66 M60 55 L80 66 M60 78 L46 100 M60 78 L74 100"
+      stroke="#ffe3c2" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+    <path d="M60 20 L60 4" stroke="#ff9d5c" stroke-width="2" stroke-dasharray="2 3"/>`,
+  'The current highest skydive on record': `
+    <rect width="120" height="120" fill="#0c1c36"/>
+    <ellipse cx="60" cy="22" rx="26" ry="10" fill="none" stroke="#eaf3ff" stroke-width="2.4"/>
+    <path d="M38 26 L60 52 M82 26 L60 52" stroke="#eaf3ff" stroke-width="1.6"/>
+    <circle cx="60" cy="62" r="7" fill="#ffe3c2"/>
+    <path d="M60 69 L60 88 M60 74 L44 84 M60 74 L76 84" stroke="#ffe3c2" stroke-width="4" stroke-linecap="round" fill="none"/>`,
+  'Tsar Bomba’s mushroom cloud': `
+    <rect width="120" height="120" fill="#150e18"/>
+    <path d="M60 100 L60 66" stroke="#c98a5a" stroke-width="10"/>
+    <circle cx="60" cy="52" r="30" fill="#ff8a5c" opacity="0.9"/>
+    <circle cx="42" cy="40" r="14" fill="#ffb066" opacity="0.85"/>
+    <circle cx="80" cy="44" r="16" fill="#ffb066" opacity="0.85"/>
+    <circle cx="60" cy="26" r="15" fill="#ffd9a8" opacity="0.9"/>`,
+  'The Kármán line': `
+    <rect width="120" height="120" fill="#060915"/>
+    <rect width="120" height="60" y="60" fill="#12335a"/>
+    <line x1="0" y1="60" x2="120" y2="60" stroke="#fff" stroke-width="1.6" stroke-dasharray="4 4" opacity="0.9"/>
+    <circle cx="30" cy="26" r="1.4" fill="#fff" opacity="0.8"/>
+    <circle cx="86" cy="18" r="1" fill="#fff" opacity="0.6"/>
+    <circle cx="66" cy="34" r="1.2" fill="#fff" opacity="0.7"/>
+    <circle cx="100" cy="40" r="1" fill="#fff" opacity="0.5"/>
+    <text x="60" y="54" fill="#ffd27a" font-size="9" font-family="sans-serif" text-anchor="middle">100 km</text>`,
+  'The X-15’s highest flight': `
+    <rect width="120" height="120" fill="#050814"/>
+    <circle cx="24" cy="90" r="1" fill="#fff" opacity="0.6"/>
+    <circle cx="96" cy="20" r="1.3" fill="#fff" opacity="0.7"/>
+    <circle cx="80" cy="70" r="1" fill="#fff" opacity="0.5"/>
+    <path d="M30 90 Q55 40 90 18" fill="none" stroke="#ff8a5c" stroke-width="2" stroke-dasharray="3 4"/>
+    <g transform="translate(90 18) rotate(-35)">
+      <path d="M-14 0 L14 0 L18 3 L-10 3Z" fill="#eaf3ff"/>
+      <path d="M-4 3 L-10 10 L-2 3Z" fill="#eaf3ff"/>
+      <path d="M-2 -3 L4 -3 L2 0 L-2 0Z" fill="#ff8a5c"/>
+    </g>`,
+}
+
+const rec = MARKERS.find((m) => m.title.includes('Kármán'))!
+---
+
+<GameLayout slug="space-elevator" bar="#0d1a2e" bodyClass="se-body">
+  <div class="sky" id="sky"></div>
+  <div class="hud-scrim" aria-hidden="true"></div>
+
+  <div class="hud">
+    <div class="hud-label" id="hudZone">the troposphere</div>
+    <div class="hud-alt" id="hudAlt">0m</div>
+    <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
+    <div class="hud-row">
+      <span id="hudTemp">15°C outside</span>
+      <span id="hudPressure">100% sea-level pressure</span>
+    </div>
+  </div>
+
+  <div class="intro">
+    <h1>Space Elevator</h1>
+    <p>Every metre above is real. Keep scrolling to the edge of space — 100,000 real metres up.</p>
+    <div class="arrow">↑</div>
+  </div>
+
+  <div class="reel" style={`height:${reelHeight}px`}>
+    {
+      zones.map((z, i) =>
+        i === 0 ? null : (
+          <div class="seam" style={`top:${z.offset}px;--from:${zones[i - 1].sky[1]};--to:${z.sky[0]}`}>
+            <span class="seam-name">{z.label}</span>
+            <span class="seam-note">
+              {z.from.toLocaleString('en-US')}m to {z.to.toLocaleString('en-US')}m — {z.note}
+            </span>
+          </div>
+        )
+      )
+    }
+    {
+      placed.map((m) => {
+        const icon = ICON[m.title]
+        return (
+          <article class:list={['ev', `lane-${m.lane}`, { big: m.big }]} style={`top:${m.top}px`}>
+            {icon && <div class="ev-art" set:html={`<svg viewBox="0 0 120 120">${icon}</svg>`} />}
+            <div class="ev-text">
+              <div class="ev-when">{fmtAltitude(m.altitude)} up</div>
+              <h2>{m.title}</h2>
+              <p>{m.note}</p>
+            </div>
+          </article>
+        )
+      })
+    }
+  </div>
+
+  <section class="finale">
+    <p class="fin-kicker">Past the Kármán line</p>
+    <h2>The elevator doesn't stop here — it just gets a lot less interesting to draw</h2>
+    <p>
+      Keep going and, around 220 kilometres up, you'd pass through the
+      brightest part of the aurora — the same particles from the sun that,
+      lower down, only ever reach the thermosphere you just left. Around
+      400 kilometres, you'd meet the International Space Station, quietly
+      falling around the Earth just fast enough to keep missing it.
+    </p>
+    <p>
+      But a <em>real</em> space elevator — the kind engineers have
+      seriously proposed — doesn't stop until <strong>35,786 kilometres</strong>,
+      geostationary orbit, where a counterweight has to sit for the whole
+      cable to hang taut rather than fall. Nobody has built one, and the
+      reason is not imagination. It's materials science: the cable has to be
+      strong enough to hold up its own weight across that entire span, and
+      no material we can currently manufacture at that length — not steel,
+      not Kevlar, not carbon fibre — is anywhere close. Carbon nanotubes are
+      individually strong enough, in a lab, at a few centimetres. Nobody
+      knows how to make one 35,786 kilometres long.
+    </p>
+    <p class="fin-closer">
+      So the gap between "possible" and "built" here isn't physics. It's an
+      unsolved engineering problem, sitting quietly behind a page that, until
+      a few paragraphs ago, was only asking you to scroll.
+    </p>
+  </section>
+
+  <footer class="outro">
+    <div class="acts">
+      <button type="button" data-share data-title="Space Elevator">Share this</button>
+      <button type="button" id="again">Start over</button>
+      <a href={withBase('/')}>try something else →</a>
+    </div>
+    <p class="outro-line">100,000 metres. The edge of space, or this page, whichever you hit first.</p>
+  </footer>
+</GameLayout>
+
+<script type="application/json" id="game-data" set:html={JSON.stringify({ zones, totalHeight })} />
+
+<script>
+  import { ring } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+  import { standardTemperatureK, kelvinToC, approxPressureRatio } from '../lib/space-elevator-model'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
+
+  const { zones, totalHeight } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+
+  const cards = [...document.querySelectorAll('.ev')] as HTMLElement[]
+
+  function relayout() {
+    const measure = (lane: string) => {
+      for (const el of cards) {
+        el.classList.remove('lane-center', 'lane-left', 'lane-right', 'compact', 'compact-hard')
+        el.classList.add(lane)
+      }
+      return cards.map((el) => el.offsetHeight)
+    }
+    const wide = measure('lane-center')
+    const narrow = measure('lane-left')
+
+    const GROUP_GAP = 8
+    const boxes = cards.map((el, i) => ({
+      el, top: el.offsetTop, h: Math.max(wide[i], narrow[i]) + GROUP_GAP,
+    }))
+
+    const groups: typeof boxes[] = []
+    for (let i = 0; i < boxes.length; ) {
+      let j = i + 1
+      while (j < boxes.length && boxes[j].top < boxes[j - 1].top + boxes[j - 1].h) j++
+      groups.push(boxes.slice(i, j))
+      i = j
+    }
+
+    for (const group of groups) {
+      if (group.length === 1) {
+        group[0].el.classList.remove('lane-left')
+        group[0].el.classList.add('lane-center')
+        continue
+      }
+      const TIERS = ['', 'compact', 'compact-hard']
+      for (let attempt = 0; attempt < TIERS.length; attempt++) {
+        const bottom = { left: -Infinity, right: -Infinity }
+        let clash = false
+        for (const b of group) {
+          const h = b.el.offsetHeight
+          const GAP = 10
+          let lane =
+            bottom.left + GAP <= b.top ? 'left' : bottom.right + GAP <= b.top ? 'right' : null
+          if (!lane) {
+            clash = true
+            lane = bottom.left <= bottom.right ? 'left' : 'right'
+          }
+          b.el.classList.remove('lane-left', 'lane-right')
+          b.el.classList.add('lane-' + lane)
+          bottom[lane as 'left' | 'right'] = b.top + h
+        }
+        if (!clash) break
+        const next = TIERS[attempt + 1]
+        if (next) for (const b of group) b.el.classList.add(next)
+      }
+    }
+  }
+  relayout()
+
+  let chimeStep = 0
+  const bigCards = cards.filter((c) => c.classList.contains('big'))
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue
+          io.unobserve(e.target)
+          sfx.blip(chimeStep++)
+          const r = e.target.getBoundingClientRect()
+          ring(r.left + r.width / 2, r.top + r.height / 2, 'rgba(255,255,255,0.5)', 20)
+          e.target.classList.add('focused')
+        }
+      },
+      { rootMargin: '-42% 0px -42% 0px' },
+    )
+    bigCards.forEach((c) => io.observe(c))
+  }
+  addEventListener('pointerdown', unlock, { once: true })
+  addEventListener('scroll', unlock, { once: true, passive: true })
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+  const sky = $('sky')
+  const hudZone = $('hudZone')
+  const hudAlt = $('hudAlt')
+  const hudFill = $('hudFill')
+  const hudTemp = $('hudTemp')
+  const hudPressure = $('hudPressure')
+  const reel = document.querySelector('.reel') as HTMLElement
+
+  const fmtAltitude = (m: number) => (m >= 1000 ? `${(m / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })}km` : `${Math.round(m)}m`)
+
+  const mix = (a: string, b: string, t: number) => {
+    const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const [r1, g1, b1] = p(a); const [r2, g2, b2] = p(b)
+    const c = (x: number, y: number) => Math.round(x + (y - x) * t)
+    return `rgb(${c(r1, r2)},${c(g1, g2)},${c(b1, b2)})`
+  }
+
+  /* Declared before the pacing block on purpose — see day-go.astro and
+     speed.astro for why a page that can load already scrolled needs this
+     ordering: shareCard's TDZ window has to close before anything can
+     synchronously reach it. */
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({ title: 'Space Elevator', text: `${c.headline}.` }))
+
+  let recorded = false
+  function updateShareCard(altitude: number) {
+    const t = standardTemperatureK(Math.min(altitude, 86_000))
+    shareCard = {
+      slug: 'space-elevator',
+      siteName: SITE.name,
+      headline: `Climbed to ${fmtAltitude(altitude)}`,
+      sub: t !== null ? `Real outside air: ${kelvinToC(t).toFixed(0)}°C` : 'Past where a single temperature even means anything',
+      stats: [
+        { label: 'Altitude', value: fmtAltitude(altitude) },
+        { label: '% to the Kármán line', value: `${Math.min(100, Math.round((altitude / 100_000) * 100))}%` },
+      ],
+    }
+    recordPlay('space-elevator', { altitudeM: altitude }, { altitudeM: 'high' })
+  }
+
+  let ticking = false
+  function update() {
+    ticking = false
+    const raw = window.scrollY + window.innerHeight / 2 - reel.offsetTop
+    const clamped = Math.max(0, Math.min(totalHeight, raw))
+
+    const zone = zones.find((z: any) => clamped < z.offset + z.height) ?? zones[zones.length - 1]
+    const within = clamped - zone.offset
+    const metres = Math.max(0, Math.min(zone.to, zone.from + within / zone.pxPerMetre))
+
+    hudZone.textContent = zone.label.toLowerCase()
+    hudAlt.textContent = fmtAltitude(metres)
+
+    const t = standardTemperatureK(metres)
+    hudTemp.textContent = t !== null ? `${kelvinToC(t).toFixed(0)}°C outside` : 'no single temperature up here'
+    const pct = approxPressureRatio(metres) * 100
+    hudPressure.textContent = pct >= 1 ? `${pct.toFixed(1)}% sea-level pressure` : `${pct.toFixed(3)}% sea-level pressure`
+
+    hudFill.style.width = `${(clamped / totalHeight) * 100}%`
+    const zt = zone.height ? Math.min(1, Math.max(0, within / zone.height)) : 0
+    hudFill.style.background = mix(zone.sky[0], zone.sky[1], zt)
+    sky.style.background = `linear-gradient(${mix(zone.sky[0], zone.sky[1], zt)}, ${mix(zone.sky[0], zone.sky[1], Math.min(1, zt + 0.25))})`
+
+    if (!recorded && raw >= totalHeight - 40) {
+      recorded = true
+      updateShareCard(metres)
+    }
+  }
+
+  addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update) }
+  }, { passive: true })
+  addEventListener('resize', () => { relayout(); update() }, { passive: true })
+  update()
+
+  document.getElementById('again')?.addEventListener('click', () => location.reload())
+</script>
+
+<style>
+  :global(.se-body) { background: #030510; color: #fff; }
+
+  .sky {
+    position: fixed; inset: 0; z-index: -2;
+    background: linear-gradient(#8fcaf0, #2a5a86);
+    transition: background 260ms linear;
+  }
+
+  .hud-scrim {
+    position: fixed; inset: 0 0 auto 0; height: 172px; z-index: 39;
+    pointer-events: none;
+    background: linear-gradient(rgba(0, 4, 8, 0.5), rgba(0, 4, 8, 0));
+  }
+
+  .hud {
+    position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+    z-index: 40; width: min(92vw, 520px); text-align: center;
+    padding: 10px 16px; border-radius: 12px;
+    background: rgba(0, 0, 0, 0.66);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+  }
+  .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
+  .hud-alt { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .hud-bar { height: 3px; background: rgba(255, 255, 255, 0.2); border-radius: 2px; margin: 9px 0 6px; }
+  .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; transition: background 300ms linear; }
+  .hud-row { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; gap: 10px; }
+  .hud-row span:last-child { opacity: 0.85; text-align: right; }
+
+  .intro { min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
+  .intro h1 { font-size: clamp(38px, 9vw, 74px); margin: 0; letter-spacing: -0.03em; }
+  .intro p { opacity: 0.75; margin: 0; font-size: 18px; max-width: 32ch; margin-inline: auto; }
+  .arrow { font-size: 30px; opacity: 0.6; animation: bob 1.8s ease-in-out infinite; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+  .reel { position: relative; overflow-x: clip; }
+
+  .ev {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    width: min(90vw, 560px);
+    display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+    gap: 14px; text-align: left;
+    padding: 15px 19px; border-radius: 14px;
+    background: linear-gradient(165deg, rgba(6, 14, 22, 0.90), rgba(2, 5, 9, 0.90));
+    border: 1px solid rgba(180, 200, 230, 0.24);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 20px 44px -26px rgb(0 0 0 / 0.8),
+      0 0 30px -8px rgba(120, 170, 220, 0.3);
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+  }
+  .ev.lane-left { left: 50%; transform: translateX(-102%); width: min(44vw, 330px); }
+  .ev.lane-right { left: 50%; transform: translateX(2%); width: min(44vw, 330px); }
+  .ev.lane-left, .ev.lane-right { padding: 12px 15px; }
+  .ev.lane-left h2, .ev.lane-right h2 { font-size: 19px; }
+  .ev.lane-left p, .ev.lane-right p { font-size: 14px; }
+  .ev-art {
+    width: 88px; aspect-ratio: 1 / 1;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(180, 200, 230, 0.4);
+    box-shadow: 0 0 24px -6px rgba(120, 170, 220, 0.55), inset 0 0 0 1px rgb(0 0 0 / 0.35);
+  }
+  .ev-art svg { display: block; width: 100%; height: 100%; }
+  .ev.lane-left .ev-art, .ev.lane-right .ev-art { width: 64px; }
+
+  .ev.big {
+    background: linear-gradient(165deg, rgba(8, 18, 28, 0.94), rgba(2, 5, 9, 0.94));
+    border-color: rgba(255, 210, 150, 0.4);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.09),
+      0 24px 54px -26px rgb(0 0 0 / 0.85),
+      0 0 46px -8px rgba(255, 180, 110, 0.4);
+  }
+  .ev.big h2 { font-size: 24px; }
+  .ev.big .ev-art { width: 108px; }
+  .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 20px; }
+  .ev.lane-left.big .ev-art, .ev.lane-right.big .ev-art { width: 76px; }
+
+  @keyframes seen-pulse {
+    0% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.09), 0 24px 54px -26px rgb(0 0 0 / 0.85), 0 0 26px -8px rgba(255, 180, 110, 0.3); }
+    45% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 28px 62px -24px rgb(0 0 0 / 0.92), 0 0 70px -6px rgba(255, 180, 110, 0.85); }
+    100% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.09), 0 24px 54px -26px rgb(0 0 0 / 0.85), 0 0 46px -8px rgba(255, 180, 110, 0.4); }
+  }
+  .ev.big.focused { animation: seen-pulse 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  .ev.compact p { display: none; }
+  .ev.compact .ev-art { width: 48px; }
+  .ev.compact-hard .ev-when { display: none; }
+  .ev.compact-hard .ev-art { display: none; }
+  .ev.compact-hard { padding: 9px 12px; grid-template-columns: minmax(0, 1fr); }
+  @media (max-width: 620px) {
+    .ev.lane-left, .ev.lane-right { width: min(46vw, 220px); }
+    .ev.lane-left { transform: translateX(-104%); }
+    .ev.lane-left .ev-art, .ev.lane-right .ev-art { width: 38px; }
+    .ev.lane-left.big .ev-art, .ev.lane-right.big .ev-art { width: 46px; }
+    .ev.lane-left, .ev.lane-right { padding: 8px 10px; }
+    .ev { gap: 7px; }
+  }
+  .ev-when { font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase; opacity: 0.75; font-variant-numeric: tabular-nums; }
+  .ev h2 { font-size: 22px; margin: 4px 0 0; font-weight: 700; }
+  .ev p { margin: 6px 0 0; opacity: 0.72; font-size: 15px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ev.big.focused { animation: none; }
+    .ev { transition: none; }
+    .arrow { animation: none; }
+  }
+
+  .seam { position: absolute; left: 0; right: 0; text-align: center; padding-top: 11px; }
+  .seam::before {
+    content: ''; position: absolute; left: 9%; right: 9%; top: 0; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, var(--from), var(--to)); opacity: 0.65;
+  }
+  .seam-name, .seam-note {
+    position: relative; display: block;
+    background: rgb(0 0 0 / 0.46); border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 999px; padding: 4px 13px; margin: 0 auto 4px; width: fit-content; max-width: 90%;
+  }
+  .seam-name { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.9; font-weight: 600; }
+  .seam-note { font-size: 11.5px; opacity: 0.72; margin-top: 6px; }
+
+  .finale { max-width: 640px; margin: 10vh auto 0; padding: 0 22px 8vh; text-align: left; }
+  .fin-kicker { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #ff9d5c; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
+  .finale h2 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 18px; letter-spacing: -0.02em; }
+  .finale p { font-size: 16px; line-height: 1.7; opacity: 0.85; margin: 0 0 16px; }
+  .finale em { color: #ff9d5c; font-style: normal; }
+  .finale strong { color: #ffd27a; }
+  .fin-closer { opacity: 0.95; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+
+  .outro { padding: 6vh 20px 16vh; text-align: center; }
+  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 20px; }
+  .acts button {
+    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  .acts button:first-child { background: linear-gradient(165deg, #ffcb8f, #ff9d5c); color: #2a1608; border: 0; }
+  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
+  .acts a:hover { opacity: 1; }
+  .outro-line { font-size: 15px; opacity: 0.6; margin: 0; }
+</style>
