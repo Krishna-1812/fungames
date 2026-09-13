@@ -42,6 +42,8 @@ export const PAGES: Record<string, Page> = {
   home: { bg: '#f6f5f1', ink: '#16151a', size: 20 },
   // :global(.incident-body) { background: #0e1004; color: #d4ff3d }, .row-icon { 22px }
   'days-since-incident': { bg: '#0e1004', ink: '#d4ff3d', size: 22 },
+  // .toolbar's own near-opaque backdrop over the sky canvas, .tbtn { color: #e5dbfa }, svg { 15px }
+  'constellation-draw': { bg: '#100a1c', ink: '#e5dbfa', size: 15 },
 }
 
 export const USES: Record<string, string[]> = {
@@ -54,4 +56,5 @@ export const USES: Record<string, string[]> = {
   chrome: ['die', 'compass'],
   home: ['coffee'],
   'days-since-incident': ['quake', 'solar-flare', 'geostorm', 'shock'],
+  'constellation-draw': ['star', 'compass'],
 }

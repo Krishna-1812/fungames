@@ -225,7 +225,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty-six games
+## The twenty-seven games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -675,6 +675,42 @@ and the info table both build markup Astro never sees at compile time
 either one silently matched nothing until written `:global` — the same trap
 `lib/trolley-scene.ts` hit earlier for the same reason, and a build that
 passed clean both times before someone actually opened the page and looked.
+
+**Constellation Draw** — almost 9,000 real stars, at their real position and
+real brightness, down to magnitude 6.5, the commonly-cited naked-eye limit —
+generated once by `scripts/build-star-data.mjs` from HYG v4.4 (CC BY-SA 4.0)
+and the real western constellation line figures every planetarium app draws
+(d3-celestial, itself derived from Stellarium's sky culture, BSD-3-Clause).
+Pan and zoom a real gnomonic tangent-plane projection, recomputed around the
+current look direction on every drag — not a flat RA/Dec map, which warps
+constellations badly near the poles — and click real star to real star to
+draw a shape of your own, named and saved to a link keyed on the stars'
+own permanent catalogue ids. Toggle all 88 real IAU constellations on or
+off, or hit "Surprise me" for a real one at random with its real English
+translation, genitive form and brightest catalogued star. Each star's dot
+is coloured from its own real B-V colour index — Ballesteros' 2012
+temperature formula, then a real blackbody-to-RGB approximation — so
+Betelgeuse actually reads redder than Rigel rather than every star being a
+plain white pixel. *`scripts/check-sky-projection.mjs` checks the
+projection against the geometry it has to satisfy regardless of formula
+(the view centre always projects to the origin, real angular separation
+matches projected Cartesian distance, nothing over 90° from the look
+direction is visible); `check-star-catalog.mjs` and `check-star-color.mjs`
+check the data and the colour pipeline against real, independently-known
+facts — Sirius's real position, Vega's historically-defined B-V of
+0.00, Betelgeuse rendering redder than Rigel.*
+
+Two facts about the source data only surfaced by actually reading it.
+Serpens is the one real exception among the 88 IAU constellations — a
+single constellation drawn as two disconnected pieces (Caput and Cauda)
+either side of Ophiuchus — and the raw line-figure data correctly gives
+both pieces the same id; naively counting rows would have made this "89
+constellations," so the build script merges them back into the one real
+entry the fact actually is. And Orion's own English name is "Orion," not
+"The Hunter" as it's often informally described — a mythological figure's
+name doesn't get "translated," which is exactly why Apus ("Bird of
+Paradise") does. Both surfaced as checker failures against an assumption
+that turned out to be the wrong one, not the data.
 
 ---
 

@@ -1701,11 +1701,56 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     and `getComputedStyle` on the real element in the real page is what
     named it — no amount of re-reading the CSS would have.
 
-30. Then reassess against the depth work in Phases 1–2 above.
+31. ~~**Constellation Draw**~~ — **done.** An eighth pick from neal.fun's own
+    catalogue, chosen after actually comparing five real candidates live
+    (Constellation Draw, Who Was Alive, Printing Money, Days Since Incident,
+    Internet Artifacts) rather than from memory — this one lost the first
+    round to Days Since Incident and won the second, on the same reasoning
+    that decided it the first time: it reuses this site's own proven star-
+    field/shader work, and it is a genuinely different *mechanism* (freeform
+    creative drawing) from anything else here.
 
-**Where that leaves it.** Ten new games, ten checkers. The pattern that
-worked every time: build the model as pure functions over plain data, run
-it headlessly against answers somebody else already knows, and let the page be a
+    Almost 9,000 real stars down to magnitude 6.5 (the commonly-cited
+    naked-eye limit), generated once at author time from HYG v4.4 (CC
+    BY-SA 4.0) by `scripts/build-star-data.mjs`, alongside the real western
+    constellation line figures every planetarium app draws (d3-celestial,
+    itself derived from Stellarium's sky culture). The projection
+    (`lib/sky-projection.ts`) is a real gnomonic tangent-plane projection,
+    recomputed around the current look direction on every pan — the honest
+    reason being that a flat RA/Dec map (this site's own Every Second,
+    Somewhere among others) warps constellations badly near the poles, and
+    a page whose entire subject is real constellation shapes cannot afford
+    that. Each star's colour comes from its own real B-V index via
+    Ballesteros' 2012 temperature formula and a real blackbody-to-RGB
+    approximation, not a flat white dot.
+
+    Two real facts about the source data surfaced only by actually reading
+    it, not by assuming a row count or a name meant what it looked like it
+    meant. Serpens is genuinely the one exception among the 88 IAU
+    constellations — one constellation, drawn in two disconnected pieces —
+    and the raw data correctly gives both pieces the same id; naively
+    counting rows would have shipped "89 constellations" as a fact.
+    And Orion's own real English name is "Orion," not "The Hunter" — a
+    mythological figure's name in Latin is already its name in English, and
+    checking that assumption against Apus ("Bird of Paradise," a real
+    translated name) is what caught it.
+
+    Two more engineering bugs came from the same family this file already
+    named for Days Since Incident: an icon rendered enormous because
+    `iconSvg()`'s own `width:100%;height:100%` is an inline style, which
+    beats any external rule sizing the `<svg>` itself rather than its
+    wrapper — sizing the wrapper is the only thing that was ever going to
+    work, and it says so in `lib/icons.ts`'s own comment, unread the first
+    time. And a toolbar button's icon, sized correctly this time, still
+    needed `:global` to reach the `set:html`-injected markup at all — the
+    same trap for the fourth real time on this site.
+
+32. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Eleven new games, eleven checkers (fifteen,
+counting Constellation Draw's own four). The pattern that worked every
+time: build the model as pure functions over plain data, run it headlessly
+against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
 Mach-stem approximation, the crater-depth unit, the dodging checkbox, the
 premium inverse, the one rival winning 70% of the room, a scene that rasterised
@@ -1719,14 +1764,15 @@ enough that a short section could cross it unfired on a fast scroll, a
 temporal-dead-zone reference thrown only when a page loaded already
 scrolled, a slice-cropped tile slot whose geometry could rasterise to an
 empty box on the widest card, a live query fast enough for a rare tier that
-took 20 real seconds on the single most common one — was found by running
-the thing and reading the output, not by re-reading the code.
+took 20 real seconds on the single most common one, an icon sized on the
+wrong element entirely — was found by running the thing and reading the
+output, not by re-reading the code.
 
-Phases 1 and 2 above are already done. The rule that got all ten of these
-built properly rather than quickly: **look at the real thing before building,
-and run the actual thing before calling it finished.** That is the entire
-lesson of the diagnosis at the top of this file, and it keeps paying for
-itself on the tenth game exactly as it did on the first.
+Phases 1 and 2 above are already done. The rule that got all eleven of
+these built properly rather than quickly: **look at the real thing before
+building, and run the actual thing before calling it finished.** That is
+the entire lesson of the diagnosis at the top of this file, and it keeps
+paying for itself on the eleventh game exactly as it did on the first.
 
 ---
 

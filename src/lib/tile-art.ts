@@ -64,6 +64,82 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
 export const ART: Record<string, Illustration> = {
+  /* ---- Constellation Draw ---------------------------------------------------- */
+  'constellation-draw': {
+    subject: 'a telescope eyepiece view of a real patch of sky, four of its stars joined into a drawn shape',
+    slot: 'column-right',
+    viewBox: '0 0 100 260',
+    palette: ['#1c1130', '#0a0612', '#c9b8ff', '#ffd94a', '#eae2ff'],
+    draw: (seed) => {
+      // A round eyepiece rather than a full-bleed sky rectangle: the same
+      // "dark column, bright vertical thing" silhouette Space Elevator
+      // already owns on this slot would otherwise repeat almost exactly —
+      // check-art's own distinctness measure is what caught that here.
+      // The tube below it is not just decoration: a lone centred circle
+      // left the rest of the tall frame empty, and the widest, shortest
+      // card crop scales a `meet`-fit slot to that circle's own narrow
+      // width, all but disappearing — the same failure mode check-art's
+      // visibility measure caught on Steady Hand's title once before.
+      const cx = 50
+      const cy = 82
+      const rOut = 44
+      const defs = `<defs>
+        <clipPath id="constellation-draw-port"><circle cx="${cx}" cy="${cy}" r="${rOut}"/></clipPath>
+        <radialGradient id="constellation-draw-sky" cx="50%" cy="42%" r="65%">
+          <stop offset="0%" stop-color="#1c1130"/>
+          <stop offset="100%" stop-color="#08050f"/>
+        </radialGradient>
+        <filter id="constellation-draw-glow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="1.4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>`
+      const port = `<g clip-path="url(#constellation-draw-port)">
+        <circle cx="${cx}" cy="${cy}" r="${rOut}" fill="url(#constellation-draw-sky)"/>
+        ${range(70)
+          .map((i) => {
+            const x = cx + (rnd(seed, i) * 2 - 1) * rOut
+            const y = cy + (rnd(seed, i + 200) * 2 - 1) * rOut
+            const r = 0.35 + rnd(seed, i + 400) * 0.5
+            return `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="#eae2ff" opacity="${n(0.3 + rnd(seed, i + 600) * 0.55)}"/>`
+          })
+          .join('')}
+        ${(() => {
+          // Four "real" bright stars forming a kite — the same shape the
+          // drawing-line game itself produces, not a scatter with a line
+          // dropped over it.
+          const stars: [number, number, number][] = [
+            [cx - 16, cy - 18, 2.5], [cx + 12, cy - 26, 2.0], [cx + 20, cy + 14, 3.0], [cx - 6, cy + 24, 1.8],
+          ]
+          const path = stars.map(([x, y]) => `${n(x)},${n(y)}`).join(' L')
+          const line = `<path d="M${path}" fill="none" stroke="#c9b8ff" stroke-width="1.7" stroke-linecap="round" filter="url(#constellation-draw-glow)"/>`
+          const bright = stars.map(([x, y, r]) => `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="#ffd94a" filter="url(#constellation-draw-glow)"/>`).join('')
+          return line + bright
+        })()}
+      </g>`
+      const bezel = `<circle cx="${cx}" cy="${cy}" r="${rOut}" fill="none" stroke="#eae2ff" stroke-width="2.4" opacity="0.5"/>` +
+        `<circle cx="${cx}" cy="${cy}" r="${rOut + 3}" fill="none" stroke="#1c1130" stroke-width="2" opacity="0.6"/>`
+      // The telescope barrel the eyepiece belongs to, tapering away toward
+      // the bottom of the frame — real ink all the way down, not a circle
+      // floating alone over empty space.
+      const tubeTopY = cy + rOut - 4
+      const tubeTopHalfW = 21
+      const tubeBotHalfW = 12
+      const tube =
+        `<path d="M${n(cx - tubeTopHalfW)} ${n(tubeTopY)} L${n(cx - tubeBotHalfW)} 260 L${n(cx + tubeBotHalfW)} 260 L${n(cx + tubeTopHalfW)} ${n(tubeTopY)}Z" fill="#150c26"/>` +
+        `<path d="M${n(cx - tubeTopHalfW)} ${n(tubeTopY)} L${n(cx + tubeTopHalfW)} ${n(tubeTopY)}" stroke="#eae2ff" stroke-width="1.6" opacity="0.35"/>` +
+        range(4)
+          .map((i) => {
+            const t = (i + 1) / 5
+            const y = tubeTopY + t * (260 - tubeTopY)
+            const halfW = tubeTopHalfW + (tubeBotHalfW - tubeTopHalfW) * t
+            return `<path d="M${n(cx - halfW)} ${n(y)} L${n(cx + halfW)} ${n(y)}" stroke="#0a0612" stroke-width="1.4" opacity="0.5"/>`
+          })
+          .join('')
+      return defs + tube + port + bezel
+    },
+  },
+
   /* ---- Days Since Incident -------------------------------------------------- */
   'days-since-incident': {
     subject: 'a hazard sign on a post, glowing seismograph traces behind its striped frame',

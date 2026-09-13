@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'constellation-draw',
+    title: 'Constellation Draw',
+    blurb: 'Draw your own constellation on the real night sky',
+    description:
+      'Almost 9,000 real stars, at their real position and real brightness, down to the naked-eye limit of magnitude 6.5 — pan and zoom a real gnomonic sky projection, the same one astrometry has used for a century, rather than a flat map that warps near the poles. Toggle on all 88 real IAU constellations, drawn from the same line figures every planetarium app uses, or click star to real star and draw your own — named, saved to a link, and read back against real facts about what you actually drew.',
+    accent: '#0a0612', accent2: '#c9b8ff',
+    category: 'science',
+    added: '2026-09-27',
+  },
+  {
     slug: 'days-since-incident',
     title: 'Days Since Incident',
     blurb: 'A live safety sign for the whole planet',
