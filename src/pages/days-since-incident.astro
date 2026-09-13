@@ -2,6 +2,7 @@
 import GameLayout from '../layouts/GameLayout.astro'
 import { iconSvg } from '../lib/icons'
 import { EARTHQUAKE_CATEGORIES, FLARE_CATEGORIES, STORM_CATEGORIES, SHOCK_CATEGORIES } from '../lib/incident-model'
+import { digitCellHTML } from '../lib/seven-segment'
 
 /**
  * Days Since Incident — the workplace "days since last accident" sign,
@@ -14,6 +15,14 @@ import { EARTHQUAKE_CATEGORIES, FLARE_CATEGORIES, STORM_CATEGORIES, SHOCK_CATEGO
  * `scripts/check-incident-model.mjs` proves the pure arithmetic and parsing
  * against real captured API shapes; there is deliberately no live-network
  * checker, the same restraint every other checker on this site takes.
+ *
+ * The visual redo: neal.fun's own version of this page renders every count
+ * as a real eight-digit car-odometer window — ghosted unlit segments and
+ * all — inside a bolted black plate. That structure is worth taking
+ * literally rather than approximating with a monospace font, so
+ * `lib/seven-segment.ts` draws a real seven-segment digit (`check-seven-
+ * segment.mjs` proves the table is genuine, not just plausible), and every
+ * card here is a mounted plate: rivets, a recessed screen, real depth.
  */
 
 const GROUPS = [
@@ -22,6 +31,66 @@ const GROUPS = [
   { id: 'storm', label: 'Geomagnetic Storms', source: 'NASA DONKI', icon: 'geostorm', categories: STORM_CATEGORIES },
   { id: 'shock', label: 'Interplanetary Shocks', source: 'NASA DONKI', icon: 'shock', categories: SHOCK_CATEGORIES },
 ] as const
+
+const ROW_DIGITS = 5
+const HERO_DAY_DIGITS = 3
+const HERO_UNIT_DIGITS = 2
+
+/** Real classification-scale content behind each group's info button — the
+ *  same real, cited tables neal.fun's own info icons open, restated rather
+ *  than copied, with a severity tier (0-5) driving the row's accent colour. */
+type InfoRow = { range: string; effect: string; tier: 0 | 1 | 2 | 3 | 4 | 5 }
+type InfoContent = { title: string; intro: string; rows: InfoRow[]; source: string; sourceUrl: string }
+const INFO: Record<string, InfoContent> = {
+  quake: {
+    title: 'The moment magnitude scale',
+    intro: 'Each whole number is roughly 32 times more energy released than the last — not a straight line.',
+    rows: [
+      { range: 'Under 2.5', effect: 'Usually not felt; recorded only by seismographs', tier: 0 },
+      { range: '2.5 – 5.4', effect: 'Often felt; minor damage in most cases', tier: 1 },
+      { range: '5.5 – 6.0', effect: 'Slight damage to buildings and structures', tier: 2 },
+      { range: '6.1 – 6.9', effect: 'Can be destructive across populated areas', tier: 3 },
+      { range: '7.0 – 7.9', effect: 'Major earthquake; serious damage over a wide area', tier: 4 },
+      { range: '8.0 and up', effect: 'Great earthquake; serious damage hundreds of miles across', tier: 5 },
+    ],
+    source: 'United States Geological Survey',
+    sourceUrl: 'https://www.usgs.gov/programs/earthquake-hazards/earthquake-magnitude-energy-release-and-shaking-intensity',
+  },
+  flare: {
+    title: 'GOES X-ray flare class',
+    intro: "Each letter is a tenfold jump in X-ray brightness. The bracketed R-number is NOAA's own radio-blackout severity for a flare of that class.",
+    rows: [
+      { range: 'A / B class', effect: 'Background level — no effect at Earth', tier: 0 },
+      { range: 'C class', effect: 'Small; essentially no effect at Earth', tier: 1 },
+      { range: 'M1 – M4 (R1)', effect: 'Minor HF radio degradation on the sunlit side', tier: 2 },
+      { range: 'M5 – M9 (R2)', effect: 'Wide HF blackout; frequencies under 10 MHz fade', tier: 3 },
+      { range: 'X1 – X9 (R3)', effect: 'Full dayside HF blackout, up to about an hour', tier: 4 },
+      { range: 'X10 and up (R4–R5)', effect: 'Severe to extreme blackout across the dayside', tier: 5 },
+    ],
+    source: 'NOAA Space Weather Prediction Center',
+    sourceUrl: 'https://www.spaceweather.gov/phenomena/solar-flares-radio-blackouts',
+  },
+  storm: {
+    title: "NOAA's G-scale",
+    intro: "Rated on the planetary Kp index — the same real-time measure of Earth's magnetic field this page's own counters are keyed to.",
+    rows: [
+      { range: 'G1, Kp 5', effect: 'Weak grid fluctuations; aurora reaches the far-northern US', tier: 1 },
+      { range: 'G2, Kp 6', effect: 'High-latitude power grids see voltage alarms', tier: 2 },
+      { range: 'G3, Kp 7', effect: 'Voltage corrections required; aurora as low as Illinois', tier: 3 },
+      { range: 'G4, Kp 8', effect: 'Widespread voltage-control problems likely', tier: 4 },
+      { range: 'G5, Kp 9', effect: 'Possible grid collapse — aurora reached Florida in May 2024', tier: 5 },
+    ],
+    source: 'NOAA Space Weather Prediction Center',
+    sourceUrl: 'https://www.swpc.noaa.gov/noaa-scales-explanation',
+  },
+  shock: {
+    title: 'Interplanetary shock',
+    intro: "Not a category with levels — a shock either reached a spacecraft or it didn't. A fast coronal mass ejection drives a wave of compressed solar wind ahead of it; when that wave crosses a spacecraft near Earth, instruments record a sudden jump in solar-wind speed, density and magnetic field. It's often the first hard evidence that a geomagnetic storm is on its way, sometimes under an hour before it arrives.",
+    rows: [],
+    source: 'NASA DONKI (Space Weather Database Of Notifications, Knowledge, Information)',
+    sourceUrl: 'https://ccmc.gsfc.nasa.gov/tools/DONKI/',
+  },
+}
 ---
 
 <GameLayout
@@ -43,12 +112,32 @@ const GROUPS = [
     </header>
 
     <section class="hero" aria-live="polite" aria-label="Time since the most recent incident of any kind">
-      <p class="hero-label">Safe for</p>
-      <div class="hero-clock">
-        <div class="hero-fig"><span class="hero-n" data-hero="days">–</span><span class="hero-u">days</span></div>
-        <div class="hero-fig"><span class="hero-n" data-hero="hours">–</span><span class="hero-u">hrs</span></div>
-        <div class="hero-fig"><span class="hero-n" data-hero="minutes">–</span><span class="hero-u">min</span></div>
-        <div class="hero-fig"><span class="hero-n" data-hero="seconds">–</span><span class="hero-u">sec</span></div>
+      <i class="bolt bolt-tl" aria-hidden="true"></i><i class="bolt bolt-tr" aria-hidden="true"></i>
+      <i class="bolt bolt-bl" aria-hidden="true"></i><i class="bolt bolt-br" aria-hidden="true"></i>
+      <p class="hero-label"><i class="live-dot" aria-hidden="true"></i>Safe for</p>
+      <div class="hero-screen">
+        <div class="hero-clock">
+          <div class="hero-fig">
+            <span class="odometer hero-odo" data-hero="days" set:html={Array.from({ length: HERO_DAY_DIGITS }, () => digitCellHTML()).join('')} />
+            <span class="hero-u">days</span>
+          </div>
+          <span class="hero-sep" aria-hidden="true">:</span>
+          <div class="hero-fig">
+            <span class="odometer hero-odo" data-hero="hours" set:html={Array.from({ length: HERO_UNIT_DIGITS }, () => digitCellHTML()).join('')} />
+            <span class="hero-u">hrs</span>
+          </div>
+          <span class="hero-sep" aria-hidden="true">:</span>
+          <div class="hero-fig">
+            <span class="odometer hero-odo" data-hero="minutes" set:html={Array.from({ length: HERO_UNIT_DIGITS }, () => digitCellHTML()).join('')} />
+            <span class="hero-u">min</span>
+          </div>
+          <span class="hero-sep" aria-hidden="true">:</span>
+          <div class="hero-fig">
+            <span class="odometer hero-odo" data-hero="seconds" set:html={Array.from({ length: HERO_UNIT_DIGITS }, () => digitCellHTML()).join('')} />
+            <span class="hero-u">sec</span>
+          </div>
+        </div>
+        <div class="screen-glass" aria-hidden="true"></div>
       </div>
       <p class="hero-caption" data-hero-caption>Reading the sensors&hellip;</p>
     </section>
@@ -61,17 +150,20 @@ const GROUPS = [
           <h2 class="group-head" id={`g-${group.id}`}>
             <span class="group-icon" set:html={iconSvg(group.icon)} />
             {group.label}
+            <button class="info-btn" type="button" data-info={group.id} aria-label={`What the ${group.label} scale means`}>i</button>
             <span class="group-source">{group.source}, live</span>
           </h2>
           <ol class="rows">
             {group.categories.map((cat) => (
               <li class="row" data-cat={cat.id} data-kind={group.id}>
+                <i class="bolt bolt-tl" aria-hidden="true"></i><i class="bolt bolt-tr" aria-hidden="true"></i>
                 <div class="row-top">
                   <span class="row-title">{cat.title}</span>
                   <span class="row-threshold">{cat.thresholdLabel}</span>
                 </div>
-                <div class="row-fig" data-fig aria-hidden="true">
-                  <span class="d">&ndash;</span><span class="d">&ndash;</span><span class="d">&ndash;</span>
+                <div class="row-screen">
+                  <span class="odometer" data-fig aria-hidden="true" set:html={Array.from({ length: ROW_DIGITS }, () => digitCellHTML()).join('')} />
+                  <div class="screen-glass" aria-hidden="true"></div>
                 </div>
                 <p class="visually-hidden" data-sr>Reading the sensors.</p>
                 <p class="row-detail" data-detail>&nbsp;</p>
@@ -102,6 +194,18 @@ const GROUPS = [
       </p>
     </footer>
   </div>
+
+  <dialog id="infoDialog" class="info-dialog" aria-labelledby="infoTitle">
+    <button class="info-close" type="button" data-close aria-label="Close">&times;</button>
+    <h2 id="infoTitle" data-info-title></h2>
+    <p class="info-intro" data-info-intro></p>
+    <table class="info-table" data-info-table>
+      <tbody data-info-rows></tbody>
+    </table>
+    <p class="info-source">Data from <a data-info-source-link target="_blank" rel="noopener"><span data-info-source></span></a>.</p>
+  </dialog>
+
+  <script type="application/json" id="info-data" set:html={JSON.stringify(INFO)} />
 </GameLayout>
 
 <script>
@@ -111,42 +215,44 @@ const GROUPS = [
     type IncidentEvent, type IncidentCategory,
   } from '../lib/incident-model'
   import { loadFast, loadDeep, readCache, writeCache, type SourceResult, type DonkiKind } from '../lib/incident-fetch'
-
-  const CAT_BY_ID = new Map(ALL_CATEGORIES.map((c) => [c.id, c]))
-  const KIND_OF_CATEGORY: Record<string, DonkiKind> = {}
-  for (const c of FLARE_CATEGORIES) KIND_OF_CATEGORY[c.id] = 'FLR'
-  for (const c of STORM_CATEGORIES) KIND_OF_CATEGORY[c.id] = 'GST'
-  for (const c of SHOCK_CATEGORIES) KIND_OF_CATEGORY[c.id] = 'IPS'
+  import { segmentsFor, fitWidth, SEGMENT_KEYS } from '../lib/seven-segment'
 
   const rowEls = new Map(
     Array.from(document.querySelectorAll<HTMLLIElement>('.row')).map((el) => [el.dataset.cat!, el]),
   )
 
-  /** Same technique as Paper Folds: each digit is its own inline-block, so a
-   *  changed one gets a short slide instead of the whole number silently
+  /** A real seven-segment odometer, not a monospace font pretending to be
+   *  one. Each `.odometer` already holds N pre-built `.digit` cells (server-
+   *  rendered by `digitCellHTML()`); this only ever toggles each cell's
+   *  seven `.seg` children between on/off, so a changed digit flickers
+   *  exactly the way a real display does rather than the text silently
    *  becoming a different string. */
   const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
-  function setDigits(node: HTMLElement, s: string) {
-    if (node.dataset.v === s) return
-    const prev = node.dataset.v ?? ''
-    node.dataset.v = s
-    if (prefersReducedMotion) { node.textContent = s; return }
-    const frag = document.createDocumentFragment()
-    for (let i = 0; i < s.length; i++) {
-      const c = document.createElement('span')
-      c.className = prev[i] === s[i] ? 'd' : 'd roll'
-      c.style.animationDelay = Math.min(200, i * 8) + 'ms'
-      c.textContent = s[i]
-      frag.append(c)
+  function setSegDigit(cell: HTMLElement, ch: string) {
+    if (cell.dataset.v === ch) return
+    const changed = cell.dataset.v !== undefined
+    cell.dataset.v = ch
+    const lit = segmentsFor(ch)
+    const segs = cell.children
+    for (let i = 0; i < SEGMENT_KEYS.length; i++) segs[i]!.classList.toggle('on', lit[i])
+    if (changed && !prefersReducedMotion) {
+      cell.classList.remove('flicker')
+      // Force a reflow so the same animation can retrigger on the next change.
+      void (cell as HTMLElement).offsetWidth
+      cell.classList.add('flicker')
     }
-    node.textContent = ''
-    node.append(frag)
+  }
+  function setOdometer(container: HTMLElement, raw: string) {
+    const cells = container.children
+    const value = fitWidth(raw, cells.length)
+    for (let i = 0; i < cells.length; i++) setSegDigit(cells[i] as HTMLElement, value[i])
   }
 
   type RowState = { event: IncidentEvent | null; ok: boolean; pending: boolean }
   const state = new Map<string, RowState>()
   for (const cat of ALL_CATEGORIES) state.set(cat.id, { event: null, ok: true, pending: true })
 
+  const ALL_DASHES = '----------'
   function paintRow(cat: IncidentCategory) {
     const el = rowEls.get(cat.id)
     if (!el) return
@@ -155,25 +261,27 @@ const GROUPS = [
     const detail = el.querySelector<HTMLElement>('[data-detail]')!
     const s = state.get(cat.id)!
 
+    fig.classList.toggle('scanning', s.pending && !s.event)
+
     if (!s.ok) {
-      setDigits(fig, '———') // em dashes: the feed itself failed
+      setOdometer(fig, ALL_DASHES) // the feed itself failed
       sr.textContent = 'The feed for this row did not answer.'
       detail.textContent = 'Feed unavailable right now — try reloading in a bit.'
       return
     }
     if (s.event) {
       const days = daysSince(Date.now(), s.event.time)
-      setDigits(fig, String(days))
+      setOdometer(fig, String(days))
       sr.textContent = `${days} days.`
       detail.textContent = `Last: ${s.event.detail}, ${new Date(s.event.time).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
       return
     }
     if (s.pending) {
-      setDigits(fig, '···')
+      setOdometer(fig, '')
       sr.textContent = 'Still searching further back.'
       detail.textContent = 'Nothing in the last 400 days — checking the last five years…'
     } else {
-      setDigits(fig, '–––')
+      setOdometer(fig, ALL_DASHES)
       sr.textContent = 'None found.'
       detail.textContent = 'No confirmed event in the last five years.'
     }
@@ -204,10 +312,10 @@ const GROUPS = [
     }
     const { days, hours, minutes } = elapsedParts(Date.now(), heroEvent.time)
     const seconds = Math.floor((Date.now() - heroEvent.time) / 1000) % 60
-    setDigits(document.querySelector('[data-hero="days"]')!, String(Math.max(0, days)))
-    setDigits(document.querySelector('[data-hero="hours"]')!, String(hours).padStart(2, '0'))
-    setDigits(document.querySelector('[data-hero="minutes"]')!, String(minutes).padStart(2, '0'))
-    setDigits(document.querySelector('[data-hero="seconds"]')!, String(Math.max(0, seconds)).padStart(2, '0'))
+    setOdometer(document.querySelector('[data-hero="days"]')!, String(Math.max(0, days)))
+    setOdometer(document.querySelector('[data-hero="hours"]')!, String(hours).padStart(2, '0'))
+    setOdometer(document.querySelector('[data-hero="minutes"]')!, String(minutes).padStart(2, '0'))
+    setOdometer(document.querySelector('[data-hero="seconds"]')!, String(Math.max(0, seconds)).padStart(2, '0'))
     capEl.textContent = `Last: ${heroEvent.detail}`
   }
   setInterval(tickHero, 1000)
@@ -287,22 +395,68 @@ const GROUPS = [
   }
 
   run()
+
+  /* ---- the info dialog: one real classification scale per group ----------- */
+
+  type InfoRow = { range: string; effect: string; tier: 0 | 1 | 2 | 3 | 4 | 5 }
+  type InfoContent = { title: string; intro: string; rows: InfoRow[]; source: string; sourceUrl: string }
+  const INFO: Record<string, InfoContent> = JSON.parse(document.getElementById('info-data')!.textContent!)
+
+  const dialog = document.getElementById('infoDialog') as HTMLDialogElement
+  const titleEl = dialog.querySelector<HTMLElement>('[data-info-title]')!
+  const introEl = dialog.querySelector<HTMLElement>('[data-info-intro]')!
+  const tableEl = dialog.querySelector<HTMLElement>('[data-info-table]')!
+  const rowsEl = dialog.querySelector<HTMLElement>('[data-info-rows]')!
+  const sourceEl = dialog.querySelector<HTMLElement>('[data-info-source]')!
+  const sourceLinkEl = dialog.querySelector<HTMLAnchorElement>('[data-info-source-link]')!
+
+  document.querySelectorAll<HTMLButtonElement>('[data-info]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const content = INFO[btn.dataset.info!]
+      if (!content) return
+      titleEl.textContent = content.title
+      introEl.textContent = content.intro
+      sourceEl.textContent = content.source
+      sourceLinkEl.href = content.sourceUrl
+      rowsEl.innerHTML = ''
+      tableEl.classList.toggle('empty', content.rows.length === 0)
+      for (const row of content.rows) {
+        const tr = document.createElement('tr')
+        tr.style.setProperty('--tier', String(row.tier))
+        tr.innerHTML = `<td class="info-range">${row.range}</td><td class="info-effect">${row.effect}</td>`
+        rowsEl.append(tr)
+      }
+      dialog.showModal()
+    })
+  })
+  dialog.querySelector('[data-close]')!.addEventListener('click', () => dialog.close())
+  // A click on the ::backdrop lands on the <dialog> element itself (its box
+  // is exactly the panel), so this only fires for a genuine outside click.
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close() })
 </script>
 
 <style>
-  :global(.incident-body) { background: #0e1004; color: #eaf2c8; }
+  :global(.incident-body) {
+    background: #0b0c03 radial-gradient(ellipse 90% 60% at 50% -10%, #1b2008 0%, #0b0c03 60%);
+    color: #eaf2c8;
+  }
 
   .wrap {
-    max-width: 760px;
+    max-width: 780px;
     margin: 0 auto;
     padding: 8px 20px 64px;
     font-family: 'Oswald', sans-serif;
+    /* A faint printed-hazard watermark on the page itself, not just the tape —
+       barely there, the way a real warehouse wall has grime patterns rather
+       than a flat coat of paint. */
+    background-image: repeating-linear-gradient(45deg, rgba(212, 255, 61, 0.025) 0 2px, transparent 2px 34px);
   }
 
   .tape {
-    height: 12px;
+    height: 13px;
     margin: 0 -20px 22px;
     background: repeating-linear-gradient(45deg, #d4ff3d 0 10px, #14160c 10px 20px);
+    box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.7), inset 0 -2px 3px rgba(0, 0, 0, 0.25);
   }
   .head + .hero { margin-top: 0; }
   .hero + .tape { margin-top: 26px; }
@@ -315,6 +469,7 @@ const GROUPS = [
     letter-spacing: 0.01em;
     text-transform: uppercase;
     color: #f4ffe0;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
   }
   .lede {
     margin: 0 auto;
@@ -326,65 +481,189 @@ const GROUPS = [
   }
   .lede em { color: #d4ff3d; font-style: normal; }
 
-  /* ---- hero ------------------------------------------------------------- */
+  /* ---- mounted-plate chrome, shared by the hero and every row ------------- */
+
+  .bolt {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background:
+      linear-gradient(135deg, #4a4d3c, #1c1e14) padding-box,
+      conic-gradient(from 200deg, rgba(255, 255, 255, 0.5), transparent 40%, transparent 60%, rgba(255, 255, 255, 0.5)) border-box;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  }
+  .bolt::after {
+    content: '';
+    position: absolute;
+    inset: 40% 12%;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.55);
+    transform: rotate(28deg);
+  }
+  .bolt-tl { top: 9px; left: 10px; }
+  .bolt-tr { top: 9px; right: 10px; }
+  .bolt-bl { bottom: 9px; left: 10px; }
+  .bolt-br { bottom: 9px; right: 10px; }
+
+  /* The recessed "screen" the odometer sits inside, and the glass over it —
+     shared between the hero and every row so one texture reads as one
+     material throughout the sign rather than a different fake per size. */
+  .hero-screen, .row-screen { position: relative; overflow: hidden; border-radius: 8px; }
+  .screen-glass {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(115deg, rgba(255, 255, 255, 0.09) 0%, transparent 26%, transparent 72%, rgba(255, 255, 255, 0.05) 100%),
+      repeating-linear-gradient(rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  }
+
+  /* ---- hero --------------------------------------------------------------- */
 
   .hero {
+    position: relative;
     text-align: center;
-    padding: 22px 16px 26px;
-    border-radius: 14px;
-    background: linear-gradient(180deg, #181b0e, #0f110a);
-    border: 1px solid rgba(212, 255, 61, 0.16);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
+    padding: 26px 18px 24px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #1b1f0f, #0e100a);
+    border: 1px solid rgba(212, 255, 61, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 22px 46px -24px rgba(0, 0, 0, 0.85),
+      0 1px 0 rgba(255, 255, 255, 0.02);
   }
   .hero-label {
-    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin: 0 0 12px;
     font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     color: #9db06a;
   }
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #6bd44e;
+    box-shadow: 0 0 6px #6bd44e;
+    animation: incident-live 1.8s ease-in-out infinite;
+  }
+  @keyframes incident-live {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot { animation: none; }
+  }
+  .hero-screen {
+    display: inline-block;
+    padding: 14px clamp(10px, 3vw, 22px);
+    background: #05060a;
+    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(212, 255, 61, 0.08);
+  }
   .hero-clock {
+    position: relative;
     display: flex;
     justify-content: center;
-    align-items: baseline;
-    gap: clamp(6px, 2.4vw, 18px);
+    align-items: flex-end;
+    gap: clamp(4px, 1.6vw, 12px);
     flex-wrap: wrap;
   }
-  .hero-fig {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-  .hero-n {
-    display: inline-flex;
+  .hero-fig { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .hero-odo { font-size: clamp(26px, 8vw, 46px); }
+  .hero-sep {
+    align-self: center;
+    margin-bottom: 0.5em;
     font-family: 'Space Mono', monospace;
-    font-weight: 700;
-    font-size: clamp(30px, 9vw, 58px);
-    line-height: 1;
-    color: #d4ff3d;
-    text-shadow: 0 0 18px rgba(212, 255, 61, 0.55), 0 0 44px rgba(212, 255, 61, 0.25);
-    font-variant-numeric: tabular-nums;
+    font-size: clamp(20px, 6vw, 34px);
+    color: rgba(212, 255, 61, 0.35);
   }
   .hero-u {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 600;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: #7c8f4c;
   }
   .hero-caption {
-    margin: 14px 0 0;
+    margin: 16px 0 0;
     font-family: 'Bricolage Grotesque', sans-serif;
     font-size: 13px;
     color: #a9bb75;
     min-height: 1.4em;
   }
 
-  /* ---- groups / rows ------------------------------------------------------ */
+  /* ---- the odometer: a real seven-segment display -------------------------- */
 
-  .groups { display: flex; flex-direction: column; gap: 30px; }
+  /* `digitCellHTML()` builds these nodes as a raw HTML string, inserted via
+     `set:html` — Astro only rewrites elements it sees written directly in a
+     template with its own scoping attribute, so anything injected as markup
+     (here, or built at runtime by a script) never receives it and every
+     rule for it has to be `:global`, the same trap trolley-scene.ts hit. */
+  .odometer { display: inline-flex; line-height: 1; }
+  :global(.digit) {
+    position: relative;
+    display: inline-block;
+    width: 0.56em;
+    height: 1em;
+    margin: 0 0.05em;
+    flex: none;
+  }
+  :global(.digit.flicker) { animation: incident-flicker 320ms steps(1, end); }
+  @keyframes incident-flicker {
+    0%, 18%, 36% { filter: brightness(1.9); }
+    9%, 27%, 100% { filter: brightness(1); }
+  }
+  :global(.seg) {
+    position: absolute;
+    background: var(--seg-off, rgba(212, 255, 61, 0.07));
+    transition: background 140ms linear, box-shadow 140ms linear;
+  }
+  :global(.seg.on) {
+    background: var(--seg-on, #d4ff3d);
+    box-shadow: 0 0 0.08em var(--seg-on, #d4ff3d), 0 0 0.24em rgba(212, 255, 61, 0.55);
+  }
+  :global(.seg-a), :global(.seg-g), :global(.seg-d) {
+    left: 0.065em;
+    width: 0.43em;
+    height: 0.085em;
+    clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
+  }
+  :global(.seg-a) { top: 0; }
+  :global(.seg-g) { top: 0.4575em; }
+  :global(.seg-d) { top: 0.915em; }
+  :global(.seg-f), :global(.seg-b), :global(.seg-e), :global(.seg-c) {
+    width: 0.085em;
+    height: 0.41em;
+    clip-path: polygon(0 14%, 50% 0, 100% 14%, 100% 86%, 50% 100%, 0 86%);
+  }
+  :global(.seg-f), :global(.seg-e) { left: 0; }
+  :global(.seg-b), :global(.seg-c) { right: 0; }
+  :global(.seg-f), :global(.seg-b) { top: 0.085em; }
+  :global(.seg-e), :global(.seg-c) { top: 0.505em; }
+
+  /* Still searching a rare tier's deeper window: a slow sweep of brightness
+     crosses the blank digits left to right, rather than the row just
+     sitting there looking broken. */
+  .odometer.scanning :global(.digit) { animation: incident-scan 1.8s ease-in-out infinite; }
+  .odometer.scanning :global(.digit:nth-child(1)) { animation-delay: 0ms; }
+  .odometer.scanning :global(.digit:nth-child(2)) { animation-delay: 120ms; }
+  .odometer.scanning :global(.digit:nth-child(3)) { animation-delay: 240ms; }
+  .odometer.scanning :global(.digit:nth-child(4)) { animation-delay: 360ms; }
+  .odometer.scanning :global(.digit:nth-child(5)) { animation-delay: 480ms; }
+  @keyframes incident-scan {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+
+  /* ---- groups / rows -------------------------------------------------------- */
+
+  .groups { display: flex; flex-direction: column; gap: 32px; }
   .group-head {
     display: flex;
     align-items: center;
@@ -401,7 +680,27 @@ const GROUPS = [
     height: 22px;
     flex: none;
     color: #d4ff3d;
+    filter: drop-shadow(0 0 5px rgba(212, 255, 61, 0.3));
   }
+  .info-btn {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 255, 61, 0.4);
+    background: rgba(212, 255, 61, 0.08);
+    color: #d4ff3d;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 140ms, transform 140ms;
+  }
+  .info-btn:hover { background: rgba(212, 255, 61, 0.22); transform: scale(1.1); }
+  .info-btn:active { transform: scale(0.95); }
   .group-source {
     margin-left: auto;
     font-family: 'Space Mono', monospace;
@@ -412,18 +711,26 @@ const GROUPS = [
     color: #5f7038;
   }
 
-  .rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
   .row {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
     column-gap: 14px;
     row-gap: 2px;
-    padding: 12px 16px;
-    border-radius: 10px;
-    background: #171a0f;
+    padding: 16px 18px 13px;
+    border-radius: 11px;
+    background: linear-gradient(180deg, #1a1d10, #14160d);
     border: 1px solid rgba(212, 255, 61, 0.1);
+    box-shadow: 0 10px 22px -16px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition: border-color 160ms, transform 160ms;
   }
+  .row:hover { border-color: rgba(212, 255, 61, 0.28); transform: translateY(-1px); }
+  .row .bolt-tl { top: 7px; left: 8px; }
+  .row .bolt-tr { top: 7px; right: 8px; }
+  .row .bolt { width: 6px; height: 6px; }
+
   .row-top { grid-column: 1; display: flex; flex-direction: column; gap: 1px; }
   .row-title {
     font-size: 14px;
@@ -436,34 +743,92 @@ const GROUPS = [
     font-size: 10.5px;
     color: #6c7d40;
   }
-  .row-fig {
+  .row-screen {
     grid-column: 2;
     grid-row: 1 / 3;
-    font-family: 'Space Mono', monospace;
-    font-weight: 700;
-    font-size: clamp(22px, 5.4vw, 30px);
-    color: #d4ff3d;
-    text-shadow: 0 0 10px rgba(212, 255, 61, 0.4);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    padding: 5px 8px;
+    background: #05060a;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(212, 255, 61, 0.07);
   }
+  .row-screen .odometer { font-size: clamp(19px, 4.6vw, 25px); }
   .row-detail {
     grid-column: 1;
-    margin: 3px 0 0;
+    margin: 4px 0 0;
     font-family: 'Bricolage Grotesque', sans-serif;
     font-size: 11.5px;
     line-height: 1.4;
     color: #7c8f4c;
   }
 
-  .d { display: inline-block; }
-  .d.roll { animation: incident-digit 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-  @keyframes incident-digit {
-    0% { transform: translateY(0.4em) scale(0.86); opacity: 0; }
-    55% { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .digit.flicker, .odometer.scanning .digit { animation: none; }
   }
 
-  /* ---- footer -------------------------------------------------------------- */
+  @media (max-width: 480px) {
+    .row { grid-template-columns: 1fr; row-gap: 8px; padding-top: 20px; }
+    .row-screen { grid-column: 1; grid-row: auto; justify-self: start; }
+  }
+
+  /* ---- the info dialog ------------------------------------------------------ */
+
+  .info-dialog {
+    position: fixed;
+    margin: auto;
+    width: min(480px, calc(100vw - 32px));
+    max-height: min(560px, calc(100vh - 48px));
+    padding: 26px 24px 22px;
+    border: 1px solid rgba(212, 255, 61, 0.22);
+    border-radius: 16px;
+    background: linear-gradient(180deg, #1a1d10, #0f110a);
+    color: #eaf2c8;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.9);
+  }
+  .info-dialog::backdrop { background: rgba(4, 5, 1, 0.72); backdrop-filter: blur(2px); }
+  .info-dialog h2 {
+    margin: 0 0 8px;
+    padding-right: 24px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #f4ffe0;
+  }
+  .info-intro { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: #b7c68f; }
+  .info-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 0;
+    background: rgba(255, 255, 255, 0.06);
+    color: #c9d8a4;
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .info-close:hover { background: rgba(255, 255, 255, 0.14); }
+  /* The rows/cells here are appended by the info-button script (dialog.rowsEl
+     is built from `content.rows`, not written in this template), so every
+     rule that must reach them is `:global` — the same set:html trap as the
+     odometer digits above. */
+  .info-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .info-table.empty { display: none; }
+  :global(.info-table td) {
+    padding: 7px 4px 7px 10px;
+    border-top: 1px solid rgba(212, 255, 61, 0.08);
+    border-left: 3px solid color-mix(in oklab, #d4302e calc(var(--tier, 0) * 20%), #6fae2e);
+    vertical-align: top;
+  }
+  :global(.info-range) { white-space: nowrap; font-family: 'Space Mono', monospace; font-size: 11.5px; color: #eaf2c8; padding-right: 12px !important; }
+  :global(.info-effect) { color: #b7c68f; line-height: 1.4; }
+  .info-source { margin: 14px 0 0; font-size: 11.5px; color: #6c7d40; }
+  .info-source a { color: #9db06a; }
+
+  /* ---- footer ---------------------------------------------------------------- */
 
   .foot {
     margin-top: 34px;
@@ -476,13 +841,4 @@ const GROUPS = [
   }
   .foot a { color: #b7d16f; }
   .foot-small { margin-top: 10px; opacity: 0.85; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .d.roll { animation: none; }
-  }
-
-  @media (max-width: 480px) {
-    .row { grid-template-columns: 1fr; row-gap: 6px; }
-    .row-fig { grid-column: 1; grid-row: auto; }
-  }
 </style>

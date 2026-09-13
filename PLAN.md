@@ -1652,7 +1652,56 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     happens many times a day; 1,800 for M8.0+, which doesn't) and only
     widens to the full record if that comes back genuinely empty.
 
-29. Then reassess against the depth work in Phases 1–2 above.
+29. ~~**Days Since Incident, made hyper-realistic**~~ — **done.** Requested
+    the same turn the game shipped, in the same words as every prior visual
+    pass — "hyper-realistic," "extremely beautiful" — and answered the same
+    way: opened neal.fun's own page again and looked at what it actually
+    does, rather than redesigning from memory. What it does is render every
+    count as a genuine eight-digit car-odometer window, ghosted unlit
+    segments and all, inside a bolted black plate with an info icon that
+    opens the real classification scale behind that row.
+
+    `lib/seven-segment.ts` draws a real seven-segment digit rather than
+    leaning on a monospace font — the same seven on/off segments a real
+    display lights, with the unlit ones staying in the DOM at low opacity so
+    a blank position reads as a dim ghost "8" instead of empty space.
+    `scripts/check-seven-segment.mjs` re-derives the pattern independently
+    (traced by hand from the classic digit shapes) and cross-checks it a
+    second way, by the plain segment *count* per digit anyone can verify by
+    looking at a calculator — 8 lights all seven, 1 lights exactly two — so
+    a wrong bit has to survive two unrelated proofs, not one. Every card on
+    the page is a mounted plate now: rivets at the corners, a recessed dark
+    screen with a glass reflection and a faint scanline texture over the
+    digits, and a live/scanning indicator rather than a static number when a
+    rare tier is still being searched.
+
+    The four info buttons open a real, cited table each — USGS's own
+    magnitude-effects table, NOAA's GOES flare classes with their R-scale
+    radio-blackout severity, and NOAA's G-scale with its real, documented
+    effects (the G5 row cites the actual May 2024 storm that put aurora over
+    Florida) — colour-graded green to red by severity by mixing two colours
+    in oklab against each row's own tier, the same colour-mixing space the
+    tile-art checker already uses elsewhere on this site. Interplanetary
+    shock gets a paragraph instead of a table, honestly, because it is not a
+    category with levels.
+
+    One real bug came from the odometer, and a second from the info table,
+    and both were the same bug: `digitCellHTML()` and the info-button script
+    both build real markup — seven-segment digit cells, `<tr>`/`<td>` rows —
+    that Astro never sees at compile time, because it arrives via `set:html`
+    or a runtime `.innerHTML` write. Astro only scopes the elements it
+    rewrites directly in a template, so every rule meant to reach either one
+    silently matched nothing until it was written `:global`, the identical
+    trap `lib/trolley-scene.ts` hit earlier in this file for the same
+    reason. The first sign of it was not a build error — the digits and the
+    severity-coloured borders both just failed to render, in a build that
+    passed clean, and it only turned up by actually opening the page and
+    looking. The severity colour specifically: `color-mix()` was in the
+    stylesheet, computed to `border-left-style: none` in the actual browser,
+    and `getComputedStyle` on the real element in the real page is what
+    named it — no amount of re-reading the CSS would have.
+
+30. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Ten new games, ten checkers. The pattern that
 worked every time: build the model as pure functions over plain data, run

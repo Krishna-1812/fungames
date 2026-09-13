@@ -651,6 +651,31 @@ cleanest free cyclone feed labels the identical wind speed two different
 things depending which agency reported it, and a category built on data that
 disagrees with itself would be worse than no row at all.
 
+Requested a hyper-realistic visual pass in the very next turn, the same
+words as every prior redo — and neal.fun's own page turned out to render
+every count as a real eight-digit car-odometer window, ghosted unlit
+segments and all, inside a bolted black plate. `lib/seven-segment.ts` draws
+a genuine seven-segment digit rather than a monospace font standing in for
+one — the same seven segments a real display lights, unlit ones left in the
+DOM at low opacity so a blank position reads as a dim ghost "8".
+*`scripts/check-seven-segment.mjs` re-derives the pattern by hand from the
+classic digit shapes and separately checks the plain segment count per
+digit — an 8 lights all seven, a 1 lights exactly two — so a wrong bit has
+to survive two independent proofs.* Every card is a mounted plate now:
+corner rivets, a recessed screen with a glass reflection and a faint
+scanline texture, and a live/scanning indicator while a rare tier is still
+being searched rather than a number that just sits there. Four info buttons
+open a real, cited table each — USGS's magnitude-effects table, NOAA's GOES
+flare classes with their R-scale radio-blackout severity, and NOAA's
+G-scale (the G5 row names the real May 2024 storm that put aurora over
+Florida) — colour-graded green to red by mixing two colours in oklab against
+each row's own severity tier. Two real bugs, one cause: `digitCellHTML()`
+and the info table both build markup Astro never sees at compile time
+(`set:html`, a runtime `.innerHTML` write), so every rule meant to reach
+either one silently matched nothing until written `:global` — the same trap
+`lib/trolley-scene.ts` hit earlier for the same reason, and a build that
+passed clean both times before someone actually opened the page and looked.
+
 ---
 
 ## Sound
