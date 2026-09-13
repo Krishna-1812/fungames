@@ -50,4 +50,18 @@ export const SITE = {
    * until a real brand is picked.
    */
   buyMeACoffee: 'yourhandle',
+
+  /**
+   * NASA's open API key, used by /days-since-incident/ to read NASA DONKI's
+   * live solar-flare, geomagnetic-storm and interplanetary-shock logs
+   * straight from the visitor's own browser — no backend of this site's own
+   * sees or needs the key. `'DEMO_KEY'` works with no signup, and is the
+   * honest default here, but it is shared globally across every app on the
+   * internet that hasn't changed it and is capped at roughly 30 requests an
+   * hour *in total, across all of them* — this page can start failing with
+   * no relation to this site's own traffic. A real key is instant, free and
+   * unlimited-in-practice (1,000/hour) at https://api.nasa.gov/, and dropping
+   * it in here is the only thing that needs to change.
+   */
+  nasaApiKey: 'DEMO_KEY',
 } as const

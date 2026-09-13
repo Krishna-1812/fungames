@@ -40,6 +40,8 @@ export const PAGES: Record<string, Page> = {
   // luminance swing within a few percent of --paper), which is what the card
   // actually composites close to in practice.
   home: { bg: '#f6f5f1', ink: '#16151a', size: 20 },
+  // :global(.incident-body) { background: #0e1004; color: #d4ff3d }, .row-icon { 22px }
+  'days-since-incident': { bg: '#0e1004', ink: '#d4ff3d', size: 22 },
 }
 
 export const USES: Record<string, string[]> = {
@@ -51,4 +53,5 @@ export const USES: Record<string, string[]> = {
   overstimulated: ['trophy', 'cat', 'duck', 'snail', 'dino', 'scooter'],
   chrome: ['die', 'compass'],
   home: ['coffee'],
+  'days-since-incident': ['quake', 'solar-flare', 'geostorm', 'shock'],
 }

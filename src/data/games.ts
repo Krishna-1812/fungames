@@ -42,7 +42,7 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
   {
     key: 'science',
     label: 'Real science, worked out live',
-    note: 'Nothing here is looked up — it is computed in your browser from the same equations the real thing runs on.',
+    note: 'Nothing here is invented — it is computed in your browser from the same equations the real thing runs on, or read live from the same public sensors and satellites scientists use.',
   },
   {
     key: 'you',
@@ -62,6 +62,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 ]
 
 export const GAMES: Game[] = [
+  {
+    slug: 'days-since-incident',
+    title: 'Days Since Incident',
+    blurb: 'A live safety sign for the whole planet',
+    description:
+      'The "days since last incident" sign from a warehouse wall, except the incidents are real and the counters are live: the most recent earthquake at five real magnitude thresholds, the most recent solar flare at five real GOES X-ray classes, the most recent geomagnetic storm at all five of NOAA’s own G-scale levels, and the most recent interplanetary shock — read straight off USGS’s earthquake catalogue and NASA’s DONKI space-weather log in your own browser, not a number anyone typed in.',
+    accent: '#0e1004', accent2: '#d4ff3d',
+    category: 'science',
+    added: '2026-09-26',
+  },
   {
     slug: 'space-elevator',
     title: 'Space Elevator',

@@ -1,0 +1,488 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { iconSvg } from '../lib/icons'
+import { EARTHQUAKE_CATEGORIES, FLARE_CATEGORIES, STORM_CATEGORIES, SHOCK_CATEGORIES } from '../lib/incident-model'
+
+/**
+ * Days Since Incident — the workplace "days since last accident" sign,
+ * except the incidents are real and every counter is live.
+ *
+ * The model (`lib/incident-model.ts`) and the loader (`lib/incident-fetch.ts`)
+ * do all the real work; this page is a thin, honest client for them. Every
+ * feed is read straight from the visitor's own browser at USGS and NASA — no
+ * backend of this site's own, and nothing here is precomputed or invented.
+ * `scripts/check-incident-model.mjs` proves the pure arithmetic and parsing
+ * against real captured API shapes; there is deliberately no live-network
+ * checker, the same restraint every other checker on this site takes.
+ */
+
+const GROUPS = [
+  { id: 'quake', label: 'Earthquakes', source: 'USGS', icon: 'quake', categories: EARTHQUAKE_CATEGORIES },
+  { id: 'flare', label: 'Solar Flares', source: 'NASA DONKI', icon: 'solar-flare', categories: FLARE_CATEGORIES },
+  { id: 'storm', label: 'Geomagnetic Storms', source: 'NASA DONKI', icon: 'geostorm', categories: STORM_CATEGORIES },
+  { id: 'shock', label: 'Interplanetary Shocks', source: 'NASA DONKI', icon: 'shock', categories: SHOCK_CATEGORIES },
+] as const
+---
+
+<GameLayout
+  slug="days-since-incident"
+  bar="#171907"
+  bodyClass="incident-body"
+  fonts={['Oswald:wght@500;600;700', 'Space+Mono:wght@400;700']}
+>
+  <div class="wrap">
+    <div class="tape" aria-hidden="true"></div>
+
+    <header class="head">
+      <h1>Days Since Incident</h1>
+      <p class="lede">
+        The sign from a warehouse wall, except the incidents are real. Every
+        number below is read <em>right now</em> from a live feed — not a
+        drill, and nobody typed it in.
+      </p>
+    </header>
+
+    <section class="hero" aria-live="polite" aria-label="Time since the most recent incident of any kind">
+      <p class="hero-label">Safe for</p>
+      <div class="hero-clock">
+        <div class="hero-fig"><span class="hero-n" data-hero="days">–</span><span class="hero-u">days</span></div>
+        <div class="hero-fig"><span class="hero-n" data-hero="hours">–</span><span class="hero-u">hrs</span></div>
+        <div class="hero-fig"><span class="hero-n" data-hero="minutes">–</span><span class="hero-u">min</span></div>
+        <div class="hero-fig"><span class="hero-n" data-hero="seconds">–</span><span class="hero-u">sec</span></div>
+      </div>
+      <p class="hero-caption" data-hero-caption>Reading the sensors&hellip;</p>
+    </section>
+
+    <div class="tape" aria-hidden="true"></div>
+
+    <div class="groups">
+      {GROUPS.map((group) => (
+        <section class="group" aria-labelledby={`g-${group.id}`}>
+          <h2 class="group-head" id={`g-${group.id}`}>
+            <span class="group-icon" set:html={iconSvg(group.icon)} />
+            {group.label}
+            <span class="group-source">{group.source}, live</span>
+          </h2>
+          <ol class="rows">
+            {group.categories.map((cat) => (
+              <li class="row" data-cat={cat.id} data-kind={group.id}>
+                <div class="row-top">
+                  <span class="row-title">{cat.title}</span>
+                  <span class="row-threshold">{cat.thresholdLabel}</span>
+                </div>
+                <div class="row-fig" data-fig aria-hidden="true">
+                  <span class="d">&ndash;</span><span class="d">&ndash;</span><span class="d">&ndash;</span>
+                </div>
+                <p class="visually-hidden" data-sr>Reading the sensors.</p>
+                <p class="row-detail" data-detail>&nbsp;</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
+
+    <footer class="foot">
+      <p>
+        Earthquakes are read from <a href="https://earthquake.usgs.gov/earthquakes/feed/" target="_blank" rel="noopener">USGS's</a>
+        own catalogue search, one request per magnitude tier. Solar flares,
+        geomagnetic storms and interplanetary shocks come from
+        <a href="https://ccmc.gsfc.nasa.gov/tools/DONKI/" target="_blank" rel="noopener">NASA's DONKI</a> space-weather
+        log, reduced to NOAA's own published GOES flare classes and G-scale.
+        Hurricanes and tsunamis are deliberately not here: the cleanest free
+        feed for them labels the identical wind speed two different things
+        depending which weather agency reported it, and a category built on
+        data that disagrees with itself would be worse than no row at all.
+      </p>
+      <p class="foot-small">
+        A rare tier can take a few seconds longer than the rest — the
+        difference between "no X10 flare in the last year" and "keep looking
+        back until one turns up" isn't free, and this page pays it live
+        rather than pretending otherwise.
+      </p>
+    </footer>
+  </div>
+</GameLayout>
+
+<script>
+  import {
+    EARTHQUAKE_CATEGORIES, FLARE_CATEGORIES, STORM_CATEGORIES, SHOCK_CATEGORIES, ALL_CATEGORIES,
+    mostRecentQualifying, daysSince, elapsedParts,
+    type IncidentEvent, type IncidentCategory,
+  } from '../lib/incident-model'
+  import { loadFast, loadDeep, readCache, writeCache, type SourceResult, type DonkiKind } from '../lib/incident-fetch'
+
+  const CAT_BY_ID = new Map(ALL_CATEGORIES.map((c) => [c.id, c]))
+  const KIND_OF_CATEGORY: Record<string, DonkiKind> = {}
+  for (const c of FLARE_CATEGORIES) KIND_OF_CATEGORY[c.id] = 'FLR'
+  for (const c of STORM_CATEGORIES) KIND_OF_CATEGORY[c.id] = 'GST'
+  for (const c of SHOCK_CATEGORIES) KIND_OF_CATEGORY[c.id] = 'IPS'
+
+  const rowEls = new Map(
+    Array.from(document.querySelectorAll<HTMLLIElement>('.row')).map((el) => [el.dataset.cat!, el]),
+  )
+
+  /** Same technique as Paper Folds: each digit is its own inline-block, so a
+   *  changed one gets a short slide instead of the whole number silently
+   *  becoming a different string. */
+  const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  function setDigits(node: HTMLElement, s: string) {
+    if (node.dataset.v === s) return
+    const prev = node.dataset.v ?? ''
+    node.dataset.v = s
+    if (prefersReducedMotion) { node.textContent = s; return }
+    const frag = document.createDocumentFragment()
+    for (let i = 0; i < s.length; i++) {
+      const c = document.createElement('span')
+      c.className = prev[i] === s[i] ? 'd' : 'd roll'
+      c.style.animationDelay = Math.min(200, i * 8) + 'ms'
+      c.textContent = s[i]
+      frag.append(c)
+    }
+    node.textContent = ''
+    node.append(frag)
+  }
+
+  type RowState = { event: IncidentEvent | null; ok: boolean; pending: boolean }
+  const state = new Map<string, RowState>()
+  for (const cat of ALL_CATEGORIES) state.set(cat.id, { event: null, ok: true, pending: true })
+
+  function paintRow(cat: IncidentCategory) {
+    const el = rowEls.get(cat.id)
+    if (!el) return
+    const fig = el.querySelector<HTMLElement>('[data-fig]')!
+    const sr = el.querySelector<HTMLElement>('[data-sr]')!
+    const detail = el.querySelector<HTMLElement>('[data-detail]')!
+    const s = state.get(cat.id)!
+
+    if (!s.ok) {
+      setDigits(fig, '———') // em dashes: the feed itself failed
+      sr.textContent = 'The feed for this row did not answer.'
+      detail.textContent = 'Feed unavailable right now — try reloading in a bit.'
+      return
+    }
+    if (s.event) {
+      const days = daysSince(Date.now(), s.event.time)
+      setDigits(fig, String(days))
+      sr.textContent = `${days} days.`
+      detail.textContent = `Last: ${s.event.detail}, ${new Date(s.event.time).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
+      return
+    }
+    if (s.pending) {
+      setDigits(fig, '···')
+      sr.textContent = 'Still searching further back.'
+      detail.textContent = 'Nothing in the last 400 days — checking the last five years…'
+    } else {
+      setDigits(fig, '–––')
+      sr.textContent = 'None found.'
+      detail.textContent = 'No confirmed event in the last five years.'
+    }
+  }
+
+  function applyResult(cat: IncidentCategory, event: IncidentEvent | null, ok: boolean, pending: boolean) {
+    state.set(cat.id, { event, ok, pending })
+    paintRow(cat)
+  }
+
+  /* ---- the hero: the single most recent incident of any kind -------------- */
+
+  let heroEvent: IncidentEvent | null = null
+  let heroPending = true
+  function recomputeHero() {
+    let best: IncidentEvent | null = null
+    for (const cat of ALL_CATEGORIES) {
+      const ev = state.get(cat.id)?.event
+      if (ev && (!best || ev.time > best.time)) best = ev
+    }
+    heroEvent = best
+  }
+  function tickHero() {
+    const capEl = document.querySelector<HTMLElement>('[data-hero-caption]')!
+    if (!heroEvent) {
+      capEl.textContent = heroPending ? 'Reading the sensors…' : 'No confirmed incident to report yet.'
+      return
+    }
+    const { days, hours, minutes } = elapsedParts(Date.now(), heroEvent.time)
+    const seconds = Math.floor((Date.now() - heroEvent.time) / 1000) % 60
+    setDigits(document.querySelector('[data-hero="days"]')!, String(Math.max(0, days)))
+    setDigits(document.querySelector('[data-hero="hours"]')!, String(hours).padStart(2, '0'))
+    setDigits(document.querySelector('[data-hero="minutes"]')!, String(minutes).padStart(2, '0'))
+    setDigits(document.querySelector('[data-hero="seconds"]')!, String(Math.max(0, seconds)).padStart(2, '0'))
+    capEl.textContent = `Last: ${heroEvent.detail}`
+  }
+  setInterval(tickHero, 1000)
+  tickHero()
+
+  /* ---- loading: cache, fast pass, then a background deep pass per source -- */
+
+  const now = Date.now()
+  const cached = readCache(now)
+
+  async function run() {
+    let quakes: Map<string, SourceResult>
+    let flr: SourceResult
+    let gst: SourceResult
+    let ips: SourceResult
+    const deep: Partial<Record<DonkiKind, SourceResult>> = {}
+
+    if (cached) {
+      quakes = new Map(cached.quakes)
+      flr = cached.flr
+      gst = cached.gst
+      ips = cached.ips
+      Object.assign(deep, cached.deep)
+    } else {
+      const fast = await loadFast(now)
+      quakes = fast.quakes
+      flr = fast.flr
+      gst = fast.gst
+      ips = fast.ips
+    }
+
+    for (const cat of EARTHQUAKE_CATEGORIES) {
+      const r = quakes.get(cat.id)
+      applyResult(cat, r?.events[0] ?? null, r?.ok ?? false, false)
+    }
+
+    const eventsByKind: Record<DonkiKind, IncidentEvent[]> = {
+      FLR: [...flr.events, ...(deep.FLR?.events ?? [])],
+      GST: [...gst.events, ...(deep.GST?.events ?? [])],
+      IPS: [...ips.events, ...(deep.IPS?.events ?? [])],
+    }
+    const okByKind: Record<DonkiKind, boolean> = { FLR: flr.ok, GST: gst.ok, IPS: ips.ok }
+
+    function paintKind(kind: DonkiKind, pending: boolean) {
+      const list = { FLR: FLARE_CATEGORIES, GST: STORM_CATEGORIES, IPS: SHOCK_CATEGORIES }[kind]
+      for (const cat of list) {
+        const found = mostRecentQualifying(eventsByKind[kind], cat)
+        applyResult(cat, found, okByKind[kind], pending && !found)
+      }
+    }
+
+    paintKind('FLR', !cached)
+    paintKind('GST', !cached)
+    paintKind('IPS', !cached)
+    recomputeHero()
+    tickHero()
+
+    if (!cached) {
+      writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, deep }, now)
+    }
+
+    // A background pass, per source, only for a kind that still has an
+    // unresolved tier — the rare-tier cost from the file header, paid once.
+    for (const kind of ['FLR', 'GST', 'IPS'] as const) {
+      const list = { FLR: FLARE_CATEGORIES, GST: STORM_CATEGORIES, IPS: SHOCK_CATEGORIES }[kind]
+      const unresolved = okByKind[kind] && list.some((c) => !mostRecentQualifying(eventsByKind[kind], c))
+      if (!unresolved || deep[kind]) continue
+      const deeper = await loadDeep(kind, now)
+      deep[kind] = deeper
+      eventsByKind[kind] = eventsByKind[kind].concat(deeper.events)
+      okByKind[kind] = okByKind[kind] && deeper.ok
+      paintKind(kind, false)
+      recomputeHero()
+      tickHero()
+      writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, deep }, now)
+    }
+  }
+
+  run()
+</script>
+
+<style>
+  :global(.incident-body) { background: #0e1004; color: #eaf2c8; }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 8px 20px 64px;
+    font-family: 'Oswald', sans-serif;
+  }
+
+  .tape {
+    height: 12px;
+    margin: 0 -20px 22px;
+    background: repeating-linear-gradient(45deg, #d4ff3d 0 10px, #14160c 10px 20px);
+  }
+  .head + .hero { margin-top: 0; }
+  .hero + .tape { margin-top: 26px; }
+
+  .head { text-align: center; padding: 4px 0 22px; }
+  h1 {
+    margin: 0 0 10px;
+    font-size: clamp(28px, 6vw, 42px);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: #f4ffe0;
+  }
+  .lede {
+    margin: 0 auto;
+    max-width: 46em;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #c9d8a4;
+  }
+  .lede em { color: #d4ff3d; font-style: normal; }
+
+  /* ---- hero ------------------------------------------------------------- */
+
+  .hero {
+    text-align: center;
+    padding: 22px 16px 26px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #181b0e, #0f110a);
+    border: 1px solid rgba(212, 255, 61, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
+  }
+  .hero-label {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #9db06a;
+  }
+  .hero-clock {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    gap: clamp(6px, 2.4vw, 18px);
+    flex-wrap: wrap;
+  }
+  .hero-fig {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .hero-n {
+    display: inline-flex;
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: clamp(30px, 9vw, 58px);
+    line-height: 1;
+    color: #d4ff3d;
+    text-shadow: 0 0 18px rgba(212, 255, 61, 0.55), 0 0 44px rgba(212, 255, 61, 0.25);
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-u {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #7c8f4c;
+  }
+  .hero-caption {
+    margin: 14px 0 0;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 13px;
+    color: #a9bb75;
+    min-height: 1.4em;
+  }
+
+  /* ---- groups / rows ------------------------------------------------------ */
+
+  .groups { display: flex; flex-direction: column; gap: 30px; }
+  .group-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #eaf2c8;
+  }
+  .group-icon {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    color: #d4ff3d;
+  }
+  .group-source {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    text-transform: none;
+    color: #5f7038;
+  }
+
+  .rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 14px;
+    row-gap: 2px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: #171a0f;
+    border: 1px solid rgba(212, 255, 61, 0.1);
+  }
+  .row-top { grid-column: 1; display: flex; flex-direction: column; gap: 1px; }
+  .row-title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #eaf2c8;
+  }
+  .row-threshold {
+    font-family: 'Space Mono', monospace;
+    font-size: 10.5px;
+    color: #6c7d40;
+  }
+  .row-fig {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: clamp(22px, 5.4vw, 30px);
+    color: #d4ff3d;
+    text-shadow: 0 0 10px rgba(212, 255, 61, 0.4);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .row-detail {
+    grid-column: 1;
+    margin: 3px 0 0;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: #7c8f4c;
+  }
+
+  .d { display: inline-block; }
+  .d.roll { animation: incident-digit 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes incident-digit {
+    0% { transform: translateY(0.4em) scale(0.86); opacity: 0; }
+    55% { opacity: 1; }
+  }
+
+  /* ---- footer -------------------------------------------------------------- */
+
+  .foot {
+    margin-top: 34px;
+    padding-top: 20px;
+    border-top: 1px dashed rgba(212, 255, 61, 0.16);
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #7c8f4c;
+  }
+  .foot a { color: #b7d16f; }
+  .foot-small { margin-top: 10px; opacity: 0.85; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .d.roll { animation: none; }
+  }
+
+  @media (max-width: 480px) {
+    .row { grid-template-columns: 1fr; row-gap: 6px; }
+    .row-fig { grid-column: 1; grid-row: auto; }
+  }
+</style>

@@ -64,6 +64,57 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
 export const ART: Record<string, Illustration> = {
+  /* ---- Days Since Incident -------------------------------------------------- */
+  'days-since-incident': {
+    subject: 'a hazard sign on a post, glowing seismograph traces behind its striped frame',
+    slot: 'column-right',
+    viewBox: '0 0 100 260',
+    palette: ['#d4ff3d', '#15170f', '#4a4d3c', '#0e1004'],
+    draw: (seed) => {
+      const defs = `<defs>
+        <pattern id="days-since-incident-hazard" width="16" height="16" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+          <rect width="16" height="16" fill="#d4ff3d"/>
+          <rect width="8" height="16" fill="#0e1004"/>
+        </pattern>
+        <filter id="days-since-incident-glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="1.6" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>`
+      // A literal sign on a post rather than a full-bleed backdrop: the card's
+      // own accent gradient shows through everywhere the sign isn't, which is
+      // what keeps this from reading as "another column-right full panel" next
+      // to Space Elevator's sky.
+      const frame = `<rect x="4" y="14" width="92" height="136" rx="7" fill="url(#days-since-incident-hazard)"/>`
+      const plate = `<rect x="11" y="21" width="78" height="122" rx="3" fill="#15170f"/>`
+      // Three strip-chart rows, each its own little seismograph trace with a
+      // pulse at its peak — several small incidents on one sign, rather than
+      // one shape repeated.
+      const rows = [50, 84, 118].map((y, i) => {
+        const amp = 8 + rnd(seed, i) * 8
+        const pts = range(7)
+          .map((k) => {
+            const x = 18 + (k / 6) * 64
+            const dy = (k % 2 === 0 ? 1 : -1) * (amp * (0.4 + rnd(seed, i * 10 + k) * 0.8))
+            return `${n(x)},${n(y + dy)}`
+          })
+          .join(' L')
+        const peakX = 18 + (3 / 6) * 64
+        return (
+          `<path d="M${pts}" fill="none" stroke="#d4ff3d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" filter="url(#days-since-incident-glow)"/>` +
+          `<circle cx="${n(peakX)}" cy="${n(y - amp * 0.9)}" r="2.6" fill="#d4ff3d" filter="url(#days-since-incident-glow)"/>`
+        )
+      }).join('')
+      // A post, not a panel: two mounting brackets where it meets the sign,
+      // and a small footing at the ground.
+      const post = `<rect x="44" y="150" width="12" height="98" fill="#4a4d3c"/>` +
+        `<rect x="38" y="150" width="24" height="7" rx="2" fill="#33362a"/>` +
+        `<rect x="38" y="196" width="24" height="7" rx="2" fill="#33362a"/>` +
+        `<path d="M32 254 L68 254 L60 246 L40 246Z" fill="#33362a"/>`
+      return defs + post + frame + plate + rows
+    },
+  },
+
   /* ---- Space Elevator ----------------------------------------------------- */
   'space-elevator': {
     subject: 'a cable rising from green ground through blue sky into starlit black',

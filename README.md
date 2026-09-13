@@ -225,7 +225,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty-five games
+## The twenty-six games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -623,6 +623,33 @@ CAPTCHAs infuriating. The street is baked to a JPEG at build time by
 `pages/street.jpg.ts`, because the tiles are crops of one picture rather than
 nine copies of a drawing, and because the artefacts of lossy compression are
 themselves part of what a real tile looks like.
+
+**Days Since Incident** — the "days since last accident" sign from a
+warehouse wall, except the incidents are real and every counter is live.
+Sixteen rows across four real feeds: five earthquake magnitude tiers from
+USGS's own catalogue search, five GOES flare classes and five NOAA G-scale
+storm levels from NASA's DONKI space-weather log, and interplanetary shocks
+alongside them. Nothing is precomputed — every number is read from the
+visitor's own browser, from the same public instruments scientists use, the
+moment the page loads. The hero is the real centrepiece: a full-bleed,
+second-by-second "safe for" clock ticking up from the single most recent
+incident of any kind. *`scripts/check-incident-model.mjs` checks the pure
+arithmetic and parsing against real API shapes captured while building it —
+GOES flux boundaries, a storm's peak Kp rather than its first reading, and
+that "most recent qualifying" correctly prefers a smaller, newer event over
+a bigger, older one.* Two real engineering problems fell out of building it
+live rather than assuming: a ten-year DONKI query is 1.5MB and took 27 real
+seconds, so a fast 400-day pull renders the page immediately and only a
+still-unresolved rare tier (an X10 flare, a G5 storm) pays for one further,
+slower pull; and `minmagnitude=2.5&starttime=1950-01-01` — a perfectly good
+query for a rare tier — made USGS itself take 20 seconds and return a 503,
+because the most common earthquake tier over a 76-year window is an enormous
+scan regardless of `limit=1`. Each magnitude tier now searches a window sized
+to its own real-world frequency first, and only widens if that comes back
+genuinely empty. Hurricanes and tsunamis were tried and dropped: the
+cleanest free cyclone feed labels the identical wind speed two different
+things depending which agency reported it, and a category built on data that
+disagrees with itself would be worse than no row at all.
 
 ---
 

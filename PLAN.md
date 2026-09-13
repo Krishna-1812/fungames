@@ -1581,9 +1581,80 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     by accident in a `slice` slot." Switched to `meet`-fit, which cannot
     produce an empty box by construction, and the crash could not recur.
 
-27. Then reassess against the depth work in Phases 1–2 above.
+27. ~~**Space Elevator, made hyper-realistic**~~ — **done.** Requested in the
+    very next turn after item 26 shipped, with no complaint behind it —
+    rule #1 (existing games get a proactive quality pass) applied by the
+    user rather than by this file first. A real cable and elevator car now
+    climb continuously from a hand-drawn mountain horizon at the very start
+    to the Kármán line, tied directly to real scroll altitude — the ground
+    art was rebuilt around the live car rather than keeping a second, static
+    one that duplicated it. A deterministic starfield fades in through the
+    upper stratosphere, and the HUD gained a glow and a pulse keyed to the
+    current zone's own sky colour. Three new real markers (two low clouds,
+    and a cumulonimbus whose anvil top forms exactly at the tropopause) took
+    the marker count from twenty to twenty-three, and every one of the
+    twenty-three now carries its own hand-drawn icon, up from seven.
 
-**Where that leaves it.** Nine new games, nine checkers. The pattern that
+    Visual verification, not just the check suite, caught two real bugs
+    before either shipped. Stars were drawn as circles inside an
+    `<svg viewBox="0 0 100 100" preserveAspectRatio="none">` sized to a very
+    tall, narrow container — `none` stretches non-uniformly to fill the box
+    it's given, so every star rendered as a long vertical streak rather than
+    a dot. Fixed by dropping the SVG entirely for the starfield: plain
+    absolutely-positioned HTML elements, sized in real pixels, cannot be
+    stretched by a container's aspect ratio because nothing is scaling them
+    to fit one. And the new cumulonimbus marker sat close enough to the
+    troposphere/stratosphere seam that its card's 90%-opacity background let
+    the zone-seam label show through underneath — fixed by moving the
+    marker, shortening its note, and raising every marker card to 98% opacity
+    with an explicit z-index over the seam.
+
+28. ~~**Days Since Incident**~~ — **done.** A seventh pick from neal.fun's
+    own catalogue, and a genuinely different mechanism from anything else
+    here: every other "real data" game on this site computes from a model
+    or plays back something pre-fetched at build time; this one reads four
+    live feeds — USGS's earthquake catalogue and NASA DONKI's solar-flare,
+    geomagnetic-storm and interplanetary-shock logs — straight from the
+    visitor's own browser, the moment the page loads. Sixteen rows: five
+    earthquake magnitude tiers, five GOES flare classes, five NOAA G-scale
+    storm levels (from a storm's own peak Kp, not its first reading), and
+    interplanetary shocks. The hero is a full-bleed, second-by-second "safe
+    for" clock — the actual centrepiece, not a footnote next to the rows.
+
+    Confirmed live before building, not assumed: all three feeds are
+    genuinely CORS-accessible from a browser with no key (USGS) or a free
+    one (NASA's `DEMO_KEY`, disclosed in `site.config.ts` along with its
+    real, shared, ~30/hour global rate limit). Hurricanes and tsunamis were
+    tried and dropped — GDACS's cyclone feed labels the identical wind speed
+    "Tropical Storm" in one record and "Hurricane/Typhoon" in another,
+    because member agencies average sustained wind over different windows,
+    and there is no clean tsunami feed behind it at all. Categorising on top
+    of a source that disagrees with itself would be worse than no row.
+
+    `scripts/check-incident-model.mjs` holds the pure model to real captured
+    API shapes rather than the network (every other checker on this site
+    avoids live network too, and this page's own multi-second real calls
+    make it doubly not worth doing here): GOES flux boundaries, a storm's
+    peak Kp picked out of its whole reading list, and — the actual point of
+    `mostRecentQualifying` — that a smaller, newer qualifying event correctly
+    beats a bigger, older one.
+
+    Two real engineering problems only showed up by running the thing live.
+    A ten-year DONKI query is 1.5MB and took 27 real seconds, so the page
+    stages its load: a fast 400-day pull renders immediately, and only a
+    tier still unresolved after that (an X10 flare, a G5 storm — genuinely
+    rare) pays for one further, slower pull reaching back five years. And
+    `minmagnitude=2.5&starttime=1950-01-01` — a fine query for a rare
+    tier — made USGS itself take 20 seconds and come back a 503, because a
+    76-year window over the single most common earthquake tier is an
+    enormous scan even with `limit=1`. Each tier now searches a window sized
+    to its own real-world frequency first (five days for M2.5+, which
+    happens many times a day; 1,800 for M8.0+, which doesn't) and only
+    widens to the full record if that comes back genuinely empty.
+
+29. Then reassess against the depth work in Phases 1–2 above.
+
+**Where that leaves it.** Ten new games, ten checkers. The pattern that
 worked every time: build the model as pure functions over plain data, run
 it headlessly against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
@@ -1598,16 +1669,15 @@ fit the block it came from, a section-activation observer tuned narrowly
 enough that a short section could cross it unfired on a fast scroll, a
 temporal-dead-zone reference thrown only when a page loaded already
 scrolled, a slice-cropped tile slot whose geometry could rasterise to an
-empty box on the widest card — was found by running the thing and reading
-the output, not by re-reading the code.
+empty box on the widest card, a live query fast enough for a rare tier that
+took 20 real seconds on the single most common one — was found by running
+the thing and reading the output, not by re-reading the code.
 
-Next is the depth work in Phases 1–2, which is a different muscle: Rule Cascade
-12 → 30 rules, Trolley 12 → 26 dilemmas, Powder 12 → 30 elements with a
-discovery log, From Memory 8 → 16 prompts. No new engines, a great deal of
-writing.
-
-The rule for all of them: **one built properly beats five built quickly.** That is
-the entire lesson of the diagnosis and it applies to new games hardest of all.
+Phases 1 and 2 above are already done. The rule that got all ten of these
+built properly rather than quickly: **look at the real thing before building,
+and run the actual thing before calling it finished.** That is the entire
+lesson of the diagnosis at the top of this file, and it keeps paying for
+itself on the tenth game exactly as it did on the first.
 
 ---
 

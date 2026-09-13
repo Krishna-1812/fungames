@@ -110,6 +110,38 @@ export const ICONS: Record<IconKey, Icon> = {
             fill="${P.slate}" opacity="0.92"/>`,
   },
 
+  /* ---- hazard-sign glyphs (Days Since Incident) -------------------------- */
+  quake: {
+    subject: 'a seismograph trace across a fault line',
+    draw: () => `
+      <path d="M1 12.4h22" stroke="currentColor" stroke-width="1.4" opacity="0.22"/>
+      <path d="M1 12.4h3.2l2-6.4 3 13 3-10 2 5.4 2-3.6h3l2 4.6h2.8"
+            fill="none" stroke="${P.brick}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`,
+  },
+  'solar-flare': {
+    subject: 'the Sun throwing a bright jet off its edge',
+    draw: () => `
+      <circle cx="9.6" cy="14.4" r="6.2" fill="${P.rust}"/>
+      <path d="M13.6 9.8c3-.6 6.4.8 8 3.6-2.6-1-5-.6-6 .8-.9-1.6-1.5-3-2-4.4Z" fill="${P.gold}"/>
+      <path d="M11.2 3c1.7 2 2.8 4.3 2.4 6.6" fill="none" stroke="${P.gold}" stroke-width="2" stroke-linecap="round" opacity="0.85"/>`,
+  },
+  geostorm: {
+    subject: 'aurora ribbons rippling over a horizon',
+    draw: () => `
+      <path d="M1 19.8c4-2.4 8-2.4 11 0s7 2.4 11 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+      <path d="M2 13.2c3.4-3.4 6.6-1.4 9 .8s6 3.4 9.6-.4" fill="none" stroke="${P.green}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M3 7.8c3-2.8 6-1 8.4 1.2s5.6 3 8.8-.4" fill="none" stroke="${P.teal}" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+      <path d="M4.4 3.4c2.4-1.8 4.8-.6 6.6 1s4.4 2 7-.6" fill="none" stroke="${P.gold}" stroke-width="1.6" stroke-linecap="round" opacity="0.7"/>`,
+  },
+  shock: {
+    subject: 'a bow shock in front of a small craft',
+    draw: () => `
+      <path d="M9.4 12a8.4 8.4 0 0 1 8.4-8.4" fill="none" stroke="${P.indigo}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M6.2 12a11.6 11.6 0 0 1 11.6-11.6" fill="none" stroke="${P.indigo}" stroke-width="1.8" stroke-linecap="round" opacity="0.5"/>
+      <circle cx="12.4" cy="15.6" r="2.3" fill="${P.slate}"/>
+      <path d="M9.4 16.6H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.45"/>`,
+  },
+
   /* ---- living things ---------------------------------------------------- */
   bird: {
     subject: 'a small bird on a branch',
