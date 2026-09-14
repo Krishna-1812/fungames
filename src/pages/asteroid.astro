@@ -125,33 +125,42 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
       </section>
     </div>
 
-    <section class="result" id="result" hidden aria-live="polite">
-      <div class="verdict">
+  </div>
+
+  {/* The impact itself takes the whole screen. Everything above is the
+      instrument panel; this is the thing the instruments were for, and it
+      earns the viewport the way the real event would. It sits under the site
+      chrome bar (z-index 60) rather than over it, so the way back out of the
+      game is never covered. */}
+  <section class="stage" id="stage" hidden aria-label="Impact">
+    <div id="zoom" class="leafletMap" role="img" aria-label="Real satellite imagery of the impact site, with damage rings"></div>
+    <svg id="entryFx" class="entryFx" aria-hidden="true"></svg>
+
+    <div class="stage-head">
+      <div class="stage-verdict">
         <p class="energy" id="energyOut"></p>
         <p class="compare" id="compareOut"></p>
       </div>
+      <button type="button" class="stage-close" id="stageClose">Build another</button>
+    </div>
 
-      <div class="zoomwrap">
-        <div id="zoom" class="leafletMap" role="img" aria-label="Real satellite imagery of the impact site, with damage rings"></div>
-        <svg id="entryFx" class="entryFx" aria-hidden="true"></svg>
+    <div class="tour" id="tour" aria-live="polite">
+      <div class="tour-card">
+        <p class="tour-kicker" id="tourKicker"></p>
+        <p class="tour-figure" id="tourFigure"></p>
+        <p class="tour-note" id="tourNote"></p>
+        <ul class="tour-facts" id="tourFacts"></ul>
       </div>
-
-      <div class="stats" id="stats"></div>
-
-      <div class="cols">
-        <div>
-          <h3>What it does</h3>
-          <ul class="rings-list" id="ringsList"></ul>
-        </div>
-        <div>
-          <h3>Who it reaches</h3>
-          <p class="toll" id="tollOut"></p>
-          <ul class="cities-list" id="citiesList"></ul>
-        </div>
+      <div class="tour-nav">
+        <button type="button" class="tour-prev" id="tourPrev">Back</button>
+        <div class="tour-dots" id="tourDots" aria-hidden="true"></div>
+        <button type="button" class="tour-next" id="tourNext">Next</button>
       </div>
+    </div>
 
-      <details class="method">
-        <summary>How these numbers are worked out</summary>
+    <details class="method" id="method">
+      <summary>How these numbers are worked out</summary>
+      <div class="method-body">
         <p>
           Crater, fireball, blast and seismic figures come from Collins, Melosh &amp;
           Marcus (2005), the peer-reviewed model behind the Imperial College and
@@ -170,9 +179,9 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
           1,500 and killed nobody.
         </p>
         <p>Tsunami, ejecta and the global climate effects of the very largest impacts are not modelled.</p>
-      </details>
-    </section>
-  </div>
+      </div>
+    </details>
+  </section>
 </GameLayout>
 
 <script>
@@ -519,11 +528,214 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     render(result, casualties)
     unlock()
     sfx.whoosh()
-    el('result').scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
 
+  el('stageClose').addEventListener('click', closeStage)
+  addEventListener('keydown', (e) => {
+    if (el('stage').hidden) return
+    if (e.key === 'Escape') closeStage()
+    else if (e.key === 'ArrowRight') goStep(stepIndex + 1)
+    else if (e.key === 'ArrowLeft') goStep(stepIndex - 1)
+  })
+
+  function closeStage() {
+    el('stage').hidden = true
+    document.body.classList.remove('staged')
+    el('fire').focus()
+  }
+
+  /* ---- the tour ---------------------------------------------------------
+   *
+   * One effect at a time, each framed on the map at its own real radius.
+   * Every ring was already drawn at once in the first version of this page,
+   * which is an information display: it shows you that six circles exist. The
+   * thing being modelled is a sequence — a hole, then a fireball, then a wave
+   * of pressure arriving — and showing it one step at a time is the only way
+   * the sizes mean anything, because each step is framed against the last.
+   */
+
+  type TourStep = {
+    key: string
+    kicker: string
+    figure: string
+    note: string
+    facts: string[]
+    /** Metres from the impact point that the map should frame for this step. */
+    radius: number
+  }
+
+  let steps: TourStep[] = []
+  let stepIndex = 0
+
+  function buildTour(
+    r: ReturnType<typeof simulate>,
+    cas: ReturnType<typeof estimateCasualties>,
+  ): TourStep[] {
+    const out: TourStep[] = []
+    const thermal = (e: string) => r.thermal.find((t) => t.effect === e)
+    const burns3 = thermal('thirdDegreeBurns')
+    const clothes = thermal('clothingIgnites')
+    const trees = thermal('treesIgnite')
+
+    if (r.crater) {
+      out.push({
+        key: 'crater',
+        kicker: 'The crater',
+        figure: `${dist(r.crater.final)} across`,
+        note: 'Everything that was standing here is now part of the rim.',
+        facts: [
+          `${dist(r.crater.depth)} deep`,
+          `The cavity opens to ${dist(r.crater.transient)} before its walls slump back in`,
+        ],
+        radius: r.crater.final / 2,
+      })
+    } else {
+      out.push({
+        key: 'airburst',
+        kicker: 'It never lands',
+        figure: `${dist(r.entry.burstAltitude)} up`,
+        note: 'The air tears it apart before it reaches the ground and it detonates there. No crater — this is what Tunguska did.',
+        facts: [
+          r.entry.breakupAltitude
+            ? `It starts coming apart at ${dist(r.entry.breakupAltitude)}`
+            : 'It comes apart on the way down',
+          'The damage below is all pressure and heat, with nothing to dig',
+        ],
+        radius: r.fireball,
+      })
+    }
+
+    out.push({
+      key: 'fireball',
+      kicker: 'The fireball',
+      figure: `${dist(r.fireball)} radius`,
+      note: 'A ball of glowing vapour, briefly several times brighter than the Sun.',
+      facts: [
+        clothes ? `Clothing catches fire out to ${dist(clothes.radius)}` : 'Not hot enough to set clothing alight',
+        burns3 ? `Third-degree burns to ${dist(burns3.radius)}` : 'No third-degree burns beyond the fireball itself',
+        trees ? `Trees ignite to ${dist(trees.radius)}` : 'Nothing catches light at a distance',
+      ],
+      radius: Math.max(r.fireball, burns3?.radius ?? 0),
+    })
+
+    if (r.blast.length) {
+      const worst = r.blast[0]
+      const outer = r.blast[r.blast.length - 1]
+      out.push({
+        key: 'shock',
+        kicker: 'The shockwave',
+        figure: `${dist(outer.radius)} out`,
+        note: `${worst.label} at the centre, and it is still breaking windows at the far edge.`,
+        facts: r.blast.map((b) => `${b.label} to ${dist(b.radius)} — ${b.note}`),
+        radius: outer.radius,
+      })
+
+      const fastest = r.blast.reduce((a, b) => (b.wind > a.wind ? b : a))
+      out.push({
+        key: 'wind',
+        kicker: 'The wind',
+        figure: `${nf(fastest.wind * 3.6)} km/h`,
+        note: 'Peak gust behind the pressure front. A strong hurricane is about 250 km/h.',
+        facts: r.blast
+          .slice(0, 4)
+          .map((b) => `${nf(b.wind * 3.6)} km/h at ${dist(b.radius)}`),
+        radius: outer.radius,
+      })
+    }
+
+    const rec = r.recurrenceYears
+    out.push({
+      key: 'quake',
+      kicker: 'The earthquake',
+      figure: `M${r.magnitude.toFixed(1)}`,
+      note: 'The ground shock, on the same scale a seismologist would give it.',
+      facts: [
+        `An impact this size happens somewhere on Earth about every ${
+          rec >= 1e6 ? `${nf(rec / 1e6, 1)} million years` : rec >= 1000 ? `${nf(rec / 1000)},000 years` : `${nf(rec)} years`
+        }`,
+        `${bigNumber(Math.round(r.energyMt * 1000 / 15))} Hiroshima bombs of energy, released at once`,
+      ],
+      radius: r.maxRadius,
+    })
+
+    const toll: TourStep = {
+      key: 'toll',
+      kicker: 'Who it reaches',
+      figure: cas.dead > 0 ? `${bigNumber(cas.dead)} dead` : 'Nobody',
+      note:
+        cas.dead > 0 || cas.injured > 0
+          ? `${bigNumber(cas.injured)} more are injured.`
+          : isLand(target!.lat, target!.lon)
+            ? 'No city in the dataset is close enough to be hurt. Empty land absorbs it.'
+            : 'Open water. Nobody is under it — though a strike this size at sea would raise waves this model does not attempt.',
+      facts: cas.cities
+        .slice(0, 6)
+        .map((c) => `${c.city.n} — ${bigNumber(Math.round(c.dead))} dead, ${dist(c.distance)} away`),
+      radius: r.maxRadius,
+    }
+    out.push(toll)
+    return out
+  }
+
+  function goStep(i: number) {
+    if (!steps.length) return
+    stepIndex = Math.max(0, Math.min(steps.length - 1, i))
+    const s = steps[stepIndex]
+
+    el('tourKicker').textContent = s.kicker
+    el('tourFigure').textContent = s.figure
+    el('tourNote').textContent = s.note
+    el('tourFacts').innerHTML = s.facts.map((f) => `<li>${f}</li>`).join('')
+
+    el('tourDots').innerHTML = steps
+      .map((_, k) => `<span class="dot${k === stepIndex ? ' on' : ''}"></span>`)
+      .join('')
+
+    const prev = el<HTMLButtonElement>('tourPrev')
+    const next = el<HTMLButtonElement>('tourNext')
+    prev.disabled = stepIndex === 0
+    next.disabled = stepIndex === steps.length - 1
+    next.textContent = stepIndex === steps.length - 1 ? 'That is all of it' : `Next: ${steps[stepIndex + 1].kicker.replace(/^The /, '')}`
+
+    // The card re-announces itself on every step, so the figure reads as a
+    // new arrival rather than text quietly swapping underneath you.
+    const card = document.querySelector<HTMLElement>('.tour-card')
+    if (card && !prefersReducedMotion) {
+      card.classList.remove('stepIn')
+      void card.offsetWidth
+      card.classList.add('stepIn')
+    }
+
+    ;(el('zoom') as HTMLElement).dataset.step = s.key
+    frameStep(s.radius)
+    sfx.blip(stepIndex)
+  }
+
+  /**
+   * Fly the map so this step's own radius fills a comfortable part of the view.
+   *
+   * The padding is the point, not a margin: the tour card sits over the bottom
+   * of the stage and the impact point is the middle of the bounds, so fitting
+   * to the raw viewport put the crater directly behind the card describing it.
+   * Leaflet's own padding options fit the circle into the part of the map that
+   * is actually visible, which is what the numbers are being compared against.
+   */
+  function frameStep(radius: number) {
+    if (!zoomMap || !target) return
+    const center = L.latLng(target.lat, target.lon)
+    const card = document.querySelector<HTMLElement>('.tour')
+    const below = card ? Math.min(card.offsetHeight + 26, innerHeight * 0.52) : 0
+    zoomMap.flyToBounds(center.toBounds(Math.max(radius, 60) * 2 * 1.9), {
+      duration: prefersReducedMotion ? 0 : 0.85,
+      easeLinearity: 0.25,
+      paddingTopLeft: [0, 56],
+      paddingBottomRight: [0, below],
+    })
+  }
+
   function render(r: ReturnType<typeof simulate>, cas: ReturnType<typeof estimateCasualties>) {
-    el('result').hidden = false
+    el('stage').hidden = false
+    document.body.classList.add('staged')
     buildCard(r, cas)
 
     /* headline ------------------------------------------------------- */
@@ -542,65 +754,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
           ? `About ${bigNumber(Math.round(hiroshimas))} Hiroshima bombs.`
           : `About ${bigNumber(Math.round(mt / 50))} times the largest bomb ever tested.`
 
-    /* stats ---------------------------------------------------------- */
-    const stat = (v: string, l: string) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`
-    const rec = r.recurrenceYears
-    el('stats').innerHTML =
-      (r.crater
-        ? stat(dist(r.crater.final), 'crater across') + stat(dist(r.crater.depth), 'crater deep')
-        : stat(dist(r.entry.burstAltitude), 'burst altitude') + stat('none', 'crater')) +
-      stat(dist(r.fireball), 'fireball radius') +
-      stat(`M${r.magnitude.toFixed(1)}`, 'earthquake') +
-      stat(
-        rec >= 1e6 ? `${nf(rec / 1e6, 1)} Myr` : rec >= 1000 ? `${nf(rec / 1000)} kyr` : `${nf(rec)} yr`,
-        'happens about every',
-      )
-
-    /* what it does --------------------------------------------------- */
-    const burns = r.thermal.find((t) => t.effect === 'thirdDegreeBurns')
-    const rows: string[] = []
-    if (!r.crater) {
-      rows.push(
-        `<li><b>It never reaches the ground.</b><span>The air tears it apart at ${dist(
-          r.entry.burstAltitude,
-        )} and it detonates there. No crater — this is what Tunguska did.</span></li>`,
-      )
-    }
-    if (burns) {
-      rows.push(
-        `<li><b>Third-degree burns to ${dist(burns.radius)}</b><span>Anyone outdoors and facing it inside that circle.</span></li>`,
-      )
-    }
-    for (const b of r.blast) {
-      rows.push(
-        `<li><b>${b.label} to ${dist(b.radius)}</b><span>${b.note}. Peak wind ${nf(
-          b.wind * 3.6,
-        )} km/h.</span></li>`,
-      )
-    }
-    el('ringsList').innerHTML = rows.join('')
-
-    /* casualties ----------------------------------------------------- */
-    if (cas.dead === 0 && cas.injured === 0) {
-      el('tollOut').textContent = isLand(target!.lat, target!.lon)
-        ? 'No city in the dataset is close enough to be hurt. Empty land absorbs it.'
-        : 'Open water. Nobody is under it — though a strike this size in the sea would raise waves this model does not attempt.'
-      el('citiesList').innerHTML = ''
-    } else {
-      el('tollOut').innerHTML =
-        `<strong>${bigNumber(cas.dead)}</strong> dead, ` +
-        `<strong>${bigNumber(cas.injured)}</strong> injured.`
-      el('citiesList').innerHTML = cas.cities
-        .slice(0, 8)
-        .map(
-          (c) =>
-            `<li><b>${c.city.n}</b><span>${bigNumber(Math.round(c.dead))} dead · ${dist(
-              c.distance,
-            )} away</span></li>`,
-        )
-        .join('')
-    }
-
+    steps = buildTour(r, cas)
+    stepIndex = 0
     drawZoom(r)
   }
 
@@ -629,18 +784,38 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   let zoomMap: L.Map | null = null
   let ringsGroup: L.LayerGroup | null = null
 
+  /**
+   * Seed the gradient <defs> into Leaflet's own SVG renderer, and keep asking.
+   *
+   * Calling this once from ensureZoomMap was a silent, invisible bug: adding
+   * the renderer to the map does not necessarily create its <svg> element in
+   * the same tick, so `querySelector('svg')` returned null, the defs were
+   * never inserted, and the crater and fireball — whose fills are
+   * `url(#zoom-crater)` and `url(#zoom-fire)` — painted as nothing at all.
+   * Nothing errors when an SVG paint server is missing; the shape is simply
+   * not there. So this runs again on every launch, after the rings exist,
+   * where the element is guaranteed.
+   */
+  function ensureDefs() {
+    const svg = (el('zoom') as HTMLElement).querySelector('svg')
+    if (svg && !svg.querySelector('#zoom-fire')) svg.insertAdjacentHTML('afterbegin', ZOOM_DEFS)
+  }
+
   function ensureZoomMap() {
     if (zoomMap) return
+    // No zoom buttons: the tour drives the camera, and a pair of +/- controls
+    // in the corner invites you to fight it. Attribution stays — the tiles
+    // require it.
     zoomMap = L.map('zoom', {
       attributionControl: true, scrollWheelZoom: false, doubleClickZoom: false,
+      zoomControl: false,
     })
     L.tileLayer(SAT_URL, { maxZoom: 19, attribution: SAT_ATTR }).addTo(zoomMap)
     // Explicitly instantiates the SVG renderer (rather than waiting for the
     // first vector layer) so ZOOM_DEFS can be seeded before any ring ever
     // references it by url(#...).
     L.svg().addTo(zoomMap)
-    const svg = (el('zoom') as HTMLElement).querySelector('svg')
-    if (svg && !svg.querySelector('#zoom-fire')) svg.insertAdjacentHTML('afterbegin', ZOOM_DEFS)
+    ensureDefs()
     L.control.scale({ imperial: false, maxWidth: 110 }).addTo(zoomMap)
     ringsGroup = L.layerGroup().addTo(zoomMap)
   }
@@ -658,10 +833,12 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     zmap.fitBounds(center.toBounds(r.maxRadius * 2 * 1.35), { animate: false })
     zmap.invalidateSize()
 
-    const ring = (metres: number, colour: string, i: number, dashed = false) => {
+    // Each ring carries what kind of thing it is, so the tour can dim
+    // everything that is not the step you are on without re-drawing anything.
+    const ring = (metres: number, colour: string, i: number, kind: string, dashed = false) => {
       const c = L.circle(center, {
         radius: metres, color: colour, weight: 1.6, opacity: 0.85,
-        fillColor: colour, fillOpacity: 0.13, className: 'ring', interactive: false,
+        fillColor: colour, fillOpacity: 0.13, className: `ring ${kind}`, interactive: false,
         dashArray: dashed ? '6 5' : undefined,
       }).addTo(ringsGroup!)
       ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(i))
@@ -669,13 +846,13 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
 
     // Largest first so the small, hot rings paint on top.
     const ordered = [...r.blast].sort((a, b) => b.radius - a.radius)
-    ordered.forEach((b, i) => ring(b.radius, RING_COLOURS[Math.min(i, 5)], i))
+    ordered.forEach((b, i) => ring(b.radius, RING_COLOURS[Math.min(i, 5)], i, 'blast'))
     const burns = r.thermal.find((t) => t.effect === 'thirdDegreeBurns')
-    if (burns) ring(burns.radius, '#ffd166', ordered.length, true)
+    if (burns) ring(burns.radius, '#ffd166', ordered.length, 'thermal', true)
     if (r.crater) {
       const c = L.circle(center, {
         radius: r.crater.final / 2, color: '#6b4231', weight: 1.6, opacity: 0.55,
-        fillColor: 'url(#zoom-crater)', fillOpacity: 0.95, className: 'ring', interactive: false,
+        fillColor: 'url(#zoom-crater)', fillOpacity: 0.95, className: 'ring crater', interactive: false,
       }).addTo(ringsGroup!)
       ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(ordered.length + 1))
     }
@@ -690,6 +867,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
       }).addTo(ringsGroup!)
       ;(c.getElement() as HTMLElement | undefined)?.style.setProperty('--i', String(ordered.length + 2))
     }
+
+    ensureDefs()
 
     // Nearby cities, so the rings have something real to sit next to —
     // Leaflet's own bounds after fitBounds, not a hand-measured radius.
@@ -735,6 +914,10 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
       zoomEl.classList.add('impacted')
       sfx.boom()
       shake(document.body, 10, 420)
+      // The rings arrive at their real sizes first, so the tour's first fly-in
+      // reads as zooming into something already there rather than as the map
+      // simply starting somewhere arbitrary.
+      setTimeout(() => goStep(0), prefersReducedMotion ? 0 : 620)
 
       const live = zoomEl.getBoundingClientRect()
       const sx = live.left + targetPt.x
@@ -751,7 +934,7 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
         void (flash as HTMLElement).offsetWidth
         flash.classList.add('hit')
 
-        const wrap = zoomEl.closest<HTMLElement>('.zoomwrap')
+        const wrap = zoomEl.closest<HTMLElement>('.stage')
         wrap?.classList.remove('impactPunch')
         void wrap?.offsetWidth
         wrap?.classList.add('impactPunch')
@@ -851,6 +1034,9 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   }
 
   /* --------------------------------------------------------------- boot */
+
+  el('tourPrev').addEventListener('click', () => goStep(stepIndex - 1))
+  el('tourNext').addEventListener('click', () => goStep(stepIndex + 1))
 
   syncReadouts()
   setTarget(51.507, -0.128, 'London, United Kingdom')
@@ -954,7 +1140,12 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   .rock-body .hits button:hover { background: #3a1a11; }
   .rock-body .hits span { color: #b1897b; font-size: 12.5px; white-space: nowrap; }
 
-  .rock-body .mapwrap { position: relative; border-radius: var(--radius); overflow: hidden; background: #0b1522; }
+  /* `z-index: 0` is load-bearing, not tidying. Leaflet gives its own panes
+     z-index 400 and its controls 1000, and the map container itself has no
+     z-index, so without a stacking context here those panes compete directly
+     with the impact stage in the root stacking context and the target picker
+     paints straight through it. */
+  .rock-body .mapwrap { position: relative; z-index: 0; border-radius: var(--radius); overflow: hidden; background: #0b1522; }
   .rock-body .leafletMap { width: 100%; aspect-ratio: 16 / 10; background: #0b1522; }
   .rock-body #map { cursor: crosshair; }
 
@@ -1007,20 +1198,142 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   .rock-body .fire:active:not(:disabled) { transform: scale(0.97); }
   .rock-body .fire:disabled { background: #4a2418; color: #a5806f; cursor: default; }
 
-  /* results ---------------------------------------------------------- */
-  .rock-body .result { margin-top: 26px; }
-  .rock-body .verdict { text-align: center; margin-bottom: 18px; }
-  .rock-body .energy {
-    font-family: var(--display); font-size: clamp(28px, 5.6vw, 46px);
-    font-weight: 800; margin: 0; letter-spacing: -0.02em; color: #ffb066;
-  }
-  .rock-body .compare { color: #c7a99c; margin: 6px 0 0; }
+  /* the impact stage -------------------------------------------------- */
 
-  .rock-body .zoomwrap {
-    background: #0b1522; border: 1px solid #3d1f16; border-radius: var(--radius-lg);
-    overflow: hidden; position: relative;
+  /* The map is the page once something has been dropped on it. Fixed rather
+     than a tall block in the flow, because the whole point of the tour is
+     that the frame stays put while the scale of what is in it changes — a
+     scrolling page would move the thing you are trying to compare against. */
+  .rock-body .stage {
+    position: fixed; inset: 48px 0 0; z-index: 50;
+    background: #0b1522; overflow: hidden;
+    display: block;
   }
-  .rock-body .zoomwrap .leafletMap { aspect-ratio: auto; height: min(56vh, 460px); }
+  /* Required, and not redundant: an author rule that sets `display` at all
+     outranks the user-agent's own `[hidden] { display: none }` regardless of
+     specificity, so without this the stage covers the page from first paint
+     while still reporting `hidden === true`. */
+  .rock-body .stage[hidden] { display: none; }
+  /* The builder is not just covered, it stops painting: it owns a second
+     Leaflet map whose tiles would otherwise keep rendering underneath. */
+  .rock-body.staged { overflow: hidden; }
+  .rock-body.staged .wrap { visibility: hidden; }
+  .rock-body .stage .leafletMap { width: 100%; height: 100%; aspect-ratio: auto; }
+
+  /* Above Leaflet's own controls, which sit at z-index 1000. */
+  .rock-body .stage-head {
+    position: absolute; z-index: 1100; top: 0; left: 0; right: 0;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding: 14px 16px 34px;
+    background: linear-gradient(180deg, rgb(8 4 3 / 0.86) 0%, rgb(8 4 3 / 0.5) 55%, transparent 100%);
+    pointer-events: none;
+  }
+  .rock-body .stage-head > * { pointer-events: auto; }
+  .rock-body .energy {
+    font-family: var(--display); font-size: clamp(22px, 3.6vw, 38px);
+    font-weight: 800; margin: 0; letter-spacing: -0.02em; color: #ffb066;
+    text-shadow: 0 2px 14px rgb(0 0 0 / 0.8);
+  }
+  .rock-body .compare { color: #e0c3b4; margin: 4px 0 0; font-size: 13.5px; text-shadow: 0 1px 8px rgb(0 0 0 / 0.9); }
+  .rock-body .stage-close {
+    flex: none; background: rgb(20 10 7 / 0.82); border: 1px solid #5d3020;
+    color: #f0d9cd; border-radius: 999px; padding: 9px 16px; font-size: 13px;
+    cursor: pointer; backdrop-filter: blur(4px);
+    transition: background 140ms var(--ease), transform 180ms var(--ease-bounce);
+  }
+  .rock-body .stage-close:hover { background: #3a1a11; transform: scale(1.04); }
+
+  /* The tour card. One effect at a time: a kicker, the figure itself at the
+     size the figure deserves, and the detail underneath it. */
+  .rock-body .tour {
+    position: absolute; z-index: 1100; left: 50%; bottom: 30px; transform: translateX(-50%);
+    width: min(560px, calc(100vw - 24px));
+    display: grid; gap: 8px;
+  }
+  .rock-body .tour-card {
+    background: rgb(12 6 4 / 0.88); border: 1px solid #4d2619;
+    border-radius: var(--radius-lg); padding: 16px 18px 14px;
+    backdrop-filter: blur(8px); box-shadow: 0 18px 50px rgb(0 0 0 / 0.55);
+    /* The toll step lists six cities and would otherwise grow up over the
+       energy headline on a short window. */
+    max-height: min(46vh, 340px); overflow-y: auto;
+  }
+  .rock-body .tour-card.stepIn { animation: stepIn 420ms var(--ease-bounce); }
+  @keyframes stepIn {
+    0% { opacity: 0; transform: translateY(10px) scale(0.985); }
+    100% { opacity: 1; transform: none; }
+  }
+  .rock-body .tour-kicker {
+    margin: 0; font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #c98b6b;
+  }
+  .rock-body .tour-figure {
+    margin: 2px 0 0; font-family: var(--display); font-weight: 800;
+    font-size: clamp(26px, 5vw, 40px); letter-spacing: -0.02em; color: #fff3e6;
+    font-variant-numeric: tabular-nums; line-height: 1.05;
+  }
+  .rock-body .tour-note { margin: 7px 0 0; font-size: 14px; color: #e0c3b4; }
+  .rock-body .tour-facts {
+    list-style: none; margin: 11px 0 0; padding: 0; display: grid; gap: 5px;
+  }
+  .rock-body .tour-facts li {
+    font-size: 12.5px; color: #c7a99c; padding-left: 13px; position: relative;
+  }
+  .rock-body .tour-facts li::before {
+    content: ''; position: absolute; left: 0; top: 7px;
+    width: 5px; height: 5px; border-radius: 50%; background: #ff7a33;
+  }
+
+  .rock-body .tour-nav {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: rgb(12 6 4 / 0.88); border: 1px solid #4d2619;
+    border-radius: 999px; padding: 6px 8px; backdrop-filter: blur(8px);
+  }
+  .rock-body .tour-nav button {
+    background: none; border: 0; color: #f0d9cd; border-radius: 999px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background 140ms var(--ease);
+  }
+  .rock-body .tour-nav button:hover:not(:disabled) { background: #3a1a11; }
+  .rock-body .tour-nav button:disabled { color: #7a5748; cursor: default; }
+  .rock-body .tour-next { background: #ff7a33 !important; color: #2a0d08 !important; }
+  .rock-body .tour-next:disabled { background: #4a2418 !important; color: #a5806f !important; }
+  .rock-body .tour-dots { display: flex; gap: 5px; }
+  .rock-body .tour-dots .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #5d3020;
+    transition: background 200ms var(--ease), transform 200ms var(--ease);
+  }
+  .rock-body .tour-dots .dot.on { background: #ff9a3d; transform: scale(1.35); }
+
+  /* Everything that is not this step fades back rather than disappearing:
+     the comparison between one radius and the next is the entire point, so
+     the others have to stay faintly on screen to be compared against. */
+  .rock-body #zoom.impacted[data-step='crater'] path.ring:not(.crater) { opacity: 0.16; }
+  .rock-body #zoom.impacted[data-step='fireball'] path.ring:not(.fireball):not(.thermal) { opacity: 0.16; }
+  .rock-body #zoom.impacted[data-step='shock'] path.ring:not(.blast) { opacity: 0.16; }
+  .rock-body #zoom.impacted[data-step='wind'] path.ring:not(.blast) { opacity: 0.16; }
+
+  .rock-body .method {
+    position: absolute; z-index: 1100; left: 16px; top: 86px;
+    max-width: 320px; color: #b1897b; font-size: 12.5px;
+  }
+  .rock-body .method summary {
+    cursor: pointer; color: #c98b6b; background: rgb(12 6 4 / 0.8);
+    border: 1px solid #4d2619; border-radius: 999px; padding: 7px 13px;
+    list-style: none; display: inline-block; backdrop-filter: blur(4px);
+  }
+  .rock-body .method summary::-webkit-details-marker { display: none; }
+  .rock-body .method-body {
+    margin-top: 8px; max-height: 42vh; overflow-y: auto;
+    background: rgb(12 6 4 / 0.92); border: 1px solid #4d2619;
+    border-radius: var(--radius); padding: 12px 14px; backdrop-filter: blur(8px);
+  }
+  .rock-body .method p { max-width: 78ch; margin: 0 0 8px; }
+  .rock-body .method p:last-child { margin-bottom: 0; }
+
+  @media (max-width: 720px) {
+    .rock-body .method { display: none; }
+    .rock-body .tour { bottom: 10px; }
+  }
   /* Real imagery, so the rings and the entry streak are what have to earn
      their keep against it rather than a hand-drawn coastline held low
      contrast on purpose. Weight is in screen pixels already (Leaflet paths
@@ -1056,7 +1369,7 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   /* A brief camera "punch" at the moment of impact — the whole map box
      bumps larger and settles, the way a hit lands weight in a game rather
      than just appearing. */
-  .rock-body .zoomwrap.impactPunch { animation: camPunch 420ms cubic-bezier(0.22, 0.9, 0.34, 1); }
+  .rock-body .stage.impactPunch { animation: camPunch 420ms cubic-bezier(0.22, 0.9, 0.34, 1); }
   @keyframes camPunch {
     0% { transform: scale(1); }
     16% { transform: scale(1.045); }
@@ -1084,32 +1397,6 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     100% { opacity: 0; }
   }
 
-  .rock-body .stats {
-    display: grid; gap: 10px; margin: 16px 0;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  }
-  .rock-body .stat {
-    background: #21100c; border: 1px solid #3d1f16; border-radius: var(--radius);
-    padding: 14px 12px; text-align: center;
-  }
-  .rock-body .stat b {
-    display: block; font-family: var(--display); font-size: 22px;
-    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
-  }
-  .rock-body .stat span { font-size: 11.5px; color: #b1897b; }
-
-  .rock-body .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 760px) { .rock-body .cols { grid-template-columns: 1fr; } }
-  .rock-body .cols h3 { font-size: 17px; margin: 0 0 10px; }
-  .rock-body .rings-list, .rock-body .cities-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .rock-body .rings-list li, .rock-body .cities-list li {
-    background: #21100c; border-left: 3px solid #ff7a33; border-radius: 8px;
-    padding: 10px 12px;
-  }
-  .rock-body .rings-list b, .rock-body .cities-list b { display: block; font-size: 14.5px; }
-  .rock-body .rings-list span, .rock-body .cities-list span { font-size: 12.5px; color: #b1897b; }
-  .rock-body .toll { font-size: 17px; margin: 0 0 12px; }
-  .rock-body .toll strong { color: #ff8f4a; font-variant-numeric: tabular-nums; }
 
   .rock-body .method { margin-top: 22px; color: #b1897b; font-size: 13.5px; }
   .rock-body .method summary { cursor: pointer; color: #c98b6b; }
