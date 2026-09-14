@@ -328,9 +328,12 @@ console.log('\ndeterministic, and nothing borrowed from a font')
     bad++
     fail('spend-art.ts contains an emoji — everything here is drawn')
   }
-  if (/<text[\s>]/.test(src)) {
+  // Scanned on the drawn markup, not the source: a doc comment that states
+  // this very rule would otherwise match itself.
+  const drawn = names.map((k) => SPEND_ART[k].draw()).join('')
+  if (/<text[\s>]/.test(drawn)) {
     bad++
-    fail('spend-art.ts uses <text> — these are drawings, and a font would not be embedded in the card')
+    fail('a drawing uses <text> — these are pictures, and a font would not be embedded in the card')
   }
   check(bad === 0, 'every drawing is deterministic and drawn, not typed')
 }
