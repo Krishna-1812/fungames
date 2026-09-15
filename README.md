@@ -1,6 +1,6 @@
 # funsite
 
-A neal.fun-style site: one lean homepage and twenty self-contained
+A neal.fun-style site: one lean homepage and twenty-seven self-contained
 interactive pages, each rendered with its own WebGL shader or 2D canvas and
 shipping only the script that page actually needs.
 
