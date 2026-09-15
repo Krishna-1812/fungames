@@ -266,11 +266,10 @@ export const GAMES: Game[] = [
   {
     slug: 'fusion',
     title: 'Fusion',
-    blurb: 'Combine anything with anything',
+    blurb: 'Thirty-nine things, and four to start with',
     description:
-      'Start with four things. Drag one onto another and get something new. Every combination anyone has ever made is remembered forever.',
+      'Water, fire, earth and wind, and thirty-five things to make out of them — stone, glass, a blade, an hourglass, a city. Every element is drawn rather than borrowed from an emoji set, and the whole tree works offline; deploy the bundled Cloudflare Worker and it will invent new ones beyond it.',
     accent: '#1e1a45', accent2: '#b44cf0',
-    unlisted: true,
     category: 'fun',
     added: '2026-09-07',
   },

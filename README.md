@@ -96,6 +96,7 @@ src/
     tile-art.ts         twenty bespoke tile drawings, one per game slug
     scale-things.ts     what Scale draws, how big it is, and the sky behind it
     scale-art.ts        twenty-six of those drawn, with both their real axes
+    spend-art.ts        the thirty things you can buy, drawn as products
     time-events.ts      Deep Time's forty-four events and when they happened
     time-art.ts         a scene for each, flat colour on one palette
     trolley-scene.ts    the field, the track, the tram and whoever is on it
@@ -123,7 +124,8 @@ src/
     result-card.ts      the 1200x630 card for a *result*, not for a game
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished
-    icons.ts            sixty-five drawn icons, shared across the games
+    icons.ts            seventy-two drawn icons, shared across the games
+    fusion-art.ts       the thirty-nine elements of Fusion, drawn
     icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
     fx.ts               particles, screen shake, floating text
@@ -873,7 +875,7 @@ judged where the type lands rather than over a rectangle that is mostly empty.
 Run it with `--sheet out.png` to get a contact sheet of all twenty tiles
 from the same compositor.
 
-`check-icons.mjs` does the same job for the sixty-five drawn icons inside the
+`check-icons.mjs` does the same job for the seventy-two drawn icons inside the
 games. They get 26 to 34 pixels, on pages that are cream in three cases and
 nearly black in two, so it renders each one at the size and on the background
 it actually appears on. `--sheet out.png` writes the whole set on both a cream
