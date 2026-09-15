@@ -1,12 +1,11 @@
 export const KEY = 'fusion:v1'
 export const SEED = [
-  { text: 'Water', emoji: '💧' }, { text: 'Fire', emoji: '🔥' },
-  { text: 'Earth', emoji: '🌍' }, { text: 'Wind', emoji: '🌬️' },
+  { text: 'Water' }, { text: 'Fire' }, { text: 'Earth' }, { text: 'Wind' },
 ]
 
 export function validItem(item) {
   return item && typeof item.text === 'string' && item.text.trim().length > 0 &&
-    item.text.length <= 60 && typeof item.emoji === 'string' && item.emoji.length <= 32
+    item.text.length <= 60
 }
 
 export function restoreState(raw) {
@@ -14,7 +13,7 @@ export function restoreState(raw) {
   const recipes = {}
   if (raw && Array.isArray(raw.items)) {
     for (const item of raw.items) {
-      if (validItem(item)) items.set(item.text.trim().toLowerCase(), { text: item.text.trim(), emoji: item.emoji })
+      if (validItem(item)) items.set(item.text.trim().toLowerCase(), { text: item.text.trim() })
     }
     // Old '+' keys cannot be migrated unambiguously. Keep earned items and
     // rebuild only the recipe cache as pairs are tried again.
@@ -23,7 +22,7 @@ export function restoreState(raw) {
         try {
           const pair = JSON.parse(key)
           if (Array.isArray(pair) && pair.length === 2 && pair.every((s) => typeof s === 'string') && validItem(item)) {
-            recipes[key] = { text: item.text, emoji: item.emoji }
+            recipes[key] = { text: item.text }
           }
         } catch { /* Discard only the invalid cache entry. */ }
       }

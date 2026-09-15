@@ -4,7 +4,7 @@ import { pairKey } from '../src/lib/fusion-pair.js'
 import { RECIPES, LOCAL } from '../src/lib/fusion-recipes.js'
 import { loadState, restoreState, saveState } from '../src/lib/fusion-state.js'
 
-const discovered = { text: 'Glass', emoji: '🪟' }
+const discovered = { text: 'Glass' }
 const migrated = restoreState({ items: [discovered, discovered, null, { text: 42 }], recipes: { 'fire+sand': discovered } })
 assert.equal(migrated.items.length, 5)
 assert.ok(migrated.items.some((i) => i.text === 'Glass'))
@@ -46,7 +46,7 @@ globalThis.caches = { default: {
 const env = {
   ALLOWED_ORIGINS: 'https://games.test,https://other.test',
   FUSION: { async get(key) { return kv.get(key) }, async put(key, value) { kv.set(key, JSON.parse(value)) } },
-  AI: { async run() { calls++; return { response: '{"result":"Cloud","emoji":"☁️"}' } } },
+  AI: { async run() { calls++; return { response: '{"result":"Cloud","unexpected":"field"}' } } },
 }
 const ctx = { waitUntil(promise) { pending.push(promise) } }
 async function request(headers = { origin: 'https://games.test' }, first = 'Water', second = 'Wind', method = 'GET') {
@@ -67,10 +67,10 @@ assert.equal((await request(undefined, 'Water', 'Wind', 'POST')).status, 405)
 assert.equal((await request(undefined, 'Water', 'Wind', 'OPTIONS')).status, 204)
 const first = await request()
 assert.equal(first.headers.get('access-control-allow-origin'), 'https://games.test')
-assert.deepEqual(await first.json(), { result: 'Cloud', emoji: '☁️' })
+assert.deepEqual(await first.json(), { result: 'Cloud' })
 const second = await request({ origin: 'https://other.test' }, 'wind', 'water')
 assert.equal(second.headers.get('access-control-allow-origin'), 'https://other.test')
-assert.deepEqual(await second.json(), { result: 'Cloud', emoji: '☁️' })
+assert.deepEqual(await second.json(), { result: 'Cloud' })
 assert.equal(calls, 1, 'reversed pair must reuse edge answer')
 edge.clear()
 assert.equal((await request({ referer: 'https://games.test/fusion/' })).status, 200)
@@ -78,7 +78,7 @@ assert.equal(calls, 1, 'KV must survive an edge miss')
 await request(undefined, 'a|b', 'c')
 await request(undefined, 'a', 'b|c')
 assert.equal(calls, 3, 'delimiter-containing pairs must not collide')
-env.AI.run = async () => ({ response: '{"result":{},"emoji":42}' })
+env.AI.run = async () => ({ response: '{"result":{}}' })
 assert.equal((await request(undefined, 'Bad', 'Shape')).status, 502)
 env.AI.run = async () => { throw new Error('offline') }
 assert.equal((await request(undefined, 'No', 'Network')).status, 502)

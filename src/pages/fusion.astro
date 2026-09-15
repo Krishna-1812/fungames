@@ -1,10 +1,18 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
 import { SITE } from '../site.config'
+import { FUSION_ART, elementSvg } from '../lib/fusion-art'
 
 /** Fusion resolves pairs from saved recipes, then the built-in table, then
  * the optional API. Personal discoveries stay on this device. */
 const API = SITE.fusionApi
+
+/* Every element in the tree, drawn. Serialised into the page once rather
+   than imported by the client module, because the board builds its pieces
+   at runtime and needs the markup as data. */
+const ART_BY_NAME = Object.fromEntries(
+  Object.keys(FUSION_ART).map((name) => [name, elementSvg(name)]),
+)
 ---
 
 <GameLayout slug="fusion" bar="#241e4e" fixed bodyClass="fusion-body">
@@ -42,6 +50,7 @@ const API = SITE.fusionApi
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
+  <script type="application/json" id="art-data" set:html={JSON.stringify(ART_BY_NAME)} />
   <script type="application/json" id="game-data" set:html={JSON.stringify({ API })} />
 
   <script>
@@ -52,7 +61,10 @@ const API = SITE.fusionApi
   import { LOCAL } from '../lib/fusion-recipes.js'
   import { KEY, SEED, loadState, saveState, restoreState } from '../lib/fusion-state.js'
   import { FIELD_FRAG } from '../lib/fusion-field'
+  import { UNKNOWN_MARK } from '../lib/fusion-art'
     const { API } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+  const ART = JSON.parse(document.getElementById('art-data')!.textContent!) as Record<string, string>
+  const UNKNOWN = UNKNOWN_MARK
 
   const board = document.getElementById('board')
   const tray = document.getElementById('tray')
@@ -90,7 +102,7 @@ const API = SITE.fusionApi
   /** Resolve a pair: memory -> local table -> edge worker. */
   async function combine(a, b) {
     const key = norm(a.text, b.text)
-    if (state.recipes[key] && typeof state.recipes[key].text === 'string' && typeof state.recipes[key].emoji === 'string') return state.recipes[key]
+    if (state.recipes[key] && typeof state.recipes[key].text === 'string') return state.recipes[key]
     if (LOCAL[key]) {
       return (state.recipes[key] = LOCAL[key])
     }
@@ -100,8 +112,10 @@ const API = SITE.fusionApi
       const r = await fetch(url, { signal: AbortSignal.timeout(10_000) })
       if (!r.ok) throw new Error(String(r.status))
       const j = await r.json()
-      if (!j || typeof j.result !== 'string' || !j.result.trim() || j.result.length > 60 || (j.emoji != null && typeof j.emoji !== 'string')) throw new Error('invalid recipe')
-      return (state.recipes[key] = { text: j.result, emoji: j.emoji || '✨' })
+      if (!j || typeof j.result !== 'string' || !j.result.trim() || j.result.length > 60) throw new Error('invalid recipe')
+      // Any emoji the pair API sends is ignored: an element invented at runtime
+      // gets UNKNOWN_MARK, not somebody else’s artwork.
+      return (state.recipes[key] = { text: j.result })
     } catch {
       // No backend yet — say so plainly instead of inventing a result.
       return null
@@ -180,7 +194,13 @@ const API = SITE.fusionApi
     const el = document.createElement('button')
     el.type = 'button'
     el.className = 'piece'
-    el.textContent = `${item.emoji} ${item.text}`
+    // A drawing and a label, not one string with a picture character in it.
+    // Unknown elements (anything a deployed pair API invents at runtime) get
+    // the neutral mark rather than an emoji: see UNKNOWN_MARK in lib/fusion-art.
+    el.innerHTML =
+      `<span class="pic" aria-hidden="true">${ART[item.text] ?? UNKNOWN}</span>` +
+      `<span class="lbl"></span>`
+    el.querySelector(".lbl").textContent = item.text
     el.dataset.text = item.text
     el.dataset.emoji = item.emoji
     el.style.left = x + 'px'
@@ -303,7 +323,7 @@ const API = SITE.fusionApi
     }
     if (isNew) {
       state.items.push(res)
-      show(`First time discovering ${res.emoji} ${res.text}`)
+      show(`First time discovering ${res.text}`)
       made.classList.add('fresh')
     }
     save()
@@ -325,7 +345,7 @@ const API = SITE.fusionApi
       const previous = select.value
       select.replaceChildren(...state.items.map(item => {
         const option = document.createElement('option')
-        option.value = item.text; option.textContent = `${item.emoji} ${item.text}`
+        option.value = item.text; option.textContent = item.text
         return option
       }))
       select.value = state.items.some(item => item.text === previous) ? previous : state.items[Math.min(index, state.items.length - 1)].text
@@ -368,7 +388,10 @@ const API = SITE.fusionApi
         const b = document.createElement('button')
         b.type = 'button'
         b.className = 'chip'
-        b.textContent = `${item.emoji} ${item.text}`
+        b.innerHTML =
+          `<span class="pic" aria-hidden="true">${ART[item.text] ?? UNKNOWN}</span>` +
+          `<span class="lbl"></span>`
+        b.querySelector(".lbl").textContent = item.text
         b.addEventListener('click', () => {
           const r = board.getBoundingClientRect()
           spawn(item, Math.random() * (r.width - 160) + 20, Math.random() * (r.height - 90) + 20)
@@ -446,6 +469,7 @@ const API = SITE.fusionApi
     border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 11px;
     padding: 8px 14px; font-size: 15px; font-weight: 500;
     cursor: grab; user-select: none; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.95),
       inset 0 -1px 0 rgba(80, 60, 140, 0.20),
@@ -516,8 +540,14 @@ const API = SITE.fusionApi
   .chip {
     background: #2b2456; border: 1px solid #3d3470; color: #fff;
     border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
     transition: background 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
+  /* The drawing fills whatever box it is given — see elementSvg — so the
+     wrapper is the only thing that can size it. */
+  .pic { width: 20px; height: 20px; flex: none; display: inline-block; }
+  .chip .pic { width: 17px; height: 17px; }
+  .lbl { display: inline-block; }
   .chip:hover { background: #3a3170; transform: translateY(-1px) scale(1.05); }
   .chip:active { transform: scale(0.95); }
 

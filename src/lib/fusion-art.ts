@@ -84,6 +84,21 @@ export const FUSION_ART: Record<string, Element> = {
   },
 }
 
+/**
+ * The stand-in for an element this build has no drawing for.
+ *
+ * Every element in the recipe tree is drawn, so in the shipped game this is
+ * never used. It exists because lib/site.config can point Fusion at a live
+ * pair API, and anything that invents a new element at runtime cannot have
+ * been drawn in advance. A neutral mark is the honest answer there — falling
+ * back to an emoji would put back exactly the thing this file removed.
+ */
+export const UNKNOWN_MARK =
+  `<svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block" ` +
+  `aria-hidden="true" focusable="false">` +
+  `<circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2.4" ` +
+  `stroke-dasharray="3.4 3" opacity="0.75"/>` +
+  `<circle cx="12" cy="12" r="2.6" fill="currentColor" opacity="0.6"/></svg>`
 /** One element as a complete inline `<svg>`, filling whatever box it is given. */
 export function elementSvg(name: string): string {
   const e = FUSION_ART[name]

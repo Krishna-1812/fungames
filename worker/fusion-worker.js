@@ -53,7 +53,7 @@ export default {
       ctx.waitUntil(env.FUSION.put(key, JSON.stringify(record)))
     }
 
-    const body = JSON.stringify({ result: record.result, emoji: record.emoji })
+    const body = JSON.stringify({ result: record.result })
     const res = new Response(body, {
       headers: {
         'content-type': 'application/json',
@@ -74,14 +74,18 @@ function isAllowed(request, origins) {
 }
 
 /**
- * Ask the model for a single combined noun plus one emoji.
+ * Ask the model for a single combined noun.
+ *
+ * It used to ask for an emoji alongside it, which nothing renders any more:
+ * the page draws its elements (src/lib/fusion-art.ts) and gives anything
+ * invented at runtime a neutral mark instead.
  * Uses Workers AI when the binding exists, otherwise any OpenAI-compatible
  * endpoint via LLM_BASE_URL + LLM_API_KEY + LLM_MODEL.
  */
 async function ask(env, first, second) {
   const system =
     'You combine two things into one new thing, like an alchemy game. ' +
-    'Reply with ONLY compact JSON: {"result":"<Thing>","emoji":"<one emoji>"}. ' +
+    'Reply with ONLY compact JSON: {"result":"<Thing>"}. ' +
     'The result must be a single common noun in Title Case, at most three words. ' +
     'It must be a real, recognisable thing or concept — never a sentence, never a ' +
     'repeat of an input unless that genuinely is the answer. Be imaginative but sensible.'
@@ -134,11 +138,10 @@ function parseResult(raw) {
   } catch {
     return null
   }
-  if (typeof obj.result !== 'string' || obj.result.length > 60 || (obj.emoji != null && typeof obj.emoji !== 'string')) return null
+  if (typeof obj.result !== 'string' || obj.result.length > 60) return null
   const result = obj.result.trim()
-  const emoji = (obj.emoji || '').trim().slice(0, 16)
   if (!result) return null
-  return { result, emoji: emoji || '✨' }
+  return { result }
 }
 
 function text(message, status) {
