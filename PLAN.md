@@ -285,10 +285,11 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   question, and it was verified by pointing one icon at another's drawing and
   watching it fail at 0.00.
 
-  **Two emoji are deliberately left.** Fusion's come back from the worker per
-  generated element, so there is nothing to draw in advance. Rule Cascade's 🕷
-  is not decoration: the rule requires you to type it, and the moth eats every
-  character that is not one.
+  **One emoji is deliberately left.** Rule Cascade's is not decoration: the
+  rule requires you to type it, and the moth eats every character that is not
+  one. Fusion’s are gone (item 34 below): the argument for keeping them was
+  that an open-ended tree leaves nothing to draw in advance, and the tree
+  turned out to be a closed set of thirty-nine elements known at build time.
 - ~~**Illustrated scenes for Trolley**~~ **done.** It is a place now: a field
   with scrub, a ballast bed and two rails under each track, and a tram with a
   pole, a driver and a headlight instead of a rectangle with two circles under
@@ -1792,7 +1793,64 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     explicit `.swatches[hidden] { display: none }`, not deleting the
     `display: flex` rule.
 
-33. Then reassess against the depth work in Phases 1–2 above.
+34. ~~**Five games raised to the bar the rest of the site is held to.**~~
+    **done.** Prompted by a blunt and correct comparison: neal.fun’s own
+    versions of these look better. Opening ours next to theirs made the
+    pattern obvious, and it was not substance — the physics, the shaders and
+    the real data were already here. It was *staging*: the artwork was small
+    relative to the page, and everything was presented as panels and cards
+    rather than as the thing itself.
+
+    **Asteroid Launcher.** The model was already Collins, Melosh & Marcus,
+    checked against four real impacts. The presentation drew all six damage
+    rings at once and listed the numbers beside them, which is an information
+    display: it tells you six circles exist. A radius only means something
+    framed against the last one, so the result is now a full-viewport stage
+    that flies the camera through crater, fireball, shockwave, wind, quake and
+    toll in turn, dimming every ring that is not the one being described.
+    Three real bugs fell out of building it, all invisible before: the
+    gradient <defs> for the crater and fireball were seeded the moment the
+    renderer was added to the map, before Leaflet had created its <svg>, so
+    both painted as nothing — a missing SVG paint server raises no error
+    anywhere; the target picker painted straight through the stage, because
+    Leaflet gives its panes z-index 400 with no stacking context of their own;
+    and the stage covered the page from first paint while still reporting
+    `hidden === true`, because an author rule that sets `display` outranks the
+    user-agent’s `[hidden]` regardless of specificity.
+
+    **Spend It.** A 34px UI glyph floating in a 184px card is what made a page
+    about spending a hundred billion dollars read as a settings screen. Thirty
+    bespoke product drawings now sit on a 120-unit stage (`lib/spend-art.ts`),
+    with `check-spend-art.mjs` measuring the thing that actually separates a
+    product shot from an icon: the share of a drawing’s own ink sitting on an
+    *internal* edge, with a flat filled rect as the control that must fail.
+    The original glyphs were not discarded — they moved to the receipt, where
+    a dense list is the size they were drawn for. The checker earned its keep
+    immediately by catching Smartphone and Skyscraper as the closest pair in
+    the set, both being a lit grid on a dark slab; the tower has a street now.
+
+    **Fusion.** See the emoji note above. Thirty-nine drawn elements
+    (`lib/fusion-art.ts`), following the icon conventions rather than the
+    product-art ones because each renders at ~20px on a light pill and again
+    on a dark chip — one drawing, two backgrounds, which is what the mid-tone
+    palette already exists for, and what `check-fusion-art.mjs` measures twice.
+
+    **The Deep Sea.** Every animal sat in an identical dark panel with the
+    drawing about a third the width of the box around it. The panel is gone;
+    the window into the water is the full width of the marker and drifts on
+    its own deterministic phase. The scenes stay rectangular because
+    check-deep-sea-art requires them painted edge to edge — it is a porthole,
+    and it is allowed to look like one.
+
+    **Scale.** A dark panel behind every name turned the crowded small end
+    into a stack of menu items. Removing it alone broke the middle of the
+    journey, which is the interesting part: this sky runs from near-black at
+    the quark end to pale daylight around a human and back, so there is no one
+    ink colour a name can be set in. `skyAt` now splits out `skyStops`, and
+    the ink is picked from the real relative luminance of what is behind the
+    text.
+
+35. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Eleven new games, eleven checkers (fifteen,
 counting Constellation Draw's own four). The pattern that worked every

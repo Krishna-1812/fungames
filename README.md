@@ -240,6 +240,17 @@ lethality ladder calibrated on Hiroshima and Chelyabinsk. *`scripts/check-impact
 reproduces Chelyabinsk, Tunguska, Meteor Crater and Chicxulub — the entry model,
 the airburst reflection and a crater-depth unit bug were all caught by it.*
 
+The impact takes the whole screen, one effect at a time. Drawing all six
+damage rings at once told you six circles existed; a radius only means
+something framed against the last one. So the result is a stage that flies
+the camera through crater, fireball, shockwave, wind, quake and toll in turn
+— from street level to a hundred kilometres across — dimming every ring that
+is not the one being described, and offsetting each fit so the thing being
+described is never behind the card describing it. Building it turned up a
+crater and a fireball that had never once rendered: their gradient `<defs>`
+were seeded before Leaflet had created the `<svg>` to put them in, and a
+missing SVG paint server raises no error anywhere.
+
 The rock you build is a real sphere, not a texture (`lib/asteroid-art.ts`).
 Craters sit at genuine points on a unit sphere and are projected with actual
 orthographic foreshortening — a crater's radius along the sphere's own radial
@@ -498,8 +509,21 @@ counting ladder. It caught a no-repeats rule that made the game unwinnable for
 three hours of every day, and a parity trap where the length could never be
 prime.*
 
-**Spend It** — one hundred billion dollars, thirty real-priced things. *Balance
-cannot go negative by clicking, shift-clicking, or typing a huge quantity.*
+**Spend It** — one hundred billion dollars, thirty real-priced things, each
+with its own drawing (`lib/spend-art.ts`). The reference here uses photographs
+of branded goods, which this site will not do, so the answer had to be our own
+artwork at the size the card actually wants: a 120-unit stage, three tones on
+any solid form, a real ground shadow, and detail that rewards being looked at
+— a foam heart on the latte, the tear line on the cinema ticket, grid fins on
+the rocket, the halo over the Formula 1 cockpit. The thirty small glyphs that
+used to sit on the cards moved to the receipt, which is the dense list they
+were drawn for. *`scripts/check-spend-art.mjs` measures the thing that
+actually separates a product shot from an icon: the share of a drawing’s own
+ink sitting on an internal edge, with a flat filled rectangle as the control
+that has to fail. It also caught Smartphone and Skyscraper as the closest pair
+in the set — both a lit grid on a dark slab — which is why the tower now has
+a street to stand in. Balance still cannot go negative by clicking,
+shift-clicking, or typing a huge quantity.*
 
 **Steady Hand** — four shapes, one unbroken stroke each: a line between two
 dots, a circle round one, a square through four corners, a two-turn spiral.
@@ -515,6 +539,20 @@ scores the same on a phone and a monitor, and at every angle.*
 
 **Fusion** — drag one thing onto another. Playable offline via a local recipe
 table; the Cloudflare Worker takes over when deployed.
+
+Every element is drawn (`lib/fusion-art.ts`). It used to render an emoji per
+piece, grandfathered on the argument that an open-ended tree leaves nothing to
+draw in advance — but the tree is a closed set of thirty-nine elements, all
+reachable from the four starters and all known at build time. These follow the
+icon conventions rather than the product-art ones, because each renders at
+about 20px inline in a light pill and again in a dark tray chip: one drawing,
+two backgrounds, which is exactly what the mid-tone palette exists for.
+*`scripts/check-fusion-art.mjs` measures ink and contrast on both surfaces,
+and treats Dust, Smoke, Ash and Sand as the real test — four ways to draw
+“some loose material” that must not collapse into one grey cloud.* The emoji
+are gone rather than hidden: out of the tuples, the seed, the saved-state
+validation, the wire format and the worker’s own prompt, which had been asking
+a model for a character nothing renders.
 
 **Trolley** — twenty-six dilemmas, each authored with what four named ethical
 positions actually say about it, so the ending scores your answers against all
