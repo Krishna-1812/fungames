@@ -25,8 +25,10 @@ export type Page = {
 export const PAGES: Record<string, Page> = {
   // :global(.mix-body) { background: #0e1b28; color: #eaf1f7 } and .glyph { 26px }
   'ambient-mix': { bg: '#0e1b28', ink: '#eaf1f7', size: 26 },
-  // .spend-body { background: #f2f6f4 } with the site's default ink, .glyph { 34px }
-  'spend-it': { bg: '#f2f6f4', ink: '#241d12', size: 34 },
+  // Spend It draws its own product art on the cards now (lib/spend-art.ts);
+  // these glyphs moved to the receipt, which is a white sheet-card, and the
+  // rule that sizes them there is .l-icon { 22px }.
+  'spend-it': { bg: '#ffffff', ink: '#241d12', size: 22 },
   // :global(.fold-body) { background: #faf6ea }, .mark-glyph { 26px }
   'paper-folds': { bg: '#faf6ea', ink: '#241d12', size: 26 },
   // .over-body { background: #0b0114; color: #f3e9ff }, .runner { 34px }

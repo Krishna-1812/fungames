@@ -2,6 +2,7 @@
 import GameLayout from '../layouts/GameLayout.astro'
 import { ITEMS, BUDGET } from '../lib/spend-items'
 import { iconSvg } from '../lib/icons'
+import { productSvg } from '../lib/spend-art'
 
 /** Spend It — the resource-disposal archetype. The list lives in lib/spend-items. */
 
@@ -30,7 +31,7 @@ import { iconSvg } from '../lib/icons'
       {
         ITEMS.map((item, i) => (
           <li class="item" data-price={item.price} data-name={item.name} data-i={i}>
-            <div class="glyph" aria-hidden="true" set:html={iconSvg(item.icon)} />
+            <div class="shot" aria-hidden="true" set:html={productSvg(item.name)} />
             <div class="name">{item.name}</div>
             <div class="price">${item.price.toLocaleString('en-US')}</div>
             <div class="controls">
@@ -69,7 +70,7 @@ import { iconSvg } from '../lib/icons'
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
-  <script type="application/json" id="game-data" set:html={JSON.stringify({ BUDGET })} />
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ BUDGET, ICONS: Object.fromEntries(ITEMS.map((i) => [i.name, iconSvg(i.icon)])) })} />
 
   <script>
   import { burst, floatText, prefersReducedMotion } from '../lib/fx'
@@ -78,7 +79,7 @@ import { iconSvg } from '../lib/icons'
   import { VAULT_FRAG } from '../lib/spend-vault'
   import { onShare } from '../lib/share-card'
   import { SITE } from '../site.config'
-    const { BUDGET } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+    const { BUDGET, ICONS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const money = document.getElementById('money')
   const trackFill = document.getElementById('trackFill')
@@ -94,7 +95,7 @@ import { iconSvg } from '../lib/icons'
     input: el.querySelector('.qty'),
     sell: el.querySelector('.sell'),
     buy: el.querySelector('.buy'),
-    glyph: el.querySelector('.glyph'),
+    glyph: el.querySelector('.shot'),
     n: 0,
   }))
 
@@ -238,6 +239,7 @@ import { iconSvg } from '../lib/icons'
         ? bought.map((i) => {
             const li = document.createElement('li')
             li.innerHTML =
+              `<span class="l-icon" aria-hidden="true">${ICONS[i.name] ?? ''}</span>` +
               `<span class="l-name">${i.name}</span>` +
               `<span class="l-qty">×${i.n.toLocaleString('en-US')}</span>` +
               `<span class="l-sum">${usd(i.n * i.price)}</span>`
@@ -368,7 +370,7 @@ import { iconSvg } from '../lib/icons'
   .grid {
     list-style: none; margin: 0; padding: 0;
     display: grid; gap: 14px;
-    grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
   }
   .item {
     background: linear-gradient(178deg, #ffffff, #fbfcfb);
@@ -403,17 +405,28 @@ import { iconSvg } from '../lib/icons'
     border-color: #e7e9e6;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(15, 40, 38, 0.04);
   }
-  .item.unaffordable .glyph { filter: saturate(0.2) opacity(0.75); }
+  .item.unaffordable .shot { filter: saturate(0.2) opacity(0.75); }
   .item.unaffordable .name { color: var(--ink-soft); }
   /* The drawing sizes itself from inside — see iconSvg. A rule here that
      targeted the <svg> would not apply to it, because it arrives via set:html. */
-  .glyph { width: 34px; height: 34px; transition: filter 160ms var(--ease); display: inline-block; }
+  /* The product shot. It sizes itself from inside — see productSvg — so a
+     rule here targeting the <svg> would not apply to it, because it arrives
+     via set:html. */
+  .shot {
+    width: 100%; max-width: 130px; aspect-ratio: 1 / 1; margin: 0 auto;
+    transition: filter 160ms var(--ease), transform 220ms var(--ease-bounce);
+    display: block;
+  }
+  .item:hover .shot { transform: translateY(-3px) scale(1.04); }
+  /* The small drawn glyph, in the receipt, where a dense list is exactly the
+     size that set was drawn for. */
+  .l-icon { width: 22px; height: 22px; display: inline-block; flex: none; }
   /* A one-shot jump on the glyph itself when it's actually bought or sold —
      the burst of confetti already says "something happened"; this says
      "to this specific thing". Toggled by class, not tied to .owned, since
      .owned stays applied between purchases and would only fire once. */
-  .glyph.jump { animation: jump-glyph 340ms var(--ease-bounce); }
-  @keyframes jump-glyph { 40% { transform: translateY(-6px) scale(1.14); } }
+  .shot.jump { animation: jump-glyph 340ms var(--ease-bounce); }
+  @keyframes jump-glyph { 40% { transform: translateY(-9px) scale(1.09); } }
   .item .name { font-weight: 600; margin-top: 8px; font-size: 15px; }
   .item .price { color: var(--ink-soft); font-size: 13.5px; font-variant-numeric: tabular-nums; }
 
@@ -451,7 +464,7 @@ import { iconSvg } from '../lib/icons'
   .sheet-card h2 { font-size: 26px; margin-bottom: 14px; }
   .lines { list-style: none; margin: 0 0 16px; padding: 0; font-variant-numeric: tabular-nums; }
   .lines li {
-    display: grid; grid-template-columns: 1fr auto auto; gap: 12px;
+    display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center;
     padding: 7px 0; border-bottom: 1px dashed var(--line);
     font-size: 14.5px;
   }
