@@ -77,14 +77,36 @@ export const rnd = (seed: number, k: number) => {
   const x = Math.sin(seed * 9301 + k * 49297) * 233280
   return x - Math.floor(x)
 }
-
-/** A flat sheet of water filling the whole frame. */
-const bg = (colour: string) => `<rect width="${W}" height="${H}" fill="${colour}"/>`
-
-/** Water above a seafloor, for scenes that rest on the bottom. */
-const floor = (water: string, ground: string, horizon = 58) =>
-  `<rect width="${W}" height="${horizon}" fill="${water}"/>` +
-  `<rect y="${horizon}" width="${W}" height="${H - horizon}" fill="${ground}"/>`
+/**
+ * A patch of seafloor for the scenes that rest on the bottom.
+ *
+ * It used to be two rectangles — water above, ground below — which is what a
+ * framed scene wants. A cut-out has no water, and a band of ground with square
+ * ends reads as a crop: the eye sees the cut, not the seabed. So this is a
+ * mound that rises out of the bottom edge and settles back into it before
+ * either side of the frame, with nothing vertical anywhere in its outline.
+ */
+const seabed = (ground: string, horizon = 58) => {
+  const grain = Array.from({ length: 14 }, (_, i) => {
+    const x = 20 + rnd(7, i) * (W - 40)
+    const y = horizon + 5 + rnd(7, i + 30) * (H - horizon - 8)
+    const r = 0.5 + rnd(7, i + 60) * 0.9
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${P.void}" opacity="0.28"/>`
+  }).join('')
+  return (
+    `<path d="M6 ${H} ` +
+    `C${W * 0.16} ${H} ${W * 0.2} ${horizon + 2} ${W * 0.34} ${horizon + 1} ` +
+    `C${W * 0.48} ${horizon} ${W * 0.56} ${horizon + 5} ${W * 0.68} ${horizon + 3} ` +
+    `C${W * 0.82} ${horizon + 1} ${W * 0.88} ${H} ${W - 6} ${H} Z" fill="${ground}"/>` +
+    // A lit upper lip, so the mound has a top rather than being a flat
+    // shape the same colour all the way down.
+    `<path d="M${W * 0.2} ${horizon + 6} ` +
+    `C${W * 0.34} ${horizon + 1} ${W * 0.5} ${horizon + 1} ${W * 0.68} ${horizon + 3} ` +
+    `C${W * 0.8} ${horizon + 4} ${W * 0.84} ${horizon + 6} ${W * 0.86} ${horizon + 8} ` +
+    `C${W * 0.6} ${horizon + 4} ${W * 0.38} ${horizon + 4} ${W * 0.2} ${horizon + 6} Z" fill="${P.pale}" opacity="0.14"/>` +
+    grain
+  )
+}
 
 /** Marine snow — slow, tiny, dim. Present in every scene past the reef. */
 const snow = (seed: number, n = 10, colour: string = P.pale, maxY = H) =>
@@ -155,8 +177,8 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
   'Coral reefs': {
     subject: 'a bright, sunlit reef crowded with coral and small fish',
     draw: () =>
-      floor(P.reef, P.sand, 60) +
-      rays(18, 10, P.foam, 0.11) + rays(56, 8, P.foam, 0.08) + rays(96, 11, P.foam, 0.09) +
+      seabed(P.sand, 60) +
+        
       `<path d="M0 60 q10 -3 20 0 t20 0 t20 0 t20 0 t20 0 t20 0" stroke="${P.nodule}" stroke-width="1" fill="none" opacity="0.3"/>` +
       // brain coral, ridged
       `<ellipse cx="24" cy="64" rx="10" ry="6" fill="${P.coral3}"/>` +
@@ -177,15 +199,14 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
         const x = 58 + i * 8 + (i % 2) * 3
         const y = 14 + (i % 3) * 5
         return `<path d="M${x} ${y} l5 -2.2 l0 4.4Z" fill="${P.coral2}"/><path d="M${x} ${y} l-2.4 -1 l0 2Z" fill="${P.coral}"/>`
-      }).join('') +
-      snow(41, 6, P.foam, 22),
+      }).join('') ,
   },
 
   'The recreational diving limit': {
     subject: 'a lone diver descending a marked line, breath rising toward a surface far above',
     draw: () =>
-      bg(P.shallow) +
-      rays(30, 15, P.foam, 0.09) + rays(94, 11, P.foam, 0.07) +
+      
+       
       `<ellipse cx="60" cy="-14" rx="76" ry="18" fill="${P.foam}" opacity="0.14"/>` +
       `<line x1="24" y1="0" x2="24" y2="76" stroke="${P.foam}" stroke-width="1" opacity="0.4"/>` +
       Array.from({ length: 8 }, (_, i) => `<line x1="20" y1="${i * 10 + 4}" x2="28" y2="${i * 10 + 4}" stroke="${P.foam}" stroke-width="1" opacity="0.35"/>`).join('') +
@@ -204,16 +225,15 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       Array.from({ length: 4 }, (_, i) => `<path d="M${84 + i * 5} ${18 + i * 3} l4 -1.7 l0 3.4Z" fill="${P.pale}" opacity="0.4"/>`).join('') +
       `<circle cx="67" cy="24" r="2" fill="${P.foam}" opacity="0.55"/>` +
       `<circle cx="71" cy="15" r="1.3" fill="${P.foam}" opacity="0.45"/>` +
-      `<circle cx="63" cy="9" r="1" fill="${P.foam}" opacity="0.4"/>` +
-      snow(41, 6, P.pale, 76),
+      `<circle cx="63" cy="9" r="1" fill="${P.foam}" opacity="0.4"/>` ,
   },
 
   'Ninety percent of what lives here makes its own light': {
     subject: 'a shoal of hatchetfish and lanternfish, lit from underneath by themselves',
     draw: () =>
-      bg(P.twilight) +
-      current(45, 6, P.pale, 80, 0.55) +
-      snow(4, 10) +
+      
+      
+      
       `<path d="M32 36 L22 31 L14 36 L22 43 L32 48 L40 38Z" fill="${P.dusk}"/>` +
       `<path d="M32 36 L22 31 L14 36 L22 40Z" fill="${P.ink}" opacity="0.55"/>` +
       `<circle cx="24" cy="34" r="1.1" fill="${P.foam}" opacity="0.5"/>` +
@@ -231,14 +251,13 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       `<path d="M100 20 L94 16 L88 20 L94 25 L100 28 L106 21Z" fill="${P.ink}" opacity="0.7"/>` +
       `${spark(92, 25, P.glow2, 0.8)}` +
       `<path d="M0 20 q60 8 120 -4" stroke="${P.pale}" stroke-width="0.6" fill="none" opacity="0.15"/>` +
-      `<path d="M0 60 q60 -10 120 6" stroke="${P.pale}" stroke-width="0.6" fill="none" opacity="0.12"/>` +
-      sparks(11, 10, P.glow2),
+      `<path d="M0 60 q60 -10 120 6" stroke="${P.pale}" stroke-width="0.6" fill="none" opacity="0.12"/>` ,
   },
 
   'The deepest a scuba diver has ever gone': {
     subject: 'a pressure gauge pinned near its limit, and a line up to a memory of a surface',
     draw: () =>
-      bg(P.dusk) +
+      
       `<line x1="70" y1="0" x2="70" y2="80" stroke="${P.pale}" stroke-width="1" opacity="0.3"/>` +
       `<rect x="64" y="30" width="12" height="18" rx="4" fill="${P.tank}"/>` +
       `<rect x="64" y="30" width="4" height="18" rx="2" fill="${P.scale}" opacity="0.4"/>` +
@@ -259,15 +278,14 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
         return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${P.pale}" stroke-width="1" opacity="0.6"/>`
       }).join('') +
       `<line x1="22" y1="46" x2="30" y2="38" stroke="${P.ember}" stroke-width="1.6" stroke-linecap="round"/>` +
-      `<circle cx="22" cy="46" r="1.6" fill="${P.pale}"/>` +
-      snow(6, 8, P.pale, 30),
+      `<circle cx="22" cy="46" r="1.6" fill="${P.pale}"/>` ,
   },
 
   'Giant squid': {
     subject: 'a huge eye and a wall of trailing, sucker-lined tentacles',
     draw: () =>
-      bg(P.dusk) +
-      current(2, 4, P.pale, 80, 0.2) +
+      
+      
       `<ellipse cx="60" cy="26" rx="14" ry="17" fill="${P.squid}"/>` +
       `<path d="M48 20 q-2 12 6 22 q-9 -6 -10 -18 Z" fill="${P.squid2}" opacity="0.6"/>` +
       `<path d="M60 10 q-4 -8 0 -10 q4 2 0 10Z" fill="${P.squid}"/>` +
@@ -311,8 +329,7 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
           `<path d="M${x.toFixed(1)} 40 Q${midx.toFixed(1)} ${midy.toFixed(1)} ${endx.toFixed(1)} ${endy.toFixed(1)}" ` +
           `stroke="${P.squid2}" stroke-width="${feeder ? 1.8 : 2.6}" fill="none" stroke-linecap="round"/>${suckers}${club}`
         )
-      }).join('') +
-      snow(2, 8),
+      }).join('') ,
   },
 
   'Vampire squid': {
@@ -339,16 +356,15 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
         .map(([x, y], i) => (i % 2 === 0 ? spark(x, y, i % 4 === 0 ? P.glow : P.glow2, 0.9) : ''))
         .join('')
       return (
-        bg(P.ink) +
-        current(48, 5, P.pale, 80, 0.4) +
+        
+        
         `<path d="${cape}" fill="${P.vamp}"/>` +
         webShade + ribs +
         `<ellipse cx="60" cy="30" rx="13" ry="12" fill="${P.vamp}"/>` +
         `<path d="M49 25 q11 -9 22 0 q-5 9 -11 9 q-6 0 -11 -9Z" fill="${P.vamp2}" opacity="0.3"/>` +
         `<circle cx="53" cy="29" r="5.8" fill="${P.void}"/><circle cx="67" cy="29" r="5.8" fill="${P.void}"/>` +
         `<circle cx="50.8" cy="27" r="1.6" fill="${P.foam}" opacity="0.55"/><circle cx="64.8" cy="27" r="1.6" fill="${P.foam}" opacity="0.55"/>` +
-        lights +
-        snow(7, 8)
+        lights 
       )
     },
   },
@@ -356,23 +372,22 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
   Blobfish: {
     subject: 'a droopy, near-boneless body, resting on the rocks',
     draw: () =>
-      floor(P.ink, P.sand, 60) +
-      silt(8, 10, P.nodule, 60, 78) +
+      seabed(P.sand, 60) +
+      
       `<ellipse cx="30" cy="66" rx="10" ry="6" fill="${P.abyss}"/>` +
       `<ellipse cx="82" cy="68" rx="14" ry="7" fill="${P.abyss}"/>` +
       `<path d="M42 58 q-6 -12 8 -18 q22 -8 30 4 q6 10 -6 20 q-4 8 -16 8 q-12 0 -16 -14Z" fill="${P.flesh}"/>` +
       `<path d="M46 52 q-2 -8 8 -12 q10 -4 16 2 q-14 -2 -20 4 q-4 3 -4 6Z" fill="${P.bone}" opacity="0.35"/>` +
       `<path d="M58 62 q10 4 18 -2 q2 8 -8 10 q-8 1 -10 -8Z" fill="${P.rust}" opacity="0.3"/>` +
       `<path d="M56 46 q6 -6 14 -2" stroke="${P.rust}" stroke-width="2" fill="none" opacity="0.4"/>` +
-      `<ellipse cx="48" cy="42" rx="2.6" ry="2.2" fill="${P.void}"/><circle cx="47.3" cy="41.2" r="0.6" fill="${P.foam}" opacity="0.5"/>` +
-      snow(8, 6),
+      `<ellipse cx="48" cy="42" rx="2.6" ry="2.2" fill="${P.void}"/><circle cx="47.3" cy="41.2" r="0.6" fill="${P.foam}" opacity="0.5"/>` ,
   },
 
   'Below this, no light has ever reached': {
     subject: 'a lone siphonophore, trailing the only lights for a very long way',
     draw: () =>
-      bg(P.void) +
-      current(16, 6, P.pale, 80, 0.36) +
+      
+      
       `<path d="M60 14 q-16 2 -16 18 q0 14 16 16 q16 -2 16 -16 q0 -16 -16 -18Z" fill="${P.ink}" opacity="0.7"/>` +
       `<path d="M60 14 q-10 2 -13 12 q7 -6 13 -6Z" fill="${P.trench2}" opacity="0.5"/>` +
       `<path d="M46 28 q14 8 28 0" stroke="${P.trench2}" stroke-width="1" fill="none" opacity="0.5"/>` +
@@ -384,15 +399,14 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       }).join('') +
       halo(52, 26, P.glow, 6, 0.12) + halo(68, 26, P.glow2, 6, 0.12) +
       spark(52, 26, P.glow, 1.4) + spark(68, 26, P.glow2, 1.4) + spark(60, 40, P.glow, 1) +
-      Array.from({ length: 5 }, (_, i) => spark(40 + i * 10 + (rnd(43, i + 20) - 0.5) * 6, 74 + rnd(43, i) * 4, i % 2 ? P.glow2 : P.glow, 0.9)).join('') +
-      sparks(15, 6, P.glow, 74),
+      Array.from({ length: 5 }, (_, i) => spark(40 + i * 10 + (rnd(43, i + 20) - 0.5) * 6, 74 + rnd(43, i) * 4, i % 2 ? P.glow2 : P.glow, 0.9)).join('') ,
   },
 
   Anglerfish: {
     subject: 'a single lure, and the mouth waiting underneath it',
     draw: () =>
-      bg(P.void) +
-      current(59, 5, P.pale, 80, 0.36) +
+      
+      
       `<path d="M40 30 q26 -4 6 8" stroke="${P.bone}" stroke-width="1.6" fill="none"/>` +
       halo(48, 40, P.lure, 8, 0.12) +
       spark(48, 40, P.lure, 2.2) +
@@ -405,15 +419,14 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       `<path d="M56 50 L55 57 L59 55Z" fill="${P.foam}" opacity="0.85"/>` +
       `<path d="M50 52 L49 58 L52 57Z" fill="${P.foam}" opacity="0.75"/>` +
       `<path d="M60 51 L60 57 L63 55Z" fill="${P.foam}" opacity="0.75"/>` +
-      `<path d="M28 46 q6 8 16 8" stroke="${P.void}" stroke-width="0.8" fill="none" opacity="0.4"/>` +
-      snow(9, 8),
+      `<path d="M28 46 q6 8 16 8" stroke="${P.void}" stroke-width="0.8" fill="none" opacity="0.4"/>` ,
   },
 
   'Sperm whales hunt here': {
     subject: 'a whale diving on an angle, chasing something smaller',
     draw: () =>
-      bg(P.void) +
-      current(60, 5, P.pale, 80, 0.36) +
+      
+      
       `<path d="M14 14 q40 -6 66 20 q10 10 2 18 q-8 6 -20 -2 q-46 -18 -52 -30 q-2 -4 4 -6Z" fill="${P.whale}"/>` +
       `<path d="M18 16 q30 -2 48 16 q-30 -8 -48 -10Z" fill="${P.whale2}" opacity="0.4"/>` +
       `<path d="M76 46 q10 2 14 12 q-10 2 -16 -6Z" fill="${P.whale}"/>` +
@@ -427,15 +440,14 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
         return `<path d="M${x} ${y}q${(rnd(21, i + 5) - 0.5) * 6} 6 0 12" stroke="${P.squid2}" stroke-width="1.6" fill="none"/>`
       }).join('') +
       `<ellipse cx="62" cy="62" rx="6" ry="7" fill="${P.squid}"/>` +
-      `<circle cx="60" cy="59" r="1.2" fill="${P.void}"/>` +
-      snow(21, 10),
+      `<circle cx="60" cy="59" r="1.2" fill="${P.void}"/>` ,
   },
 
   'A hydrothermal vent': {
     subject: 'a mineral chimney, its own heat lighting the smoke coming off it',
     draw: () =>
-      floor(P.abyss, P.vent, 66) +
-      silt(2, 8, P.rust, 66, 79) +
+      seabed(P.vent, 66) +
+      
       `<path d="M52 66 L56 20 L64 20 L70 66Z" fill="${P.vent}"/>` +
       `<path d="M53 66 L57 26 L60 26 L58 66Z" fill="${P.rust}" opacity="0.5"/>` +
       `<path d="M63 66 L65 30 L64 20 L67 20 L69 66Z" fill="${P.vent2}" opacity="0.3"/>` +
@@ -459,8 +471,8 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
   'Colossal squid': {
     subject: 'a heavier, hook-armed relative of the giant squid',
     draw: () =>
-      bg(P.void) +
-      current(5, 4, P.pale, 80, 0.31) +
+      
+      
       `<ellipse cx="60" cy="30" rx="18" ry="20" fill="${P.squid2}"/>` +
       `<path d="M46 16 q-2 16 8 30 q-14 -8 -14 -22 q0 -6 6 -8Z" fill="${P.squid3}" opacity="0.3"/>` +
       `<path d="M48 14 q-6 -6 -2 -10 q6 2 2 10Z" fill="${P.squid2}"/>` +
@@ -485,15 +497,14 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
           `stroke="${P.squid}" stroke-width="3" fill="none" stroke-linecap="round"/>${hooks}` +
           `<circle cx="${endx.toFixed(1)}" cy="${endy.toFixed(1)}" r="1.1" fill="${P.bone}"/>`
         )
-      }).join('') +
-      snow(5, 6),
+      }).join('') ,
   },
 
   'The deepest dive any mammal has ever made': {
     subject: 'a beaked whale, alone, on a single breath, past a scale nothing else here reaches',
     draw: () =>
-      bg(P.abyss) +
-      current(13, 5, P.pale, 80, 0.36) +
+      
+      
       `<path d="M20 30 q34 -10 56 8 q8 8 0 14 q-30 8 -50 -6 q-10 -8 -6 -16Z" fill="${P.whale}"/>` +
       `<path d="M22 32 q26 -6 44 6 q-24 -2 -44 0Z" fill="${P.whale2}" opacity="0.4"/>` +
       `<path d="M18 32 q-6 0 -8 -6 q6 -2 10 2Z" fill="${P.whale}"/>` +
@@ -503,32 +514,42 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       `<circle cx="26" cy="30" r="1.2" fill="${P.void}"/><circle cx="25.5" cy="29.5" r="0.4" fill="${P.foam}" opacity="0.5"/>` +
       `<line x1="14" y1="58" x2="14" y2="76" stroke="${P.pale}" stroke-width="1" opacity="0.5"/>` +
       Array.from({ length: 5 }, (_, i) => `<line x1="11" y1="${58 + i * 4.5}" x2="17" y2="${58 + i * 4.5}" stroke="${P.pale}" stroke-width="0.8" opacity="0.45"/>`).join('') +
-      `<line x1="14" y1="58" x2="72" y2="20" stroke="${P.pale}" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.35"/>` +
-      snow(13, 9),
+      `<line x1="14" y1="58" x2="72" y2="20" stroke="${P.pale}" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.35"/>` ,
   },
 
   'The average depth of the entire ocean': {
-    subject: 'a plain measuring line, holding the whole ocean to one number',
+    subject: 'a sounding lead hanging on a graduated line, at the depth that averages the whole ocean',
     draw: () =>
-      bg(P.abyss) +
-      current(35, 4, P.pale, 80, 0.18) +
-      `<line x1="18" y1="8" x2="18" y2="72" stroke="${P.pale}" stroke-width="1.4"/>` +
-      Array.from({ length: 6 }, (_, i) => {
-        const y = 8 + i * 12.8
-        return `<line x1="14" y1="${y}" x2="22" y2="${y}" stroke="${P.pale}" stroke-width="1.4"/>`
+      // Hung off-centre and leaning, the way a line lowered from a moving
+      // ship actually hangs — and, as it happens, the thing that stops this
+      // reading as the same picture as the submersible eleven markers down.
+      `<g transform="translate(-14 2) rotate(-9 60 40)">` +
+      // the line, with its graduations
+      `<line x1="60" y1="2" x2="60" y2="33" stroke="${P.pale}" stroke-width="1.4" opacity="0.85"/>` +
+      Array.from({ length: 5 }, (_, i) => {
+        const y = 5 + i * 5.6
+        const long = i % 2 === 0
+        return `<line x1="${long ? 50 : 54}" y1="${y}" x2="${long ? 70 : 66}" y2="${y}" stroke="${P.pale}" stroke-width="1.2" opacity="${long ? 0.8 : 0.5}"/>`
       }).join('') +
-      `<rect x="34" y="8" width="72" height="64" fill="${P.dusk}" opacity="0.5"/>` +
-      `<rect x="34" y="40" width="72" height="32" fill="${P.trench2}" opacity="0.4"/>` +
-      `<line x1="34" y1="40" x2="106" y2="40" stroke="${P.foam}" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.8"/>` +
-      `<path d="M96 8 h6 q4 0 4 6 v52 q0 6 -4 6 h-6" fill="none" stroke="${P.pale}" stroke-width="1.2" opacity="0.7"/>` +
-      snow(35, 8, P.pale, 72),
+      // the lead itself: a tapered plummet, lit from the upper left
+      `<path d="M60 32 L70 42 L67 68 Q60 78 53 68 L50 42 Z" fill="${P.iron}"/>` +
+      `<path d="M60 32 L50 42 L53 68 Q56 75 60 76 Z" fill="${P.hull2}" opacity="0.55"/>` +
+      `<path d="M55 46 L57.5 66" stroke="${P.foam}" stroke-width="1" opacity="0.35"/>` +
+      `<ellipse cx="60" cy="33" rx="10.4" ry="3" fill="${P.hull2}"/>` +
+      // the datum mark: this is the depth the whole ocean averages to
+      `<line x1="24" y1="56" x2="50" y2="56" stroke="${P.foam}" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.8"/>` +
+      `<line x1="70" y1="56" x2="96" y2="56" stroke="${P.foam}" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.8"/>` +
+      `<path d="M24 56 L29 53 L29 59 Z" fill="${P.foam}" opacity="0.85"/>` +
+      `<path d="M96 56 L91 53 L91 59 Z" fill="${P.foam}" opacity="0.85"/>` +
+      spark(60, 33, P.glow, 1.6) +
+      `</g>`,
   },
 
   'The Titanic': {
     subject: 'a broken hull, settled and rusting on the sediment',
     draw: () =>
-      floor(P.abyss, P.sand, 64) +
-      silt(17, 12, P.rust, 64, 79) +
+      seabed(P.sand, 64) +
+      
       `<path d="M10 58 q4 -22 30 -26 L94 30 q10 0 10 10 l0 12 q0 6 -8 6 L18 60Z" fill="${P.iron}"/>` +
       `<path d="M14 54 q4 -18 26 -22 L90 32 q-2 6 -4 10 L20 56Z" fill="${P.hull2}" opacity="0.3"/>` +
       `<rect x="30" y="36" width="6" height="10" fill="${P.abyss}"/><rect x="30" y="36" width="6" height="2" fill="${P.trench2}"/>` +
@@ -539,30 +560,28 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       `<path d="M50 32 q4 14 -2 26" stroke="${P.rust}" stroke-width="2.4" fill="none" opacity="0.7"/>` +
       `<path d="M76 34 q3 10 -1 18" stroke="${P.rust}" stroke-width="2" fill="none" opacity="0.6"/>` +
       `<rect x="44" y="14" width="4" height="20" fill="${P.iron}"/><rect x="44" y="14" width="1.4" height="20" fill="${P.hull2}" opacity="0.5"/>` +
-      `<path d="M18 60 q40 6 76 -4 l0 3 q-38 9 -76 3Z" fill="${P.nodule}" opacity="0.5"/>` +
-      snow(17, 8),
+      `<path d="M18 60 q40 6 76 -4 l0 3 q-38 9 -76 3Z" fill="${P.nodule}" opacity="0.5"/>` ,
   },
 
   'Almost nothing lives here, and almost everything that does is beige': {
     subject: 'a single small creature, alone in an enormous, nearly empty frame',
     draw: () =>
-      floor(P.void, P.sand, 62) +
-      current(19, 5, P.pale, 60, 0.36) +
-      silt(19, 14, P.nodule, 62, 79) +
+      seabed(P.sand, 62) +
+      
+      
       `<path d="M0 62 q30 -4 60 0 t60 0" stroke="${P.nodule}" stroke-width="1" fill="none" opacity="0.4"/>` +
       `<path d="M0 70 q30 -3 60 0 t60 0" stroke="${P.nodule}" stroke-width="1" fill="none" opacity="0.3"/>` +
       `<ellipse cx="70" cy="66" rx="5" ry="2.6" fill="${P.flesh}"/>` +
       `<ellipse cx="68.5" cy="65" rx="2" ry="1" fill="${P.bone}" opacity="0.5"/>` +
       Array.from({ length: 6 }, (_, i) => `<line x1="${67 + i}" y1="68" x2="${66.5 + i}" y2="70" stroke="${P.flesh}" stroke-width="0.6" opacity="0.7"/>`).join('') +
-      `<path d="M60 68 q6 1 12 0" stroke="${P.sand}" stroke-width="0.8" fill="none" opacity="0.5"/>` +
-      snow(19, 20, P.pale, 62),
+      `<path d="M60 68 q6 1 12 0" stroke="${P.sand}" stroke-width="0.8" fill="none" opacity="0.5"/>` ,
   },
 
   'Sea cucumbers, grazing': {
     subject: 'a scatter of nodules, and the trails the slow animals working them leave behind',
     draw: () =>
-      floor(P.void, P.nodule, 60) +
-      current(24, 6, P.pale, 58, 0.4) +
+      seabed(P.nodule, 60) +
+      
       Array.from({ length: 13 }, (_, i) => {
         const x = 6 + rnd(23, i) * 108
         const y = 64 + rnd(23, i + 9) * 14
@@ -574,34 +593,38 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       `<ellipse cx="32" cy="62.6" rx="5" ry="1.4" fill="${P.bone}" opacity="0.35"/>` +
       `<path d="M56 69 q14 1 24 0" stroke="${P.sand}" stroke-width="1" fill="none" opacity="0.55"/>` +
       `<ellipse cx="80" cy="68" rx="7" ry="2.6" fill="${P.bone}"/>` +
-      `<ellipse cx="14" cy="72" rx="5" ry="2" fill="${P.flesh}"/>` +
-      snow(24, 8, P.pale, 60),
+      `<ellipse cx="14" cy="72" rx="5" ry="2" fill="${P.flesh}"/>` ,
   },
 
   'Past this line, life only exists in trenches': {
     subject: 'a crack in an otherwise flat and empty plain, with something small living at the bottom of it',
+    // The whole subject here is a landform, which is the awkward case for a
+    // cut-out: it used to be a full-frame plain with a notch in it, and a
+    // full-frame anything is a backdrop. So the plain is now a slab that
+    // tapers away before the sides, and the crack is cut into it — the same
+    // picture, but as an object suspended in water rather than as a wall.
     draw: () =>
-      bg(P.void) +
-      `<rect y="0" width="${W}" height="30" fill="${P.abyss}"/>` +
-      `<path d="M0 30 L40 30 L54 74 L66 74 L80 30 L${W} 30 L${W} ${H} L0 ${H}Z" fill="${P.abyss}"/>` +
-      `<path d="M40 30 L54 74 L58 74 L46 30Z" fill="${P.trench2}" opacity="0.6"/>` +
-      current(27, 6, P.pale, 30, 0.42) +
-      current(28, 5, P.pale, H, 0.26) +
-      `<path d="M40 30 L54 74" stroke="${P.pale}" stroke-width="0.7" opacity="0.3"/>` +
-      `<path d="M80 30 L66 74" stroke="${P.pale}" stroke-width="0.7" opacity="0.3"/>` +
-      `<path d="M46 46 L50 62 L54 48" stroke="${P.pale}" stroke-width="0.6" opacity="0.2" fill="none"/>` +
-      `<path d="M72 40 L68 56 L74 50" stroke="${P.pale}" stroke-width="0.6" opacity="0.2" fill="none"/>` +
-      `<ellipse cx="60" cy="70" rx="5" ry="2.4" fill="${P.bone}" opacity="0.7"/>` +
-      `<ellipse cx="58.5" cy="69" rx="2" ry="0.8" fill="${P.foam}" opacity="0.3"/>` +
-      halo(60, 70, P.glow, 4, 0.1) +
-      sparks(27, 4, P.glow, 74),
+      `<path d="M6 ${H} L10 44 Q30 40 44 43 L58 76 L64 76 L78 43 Q94 40 110 45 L114 ${H} Z" fill="${P.abyss}"/>` +
+      `<path d="M10 44 Q30 40 44 43 L47 50 Q30 47 11 51 Z" fill="${P.trench2}"/>` +
+      `<path d="M78 43 Q94 40 110 45 L109 52 Q94 47 75 50 Z" fill="${P.trench2}"/>` +
+      `<path d="M44 43 L58 76 L61 76 L49 43 Z" fill="${P.void}" opacity="0.75"/>` +
+      `<path d="M78 43 L64 76 L62 76 L74 43 Z" fill="${P.void}" opacity="0.55"/>` +
+      `<path d="M48 54 L52 66 L56 56" stroke="${P.pale}" stroke-width="0.7" opacity="0.28" fill="none"/>` +
+      `<path d="M72 50 L68 62 L74 57" stroke="${P.pale}" stroke-width="0.7" opacity="0.24" fill="none"/>` +
+      // The one living thing, at the bottom of the crack, carrying the only
+      // light in the picture — which is also the only reason you can see the
+      // crack at all at six thousand metres.
+      halo(60, 72, P.glow, 9, 0.16) +
+      `<ellipse cx="60" cy="72" rx="5" ry="2.4" fill="${P.bone}"/>` +
+      `<ellipse cx="58.4" cy="71" rx="2" ry="0.9" fill="${P.foam}" opacity="0.8"/>` +
+      spark(60, 72, P.glow, 1.6),
   },
 
   'The deepest-living octopus ever filmed': {
     subject: 'ear-like fins, and a pale, nearly translucent mantle',
     draw: () =>
-      floor(P.void, P.sand, 66) +
-      silt(29, 8, P.nodule, 66, 78) +
+      seabed(P.sand, 66) +
+      
       `<ellipse cx="60" cy="42" rx="14" ry="12" fill="${P.bone}" opacity="0.9"/>` +
       `<ellipse cx="55" cy="37" rx="7" ry="5" fill="${P.foam}" opacity="0.25"/>` +
       `<ellipse cx="48" cy="36" rx="6" ry="4" fill="${P.bone}" opacity="0.9"/>` +
@@ -611,31 +634,29 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
         return `<path d="M${x} 52 q${(rnd(29, i) - 0.5) * 6} 10 0 16" stroke="${P.bone}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.85"/>`
       }).join('') +
       `<circle cx="55" cy="40" r="1.6" fill="${P.void}"/><circle cx="54.6" cy="39.6" r="0.5" fill="${P.foam}" opacity="0.6"/>` +
-      `<circle cx="65" cy="40" r="1.6" fill="${P.void}"/><circle cx="64.6" cy="39.6" r="0.5" fill="${P.foam}" opacity="0.6"/>` +
-      snow(29, 6),
+      `<circle cx="65" cy="40" r="1.6" fill="${P.void}"/><circle cx="64.6" cy="39.6" r="0.5" fill="${P.foam}" opacity="0.6"/>` ,
   },
 
   'The deepest fish ever recorded': {
     subject: 'a translucent, tadpole-shaped fish, its own skeleton visible through its skin',
     draw: () =>
-      floor(P.void, P.abyss, 64) +
-      silt(31, 8, P.nodule, 64, 78) +
-      current(31, 5, P.pale, 62, 0.36) +
+      seabed(P.abyss, 64) +
+      
+      
       `<path d="M36 58 q4 -20 26 -20 q20 0 22 15 q1 9 -9 11 q-7 7 -18 5 q-18 -2 -21 -11Z" fill="${P.bone}" opacity="0.7"/>` +
       `<path d="M40 52 q6 -12 20 -14 q-4 8 -2 16 q-10 2 -18 -2Z" fill="${P.foam}" opacity="0.15"/>` +
       `<path d="M46 50 L70 52" stroke="${P.pale}" stroke-width="1" opacity="0.55"/>` +
       Array.from({ length: 6 }, (_, i) => `<line x1="${48 + i * 4}" y1="49" x2="${47 + i * 4}" y2="58" stroke="${P.pale}" stroke-width="0.6" opacity="0.4"/>`).join('') +
       `<path d="M48 44 q10 -2 18 4" stroke="${P.pale}" stroke-width="1" fill="none" opacity="0.5"/>` +
       `<circle cx="48" cy="44" r="2" fill="${P.void}" opacity="0.7"/>` +
-      `<ellipse cx="88" cy="64" rx="8" ry="4" fill="${P.bone}" opacity="0.3"/>` +
-      snow(31, 12, P.pale, 64),
+      `<ellipse cx="88" cy="64" rx="8" ry="4" fill="${P.bone}" opacity="0.3"/>` ,
   },
 
   'Fewer people have been here than on the Moon': {
     subject: 'a single lit porthole, descending through total black',
     draw: () =>
-      bg(P.void) +
-      current(33, 6, P.pale, 80, 0.36) +
+      
+      
       `<path d="M56 10 L64 10 L68 60 L64 68 L56 68 L52 60Z" fill="${P.iron}"/>` +
       `<path d="M56 10 L59 10 L61 60 L58 68 L56 68 L52 60Z" fill="${P.hull2}" opacity="0.3"/>` +
       halo(60, 30, P.lure, 9, 0.1) +
@@ -644,30 +665,27 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       `<rect x="54" y="46" width="12" height="4" fill="${P.abyss}"/>` +
       Array.from({ length: 6 }, (_, i) => `<circle cx="${58 + (i % 2) * 4}" cy="${14 + i * 8}" r="0.7" fill="${P.void}" opacity="0.6"/>`).join('') +
       `<path d="M52 60 L48 66 L56 68Z" fill="${P.iron}"/>` +
-      `<path d="M68 60 L72 66 L64 68Z" fill="${P.iron}"/>` +
-      snow(33, 16, P.pale, 80),
+      `<path d="M68 60 L72 66 L64 68Z" fill="${P.iron}"/>` ,
   },
 
   'Challenger Deep — the bottom': {
     subject: 'a submersible and a marker, resting on the true floor of the ocean',
     draw: () =>
-      bg(P.void) +
-      current(37, 5, P.pale, 66, 0.36) +
-      `<path d="M0 66 L44 66 L60 78 L76 66 L${W} 66 L${W} ${H} L0 ${H}Z" fill="${P.abyss}"/>` +
-      `<path d="M44 66 L60 78 L76 66 L72 66 L60 74 L48 66Z" fill="${P.trench2}" opacity="0.6"/>` +
-      `<path d="M20 66 L26 74" stroke="${P.void}" stroke-width="0.6" opacity="0.3"/>` +
-      `<path d="M96 66 L90 74" stroke="${P.void}" stroke-width="0.6" opacity="0.3"/>` +
+      `<path d="M8 ${H} C22 ${H} 26 67 44 66 L60 78 L76 66 C94 65 98 ${H} 112 ${H} Z" fill="${P.abyss}"/>` +
+      `<path d="M44 66 L60 78 L76 66 L72 66 L60 74 L48 66 Z" fill="${P.trench2}" opacity="0.6"/>` +
+      `<path d="M26 69 C36 66.5 40 66.5 44 66.4 L44 68 C38 68.2 34 68.6 27 70.6 Z" fill="${P.pale}" opacity="0.12"/>` +
+      `<path d="M76 66.4 C82 66.6 88 67.6 94 69.6 L93 71 C87 69 82 68.2 76 68 Z" fill="${P.pale}" opacity="0.12"/>` +
       `<ellipse cx="60" cy="52" rx="10" ry="8" fill="${P.iron}"/>` +
-      `<path d="M52 48 q4 -6 12 -6 q-6 3 -8 9Z" fill="${P.hull2}" opacity="0.4"/>` +
+      `<path d="M52 48 q4 -6 12 -6 q-6 3 -8 9Z" fill="${P.hull2}" opacity="0.45"/>` +
+      `<path d="M54 56 q6 4 13 1" stroke="${P.void}" stroke-width="1.2" fill="none" opacity="0.5"/>` +
       halo(60, 50, P.lure, 6, 0.12) +
       `<circle cx="60" cy="50" r="2.4" fill="${P.lure}" opacity="0.85"/>` +
       `<circle cx="60" cy="50" r="4" fill="${P.lure}" opacity="0.18"/>` +
       `<rect x="57" y="60" width="6" height="8" fill="${P.iron}"/>` +
-      `<ellipse cx="60" cy="72" rx="14" ry="3" fill="${P.abyss}"/>` +
+      `<rect x="57" y="60" width="2.4" height="8" fill="${P.hull2}" opacity="0.5"/>` +
+      `<ellipse cx="60" cy="72" rx="12" ry="2.6" fill="${P.void}" opacity="0.7"/>` +
       `<line x1="84" y1="40" x2="84" y2="70" stroke="${P.foam}" stroke-width="1"/>` +
-      `<path d="M84 40 L94 44 L84 48Z" fill="${P.foam}"/>` +
-      sparks(37, 4, P.glow, 74) +
-      snow(37, 10, P.pale, 66),
+      `<path d="M84 40 L94 44 L84 48Z" fill="${P.foam}"/>`,
   },
 }
 

@@ -12,8 +12,13 @@
  *   3. Every fill and stroke is one of the palette colours, and none of them
  *      sit at the extremes of the range a translucent card over a background
  *      running from bright surface blue to hadal black actually needs.
- *   4. Every scene is opaque edge to edge — no gap for the card underneath to
- *      show through.
+ *   4. Every subject is a CUT-OUT that reads against the water it will
+ *      actually float on. These used to be framed scenes that painted their
+ *      own sea; the page renders the sea for real now, so a scene has no
+ *      background of its own and is composited over the true colour of its
+ *      own depth — which for most of these is very close to black. A dark
+ *      animal on dark water is the failure this check exists to catch, and
+ *      it is the reason the deep ones have to carry their own light.
  *   5. Still a picture at 64 pixels: real structure at the width most cards
  *      get, and a real subject (not just backdrop) at the width a compacted
  *      cluster falls back to.
@@ -41,6 +46,7 @@ const fail = (m) => {
 const ok = (m) => console.log(`  ok    ${m}`)
 const check = (c, m) => (c ? ok(m) : fail(m))
 
+const hex = (h) => { const v = parseInt(h.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255] }
 const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
 const lum = (r, g, b) => 0.2126 * lin(r / 255) + 0.7152 * lin(g / 255) + 0.0722 * lin(b / 255)
 
@@ -140,98 +146,136 @@ console.log('palette')
   check(outliers.length === 0, `no palette colour is at the extremes${outliers.length ? ': ' + outliers.map((o) => o[0]) : ''}`)
 }
 
-/* ---- 4. the scene covers its own frame ------------------------------------- */
+/* ---- 4. a cut-out, and one you can see on its own water -------------------- */
 
-console.log('\nevery scene owns its background')
+/** The real water colour at a depth, interpolated inside its own zone. */
+function waterAt(depth) {
+  const z = ZONES.find((z) => depth >= z.from && depth <= z.to) ?? ZONES[ZONES.length - 1]
+  const t = Math.min(1, Math.max(0, (depth - z.from) / Math.max(1, z.to - z.from)))
+  const a = hex(z.sky[0])
+  const b = hex(z.sky[1])
+  return a.map((v, i) => Math.round(v + (b[i] - v) * t))
+}
+
+console.log('\nevery subject is cut out, and visible on its own water')
 {
   let bad = 0
   for (const n of names) {
-    const s = shot(n, 120)
-    let clear = 0
-    for (let i = 3; i < s.px.length; i += 4) if (s.px[i] < 250) clear++
-    const frac = clear / (s.W * s.H)
-    if (frac > 0.004) {
-      fail(`${n}: ${(frac * 100).toFixed(1)}% of its frame is transparent — the card shows through`)
-      bad++
+    const marker = MARKERS.find((m) => m.title === n)
+    const water = waterAt(marker.depth)
+    const waterL = lum(...water)
+    const s0 = shot(n, 120)
+
+    // Coverage: a cut-out that fills the frame is not a cut-out, and one that
+    // barely marks it is a speck in open water.
+    let inked = 0
+    for (let i = 3; i < s0.px.length; i += 4) if (s0.px[i] > 140) inked++
+    const cover = inked / (s0.W * s0.H)
+
+    // A real margin: nothing solid may touch the frame, or it reads as cropped
+    // rather than as a thing suspended in water. The seabed scenes are allowed
+    // the bottom edge, because a patch of seafloor genuinely continues.
+    const edgePx = []
+    for (let x = 0; x < s0.W; x++) edgePx.push(s0.px[(0 * s0.W + x) * 4 + 3])
+    for (let y = 0; y < s0.H; y++) {
+      edgePx.push(s0.px[(y * s0.W + 0) * 4 + 3])
+      edgePx.push(s0.px[(y * s0.W + s0.W - 1) * 4 + 3])
     }
+    const touching = edgePx.filter((a) => a > 200).length / edgePx.length
+
+    // Contrast against the real water. Measured on the subject\u2019s own opaque
+    // pixels only: an anti-aliased edge is always partway to the water and
+    // would grade the rasteriser rather than the drawing.
+    let best = 1
+    for (let i = 0; i < s0.W * s0.H; i++) {
+      if (s0.px[i * 4 + 3] < 250) continue
+      const l = lum(s0.px[i * 4], s0.px[i * 4 + 1], s0.px[i * 4 + 2])
+      const c = (Math.max(l, waterL) + 0.05) / (Math.min(l, waterL) + 0.05)
+      if (c > best) best = c
+    }
+
+    const notes = []
+    if (cover < 0.06) notes.push(`only ${(cover * 100).toFixed(0)}% of the frame is drawn`)
+    if (cover > 0.72) notes.push(`${(cover * 100).toFixed(0)}% drawn — that is a backdrop, not a cut-out`)
+    if (touching > 0.30) notes.push(`${(touching * 100).toFixed(0)}% of its top and side edges are solid — it reads as cropped`)
+    if (best < 3) notes.push(`its brightest tone is only ${best.toFixed(1)}:1 on ${marker.depth}m water`)
+    if (notes.length) { fail(`${n}: ${notes.join('; ')}`); bad++ }
   }
-  check(bad === 0, `all ${names.length} are opaque edge to edge`)
+  check(bad === 0, `all ${names.length} read as cut-outs against their own depth`)
 }
+/* ---- 5. still a picture at the size the card gives it ---------------------- */
 
-/* ---- 5. still a picture at 64 pixels --------------------------------------- */
+/**
+ * Both of these used to be measured over the whole 120x80 frame, which was the
+ * right question when a scene painted its own sea edge to edge: a flat frame
+ * meant a flat picture. A cut-out is mostly transparent by design, so the same
+ * measurement now reports "flat" for every one of them and says nothing about
+ * the drawing at all. Both are therefore measured inside the subject: how much
+ * internal structure the animal itself has, and how much of it survives being
+ * shrunk to the width a crowded cluster falls back to.
+ */
 
-console.log('\nstructure, at the width most cards get')
+console.log('\nstructure, inside the subject itself')
 {
   const STEP = 0.05
-  const FLOOR = 0.05
+  const FLOOR = 0.10
   const rows = []
   let bad = 0
   for (const n of names) {
-    for (const { name: wname, w } of WIDTHS.slice(0, 1)) {
-      const s = shot(n, w)
-      const L = (x, y) => {
-        const i = (y * s.W + x) * 4
-        return lum(s.px[i], s.px[i + 1], s.px[i + 2])
+    const s = shot(n, WIDTHS[0].w)
+    const A = (x, y) => s.px[(y * s.W + x) * 4 + 3]
+    const L = (x, y) => {
+      const i = (y * s.W + x) * 4
+      return lum(s.px[i], s.px[i + 1], s.px[i + 2])
+    }
+    let inked = 0
+    let edge = 0
+    for (let y = 1; y < s.H - 1; y++)
+      for (let x = 1; x < s.W - 1; x++) {
+        if (A(x, y) < 200) continue
+        inked++
+        const l = L(x, y)
+        let d = 0
+        // Only against neighbours that are also subject: otherwise the
+        // silhouette against empty water scores every blob as structured,
+        // which is the exact thing being tested for.
+        if (A(x - 1, y) >= 200) d = Math.max(d, Math.abs(l - L(x - 1, y)))
+        if (A(x + 1, y) >= 200) d = Math.max(d, Math.abs(l - L(x + 1, y)))
+        if (A(x, y - 1) >= 200) d = Math.max(d, Math.abs(l - L(x, y - 1)))
+        if (A(x, y + 1) >= 200) d = Math.max(d, Math.abs(l - L(x, y + 1)))
+        if (d >= STEP) edge++
       }
-      let total = 0
-      let edge = 0
-      for (let y = 1; y < s.H - 1; y++)
-        for (let x = 1; x < s.W - 1; x++) {
-          total++
-          const l = L(x, y)
-          if (
-            Math.max(
-              Math.abs(l - L(x - 1, y)),
-              Math.abs(l - L(x + 1, y)),
-              Math.abs(l - L(x, y - 1)),
-              Math.abs(l - L(x, y + 1)),
-            ) >= STEP
-          )
-            edge++
-        }
-      const d = edge / total
-      rows.push({ n, d })
-      if (d < FLOOR) {
-        fail(`${n} @${wname}: ${(d * 100).toFixed(1)}% edge — that is a backdrop with a mark on it`)
-        bad++
-      }
+    const d = inked ? edge / inked : 0
+    rows.push({ n, d })
+    if (d < FLOOR) {
+      fail(`${n}: ${(d * 100).toFixed(1)}% of its own ink is on an internal edge — a silhouette, not a drawing`)
+      bad++
     }
   }
-  check(bad === 0, `all ${names.length} have structure at ${(FLOOR * 100).toFixed(0)}% edge or better`)
-  rows.sort((a, b) => a.d - b.d)
+  check(bad === 0, `all ${names.length} have real structure inside the subject`)
+  rows.sort((x, y) => x.d - y.d)
   ok(
     `flattest ${rows[0].n} ${(rows[0].d * 100).toFixed(1)}%, ` +
-      `busiest ${rows[rows.length - 1].n} ${(rows[rows.length - 1].d * 100).toFixed(1)}%`,
+      `busiest ${rows[rows.length - 1].n} ${(rows[rows.length - 1].d * 100).toFixed(1)}%`
   )
 }
 
-console.log('\nsubject, at the width a compacted cluster gives')
+console.log('\nstill there at the width a compacted cluster gives')
 {
-  const FLOOR = 0.14
+  const FLOOR = 0.04
   let bad = 0
-  const rows = []
   for (const n of names) {
     const s = shot(n, 52)
-    const tally = new Map()
-    for (let i = 0; i < s.px.length; i += 4) {
-      const k = ((s.px[i] >> 4) << 8) | ((s.px[i + 1] >> 4) << 4) | (s.px[i + 2] >> 4)
-      tally.set(k, (tally.get(k) ?? 0) + 1)
-    }
-    let mode = 0
-    let best = -1
-    for (const [k, c] of tally) if (c > best) ((best = c), (mode = k))
-    const frac = 1 - best / (s.W * s.H)
-    rows.push({ n, frac })
+    let inked = 0
+    for (let i = 3; i < s.px.length; i += 4) if (s.px[i] > 140) inked++
+    const frac = inked / (s.W * s.H)
     if (frac < FLOOR) {
-      fail(`${n}: only ${(frac * 100).toFixed(0)}% of the frame is subject — at 64px that is a rectangle`)
+      fail(`${n}: only ${(frac * 100).toFixed(0)}% of the frame survives at 52px`)
       bad++
     }
   }
-  check(bad === 0, `all ${names.length} are more than ${(FLOOR * 100).toFixed(0)}% subject`)
-  rows.sort((a, b) => a.frac - b.frac)
-  ok(`emptiest is ${rows[0].n} at ${(rows[0].frac * 100).toFixed(0)}% subject`)
+  check(bad === 0, `all ${names.length} still read when the cluster squeezes them`)
 }
-
 /* ---- 6. distinctness -------------------------------------------------------- */
 
 console.log('\ndistinctness')
