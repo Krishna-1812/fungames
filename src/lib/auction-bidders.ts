@@ -1,3 +1,5 @@
+import { dominantMood } from './auction-art'
+
 /** Portraits are decorative; names and bidding states remain ordinary text. */
 export const BIDDER_PORTRAITS: Record<string, string> = {
   holloway: '<path d="M14 78 Q15 53 40 53 Q65 53 66 78" fill="#596f63"/><ellipse cx="40" cy="32" rx="21" ry="26" fill="#c8c2b4"/><ellipse cx="40" cy="37" rx="16" ry="21" fill="#e3b58f"/><path d="M22 29 Q39 2 58 28" fill="#c8c2b4"/><g fill="none" stroke="#4d4a44" stroke-width="2"><circle cx="32" cy="36" r="7"/><circle cx="48" cy="36" r="7"/><path d="M39 36 H41 M25 40 Q14 65 32 68 M55 40 Q66 65 48 68"/></g>',
@@ -8,5 +10,12 @@ export const BIDDER_PORTRAITS: Record<string, string> = {
 }
 
 export function bidderPortrait(id: string) {
-  return `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="40" cy="40" r="39" fill="#e2cda522"/>${BIDDER_PORTRAITS[id] ?? ''}<g fill="#372d28"><circle cx="32" cy="36" r="1.5"/><circle cx="48" cy="36" r="1.5"/></g><path d="M35 47 Q40 50 45 47" fill="none" stroke="#76503f" stroke-width="1.5"/></svg>`
+  return `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${BIDDER_PORTRAITS[id] ?? ''}<g fill="#372d28"><circle cx="32" cy="36" r="1.5"/><circle cx="48" cy="36" r="1.5"/></g><path d="M35 47 Q40 50 45 47" fill="none" stroke="#76503f" stroke-width="1.5"/></svg>`
 }
+
+/** Each rival's own dominant garment colour, for the glow behind their bust —
+ *  same `dominantMood` weighting as the lot art, so the room lights the same
+ *  way the rostrum does. */
+export const BIDDER_MOOD: Record<string, string> = Object.fromEntries(
+  Object.keys(BIDDER_PORTRAITS).map((id) => [id, dominantMood(BIDDER_PORTRAITS[id])]),
+)

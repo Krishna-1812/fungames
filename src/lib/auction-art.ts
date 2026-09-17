@@ -20,3 +20,41 @@ export const LOT_ART: Record<string, string> = {
 export function lotArt(id: string): string {
   return `<svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><ellipse cx="160" cy="198" rx="102" ry="11" fill="#000" opacity=".17"/><g stroke="#49382c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LOT_ART[id] ?? ''}</g></svg>`
 }
+
+/**
+ * Which colour lights the rostrum for a given lot. Every lot used to sit in
+ * the identical generic gold spotlight regardless of what was on it; this
+ * picks the lot's own dominant fill by drawn area, the same way
+ * `space-elevator-art.ts` and `deep-sea-art.ts` pick a card's glow.
+ */
+export function dominantMood(svg: string): string {
+  const weight = new Map<string, number>()
+  const num = (attrs: string, name: string) => {
+    const m = attrs.match(new RegExp(`${name}="(-?[\\d.]+)"`))
+    return m ? Number(m[1]) : undefined
+  }
+  const attr = (attrs: string, name: string) => attrs.match(new RegExp(`${name}="([^"]*)"`))?.[1]
+  for (const m of svg.matchAll(/<(rect|circle|ellipse|path|polygon)\s+([^>]*)\/?>/g)) {
+    const [, tag, attrs] = m
+    const fill = attr(attrs, 'fill')
+    if (!fill || fill === 'none' || !fill.startsWith('#')) continue
+    let area = 260
+    if (tag === 'rect') { const w = num(attrs, 'width'), h = num(attrs, 'height'); if (w && h) area = w * h }
+    else if (tag === 'circle') { const r = num(attrs, 'r'); if (r) area = Math.PI * r * r }
+    else if (tag === 'ellipse') { const rx = num(attrs, 'rx'), ry = num(attrs, 'ry'); if (rx && ry) area = Math.PI * rx * ry }
+    weight.set(fill, (weight.get(fill) ?? 0) + area)
+  }
+  let best: string | null = null, bestArea = 0
+  for (const [hex, area] of weight) if (area > bestArea) { best = hex; bestArea = area }
+  return best ?? '#c8894a'
+}
+
+export const LOT_MOOD: Record<string, string> = Object.fromEntries(
+  Object.keys(LOT_ART).map((id) => [id, dominantMood(LOT_ART[id])]),
+)
+
+/** #rrggbb -> "r, g, b", for a glow's rgba(). */
+export function rgbTriplet(hex: string): string {
+  const v = parseInt(hex.slice(1), 16)
+  return `${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}`
+}

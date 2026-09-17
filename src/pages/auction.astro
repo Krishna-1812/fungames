@@ -166,8 +166,8 @@ import { withBase } from '../lib/base'
   } from '../lib/auction'
   import type { Bidder, LotState, LotOutcome } from '../lib/auction'
   import type { Lot } from '../data/lots'
-  import { lotArt } from '../lib/auction-art'
-  import { bidderPortrait } from '../lib/auction-bidders'
+  import { lotArt, LOT_MOOD, rgbTriplet } from '../lib/auction-art'
+  import { bidderPortrait, BIDDER_MOOD } from '../lib/auction-bidders'
   import { previewCard, shareResult, outcomeLabel } from '../lib/share-card'
   import type { ResultCard } from '../lib/result-card'
   import { SITE } from '../site.config'
@@ -190,7 +190,17 @@ import { withBase } from '../lib/base'
   }
   const everyone = [...rivals, you]
   const outcomes: LotOutcome[] = []
-  $('lotArt').innerHTML = lotArt('fox')
+
+  /** The rostrum's spotlight follows whatever is actually sitting on it. */
+  function paintLotArt(id: string) {
+    $('lotArt').innerHTML = lotArt(id)
+    const mood = LOT_MOOD[id]
+    if (mood) {
+      $('lotArt').style.setProperty('--mood', mood)
+      $('lotArt').style.setProperty('--moodRgb', rgbTriplet(mood))
+    }
+  }
+  paintLotArt('fox')
   $('shareAuction').addEventListener('click', async () => {
     if (!result) return
     const button = $('shareAuction') as HTMLButtonElement
@@ -211,7 +221,7 @@ import { withBase } from '../lib/base'
   /* ------------------------------------------------------------------ */
 
   $('rivals').innerHTML = rivals.map((b) =>
-    `<li class="rival" data-id="${b.id}">
+    `<li class="rival" data-id="${b.id}" style="--mood:${BIDDER_MOOD[b.id]};--moodRgb:${rgbTriplet(BIDDER_MOOD[b.id])}">
        <div class="bidder-face">${bidderPortrait(b.id)}</div>
        <div class="who"><b>${b.name}</b><span class="chip" data-chip="${b.id}"></span></div>
        <p class="reaction" data-reaction="${b.id}">Taking their seat</p>
@@ -262,7 +272,7 @@ import { withBase } from '../lib/base'
   /* ------------------------------------------------------------------ */
 
   function showCard(lot: Lot) {
-    $('lotArt').innerHTML = lotArt(lot.id)
+    paintLotArt(lot.id)
     $('cat').textContent = lot.category
     $('title').textContent = lot.title
     $('blurb').textContent = lot.blurb
@@ -526,20 +536,46 @@ import { withBase } from '../lib/base'
 </script>
 
 <style is:global>
-  .saleroom .bidder-face { width: 54px; height: 54px; float: left; margin: 0 10px 8px 0; border-radius: 50%; overflow: hidden; border: 1px solid #715447; background: #34272a; }
+  /* The bust used to be a 54px avatar clipped into a circle badge, which is
+     the exact "settings screen" tell item 34 in PLAN.md names for pre-fix
+     Spend It: a small UI glyph standing in for a real character. It is a
+     cut-out now, same contract as the lot art below — no frame of its own,
+     lit by its own dominant colour — just bigger, and given its own column
+     instead of a float so the text no longer has to wrap around a circle. */
+  .saleroom .rival { display: grid; grid-template-columns: 72px 1fr; column-gap: 13px; align-items: start; }
+  .saleroom .bidder-face {
+    grid-row: 1 / span 4; width: 72px; height: 72px;
+    filter: drop-shadow(0 0 6px rgba(var(--moodRgb), 0.4)) drop-shadow(0 0 16px rgba(var(--moodRgb), 0.22));
+    transition: filter 200ms var(--ease);
+  }
   .saleroom .bidder-face svg { width: 100%; height: 100%; display: block; }
   .saleroom .reaction { color: #d2b59a; font-size: 11px; line-height: 1.4; min-height: 30px; margin: 5px 0 8px; }
-  .saleroom .bidder-notes { clear: both; margin: 7px 0 10px; }
+  .saleroom .bidder-notes { margin: 7px 0 10px; }
   .saleroom .bidder-notes summary { color: #c5aa99; font-size: 11px; cursor: pointer; padding: 4px 0; }
   .saleroom .rival.is-leading { background: #443024; }
-  .saleroom .rival.is-leading .bidder-face { border-color: #e8b46c; }
+  .saleroom .rival.is-leading .bidder-face {
+    filter: drop-shadow(0 0 9px rgba(var(--moodRgb), 0.7)) drop-shadow(0 0 22px rgba(var(--moodRgb), 0.4));
+  }
   .saleroom .rival.is-out .bidder-face { filter: saturate(.35); }
   .saleroom .bid-update { color: #d8c1ae; font-size: 13px; line-height: 1.5; margin: 6px 0; }
   .saleroom .rival .who { display: grid; gap: 5px; }
-  .saleroom .lot-art { height: clamp(160px, 24vw, 250px); margin: -4px 0 22px; border-radius: 12px; background: radial-gradient(ellipse at 50% 20%, #e7c99455, transparent 65%), #2a2927; overflow: hidden; }
+  /* The lot used to sit in a 160-250px case inset from the card's own
+     padding, in one generic gold spotlight regardless of what was on it. It
+     now bleeds to the card's own edges — the same move Deep Sea and Space
+     Elevator made, removing the frame around a cut-out — is bigger, and its
+     spotlight is the lot's own dominant colour rather than one colour for
+     all fourteen. */
+  .saleroom .lot-art {
+    height: clamp(210px, 30vw, 320px); margin: -22px -24px 24px;
+    border-radius: 12px 12px 0 0;
+    background: radial-gradient(ellipse at 50% 30%, rgba(var(--moodRgb), 0.32), transparent 70%), #24211d;
+    overflow: hidden;
+  }
   .saleroom .lot-art svg { width: 100%; height: 100%; display: block; }
   .saleroom .auction-result { max-width: 760px; margin: 0 auto 30px; border-radius: 16px; overflow: hidden; }
-  .saleroom { background: #1b0f11; color: #f2e7dd; }
+  /* Set before the mood-computing script runs, so the first paint (no-JS,
+     or a slow connection) never resolves an empty rgba(). */
+  .saleroom { background: #1b0f11; color: #f2e7dd; --moodRgb: 200, 137, 74; }
 
   .wrap { max-width: 1060px; margin: 0 auto; padding: 22px 18px 40px; }
 
