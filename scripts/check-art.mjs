@@ -507,13 +507,19 @@ console.log('\ncategories')
 console.log('\nno shared template')
 {
   // A slot is a composition. If most tiles share one, the grid has a template
-  // again whatever the silhouettes do.
+  // again whatever the silhouettes do. The cap scales with the catalogue
+  // rather than staying fixed at 3: nine Slot values times three each was
+  // exactly 27 tiles, so a fixed "3" becomes mathematically impossible to
+  // satisfy the moment an 28th game exists, no matter how the new one is
+  // drawn — the same shape of bug as the icon set's distinctness threshold
+  // turning into a treadmill once the catalogue outgrew it.
   const bySlot = {}
   for (const s of Object.keys(ART)) (bySlot[ART[s].slot] ??= []).push(s)
   const worst = Object.entries(bySlot).sort((a, b) => b[1].length - a[1].length)[0]
+  const cap = Math.ceil(Object.keys(ART).length / 9)
   check(
-    worst[1].length <= 3,
-    `no composition used more than three times (worst: ${worst[0]} × ${worst[1].length})`,
+    worst[1].length <= cap,
+    `no composition used more than ${cap} times for ${Object.keys(ART).length} tiles (worst: ${worst[0]} × ${worst[1].length})`,
   )
   check(Object.keys(bySlot).length >= 6, `at least six distinct compositions (${Object.keys(bySlot).length})`)
   const boxes = new Set(Object.keys(ART).map((s) => ART[s].viewBox))

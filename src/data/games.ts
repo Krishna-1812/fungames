@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'printing-money',
+    title: 'Printing Money',
+    blurb: 'Nine real rates, one dollar bill at a time',
+    description:
+      'Federal minimum wage, a teacher, a physician, a Fortune 500 CEO, and then NASA’s whole budget, the US deficit and the US government itself — nine real rates of earning, each one reduced to the same picture: how many one-dollar bills that buys, laid end to end. Five are small enough to actually draw; the other four would need a scrollbar several thousand kilometres long, so they get a real-world comparison instead. Type in your own wage and watch where it lands.',
+    accent: '#0f1c12', accent2: '#c9dd8f',
+    category: 'science',
+    added: '2026-09-28',
+  },
+  {
     slug: 'constellation-draw',
     title: 'Constellation Draw',
     blurb: 'Draw your own constellation on the real night sky',

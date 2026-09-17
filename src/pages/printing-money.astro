@@ -1,0 +1,418 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { withBase } from '../lib/base'
+import {
+  TIERS, dollarsPerHour, billCount, billStripLengthM, LITERAL_RENDER_MAX_BILLS,
+  nearestComparison, describeComparison, formatMoney,
+} from '../lib/printing-money'
+import { billDataUri, BILL_W, BILL_H } from '../lib/bill-art'
+
+/**
+ * Printing Money — nine real rates of earning, reduced to the one thing that
+ * makes them comparable: how many one-dollar bills is that, laid end to end.
+ *
+ * `src/lib/printing-money.ts` is the whole model: every tier's hourly rate is
+ * *derived* from an annual figure and a real hours-per-year (2,080 for a
+ * person, 8,760 for a continuous institution), never typed in twice.
+ * `scripts/check-printing-money.mjs` holds the arithmetic to account — it
+ * cannot and does not grade whether the salaries themselves are exactly
+ * right, only that the derivation, the bill counts and the comparison ladder
+ * are internally consistent.
+ *
+ * The picture is the same idea Paper Folds' own scale ladder uses: draw the
+ * real thing where it's small enough to draw (five tiers, seven to a
+ * hundred and twenty-five bills, an actual tiled strip of them), and switch
+ * to a named real-world comparison the moment literally laying out the bills
+ * would mean a scrollbar several thousand kilometres long.
+ *
+ * Every number below the hero is precomputed at build time from the real
+ * model — nothing here is typed in independently of `printing-money.ts`.
+ * Only the live "since you opened this page" counters run client-side.
+ */
+
+const BILL_PX_W = 84
+const BILL_PX_H = Math.round((BILL_PX_W * BILL_H) / BILL_W)
+const BILL_URI = billDataUri()
+
+const rows = TIERS.map((t) => {
+  const rate = dollarsPerHour(t)
+  const bills = billCount(rate)
+  const literal = bills <= LITERAL_RENDER_MAX_BILLS
+  const lengthM = billStripLengthM(bills)
+  const cmp = literal ? null : nearestComparison(lengthM)
+  return { tier: t, rate, bills, literal, lengthM, cmp }
+})
+
+const spending = rows.find((r) => r.tier.id === 'spending')!
+---
+
+<GameLayout slug="printing-money" bar="#132116" bodyClass="pm-body">
+  <div class="pm-bg" aria-hidden="true"></div>
+
+  <header class="pm-head">
+    <p class="pm-eyebrow">Nine real rates, one dollar bill at a time</p>
+    <h1>Printing Money</h1>
+    <p>
+      A wage, a salary, a government's own hourly rate of spending — nine
+      real figures that live at wildly different scales, all reduced to the
+      one thing that makes them comparable: how many one-dollar bills that
+      buys, laid end to end. Keep this tab open and watch the top of the
+      page move while the bottom barely does.
+    </p>
+  </header>
+
+  <section class="pm-hero" aria-label="Live counter">
+    <p class="pm-hero-label">Since you opened this page, the US federal government has spent</p>
+    <p class="pm-hero-amount" id="heroAmount">$0.00</p>
+    <div class="pm-hero-bar">
+      <div class="pm-hero-fill" id="heroFill"></div>
+      <span class="pm-hero-ref" id="heroRef"></span>
+    </div>
+    <p class="pm-hero-note">
+      About {formatMoney(spending.rate)} an hour, {formatMoney(spending.rate / 3600)} every second.
+      {spending.tier.note}
+    </p>
+  </section>
+
+  <main class="pm-body-content">
+    {
+      rows.slice(0, 6).map((r, i) => (
+        <section class="pm-stage" data-tier={r.tier.id} data-rate={r.rate}>
+          <p class="pm-kicker">Rate {i + 1} of 9</p>
+          <h2>{r.tier.label}</h2>
+          <p class="pm-rate">
+            {formatMoney(r.rate)}<span>/hr</span>
+          </p>
+          <p class="pm-note">{r.tier.note}</p>
+          <p class="pm-since">
+            Since you've been on this page: <b data-since>$0.00</b>
+          </p>
+          {r.literal ? (
+            <div class="pm-strip-wrap">
+              <div
+                class="pm-strip"
+                style={`width:${r.bills * BILL_PX_W}px;height:${BILL_PX_H}px;background-image:url("${BILL_URI}");background-size:${BILL_PX_W}px ${BILL_PX_H}px`}
+                title={`${r.bills.toLocaleString('en-US')} one-dollar bills`}
+              />
+              <p class="pm-strip-caption">
+                {r.bills.toLocaleString('en-US')} bills, {r.lengthM.toFixed(1)}m of them end to end — scroll to see them all →
+              </p>
+            </div>
+          ) : (
+            <div class="pm-compare">
+              <div class="pm-compare-track">
+                <div
+                  class="pm-compare-fill"
+                  style={`width:${Math.min(1, r.cmp!.kind === 'fraction' ? r.cmp!.fraction : 1) * 100}%`}
+                />
+              </div>
+              <p class="pm-compare-caption">
+                {r.bills.toLocaleString('en-US')} bills — {(r.lengthM / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })} km of them, end to end.{' '}
+                {describeComparison(r.cmp!)}
+              </p>
+            </div>
+          )}
+        </section>
+      ))
+    }
+
+    <section class="pm-stage pm-wage" id="wageStage">
+      <p class="pm-kicker">Where you fit</p>
+      <h2>What's your hourly wage?</h2>
+      <p class="pm-note">
+        Salaried? Divide by 2,080 — the same standard work-year every human
+        rate on this page uses. Typed in, not stored anywhere.
+      </p>
+      <div class="pm-wage-input">
+        <span>$</span>
+        <input type="text" inputmode="decimal" id="wageBox" placeholder="25.00" aria-label="Your hourly wage" />
+        <span>/hr</span>
+      </div>
+      <p class="pm-wage-out" id="wageOut" hidden></p>
+      <div class="pm-wage-strip-wrap" id="wageStripWrap" hidden>
+        <div class="pm-strip" id="wageStrip" />
+        <p class="pm-strip-caption" id="wageStripCaption"></p>
+      </div>
+      <p class="pm-since" id="wageSinceWrap" hidden>
+        Since you've been on this page, at that rate: <b id="wageSince">$0.00</b>
+      </p>
+    </section>
+
+    {
+      rows.slice(6).map((r, i) => (
+        <section class="pm-stage pm-institution" data-tier={r.tier.id} data-rate={r.rate}>
+          <p class="pm-kicker">Rate {i + 7} of 9 — an institution, not a person</p>
+          <h2>{r.tier.label}</h2>
+          <p class="pm-rate">
+            {formatMoney(r.rate)}<span>/hr</span>
+          </p>
+          <p class="pm-note">{r.tier.note}</p>
+          <p class="pm-since">
+            Since you've been on this page: <b data-since>$0.00</b>
+          </p>
+          <div class="pm-compare">
+            <div class="pm-compare-track">
+              <div
+                class="pm-compare-fill"
+                style={`width:${Math.min(1, r.cmp!.kind === 'fraction' ? r.cmp!.fraction : 1) * 100}%`}
+              />
+            </div>
+            <p class="pm-compare-caption">
+              {r.bills.toLocaleString('en-US')} bills — {(r.lengthM / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })} km of them, end to end.{' '}
+              {describeComparison(r.cmp!)}
+            </p>
+          </div>
+        </section>
+      ))
+    }
+
+    <footer class="pm-outro">
+      <div class="acts">
+        <button type="button" data-share data-title="Printing Money">Share this</button>
+        <a href={withBase('/')}>try something else →</a>
+      </div>
+
+      <details class="how">
+        <summary>Which of this is real</summary>
+        <p>
+          <b>The bill counts and the ladder are exact,</b> given the number
+          above them: a real US $1 bill is 6.14 x 2.61 inches per the Bureau
+          of Engraving and Printing's own spec, and the comparison distances
+          — a marathon, Manhattan Island, the Earth's circumference, the
+          distance to the Moon — are real, published figures.
+          <code>scripts/check-printing-money.mjs</code> holds that arithmetic
+          to account.
+        </p>
+        <p>
+          <b>The nine salaries and budgets are honestly approximate</b> — see
+          the note under each one. They move every year; the maths built on
+          top of them does not care which year it is.
+        </p>
+        <p>
+          <b>Every human rate uses the same 2,080-hour work-year</b> — 40
+          hours a week, 52 weeks — even though a Fortune 500 CEO's real hours
+          and a minimum-wage worker's real hours are not actually
+          comparable. The institutional rates use a real continuous
+          8,760-hour year instead, because a government does not clock off.
+        </p>
+        <p>
+          Related: <a href={withBase('/scale/')}>Scale</a> is the other game
+          here about what happens when a number gets too big to picture
+          directly, and <a href={withBase('/spend-it/')}>Spend It</a> is the
+          other one about money at a size nobody actually holds.
+        </p>
+      </details>
+    </footer>
+  </main>
+</GameLayout>
+
+{/* Data for the module below: modules cannot take define:vars, and modules
+    are what let every game share one synthesiser. */}
+<script type="application/json" id="pm-data" set:html={JSON.stringify({ BILL_PX_W, BILL_PX_H, billUri: BILL_URI })} />
+
+<script>
+  import {
+    billCount, billStripLengthM, LITERAL_RENDER_MAX_BILLS, formatMoney, parseWage, withCustomWage,
+  } from '../lib/printing-money'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
+
+  const { BILL_PX_W, BILL_PX_H, billUri } = JSON.parse(document.getElementById('pm-data')!.textContent!) as {
+    BILL_PX_W: number; BILL_PX_H: number; billUri: string
+  }
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+
+  const stages = [...document.querySelectorAll<HTMLElement>('.pm-stage[data-rate]')].map((el) => ({
+    el, rate: Number(el.dataset.rate), since: el.querySelector('[data-since]') as HTMLElement,
+  }))
+  const spendingRate = Number((document.querySelector('[data-tier="spending"]') as HTMLElement).dataset.rate)
+
+  let currentWageRate: number | null = null
+
+  const t0 = performance.now()
+  function tick() {
+    const elapsed = (performance.now() - t0) / 1000
+    $('heroAmount').textContent = formatMoney((spendingRate / 3600) * elapsed)
+    for (const s of stages) s.since.textContent = formatMoney((s.rate / 3600) * elapsed)
+    if (currentWageRate != null) $('wageSince').textContent = formatMoney((currentWageRate / 3600) * elapsed)
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+
+  // The hero's own little bar: how far its live total has grown toward the
+  // same "distance to the Moon" scale the spending stage below uses.
+  const MOON_M = 384_400_000
+  function paintHeroBar() {
+    const elapsed = (performance.now() - t0) / 1000
+    const dollars = (spendingRate / 3600) * elapsed
+    const m = billStripLengthM(billCount(dollars))
+    const frac = Math.min(1, m / MOON_M)
+    $('heroFill').style.width = `${(frac * 100).toFixed(6)}%`
+    $('heroRef').textContent = `${(m / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 })} km of bills so far — the distance to the Moon is 384,400 km`
+    requestAnimationFrame(paintHeroBar)
+  }
+  requestAnimationFrame(paintHeroBar)
+
+  // ---- your own wage --------------------------------------------------------
+  const wageBox = $<HTMLInputElement>('wageBox')
+  const wageOut = $('wageOut')
+  const stripWrap = $('wageStripWrap')
+  const strip = $('wageStrip')
+  const stripCaption = $('wageStripCaption')
+  const sinceWrap = $('wageSinceWrap')
+
+  function paintWage() {
+    const hourly = parseWage(wageBox.value)
+    currentWageRate = hourly
+    if (hourly == null) {
+      wageOut.hidden = true
+      stripWrap.hidden = true
+      sinceWrap.hidden = true
+      return
+    }
+    const withYou = withCustomWage(hourly)
+    const idx = withYou.findIndex((t) => t.id === 'you')
+    const below = withYou[idx - 1]
+    const above = withYou[idx + 1]
+    const placement = below && above
+      ? `That puts you between ${below.label.toLowerCase()} and ${above.label.toLowerCase()}.`
+      : above
+        ? `That's below every other rate on this page — even ${above.label.toLowerCase()}.`
+        : below
+          ? `That's above every other rate on this page — including ${below.label.toLowerCase()}.`
+          : ''
+    wageOut.hidden = false
+    wageOut.textContent = `${formatMoney(hourly)}/hr. ${placement}`
+
+    const bills = billCount(hourly)
+    if (bills <= LITERAL_RENDER_MAX_BILLS) {
+      stripWrap.hidden = false
+      strip.style.width = `${bills * BILL_PX_W}px`
+      strip.style.height = `${BILL_PX_H}px`
+      strip.style.backgroundImage = `url("${billUri}")`
+      strip.style.backgroundSize = `${BILL_PX_W}px ${BILL_PX_H}px`
+      stripCaption.textContent = `${bills.toLocaleString('en-US')} bills, ${billStripLengthM(bills).toFixed(2)}m of them end to end.`
+    } else {
+      stripWrap.hidden = true
+    }
+    sinceWrap.hidden = false
+  }
+  wageBox.addEventListener('input', paintWage)
+
+  // ---- share ------------------------------------------------------------------
+  onShare(
+    () => {
+      const elapsed = (performance.now() - t0) / 1000
+      const dollars = (spendingRate / 3600) * elapsed
+      return {
+        slug: 'printing-money',
+        siteName: SITE.name,
+        headline: `The government spent ${formatMoney(dollars)} while you read this`,
+        sub: 'Nine real rates of earning, from minimum wage to a government.',
+        stats: [
+          { label: 'Time on page', value: `${elapsed.toFixed(0)}s` },
+          { label: 'Govt. spending', value: formatMoney(dollars) },
+          { label: 'Your rate', value: currentWageRate != null ? formatMoney(currentWageRate) + '/hr' : 'not entered' },
+        ],
+      }
+    },
+    (c) => ({ title: 'Printing Money', text: c.headline }),
+  )
+
+  recordPlay('printing-money')
+</script>
+
+<style is:global>
+  .pm-body { background: #0a120b; color: #eef2ea; }
+  .pm-bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(70vmax 70vmax at 15% -10%, rgba(90, 200, 120, 0.08), transparent 70%),
+      radial-gradient(70vmax 70vmax at 90% 105%, rgba(200, 170, 90, 0.07), transparent 70%);
+  }
+  .pm-body .game { position: relative; }
+  .pm-body .game > * { position: relative; z-index: 1; }
+
+  .pm-head { max-width: 640px; margin: 6vh auto 0; padding: 0 22px; text-align: center; }
+  .pm-eyebrow { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #7ec98a; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
+  .pm-head h1 { font-size: clamp(32px, 6.4vw, 50px); margin: 0 0 14px; letter-spacing: -0.03em; }
+  .pm-head p { font-size: 16.5px; line-height: 1.65; opacity: 0.8; max-width: 56ch; margin: 0 auto; }
+
+  /* ---- the hero: the one number that actually moves while you watch ----- */
+  .pm-hero {
+    max-width: 620px; margin: 5vh auto 0; padding: 26px 24px;
+    background: linear-gradient(165deg, #16261a, #0f1c12);
+    border: 1px solid rgba(126, 201, 138, 0.25); border-radius: 18px;
+    text-align: center; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7);
+  }
+  .pm-hero-label { margin: 0 0 6px; font-size: 14px; opacity: 0.75; }
+  .pm-hero-amount {
+    margin: 0 0 16px; font-size: clamp(38px, 9vw, 64px); font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: #a8f0b6;
+    text-shadow: 0 0 40px rgba(126, 201, 138, 0.35);
+  }
+  .pm-hero-bar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); overflow: hidden; position: relative; }
+  .pm-hero-fill { height: 100%; background: linear-gradient(90deg, #7ec98a, #d9c26a); width: 0%; transition: width 120ms linear; }
+  .pm-hero-ref { display: block; margin-top: 8px; font-size: 11.5px; opacity: 0.6; }
+  .pm-hero-note { margin: 14px 0 0; font-size: 13px; opacity: 0.65; line-height: 1.6; }
+
+  .pm-body-content { max-width: 620px; margin: 0 auto; padding: 0 22px; }
+  .pm-stage { padding: 8vh 0; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .pm-stage:first-of-type { border-top: 0; }
+  .pm-kicker { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.5; margin: 0 0 8px; }
+  .pm-stage h2 { font-size: clamp(21px, 3.6vw, 28px); margin: 0 0 10px; letter-spacing: -0.02em; }
+  .pm-rate { margin: 0 0 10px; font-size: clamp(24px, 5vw, 34px); font-weight: 800; font-variant-numeric: tabular-nums; color: #d9c26a; }
+  .pm-rate span { font-size: 15px; opacity: 0.6; font-weight: 600; margin-left: 4px; }
+  .pm-note { font-size: 14px; line-height: 1.6; opacity: 0.68; margin: 0 0 14px; max-width: 54ch; }
+  .pm-since { font-size: 14.5px; opacity: 0.85; margin: 0 0 16px; }
+  .pm-since b { font-variant-numeric: tabular-nums; color: #a8f0b6; }
+
+  /* ---- the literal strip: a real tiled wall of bills, scrolled through --- */
+  .pm-strip-wrap { border-radius: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); }
+  .pm-strip { overflow: hidden; background-repeat: repeat-x; background-position: left center; max-width: 100%; overflow-x: auto; }
+  .pm-strip-caption { margin: 8px 0 0; font-size: 12px; opacity: 0.55; }
+
+  /* ---- the comparison, for anything too big to draw ---------------------- */
+  .pm-compare-track { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+  .pm-compare-fill { height: 100%; background: linear-gradient(90deg, #d9c26a, #e8926a); border-radius: 7px; }
+  .pm-compare-caption { margin: 9px 0 0; font-size: 13.5px; line-height: 1.6; opacity: 0.78; }
+
+  .pm-institution h2 { color: #f0c98a; }
+
+  /* ---- your own wage ------------------------------------------------------ */
+  .pm-wage { background: rgba(126, 201, 138, 0.05); border-radius: 16px; padding: 6vh 24px; margin: 0 -24px; }
+  .pm-wage-input {
+    display: flex; align-items: center; gap: 6px; max-width: 220px;
+    background: #0f1c12; border: 1px solid rgba(126, 201, 138, 0.3); border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 14px;
+  }
+  .pm-wage-input span { opacity: 0.6; font-size: 15px; }
+  .pm-wage-input input {
+    flex: 1; min-width: 0; background: none; border: 0; color: inherit; font-size: 17px;
+    font-variant-numeric: tabular-nums; outline: none;
+  }
+  .pm-wage-out { font-size: 15px; margin: 0 0 14px; color: #a8f0b6; }
+  .pm-wage-strip-wrap { margin-bottom: 14px; }
+
+  /* ---- outro --------------------------------------------------------------- */
+  .pm-outro { padding: 6vh 0 14vh; }
+  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 24px; }
+  .acts button {
+    appearance: none; border: 0; background: linear-gradient(165deg, #9de8ab, #7ec98a); color: #08240f;
+    padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 700;
+  }
+  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
+  .acts a:hover { opacity: 1; }
+
+  .how { text-align: left; font-size: 14px; opacity: 0.8; }
+  .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; text-align: center; }
+  .how p { line-height: 1.6; margin: 10px 0; }
+  .how a { color: #9de8ab; }
+  .how code { font-size: 12.5px; background: rgba(255, 255, 255, 0.06); padding: 1px 5px; border-radius: 4px; }
+
+  @media (max-width: 560px) {
+    .pm-wage { margin: 0 -22px; border-radius: 0; }
+  }
+</style>

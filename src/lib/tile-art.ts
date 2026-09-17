@@ -884,6 +884,52 @@ export const ART: Record<string, Illustration> = {
     },
   },
 
+  /* ---- Printing Money ------------------------------------------------------ */
+  'printing-money': {
+    subject: 'one-dollar bills at dusk, laid end to end, receding into the distance',
+    slot: 'band-bottom',
+    viewBox: '0 0 320 128',
+    palette: ['#111a13', '#3f5142', '#2f6b3f', '#c9dd8f', '#e8e2c8'],
+    draw: (s) => {
+      // Dark body, pale linework: the same call every other band-bottom
+      // drawing here makes (asteroid's night skyline, its bulk in near-black
+      // with the fireball as the one bright thing) — a literally cream bill
+      // face reads as paper on the workbench, but sitting in the card's own
+      // dark ground under light type it is the palest thing in the frame and
+      // crowds the title instead of sitting behind it.
+      const bill = (x: number, y: number, w: number, h: number, i: number) => `
+        <g transform="translate(${n(x)} ${n(y)})">
+          <rect width="${n(w)}" height="${n(h)}" rx="${n(h * 0.08)}" fill="#111a13"/>
+          <rect x="${n(w * 0.03)}" y="${n(h * 0.09)}" width="${n(w * 0.94)}" height="${n(h * 0.82)}" rx="${n(h * 0.05)}" fill="none" stroke="#e8e2c8" stroke-width="${n(Math.max(0.7, h * 0.025))}" opacity="0.75"/>
+          <circle cx="${n(w * 0.5)}" cy="${n(h * 0.5)}" r="${n(h * 0.3)}" fill="none" stroke="#c9dd8f" stroke-width="${n(Math.max(0.6, h * 0.02))}" opacity="0.85"/>
+          <ellipse cx="${n(w * 0.5)}" cy="${n(h * 0.54)}" rx="${n(h * 0.17)}" ry="${n(h * 0.22)}" fill="#3f5142" opacity="${(0.8 + rnd(s, i) * 0.15).toFixed(2)}"/>
+          <circle cx="${n(w * 0.22)}" cy="${n(h * 0.5)}" r="${n(h * 0.18)}" fill="none" stroke="#2f6b3f" stroke-width="${n(Math.max(0.6, h * 0.025))}"/>
+          <rect y="0" width="${n(w)}" height="${n(h * 0.06)}" rx="${n(h * 0.03)}" fill="#c9dd8f" opacity="0.3"/>
+        </g>`
+      // Perspective: each bill a little smaller and higher than the last, the
+      // same recession Deep Time and Space Elevator use for depth — laid end
+      // to end is the whole subject, so the strip has to look like it keeps
+      // going rather than stop at four bills and a full stop. Sized to fill
+      // most of the band rather than a thin ribbon across the bottom of it —
+      // the first pass drew five bills as a fifth of the slot and read as
+      // barely there once the fade and the card's own crop took their share.
+      const n_bills = 5
+      let x = 2
+      let bills = ''
+      for (let i = 0; i < n_bills; i++) {
+        const w = 132 - i * 19
+        const h = w * 0.425
+        const y = 122 - h - i * 4.5
+        bills += bill(x, y, w, h, i)
+        x += w * 0.6
+      }
+      const dash = range(7)
+        .map((i) => `<rect x="${n(x + 6 + i * 11)}" y="${n(122 - 24)}" width="5.5" height="4" rx="2" fill="#c9dd8f" opacity="${(0.7 - i * 0.08).toFixed(2)}"/>`)
+        .join('')
+      return `${bills}${dash}`
+    },
+  },
+
   /* ---- Steady Hand -------------------------------------------------------- */
   'steady-hand': {
     subject: 'the four shapes, drawn by a hand that is not as steady as it thinks',
