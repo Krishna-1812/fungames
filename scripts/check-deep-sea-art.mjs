@@ -217,8 +217,26 @@ console.log('\nevery subject is cut out, and visible on its own water')
 
 console.log('\nstructure, inside the subject itself')
 {
-  const STEP = 0.05
-  const FLOOR = 0.10
+  /*
+   * Measured as a CONTRAST RATIO between neighbouring pixels, not as an
+   * absolute difference in luminance, and that distinction is the whole
+   * calibration of this test.
+   *
+   * An absolute step — the 0.05 this used before — is a reasonable bar for a
+   * coral reef and an impossible one for a hadal trench. Relative luminance is
+   * compressed almost flat down at the dark end: abyss, ink, void and trench2
+   * all sit inside a span of about 0.01, so shading an abyssal subject in the
+   * abyssal palette can never clear 0.05 no matter how carefully it is drawn.
+   * The test was therefore not measuring whether a drawing had form; it was
+   * measuring how deep the animal lives.
+   *
+   * A ratio asks the scale-free question instead — is this pixel meaningfully
+   * lighter than the one beside it — and ranks the set the way the eye does:
+   * the two whales drawn as one flat mass fall to the bottom, and every scene
+   * with real modelling in it clusters well above.
+   */
+  const RATIO = 1.25
+  const FLOOR = 0.08
   const rows = []
   let bad = 0
   for (const n of names) {
@@ -235,31 +253,29 @@ console.log('\nstructure, inside the subject itself')
         if (A(x, y) < 200) continue
         inked++
         const l = L(x, y)
-        let d = 0
         // Only against neighbours that are also subject: otherwise the
         // silhouette against empty water scores every blob as structured,
         // which is the exact thing being tested for.
-        if (A(x - 1, y) >= 200) d = Math.max(d, Math.abs(l - L(x - 1, y)))
-        if (A(x + 1, y) >= 200) d = Math.max(d, Math.abs(l - L(x + 1, y)))
-        if (A(x, y - 1) >= 200) d = Math.max(d, Math.abs(l - L(x, y - 1)))
-        if (A(x, y + 1) >= 200) d = Math.max(d, Math.abs(l - L(x, y + 1)))
-        if (d >= STEP) edge++
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          if (A(x + dx, y + dy) < 200) continue
+          const nl = L(x + dx, y + dy)
+          if ((Math.max(l, nl) + 0.05) / (Math.min(l, nl) + 0.05) >= RATIO) { edge++; break }
+        }
       }
     const d = inked ? edge / inked : 0
     rows.push({ n, d })
     if (d < FLOOR) {
-      fail(`${n}: ${(d * 100).toFixed(1)}% of its own ink is on an internal edge — a silhouette, not a drawing`)
+      fail(`${n}: ${(d * 100).toFixed(1)}% of its own ink sits next to a tone it can be told apart from — that is one flat mass, not a drawing`)
       bad++
     }
   }
-  check(bad === 0, `all ${names.length} have real structure inside the subject`)
+  check(bad === 0, `all ${names.length} have real modelling inside the subject`)
   rows.sort((x, y) => x.d - y.d)
   ok(
     `flattest ${rows[0].n} ${(rows[0].d * 100).toFixed(1)}%, ` +
       `busiest ${rows[rows.length - 1].n} ${(rows[rows.length - 1].d * 100).toFixed(1)}%`
   )
 }
-
 console.log('\nstill there at the width a compacted cluster gives')
 {
   const FLOOR = 0.04

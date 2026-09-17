@@ -1,3 +1,18 @@
+/**
+ * deep-sea-sheet — every cut-out over the real water it will float on.
+ *
+ * The scenes are transparent now, so rendering one on its own tells you almost
+ * nothing: the question is always whether you can see it against the colour of
+ * its OWN depth, and below about a thousand metres that colour is very close to
+ * black. This composites each subject onto the true interpolated sky of its
+ * marker depth and lays them out in one sheet, which is the only honest way to
+ * look at the set.
+ *
+ * Not a check — check-deep-sea-art.mjs measures this properly. This is for
+ * eyes, and it is deliberately named so check-all does not pick it up.
+ *
+ *   node scripts/deep-sea-sheet.mjs out.png
+ */
 import { Resvg } from '@resvg/resvg-js'
 import fs from 'node:fs'
 import { register } from 'node:module'

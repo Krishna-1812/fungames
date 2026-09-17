@@ -423,24 +423,53 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
   },
 
   'Sperm whales hunt here': {
-    subject: 'a whale diving on an angle, chasing something smaller',
+    subject: 'a whale diving on an angle, its blunt case and knuckled ridge lit from above, chasing something smaller',
     draw: () =>
-      
-      
-      `<path d="M14 14 q40 -6 66 20 q10 10 2 18 q-8 6 -20 -2 q-46 -18 -52 -30 q-2 -4 4 -6Z" fill="${P.whale}"/>` +
-      `<path d="M18 16 q30 -2 48 16 q-30 -8 -48 -10Z" fill="${P.whale2}" opacity="0.4"/>` +
-      `<path d="M76 46 q10 2 14 12 q-10 2 -16 -6Z" fill="${P.whale}"/>` +
-      `<path d="M20 16 q6 8 6 16" stroke="${P.void}" stroke-width="1" fill="none" opacity="0.4"/>` +
-      `<path d="M32 20 q6 9 5 18" stroke="${P.void}" stroke-width="1" fill="none" opacity="0.35"/>` +
-      `<path d="M44 26 q5 9 4 18" stroke="${P.void}" stroke-width="1" fill="none" opacity="0.3"/>` +
-      `<circle cx="30" cy="22" r="1.6" fill="${P.void}" opacity="0.6"/><circle cx="29.4" cy="21.4" r="0.5" fill="${P.foam}" opacity="0.5"/>` +
+      // The body: a blunt, near-vertical face (the "case" a sperm whale
+      // carries instead of a beak), an underslung jaw, and a back that dips
+      // and rises toward the tail where a true dorsal fin would be.
+      `<path d="M16 13 Q12 21 14 30 Q19 34 26 35 Q42 40 55 47 Q70 53 80 57 Q90 60 94 60 ` +
+      `Q90 54 84 51 Q79 48 74 49 Q70 45 66 46 Q60 42 56 43 Q48 36 38 27 Q28 18 16 13Z" fill="${P.whale}"/>` +
+      // The lit back — everything the light from above actually reaches —
+      // against the belly and jaw left in shadow below it.
+      `<path d="M16 13 Q28 18 38 27 Q48 36 56 43 Q60 42 66 46 Q70 45 74 49 Q79 48 84 51 Q90 54 94 60 ` +
+      `Q84 56 74 52 Q64 48 54 42 Q42 34 30 26 Q22 19 16 13Z" fill="${P.whale2}"/>` +
+      `<path d="M17 31 Q23 36 30 35" stroke="${P.void}" stroke-width="0.9" fill="none" opacity="0.5"/>` +
+      // The single, off-centre blowhole — never on the midline, the one
+      // feature that alone tells a sperm whale from anything else diving.
+      `<path d="M19 14 q2 -2 3.4 -0.4 q1 1.6 -0.6 2.6" stroke="${P.void}" stroke-width="1" fill="none"/>` +
+      // The knuckled ridge — bony bumps standing in for a dorsal fin, each
+      // one catching a rim of light.
+      Array.from({ length: 4 }, (_, i) => {
+        const x = 80 - i * 8, y = 49 - i * 2.4, r = 2 - i * 0.25
+        return `<circle cx="${x}" cy="${y}" r="${r}" fill="${P.whale2}"/><circle cx="${x}" cy="${(y - r * 0.5).toFixed(1)}" r="${(r * 0.5).toFixed(1)}" fill="${P.pale}" opacity="0.7"/>`
+      }).join('') +
+      `<path d="M22 33 q-9 3 -11 11 q8 -1 12 -7Z" fill="${P.whale2}"/>` +
+      `<circle cx="21" cy="27" r="1.6" fill="${P.void}"/><circle cx="20.3" cy="26.3" r="0.5" fill="${P.foam}" opacity="0.7"/>` +
+      // Real sperm whale skin is famously corrugated — a field of shallow
+      // wrinkles, not a smooth hide — plus the round, sucker-ring scars a
+      // whale that actually hunts giant squid carries from the ones that
+      // fought back.
+      Array.from({ length: 13 }, (_, i) => {
+        const t = i / 12
+        const x = 22 + t * 62 + (rnd(63, i) - 0.5) * 4
+        const y = 20 + t * 30 + (rnd(63, i + 9) - 0.5) * 3
+        const len = 2.6 + rnd(63, i + 20) * 1.8
+        const onLit = i % 2 === 0
+        return `<path d="M${x.toFixed(1)} ${y.toFixed(1)} q1 1.6 ${(len * 0.6).toFixed(1)} ${len.toFixed(1)}" stroke="${onLit ? P.void : P.pale}" stroke-width="1.2" fill="none" opacity="0.7"/>`
+      }).join('') +
+      `<circle cx="47" cy="33" r="1.7" fill="none" stroke="${P.pale}" stroke-width="1" opacity="0.65"/>` +
+      `<circle cx="64" cy="42" r="1.4" fill="none" stroke="${P.void}" stroke-width="1" opacity="0.65"/>` +
+      `<circle cx="36" cy="28" r="1.3" fill="none" stroke="${P.pale}" stroke-width="0.9" opacity="0.6"/>` +
+      // The something smaller, still swimming, straight into the dive.
       Array.from({ length: 6 }, (_, i) => {
         const x = 40 + i * 8
         const y = 58 + rnd(21, i) * 6
         return `<path d="M${x} ${y}q${(rnd(21, i + 5) - 0.5) * 6} 6 0 12" stroke="${P.squid2}" stroke-width="1.6" fill="none"/>`
       }).join('') +
       `<ellipse cx="62" cy="62" rx="6" ry="7" fill="${P.squid}"/>` +
-      `<circle cx="60" cy="59" r="1.2" fill="${P.void}"/>` ,
+      `<path d="M58 58 q4 -3 8 0" stroke="${P.squid3}" stroke-width="1" fill="none" opacity="0.5"/>` +
+      `<circle cx="60" cy="59" r="1.2" fill="${P.void}"/>`,
   },
 
   'A hydrothermal vent': {
@@ -501,20 +530,38 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
   },
 
   'The deepest dive any mammal has ever made': {
-    subject: 'a beaked whale, alone, on a single breath, past a scale nothing else here reaches',
+    subject: 'a beaked whale, scarred and alone on a single breath, past a scale nothing else here reaches',
     draw: () =>
-      
-      
-      `<path d="M20 30 q34 -10 56 8 q8 8 0 14 q-30 8 -50 -6 q-10 -8 -6 -16Z" fill="${P.whale}"/>` +
-      `<path d="M22 32 q26 -6 44 6 q-24 -2 -44 0Z" fill="${P.whale2}" opacity="0.4"/>` +
-      `<path d="M18 32 q-6 0 -8 -6 q6 -2 10 2Z" fill="${P.whale}"/>` +
-      `<path d="M66 46 q6 0 10 8 q-8 2 -12 -4Z" fill="${P.whale}"/>` +
-      `<path d="M28 30 q10 -4 20 -2" stroke="${P.void}" stroke-width="1" fill="none" opacity="0.4"/>` +
-      `<path d="M32 40 q10 -2 22 0" stroke="${P.void}" stroke-width="1" fill="none" opacity="0.3"/>` +
-      `<circle cx="26" cy="30" r="1.2" fill="${P.void}"/><circle cx="25.5" cy="29.5" r="0.4" fill="${P.foam}" opacity="0.5"/>` +
+      // A slighter, more streamlined body than a sperm whale's — a pointed
+      // beak instead of a blunt case, and a small fin set well back.
+      `<path d="M14 36 Q18 28 30 26 Q48 24 64 28 Q80 32 90 40 Q94 43 92 46 ` +
+      `Q86 47 78 44 Q60 40 44 40 Q30 41 22 44 Q16 42 14 36Z" fill="${P.whale}"/>` +
+      `<path d="M14 36 Q18 28 30 26 Q48 24 64 28 Q80 32 90 40 ` +
+      `Q74 37 58 36 Q42 34 26 34 Q18 35 14 36Z" fill="${P.whale2}"/>` +
+      // the small dorsal fin, set back — a beaked whale's one real fin,
+      // where a sperm whale carries only its knuckled ridge
+      `<path d="M65 29 L72 16 L78 30 Q71 33 65 29Z" fill="${P.whale}"/>` +
+      `<path d="M65 29 L72 16" stroke="${P.pale}" stroke-width="1.1" opacity="0.6"/>` +
+      // throat grooves, under the chin
+      `<path d="M18 39 q4 3 9 2" stroke="${P.void}" stroke-width="1.1" fill="none" opacity="0.6"/>` +
+      `<path d="M20 42 q4 2 8 1" stroke="${P.void}" stroke-width="1" fill="none" opacity="0.55"/>` +
+      // the scarring a real Cuvier's beaked whale carries by adulthood —
+      // tooth rakes and the round, pale bite of a cookie-cutter shark
+      Array.from({ length: 9 }, (_, i) => {
+        const t = i / 8
+        const x = 24 + t * 58 + (rnd(71, i) - 0.5) * 4
+        const y = 30 + t * 8 + (rnd(71, i + 9) - 0.5) * 6
+        const len = 2.5 + rnd(71, i + 20) * 2.5
+        return `<path d="M${x.toFixed(1)} ${y.toFixed(1)} q${len.toFixed(1)} 2 ${(len * 1.6).toFixed(1)} ${(len * 0.5).toFixed(1)}" stroke="${P.pale}" stroke-width="1" fill="none" opacity="0.6"/>`
+      }).join('') +
+      `<circle cx="52" cy="36" r="1.6" fill="none" stroke="${P.pale}" stroke-width="1" opacity="0.65"/>` +
+      `<circle cx="60" cy="39" r="1.2" fill="none" stroke="${P.pale}" stroke-width="0.9" opacity="0.6"/>` +
+      `<circle cx="35" cy="30" r="1" fill="none" stroke="${P.pale}" stroke-width="0.8" opacity="0.55"/>` +
+      `<circle cx="26" cy="33" r="1.4" fill="${P.void}"/><circle cx="25.4" cy="32.4" r="0.45" fill="${P.foam}" opacity="0.7"/>` +
+      // the depth this dive alone reaches, ruled out below it
       `<line x1="14" y1="58" x2="14" y2="76" stroke="${P.pale}" stroke-width="1" opacity="0.5"/>` +
       Array.from({ length: 5 }, (_, i) => `<line x1="11" y1="${58 + i * 4.5}" x2="17" y2="${58 + i * 4.5}" stroke="${P.pale}" stroke-width="0.8" opacity="0.45"/>`).join('') +
-      `<line x1="14" y1="58" x2="72" y2="20" stroke="${P.pale}" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.35"/>` ,
+      `<line x1="14" y1="58" x2="46" y2="41" stroke="${P.pale}" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.35"/>`,
   },
 
   'The average depth of the entire ocean': {
@@ -550,27 +597,64 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
     draw: () =>
       seabed(P.sand, 64) +
       
+      // the wreck's own shadow, thrown across the sediment it rests in
+      `<ellipse cx="54" cy="62" rx="46" ry="4" fill="${P.ink}" opacity="0.4"/>` +
+      // a contact shadow, cast by the hull's own curved underside, laid down first
+      `<path d="M13 59 q4 -20 29 -24 L93 32 q9 0 9 9 l0 11 q0 5 -7 6 L21 61Z" fill="${P.ink}" opacity="0.5"/>` +
       `<path d="M10 58 q4 -22 30 -26 L94 30 q10 0 10 10 l0 12 q0 6 -8 6 L18 60Z" fill="${P.iron}"/>` +
       `<path d="M14 54 q4 -18 26 -22 L90 32 q-2 6 -4 10 L20 56Z" fill="${P.hull2}" opacity="0.3"/>` +
-      `<rect x="30" y="36" width="6" height="10" fill="${P.abyss}"/><rect x="30" y="36" width="6" height="2" fill="${P.trench2}"/>` +
-      `<rect x="42" y="34" width="6" height="10" fill="${P.abyss}"/><rect x="42" y="34" width="6" height="2" fill="${P.trench2}"/>` +
-      `<rect x="54" y="33" width="6" height="10" fill="${P.abyss}"/><rect x="54" y="33" width="6" height="2" fill="${P.trench2}"/>` +
-      `<rect x="66" y="33" width="6" height="10" fill="${P.abyss}"/><rect x="66" y="33" width="6" height="2" fill="${P.trench2}"/>` +
+      // riveted plate seams, breaking the flat hull into real panels
+      `<path d="M24 56 q1 -14 6 -22" stroke="${P.abyss}" stroke-width="1" fill="none" opacity="0.5"/>` +
+      `<path d="M44 32 q0 14 -1 26" stroke="${P.abyss}" stroke-width="1" fill="none" opacity="0.5"/>` +
+      `<path d="M62 31 q1 13 0 25" stroke="${P.abyss}" stroke-width="1" fill="none" opacity="0.45"/>` +
+      `<path d="M80 32 q1 12 -1 24" stroke="${P.abyss}" stroke-width="1" fill="none" opacity="0.45"/>` +
+      // a waterline seam, separating the lit upper strakes from the hull below
+      `<path d="M12 52 q30 8 82 4" stroke="${P.abyss}" stroke-width="1.2" fill="none" opacity="0.5"/>` +
+      // rivets, marching along the seams — the texture a hand-plated hull needs
+      Array.from({ length: 9 }, (_, i) => {
+        const x = 16 + i * 8.5
+        const y = 51 + Math.sin(i * 1.3) * 3
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="0.6" fill="${P.abyss}" opacity="0.6"/>`
+      }).join('') +
+      // the lit top edge of the deck, traced straight off the hull's own contour
+      `<path d="M10 58 q4 -22 30 -26 L94 30 q10 0 10 10" stroke="${P.scale}" stroke-width="1.1" fill="none" opacity="0.65"/>` +
+      // portholes, round and rimmed, following the sheer of the deck
+      Array.from({ length: 6 }, (_, i) => {
+        const x = [26, 38, 50, 62, 74, 86][i]
+        const y = [45, 37, 34, 33, 33, 34][i]
+        return (
+          `<circle cx="${x}" cy="${y}" r="2.3" fill="${P.abyss}"/>` +
+          `<circle cx="${x}" cy="${y}" r="2.3" fill="none" stroke="${P.scale}" stroke-width="0.8" opacity="0.6"/>` +
+          `<circle cx="${(x - 0.7).toFixed(1)}" cy="${(y - 0.7).toFixed(1)}" r="0.55" fill="${P.foam}" opacity="0.45"/>`
+        )
+      }).join('') +
       `<path d="M20 40 q6 10 2 20" stroke="${P.rust}" stroke-width="3" fill="none" opacity="0.8"/>` +
       `<path d="M50 32 q4 14 -2 26" stroke="${P.rust}" stroke-width="2.4" fill="none" opacity="0.7"/>` +
       `<path d="M76 34 q3 10 -1 18" stroke="${P.rust}" stroke-width="2" fill="none" opacity="0.6"/>` +
+      `<path d="M34 34 q3 8 -1 15" stroke="${P.rust}" stroke-width="1.5" fill="none" opacity="0.5"/>` +
+      `<path d="M90 36 q4 8 -1 15" stroke="${P.rust}" stroke-width="1.6" fill="none" opacity="0.5"/>` +
+      // rusticle blooms at the torn stern
+      `<circle cx="91" cy="42" r="2" fill="${P.rust}" opacity="0.5"/><circle cx="94" cy="47" r="1.4" fill="${P.rust}" opacity="0.45"/>` +
       `<rect x="44" y="14" width="4" height="20" fill="${P.iron}"/><rect x="44" y="14" width="1.4" height="20" fill="${P.hull2}" opacity="0.5"/>` +
       `<path d="M18 60 q40 6 76 -4 l0 3 q-38 9 -76 3Z" fill="${P.nodule}" opacity="0.5"/>` ,
   },
 
   'Almost nothing lives here, and almost everything that does is beige': {
-    subject: 'a single small creature, alone in an enormous, nearly empty frame',
+    subject: 'two small, drab creatures, alone on a low sediment mound in an enormous, nearly empty frame',
     draw: () =>
       seabed(P.sand, 62) +
       
       
-      `<path d="M0 62 q30 -4 60 0 t60 0" stroke="${P.nodule}" stroke-width="1" fill="none" opacity="0.4"/>` +
+      // a low dune of sediment, not a flat line — the mound this whole scene rests on
+      `<path d="M12 62 Q32 45 56 49 Q76 52 86 62Z" fill="${P.sand}"/>` +
+      `<path d="M15 61 Q30 47 52 49 Q40 51 28 58 Q20 61 15 61Z" fill="${P.bone}" opacity="0.3"/>` +
+      `<path d="M56 49 Q76 52 86 62 L62 62 Q63 54 56 49Z" fill="${P.nodule}" opacity="0.5"/>` +
+      `<path d="M18 60 q18 -13 38 -11 t30 13" stroke="${P.nodule}" stroke-width="1" fill="none" opacity="0.4"/>` +
       `<path d="M0 70 q30 -3 60 0 t60 0" stroke="${P.nodule}" stroke-width="1" fill="none" opacity="0.3"/>` +
+      // a second, smaller animal, resting pale against the lit slope of the mound
+      `<ellipse cx="38" cy="51.5" rx="6.5" ry="2.4" fill="${P.bone}" opacity="0.85"/>` +
+      `<ellipse cx="35.5" cy="50.6" rx="2.6" ry="0.9" fill="${P.foam}" opacity="0.3"/>` +
+      Array.from({ length: 4 }, (_, i) => `<path d="M${34 + i * 2.6} 53.4 q0.4 1.6 -0.3 2.6" stroke="${P.nodule}" stroke-width="0.5" fill="none" opacity="0.5"/>`).join('') +
       `<ellipse cx="70" cy="66" rx="5" ry="2.6" fill="${P.flesh}"/>` +
       `<ellipse cx="68.5" cy="65" rx="2" ry="1" fill="${P.bone}" opacity="0.5"/>` +
       Array.from({ length: 6 }, (_, i) => `<line x1="${67 + i}" y1="68" x2="${66.5 + i}" y2="70" stroke="${P.flesh}" stroke-width="0.6" opacity="0.7"/>`).join('') +
@@ -597,26 +681,47 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
   },
 
   'Past this line, life only exists in trenches': {
-    subject: 'a crack in an otherwise flat and empty plain, with something small living at the bottom of it',
-    // The whole subject here is a landform, which is the awkward case for a
-    // cut-out: it used to be a full-frame plain with a notch in it, and a
-    // full-frame anything is a backdrop. So the plain is now a slab that
-    // tapers away before the sides, and the crack is cut into it — the same
-    // picture, but as an object suspended in water rather than as a wall.
+    subject: 'a crack in an otherwise flat and empty plain, its near wall lit and its far wall dark, with something small living at the bottom of it',
+    // The awkward case for a cut-out: the subject IS a landform, and it used
+    // to be a full-frame plain with a notch in it — a full-frame anything is a
+    // backdrop. So the plain is a slab that tapers away before either side.
+    //
+    // Everything here is lit in genuinely separated tones rather than shades
+    // of the same near-black. At six thousand metres the palette available to
+    // an honest drawing is abyss, ink and void, and those three sit inside a
+    // span of about one percent of relative luminance — model a trench in them
+    // and you have drawn one flat mass. The top surface is therefore trench2,
+    // the lit wall is genuinely pale, and the only real light in the picture
+    // comes from the animal at the bottom of the crack, which is also the only
+    // reason anybody would ever have seen one.
     draw: () =>
       `<path d="M6 ${H} L10 44 Q30 40 44 43 L58 76 L64 76 L78 43 Q94 40 110 45 L114 ${H} Z" fill="${P.abyss}"/>` +
-      `<path d="M10 44 Q30 40 44 43 L47 50 Q30 47 11 51 Z" fill="${P.trench2}"/>` +
-      `<path d="M78 43 Q94 40 110 45 L109 52 Q94 47 75 50 Z" fill="${P.trench2}"/>` +
-      `<path d="M44 43 L58 76 L61 76 L49 43 Z" fill="${P.void}" opacity="0.75"/>` +
-      `<path d="M78 43 L64 76 L62 76 L74 43 Z" fill="${P.void}" opacity="0.55"/>` +
-      `<path d="M48 54 L52 66 L56 56" stroke="${P.pale}" stroke-width="0.7" opacity="0.28" fill="none"/>` +
-      `<path d="M72 50 L68 62 L74 57" stroke="${P.pale}" stroke-width="0.7" opacity="0.24" fill="none"/>` +
-      // The one living thing, at the bottom of the crack, carrying the only
-      // light in the picture — which is also the only reason you can see the
-      // crack at all at six thousand metres.
-      halo(60, 72, P.glow, 9, 0.16) +
+      // the top surface of the plain, catching what little falls on it
+      `<path d="M10 44 Q30 40 44 43 L46 52 Q30 48 11 53 Z" fill="${P.trench2}"/>` +
+      `<path d="M78 43 Q94 40 110 45 L109 54 Q94 49 76 52 Z" fill="${P.trench2}"/>` +
+      `<path d="M10 44 Q30 40 44 43 L44.6 45.6 Q30 42.6 10.6 47 Z" fill="${P.pale}" opacity="0.5"/>` +
+      `<path d="M78 43 Q94 40 110 45 L109.4 47.6 Q94 43 77.6 45.6 Z" fill="${P.pale}" opacity="0.42"/>` +
+      // strata, banding the plain the crack is cut through
+      `<path d="M11 56 Q30 51 45 55" stroke="${P.pale}" stroke-width="1.2" fill="none" opacity="0.3"/>` +
+      `<path d="M77 55 Q94 51 109 57" stroke="${P.pale}" stroke-width="1.2" fill="none" opacity="0.26"/>` +
+      `<path d="M12 64 Q30 60 48 65" stroke="${P.trench2}" stroke-width="1.4" fill="none" opacity="0.9"/>` +
+      `<path d="M74 64 Q94 60 108 66" stroke="${P.trench2}" stroke-width="1.4" fill="none" opacity="0.85"/>` +
+      `<path d="M14 71 Q30 68 52 72" stroke="${P.pale}" stroke-width="1" fill="none" opacity="0.18"/>` +
+      `<path d="M70 72 Q92 68 106 73" stroke="${P.pale}" stroke-width="1" fill="none" opacity="0.16"/>` +
+      // near wall lit, far wall in its own shadow — the two faces of the crack
+      `<path d="M44 43 L58 76 L61 76 L49 43 Z" fill="${P.pale}" opacity="0.4"/>` +
+      `<path d="M46 48 L54 50" stroke="${P.foam}" stroke-width="0.8" opacity="0.5"/>` +
+      `<path d="M48 58 L56 60" stroke="${P.foam}" stroke-width="0.8" opacity="0.38"/>` +
+      `<path d="M78 43 L64 76 L61.5 76 L74 43 Z" fill="${P.void}"/>` +
+      `<path d="M73 50 L67 58" stroke="${P.ink}" stroke-width="1" opacity="0.9"/>` +
+      // the creature’s own light, pooling up the walls it sits between
+      `<path d="M50 76 L56 58 L64 58 L70 76 Z" fill="${P.glow}" opacity="0.12"/>` +
+      `<path d="M53 76 L57.5 64 L62.5 64 L67 76 Z" fill="${P.glow}" opacity="0.18"/>` +
+      `<path d="M55.5 76 L58.5 69 L61.5 69 L64.5 76 Z" fill="${P.foam}" opacity="0.26"/>` +
+      halo(60, 72, P.glow, 9, 0.2) +
       `<ellipse cx="60" cy="72" rx="5" ry="2.4" fill="${P.bone}"/>` +
-      `<ellipse cx="58.4" cy="71" rx="2" ry="0.9" fill="${P.foam}" opacity="0.8"/>` +
+      `<ellipse cx="58.4" cy="71" rx="2" ry="0.9" fill="${P.foam}"/>` +
+      `<path d="M56 73.6 q4 1.6 8 0" stroke="${P.trench2}" stroke-width="0.9" fill="none" opacity="0.9"/>` +
       spark(60, 72, P.glow, 1.6),
   },
 
@@ -643,8 +748,12 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
       seabed(P.abyss, 64) +
       
       
-      `<path d="M36 58 q4 -20 26 -20 q20 0 22 15 q1 9 -9 11 q-7 7 -18 5 q-18 -2 -21 -11Z" fill="${P.bone}" opacity="0.7"/>` +
+      `<path d="M36 58 q4 -20 26 -20 q20 0 22 15 q1 9 -9 11 q-7 7 -18 5 q-18 -2 -21 -11Z" fill="${P.bone}" opacity="0.65"/>` +
       `<path d="M40 52 q6 -12 20 -14 q-4 8 -2 16 q-10 2 -18 -2Z" fill="${P.foam}" opacity="0.15"/>` +
+      // the gut, a soft shadow showing straight through the translucent skin
+      `<path d="M51 56 q8 -6 15 -2 q2 5 -3 8 q-9 2 -12 -6Z" fill="${P.trench2}" opacity="0.28"/>` +
+      // a gloss of light along the whole dorsal curve
+      `<path d="M39 47 q15 -11 32 -8" stroke="${P.foam}" stroke-width="1.2" fill="none" opacity="0.35"/>` +
       `<path d="M46 50 L70 52" stroke="${P.pale}" stroke-width="1" opacity="0.55"/>` +
       Array.from({ length: 6 }, (_, i) => `<line x1="${48 + i * 4}" y1="49" x2="${47 + i * 4}" y2="58" stroke="${P.pale}" stroke-width="0.6" opacity="0.4"/>`).join('') +
       `<path d="M48 44 q10 -2 18 4" stroke="${P.pale}" stroke-width="1" fill="none" opacity="0.5"/>` +
@@ -673,19 +782,30 @@ export const DEEP_SEA_ART: Record<string, Scene> = {
     draw: () =>
       `<path d="M8 ${H} C22 ${H} 26 67 44 66 L60 78 L76 66 C94 65 98 ${H} 112 ${H} Z" fill="${P.abyss}"/>` +
       `<path d="M44 66 L60 78 L76 66 L72 66 L60 74 L48 66 Z" fill="${P.trench2}" opacity="0.6"/>` +
-      `<path d="M26 69 C36 66.5 40 66.5 44 66.4 L44 68 C38 68.2 34 68.6 27 70.6 Z" fill="${P.pale}" opacity="0.12"/>` +
+      `<path d="M26 69 C36 66.5 40 66.5 44 66.4 L44 68 C38 68.2 34 68.6 27 70.6 Z" fill="${P.pale}" opacity="0.14"/>` +
       `<path d="M76 66.4 C82 66.6 88 67.6 94 69.6 L93 71 C87 69 82 68.2 76 68 Z" fill="${P.pale}" opacity="0.12"/>` +
+      // the sub sits in the sediment rather than on top of it
+      // the lamp falling on the sediment in front of it
+      `<path d="M56 52 L34 70 L52 72 L60 56 Z" fill="${P.lure}" opacity="0.10"/>` +
+      `<path d="M57 52 L42 69 L53 70.5 L60 56 Z" fill="${P.lure}" opacity="0.13"/>` +
+      `<ellipse cx="47" cy="69.5" rx="9" ry="2.4" fill="${P.lure}" opacity="0.16"/>` +
+      `<ellipse cx="47" cy="69.5" rx="4.4" ry="1.3" fill="${P.foam}" opacity="0.18"/>` +
+      `<ellipse cx="60" cy="71" rx="15" ry="3" fill="${P.void}" opacity="0.6"/>` +
       `<ellipse cx="60" cy="52" rx="10" ry="8" fill="${P.iron}"/>` +
-      `<path d="M52 48 q4 -6 12 -6 q-6 3 -8 9Z" fill="${P.hull2}" opacity="0.45"/>` +
-      `<path d="M54 56 q6 4 13 1" stroke="${P.void}" stroke-width="1.2" fill="none" opacity="0.5"/>` +
-      halo(60, 50, P.lure, 6, 0.12) +
-      `<circle cx="60" cy="50" r="2.4" fill="${P.lure}" opacity="0.85"/>` +
-      `<circle cx="60" cy="50" r="4" fill="${P.lure}" opacity="0.18"/>` +
+      // lit crown, shadowed belly — one light, from above and to the left
+      `<path d="M52 48 q4 -6 12 -6 q-6 3 -8 9Z" fill="${P.hull2}" opacity="0.5"/>` +
+      `<path d="M51 54 q9 8 18 1 q-3 5 -9 5 q-7 0 -9 -6Z" fill="${P.void}" opacity="0.55"/>` +
+      `<path d="M53 45 q8 -4 15 1" stroke="${P.scale}" stroke-width="1" fill="none" opacity="0.5"/>` +
+      // the viewport, rimmed, with the lamp burning inside it
+      halo(60, 50, P.lure, 6, 0.14) +
+      `<circle cx="60" cy="50" r="3.2" fill="none" stroke="${P.hull2}" stroke-width="1" opacity="0.7"/>` +
+      `<circle cx="60" cy="50" r="2.4" fill="${P.lure}"/>` +
+      `<circle cx="59.2" cy="49.2" r="0.9" fill="${P.foam}" opacity="0.8"/>` +
       `<rect x="57" y="60" width="6" height="8" fill="${P.iron}"/>` +
-      `<rect x="57" y="60" width="2.4" height="8" fill="${P.hull2}" opacity="0.5"/>` +
-      `<ellipse cx="60" cy="72" rx="12" ry="2.6" fill="${P.void}" opacity="0.7"/>` +
+      `<rect x="57" y="60" width="2.2" height="8" fill="${P.hull2}" opacity="0.55"/>` +
       `<line x1="84" y1="40" x2="84" y2="70" stroke="${P.foam}" stroke-width="1"/>` +
-      `<path d="M84 40 L94 44 L84 48Z" fill="${P.foam}"/>`,
+      `<path d="M84 40 L94 44 L84 48Z" fill="${P.foam}"/>` +
+      `<path d="M84 41 L91 44 L84 46Z" fill="${P.scale}" opacity="0.5"/>`,
   },
 }
 
@@ -752,7 +872,10 @@ export function sceneSvg(title: string): string {
   const s = DEEP_SEA_ART[title]
   if (!s) return ''
   return (
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" ` +
+    // `meet`, not `slice`. Slice fills the box by cropping whatever does not
+    // fit, which is right for a scene that paints its own frame edge to edge
+    // and exactly wrong for a cut-out: it would trim the animal.
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" ` +
     `style="width:100%;height:100%;display:block" aria-hidden="true" focusable="false">` +
     `${s.draw()}</svg>`
   )
