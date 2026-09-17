@@ -1342,7 +1342,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   function paintMoon() {
     const host = $('moonArt')
-    const size = 132
+    const size = 168
     let c = host.querySelector('canvas')
     if (!c) {
       c = document.createElement('canvas')
@@ -1998,25 +1998,35 @@ import GameLayout from '../layouts/GameLayout.astro'
     color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 700;
   }
 
-  /* --- the two panels ---------------------------------------------------- */
-
+  /* --- the moon and the wheel ---------------------------------------------
+     These used to sit in two dark boxes side by side — the one piece of card
+     chrome this redesign left standing after the feed below got rebuilt as a
+     timeline. A box earns its keep when it separates unrelated things; here
+     it was just re-drawing the sky's own darkness on top of itself. Both are
+     full width now, stacked, with nothing behind either but the sky the rest
+     of the page already sits on — a hairline underneath is enough to mark
+     where one ends and the other starts. */
   .sky-body .panels {
-    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-    gap: 14px; margin: 14px 0 0;
+    display: grid; gap: 40px; margin: 44px 0 0;
   }
   .sky-body .panel {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
-    padding: 18px 18px 20px;
-    backdrop-filter: blur(2px);
+    padding: 0 0 30px; border-bottom: 1px solid var(--line);
   }
+  .sky-body .panel:last-child { border-bottom: 0; padding-bottom: 0; }
   .sky-body .panel-h {
-    margin: 0 0 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.17em;
-    text-transform: uppercase; color: #7f8fd0;
+    margin: 0 0 18px; font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: #7f8fd0; text-align: center;
   }
 
-  .sky-body .moon-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-  .sky-body .moon-art { flex: none; line-height: 0; }
-  .sky-body .moon-facts { margin: 0; flex: 1 1 150px; min-width: 0; display: grid; gap: 5px; }
+  .sky-body .moon-row {
+    display: flex; gap: 30px; align-items: center; justify-content: center; flex-wrap: wrap;
+    max-width: 560px; margin: 0 auto;
+  }
+  .sky-body .moon-art {
+    flex: none; line-height: 0;
+    filter: drop-shadow(0 0 28px rgba(180, 196, 255, 0.22)) drop-shadow(0 0 70px rgba(120, 150, 255, 0.14));
+  }
+  .sky-body .moon-facts { margin: 0; flex: 1 1 190px; min-width: 0; display: grid; gap: 7px; }
   .sky-body .mf {
     display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
     border-bottom: 1px dashed rgba(126, 146, 226, 0.16); padding-bottom: 4px;
@@ -2030,7 +2040,10 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   .sky-body .wheel-wrap { position: relative; }
   .sky-body .wheel { line-height: 0; }
-  .sky-body .wheel svg { width: 100%; height: auto; max-width: 300px; margin: 0 auto; display: block; }
+  .sky-body .wheel svg {
+    width: 100%; height: auto; max-width: 380px; margin: 0 auto; display: block;
+    filter: drop-shadow(0 0 30px rgba(120, 150, 255, 0.14));
+  }
   .sky-body .wheel .wm {
     /* #7c8ac2 came out 4.3:1 against the sector it sits on. */
     font-size: 8.5px; fill: #8e9cd2; letter-spacing: 0.1em; text-transform: uppercase;
