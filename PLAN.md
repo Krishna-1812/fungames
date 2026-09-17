@@ -1850,6 +1850,34 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     the ink is picked from the real relative luminance of what is behind the
     text.
 
+35. ~~**The Deep Sea, properly: cut-outs.**~~ **done.** Item 34 left this one
+    half-finished and said so: the creature windows got bigger and lost their
+    card, but each was still a little framed scene painting its own sea, which
+    is a porthole. Asked to do it properly, the background layer came out
+    entirely — bg, snow, current, rays, silt and sparks deleted, floor replaced
+    by a seabed mound that tapers into the bottom edge rather than stopping
+    square, because a band of ground with hard ends reads as a crop.
+
+    Two things worth keeping from it. First, the conversion was mechanical and
+    that was the point: the ambient water was already isolated in named helper
+    functions, so stripping the calls converted twenty of twenty-two scenes
+    without touching an animal. Only the two whose subject genuinely WAS the
+    water needed redrawing — the trench, which was a full-frame plain with a
+    notch in it, and the average depth of the ocean, which was a translucent
+    column with a line across the middle and became a sounding lead.
+
+    Second, and more useful: the structure checker was measuring the wrong
+    thing and had been all along. It counted an absolute 0.05 step of relative
+    luminance between neighbouring pixels. Down at the dark end of this palette
+    abyss, ink, void and trench2 span about 0.01 in total, so an abyssal
+    subject shaded in abyssal colours cannot clear that bar however well it is
+    drawn — the test was reporting depth, not draughtsmanship. Switching to a
+    contrast RATIO made it scale-free, and the ranking it then produced matched
+    the eye exactly: the two whales drawn as one flat mass at the bottom, every
+    properly modelled scene clustered well above, and a clean gap to put the
+    floor in. Calibrating a threshold by looking at the distribution first, and
+    only then choosing the number, is the thing to repeat.
+
 35. Then reassess against the depth work in Phases 1–2 above.
 
 **Where that leaves it.** Eleven new games, eleven checkers (fifteen,

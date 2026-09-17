@@ -96,6 +96,7 @@ src/
     tile-art.ts         twenty bespoke tile drawings, one per game slug
     scale-things.ts     what Scale draws, how big it is, and the sky behind it
     scale-art.ts        twenty-six of those drawn, with both their real axes
+    deep-sea-art.ts     twenty-two cut-out subjects, no water of their own
     spend-art.ts        the thirty things you can buy, drawn as products
     time-events.ts      Deep Time's forty-four events and when they happened
     time-art.ts         a scene for each, flat colour on one palette
@@ -1117,4 +1118,23 @@ the button goes anywhere useful — same as `name`/`domain`/`email` above.
   Turnstile and a WASM anti-cheat in front of it.
 - Commissioned illustration. Size of Life credits a named palaeoartist.
 - Rate limiting beyond the worker's referer gate. Add Cloudflare rate limiting
-  before you get popular.
+  before you get popular.
+
+Every subject is a cut-out. Each scene used to paint its own sea inside a
+120x80 box — a flat rect of depth colour, marine snow, a current, sometimes
+a light shaft — and draw the animal on top of that; the page renders all of
+it for real in the WebGL column, so each scene was imitating, in flat fills
+at thumbnail size, the thing running full-screen behind it. The backgrounds
+are gone and the animals now hang in the actual water, glowing by
+`drop-shadow` (which follows the shape) rather than `box-shadow` (which
+would draw a bright rectangle around a transparent SVG).
+
+*`check-deep-sea-art.mjs` inverted with the contract: instead of demanding
+each scene be opaque edge to edge, it composites every subject over the true
+interpolated colour of its own depth and requires 3:1 against it — which
+below a thousand metres is near-black water, and is the honest reason the
+deep ones carry their own light. Its structure test is the part worth
+reading: it measured an absolute luminance step, which is a fair bar for a
+reef and an impossible one for a trench, because abyss, ink and void all sit
+inside about 0.01 of relative luminance. It was measuring how deep an animal
+lives rather than whether it was drawn. It asks for a contrast ratio now.*
