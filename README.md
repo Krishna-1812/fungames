@@ -597,7 +597,10 @@ rather than sampling the ratio and hoping.*
 
 **Ambient Mix** — twelve soundscape layers, all synthesised live, eight
 presets worth arriving at, and the whole mix in the URL: every layer at once is
-twenty-six characters. *Analyser tap measured peak 0.34, RMS 0.08 — real
+twenty-six characters. Each layer is a cut-out scene now rather than a
+settings-row glyph — `src/lib/ambient-art.ts`, the same contract as Deep Sea's
+and Space Elevator's own art modules, one palette and a `dominantMood` glow per
+drawing, checked by `scripts/check-ambient-art.mjs`. *Analyser tap measured peak 0.34, RMS 0.08 — real
 output, not just a running context. `scripts/check-mix.mjs` treats the code as
 what it is, a promise to a stranger: it round-trips four thousand random mixes,
 throws two dozen kinds of mangled URL at the decoder, and checks a link still
@@ -637,7 +640,13 @@ of ninety years is behind you, nothing before a date is typed.
 own bad habits, and £12,000. Real bidding increments, a real 25% buyer's premium,
 a secret reserve, and bids the auctioneer takes off the wall below it. At the end
 it names the four mechanisms that separated you from your money and puts your
-own number against each. *The winner's curse is not scripted: every bidder values
+own number against each. The lot on the rostrum and the five rivals in the room
+are both cut-outs now: the lot bleeds to the card's own edges under a spotlight
+of its own dominant colour instead of sitting boxed in one generic gold glow,
+and each rival's bust is drawn full size rather than clipped into a 54px avatar
+badge — both computed from the drawings themselves in `src/lib/auction-art.ts`
+and `src/lib/auction-bidders.ts`, the same `dominantMood` contract as the rest
+of the site's art. *The winner's curse is not scripted: every bidder values
 a lot as the truth times their own taste, so the winner is disproportionately
 whoever most overrated it. `scripts/check-auction.mjs` runs 28,000 lots and
 measures that winners really do pay about 31% over the appraisal — and it caught

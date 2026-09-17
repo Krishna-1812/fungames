@@ -1916,7 +1916,43 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     they finally had the room — the Moon from 132 to 168 pixels, the wheel
     from a 300px cap to 380.
 
-37. Then reassess again.
+37. ~~Two more games raised to the same bar: Ambient Mix and The Auction
+    Game.~~ **done.** The same reread as item 36, on two games that had never
+    had a "before neal.fun" comparison to fail, because neither one is a
+    neal.fun clone — which turned out not to matter. The tell doesn't need a
+    reference page to spot: it's whether the real thing on the page is
+    drawn at the size a real thing deserves, or at the size a UI control gets.
+
+    Ambient Mix's twelve layers were each a 24-unit glyph from `lib/icons.ts`
+    at 26px in a dark settings-row card — the exact ratio item 34 named for
+    pre-fix Spend It, "a 34px glyph floating in a 184px card." Twelve real
+    synthesised places (a coast, a campfire, a 3am office) were standing in
+    for themselves with an icon. `lib/ambient-art.ts` gives each one a real
+    scene on the same cut-out contract as Deep Sea and Space Elevator — no
+    card of its own, a `dominantMood` glow — sized up from 26px to 54,
+    checked by the new `check-ambient-art.mjs`. The one real finding: wind
+    and crickets, both genuinely green subjects, came in under the
+    distinctness floor on the first pass — not a bug in either drawing, just
+    two honest greens sitting too close together. Recolouring the cricket's
+    body and grass blade to a warmer, cooler-green pairing (rather than
+    loosening the floor) fixed it, the same call the icon set and Deep Time
+    made when their own distinctness tests hit a real collision.
+
+    The Auction Game's lot sat in a 160–250px case inset from the catalogue
+    card's own padding, lit by one generic gold radial gradient regardless of
+    what was on the rostrum — a fox in a waistcoat and a Victorian
+    chronometer got the identical spotlight. And each of the five rivals was
+    a 54px circular avatar, clipped and bordered like a badge, floated beside
+    their name. Both are cut-outs now. `dominantMood` moved into
+    `lib/auction-art.ts` so the rostrum's spotlight is the lot's own dominant
+    fill by drawn area rather than one colour for all fourteen, bleeding the
+    art to the card's own edges the way Deep Sea's water and Space Elevator's
+    sky do. `lib/auction-bidders.ts` reuses the same function for each
+    rival's own dominant garment colour, and the bust is drawn at full size
+    in its own grid column instead of a floated circle, so the text beside it
+    no longer has to wrap around an avatar.
+
+38. Then reassess again.
 
 **Where that leaves it.** Eleven new games, eleven checkers (fifteen,
 counting Constellation Draw's own four). The pattern that worked every
