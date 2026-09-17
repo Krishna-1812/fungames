@@ -1952,9 +1952,62 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     in its own grid column instead of a floated circle, so the text beside it
     no longer has to wrap around an avatar.
 
-38. Then reassess again.
+38. ~~**Printing Money.**~~ **done.** The last row of the catalogue-gap table
+    above — "Who Was Alive / Speed / Printing Money / Where Does the Day
+    Go, small honest computable pieces" — was three-quarters built; this
+    closes the fourth. Nine real rates of earning, from the US federal
+    minimum wage to the US federal government's own hourly rate of
+    spending, each one reduced to the one thing that makes them
+    comparable: how many one-dollar bills that buys, laid end to end.
 
-**Where that leaves it.** Eleven new games, eleven checkers (fifteen,
+    Every tier's `dollarsPerHour` is *derived* — an annual figure divided
+    by a real hours-per-year, 2,080 for a person's work-year or 8,760 for
+    a continuous institution — rather than typed in twice, the same
+    discipline as Paper Folds' fold limit and Space Elevator's live
+    temperature. `scripts/check-printing-money.mjs` cannot and does not
+    grade whether $69,544 is the right salary for a teacher (see the soft
+    estimates it, like Auction's, honestly is), only that the arithmetic
+    built on top of whatever number is there — the derivation, the bill
+    counts, the comparison ladder, the money formatter, the custom-wage
+    parser — holds together.
+
+    The picture is the same move Paper Folds' own scale ladder makes:
+    draw the real thing where it is small enough to draw, and switch to a
+    named comparison the moment it would not be. Five tiers are seven to
+    a hundred and twenty-five bills — an actual tiled strip of a drawn
+    bill, real dimensions (6.14 x 2.61 inches, the Bureau of Engraving and
+    Printing's own spec), scrollable. The other four would need a
+    scrollbar from 1,200 metres to 120,000 kilometres long, so they get a
+    real-world comparison instead — "82.2% of the Earth's circumference,"
+    "31.3% of the distance to the Moon" — against a ladder of named real
+    distances. The hero is the live version of the same idea: a
+    second-by-second counter of what the federal government has spent
+    since the page opened, the same "the hero is a clock, not a footnote"
+    call Days Since Incident made.
+
+    Three real bugs, none of them the salaries. `formatMoney` rounded
+    999,999,999 to "$1,000.00 million" instead of promoting it to "$1.00
+    billion" — a largest-unit-first formatter rounds correctly within a
+    unit and never checks whether the rounding just pushed it into the
+    next one; fixed by walking smallest-to-largest and taking the first
+    unit whose *rounded* value stays under 1,000. The comparison sentence
+    read "That's 31.3% of the way across the distance to the Moon" for
+    every institutional tier, because the template assumed every ladder
+    rung was a place ("across Manhattan Island") when several are already
+    a distance ("the distance to the Moon") — fixed by pulling the
+    sentence into one shared `describeComparison`, tested against every
+    rung in both directions, rather than building the same string twice
+    on the page. And the tile art's own "no composition used more than
+    three times" guard, which has quietly held since Phase 3, turned out
+    to be checking a number that stops being satisfiable at all once a
+    28th game exists — nine Slot values times three is exactly
+    twenty-seven. The cap is `Math.ceil(tileCount / 9)` now, the same
+    shape of fix as the icon set's distinctness threshold turning into a
+    treadmill once *that* catalogue outgrew its own bar.
+
+39. Then reassess again.
+
+**Where that leaves it.** Twelve new games, twelve checkers (sixteen,
 counting Constellation Draw's own four). The pattern that worked every
 time: build the model as pure functions over plain data, run it headlessly
 against answers somebody else already knows, and let the page be a

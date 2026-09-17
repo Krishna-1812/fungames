@@ -1,6 +1,6 @@
 # funsite
 
-A neal.fun-style site: one lean homepage and twenty-seven self-contained
+A neal.fun-style site: one lean homepage and twenty-eight self-contained
 interactive pages, each rendered with its own WebGL shader or 2D canvas and
 shipping only the script that page actually needs.
 
@@ -228,7 +228,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty-seven games
+## The twenty-eight games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -449,6 +449,25 @@ they get carved up, and a further sweep confirms more interruptions never
 first version of `computeDay` let the day grow past 24 hours whenever a
 carved-out slice (say, an implausibly long morning routine) didn't fit inside
 the block it was supposed to come from, in 184 of 500 random trials.*
+
+**Printing Money** — nine real rates of earning, from the US federal minimum
+wage to the US federal government's own hourly rate of spending, each reduced
+to the one thing that makes them comparable: how many one-dollar bills that
+buys, laid end to end. Every rate is *derived* — an annual figure divided by a
+real hours-per-year, 2,080 for a person's work-year or 8,760 for a continuous
+institution — rather than typed in twice. Five tiers are small enough to draw
+as an actual tiled strip of a real, drawn bill (6.14 x 2.61 inches, the Bureau
+of Engraving and Printing's own spec); the other four would need a scrollbar
+from 1,200 metres to 120,000 kilometres long, so they get a named real-world
+comparison instead — "82.2% of the Earth's circumference," "31.3% of the
+distance to the Moon." The hero is a second-by-second counter of what the
+government has spent since the page opened — the same "the hero is a clock,
+not a footnote" call Days Since Incident makes. *`scripts/check-printing-money.mjs`
+holds the arithmetic to account, not the salaries, which it cannot grade. It
+caught a real formatting bug: rounding $999,999,999 within the "million" unit
+gave "$1,000.00 million" instead of promoting to "$1.00 billion," because the
+formatter never checked whether its own rounding had just pushed the value
+into the next unit up.*
 
 **Dark Patterns** — eleven manipulative UI patterns, rebuilt as working fake
 websites rather than described in a bullet list: a basket that sneaks two
