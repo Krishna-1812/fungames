@@ -1878,7 +1878,45 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     floor in. Calibrating a threshold by looking at the distribution first, and
     only then choosing the number, is the thing to repeat.
 
-35. Then reassess against the depth work in Phases 1–2 above.
+36. ~~**Two more games raised to the same bar: Space Elevator and Universe
+    Forecast.**~~ **done.** Not because either was thin — Space Elevator ran
+    the real US Standard Atmosphere 1976 model and Universe Forecast drew
+    actual eclipse geometry from Meeus's own algorithms, both well before this
+    pass — but because both still had the tell this whole file keeps finding:
+    real work sitting in a box.
+
+    Space Elevator's twenty-three markers already had hand-drawn icons; each
+    one was a flat rect the exact colour of its zone's sky with a small scene
+    painted on top of it — a porthole, the same shape Deep Sea's creatures
+    were in before item 35. The page already computes the real sky colour for
+    the metre you're looking at, so a marker approximating that colour a
+    second time behind its own subject was always going to drift as you
+    scrolled past it. `space-elevator-art.ts` is the same cut-out contract as
+    `deep-sea-art.ts` — one palette, a `dominantMood` glow, a real checker —
+    applied climbing instead of descending. Two of the twenty-three had no
+    subject at all and were rebuilt rather than just uncropped: "a grey,
+    overcast sky" was four flat bars the width of the frame, and "the Kármán
+    line" was a filled rectangle standing for the void above it. Both are
+    real things now — a stratus deck with a top and an underside, and a
+    boundary drawn as the band of light it actually is, faked without a
+    gradient by three solid bars stacked wide to narrow. The card chrome
+    around every marker came off entirely, the same call Deep Sea made: a
+    rounded box with a border is a frame drawn around a cut-out, which is not
+    what a cut-out is for.
+
+    Universe Forecast's problem was smaller and easier to miss because the
+    page had already been redesigned once — the feed below is a real
+    timeline, not a stack of boxes, and the hero is an actual eclipse
+    diagram, not an icon. But the Moon and the year-ahead wheel were still
+    sitting in two dark rounded panels side by side, which is exactly the
+    chrome the feed's own redesign comment says it removed: "the single thing
+    making a descent past a giant squid read as an article about one." Both
+    panels are full width now, stacked, nothing behind either but the sky the
+    rest of the page already sits on, and both drawings got bigger because
+    they finally had the room — the Moon from 132 to 168 pixels, the wheel
+    from a 300px cap to 380.
+
+37. Then reassess again.
 
 **Where that leaves it.** Eleven new games, eleven checkers (fifteen,
 counting Constellation Draw's own four). The pattern that worked every

@@ -397,7 +397,11 @@ formula — the same seven-layer model aviation uses, faithful enough that it
 reproduces the model's own textbook reference points (15°C at sea level,
 -56.5°C at the tropopause, -2.5°C at the stratopause) on the nose, and
 honest enough to say "no single temperature" once you climb past its real
-86km ceiling rather than fake one. The closing section doesn't reach for a
+86km ceiling rather than fake one. Every marker's icon is a cut-out now
+rather than a framed scene — `src/lib/space-elevator-art.ts`, the same
+contract as Deep Sea's own art module, one palette and a `dominantMood` glow
+per drawing, floating free of any card against the real sky colour of its
+own altitude instead of a painted approximation of it. The closing section doesn't reach for a
 joke ending: it explains, in real materials-science terms, why nobody has
 actually built a space elevator to geostationary orbit yet — not
 imagination, a genuine unsolved cable-strength problem. *`scripts/check-
@@ -1118,7 +1122,7 @@ the button goes anywhere useful — same as `name`/`domain`/`email` above.
   Turnstile and a WASM anti-cheat in front of it.
 - Commissioned illustration. Size of Life credits a named palaeoartist.
 - Rate limiting beyond the worker's referer gate. Add Cloudflare rate limiting
-  before you get popular.
+  before you get popular.
 
 Every subject is a cut-out. Each scene used to paint its own sea inside a
 120x80 box — a flat rect of depth colour, marine snow, a current, sometimes
