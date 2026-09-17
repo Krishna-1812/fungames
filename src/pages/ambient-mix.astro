@@ -11,7 +11,13 @@ import GameLayout from '../layouts/GameLayout.astro'
  */
 
 import { LAYERS, PRESETS } from '../lib/mix-code'
-import { iconSvg } from '../lib/icons'
+import { MOOD, sceneSvg } from '../lib/ambient-art'
+
+/** #rrggbb -> "r, g, b", for the drop-shadow glow's rgba(). */
+function rgb(hex: string) {
+  const v = parseInt(hex.slice(1), 16)
+  return `${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}`
+}
 ---
 
 <GameLayout slug="ambient-mix" bar="#132a3f" bodyClass="mix-body">
@@ -50,9 +56,9 @@ import { iconSvg } from '../lib/icons'
     <ul class="grid" id="grid">
       {
         LAYERS.map((l) => (
-          <li class="layer" data-id={l.id}>
+          <li class="layer" data-id={l.id} style={`--mood:${MOOD[l.id]};--moodRgb:${rgb(MOOD[l.id])}`}>
             <button type="button" class="toggle" aria-pressed="false">
-              <span class="glyph" aria-hidden="true" set:html={iconSvg(l.icon)} />
+              <span class="scene" aria-hidden="true" set:html={sceneSvg(l.id)} />
               <span class="meta">
                 <span class="name">{l.name}</span>
                 <span class="hint">{l.hint}</span>
@@ -344,10 +350,10 @@ import { iconSvg } from '../lib/icons'
     L.li.classList.toggle('on', on)
     L.li.querySelector('.toggle').setAttribute('aria-pressed', String(on))
     if (on) {
-      const glyph = L.li.querySelector('.glyph')
-      glyph.classList.remove('jump')
-      void glyph.offsetWidth
-      glyph.classList.add('jump')
+      const scene = L.li.querySelector('.scene')
+      scene.classList.remove('jump')
+      void scene.offsetWidth
+      scene.classList.add('jump')
     }
   }
 
@@ -640,14 +646,24 @@ import { iconSvg } from '../lib/icons'
     display: flex; align-items: center; gap: 12px; width: 100%;
     background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit;
   }
-  /* The drawing sizes itself from inside — see iconSvg. A rule here that
-     targeted the <svg> would not apply to it, because it arrives via set:html. */
-  .glyph { width: 26px; height: 26px; flex: none; display: inline-block; }
+  /* The drawing sizes itself from inside — see sceneSvg. A rule here that
+     targeted the <svg> would not apply to it, because it arrives via set:html.
+     Same cut-out contract as Deep Sea and Space Elevator: no card of its own,
+     a mood-tinted glow standing in for the frame a settings-row icon used to
+     sit in. */
+  .scene {
+    width: 54px; height: 54px; flex: none; display: inline-block;
+    filter: drop-shadow(0 0 5px rgba(var(--moodRgb), 0.35)) drop-shadow(0 0 14px rgba(var(--moodRgb), 0.2));
+    transition: filter 200ms var(--ease);
+  }
+  .layer.on .scene {
+    filter: drop-shadow(0 0 7px rgba(var(--moodRgb), 0.6)) drop-shadow(0 0 20px rgba(var(--moodRgb), 0.4));
+  }
   /* A little jump the moment a layer actually switches on — see Spend It's
      identical .jump for why this needs a toggled class rather than tying
      straight to .on, which stays applied and would only fire once. */
-  .glyph.jump { animation: jump-glyph 380ms var(--ease-bounce); }
-  @keyframes jump-glyph { 40% { transform: translateY(-5px) scale(1.2); } }
+  .scene.jump { animation: jump-glyph 380ms var(--ease-bounce); }
+  @keyframes jump-glyph { 40% { transform: translateY(-9px) scale(1.15); } }
   .meta { display: grid; flex: 1; min-width: 0; }
   .name { font-weight: 600; font-size: 15.5px; }
   .hint { font-size: 12px; color: #7f99b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
