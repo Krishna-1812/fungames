@@ -12,6 +12,7 @@
 import { LAYERS } from './mix-code'
 import { ITEMS } from './spend-items'
 import { MARKS } from './fold-marks'
+import { CATEGORY_ORDER } from '../data/historical-figures'
 
 export type Page = {
   /** The page background the icon is composited over. */
@@ -46,6 +47,11 @@ export const PAGES: Record<string, Page> = {
   'days-since-incident': { bg: '#0e1004', ink: '#d4ff3d', size: 22 },
   // .toolbar's own near-opaque backdrop over the sky canvas, .tbtn { color: #e5dbfa }, svg { 15px }
   'constellation-draw': { bg: '#100a1c', ink: '#e5dbfa', size: 15 },
+  // :global(.wa-body) { background: #f7efe0; color: #33281a } and .wa-cat-mark { 34px }.
+  // Aged paper rather than the cream the other two light pages use, which is
+  // the tighter of the two constraints: PALETTE.gold clears 3:1 on it by a
+  // margin of 0.24, so anything warmer would push a palette entry under.
+  'who-was-alive': { bg: '#f7efe0', ink: '#33281a', size: 34 },
 }
 
 export const USES: Record<string, string[]> = {
@@ -59,4 +65,8 @@ export const USES: Record<string, string[]> = {
   home: ['coffee'],
   'days-since-incident': ['quake', 'solar-flare', 'geostorm', 'shock'],
   'constellation-draw': ['star', 'compass', 'undo', 'trash', 'link'],
+  // Derived from the category table itself, so adding a twelfth category
+  // without drawing its mark fails here rather than rendering a hole in the
+  // roster's left margin.
+  'who-was-alive': CATEGORY_ORDER.map((c) => c.icon),
 }

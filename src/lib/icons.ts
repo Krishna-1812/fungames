@@ -831,6 +831,128 @@ export const ICONS: Record<IconKey, Icon> = {
       <path d="M14 4.6h6" stroke="${P.teal}" stroke-width="2.8" stroke-linecap="round"/>
       <path d="M19.4 17.6 17.4 5.2" fill="none" stroke="${P.teal}" stroke-width="2.6" stroke-linecap="round"/>`,
   },
+
+  /* ---- what somebody was known for (Who Was Alive) ------------------------
+   *
+   * One per category in `data/historical-figures.ts`, and no more: the
+   * roster's left margin is the only place these appear, at 34px on aged
+   * paper, so each has to read as an occupation at a glance and none may be
+   * mistakable for its neighbour three rows down. They are objects rather
+   * than people on purpose — a 24-unit grid cannot draw eleven recognisably
+   * different human figures, and eleven near-identical silhouettes is the
+   * exact failure the distinctness check exists to catch.
+   */
+  crown: {
+    subject: 'a jewelled crown — a ruler',
+    draw: () => `
+      <path d="M3.4 18.2 2.2 6.2l5.2 3.8L12 2.8l4.6 7.2 5.2-3.8-1.2 12Z" fill="${P.gold}"/>
+      <rect x="3.2" y="18" width="17.6" height="3.4" rx="1.3" fill="${P.gold}"/>
+      <rect x="3.2" y="18" width="17.6" height="3.4" rx="1.3" fill="currentColor" opacity="0.22"/>
+      <circle cx="12" cy="13.2" r="1.8" fill="${P.brick}"/>
+      <circle cx="6.4" cy="14.4" r="1.3" fill="${P.brick}"/>
+      <circle cx="17.6" cy="14.4" r="1.3" fill="${P.brick}"/>`,
+  },
+  rostrum: {
+    subject: 'a lectern with a microphone over it — a leader',
+    draw: () => `
+      <path d="M4.4 8.4 19 5.8l.9 4.6L5.3 13Z" fill="${P.clay}"/>
+      <path d="M11.6 12.6 12.2 20" fill="none" stroke="${P.clay}" stroke-width="2.8"/>
+      <path d="M7.2 21.4h9.6" stroke="${P.clay}" stroke-width="2.8" stroke-linecap="round"/>
+      <path d="M14.8 6.4 16.6 3.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="17.4" cy="2.8" r="2" fill="${P.slate}"/>`,
+  },
+  sword: {
+    subject: 'a sword held across the frame — a soldier',
+    draw: () => `
+      <g transform="rotate(-35 12 12)">
+        <path d="M12 1.8 14.5 6v8.6h-5V6Z" fill="${P.slate}"/>
+        <path d="M12 1.8 14.5 6v8.6h-2.5Z" fill="currentColor" opacity="0.28"/>
+        <rect x="6.2" y="14.4" width="11.6" height="2.6" rx="1.2" fill="${P.gold}"/>
+        <rect x="10.7" y="17" width="2.6" height="3" fill="${P.clay}"/>
+        <circle cx="12" cy="21.2" r="1.9" fill="${P.gold}"/>
+      </g>`,
+  },
+  column: {
+    subject: 'a fluted stone column — a philosopher',
+    draw: () => `
+      <rect x="3.6" y="2.6" width="16.8" height="3" rx="1" fill="${P.ash}"/>
+      <rect x="3.2" y="18.6" width="17.6" height="3.2" rx="1" fill="${P.ash}"/>
+      <rect x="7.4" y="5.6" width="9.2" height="13" fill="${P.ash}"/>
+      <g stroke="currentColor" stroke-width="2.4" opacity="0.42">
+        <path d="M9.8 6.4v11.4"/><path d="M14.2 6.4v11.4"/>
+      </g>`,
+  },
+  flask: {
+    subject: 'a conical flask with something in it — a scientist',
+    draw: () => `
+      <path d="M7.2 14.2h9.6l3 5a2.6 2.6 0 0 1-2.2 3.4H6.4a2.6 2.6 0 0 1-2.2-3.4Z" fill="${P.teal}"/>
+      <path d="M9.8 3.4v5.4L4.2 18.6a2.6 2.6 0 0 0 2.2 3.6h11.2a2.6 2.6 0 0 0 2.2-3.6L14.2 8.8V3.4Z"
+            fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M8.4 2.8h7.2" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="10.2" cy="18" r="1.2" fill="currentColor" opacity="0.4"/>`,
+  },
+  cog: {
+    subject: 'a cogwheel with a lamp at its hub — an inventor',
+    draw: () => `
+      <path d="M12 1.9 14 3.3l2.4-.4 1 2.2 2.2 1-.4 2.4 1.4 2-1.4 2 .4 2.4-2.2 1-1 2.2-2.4-.4-2 1.4-2-1.4-2.4.4-1-2.2-2.2-1 .4-2.4-1.4-2 1.4-2-.4-2.4 2.2-1 1-2.2 2.4.4Z"
+            fill="${P.slate}"/>
+      <circle cx="12" cy="12" r="4.8" fill="${P.gold}"/>
+      <path d="M12 8.6a2.9 2.9 0 0 0-1.7 5.2v1.1h3.4v-1.1A2.9 2.9 0 0 0 12 8.6Z" fill="currentColor" opacity="0.5"/>`,
+  },
+  sextant: {
+    subject: 'a sextant, arc and index arm — an explorer',
+    draw: () => `
+      <path d="M12 2.8 3.8 19.2h16.4Z" fill="none" stroke="${P.slate}" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M5 17.6a9.2 9.2 0 0 1 14 0" fill="none" stroke="${P.gold}" stroke-width="2.8" stroke-linecap="round"/>
+      <path d="M12 4.4 8.2 18.4" fill="none" stroke="${P.brick}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M1.8 10h5.4" stroke="${P.slate}" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="12" cy="3.8" r="1.6" fill="${P.slate}"/>`,
+  },
+  quill: {
+    subject: 'a quill resting in an inkwell — a writer',
+    draw: () => `
+      <path d="M21.6 2.2c-7.4.5-12.8 4.6-14.4 11l-.9 3.6 3.5-1.1c6.6-2.1 10.9-6.6 11.8-13.5Z" fill="${P.olive}"/>
+      <path d="M19.4 4.6C14.6 7.8 11 12 8.8 17" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" opacity="0.45"/>
+      <path d="M8.6 16.4 5.4 19.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M1.4 17.6h7.2v2.2a2.4 2.4 0 0 1-2.4 2.4H3.8a2.4 2.4 0 0 1-2.4-2.4Z" fill="${P.indigo}"/>`,
+  },
+  palette: {
+    subject: 'a painter’s palette, thumb hole and four blobs — an artist',
+    draw: () => `
+      <path d="M11.6 2.8C6 2.8 2 6.6 2 11.4c0 4.4 3.5 7.3 7.7 7.3 1.5 0 2.2.7 2.2 1.7 0 .9.7 1.4 1.6 1.4 4.4 0 8.5-4 8.5-9.2 0-5.6-4.7-9.8-10.4-9.8Z"
+            fill="${P.clay}"/>
+      <circle cx="13.6" cy="15.8" r="2.4" fill="currentColor" opacity="0.34"/>
+      <circle cx="6.2" cy="10.2" r="1.8" fill="${P.brick}"/>
+      <circle cx="10" cy="6.4" r="1.8" fill="${P.blue}"/>
+      <circle cx="15.4" cy="7" r="1.8" fill="${P.olive}"/>
+      <circle cx="18" cy="11.6" r="1.8" fill="${P.plum}"/>`,
+  },
+  laurel: {
+    subject: 'a laurel wreath, open at the top — an athlete',
+    draw: () => `
+      <g fill="none" stroke="${P.green}" stroke-width="2.6" stroke-linecap="round">
+        <path d="M11.4 21.6C5.8 19.8 2.8 15.2 3.6 8.8"/>
+        <path d="M12.6 21.6c5.6-1.8 8.6-6.4 7.8-12.8"/>
+      </g>
+      <g fill="${P.olive}">
+        <ellipse cx="2.6" cy="11.6" rx="1.4" ry="2.5" transform="rotate(30 2.6 11.6)"/>
+        <ellipse cx="3.6" cy="16.2" rx="1.4" ry="2.5" transform="rotate(52 3.6 16.2)"/>
+        <ellipse cx="6.6" cy="19.8" rx="1.4" ry="2.5" transform="rotate(74 6.6 19.8)"/>
+        <ellipse cx="21.4" cy="11.6" rx="1.4" ry="2.5" transform="rotate(-30 21.4 11.6)"/>
+        <ellipse cx="20.4" cy="16.2" rx="1.4" ry="2.5" transform="rotate(-52 20.4 16.2)"/>
+        <ellipse cx="17.4" cy="19.8" rx="1.4" ry="2.5" transform="rotate(-74 17.4 19.8)"/>
+      </g>`,
+  },
+  hourglass: {
+    subject: 'an hourglass half run through — anyone else',
+    draw: () => `
+      <path d="M7.6 4.6h8.8L12 11Z" fill="${P.clay}"/>
+      <path d="M12 13.4 16.6 19.6H7.4Z" fill="${P.clay}"/>
+      <path d="M5.6 2.8h12.8v1.8L13 12l5.4 7.4v1.8H5.6v-1.8L11 12 5.6 4.6Z"
+            fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M3.8 2.6h16.4M3.8 21.4h16.4" stroke="${P.gold}" stroke-width="2.8" stroke-linecap="round"/>`,
+  },
 }
 
 /* ---- rendering ----------------------------------------------------------- */

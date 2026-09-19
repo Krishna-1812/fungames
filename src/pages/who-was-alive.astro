@@ -1,0 +1,1103 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { withBase } from '../lib/base'
+import { iconSvg, PALETTE } from '../lib/icons'
+import {
+  PEOPLE, CATEGORY_ORDER, MIN_YEAR, maxYear, toAxis, formatYear, lifespanLabel,
+  peopleAliveIn, isAliveIn, oldestAliveIn, youngestAliveIn, ageIn, emptyStretches,
+  type Category,
+} from '../data/historical-figures'
+
+/**
+ * Who Was Alive — a brass year counter over a chart of eighty-nine real lives.
+ *
+ * `src/data/historical-figures.ts` is the whole model: the record itself and
+ * the arithmetic over it, pure functions over plain data so
+ * `scripts/check-who-was-alive.mjs` can run the lot headlessly. Nothing on
+ * this page recomputes a span by hand — the one subtraction that matters
+ * (`yearsBetween`, which knows there is no year zero) lives there and is
+ * called from here.
+ *
+ * The page is one object: an engraved brass counter bolted to a walnut plate,
+ * the chart it indexes on the sheet below it, and the roster of names under
+ * that. No LED anywhere — the subject is a paper record, not an instrument
+ * with a power supply, and the seven-segment module the other counters on
+ * this site share would be the wrong century.
+ *
+ * Everything the year changes is a `textContent` write or a class toggle on
+ * markup that already exists. All eighty-nine chart bars and all eighty-nine
+ * roster rows are rendered here, at build time, and hidden or lit rather
+ * than rebuilt — which is why there is no `innerHTML` on this page and
+ * therefore none of the scoped-style trap that has bitten every game here
+ * that did use one. (The style block is `is:global` anyway, prefixed `wa-`.)
+ */
+
+const TOTAL = PEOPLE.length
+const MAXY = maxYear()
+const START_YEAR = 1900
+
+/* ---- the chart ---------------------------------------------------------- */
+
+// Chart geometry, in viewBox units. The head-room above the first row has to
+// hold the needle's own label and flag, which sit outside the plotted rows —
+// the first pass put the label at a negative y and resvg simply clipped it
+// away, which is exactly the class of bug check-art exists for one slot up.
+const ROW_H = 8
+const BAR_H = 5
+const TOP = 58
+const BOTTOM = 34
+const LABEL_Y = 22
+const FLAG_Y = 36
+const CHART_W = 1000
+const CHART_H = TOP + PEOPLE.length * ROW_H + BOTTOM
+const RULE_TOP = 30
+const TICK_TOP = 26
+const FOOT = CHART_H - BOTTOM
+const X0 = 44
+const X1 = 988
+
+// Plotted in astronomical years so a bar's drawn length is its real length:
+// the era boundary is one year wide, not two.
+const DOM0 = toAxis(Math.min(...PEOPLE.map((p) => p.birth))) - 24
+const DOM1 = MAXY + 14
+const px = (year: number) => X0 + ((toAxis(year) - DOM0) / (DOM1 - DOM0)) * (X1 - X0)
+
+const BAR_COLOUR: Record<Category, string> = {
+  ruler: PALETTE.gold,
+  leader: PALETTE.brick,
+  military: PALETTE.slate,
+  philosopher: PALETTE.indigo,
+  scientist: PALETTE.teal,
+  inventor: PALETTE.rust,
+  explorer: PALETTE.blue,
+  writer: PALETTE.plum,
+  artist: PALETTE.clay,
+  athlete: PALETTE.olive,
+  other: PALETTE.ash,
+}
+
+const byBirth = [...PEOPLE].sort((a, b) => a.birth - b.birth || a.name.localeCompare(b.name))
+const bars = byBirth.map((p, i) => {
+  const x = px(p.birth)
+  const w = Math.max(3, px(p.death ?? MAXY) - x)
+  return {
+    p, i, x, w,
+    y: TOP + i * ROW_H + (ROW_H - BAR_H) / 2,
+    fill: BAR_COLOUR[p.category],
+    alive: isAliveIn(p, START_YEAR),
+    title: `${p.name}, ${lifespanLabel(p)} — ${p.place}`,
+  }
+})
+
+const MINOR = [-500, -250, 1, 250, 500, 750, 1000, 1250, 1500, 1750, 2000]
+const MAJOR: { year: number; label: string }[] = [
+  { year: -500, label: '500 BC' },
+  { year: 1, label: 'AD 1' },
+  { year: 500, label: 'AD 500' },
+  { year: 1000, label: 'AD 1000' },
+  { year: 1500, label: '1500' },
+  { year: 2000, label: '2000' },
+]
+
+/* ---- the roster --------------------------------------------------------- */
+
+const sections = CATEGORY_ORDER.map((c) => ({
+  ...c,
+  colour: BAR_COLOUR[c.key],
+  mark: iconSvg(c.icon),
+  people: PEOPLE.filter((p) => p.category === c.key).sort((a, b) => a.birth - b.birth),
+})).filter((s) => s.people.length > 0)
+
+/* ---- the opening readout, computed here rather than guessed -------------- */
+
+const startAlive = peopleAliveIn(START_YEAR)
+const startOldest = oldestAliveIn(START_YEAR)!
+const startYoungest = youngestAliveIn(START_YEAR)!
+
+/* ---- the hole in the record --------------------------------------------- */
+
+const gaps = emptyStretches()
+if (!gaps.length) throw new Error('who-was-alive: the record has no empty stretch — the note below the chart is a lie')
+const biggest = gaps.reduce((a, b) => (toAxis(b.to) - toAxis(b.from) > toAxis(a.to) - toAxis(a.from) ? b : a))
+const biggestSpan = toAxis(biggest.to) - toAxis(biggest.from) + 1
+
+const startDigits = String(Math.abs(START_YEAR)).padStart(4, '0').split('')
+const DRUM_CELLS = 30
+---
+
+<GameLayout slug="who-was-alive" bar="#3a2b18" bodyClass="wa-body">
+  <div class="wa-grain" aria-hidden="true"></div>
+
+  <header class="wa-head">
+    <p class="wa-eyebrow">Eighty-nine lives, one shared timeline</p>
+    <h1>Who Was Alive</h1>
+    <p class="wa-lede">
+      Set the counter to any year between 700 BC and this one. Every life in
+      the record that reached that year lights up on the chart, and the roster
+      underneath names them. Every birth and death year here is a settled
+      fact — nothing is rounded to make a tidier picture, and nobody has been
+      invented to fill a quiet century.
+    </p>
+  </header>
+
+  <!-- ---- the instrument ------------------------------------------------ -->
+  <section class="wa-instrument" aria-labelledby="wa-inst-h">
+    <h2 class="wa-sr" id="wa-inst-h">The year counter</h2>
+
+    <div class="wa-plate">
+      <i class="wa-bolt wa-bolt-tl" aria-hidden="true"></i><i class="wa-bolt wa-bolt-tr" aria-hidden="true"></i>
+      <i class="wa-bolt wa-bolt-bl" aria-hidden="true"></i><i class="wa-bolt wa-bolt-br" aria-hidden="true"></i>
+
+      <p class="wa-engraved">Register of the living &middot; {TOTAL} entries &middot; 551 BC&ndash;{MAXY}</p>
+
+      <div class="wa-counter">
+        <span class="wa-era" id="waEra">AD</span>
+        <div class="wa-drums">
+          {
+            startDigits.map((d, k) => (
+              <div class="wa-drum" data-drum={k}>
+                <div class="wa-strip" data-strip={k} data-pos={10 + Number(d)}
+                     style={`transform:translateY(-${((10 + Number(d)) * 100) / DRUM_CELLS}%)`}>
+                  {Array.from({ length: DRUM_CELLS }, (_, j) => <span class="wa-cell">{j % 10}</span>)}
+                </div>
+              </div>
+            ))
+          }
+        </div>
+        <div class="wa-glass" aria-hidden="true"></div>
+      </div>
+
+      <div
+        class="wa-wheel"
+        id="waWheel"
+        role="slider"
+        tabindex="0"
+        aria-label="Year"
+        aria-valuemin={MIN_YEAR}
+        aria-valuemax={MAXY}
+        aria-valuenow={START_YEAR}
+        aria-valuetext={formatYear(START_YEAR)}
+      >
+        <span class="wa-knurl" id="waKnurl" aria-hidden="true"></span>
+      </div>
+
+      <div class="wa-steps">
+        <button type="button" class="wa-step" data-step="-100">&minus;100</button>
+        <button type="button" class="wa-step" data-step="-10">&minus;10</button>
+        <button type="button" class="wa-step" data-step="-1">&minus;1</button>
+        <button type="button" class="wa-step" data-step="1">+1</button>
+        <button type="button" class="wa-step" data-step="10">+10</button>
+        <button type="button" class="wa-step" data-step="100">+100</button>
+      </div>
+
+      <p class="wa-hint">Drag the wheel, scroll over it, or use the arrow keys.</p>
+    </div>
+
+    <div class="wa-jumps">
+      <form class="wa-jump" id="waGoForm" novalidate>
+        <label for="waGo">Go to a year</label>
+        <div class="wa-field">
+          <input
+            id="waGo" name="year" type="text" inputmode="text" autocomplete="off" spellcheck="false"
+            placeholder="1492, 44 BC, AD 800"
+          />
+          <button type="submit">Set</button>
+        </div>
+        <p class="wa-err" id="waGoErr" role="status">&nbsp;</p>
+      </form>
+
+      <div class="wa-jump">
+        <label for="waDob">Jump to the year you were born</label>
+        <div class="wa-field">
+          <input id="waDob" type="date" max={`${MAXY}-12-31`} />
+        </div>
+        <p class="wa-note">Stays in your browser. Nothing is sent anywhere.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- the readout --------------------------------------------------- -->
+  <section class="wa-readout">
+    <div aria-live="polite" aria-atomic="true">
+      <p class="wa-count">
+        <b id="waCount">{startAlive.length}</b>
+        <span>of {TOTAL} were alive in <b id="waYearWord">{formatYear(START_YEAR)}</b></span>
+      </p>
+
+      <dl class="wa-ends" id="waEnds">
+        <div>
+          <dt>Oldest that year</dt>
+          <dd><b id="waOldest">{startOldest.person.name}</b><span id="waOldestAge">{startOldest.age}</span></dd>
+        </div>
+        <div>
+          <dt>Youngest that year</dt>
+          <dd><b id="waYoungest">{startYoungest.person.name}</b><span id="waYoungestAge">{startYoungest.age}</span></dd>
+        </div>
+      </dl>
+    </div>
+
+    <p class="wa-nobody" id="waNobody" hidden>
+      Nobody in this record was alive then.
+      <button type="button" id="waNearest">Go to the nearest year that has somebody</button>
+    </p>
+  </section>
+
+  <!-- ---- the chart ----------------------------------------------------- -->
+  <section class="wa-chart" aria-labelledby="wa-chart-h">
+    <h2 id="wa-chart-h">All {TOTAL} lives, on one scale</h2>
+    <p class="wa-sub">
+      One bar per person, sorted by year of birth, on a single linear axis —
+      so a long life is drawn long and the empty stretches are really empty.
+      The needle stands in the year the counter shows. Click a bar to go to
+      the year that person was born.
+    </p>
+
+    <div class="wa-chart-frame">
+      <svg
+        class="wa-svg"
+        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+        role="img"
+        aria-label={`All ${TOTAL} lifespans in the record, drawn as bars on one shared timeline from 551 BC to ${MAXY}. The ones alive in the year the counter shows are lit; the rest are faded.`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <g class="wa-rules">
+          {MINOR.map((y) => <path d={`M${px(y).toFixed(1)} ${RULE_TOP}V${FOOT + 6}`} />)}
+        </g>
+        <g class="wa-axis">
+          {MAJOR.map((t) => <path class="wa-axis-tick" d={`M${px(t.year).toFixed(1)} ${TICK_TOP}V${FOOT + 10}`} />)}
+          {MAJOR.map((t) => <text x={px(t.year).toFixed(1)} y={CHART_H - 10} text-anchor="middle">{t.label}</text>)}
+        </g>
+
+        <g class="wa-bars">
+          {
+            bars.map((b) => (
+              <rect
+                class:list={['wa-bar', { 'is-alive': b.alive }]}
+                x={b.x.toFixed(1)}
+                y={b.y}
+                width={b.w.toFixed(1)}
+                height={BAR_H}
+                rx={BAR_H / 2}
+                fill={b.fill}
+                data-birth={b.p.birth}
+                data-name={b.p.name}
+              >
+                <title>{b.title}</title>
+              </rect>
+            ))
+          }
+        </g>
+
+        <g class="wa-needle" id="waNeedle" transform={`translate(${px(START_YEAR).toFixed(1)} 0)`}>
+          <path d={`M0 ${FLAG_Y}V${FOOT + 12}`} />
+          <path class="wa-needle-head" d={`M0 ${FLAG_Y - 9} 8 ${FLAG_Y} 0 ${FLAG_Y + 9} -8 ${FLAG_Y}Z`} />
+        </g>
+        <text class="wa-needle-label" id="waNeedleLabel" x={px(START_YEAR).toFixed(1)} y={LABEL_Y} text-anchor="middle">
+          {formatYear(START_YEAR)}
+        </text>
+      </svg>
+    </div>
+
+    <ul class="wa-legend">
+      {
+        sections.map((s) => (
+          <li><i style={`background:${s.colour}`} aria-hidden="true"></i>{s.label}</li>
+        ))
+      }
+    </ul>
+
+    <p class="wa-gap-note">
+      The longest stretch this record cannot speak for runs from
+      <b>{formatYear(biggest.from)}</b> to <b>{formatYear(biggest.to)}</b> —
+      {biggestSpan.toLocaleString('en-US')} years in which none of these {TOTAL} people
+      was alive. That is a hole in the list, not in history.
+    </p>
+  </section>
+
+  <!-- ---- the roster ---------------------------------------------------- -->
+  <section class="wa-roster" aria-labelledby="wa-roster-h">
+    <h2 id="wa-roster-h">Who that was</h2>
+    <p class="wa-sub">
+      Grouped by what each one was known for, oldest first inside each group.
+      Ages are differences of years — without birthdays they can be a year
+      high either side.
+    </p>
+
+    {
+      sections.map((s) => {
+        const shown = s.people.filter((p) => isAliveIn(p, START_YEAR))
+        return (
+          <section class="wa-group" data-cat={s.key} hidden={shown.length === 0}>
+            <h3 class="wa-group-h">
+              <span class="wa-cat-mark" style={`color:${s.colour}`} set:html={s.mark} />
+              <span class="wa-group-name">{s.label}</span>
+              <span class="wa-group-note">{s.note}</span>
+              <span class="wa-group-count" data-count>{shown.length}</span>
+            </h3>
+            <ol class="wa-rows">
+              {
+                s.people.map((p) => (
+                  <li
+                    class="wa-row"
+                    data-birth={p.birth}
+                    data-death={p.death ?? ''}
+                    hidden={!isAliveIn(p, START_YEAR)}
+                  >
+                    <span class="wa-row-name">{p.name}</span>
+                    <span class="wa-row-years">{lifespanLabel(p)}</span>
+                    <span class="wa-row-age" data-age>{ageIn(p, START_YEAR)}</span>
+                    <span class="wa-row-place">{p.place}</span>
+                    <span class="wa-row-blurb">{p.blurb}</span>
+                  </li>
+                ))
+              }
+            </ol>
+          </section>
+        )
+      })
+    }
+
+    <p class="wa-roster-empty" id="waRosterEmpty" hidden>
+      The roster is empty for this year.
+    </p>
+  </section>
+
+  <footer class="wa-outro">
+    <div class="wa-acts">
+      <button type="button" data-share data-title="Who Was Alive">Share this</button>
+      <a href={withBase('/')}>try something else &rarr;</a>
+    </div>
+
+    <details class="wa-how">
+      <summary>Which of this is real</summary>
+      <p>
+        <b>Every year in the record is a fact,</b> at the level Wikipedia and
+        Britannica agree on, and none of them has been rounded. Where a
+        scholar would write <i>c.</i> in front of a year, the person is not in
+        the list at all — which is why the first millennium is so thin here,
+        and why the gap between Augustus and Charlemagne is stated above
+        rather than filled in.
+      </p>
+      <p>
+        <b>There is no year zero,</b> and that is load-bearing.
+        <code>1 BC</code> is written <code>-1</code> in the data and
+        <code>AD 1</code> is written <code>1</code>, with exactly one year
+        between them — so every span is measured with a function that knows
+        it, not with a subtraction. The first version subtracted, and put
+        Augustus at 77 years old against a real 76 calendar years from 63 BC
+        to AD 14. <code>scripts/check-who-was-alive.mjs</code> holds all of
+        that to account, along with the roster and the two named extremes,
+        against answers worked out by hand for five fixed years.
+      </p>
+      <p>
+        <b>Ages are differences of years.</b> The record holds years, not
+        dates, so somebody whose birthday falls late in the year reads a year
+        older here than they were for most of it. Stated rather than hidden;
+        adding fake birthdays to fix it would be worse.
+      </p>
+      <p>
+        Related: <a href={withBase('/deep-time/')}>Deep Time</a> is the other
+        page here about a span too long to picture, and
+        <a href={withBase('/life-in-weeks/')}>Life in Weeks</a> is the other
+        one that starts from the year you were born.
+      </p>
+    </details>
+  </footer>
+</GameLayout>
+
+{/* Data for the module below: modules cannot take define:vars, and modules
+    are what let every game share one synthesiser. */}
+<script
+  type="application/json"
+  id="wa-data"
+  set:html={JSON.stringify({
+    minYear: MIN_YEAR, maxYear: MAXY, startYear: START_YEAR, total: TOTAL,
+    x0: X0, x1: X1, dom0: DOM0, dom1: DOM1, drumCells: DRUM_CELLS,
+    top: TOP, chartW: CHART_W,
+  })}
+/>
+
+<script>
+  import {
+    PEOPLE, MIN_YEAR, clampYear, formatYear, isAliveIn, peopleAliveIn, yearsBetween,
+    oldestAliveIn, youngestAliveIn, nearestPopulatedYear, parseYearInput, toAxis,
+  } from '../data/historical-figures'
+  import { sfx, unlock } from '../lib/audio'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
+
+  const D = JSON.parse(document.getElementById('wa-data')!.textContent!) as {
+    minYear: number; maxYear: number; startYear: number; total: number
+    x0: number; x1: number; dom0: number; dom1: number; drumCells: number
+    top: number; chartW: number
+  }
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+
+  const wheel = $('waWheel')
+  const knurl = $('waKnurl')
+  const era = $('waEra')
+  const strips = [...document.querySelectorAll<HTMLElement>('.wa-strip')]
+  const needle = $('waNeedle')
+  const needleLabel = $('waNeedleLabel')
+  const bars = [...document.querySelectorAll<SVGRectElement>('.wa-bar')]
+  const rows = [...document.querySelectorAll<HTMLElement>('.wa-row')]
+  const groups = [...document.querySelectorAll<HTMLElement>('.wa-group')]
+  const chartFrame = document.querySelector<HTMLElement>('.wa-chart-frame')!
+  const goForm = $<HTMLFormElement>('waGoForm')
+  const goBox = $<HTMLInputElement>('waGo')
+  const goErr = $('waGoErr')
+  const dob = $<HTMLInputElement>('waDob')
+
+  // The chart rows are in the same order as PEOPLE sorted by birth; the roster
+  // rows are in section order. Both are matched to a person once, here, so no
+  // lookup by name happens on the hot path.
+  const byBirth = [...PEOPLE].sort((a, b) => a.birth - b.birth || a.name.localeCompare(b.name))
+  const rowPeople = rows.map((r) => ({
+    birth: Number(r.dataset.birth),
+    death: r.dataset.death === '' ? null : Number(r.dataset.death),
+    age: r.querySelector<HTMLElement>('[data-age]')!,
+  }))
+  // Queried once, not once per repaint: a drag repaints every few
+  // milliseconds and `querySelectorAll` inside that loop is the difference
+  // between a wheel that turns and one that stutters.
+  const groupRows = groups.map((g) => ({
+    el: g,
+    rows: [...g.querySelectorAll<HTMLElement>('.wa-row')],
+    count: g.querySelector<HTMLElement>('[data-count]')!,
+  }))
+
+  const px = (y: number) => D.x0 + ((toAxis(y) - D.dom0) / (D.dom1 - D.dom0)) * (D.x1 - D.x0)
+
+  let year = D.startYear
+  let lastTick = 0
+
+  /* ---- the drums ---------------------------------------------------------
+   * A real rolling counter takes the short way round: 9 to 0 is one step
+   * forward, not nine steps back. The strip carries three copies of 0-9 so
+   * there is always room to roll either way, and re-seats itself into the
+   * middle copy — without a transition, so the seat is invisible — whenever
+   * it drifts near an end. Driving it off a single copy is what makes a
+   * cheap odometer spin backwards through eight digits at every decade.
+   */
+  function setDrum(strip: HTMLElement, digit: number) {
+    const cells = D.drumCells
+    let pos = Number(strip.dataset.pos)
+    const cur = ((pos % 10) + 10) % 10
+    let delta = digit - cur
+    if (delta > 5) delta -= 10
+    if (delta < -5) delta += 10
+    if (delta === 0) return
+    let next = pos + delta
+    if (next < 3 || next > cells - 4) {
+      const seat = 10 + cur
+      strip.style.transition = 'none'
+      strip.style.transform = `translateY(${(-seat * 100) / cells}%)`
+      void strip.offsetHeight
+      strip.style.transition = ''
+      next = seat + delta
+    }
+    strip.dataset.pos = String(next)
+    strip.style.transform = `translateY(${(-next * 100) / cells}%)`
+  }
+
+  function paintCounter(y: number) {
+    const digits = String(Math.abs(y)).padStart(4, '0')
+    strips.forEach((s, i) => setDrum(s, Number(digits[i])))
+    const bc = y < 0
+    era.textContent = bc ? 'BC' : 'AD'
+    era.classList.toggle('is-bc', bc)
+  }
+
+  /* ---- everything the year changes -------------------------------------- */
+
+  function paint(y: number, { quiet = false } = {}) {
+    year = y
+    paintCounter(y)
+
+    wheel.setAttribute('aria-valuenow', String(y))
+    wheel.setAttribute('aria-valuetext', formatYear(y))
+    knurl.style.backgroundPositionX = `${(y * 7) % 1000}px`
+
+    const x = px(y)
+    needle.setAttribute('transform', `translate(${x.toFixed(1)} 0)`)
+    needleLabel.setAttribute('x', String(Math.min(D.chartW - 46, Math.max(46, x)).toFixed(1)))
+    needleLabel.textContent = formatYear(y)
+
+    // Only when the chart is actually wider than its frame — on a desktop it
+    // never is, and scrolling a frame that does not scroll is a no-op that
+    // still costs a layout read.
+    if (chartFrame.scrollWidth > chartFrame.clientWidth + 1) {
+      const at = (x / D.chartW) * chartFrame.scrollWidth
+      chartFrame.scrollLeft = Math.max(0, at - chartFrame.clientWidth / 2)
+    }
+
+    for (let i = 0; i < bars.length; i++) {
+      bars[i].classList.toggle('is-alive', isAliveIn(byBirth[i], y))
+    }
+
+    let alive = 0
+    for (let i = 0; i < rows.length; i++) {
+      const p = rowPeople[i]
+      const on = p.birth <= y && (p.death === null || y <= p.death)
+      rows[i].hidden = !on
+      if (on) {
+        alive++
+        p.age.textContent = String(yearsBetween(p.birth, y))
+      }
+    }
+    for (const g of groupRows) {
+      let shown = 0
+      for (const r of g.rows) if (!r.hidden) shown++
+      g.el.hidden = shown === 0
+      g.count.textContent = String(shown)
+    }
+
+    $('waCount').textContent = String(alive)
+    $('waYearWord').textContent = formatYear(y)
+
+    const oldest = oldestAliveIn(y)
+    const youngest = youngestAliveIn(y)
+    const ends = $('waEnds')
+    ends.hidden = !oldest
+    $('waNobody').hidden = !!oldest
+    $('waRosterEmpty').hidden = !!oldest
+    if (oldest && youngest) {
+      $('waOldest').textContent = oldest.person.name
+      $('waOldestAge').textContent = String(oldest.age)
+      $('waYoungest').textContent = youngest.person.name
+      $('waYoungestAge').textContent = String(youngest.age)
+    }
+
+    if (!quiet) {
+      const now = performance.now()
+      if (now - lastTick > 55) { lastTick = now; sfx.tick() }
+    }
+  }
+
+  const setYear = (y: number, opts?: { quiet?: boolean }) => {
+    const c = clampYear(y, D.maxYear)
+    if (c === year) return
+    paint(c, opts)
+  }
+
+  /* ---- the wheel ---------------------------------------------------------- */
+
+  const PX_PER_YEAR = 2.4
+  let dragFrom: { x: number; year: number } | null = null
+
+  wheel.addEventListener('pointerdown', (e) => {
+    unlock()
+    dragFrom = { x: e.clientX, year }
+    wheel.setPointerCapture(e.pointerId)
+    wheel.classList.add('is-dragging')
+  })
+  wheel.addEventListener('pointermove', (e) => {
+    if (!dragFrom) return
+    e.preventDefault()
+    setYear(dragFrom.year + Math.round((e.clientX - dragFrom.x) / PX_PER_YEAR))
+  })
+  const endDrag = () => { dragFrom = null; wheel.classList.remove('is-dragging') }
+  wheel.addEventListener('pointerup', endDrag)
+  wheel.addEventListener('pointercancel', endDrag)
+
+  // Contained to the wheel itself: nowhere else on the page takes the scroll
+  // away from you.
+  wheel.addEventListener('wheel', (e) => {
+    e.preventDefault()
+    const dir = Math.sign(e.deltaY || e.deltaX)
+    setYear(year + dir * (e.shiftKey ? 10 : 1))
+  }, { passive: false })
+
+  wheel.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 10 : 1
+    const moves: Record<string, number> = {
+      ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step,
+      PageUp: 50, PageDown: -50,
+    }
+    if (e.key in moves) { e.preventDefault(); setYear(year + moves[e.key]) }
+    else if (e.key === 'Home') { e.preventDefault(); setYear(MIN_YEAR) }
+    else if (e.key === 'End') { e.preventDefault(); setYear(D.maxYear) }
+  })
+
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.wa-step')) {
+    b.addEventListener('click', () => { unlock(); sfx.click(); setYear(year + Number(b.dataset.step)) })
+  }
+
+  /* ---- typing a year, and your own ---------------------------------------- */
+
+  // Implicit submission on Enter is a browser behaviour, not a guarantee —
+  // it is suppressed in enough real situations (and in enough automation)
+  // that the one control whose whole job is "type a year and go there"
+  // should not depend on it.
+  goBox.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); goForm.requestSubmit() }
+  })
+
+  goForm.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const parsed = parseYearInput(goBox.value, D.maxYear)
+    if (parsed === null) {
+      goErr.textContent = `Try a year between 700 BC and ${D.maxYear} — "1492", "44 BC", "AD 800".`
+      sfx.bad()
+      return
+    }
+    goErr.innerHTML = '&nbsp;'
+    sfx.click()
+    setYear(parsed)
+    document.querySelector('.wa-readout')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+
+  dob.addEventListener('change', () => {
+    const v = dob.valueAsDate
+    if (!v) return
+    sfx.click()
+    setYear(v.getUTCFullYear())
+  })
+
+  $('waNearest').addEventListener('click', () => {
+    sfx.click()
+    setYear(nearestPopulatedYear(year))
+  })
+
+  /* ---- the chart is a control too ------------------------------------------ */
+
+  for (const b of bars) {
+    b.addEventListener('click', () => { unlock(); sfx.click(); setYear(Number(b.dataset.birth)) })
+  }
+
+  /* ---- share ---------------------------------------------------------------- */
+
+  onShare(
+    () => {
+      const alive = peopleAliveIn(year)
+      const oldest = oldestAliveIn(year)
+      return {
+        slug: 'who-was-alive',
+        siteName: SITE.name,
+        headline: alive.length
+          ? `${alive.length} of ${D.total} were alive in ${formatYear(year)}`
+          : `Nobody in the record was alive in ${formatYear(year)}`,
+        sub: 'Eighty-nine real lives on one timeline.',
+        stats: [
+          { label: 'Year', value: formatYear(year) },
+          { label: 'Alive then', value: `${alive.length} of ${D.total}` },
+          { label: 'Oldest', value: oldest ? `${oldest.person.name}, ${oldest.age}` : 'nobody' },
+        ],
+      }
+    },
+    (c) => ({ title: 'Who Was Alive', text: c.headline }),
+  )
+
+  paint(D.startYear, { quiet: true })
+  recordPlay('who-was-alive')
+</script>
+
+<style is:global>
+  /* ---- the page is a sheet of aged paper on a walnut desk ---------------- */
+
+  .wa-body {
+    background: #f7efe0;
+    color: #33281a;
+    --wa-walnut: #3a2b18;
+    --wa-walnut-dark: #241a0e;
+    --wa-brass: #b98f3c;
+    --wa-brass-lit: #e8cd8a;
+    --wa-rule: rgba(58, 43, 24, 0.16);
+    --wa-ink-soft: rgba(51, 40, 26, 0.68);
+  }
+  .wa-grain {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(90vmax 70vmax at 12% -12%, rgba(185, 143, 60, 0.13), transparent 68%),
+      radial-gradient(80vmax 60vmax at 96% 108%, rgba(58, 43, 24, 0.12), transparent 70%);
+  }
+  .wa-body .game { position: relative; }
+  .wa-body .game > * { position: relative; z-index: 1; }
+
+  .wa-sr {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+
+  .wa-head { max-width: 660px; margin: 6vh auto 0; padding: 0 22px; text-align: center; }
+  .wa-eyebrow {
+    margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #7c5d22;
+  }
+  .wa-head h1 {
+    margin: 0 0 14px; font-size: clamp(34px, 6.6vw, 54px); letter-spacing: -0.03em;
+    font-family: Georgia, 'Times New Roman', serif; font-weight: 700;
+  }
+  .wa-lede { margin: 0 auto; max-width: 58ch; font-size: 16.5px; line-height: 1.7; color: var(--wa-ink-soft); }
+
+  /* ---- the instrument: a brass counter bolted to a walnut plate ---------- */
+
+  .wa-instrument { max-width: 680px; margin: 5vh auto 0; padding: 0 22px; }
+
+  .wa-plate {
+    position: relative;
+    padding: 30px 22px 22px;
+    border-radius: 16px;
+    background:
+      repeating-linear-gradient(97deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 7px),
+      linear-gradient(168deg, #4a3620, var(--wa-walnut) 52%, var(--wa-walnut-dark));
+    box-shadow:
+      0 24px 46px -26px rgba(36, 26, 14, 0.75),
+      inset 0 1px 0 rgba(255, 233, 190, 0.18),
+      inset 0 -2px 6px rgba(0, 0, 0, 0.45);
+    color: #f2e3c4;
+  }
+  .wa-bolt {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #e6c887, #8a6a2c 62%, #4a3717);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  }
+  .wa-bolt::after {
+    content: ''; position: absolute; inset: 42% 16%; height: 1.5px;
+    background: rgba(0, 0, 0, 0.55); transform: rotate(-24deg);
+  }
+  .wa-bolt-tl { top: 10px; left: 11px; }
+  .wa-bolt-tr { top: 10px; right: 11px; }
+  .wa-bolt-bl { bottom: 10px; left: 11px; }
+  .wa-bolt-br { bottom: 10px; right: 11px; }
+
+  .wa-engraved {
+    margin: 0 0 16px; text-align: center;
+    font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #c9a962;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+  }
+
+  /* the recessed window the drums turn behind */
+  .wa-counter {
+    position: relative;
+    display: flex; align-items: stretch; justify-content: center; gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #1a1208, #2b1f10);
+    box-shadow: inset 0 3px 9px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 226, 170, 0.14);
+    overflow: hidden;
+  }
+  .wa-era {
+    align-self: center;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(15px, 3vw, 20px); font-weight: 700; letter-spacing: 0.1em;
+    color: #d9b25c;
+    padding: 6px 9px; border-radius: 5px;
+    border: 1px solid rgba(217, 178, 92, 0.45);
+    background: rgba(217, 178, 92, 0.1);
+  }
+  .wa-era.is-bc { color: #e0a060; border-color: rgba(224, 160, 96, 0.5); background: rgba(224, 160, 96, 0.12); }
+
+  .wa-drums { display: flex; gap: 5px; }
+  .wa-drum {
+    --wa-cell: clamp(46px, 11.5vw, 66px);
+    width: calc(var(--wa-cell) * 0.72);
+    height: var(--wa-cell);
+    overflow: hidden;
+    border-radius: 4px;
+    /* The dark ends of the cylinder are lifted off the obvious near-black:
+       the digit is 62% of the cell tall, so its top and bottom sit about a
+       fifth of the way into the shading, and against the first draft's
+       #7d6132/#6d5329 ends that part of the glyph came out at 4.1:1. */
+    background: linear-gradient(180deg, #8a6b36, #e3c489 46%, #d2b071 54%, #7a5f2e);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 6px 9px -6px rgba(0, 0, 0, 0.8);
+  }
+  .wa-strip { transition: transform 260ms cubic-bezier(0.32, 0.9, 0.36, 1); will-change: transform; }
+  .wa-cell {
+    display: grid; place-items: center;
+    height: var(--wa-cell);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: calc(var(--wa-cell) * 0.62);
+    font-weight: 700;
+    color: #2a1d0b;
+    text-shadow: 0 1px 0 rgba(255, 246, 222, 0.5);
+  }
+  /* The curved glass over the whole window: one highlight across all four
+     drums, which is what makes them read as one cylinder behind one pane
+     rather than four separate tiles. */
+  .wa-glass {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      linear-gradient(107deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 24%,
+        transparent 46%, transparent 74%, rgba(255, 255, 255, 0.1) 100%),
+      linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, transparent 26%, transparent 74%, rgba(0, 0, 0, 0.46) 100%);
+  }
+
+  /* the knurled thumbwheel under it */
+  .wa-wheel {
+    margin: 16px auto 0; max-width: 360px; height: 40px;
+    border-radius: 8px; cursor: ew-resize; touch-action: none;
+    background: linear-gradient(180deg, #6b5228, #e0c286 44%, #c6a465 56%, #5c461f);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4), 0 2px 5px rgba(0, 0, 0, 0.4);
+    position: relative; overflow: hidden;
+  }
+  .wa-knurl {
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(58, 43, 24, 0.55) 0 1.5px,
+      rgba(255, 240, 206, 0.32) 1.5px 3px,
+      transparent 3px 7px
+    );
+    background-position-x: 0;
+  }
+  .wa-wheel::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent 34%, transparent 66%, rgba(0, 0, 0, 0.45));
+  }
+  .wa-wheel:focus-visible { outline: 3px solid #f7efe0; outline-offset: 3px; }
+  .wa-wheel.is-dragging { filter: brightness(1.08); }
+
+  .wa-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 14px; }
+  .wa-step {
+    min-width: 54px; min-height: 34px; padding: 6px 11px;
+    border-radius: 7px; cursor: pointer;
+    border: 1px solid rgba(233, 205, 145, 0.35);
+    background: linear-gradient(180deg, rgba(233, 205, 145, 0.2), rgba(233, 205, 145, 0.07));
+    color: #f3e5c6; font-size: 13.5px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .wa-step:hover { background: rgba(233, 205, 145, 0.3); }
+  .wa-step:active { transform: translateY(1px); }
+
+  .wa-hint { margin: 12px 0 0; text-align: center; font-size: 12px; color: #c9a962; }
+
+  /* the two ways in that are not the wheel */
+  .wa-jumps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px; margin-top: 18px;
+  }
+  .wa-jump label {
+    display: block; margin-bottom: 7px;
+    font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+    color: #7c5d22;
+  }
+  .wa-field {
+    display: flex; gap: 8px; align-items: center;
+    border: 1px solid rgba(58, 43, 24, 0.3);
+    border-radius: 9px; padding: 5px 6px 5px 12px;
+    background: rgba(255, 252, 243, 0.8);
+  }
+  .wa-field input {
+    flex: 1; min-width: 0; border: 0; background: none; outline: none;
+    color: #33281a; font-size: 16px; font-family: inherit;
+    padding: 7px 0;
+  }
+  /* 0.45 was the obvious value and it reads 2.5:1 on paper. Placeholder text
+     is still text somebody has to read to know what the box takes. */
+  .wa-field input::placeholder { color: rgba(51, 40, 26, 0.7); }
+  .wa-field:focus-within { border-color: #7c5d22; box-shadow: 0 0 0 3px rgba(185, 143, 60, 0.22); }
+  .wa-field button {
+    border: 0; border-radius: 6px; cursor: pointer;
+    background: var(--wa-walnut); color: #f5e8cc;
+    padding: 9px 15px; font-size: 13.5px; font-weight: 700;
+  }
+  .wa-field button:hover { background: #4d3a21; }
+  .wa-err { margin: 6px 0 0; min-height: 1.3em; font-size: 12.5px; color: #8f3524; }
+  .wa-note { margin: 6px 0 0; font-size: 12.5px; color: var(--wa-ink-soft); }
+
+  /* ---- the readout, engraved on its own plate ---------------------------- */
+
+  .wa-readout {
+    max-width: 680px; margin: 26px auto 0; padding: 20px 22px;
+    border-top: 2px solid var(--wa-walnut); border-bottom: 1px solid var(--wa-rule);
+  }
+  .wa-count {
+    margin: 0 0 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+    font-size: 17px; color: var(--wa-ink-soft);
+  }
+  .wa-count b {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(38px, 8vw, 58px); line-height: 1; color: #33281a;
+    font-variant-numeric: tabular-nums;
+  }
+  .wa-count span b { font-size: inherit; font-family: inherit; color: #6b4d12; }
+
+  .wa-ends { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 0; }
+  .wa-ends dt {
+    font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; font-weight: 700;
+    color: #7c5d22; margin-bottom: 4px;
+  }
+  .wa-ends dd { margin: 0; display: flex; align-items: baseline; gap: 9px; }
+  .wa-ends dd b { font-size: 17px; font-family: Georgia, 'Times New Roman', serif; }
+  .wa-ends dd span {
+    font-variant-numeric: tabular-nums; font-size: 13px; color: #f5e8cc;
+    background: var(--wa-walnut); border-radius: 999px; padding: 2px 9px;
+  }
+  .wa-ends dd span::after { content: ' yrs'; opacity: 0.7; }
+  .wa-ends[hidden] { display: none; }
+
+  .wa-nobody { margin: 6px 0 0; font-size: 15px; color: var(--wa-ink-soft); }
+  .wa-nobody[hidden] { display: none; }
+  .wa-nobody button {
+    margin-left: 6px; border: 0; background: none; cursor: pointer; padding: 4px 2px;
+    color: #8a5e10; font: inherit; text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  /* ---- the chart ---------------------------------------------------------- */
+
+  .wa-chart, .wa-roster { max-width: 940px; margin: 8vh auto 0; padding: 0 22px; }
+  .wa-chart h2, .wa-roster h2 {
+    margin: 0 0 8px; font-size: clamp(22px, 3.6vw, 30px); letter-spacing: -0.02em;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  .wa-sub { margin: 0 0 18px; max-width: 62ch; font-size: 14.5px; line-height: 1.65; color: var(--wa-ink-soft); }
+
+  .wa-chart-frame {
+    border-radius: 12px; padding: 10px 6px 4px;
+    background: linear-gradient(180deg, #fbf5e8, #efe3cb);
+    box-shadow: inset 0 0 0 1px rgba(58, 43, 24, 0.18), 0 14px 30px -22px rgba(36, 26, 14, 0.6);
+    /* Eighty-nine rows in a 1000-unit-wide drawing: on a phone the aspect
+       ratio squeezes each bar under two device pixels and the chart stops
+       being a chart. Below 560px it scrolls sideways instead, and the
+       script keeps the needle centred in the frame as the year moves. The
+       floor is 560 rather than 640 so the frame at an ordinary laptop
+       width clears it outright — 640 left a seven-pixel overflow and a
+       real scrollbar under a chart that fitted perfectly well. */
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .wa-svg { display: block; width: 100%; min-width: 560px; height: auto; }
+
+  .wa-rules path { stroke: rgba(58, 43, 24, 0.13); stroke-width: 1; }
+  .wa-axis .wa-axis-tick { stroke: rgba(58, 43, 24, 0.34); stroke-width: 1.4; }
+  .wa-axis text {
+    fill: #6b5230; font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .wa-bar {
+    opacity: 0.2;
+    cursor: pointer;
+    transition: opacity 180ms ease;
+  }
+  .wa-bar.is-alive { opacity: 1; }
+  .wa-bar:hover { opacity: 0.85; }
+  .wa-bar.is-alive:hover { opacity: 1; }
+
+  .wa-needle path { stroke: #8a5e10; stroke-width: 2; }
+  .wa-needle .wa-needle-head { fill: #b98f3c; stroke: #6b4510; stroke-width: 1; }
+  .wa-needle-label {
+    fill: #4a3410; font-size: 17px; font-weight: 700;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .wa-legend {
+    list-style: none; margin: 14px 0 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 7px 16px;
+    font-size: 12.5px; color: var(--wa-ink-soft);
+  }
+  .wa-legend li { display: flex; align-items: center; gap: 6px; }
+  .wa-legend i { width: 15px; height: 8px; border-radius: 4px; display: block; }
+
+  .wa-gap-note {
+    margin: 16px 0 0; padding: 12px 14px; border-left: 3px solid var(--wa-brass);
+    background: rgba(185, 143, 60, 0.1); border-radius: 0 8px 8px 0;
+    font-size: 14px; line-height: 1.65; color: var(--wa-ink-soft);
+  }
+  .wa-gap-note b { color: #33281a; }
+
+  /* ---- the roster: a ledger, not a stack of cards ------------------------- */
+
+  .wa-group { margin-top: 30px; }
+  .wa-group[hidden] { display: none; }
+
+  .wa-group-h {
+    display: flex; align-items: center; gap: 12px; margin: 0 0 6px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--wa-walnut);
+    font-size: 15px; font-weight: 700;
+  }
+  .wa-cat-mark { width: 34px; height: 34px; flex: none; display: block; }
+  .wa-group-name {
+    font-family: Georgia, 'Times New Roman', serif; font-size: 20px; letter-spacing: -0.01em;
+  }
+  .wa-group-note { font-weight: 400; font-size: 13px; color: var(--wa-ink-soft); }
+  .wa-group-count {
+    margin-left: auto; font-variant-numeric: tabular-nums; font-size: 13px;
+    color: #f5e8cc; background: var(--wa-walnut); border-radius: 999px; padding: 2px 10px;
+  }
+
+  .wa-rows { list-style: none; margin: 0; padding: 0; }
+  .wa-row {
+    display: grid;
+    grid-template-columns: minmax(0, 15rem) auto 3.2rem minmax(0, 1fr);
+    grid-template-areas: 'name years age place' 'blurb blurb blurb blurb';
+    align-items: baseline;
+    column-gap: 14px;
+    padding: 11px 2px 12px;
+    border-bottom: 1px solid var(--wa-rule);
+  }
+  /* An author `display` on a toggled element outranks the UA `[hidden]` rule —
+     the grid above would keep every hidden row on screen without this. */
+  .wa-row[hidden] { display: none; }
+
+  .wa-row-name { grid-area: name; font-weight: 700; font-size: 16px; }
+  .wa-row-years {
+    grid-area: years; font-variant-numeric: tabular-nums; font-size: 13.5px;
+    color: var(--wa-ink-soft); white-space: nowrap;
+  }
+  .wa-row-age {
+    grid-area: age; justify-self: start; font-variant-numeric: tabular-nums;
+    font-size: 12px; font-weight: 700; color: #6b4d12;
+  }
+  .wa-row-age::after { content: ' yr'; font-weight: 400; opacity: 0.7; }
+  .wa-row-place { grid-area: place; justify-self: end; font-size: 13px; color: var(--wa-ink-soft); text-align: right; }
+  .wa-row-blurb {
+    grid-area: blurb; margin-top: 4px; max-width: 74ch;
+    font-size: 14px; line-height: 1.6; color: var(--wa-ink-soft);
+  }
+
+  .wa-roster-empty { margin-top: 24px; font-size: 15px; color: var(--wa-ink-soft); }
+  .wa-roster-empty[hidden] { display: none; }
+
+  /* ---- outro --------------------------------------------------------------- */
+
+  .wa-outro { max-width: 680px; margin: 8vh auto 0; padding: 0 22px 14vh; }
+  .wa-acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 22px; }
+  .wa-acts button {
+    appearance: none; border: 0; cursor: pointer;
+    background: linear-gradient(180deg, #4d3a21, var(--wa-walnut));
+    color: #f6ead0; padding: 11px 19px; border-radius: 999px;
+    font-size: 14px; font-weight: 700;
+  }
+  .wa-acts a { color: #6b4d12; font-size: 14px; text-decoration: none; }
+  .wa-acts a:hover { text-decoration: underline; }
+
+  .wa-how { font-size: 14px; color: var(--wa-ink-soft); }
+  .wa-how summary { cursor: pointer; text-align: center; margin-bottom: 10px; color: #6b4d12; }
+  .wa-how p { line-height: 1.7; margin: 10px 0; }
+  .wa-how b { color: #33281a; }
+  .wa-how a { color: #6b4d12; }
+  .wa-how code {
+    font-size: 12.5px; background: rgba(58, 43, 24, 0.09);
+    /* Full-strength ink, not the paragraph's softened ink: the tint behind a
+       code span takes the same text from 4.8:1 to 4.45:1, which is a fail on
+       the only line of the page that names a filename. */
+    color: #33281a;
+    padding: 1px 5px; border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wa-strip { transition: none; }
+    .wa-bar { transition: none; }
+  }
+
+  @media (max-width: 620px) {
+    .wa-row {
+      grid-template-columns: 1fr auto;
+      grid-template-areas: 'name age' 'years place' 'blurb blurb';
+      row-gap: 2px;
+    }
+    .wa-row-place { justify-self: end; }
+    .wa-group-note { display: none; }
+    .wa-counter { gap: 7px; padding: 10px 8px; }
+    .wa-drums { gap: 3px; }
+    /* Six buttons at their natural width wrap four-and-two, which reads as a
+       mistake. Three and three reads as a keypad. */
+    .wa-steps { display: grid; grid-template-columns: repeat(3, 1fr); }
+    .wa-step { min-width: 0; }
+  }
+</style>

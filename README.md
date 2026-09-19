@@ -1,6 +1,6 @@
 # funsite
 
-A neal.fun-style site: one lean homepage and twenty-eight self-contained
+A neal.fun-style site: one lean homepage and thirty self-contained
 interactive pages, each rendered with its own WebGL shader or 2D canvas and
 shipping only the script that page actually needs.
 
@@ -85,6 +85,9 @@ those three, one per game, not one shared renderer.
 src/
   site.config.ts        rebrand the whole site from here
   data/games.ts         the registry — one entry per game
+  data/historical-figures.ts
+                        eighty-nine real lives, and the arithmetic over them,
+                        including the fact that there is no year zero
   layouts/
     Base.astro          <head>, meta, OG tags, favicon, fonts, analytics, ads
     GameLayout.astro    game chrome: home link, title, share button
@@ -93,11 +96,13 @@ src/
     TileArt.astro       places one drawing on a tile, per lib/tile-art.ts
     AdSlot.astro        AdSense unit; renders nothing until configured
   lib/
-    tile-art.ts         twenty bespoke tile drawings, one per game slug
+    tile-art.ts         thirty bespoke tile drawings, one per game slug
     scale-things.ts     what Scale draws, how big it is, and the sky behind it
     scale-art.ts        twenty-six of those drawn, with both their real axes
     deep-sea-art.ts     twenty-two cut-out subjects, no water of their own
     spend-art.ts        the thirty things you can buy, drawn as products
+    earth-reviews-art.ts  twenty-two phenomena drawn as product shots, plus
+                        the star row every rating on that page is drawn with
     time-events.ts      Deep Time's forty-four events and when they happened
     time-art.ts         a scene for each, flat colour on one palette
     trolley-scene.ts    the field, the track, the tram and whoever is on it
@@ -125,7 +130,7 @@ src/
     result-card.ts      the 1200x630 card for a *result*, not for a game
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished
-    icons.ts            seventy-two drawn icons, shared across the games
+    icons.ts            eighty-three drawn icons, shared across the games
     fusion-art.ts       the thirty-nine elements of Fusion, drawn
     icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
@@ -228,7 +233,7 @@ card shapes stay valid without needing their own rewrite.
 
 ---
 
-## The twenty-eight games
+## The thirty games
 
 Four of them carry the site. The rest are one good idea each.
 
@@ -468,6 +473,66 @@ caught a real formatting bug: rounding $999,999,999 within the "million" unit
 gave "$1,000.00 million" instead of promoting to "$1.00 billion," because the
 formatter never checked whether its own rounding had just pushed the value
 into the next unit up.*
+
+**Who Was Alive** — type a year and see who was walking around in it.
+Eighty-nine people whose birth and death years are settled fact, and nobody
+whose dates a scholar would put a *c.* in front of — which is why the first
+millennium is nearly empty here, and why the page states the seven-century
+hole between Augustus dying in AD 14 and Charlemagne being born in 742
+rather than filling it with guesses. The hero is a brass rolling-digit year
+counter bolted to a walnut plate: four drums behind one pane of glass, an
+era plate that flips to BC, a knurled thumbwheel you drag, and the same
+rivets and recessed screen as Progress and Days Since Incident, re-skinned
+off the electronics and onto an object a records office would actually own.
+Underneath it, all eighty-nine lifespans are drawn as bars on one shared
+linear axis from 551 BC to now, so a long life is drawn long, the overlaps
+are visible (Shakespeare and Galileo born the same year; Newton and Louis
+XIV sharing seventy-three) and the empty stretches are really empty. The
+roster below is a ledger rather than a grid of cards — eleven drawn
+category marks in the left margin, name, span, age that year, place and one
+cited sentence each, grouped by what somebody was known for.
+*`scripts/check-who-was-alive.mjs` cannot grade whether Kepler really died
+in 1630, so it grades everything built on top of the years instead, against
+five fixed years worked out by hand. It caught two real bugs. `ageIn` was a
+subtraction, which is correct for every span in the record except the one
+that crosses the era boundary: **there is no year zero**, so Augustus came
+out 77 years old against a real 76 calendar years from 63 BC to AD 14, and
+the chart drew his bar a year too long for the same reason. And the "go to
+a year" parser stripped full stops as separators along with commas, which
+silently turned a typed `12.5` into the year 125 — a box that answers a
+question nobody asked.*
+
+**Earth Reviews** — a consumer-reviews site for twenty-two real natural
+phenomena, physical laws and facts of existence: gravity, the Moon, entropy,
+mosquitoes, quicksand, Mondays, photosynthesis. Ninety-three reviews across
+them, all written for this page, by reviewers who are all invented — a
+storefront grid with a live search over the whole catalogue and three
+orderings, a department and a breadcrumb per product, and a product page
+carrying a star-distribution bar chart, a review list with a working sort, a
+"Verified Experiencer" badge and a helpful button that says out loud it only
+changes the number in front of you. It reuses Dark Patterns' browser chrome
+down to the address bar and the loading sweep, on a domain under `.example`,
+which RFC 2606 reserves so a fictional one can never collide with somebody's
+real site. Each product's shot is a drawn cut-out on a dark panel lit by that
+drawing's own dominant fill by area (`lib/earth-reviews-art.ts`, the same
+`dominantMood` contract as Deep Sea and the Auction), inlined once as an SVG
+`<symbol>` that the grid and the product page both point `<use>` at.
+*The writing is the one deliberately comic thing on this site; the numbers are
+not. An average is the real mean of that product's own ratings, rounded to one
+decimal place with halves going up, and `scripts/check-earth-reviews.mjs`
+proves every one of them three ways — against sums typed out by hand with the
+rating list beside them, against integer arithmetic over the reviews, and
+against a mean rebuilt from the five bar counts alone, which never see an
+individual review. It found the number that justifies stating the rounding
+rule at all: thirteen of the twenty-two averages land on exactly x.x5.* Two
+bugs came out of running it rather than reading it: every product shot
+rendered as a pale wash, because a radial gradient whose stops are all `rgba`
+has nothing behind it but the white card and so composited twenty-two dark
+moods against white; and all twenty-two drawings shipped a second time inside
+the JavaScript bundle, because a `MOOD` map computed at module scope is a call
+Rollup cannot prove side-effect-free, so it kept the call and the call kept
+the drawings — 38 KB of script became 8 KB with the same computation behind a
+function.
 
 **Dark Patterns** — eleven manipulative UI patterns, rebuilt as working fake
 websites rather than described in a bullet list: a basket that sneaks two
@@ -855,7 +920,7 @@ npm run build     # -> dist/
 npm run preview   # serve the real build on :4400
 ```
 
-Ten games carry enough real modelling that the maths is checked separately,
+The games that carry enough real modelling have the maths checked separately,
 against answers from the literature, worked out by hand, or measured over a
 simulation:
 
@@ -871,7 +936,9 @@ node scripts/check-powder.mjs      # Powder, every reaction and every scenario
 node scripts/check-memory.mjs      # From Memory, do the references fit the box
 node scripts/check-orbit.mjs       # Orbit, the integrator and all eight challenges
 node scripts/check-mix.mjs         # Ambient Mix, do shared links survive
+node scripts/check-who-was-alive.mjs # Who Was Alive, and the missing year zero
 node scripts/check-steady.mjs      # Steady Hand, is the scoring fair
+node scripts/check-earth-reviews.mjs # Earth Reviews, do the stars actually add up
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
@@ -894,7 +961,8 @@ adds the production build. Each exits non-zero on its own. None needs a browser 
 `data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,
 `lib/powder-goals.ts`, `lib/mix-code.ts`, `lib/steady-shapes.ts`,
 `lib/tile-art.ts`, `lib/icons.ts`, `lib/progress-time.ts`,
-`lib/progress-geom.ts` and `lib/scale-art.ts` is deliberately pure
+`lib/progress-geom.ts`, `data/historical-figures.ts`, `data/earth-reviews.ts`
+and `lib/scale-art.ts` is deliberately pure
 functions over plain data so it can be run this way.
 
 `check-art.mjs` is the odd one out and worth explaining, because illustration
@@ -908,10 +976,10 @@ judged where the type lands rather than over a rectangle that is mostly empty.
 Run it with `--sheet out.png` to get a contact sheet of all twenty tiles
 from the same compositor.
 
-`check-icons.mjs` does the same job for the seventy-two drawn icons inside the
-games. They get 26 to 34 pixels, on pages that are cream in three cases and
-nearly black in two, so it renders each one at the size and on the background
-it actually appears on. `--sheet out.png` writes the whole set on both a cream
+`check-icons.mjs` does the same job for the eighty-three drawn icons inside
+the games. They get 15 to 34 pixels, on pages that are pale — white, cream or
+aged paper — in five cases and nearly black in four, so it renders each one at
+the size and on the background it actually appears on. `--sheet out.png` writes the whole set on both a cream
 and a near-black ground, which is the only way to see the constraint they are
 drawn under.
 

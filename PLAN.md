@@ -595,7 +595,7 @@ diagnosed above.
 | **Dark Patterns** | A guided tour of manipulative UI, where each one is actually done *to you*. | Pure interaction design; the content is the point. |
 | **Universe Forecast** | A weather forecast for cosmic events. | Real orbital mechanics — next eclipse, next perihelion, Betelgeuse. Computable exactly. |
 | **Constellation Draw** | Draw your own constellations on a real star field. | A real star catalogue (HYG), and it reuses our shader work. |
-| **Earth Reviews** / **Rocks** | One-star reviews of natural phenomena. | Pure comic writing. Cheap, and the site badly needs proof it can be funny. |
+| ~~**Earth Reviews** / **Rocks**~~ **done** | One-star reviews of natural phenomena. | Pure comic writing. Cheap, and the site badly needs proof it can be funny. |
 | **The Deep Sea** | His most-loved scroll piece. Our Deep Time engine already does this shape. | Structure is trivial; it lives or dies on ~60 illustrated creatures. Art-gated. |
 | **Who Was Alive** / **Speed** / **Printing Money** / **Where Does the Day Go** | Small, honest, computable pieces. | Real data, no fakery. |
 
@@ -2005,10 +2005,133 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     shape of fix as the icon set's distinctness threshold turning into a
     treadmill once *that* catalogue outgrew its own bar.
 
-39. Then reassess again.
+39. ~~**Who Was Alive.**~~ **done.** The last row of the catalogue-gap table
+    is closed: the fourth of the "small, honest, computable pieces" was
+    Printing Money, and this is the one that was left over from it. Type a
+    year, see who was walking around in it. Eighty-nine people whose birth
+    and death years are settled fact at the level Wikipedia and Britannica
+    agree on, and — the decision the whole page rests on — **nobody whose
+    dates a scholar would put a *c.* in front of.** That rule is what makes
+    the first millennium nearly empty here, and rather than quietly padding
+    it with approximate figures, the page states the seven-century hole
+    between Augustus dying in AD 14 and Charlemagne being born in 742 and
+    calls it what it is: a hole in this list, not in history. The hole is
+    derived by `emptyStretches()` and checked for being both genuinely
+    empty and genuinely maximal, so it cannot go stale if the record grows.
 
-**Where that leaves it.** Twelve new games, twelve checkers (sixteen,
-counting Constellation Draw's own four). The pattern that worked every
+    Built to the finished bar in one pass rather than shipped plain and
+    redone, which is the correction item 38 earned. The hero is an object a
+    records office would own rather than an instrument with a power supply:
+    a brass rolling-digit year counter on a bolted walnut plate — four
+    drums behind one pane of glass, an era plate that flips to BC, a
+    knurled thumbwheel you drag or scroll, and engraved ±1/±10/±100 keys.
+    `lib/seven-segment.ts` was deliberately not reused; an LED readout is
+    the wrong century for a paper record, and the rivet-and-recessed-screen
+    grammar from Progress and Days Since Incident carries over perfectly
+    well re-skinned in brass and leather. The drums roll the short way
+    round — the strip holds three copies of 0–9 and re-seats itself into
+    the middle copy without a transition — because a counter that spins
+    backwards through eight digits at every decade is the tell of a cheap
+    one.
+
+    Under it, the proof: all eighty-nine lifespans as bars on one shared
+    linear axis from 551 BC to now, with a needle in the selected year, the
+    bars it crosses lit and the rest faded. One axis, not a log scale, so a
+    long life really is drawn long and the empty stretches really are
+    empty. The roster below it is a ledger rather than a grid of cards —
+    the "staging, not substance" lesson from item 34, applied before the
+    fact this time — with eleven new drawn category marks in
+    `lib/icons.ts` (crown, rostrum, sword, column, flask, cog, sextant,
+    quill, palette, laurel, hourglass) at 34px in the left margin, and
+    `lib/icon-uses.ts` reading the category table itself rather than a
+    hand-copied list. Nothing on the page is built with `innerHTML`: every
+    bar and every row is rendered at build time and lit or hidden, so the
+    scoped-style trap that has caught four games here had nothing to catch.
+
+    Two real bugs, both found by the checker rather than by looking.
+    **There is no year zero**, and `ageIn` was a plain subtraction — right
+    for eighty-eight of the eighty-nine, and wrong for the only span in the
+    record that crosses the era boundary: Augustus came out 77 years old
+    against a real 76 calendar years from 63 BC to AD 14, and the chart
+    drew his bar a year too long for the same reason. `yearsBetween` and
+    `toAxis` now own that fact between them, and the checker proves the two
+    agree on all 1,600 pairs across the boundary rather than on the one
+    case that happens to be in the data today. The second: the "go to a
+    year" parser stripped full stops along with commas as "separators,"
+    which turned a typed `12.5` into the year 125 — a box that silently
+    answers a question nobody asked. Caught by the reject list, not by
+    reading the code, which is the whole argument for writing reject lists.
+
+    Three smaller things the measuring caught, none of them in the model.
+    The needle's own label was positioned at a negative y and was being
+    clipped away with no error anywhere. The drum's first brass gradient
+    ran dark enough at the ends that the top and bottom fifth of each digit
+    sat at 4.1:1. And the "go to a year" field depended on implicit form
+    submission for its entire purpose, which is a browser behaviour rather
+    than a guarantee; it has its own Enter handler now.
+
+40. ~~**Earth Reviews.**~~ **done.** The last row left in the table above, and
+    the one this file described as "pure comic writing — cheap, and the site
+    badly needs proof it can be funny." Half of that was right. The writing
+    was cheap; the page around it was not, and building it as a bullet list of
+    jokes would have wasted the idea exactly the way a described dark pattern
+    wastes a dark pattern.
+
+    So it is a working consumer-reviews site, in Dark Patterns' own browser
+    chrome: twenty-two real phenomena — gravity, the Moon, entropy,
+    mosquitoes, quicksand, Mondays — as products in a storefront grid, each
+    with a department, a breadcrumb, a live search over the whole catalogue,
+    three orderings, and a product page carrying a star-distribution bar
+    chart, a review list you can re-sort, a "Verified Experiencer" badge and a
+    helpful button that is honest about being local-only. Ninety-three reviews
+    across the twenty-two, written to be several different kinds of annoyed
+    rather than one joke restructured twenty-two times.
+
+    **The arithmetic underneath is the part that makes it belong here.** An
+    average is the real mean of that product's own ratings, rounded to one
+    decimal place with halves going up, and `check-earth-reviews.mjs` proves
+    every one of them three independent ways: against sums typed out by hand
+    with the rating list beside them, against plain integer arithmetic over
+    the reviews, and against a mean reconstructed from the five bar counts
+    alone — which never see an individual review, so a distribution that had
+    drifted could not agree with the other two by accident. The checker's own
+    best finding was a number nobody would have guessed: **thirteen of the
+    twenty-two averages land on exactly x.x5**, so the rounding rule decides
+    more than half the numbers on the page rather than being a formality.
+
+    Three real bugs, and only the first was visible by reading the code. The
+    product shots are dark panels lit by each drawing's own `dominantMood`,
+    and every one of them came out as a pale wash: a radial gradient whose
+    stops are *all* `rgba` has nothing behind it but the white card it sits
+    on, so twenty-two moods composited against white instead of against the
+    dark they were chosen for. A solid colour under the gradient, not a
+    fourth stop inside it, is the fix. Second: `MOOD` was a `const`
+    computed at module scope, and `Object.fromEntries(...)` is not something
+    Rollup can prove side-effect-free — so importing `starsSvg` from that
+    module dragged all twenty-two drawings into the client bundle, a second
+    copy of markup the page already carries as an SVG sprite. 38 KB of
+    JavaScript became 8 KB by putting the same computation behind a function.
+    Third, the tile: `band-right` is a new composition (all nine
+    compositions in use at the time were already at check-art's limit of
+    three, so the thirtieth tile needed a real tenth composition rather than
+    a fourth copy of one) and it anchors `xMax`, which means its left third is
+    dissolved by the fade that keeps drawings off the title. The single gold
+    star of five was drawn at the left. It vanished completely, and the tile
+    shipped four empty outlines saying nothing at all until it was rendered
+    and looked at.
+
+    The checker also argued with the writing twice and was right once each
+    way. It failed Deserts' one-star review for being 26 characters — "No
+    water. This is the entire review." — where the brevity is the joke, so the
+    floor came down to 24 with the reason written next to it. And it found
+    Quicksand cross-sold by nothing: reachable from the grid, but not linked
+    from any other product's page, which is the kind of hole that only shows
+    up if something counts.
+
+41. Then reassess again.
+
+**Where that leaves it.** Fourteen new games, fourteen checkers
+(eighteen, counting Constellation Draw's own four). The pattern that worked every
 time: build the model as pure functions over plain data, run it headlessly
 against answers somebody else already knows, and let the page be a
 thin layer on top. Every serious bug across them — the entry model, the
@@ -2025,14 +2148,15 @@ temporal-dead-zone reference thrown only when a page loaded already
 scrolled, a slice-cropped tile slot whose geometry could rasterise to an
 empty box on the widest card, a live query fast enough for a rare tier that
 took 20 real seconds on the single most common one, an icon sized on the
-wrong element entirely — was found by running the thing and reading the
-output, not by re-reading the code.
+wrong element entirely, an age that was a year too high in the one span of
+eighty-nine that crosses a calendar era with no year zero in it — was found
+by running the thing and reading the output, not by re-reading the code.
 
-Phases 1 and 2 above are already done. The rule that got all eleven of
+Phases 1 and 2 above are already done. The rule that got all thirteen of
 these built properly rather than quickly: **look at the real thing before
 building, and run the actual thing before calling it finished.** That is
 the entire lesson of the diagnosis at the top of this file, and it keeps
-paying for itself on the eleventh game exactly as it did on the first.
+paying for itself on the thirteenth game exactly as it did on the first.
 
 ---
 

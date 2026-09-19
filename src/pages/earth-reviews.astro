@@ -1,0 +1,824 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import {
+  PHENOMENA,
+  averageRating,
+  ratingDistribution,
+  sortPhenomena,
+  catalogueStats,
+} from '../data/earth-reviews'
+import { moodOf, rgbTriplet, spriteSvg, starsSvg, symbolId } from '../lib/earth-reviews-art'
+import { withBase } from '../lib/base'
+
+/**
+ * Earth Reviews — a consumer-reviews site for twenty-two real natural
+ * phenomena, physical laws and facts of existence.
+ *
+ * Built the way `dark-patterns.astro` builds its eleven fake websites: not a
+ * description of a review site, and not a bullet list of jokes, but a working
+ * one inside real browser chrome — an address bar with a favicon and a domain,
+ * a storefront grid, a live search, a sort control, a breadcrumb, a product
+ * page per item with a star-distribution chart and a cross-sell row. The
+ * comedy is in the copy; everything around it is built straight.
+ *
+ * **The arithmetic is real, and it is the same arithmetic on both sides.** The
+ * grid is server-rendered here in the frontmatter, and the product pages are
+ * built in the browser from the same JSON — but both call `averageRating` and
+ * `ratingDistribution` out of `data/earth-reviews.ts` rather than each doing
+ * their own sums, so a rounding rule can only be wrong in one place at a time.
+ * `scripts/check-earth-reviews.mjs` then proves those two functions against
+ * means worked out by hand.
+ *
+ * **The domain is `.example` on purpose.** RFC 2606 reserves it precisely so
+ * that fictional domains in documentation can never collide with somebody's
+ * real site — which is the right answer for a page whose whole job is to look
+ * convincingly like a real one.
+ *
+ * One note on the stylesheet below. The product view, every review and every
+ * bar are built at runtime with `.innerHTML`, so Astro's scoped-style
+ * attribute never lands on any of them: a scoped rule targeting `.er-review`
+ * would compile clean and match nothing. The entire block is therefore
+ * `is:global` and every selector carries an `er-` prefix to keep it out of the
+ * rest of the site's way — the same call `dark-patterns.astro` made, for the
+ * same reason.
+ */
+
+const stats = catalogueStats()
+
+// Ordered the way the storefront opens: most-reviewed first. The client
+// re-sorts the same list from the same function, so the initial paint and the
+// first re-sort cannot disagree about the default order.
+const tiles = sortPhenomena(PHENOMENA, 'reviewed').map((p) => {
+  const avg = averageRating(p)
+  return {
+    p,
+    avg,
+    stars: starsSvg(avg, 15, `${avg} out of 5 stars`),
+    mood: rgbTriplet(moodOf(p.id)),
+    href: symbolId(p.id),
+  }
+})
+
+// Everything the browser needs to build a product page, and nothing it can
+// recompute: the averages and distributions are deliberately NOT in here.
+const PAYLOAD = PHENOMENA.map((p) => ({
+  id: p.id,
+  name: p.name,
+  department: p.department,
+  tagline: p.tagline,
+  alsoRegretted: p.alsoRegretted,
+  mood: rgbTriplet(moodOf(p.id)),
+  reviews: p.reviews,
+}))
+
+const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
+---
+
+<GameLayout slug="earth-reviews" bar="#42281c" bodyClass="er-body">
+  <div class="er-bg" aria-hidden="true"><i class="er-spot er-spot-a"></i><i class="er-spot er-spot-b"></i></div>
+
+  <div class="er-shell">
+    <header class="er-intro">
+      <p class="er-eyebrow">{stats.reviews} reviews · {stats.phenomena} products · none of them optional</p>
+      <h1>Earth Reviews</h1>
+      <p class="er-lede">
+        Every product on this shop is a real natural phenomenon, a real physical
+        law, or a real and unavoidable feature of being alive. None of them can
+        be returned. The reviewers are invented and so are their dates; the star
+        averages and the rating bars are the honest arithmetic over what they
+        wrote.
+      </p>
+    </header>
+
+    <!-- Every drawing, defined once. The grid and the product page both point
+         <use> at these rather than carrying their own copy. -->
+    <Fragment set:html={spriteSvg()} />
+
+    <div class="er-frame">
+      <i class="er-load" id="er-load" aria-hidden="true"></i>
+      <div class="er-framebar">
+        <span class="er-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="er-addr">
+          <i class="er-favicon" aria-hidden="true">E</i>
+          <span class="er-url" id="er-url">earthreviews.example/browse</span>
+        </span>
+        <span class="er-framebar-spacer" aria-hidden="true"></span>
+      </div>
+
+      <div class="er-site">
+        <div class="er-sitehead">
+          <span class="er-wordmark">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+              <path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+            </svg>
+            <b>Earth<span>Reviews</span></b>
+          </span>
+          <form class="er-searchwrap" role="search" onsubmit="return false">
+            <label class="er-sr" for="er-search">Search all products</label>
+            <input type="search" id="er-search" placeholder="Search every phenomenon on Earth" autocomplete="off" />
+            <svg class="er-searchicon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+              <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"></circle>
+              <path d="m16 16 4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+          </form>
+          <span class="er-acct" aria-hidden="true">Hello, resident</span>
+        </div>
+
+        <!-- ---- storefront ------------------------------------------------ -->
+        <section class="er-view" id="er-store" aria-label="All products">
+          <nav class="er-crumbs" aria-label="Breadcrumb"><ol><li aria-current="page">Earth</li></ol></nav>
+
+          <div class="er-storehead">
+            <div>
+              <h2>Everything on Earth, rated</h2>
+              <p class="er-storesub">
+                {stats.reviews} reviews across {stats.phenomena} products. Site-wide
+                average <b>{stats.mean.toFixed(1)}</b> out of 5, and {stats.oneStarShare}% of all
+                reviews are one star. Worst-reviewed product: <b>{lowest.name}</b>.
+              </p>
+            </div>
+            <div class="er-sortwrap">
+              <label class="er-sr" for="er-store-sort">Sort products by</label>
+              <select id="er-store-sort">
+                <option value="reviewed">Most reviewed</option>
+                <option value="lowest">Lowest rated first</option>
+                <option value="name">A to Z</option>
+              </select>
+            </div>
+          </div>
+
+          <ul class="er-grid" id="er-grid">
+            {
+              tiles.map((t) => (
+                <li
+                  class="er-tile"
+                  data-id={t.p.id}
+                  data-hay={`${t.p.name} ${t.p.department} ${t.p.tagline}`.toLowerCase()}
+                >
+                  <a class="er-tilelink" href={`#${t.p.id}`}>
+                    <span class="er-shot" style={`--mood:${t.mood}`}>
+                      <svg class="er-shotart" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+                        <use href={`#${t.href}`} />
+                      </svg>
+                    </span>
+                    <span class="er-tilebody">
+                      <span class="er-tiledept">{t.p.department}</span>
+                      <span class="er-tilename">{t.p.name}</span>
+                      <span class="er-tilerate">
+                        <Fragment set:html={t.stars} />
+                        <b>{t.avg.toFixed(1)}</b>
+                        <span class="er-tilen">
+                          {t.p.reviews.length} review{t.p.reviews.length === 1 ? '' : 's'}
+                        </span>
+                      </span>
+                      <span class="er-tiletag">{t.p.tagline}</span>
+                    </span>
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="er-empty" id="er-empty" hidden>Nothing on Earth matches that.</p>
+        </section>
+
+        <!-- ---- one product ------------------------------------------------ -->
+        <section class="er-view" id="er-product" aria-label="Product" hidden></section>
+      </div>
+    </div>
+
+    <details class="er-how">
+      <summary>How this page actually works</summary>
+      <p>
+        The twenty-two products are real. The reviewers are not: every display
+        name here is invented, no review is about a real person, and every
+        review was written for this page rather than collected from anywhere.
+      </p>
+      <p>
+        The numbers are real arithmetic over that invented writing. A product's
+        average is the mean of its own reviews' star ratings, rounded to one
+        decimal place with halves going up — thirteen of the twenty-two land
+        exactly on a half, so that rule decides more than half the numbers on
+        this site rather than being a formality. The five
+        bars on a product page are the actual counts per star value, and they
+        sum to the review count by construction.
+        <code>scripts/check-earth-reviews.mjs</code> proves both against means
+        worked out by hand, for every product, before this page ships.
+      </p>
+      <p>
+        The dates are invented and fixed. "Most recent" sorts by a date somebody
+        typed, not by anything live, and nothing on this page updates. The
+        helpful votes are the same: the counts are made up, pressing the button
+        changes the number in front of you and nowhere else, and it is forgotten
+        the moment you reload. There is no backend here and nothing is sent
+        anywhere.
+      </p>
+      <p>
+        Related: <a href={withBase('/dark-patterns/')}>Dark Patterns</a> is the
+        other page here built as working fake websites rather than screenshots
+        of them.
+      </p>
+    </details>
+  </div>
+</GameLayout>
+
+<script type="application/json" id="game-data" set:html={JSON.stringify(PAYLOAD)} />
+
+<script>
+  import { averageRating, ratingDistribution, sortReviews, STARS } from '../data/earth-reviews'
+  import type { Review, ReviewSort } from '../data/earth-reviews'
+  import { starsSvg, symbolId } from '../lib/earth-reviews-art'
+  import { burst, prefersReducedMotion } from '../lib/fx'
+  import { sfx, unlock } from '../lib/audio'
+
+  type Item = {
+    id: string
+    name: string
+    department: string
+    tagline: string
+    alsoRegretted: [string, string]
+    mood: string
+    reviews: Review[]
+  }
+
+  const ITEMS = JSON.parse(document.getElementById('game-data')!.textContent!) as Item[]
+  const BY_ID = new Map(ITEMS.map((i) => [i.id, i]))
+
+  const $ = (id: string) => document.getElementById(id)!
+  const store = $('er-store')
+  const product = $('er-product')
+  const grid = $('er-grid')
+  const urlBar = $('er-url')
+  const loadBar = $('er-load')
+  const empty = $('er-empty')
+
+  const nf = new Intl.NumberFormat('en-GB')
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+  /** Formatted off the ISO string's own parts. `new Date('2026-03-11')` is UTC
+   *  midnight, so anyone west of Greenwich would have been shown the 10th. */
+  const fmtDate = (iso: string) => {
+    const [y, m, d] = iso.split('-')
+    return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`
+  }
+
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+  const initials = (name: string) =>
+    name.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+
+  /* ---- helpful votes: local, in memory, gone on reload ------------------- */
+
+  const pressed = new Set<string>()
+  const voteKey = (id: string, i: number) => `${id}:${i}`
+
+  /* ---- the storefront ---------------------------------------------------- */
+
+  const tiles = () => Array.from(grid.querySelectorAll<HTMLLIElement>('.er-tile'))
+
+  ;($('er-store-sort') as HTMLSelectElement).addEventListener('change', (e) => {
+    sfx.tick()
+    const mode = (e.currentTarget as HTMLSelectElement).value
+    const order = sortOrder(mode)
+    for (const li of tiles()) li.style.order = String(order.indexOf(li.dataset.id!))
+  })
+
+  /** The same three orderings `sortPhenomena` defines, applied to the DOM with
+   *  `order` so nothing is torn out of the document and re-inserted. */
+  function sortOrder(mode: string): string[] {
+    const list = [...ITEMS]
+    if (mode === 'lowest')
+      list.sort((a, b) => averageRating(a) - averageRating(b) || b.reviews.length - a.reviews.length)
+    else if (mode === 'name') list.sort((a, b) => a.name.localeCompare(b.name))
+    else
+      list.sort(
+        (a, b) =>
+          b.reviews.length - a.reviews.length ||
+          b.reviews.reduce((s, r) => s + r.helpful, 0) - a.reviews.reduce((s, r) => s + r.helpful, 0),
+      )
+    return list.map((i) => i.id)
+  }
+
+  const search = $('er-search') as HTMLInputElement
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase()
+    let shown = 0
+    for (const li of tiles()) {
+      const hit = !q || li.dataset.hay!.includes(q)
+      li.hidden = !hit
+      if (hit) shown++
+    }
+    empty.hidden = shown > 0
+  })
+
+  /* ---- one product ------------------------------------------------------- */
+
+  function barsHtml(item: Item) {
+    const dist = ratingDistribution(item)
+    const total = item.reviews.length
+    return (
+      `<ol class="er-bars">` +
+      STARS.map((s) => {
+        const n = dist[s]
+        const pct = Math.round((n / total) * 100)
+        return (
+          `<li class="er-bar">` +
+          `<span class="er-barlabel">${s} star</span>` +
+          `<span class="er-bartrack"><i style="width:${pct}%"></i></span>` +
+          `<span class="er-barn">${n}</span>` +
+          `</li>`
+        )
+      }).join('') +
+      `</ol>`
+    )
+  }
+
+  function reviewHtml(item: Item, r: Review, i: number) {
+    const on = pressed.has(voteKey(item.id, i))
+    return (
+      `<li><article class="er-review">` +
+      `<header class="er-rhead">` +
+      `<span class="er-avatar" aria-hidden="true">${esc(initials(r.name))}</span>` +
+      `<span class="er-rname">${esc(r.name)}</span>` +
+      `</header>` +
+      `<p class="er-rtitle">${starsSvg(r.rating, 16, `${r.rating} out of 5 stars`)}<b>${esc(r.title)}</b></p>` +
+      `<p class="er-rmeta">Reviewed on ${fmtDate(r.date)}` +
+      `<span class="er-verified"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">` +
+      `<path d="m4 12.5 5 5 11-12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>` +
+      `Verified Experiencer</span></p>` +
+      `<p class="er-rbody">${esc(r.body)}</p>` +
+      `<button type="button" class="er-helpful" data-i="${i}" aria-pressed="${on}">` +
+      `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">` +
+      `<path d="M7 21V10l5-7 1.2.6c.9.5 1.3 1.6 1 2.6L13 9h5.5a2 2 0 0 1 2 2.4l-1.5 7A2 2 0 0 1 17 20H7Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>` +
+      `<path d="M3 10h4v11H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>` +
+      `<span>Helpful</span><b class="er-votes">${nf.format(r.helpful + (on ? 1 : 0))}</b>` +
+      `</button>` +
+      `</article></li>`
+    )
+  }
+
+  function crossHtml(item: Item) {
+    const others = item.alsoRegretted.map((id) => BY_ID.get(id)).filter(Boolean) as Item[]
+    if (!others.length) return ''
+    return (
+      `<section class="er-cross"><h3>Customers also regretted</h3><ul>` +
+      others
+        .map((o) => {
+          const avg = averageRating(o)
+          return (
+            `<li><a class="er-crosslink" href="#${o.id}">` +
+            `<span class="er-crossshot" style="--mood:${o.mood}">` +
+            `<svg class="er-shotart" viewBox="0 0 120 120" aria-hidden="true" focusable="false"><use href="#${symbolId(
+              o.id,
+            )}"/></svg></span>` +
+            `<span class="er-crossmeta"><b>${esc(o.name)}</b>` +
+            `<span class="er-crossrate">${starsSvg(avg, 13, `${avg} out of 5 stars`)}<span>${avg.toFixed(
+              1,
+            )} · ${o.reviews.length} reviews</span></span></span>` +
+            `</a></li>`
+          )
+        })
+        .join('') +
+      `</ul></section>`
+    )
+  }
+
+  let currentId: string | null = null
+  let sortMode: ReviewSort = 'helpful'
+
+  function renderReviews(item: Item) {
+    const list = product.querySelector('.er-rlist')!
+    const ordered = sortReviews(item, sortMode)
+    list.innerHTML = ordered.map((r) => reviewHtml(item, r, item.reviews.indexOf(r))).join('')
+  }
+
+  function showProduct(id: string, focus = true) {
+    const item = BY_ID.get(id)
+    if (!item) return
+    currentId = id
+    sortMode = 'helpful'
+    const avg = averageRating(item)
+    const total = item.reviews.length
+
+    product.innerHTML =
+      `<nav class="er-crumbs" aria-label="Breadcrumb"><ol>` +
+      `<li><a href="#" data-home>Earth</a></li>` +
+      `<li>${esc(item.department)}</li>` +
+      `<li aria-current="page">${esc(item.name)}</li>` +
+      `</ol></nav>` +
+      `<div class="er-product">` +
+      `<div class="er-hero" style="--mood:${item.mood}">` +
+      `<svg class="er-heroart" viewBox="0 0 120 120" role="img" aria-label="An illustration of ${esc(
+        item.name,
+      )}"><use href="#${symbolId(item.id)}"/></svg>` +
+      `</div>` +
+      `<div class="er-buy">` +
+      `<h2 id="er-pname" tabindex="-1">${esc(item.name)}</h2>` +
+      `<p class="er-ptag">${esc(item.tagline)}</p>` +
+      `<div class="er-summary">` +
+      `<span class="er-big">${avg.toFixed(1)}</span>` +
+      `<span class="er-summeta">${starsSvg(avg, 20, `${avg} out of 5 stars`)}` +
+      `<span>${total} global rating${total === 1 ? '' : 's'}</span></span>` +
+      `</div>` +
+      barsHtml(item) +
+      `<p class="er-stock">In stock. Cannot be cancelled, returned, or opted out of.</p>` +
+      `</div></div>` +
+      `<section class="er-reviews">` +
+      `<div class="er-reviewhead"><h3>${total} review${total === 1 ? '' : 's'}</h3>` +
+      `<div class="er-sortbar" role="group" aria-label="Sort reviews">` +
+      `<button type="button" data-sort="helpful" aria-pressed="true">Most helpful</button>` +
+      `<button type="button" data-sort="recent" aria-pressed="false">Most recent</button>` +
+      `</div></div>` +
+      `<ol class="er-rlist"></ol></section>` +
+      crossHtml(item)
+
+    renderReviews(item)
+
+    store.hidden = true
+    product.hidden = false
+    urlBar.textContent = `earthreviews.example/p/${item.id}`
+    sweep()
+    if (focus) {
+      ;(product.querySelector('#er-pname') as HTMLElement).focus({ preventScroll: true })
+      product.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
+    }
+    if (!prefersReducedMotion) {
+      product.classList.remove('er-in')
+      void product.offsetWidth
+      product.classList.add('er-in')
+    }
+  }
+
+  function showStore(focus = true) {
+    currentId = null
+    product.hidden = true
+    product.innerHTML = ''
+    store.hidden = false
+    urlBar.textContent = 'earthreviews.example/browse'
+    sweep()
+    if (focus) store.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
+  }
+
+  /** The thin line that crosses the top of the frame when a page arrives —
+   *  browsers have trained everyone to read that as navigation. */
+  function sweep() {
+    if (prefersReducedMotion) return
+    loadBar.classList.remove('er-go')
+    void loadBar.offsetWidth
+    loadBar.classList.add('er-go')
+  }
+
+  /* ---- routing: the hash is the page ------------------------------------- */
+
+  function fromHash(focus: boolean) {
+    const id = location.hash.replace(/^#/, '')
+    if (BY_ID.has(id)) showProduct(id, focus)
+    else if (!id) showStore(focus)
+    // Anything else (the skip link's own #main, for one) leaves the view alone.
+  }
+
+  addEventListener('hashchange', () => fromHash(true))
+
+  grid.addEventListener('click', (e) => {
+    const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('.er-tilelink')
+    if (!link) return
+    unlock()
+    sfx.click()
+    // The hashchange handler does the work; let it.
+  })
+
+  product.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement
+
+    const home = t.closest('[data-home]')
+    if (home) {
+      e.preventDefault()
+      sfx.tick()
+      history.pushState(null, '', location.pathname + location.search)
+      showStore()
+      return
+    }
+
+    const sortBtn = t.closest<HTMLButtonElement>('[data-sort]')
+    if (sortBtn) {
+      const mode = sortBtn.dataset.sort as ReviewSort
+      if (mode === sortMode) return
+      sortMode = mode
+      sfx.tick()
+      for (const b of product.querySelectorAll<HTMLButtonElement>('[data-sort]'))
+        b.setAttribute('aria-pressed', String(b === sortBtn))
+      renderReviews(BY_ID.get(currentId!)!)
+      return
+    }
+
+    const vote = t.closest<HTMLButtonElement>('.er-helpful')
+    if (vote && currentId) {
+      const item = BY_ID.get(currentId)!
+      const i = Number(vote.dataset.i)
+      const key = voteKey(currentId, i)
+      const on = !pressed.has(key)
+      if (on) pressed.add(key)
+      else pressed.delete(key)
+      vote.setAttribute('aria-pressed', String(on))
+      vote.querySelector('.er-votes')!.textContent = nf.format(item.reviews[i].helpful + (on ? 1 : 0))
+      if (on) {
+        sfx.pop(i % 5)
+        const r = vote.getBoundingClientRect()
+        burst(r.left + r.width / 2, r.top + r.height / 2, {
+          count: 10,
+          colors: ['#f5a623', '#ffd96b', '#fff3d6'],
+          speed: 4,
+          gravity: 0.12,
+          life: 36,
+          size: 3.5,
+        })
+      } else sfx.tick()
+    }
+  })
+
+  fromHash(false)
+</script>
+
+<style is:global>
+  /* Every selector here is `er-`-prefixed and the block is `is:global`,
+     because the whole product view is built with .innerHTML and would never
+     receive Astro's scoped-style attribute. */
+
+  .er-body {
+    background: #17130f;
+    color: #f3ece1;
+  }
+  .er-body .game { padding-bottom: 12vh; position: relative; }
+
+  .er-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .er-spot { position: absolute; width: 74vmax; height: 74vmax; border-radius: 50%; filter: blur(70px); }
+  .er-spot-a { top: -26vmax; left: -14vmax; background: radial-gradient(circle, #ffd96b, transparent 70%); opacity: 0.11; }
+  .er-spot-b { bottom: -30vmax; right: -18vmax; background: radial-gradient(circle, #c0392b, transparent 70%); opacity: 0.1; }
+
+  .er-shell { position: relative; z-index: 1; max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  .er-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+  /* ---- above the browser window ------------------------------------------ */
+  .er-intro { max-width: 640px; margin: 9vh auto 34px; text-align: center; }
+  .er-eyebrow {
+    font-size: 12.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: #ffd96b; opacity: 0.85; margin: 0 0 12px; font-weight: 600;
+  }
+  .er-intro h1 {
+    font-size: clamp(34px, 7vw, 56px); margin: 0 0 14px; letter-spacing: -0.03em;
+    background: linear-gradient(165deg, #fff6e6, #ffd96b 130%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .er-lede { font-size: 16.5px; line-height: 1.62; opacity: 0.8; margin: 0 auto; max-width: 54ch; }
+
+  /* ---- the browser window ------------------------------------------------ */
+  .er-frame {
+    position: relative; border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 40px 80px -36px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .er-load {
+    position: absolute; top: 0; left: 0; height: 2.5px; width: 38%; z-index: 4;
+    background: linear-gradient(90deg, transparent, #ffd96b, transparent); opacity: 0;
+  }
+  .er-load.er-go { animation: er-sweep 620ms ease-out; }
+  @keyframes er-sweep {
+    0% { opacity: 1; transform: translateX(-40%); }
+    85% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(260%); }
+  }
+  .er-framebar {
+    display: flex; align-items: center; gap: 10px; padding: 9px 13px;
+    background: #23180f; border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .er-dots { display: flex; gap: 6px; }
+  .er-dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.17); }
+  .er-addr {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    background: rgba(0, 0, 0, 0.26); border-radius: 999px; padding: 5px 14px; min-width: 0;
+  }
+  .er-favicon {
+    width: 15px; height: 15px; border-radius: 4px; flex: none; display: grid; place-items: center;
+    font-style: normal; font-size: 9.5px; font-weight: 800; color: #2a1a0e; background: #ffd96b;
+  }
+  .er-url {
+    font-size: 12.5px; color: rgba(255, 255, 255, 0.62); font-family: var(--mono, monospace);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .er-framebar-spacer { width: 27px; flex: none; }
+
+  /* ---- the page inside it ------------------------------------------------ */
+  .er-site {
+    --er-ink: #20242b;
+    --er-mute: #5b6169;
+    --er-line: #e2ddd4;
+    --er-page: #f4f2ee;
+    background: var(--er-page); color: var(--er-ink);
+    font-size: 15px; line-height: 1.5;
+  }
+  .er-site :is(h2, h3) { color: var(--er-ink); letter-spacing: -0.01em; }
+  .er-sr {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  .er-sitehead {
+    display: flex; align-items: center; gap: 16px; padding: 12px 18px;
+    background: #2b1a12; color: #f7efe2;
+  }
+  .er-wordmark { display: inline-flex; align-items: center; gap: 8px; flex: none; color: #ffd96b; }
+  .er-wordmark b { font-size: 16px; letter-spacing: -0.02em; color: #fff6e6; }
+  .er-wordmark b span { color: #ffd96b; }
+  .er-searchwrap { position: relative; flex: 1; min-width: 0; display: flex; }
+  .er-searchwrap input {
+    width: 100%; font: inherit; font-size: 14px; padding: 8px 12px 8px 34px;
+    border-radius: 8px; border: 1px solid #4a3324; background: #fffdf9; color: var(--er-ink);
+  }
+  .er-searchwrap input::placeholder { color: #6d7178; }
+  .er-searchwrap input:focus-visible { outline: 3px solid #ffd96b; outline-offset: 1px; }
+  .er-searchicon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #5b6169; pointer-events: none; }
+  .er-acct { font-size: 12.5px; color: #d9c7ad; flex: none; }
+
+  .er-view { padding: 16px 18px 28px; }
+  .er-view.er-in { animation: er-fade 260ms ease; }
+  @keyframes er-fade { from { opacity: 0; transform: translateY(6px); } }
+
+  .er-crumbs { font-size: 12.5px; color: var(--er-mute); margin-bottom: 14px; }
+  .er-crumbs ol { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+  .er-crumbs li + li::before { content: '\203A'; margin-right: 6px; opacity: 0.6; }
+  .er-crumbs a { color: #0f5f74; text-underline-offset: 2px; }
+
+  .er-storehead {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+    justify-content: space-between; margin-bottom: 18px;
+  }
+  .er-storehead h2 { margin: 0 0 5px; font-size: 21px; }
+  .er-storesub { margin: 0; font-size: 13.5px; color: var(--er-mute); max-width: 62ch; }
+  .er-storesub b { color: var(--er-ink); }
+  .er-sortwrap select {
+    font: inherit; font-size: 13.5px; padding: 7px 10px; border-radius: 8px;
+    border: 1px solid var(--er-line); background: #fff; color: var(--er-ink); cursor: pointer;
+  }
+  .er-sortwrap select:focus-visible { outline: 3px solid #b8892f; outline-offset: 1px; }
+
+  /* ---- the grid ----------------------------------------------------------- */
+  .er-grid {
+    list-style: none; margin: 0; padding: 0; display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  }
+  .er-tile { display: flex; }
+  .er-tile[hidden] { display: none; }
+  .er-tilelink {
+    display: flex; flex-direction: column; width: 100%; overflow: hidden;
+    background: #fff; border: 1px solid var(--er-line); border-radius: 10px;
+    text-decoration: none; color: inherit;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  }
+  .er-tilelink:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -16px rgba(0, 0, 0, 0.45); border-color: #c9c0b1; }
+  .er-tilelink:focus-visible { outline: 3px solid #b8892f; outline-offset: 2px; }
+
+  /* The product shot. Dark, lit by the drawing's own dominant colour, and the
+     drawing bleeds past the panel's edges rather than sitting boxed inside it
+     with room to spare — the failure this site has now corrected five times. */
+  .er-shot {
+    position: relative; display: block; aspect-ratio: 5 / 4; overflow: hidden;
+    /* Two layers, not one. A single gradient whose stops are all `rgba` has
+       nothing behind it but the white card, so every mood composited against
+       white and twenty-two product shots came out as pale haloes. The solid
+       colour underneath is what makes the glow read as light in a dark box. */
+    background:
+      radial-gradient(circle at 50% 46%, rgba(var(--mood), 0.5), rgba(var(--mood), 0.12) 56%, rgba(var(--mood), 0) 78%),
+      #14110d;
+  }
+  .er-shotart {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    transform: scale(1.08);
+    filter: drop-shadow(0 6px 18px rgba(var(--mood), 0.5));
+  }
+  .er-tilebody { display: flex; flex-direction: column; gap: 3px; padding: 11px 12px 13px; }
+  .er-tiledept { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--er-mute); font-weight: 600; }
+  .er-tilename { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  /* Wraps as whole phrases, not as words: at a 158px tile the count broke
+     across two lines as "5" then "reviews". */
+  .er-tilerate { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; color: var(--er-mute); font-size: 12.5px; }
+  .er-tilerate b { color: var(--er-ink); font-size: 13px; }
+  .er-tilen { color: var(--er-mute); white-space: nowrap; }
+  .er-tiletag { font-size: 12.5px; color: var(--er-mute); line-height: 1.42; margin-top: 3px; }
+  .er-stars { flex: none; display: block; }
+  .er-empty { text-align: center; color: var(--er-mute); padding: 40px 0; font-size: 15px; }
+
+  /* ---- a product ---------------------------------------------------------- */
+  .er-product { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 22px; align-items: start; }
+  .er-hero {
+    position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 46%, rgba(var(--mood), 0.54), rgba(var(--mood), 0.13) 56%, rgba(var(--mood), 0) 78%),
+      #14110d;
+  }
+  .er-heroart {
+    position: absolute; inset: 0; width: 100%; height: 100%; transform: scale(1.06);
+    filter: drop-shadow(0 10px 26px rgba(var(--mood), 0.55));
+  }
+  .er-buy h2 { margin: 0 0 4px; font-size: clamp(24px, 3.4vw, 32px); }
+  .er-ptag { margin: 0 0 14px; color: var(--er-mute); font-size: 14.5px; max-width: 48ch; }
+  .er-summary { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--er-line); }
+  .er-big { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .er-summeta { display: flex; flex-direction: column; gap: 3px; color: var(--er-mute); font-size: 13px; }
+
+  .er-bars { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+  .er-bar { display: grid; grid-template-columns: 52px 1fr 22px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--er-mute); }
+  .er-barlabel { white-space: nowrap; }
+  .er-bartrack { height: 12px; border-radius: 3px; background: #e6e1d8; overflow: hidden; border: 1px solid #d8d2c6; }
+  .er-bartrack i { display: block; height: 100%; background: linear-gradient(180deg, #ffc95c, #e59512); transition: width 420ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+  .er-barn { text-align: right; font-variant-numeric: tabular-nums; color: var(--er-ink); }
+  .er-stock { margin: 14px 0 0; font-size: 13px; color: #1f6b4a; font-weight: 600; }
+
+  /* ---- reviews ------------------------------------------------------------ */
+  .er-reviews { margin-top: 30px; border-top: 1px solid var(--er-line); padding-top: 18px; }
+  .er-reviewhead { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .er-reviewhead h3 { margin: 0; font-size: 18px; }
+  .er-sortbar { display: inline-flex; border: 1px solid var(--er-line); border-radius: 999px; background: #fff; overflow: hidden; }
+  .er-sortbar button {
+    appearance: none; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600;
+    padding: 7px 14px; cursor: pointer; color: var(--er-mute);
+  }
+  .er-sortbar button + button { border-left: 1px solid var(--er-line); }
+  .er-sortbar button[aria-pressed='true'] { background: #2b1a12; color: #ffe9b8; }
+  .er-sortbar button:focus-visible { outline: 3px solid #b8892f; outline-offset: -3px; }
+
+  .er-rlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .er-review { padding: 15px 0; border-bottom: 1px solid var(--er-line); }
+  .er-rhead { display: flex; align-items: center; gap: 9px; margin: 0 0 7px; }
+  .er-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    background: #e7e0d3; color: #4a4036; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+  }
+  .er-rname { font-size: 13.5px; font-weight: 600; }
+  .er-rtitle { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; flex-wrap: wrap; }
+  .er-rtitle b { font-size: 15px; }
+  .er-rmeta { margin: 0 0 8px; font-size: 12.5px; color: var(--er-mute); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .er-verified { display: inline-flex; align-items: center; gap: 4px; color: #8a5300; font-weight: 700; font-size: 12px; }
+  .er-rbody { margin: 0 0 10px; font-size: 14.5px; line-height: 1.58; max-width: 72ch; }
+  .er-helpful {
+    display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 6px 13px; border-radius: 999px; border: 1px solid var(--er-line); background: #fff;
+    color: var(--er-mute); cursor: pointer; transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+  }
+  .er-helpful:hover { background: #f0ebe1; color: var(--er-ink); }
+  .er-helpful:active { transform: scale(0.96); }
+  .er-helpful:focus-visible { outline: 3px solid #b8892f; outline-offset: 2px; }
+  .er-helpful[aria-pressed='true'] { background: #2b1a12; border-color: #2b1a12; color: #ffe9b8; }
+  .er-votes { font-variant-numeric: tabular-nums; }
+
+  /* ---- cross-sell ---------------------------------------------------------- */
+  .er-cross { margin-top: 26px; }
+  .er-cross h3 { margin: 0 0 12px; font-size: 16px; }
+  .er-cross ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .er-crosslink {
+    display: flex; align-items: center; gap: 12px; padding: 9px; text-decoration: none; color: inherit;
+    background: #fff; border: 1px solid var(--er-line); border-radius: 10px;
+    transition: transform 150ms ease, border-color 150ms ease;
+  }
+  .er-crosslink:hover { transform: translateY(-2px); border-color: #c9c0b1; }
+  .er-crosslink:focus-visible { outline: 3px solid #b8892f; outline-offset: 2px; }
+  .er-crossshot {
+    position: relative; width: 62px; height: 62px; flex: none; border-radius: 8px; overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 46%, rgba(var(--mood), 0.5), rgba(var(--mood), 0.12) 58%, rgba(var(--mood), 0) 80%),
+      #14110d;
+  }
+  .er-crossmeta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .er-crossmeta b { font-size: 14.5px; }
+  .er-crossrate { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--er-mute); }
+
+  /* ---- the honest bit ------------------------------------------------------ */
+  .er-how { margin: 34px auto 0; max-width: 680px; font-size: 14px; }
+  .er-how summary { cursor: pointer; opacity: 0.66; margin-bottom: 8px; }
+  .er-how p { line-height: 1.64; margin: 10px 0; opacity: 0.82; }
+  .er-how a { color: #ffd96b; }
+  .er-how code { font-size: 12.5px; background: rgba(255, 255, 255, 0.07); padding: 1px 5px; border-radius: 4px; }
+
+  @media (max-width: 760px) {
+    .er-product { grid-template-columns: 1fr; gap: 16px; }
+    .er-hero { aspect-ratio: 16 / 11; }
+  }
+  @media (max-width: 560px) {
+    .er-shell { padding: 0 12px; }
+    .er-intro { margin-top: 6vh; }
+    .er-sitehead { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+    .er-searchwrap { order: 3; flex-basis: 100%; }
+    .er-acct { margin-left: auto; }
+    .er-view { padding: 14px 12px 24px; }
+    .er-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .er-tilename { font-size: 15px; }
+    .er-bar { grid-template-columns: 46px 1fr 20px; gap: 8px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .er-load.er-go { animation: none; }
+    .er-view.er-in { animation: none; }
+    .er-tilelink:hover, .er-crosslink:hover { transform: none; }
+    .er-bartrack i { transition: none; }
+  }
+</style>

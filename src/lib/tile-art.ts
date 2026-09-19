@@ -33,6 +33,7 @@ export type Slot =
   | 'edge-right'   // full height, narrow, against the right edge
   | 'corner-br'    // tucked into the bottom-right corner, mirroring corner-tr
   | 'column-right' // full-bleed vertical column against the right edge, taller than edge-right
+  | 'band-right'   // a wide, short band against the right edge — the landscape counterpart to column-right
 
 export type Illustration = {
   /** What it depicts. For check-art's report, and for whoever edits it next. */
@@ -63,7 +64,61 @@ const person = (x: number, y: number, h: number, fill: string) =>
   `Q${n(x)} ${n(y - h * 0.82)} ${n(x + h * 0.18)} ${n(y - h * 0.62)} ` +
   `L${n(x + h * 0.22)} ${n(y)}Z"/></g>`
 
+/** A five-pointed star, from the ten points rather than from memory. */
+const starPath = (cx: number, cy: number, r: number) => {
+  const pts: string[] = []
+  for (let k = 0; k < 10; k++) {
+    const a = ((-90 + k * 36) * Math.PI) / 180
+    const rad = k % 2 === 0 ? r : r * 0.382
+    pts.push(`${n(cx + Math.cos(a) * rad)} ${n(cy + Math.sin(a) * rad)}`)
+  }
+  return `M${pts.join(' L')}Z`
+}
+
 export const ART: Record<string, Illustration> = {
+  /* ---- Earth Reviews --------------------------------------------------------- */
+  'earth-reviews': {
+    subject: 'the planet with one gold star awarded to it, the four it did not get trailing away',
+    slot: 'band-right',
+    viewBox: '0 0 170 76',
+    palette: ['#ffd96b', '#fff4d8', '#6b4a10', '#2a180f', '#c9974a'],
+    draw: () => {
+      const defs = `<defs><radialGradient id="earth-reviews-globe" cx="36%" cy="32%" r="74%">
+        <stop offset="0%" stop-color="#fff4d8"/>
+        <stop offset="100%" stop-color="#c9974a"/>
+      </radialGradient></defs>`
+      // The one thing this tile has to say — a single filled star of five —
+      // has to sit at the RIGHT of the frame, because band-right anchors
+      // xMax and the left third of the drawing is dissolved by the fade that
+      // keeps it off the title. A first attempt put the gold star at the
+      // left, where it vanished completely and left four empty outlines
+      // saying nothing.
+      const globe =
+        `<circle cx="128" cy="38" r="34" fill="url(#earth-reviews-globe)"/>` +
+        `<path d="M104 22 Q116 16 124 24 Q131 32 123 40 Q111 44 105 36Z" fill="#2a180f" opacity="0.58"/>` +
+        `<path d="M134 14 Q148 20 151 32 Q154 46 142 58 Q137 46 142 39 Q134 29 134 14Z" fill="#2a180f" opacity="0.5"/>` +
+        `<path d="M112 54 Q122 51 130 58 Q122 64 114 61Z" fill="#2a180f" opacity="0.44"/>` +
+        `<circle cx="128" cy="38" r="34" fill="none" stroke="#fff4d8" stroke-width="2.2" opacity="0.7"/>` +
+        `<path d="M94 38 H162" fill="none" stroke="#fff4d8" stroke-width="1.3" opacity="0.36"/>` +
+        `<ellipse cx="128" cy="38" rx="15" ry="34" fill="none" stroke="#fff4d8" stroke-width="1.3" opacity="0.3"/>`
+      const awarded =
+        `<path d="${starPath(80, 38, 16)}" fill="#2a180f" opacity="0.32" transform="translate(1.5 2.5)"/>` +
+        `<path d="${starPath(80, 38, 16)}" fill="#ffd96b" stroke="#6b4a10" stroke-width="1.8" stroke-linejoin="round"/>` +
+        `<path d="${starPath(78, 35, 7)}" fill="#fff4d8" opacity="0.55"/>`
+      const missing = [
+        [53, 11.5, 0.5],
+        [31, 9.5, 0.34],
+        [13, 7.5, 0.22],
+      ]
+        .map(
+          ([cx, r, o]) =>
+            `<path d="${starPath(cx, 38, r)}" fill="none" stroke="#fff4d8" stroke-width="1.9" stroke-linejoin="round" opacity="${o}"/>`,
+        )
+        .join('')
+      return defs + missing + awarded + globe
+    },
+  },
+
   /* ---- Constellation Draw ---------------------------------------------------- */
   'constellation-draw': {
     subject: 'a telescope eyepiece view of a real patch of sky, four of its stars joined into a drawn shape',
@@ -930,6 +985,48 @@ export const ART: Record<string, Illustration> = {
     },
   },
 
+  /* ---- Who Was Alive ------------------------------------------------------- */
+  'who-was-alive': {
+    subject: 'a lifespan chart on parchment, fourteen ruled bars with a brass needle standing in one year',
+    slot: 'right',
+    viewBox: '0 0 150 172',
+    palette: ['#efe0bd', '#c6a86a', '#6b5a3a', '#241a0e', '#d9b25c'],
+    draw: () => {
+      // The page's own timeline, reduced to fourteen bars — the one picture
+      // that says what the game is without a word of type: lives are spans,
+      // spans overlap, and a year is a line drawn through them. Which bars
+      // light is derived from the needle rather than marked by hand, so
+      // moving the needle can never leave a lit bar it does not cross.
+      const NEEDLE = 92
+      const spans: [number, number][] = [
+        [6, 40], [14, 58], [30, 70], [22, 95], [48, 104], [60, 88], [55, 120],
+        [76, 112], [70, 99], [88, 132], [96, 126], [84, 145], [104, 140], [112, 148],
+      ]
+      const rules = range(5)
+        .map((i) => `<path d="M${n(14 + i * 32)} 6V166" stroke="#6b5a3a" stroke-width="1" opacity="0.5"/>`)
+        .join('')
+      const bars = spans
+        .map(([a, b], i) => {
+          const y = 12 + i * 11
+          const lit = a <= NEEDLE && NEEDLE <= b
+          return (
+            `<rect x="${n(a)}" y="${n(y)}" width="${n(b - a)}" height="6.4" rx="3.2" ` +
+            `fill="${lit ? '#efe0bd' : '#6b5a3a'}"/>` +
+            (lit ? `<circle cx="${n(b)}" cy="${n(y + 3.2)}" r="2.6" fill="#d9b25c"/>` : '')
+          )
+        })
+        .join('')
+      // A hairline baseline rule under the stack, so the chart reads as a
+      // ruled sheet rather than a loose pile of bars.
+      const base = `<path d="M6 168h138" stroke="#c6a86a" stroke-width="1.6" opacity="0.7"/>`
+      const needle =
+        `<path d="M${NEEDLE} 2V170" stroke="#d9b25c" stroke-width="2.2"/>` +
+        `<path d="M${NEEDLE} 0 ${NEEDLE + 5} 7 ${NEEDLE} 14 ${NEEDLE - 5} 7Z" fill="#d9b25c"/>` +
+        `<path d="M${NEEDLE} 3 ${NEEDLE + 2.6} 7 ${NEEDLE} 11 ${NEEDLE - 2.6} 7Z" fill="#241a0e"/>`
+      return `${rules}${bars}${base}${needle}`
+    },
+  },
+
   /* ---- Steady Hand -------------------------------------------------------- */
   'steady-hand': {
     subject: 'the four shapes, drawn by a hand that is not as steady as it thinks',
@@ -1343,6 +1440,7 @@ export const PRESERVE: Record<Slot, string> = {
   'edge-right': 'xMaxYMid meet',
   'corner-br': 'xMaxYMax meet',
   'column-right': 'xMidYMid meet',
+  'band-right': 'xMaxYMid meet',
 }
 
 /** Every slug that has a drawing. */
@@ -1388,6 +1486,13 @@ export const SLOT_BOX: Record<Slot, { l: number; t: number; w: number; h: number
   // a very tall, narrow viewBox (a climb) never risks resvg's empty-visible-
   // box panic on the more extreme card aspect ratios.
   'column-right': { l: 64, t: 2, w: 34, h: 96 },
+  // column-right lying down: a wide, short band pinned to the right edge and
+  // centred vertically, for a drawing whose subject runs across rather than
+  // up. Anchored xMax like edge-right and corner-br, because the whole point
+  // of it is the edge it sits against — and the thing worth seeing therefore
+  // goes at the RIGHT of the viewBox, since that is the end that survives on
+  // every card shape and past the fade.
+  'band-right': { l: 50, t: 20, w: 52, h: 58 },
 }
 
 /**
@@ -1417,6 +1522,7 @@ export const SLOT_FADE: Record<Slot, [number, number] | null> = {
   'corner-tr': null,
   'corner-br': null,
   'column-right': null,
+  'band-right': [0.5, 0.7],
 }
 
 /**

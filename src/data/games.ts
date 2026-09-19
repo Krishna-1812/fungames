@@ -63,6 +63,26 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'earth-reviews',
+    title: 'Earth Reviews',
+    blurb: 'Twenty-two things you cannot return',
+    description:
+      'A consumer-reviews site for twenty-two real natural phenomena — gravity, the Moon, entropy, mosquitoes, Mondays, the ocean — each listed as a product and reviewed by people who never asked for it. The reviewers and their dates are invented; the star averages and the five rating bars on every product page are the real arithmetic over what they wrote, checked against means worked out by hand before it ships.',
+    accent: '#42281c', accent2: '#ffd96b',
+    category: 'fun',
+    added: '2026-09-30',
+  },
+  {
+    slug: 'who-was-alive',
+    title: 'Who Was Alive',
+    blurb: 'Pick a year and see who was walking around in it',
+    description:
+      'Eighty-nine people whose birth and death years are settled fact, drawn as eighty-nine bars on one shared timeline from 551 BC to now. Roll the brass year counter to anywhere between 700 BC and today — or jump straight to the year you were born — and every life that reached that year lights up, with the oldest and youngest of them named. Shakespeare and Galileo were born in the same year; Newton and Louis XIV shared seventy-three of them. The overlaps are the point, and the seven centuries in the middle where this record holds nobody at all are stated rather than quietly skipped.',
+    accent: '#3a2b18', accent2: '#efe0bd',
+    category: 'you',
+    added: '2026-09-29',
+  },
+  {
     slug: 'printing-money',
     title: 'Printing Money',
     blurb: 'Nine real rates, one dollar bill at a time',
