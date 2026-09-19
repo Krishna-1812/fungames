@@ -1,7 +1,7 @@
 ---
 import GameLayout from '../layouts/GameLayout.astro'
 import { withBase } from '../lib/base'
-import { iconSvg, PALETTE } from '../lib/icons'
+import { iconSvg } from '../lib/icons'
 import {
   PEOPLE, CATEGORY_ORDER, MIN_YEAR, maxYear, toAxis, formatYear, lifespanLabel,
   peopleAliveIn, isAliveIn, oldestAliveIn, youngestAliveIn, ageIn, emptyStretches,
@@ -62,18 +62,26 @@ const DOM0 = toAxis(Math.min(...PEOPLE.map((p) => p.birth))) - 24
 const DOM1 = MAXY + 14
 const px = (year: number) => X0 + ((toAxis(year) - DOM0) / (DOM1 - DOM0)) * (X1 - X0)
 
+// A bolder, jewel-toned palette than lib/icons.ts's own PALETTE on purpose:
+// that one is deliberately mid-tone so a 24px glyph clears 3:1 on both a
+// cream and a near-black page, and painted onto an 89-row chart at that same
+// muted band, the whole thing read as washed-out rather than illuminated.
+// This chart only ever sits on parchment, so it is free to go richer — like
+// a hand-tinted engraving instead of a filing cabinet's colour-coded tabs.
+// Reused for the legend swatches and the roster's own category icons below,
+// so recolouring here recolours the whole page consistently from one table.
 const BAR_COLOUR: Record<Category, string> = {
-  ruler: PALETTE.gold,
-  leader: PALETTE.brick,
-  military: PALETTE.slate,
-  philosopher: PALETTE.indigo,
-  scientist: PALETTE.teal,
-  inventor: PALETTE.rust,
-  explorer: PALETTE.blue,
-  writer: PALETTE.plum,
-  artist: PALETTE.clay,
-  athlete: PALETTE.olive,
-  other: PALETTE.ash,
+  ruler: '#c17f0a',
+  leader: '#ad2142',
+  military: '#3f5871',
+  philosopher: '#6a3aa0',
+  scientist: '#0f8f68',
+  inventor: '#c1521a',
+  explorer: '#146fa8',
+  writer: '#a02e82',
+  artist: '#c23a5e',
+  athlete: '#4f7f1e',
+  other: '#7a6a4a',
 }
 
 const byBirth = [...PEOPLE].sort((a, b) => a.birth - b.birth || a.name.localeCompare(b.name))
@@ -260,6 +268,17 @@ const DRUM_CELLS = 30
         aria-label={`All ${TOTAL} lifespans in the record, drawn as bars on one shared timeline from 551 BC to ${MAXY}. The ones alive in the year the counter shows are lit; the rest are faded.`}
         preserveAspectRatio="xMidYMid meet"
       >
+        <defs>
+          {/* The needle's own light: a soft vertical wash that stands in the
+              selected year and moves with it, so "now" reads as illuminated
+              rather than just marked by a line. */}
+          <radialGradient id="wa-spot-grad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#f0d28f" stop-opacity="0.65" />
+            <stop offset="55%" stop-color="#e8cd8a" stop-opacity="0.22" />
+            <stop offset="100%" stop-color="#e8cd8a" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+
         <g class="wa-rules">
           {MINOR.map((y) => <path d={`M${px(y).toFixed(1)} ${RULE_TOP}V${FOOT + 6}`} />)}
         </g>
@@ -268,11 +287,23 @@ const DRUM_CELLS = 30
           {MAJOR.map((t) => <text x={px(t.year).toFixed(1)} y={CHART_H - 10} text-anchor="middle">{t.label}</text>)}
         </g>
 
+        <rect
+          class="wa-spot"
+          id="waSpot"
+          x={(px(START_YEAR) - 90).toFixed(1)}
+          y={RULE_TOP}
+          width="180"
+          height={FOOT + 6 - RULE_TOP}
+          fill="url(#wa-spot-grad)"
+          aria-hidden="true"
+        />
+
         <g class="wa-bars">
           {
             bars.map((b) => (
               <rect
                 class:list={['wa-bar', { 'is-alive': b.alive }]}
+                style={`--c:${b.fill}`}
                 x={b.x.toFixed(1)}
                 y={b.y}
                 width={b.w.toFixed(1)}
@@ -281,6 +312,10 @@ const DRUM_CELLS = 30
                 fill={b.fill}
                 data-birth={b.p.birth}
                 data-name={b.p.name}
+                data-years={lifespanLabel(b.p)}
+                data-place={b.p.place}
+                data-colour={b.fill}
+                data-category={b.p.category}
               >
                 <title>{b.title}</title>
               </rect>
@@ -289,6 +324,7 @@ const DRUM_CELLS = 30
         </g>
 
         <g class="wa-needle" id="waNeedle" transform={`translate(${px(START_YEAR).toFixed(1)} 0)`}>
+          <path class="wa-needle-glow" d={`M0 ${FLAG_Y}V${FOOT + 12}`} />
           <path d={`M0 ${FLAG_Y}V${FOOT + 12}`} />
           <path class="wa-needle-head" d={`M0 ${FLAG_Y - 9} 8 ${FLAG_Y} 0 ${FLAG_Y + 9} -8 ${FLAG_Y}Z`} />
         </g>
@@ -296,12 +332,20 @@ const DRUM_CELLS = 30
           {formatYear(START_YEAR)}
         </text>
       </svg>
+      <div class="wa-tip" id="waTip" aria-hidden="true" hidden>
+        <p class="wa-tip-name" id="waTipName"></p>
+        <p class="wa-tip-meta"><span id="waTipYears"></span> &middot; <span id="waTipPlace"></span></p>
+      </div>
     </div>
 
-    <ul class="wa-legend">
+    <ul class="wa-legend" id="waLegend">
       {
         sections.map((s) => (
-          <li><i style={`background:${s.colour}`} aria-hidden="true"></i>{s.label}</li>
+          <li>
+            <button type="button" class="wa-legend-btn" data-category={s.key} aria-pressed="false">
+              <i style={`background:${s.colour}`} aria-hidden="true"></i>{s.label}
+            </button>
+          </li>
         ))
       }
     </ul>
@@ -426,6 +470,7 @@ const DRUM_CELLS = 30
   import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
+  import { prefersReducedMotion } from '../lib/gl'
 
   const D = JSON.parse(document.getElementById('wa-data')!.textContent!) as {
     minYear: number; maxYear: number; startYear: number; total: number
@@ -442,13 +487,28 @@ const DRUM_CELLS = 30
   const needle = $('waNeedle')
   const needleLabel = $('waNeedleLabel')
   const bars = [...document.querySelectorAll<SVGRectElement>('.wa-bar')]
+  const barsGroup = document.querySelector<SVGGElement>('.wa-bars')!
+  const spot = document.getElementById('waSpot') as unknown as SVGRectElement
   const rows = [...document.querySelectorAll<HTMLElement>('.wa-row')]
   const groups = [...document.querySelectorAll<HTMLElement>('.wa-group')]
   const chartFrame = document.querySelector<HTMLElement>('.wa-chart-frame')!
+  const tip = $('waTip')
+  const tipName = $('waTipName')
+  const tipYears = $('waTipYears')
+  const tipPlace = $('waTipPlace')
+  const legend = $('waLegend')
+  const legendBtns = [...document.querySelectorAll<HTMLButtonElement>('.wa-legend-btn')]
   const goForm = $<HTMLFormElement>('waGoForm')
   const goBox = $<HTMLInputElement>('waGo')
   const goErr = $('waGoErr')
   const dob = $<HTMLInputElement>('waDob')
+
+  // Each bar's own centre, in chart units, read once from the markup rather
+  // than recomputed — the wave-delay effect below needs a fixed distance
+  // from the needle per bar on every repaint, and re-parsing 89 attributes
+  // on a drag is exactly the kind of per-frame cost paintCounter's own
+  // comment already warns against.
+  const barCentres = bars.map((b) => Number(b.getAttribute('x')) + Number(b.getAttribute('width')) / 2)
 
   // The chart rows are in the same order as PEOPLE sorted by birth; the roster
   // rows are in section order. Both are matched to a person once, here, so no
@@ -524,6 +584,7 @@ const DRUM_CELLS = 30
     needle.setAttribute('transform', `translate(${x.toFixed(1)} 0)`)
     needleLabel.setAttribute('x', String(Math.min(D.chartW - 46, Math.max(46, x)).toFixed(1)))
     needleLabel.textContent = formatYear(y)
+    spot.setAttribute('x', (x - 90).toFixed(1))
 
     // Only when the chart is actually wider than its frame — on a desktop it
     // never is, and scrolling a frame that does not scroll is a no-op that
@@ -533,8 +594,18 @@ const DRUM_CELLS = 30
       chartFrame.scrollLeft = Math.max(0, at - chartFrame.clientWidth / 2)
     }
 
+    // A bar's transition-delay rides on its own distance from the needle, so
+    // a life crossing into or out of "alive" doesn't just flip — it catches
+    // light in a wave that spreads out from the year itself, front-most bars
+    // first. Recomputed every paint rather than once, since the needle is
+    // the thing moving: fixed per-bar delays would only ripple correctly
+    // from a single fixed year.
     for (let i = 0; i < bars.length; i++) {
-      bars[i].classList.toggle('is-alive', isAliveIn(byBirth[i], y))
+      const bar = bars[i]
+      bar.classList.toggle('is-alive', isAliveIn(byBirth[i], y))
+      if (!prefersReducedMotion) {
+        bar.style.transitionDelay = `${Math.min(150, Math.abs(barCentres[i] - x) * 0.1).toFixed(0)}ms`
+      }
     }
 
     let alive = 0
@@ -665,6 +736,79 @@ const DRUM_CELLS = 30
 
   for (const b of bars) {
     b.addEventListener('click', () => { unlock(); sfx.click(); setYear(Number(b.dataset.birth)) })
+  }
+
+  // One pair of listeners on the group rather than 89 pairs on each bar —
+  // `pointerover`/`pointerout` bubble, and the target is always the bar
+  // itself since nothing else in the group can receive a pointer event.
+  const frameRect = () => chartFrame.getBoundingClientRect()
+  barsGroup.addEventListener('pointerover', (e) => {
+    const bar = (e.target as Element).closest?.('.wa-bar') as SVGRectElement | null
+    if (!bar) return
+    tipName.textContent = bar.dataset.name ?? ''
+    tipYears.textContent = bar.dataset.years ?? ''
+    tipPlace.textContent = bar.dataset.place ?? ''
+    tip.hidden = false
+    requestAnimationFrame(() => tip.classList.add('is-shown'))
+  })
+  barsGroup.addEventListener('pointermove', (e) => {
+    if (tip.hidden) return
+    const r = frameRect()
+    // .wa-tip is positioned inside the frame's own scrollable content, so a
+    // narrow-viewport horizontal scroll (see .wa-chart-frame's own comment)
+    // has to be added back in, or the tooltip drifts left of the cursor by
+    // exactly however far the chart has been scrolled.
+    tip.style.left = `${(e as PointerEvent).clientX - r.left + chartFrame.scrollLeft}px`
+    tip.style.top = `${(e as PointerEvent).clientY - r.top}px`
+  })
+  barsGroup.addEventListener('pointerout', (e) => {
+    const bar = (e.target as Element).closest?.('.wa-bar')
+    if (!bar) return
+    tip.classList.remove('is-shown')
+    tip.hidden = true
+  })
+
+  // The legend doubles as a filter: click a category to isolate it (every
+  // other bar and every other chip steps back), click it again — or click a
+  // different one — to change or clear the isolation. A Set of one, but
+  // written as one so a future "compare two categories" doesn't need a
+  // rewrite, only a second add().
+  const activeCats = new Set<string>()
+  function applyLegendFilter() {
+    legend.classList.toggle('has-active', activeCats.size > 0)
+    barsGroup.classList.toggle('has-filter', activeCats.size > 0)
+    for (const btn of legendBtns) btn.setAttribute('aria-pressed', String(activeCats.has(btn.dataset.category!)))
+    for (const b of bars) b.classList.toggle('wa-cat-match', activeCats.size === 0 || activeCats.has(b.dataset.category!))
+  }
+  for (const btn of legendBtns) {
+    btn.addEventListener('click', () => {
+      sfx.click()
+      const cat = btn.dataset.category!
+      if (activeCats.has(cat)) activeCats.delete(cat)
+      else { activeCats.clear(); activeCats.add(cat) }
+      applyLegendFilter()
+    })
+  }
+
+  // Visible by default (see the .wa-chart-frame rule itself); JS only ever
+  // adds .wa-pending to a frame already confirmed below the fold, so a slow
+  // or blocked script never leaves the chart stuck invisible — the same
+  // fix Printing Money's own reveal needed after a rapid-scroll stress test
+  // first turned up a blank frame there.
+  if (!prefersReducedMotion && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const en of entries) {
+          if (!en.isIntersecting) continue
+          chartFrame.classList.add('wa-in')
+          chartFrame.classList.remove('wa-pending')
+          io.unobserve(en.target)
+        }
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -8% 0px' },
+    )
+    if (chartFrame.getBoundingClientRect().top > innerHeight * 0.85) chartFrame.classList.add('wa-pending')
+    io.observe(chartFrame)
   }
 
   /* ---- share ---------------------------------------------------------------- */
@@ -947,6 +1091,7 @@ const DRUM_CELLS = 30
   .wa-sub { margin: 0 0 18px; max-width: 62ch; font-size: 14.5px; line-height: 1.65; color: var(--wa-ink-soft); }
 
   .wa-chart-frame {
+    position: relative;
     border-radius: 12px; padding: 10px 6px 4px;
     background: linear-gradient(180deg, #fbf5e8, #efe3cb);
     box-shadow: inset 0 0 0 1px rgba(58, 43, 24, 0.18), 0 14px 30px -22px rgba(36, 26, 14, 0.6);
@@ -959,7 +1104,18 @@ const DRUM_CELLS = 30
        real scrollbar under a chart that fitted perfectly well. */
     overflow-x: auto;
     overscroll-behavior-x: contain;
+    /* A one-time reveal when the chart first scrolls into view — the frame
+       itself, not each of the 89 bars individually, so there is exactly one
+       thing to get right instead of 89 staggered ones. Visible by default:
+       JS only ever adds .wa-pending to a frame it has confirmed is still
+       off-screen, the same safe-default-then-hide order Printing Money's
+       scroll reveal uses, so a slow or blocked script never leaves the
+       chart stuck invisible. */
+    opacity: 1; transform: none; filter: none;
+    transition: opacity 640ms var(--ease, ease), transform 640ms var(--ease, ease), filter 640ms var(--ease, ease);
   }
+  .wa-chart-frame.wa-pending { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(2px); }
+  .wa-chart-frame.wa-in { opacity: 1; transform: none; filter: none; }
   .wa-svg { display: block; width: 100%; min-width: 560px; height: auto; }
 
   .wa-rules path { stroke: rgba(58, 43, 24, 0.13); stroke-width: 1; }
@@ -969,29 +1125,93 @@ const DRUM_CELLS = 30
     font-family: Georgia, 'Times New Roman', serif;
   }
 
+  /* The needle's own light: a soft gradient rect that tracks it (JS moves
+     both by the same transform), so the selected year reads as lit rather
+     than just underlined. pointer-events: none — it sits over the bars in
+     source order below but must never steal a bar's click or hover. */
+  .wa-spot { pointer-events: none; mix-blend-mode: multiply; }
+
   .wa-bar {
     opacity: 0.2;
     cursor: pointer;
-    transition: opacity 180ms ease;
+    transition: opacity 260ms ease, filter 260ms ease;
   }
-  .wa-bar.is-alive { opacity: 1; }
-  .wa-bar:hover { opacity: 0.85; }
-  .wa-bar.is-alive:hover { opacity: 1; }
+  /* The glow colour rides in on each bar's own --c custom property rather
+     than a second flat colour chosen to match, so it can never drift from
+     the fill it is lighting. Two drop-shadows at different blur radii read
+     as one soft bloom rather than a hard-edged halo. */
+  .wa-bar.is-alive {
+    opacity: 1;
+    filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 7px var(--c));
+    animation: wa-pulse 2.8s ease-in-out infinite;
+  }
+  .wa-bar:hover { opacity: 0.9; filter: drop-shadow(0 0 4px var(--c)); }
+  .wa-bar.is-alive:hover {
+    opacity: 1; animation-play-state: paused;
+    filter: drop-shadow(0 0 3px var(--c)) drop-shadow(0 0 11px var(--c));
+  }
+  @keyframes wa-pulse {
+    0%, 100% { filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 6px var(--c)); }
+    50% { filter: drop-shadow(0 0 3px var(--c)) drop-shadow(0 0 11px var(--c)); }
+  }
 
   .wa-needle path { stroke: #8a5e10; stroke-width: 2; }
-  .wa-needle .wa-needle-head { fill: #b98f3c; stroke: #6b4510; stroke-width: 1; }
+  .wa-needle-glow {
+    stroke: var(--wa-brass-lit); stroke-width: 7; opacity: 0.35;
+    filter: blur(3px);
+  }
+  .wa-needle .wa-needle-head {
+    fill: #b98f3c; stroke: #6b4510; stroke-width: 1;
+    filter: drop-shadow(0 0 5px rgba(233, 189, 107, 0.85));
+  }
   .wa-needle-label {
     fill: #4a3410; font-size: 17px; font-weight: 700;
     font-family: Georgia, 'Times New Roman', serif;
   }
 
+  /* The tooltip that actually gets looked at: a native <title> still carries
+     the accessible name (screen readers, and anyone who has JS off), but a
+     browser's own tooltip is grey text on grey a full second after the
+     pointer stops — nothing like the rest of this instrument. This one
+     follows the cursor and is styled off the same walnut/brass the counter
+     plate uses, so a hovered life feels like part of the same object. */
+  .wa-tip {
+    position: absolute; z-index: 5; pointer-events: none;
+    max-width: 240px; padding: 8px 12px; border-radius: 8px;
+    background: linear-gradient(180deg, #4d3a21, var(--wa-walnut));
+    box-shadow: 0 10px 22px -10px rgba(20, 14, 6, 0.65), inset 0 0 0 1px rgba(233, 205, 138, 0.25);
+    transform: translate(-50%, calc(-100% - 14px));
+    opacity: 0; transition: opacity 120ms ease;
+  }
+  .wa-tip.is-shown { opacity: 1; }
+  .wa-tip-name { margin: 0; font-size: 13.5px; font-weight: 700; color: #f6ead0; }
+  .wa-tip-meta { margin: 2px 0 0; font-size: 12px; color: rgba(246, 234, 208, 0.75); }
+
   .wa-legend {
     list-style: none; margin: 14px 0 0; padding: 0;
-    display: flex; flex-wrap: wrap; gap: 7px 16px;
+    display: flex; flex-wrap: wrap; gap: 4px 6px;
     font-size: 12.5px; color: var(--wa-ink-soft);
   }
-  .wa-legend li { display: flex; align-items: center; gap: 6px; }
-  .wa-legend i { width: 15px; height: 8px; border-radius: 4px; display: block; }
+  .wa-legend-btn {
+    appearance: none; border: 1px solid transparent; cursor: pointer;
+    background: transparent; font: inherit; color: inherit;
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; border-radius: 999px;
+    transition: background 160ms ease, border-color 160ms ease, opacity 160ms ease;
+  }
+  .wa-legend-btn i { width: 15px; height: 8px; border-radius: 4px; display: block; flex: none; }
+  .wa-legend-btn:hover { background: rgba(58, 43, 24, 0.06); }
+  .wa-legend-btn[aria-pressed='true'] {
+    background: rgba(185, 143, 60, 0.16); border-color: rgba(185, 143, 60, 0.4);
+    color: #33281a; font-weight: 600;
+  }
+  /* One category isolated: every other legend chip (and, via the matching
+     class on .wa-bars below, every bar not in that category) steps back
+     instead of just sitting there unaffected — the point of a filter that
+     does nothing to the thing you didn't click is that it doesn't look like
+     a filter at all. */
+  .wa-legend.has-active .wa-legend-btn:not([aria-pressed='true']) { opacity: 0.45; }
+  .wa-bars.has-filter .wa-bar:not(.wa-cat-match) { opacity: 0.05 !important; filter: none !important; animation: none !important; }
 
   .wa-gap-note {
     margin: 16px 0 0; padding: 12px 14px; border-left: 3px solid var(--wa-brass);
@@ -1082,7 +1302,10 @@ const DRUM_CELLS = 30
 
   @media (prefers-reduced-motion: reduce) {
     .wa-strip { transition: none; }
-    .wa-bar { transition: none; }
+    .wa-bar { transition: none; animation: none; }
+    .wa-bar.is-alive { filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 6px var(--c)); }
+    .wa-chart-frame { transition: none; }
+    .wa-chart-frame.wa-pending { opacity: 1; transform: none; filter: none; }
   }
 
   @media (max-width: 620px) {
