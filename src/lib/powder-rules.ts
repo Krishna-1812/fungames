@@ -22,7 +22,8 @@ export const EMPTY = 0, SAND = 1, WATER = 2, STONE = 3, WOOD = 4, FIRE = 5,
   ACID = 12, POWDER = 13, GLASS = 14, EMBER = 15,
   SALT = 16, BRINE = 17, DIRT = 18, MUD = 19, SEED = 20, METAL = 21,
   RUST = 22, SPARK = 23, COAL = 24, ASH = 25, NITRO = 26, CLOUD = 27,
-  SNOW = 28, THERMITE = 29, FUNGUS = 30, SLIME = 31
+  SNOW = 28, THERMITE = 29, FUNGUS = 30, SLIME = 31,
+  SODA = 32, CLAY = 33, WAX = 34, CERAMIC = 35, FOAM = 36, MELTED_WAX = 37
 
 /** Wide enough for every id with room to add more without resizing anything. */
 export const SLOTS = 48
@@ -73,6 +74,11 @@ export const MATERIALS: Material[] = [
   { id: FUNGUS, name: 'Fungus', type: 0, density: 9, rgb: [186, 136, 196], vary: 20, flammable: true, draw: true, hint: 'Eats wood and plants' },
   { id: SLIME, name: 'Slime', type: 2, density: 5, rgb: [120, 200, 150], vary: 18, flammable: true, draw: true, hint: 'Thick, and not fireproof' },
 
+  // --- six more --------------------------------------------------------------
+  { id: SODA, name: 'Soda', type: 1, density: 6, rgb: [232, 228, 216], vary: 10, draw: true, hint: 'Meets something acidic and everything gets loud' },
+  { id: CLAY, name: 'Clay', type: 1, density: 6, rgb: [176, 104, 76], vary: 16, draw: true, hint: 'Fire it hot enough and it never goes back' },
+  { id: WAX, name: 'Wax', type: 0, density: 9, rgb: [236, 214, 142], vary: 10, draw: true, hint: 'Melts long before it burns' },
+
   // --- only ever produced, never drawn -------------------------------------
   { id: SMOKE, name: 'Smoke', type: 3, density: 0, rgb: [110, 110, 116], vary: 18, life: 130 },
   { id: STEAM, name: 'Steam', type: 3, density: 0, rgb: [198, 210, 222], vary: 14, life: 170 },
@@ -81,6 +87,9 @@ export const MATERIALS: Material[] = [
   { id: MUD, name: 'Mud', type: 1, density: 6, rgb: [82, 62, 44], vary: 14 },
   { id: RUST, name: 'Rust', type: 0, density: 9, rgb: [150, 88, 52], vary: 20 },
   { id: ASH, name: 'Ash', type: 1, density: 5, rgb: [128, 122, 118], vary: 16 },
+  { id: CERAMIC, name: 'Ceramic', type: 0, density: 9, rgb: [190, 110, 78], vary: 14 },
+  { id: FOAM, name: 'Foam', type: 3, density: 0, rgb: [238, 240, 236], vary: 20, life: 70 },
+  { id: MELTED_WAX, name: 'Melted wax', type: 2, density: 2, rgb: [230, 200, 120], vary: 12 },
 ]
 
 export const byId = (id: number) => MATERIALS.find((m) => m.id === id)
@@ -180,6 +189,13 @@ export const REACTIONS: Reaction[] = [
   { id: 'metal-water', a: METAL, b: WATER, a2: RUST, p: 0.0009, note: 'Very slow. Leave it and come back.' },
   { id: 'metal-acid', a: METAL, b: ACID, a2: RUST, p: 0.25, note: 'Much quicker, and it eats the acid too.' },
   { id: 'acid-stone', a: ACID, b: STONE, b2: EMPTY, p: 0.1, note: 'Even stone. Acid does not respect much.' },
+
+  // --- soda, clay and wax ----------------------------------------------------
+  { id: 'soda-acid', a: SODA, b: ACID, a2: FOAM, b2: EMPTY, p: 0.5, note: 'Real fizz, real carbon dioxide — the only fake part of a vinegar volcano is the volcano.' },
+  { id: 'soda-fire', a: FIRE, b: SODA, a2: EMPTY, b2: EMPTY, p: 0.5, note: 'A real fire extinguisher, for a fire this size. People keep a box of this by the stove for exactly this reason.' },
+  { id: 'clay-lava', a: LAVA, b: CLAY, b2: CERAMIC, p: 0.15, note: 'Fired clay is a ceramic. Older chemistry than anything else on this table.' },
+  { id: 'fire-wax', a: FIRE, b: WAX, b2: MELTED_WAX, p: 0.4, note: 'It melts long before it burns. That pool is what a wick is actually for.' },
+  { id: 'lava-wax', a: LAVA, b: WAX, b2: MELTED_WAX, p: 0.8, note: 'Faster than fire, because lava does not need convincing.' },
 ]
 
 /**

@@ -20,7 +20,7 @@
 
 import {
   MATERIALS, SLOTS, EMPTY, FIRE, SMOKE, STEAM, LAVA, ACID, GLASS, EMBER,
-  CLOUD, SPARK, WOOD, ASH, STONE, WATER,
+  CLOUD, SPARK, WOOD, ASH, STONE, WATER, FOAM,
   type Reaction,
 } from './powder-rules'
 
@@ -259,6 +259,13 @@ function react(
 
   if (el === SPARK) {
     // A spark is only ever passing through.
+    if (o.life[i] > 0) { o.life[i]--; return false }
+    put(o, x, y, EMPTY)
+    return true
+  }
+
+  if (el === FOAM) {
+    // Bubbles pop. Nothing is left behind.
     if (o.life[i] > 0) { o.life[i]--; return false }
     put(o, x, y, EMPTY)
     return true

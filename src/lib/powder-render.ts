@@ -53,6 +53,12 @@ const MATS = `
 #define M_POWDER 13u
 #define M_GLASS  14u
 #define M_EMBER  15u
+#define M_SODA   32u
+#define M_CLAY   33u
+#define M_WAX    34u
+#define M_CERAMIC 35u
+#define M_FOAM   36u
+#define M_MELTED_WAX 37u
 `
 
 /* Shared by the emission pass and the composite, so a flame and the light it
@@ -63,6 +69,7 @@ float life0(uint id) {
   if (id == M_SMOKE) return 130.0;
   if (id == M_STEAM) return 170.0;
   if (id == M_EMBER) return 120.0;
+  if (id == M_FOAM)  return 70.0;
   return 1.0;
 }
 
@@ -168,8 +175,8 @@ float shadeAt(ivec2 c) { return float(texelFetch(u_shade, clamp(c, ivec2(0), ive
 
 // Fire counts as a gas here: it rises like one in the simulation, and drawn as
 // hard squares it was the single worst-looking thing on the page.
-bool isGas(uint id)   { return id == M_SMOKE || id == M_STEAM || id == M_FIRE; }
-bool isFluid(uint id) { return id == M_WATER || id == M_OIL || id == M_ACID || id == M_LAVA; }
+bool isGas(uint id)   { return id == M_SMOKE || id == M_STEAM || id == M_FIRE || id == M_FOAM; }
+bool isFluid(uint id) { return id == M_WATER || id == M_OIL || id == M_ACID || id == M_LAVA || id == M_MELTED_WAX; }
 bool isOpen(uint id)  { return id == M_EMPTY || isGas(id); }
 
 float bilin(float a, float b, float c, float d, vec2 f) {
@@ -233,7 +240,7 @@ void main() {
   // Distance from a cell edge, used for the shadow between grains.
   float edge = min(min(fc.x, 1.0 - fc.x), min(fc.y, 1.0 - fc.y));
 
-  if (base == M_SAND || base == M_POWDER || base == M_EMBER) {
+  if (base == M_SAND || base == M_POWDER || base == M_EMBER || base == M_SODA || base == M_CLAY) {
     // A powder is grains, not a fill. Every cell gets its own tone from the
     // simulation's own 'shade' byte, and the gaps between them are shadowed,
     // so a dune reads as granular at any zoom.
@@ -243,6 +250,8 @@ void main() {
     // branch it inherited air, and a falling coal was a bodiless streak.
     vec3 c0 = base == M_SAND   ? vec3(0.72, 0.53, 0.22)
             : base == M_POWDER ? vec3(0.055, 0.052, 0.062)
+            : base == M_SODA   ? vec3(0.88, 0.87, 0.83)
+            : base == M_CLAY   ? vec3(0.55, 0.35, 0.27)
             :                    vec3(0.085, 0.050, 0.038);
     float v = csh - 0.5;
     s.albedo = c0 * (1.0 + v * (base == M_SAND ? 0.34 : 0.55));
@@ -253,17 +262,22 @@ void main() {
     s.spec = base == M_SAND ? 0.30 : 0.10;
     s.shine = 18.0;
 
-  } else if (base == M_STONE) {
+  } else if (base == M_STONE || base == M_CERAMIC) {
     float mott = fbm(gp * 0.55, 4);
-    s.albedo = mix(vec3(0.075, 0.077, 0.086), vec3(0.20, 0.20, 0.215), mott) * (0.85 + 0.28 * csh);
+    // Ceramic is stone's own mottling, warmed: the same kiln that hardens the
+    // clay also oxidises the iron in it, which is the real reason terracotta
+    // is orange rather than the grey it started as.
+    s.albedo = base == M_CERAMIC
+      ? mix(vec3(0.24, 0.11, 0.075), vec3(0.62, 0.32, 0.20), mott) * (0.85 + 0.28 * csh)
+      : mix(vec3(0.075, 0.077, 0.086), vec3(0.20, 0.20, 0.215), mott) * (0.85 + 0.28 * csh);
     /* Relief at just under one cycle per cell, not 2.6. Faster than that and
        the noise is finer than the thing it is supposed to be carving, so a
        wall stops reading as rock and starts reading as static. */
     float rel = fbm(gp * 0.85 + 11.0, 3);
     s.albedo *= 0.82 + 0.30 * rel;
     s.n = normalize(vec3(-cg * 1.4 + (vec2(rel, fbm(gp * 0.85 + 31.0, 3)) - 0.5) * 0.6, 1.0));
-    s.spec = 0.09;
-    s.shine = 10.0;
+    s.spec = base == M_CERAMIC ? 0.22 : 0.09;
+    s.shine = base == M_CERAMIC ? 26.0 : 10.0;
 
   } else if (base == M_WOOD) {
     // Grain runs across the plank and the rings are the only thing that varies,
@@ -322,6 +336,15 @@ void main() {
     s.shine = 34.0;
     s.alpha = 0.88;
 
+  } else if (base == M_WAX) {
+    // Soft, not faceted: wax deforms rather than fractures, so the same fbm
+    // that carves ice into planes here just rolls, with no steps in it.
+    float soft = fbm(gp * 0.32 + csh * 5.0, 3);
+    s.albedo = mix(vec3(0.62, 0.52, 0.27), vec3(0.86, 0.78, 0.48), soft) * (0.88 + 0.20 * csh);
+    s.n = normalize(vec3(-cg * 0.7 + (vec2(soft, fbm(gp * 0.32 + 21.0, 3)) - 0.5) * 0.35, 1.0));
+    s.spec = 0.42;
+    s.shine = 28.0;
+
   } else if (isFluid(base)) {
     // Liquids get the meniscus. 'cov' is ~1 deep inside the body and falls off
     // at the surface, so depth-tinting and the specular both fall out of the
@@ -357,6 +380,13 @@ void main() {
       s.albedo += vec3(0.20, 0.42, 0.04) * pow(rip, 2.4);
       s.spec = 0.55;
       s.shine = 30.0;
+    } else if (base == M_MELTED_WAX) {
+      // The same wax, thinner and warmer: it pools rather than sitting, so it
+      // gets the meniscus the solid block never needed.
+      s.albedo = mix(vec3(0.82, 0.70, 0.40), vec3(0.52, 0.42, 0.20), depth);
+      s.albedo += vec3(0.18, 0.15, 0.08) * pow(rip, 3.0) * (1.0 - depth * 0.6);
+      s.spec = 0.58;
+      s.shine = 36.0;
     } else {                       // lava
       float crust = fbm(gp * 0.26 + vec2(u_time * 0.05, -u_time * 0.028), 3);
       s.albedo = mix(vec3(0.075, 0.032, 0.026), vec3(0.16, 0.075, 0.05), crust);
@@ -384,7 +414,7 @@ void main() {
      gaps hard, above; this is the quiet version for everything else. Without
      it the shading smooths the world into an airbrush painting and a sandbox
      stops reading as a sandbox. */
-  if (base == M_STONE || base == M_WOOD || base == M_PLANT || base == M_ICE) {
+  if (base == M_STONE || base == M_WOOD || base == M_PLANT || base == M_ICE || base == M_CERAMIC || base == M_WAX) {
     s.albedo *= 0.90 + 0.10 * smoothstep(0.0, 0.20, edge);
   }
 
@@ -457,7 +487,9 @@ void main() {
       float fa = clamp(a * 1.7, 0.0, 1.0) * (0.45 + 0.85 * lick);
       col = mix(col, fc2, clamp(fa, 0.0, 1.0));
     } else {
-      vec3 gcol = gid == M_STEAM ? vec3(0.62, 0.68, 0.74) : vec3(0.085, 0.082, 0.088);
+      vec3 gcol = gid == M_STEAM ? vec3(0.62, 0.68, 0.74)
+                : gid == M_FOAM  ? vec3(0.82, 0.84, 0.82)
+                :                  vec3(0.085, 0.082, 0.088);
       // Lit like anything else, which is why smoke over a fire glows orange
       // from below and grey higher up.
       gcol = gcol * (amb + vec3(0.30) + lightF * 2.2);

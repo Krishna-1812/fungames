@@ -307,8 +307,8 @@ punch) checks `prefers-reduced-motion` directly, because it is not the kind
 of animation the site's blanket CSS override can reach.
 
 **Powder** — a falling-sand sandbox: a cellular automaton over typed arrays,
-rendered straight into an `ImageData` buffer. Thirty-one materials and
-forty-eight named reactions, and everything interesting is emergent. Oil floats
+rendered straight into an `ImageData` buffer. Thirty-seven materials and
+fifty-three named reactions, and everything interesting is emergent. Oil floats
 on water because it is lighter. Lava quenched by water becomes stone; lava
 touching sand becomes glass; plants drink puddles and take over. Every reaction
 is a thing to find, and the log tells you how many are left. On top of that,
