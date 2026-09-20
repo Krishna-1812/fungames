@@ -1,5 +1,5 @@
 /**
- * check-space-elevator-art — do Space Elevator's twenty-three markers survive
+ * check-space-elevator-art — do Space Elevator's twenty-nine markers survive
  * being cut out of their own sky, the same way check-deep-sea-art proves it
  * for the ocean going the other direction?
  *
@@ -7,9 +7,12 @@
  *
  *   1. Every marker has a scene, every scene names a real marker, no two
  *      scenes claim the same subject.
- *   2. No ids, no defs, no gradients, no url(#…), no clipPath, no filter —
- *      all twenty-three inline into one document alongside the tile art.
- *   3. Every fill and stroke is one of the palette colours.
+ *   2. Gradients are allowed; every id (gradient, clipPath, anything) has to
+ *      be prefixed with its own scene's key, and every url(#…) has to name
+ *      an id the same scene actually defines — no filter, at all, since
+ *      that one has no id to prefix and would apply to more than itself.
+ *      All twenty-nine inline into one document alongside the tile art.
+ *   3. Every fill, stroke and gradient stop is one of the palette colours.
  *   4. Every subject is a CUT-OUT that reads against the real sky it will
  *      actually float on at its own altitude — troposphere blue at the
  *      bottom, near-black by the Kármán line.
@@ -29,7 +32,7 @@ import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
 const { MARKERS, ZONES, TOTAL_ALTITUDE } = await import('../src/data/space-elevator.ts')
-const { SPACE_ELEVATOR_ART, P, MOOD, dominantMood } = await import('../src/lib/space-elevator-art.ts')
+const { SPACE_ELEVATOR_ART, P, MOOD, dominantMood, slug } = await import('../src/lib/space-elevator-art.ts')
 
 let failures = 0
 const fail = (m) => {
@@ -93,26 +96,28 @@ console.log('\ncoverage')
 
 /* ---- 2. no ids, no defs, no gradients -------------------------------------- */
 
-console.log('\nnothing that could collide with another drawing')
+console.log('\nids are safe to inline twenty-nine at a time')
 {
+  // Gradients are allowed now — every id just has to be prefixed with the
+  // scene's own key, the same convention `earth-reviews-art.ts` and
+  // `deep-sea-art.ts` already use, so two scenes sharing an id can never
+  // mean one silently renders with the other's gradient.
+  const seen = new Map()
   let bad = 0
   for (const n of names) {
-    const m = SPACE_ELEVATOR_ART[n].draw()
-    for (const [re, what] of [
-      [/\sid="/, 'an id'],
-      [/<defs/, 'a <defs>'],
-      [/Gradient/, 'a gradient'],
-      [/url\(#/, 'a url(#…) reference'],
-      [/<clipPath/, 'a clipPath'],
-      [/<filter/, 'a <filter>'],
-    ]) {
-      if (re.test(m)) {
-        fail(`${n} has ${what} — these all share one document`)
-        bad++
-      }
+    const markup = SPACE_ELEVATOR_ART[n].draw()
+    const prefix = slug(n)
+    for (const m of markup.matchAll(/\sid="([^"]+)"/g)) {
+      const id = m[1]
+      if (!id.startsWith(prefix)) { fail(`${n}: id "${id}" is not prefixed with "${prefix}"`); bad++ }
+      if (seen.has(id)) { fail(`id "${id}" is defined by both ${seen.get(id)} and ${n}`); bad++ }
+      seen.set(id, n)
     }
+    for (const m of markup.matchAll(/url\(#([^)]+)\)/g))
+      if (!markup.includes(`id="${m[1]}"`)) { fail(`${n}: refers to #${m[1]}, which it does not define`); bad++ }
+    if (/<filter/.test(markup)) { fail(`${n} has a <filter> — not part of this contract`); bad++ }
   }
-  check(bad === 0, 'no scene defines anything the document namespace can share')
+  check(bad === 0, `${seen.size} internal ids, all key-prefixed and unique across the module`)
 }
 
 /* ---- 3. one palette --------------------------------------------------------- */
@@ -122,14 +127,14 @@ console.log('palette')
   const allowed = new Set(Object.values(P).map((c) => c.toLowerCase()))
   const strays = new Map()
   for (const n of names) {
-    for (const m of SPACE_ELEVATOR_ART[n].draw().matchAll(/(?:fill|stroke)="([^"]+)"/g)) {
+    for (const m of SPACE_ELEVATOR_ART[n].draw().matchAll(/(?:fill|stroke|stop-color)="([^"]+)"/g)) {
       const v = m[1].toLowerCase()
-      if (v === 'none' || v === 'currentcolor') continue
+      if (v === 'none' || v === 'currentcolor' || v.startsWith('url(')) continue
       if (!allowed.has(v)) strays.set(v, (strays.get(v) ?? '') + ' ' + n)
     }
   }
   for (const [v, where] of strays) fail(`colour ${v} is not in the palette (${where.trim()})`)
-  check(strays.size === 0, `every fill and stroke is one of the ${allowed.size} palette colours`)
+  check(strays.size === 0, `every fill, stroke and gradient stop is one of the ${allowed.size} palette colours`)
 }
 
 /* ---- 4. a cut-out, and one you can see on its own sky ----------------------- */

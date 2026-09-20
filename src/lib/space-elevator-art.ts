@@ -25,14 +25,24 @@
  *   `space-elevator.astro` — so a marker drawing three more of its own was
  *   duplicate work that would drift out of register with the real ones.
  *
- * **No gradients, no ids, no defs, no filters.** Flat colour only, so all
- * twenty-nine inline into one document without colliding.
+ * **Gradients are allowed, and every scene should reach for real shading
+ * now** — this module's original flat-cut-out bar was deliberately raised
+ * to match neal.fun's own illustrations, which lean on soft form and light
+ * rather than single-tone silhouettes. The one rule that survives from the
+ * old "no gradients" era, carried over from `earth-reviews-art.ts` and
+ * `deep-sea-art.ts` instead: every `id=` — a gradient, a clip path, anything
+ * — must start with that scene's own key, because all twenty-nine still
+ * inline into one shared document and an unprefixed id can silently steal
+ * another scene's gradient. `check-space-elevator-art.mjs` fails on an
+ * unprefixed id, a duplicate id, and a `url(#…)` naming an id the scene
+ * itself does not define.
  *
  * **One palette**, tuned for the sky rather than the sea: the pale
  * ice-and-metal tones almost everything is drawn in read against troposphere
  * blue, stratosphere navy and thermosphere black alike, and the warm tones
  * (gold, ember, flare) are reserved for things that are genuinely hot or lit
  * from within — a contrail catching the sun, a fireball, a mushroom cloud.
+ * A gradient's own stop colours count as uses of the palette too.
  */
 
 export const P = {
@@ -70,14 +80,63 @@ export const rnd = (seed: number, k: number) => {
   return x - Math.floor(x)
 }
 
+/**
+ * A marker's title is a full sentence ("Mount Everest's summit"), not a
+ * plain slug like `earth-reviews-art.ts`'s keys — so it cannot be used
+ * directly as an SVG id prefix. Every gradient/clipPath id in this module
+ * is prefixed with `slug(title)` instead, and `check-space-elevator-art.mjs`
+ * imports this same function to verify it, so the two can never drift.
+ */
+export const slug = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
 export const SPACE_ELEVATOR_ART: Record<string, Scene> = {
   'The highest a bird has ever been confirmed flying': {
-    subject: 'a vulture, wings spread, gliding',
-    draw: () =>
-      `<path d="M18 76 Q40 48 60 68 Q80 48 102 76" fill="none" stroke="${P.frost}" stroke-width="5" stroke-linecap="round"/>` +
-      `<path d="M28 71 Q40 58 52 67 M92 71 Q80 58 68 67" fill="none" stroke="${P.cloud}" stroke-width="2" stroke-linecap="round" opacity="0.7"/>` +
-      `<path d="M60 68 L60 90" stroke="${P.frost}" stroke-width="4" stroke-linecap="round"/>` +
-      `<circle cx="60" cy="58" r="3" fill="${P.gold}"/>`,
+    subject: 'a griffon vulture gliding on broad, upswept wings, primary feathers fingered at each tip',
+    draw: () => {
+      const k = slug('The highest a bird has ever been confirmed flying')
+      const feathers = (side: 1 | -1) => {
+        const tipX = 60 + side * 54
+        const tipY = 46
+        const rootX = 60 + side * 30
+        const rootY = 62
+        return Array.from({ length: 5 }, (_, i) => {
+          const t = i / 4
+          const x0 = rootX + (tipX - rootX) * (0.72 + t * 0.05)
+          const y0 = rootY + (tipY - rootY) * (0.72 + t * 0.05)
+          const len = 16 - i * 1.6
+          const ang = -0.9 + i * 0.34
+          const x1 = x0 + side * Math.cos(ang) * len
+          const y1 = y0 - Math.sin(ang) * len
+          return `<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} L${x1.toFixed(1)} ${y1.toFixed(1)}" stroke="${P.slate}" stroke-width="1.6" stroke-linecap="round" opacity="0.7"/>`
+        }).join('')
+      }
+      return (
+        `<defs>` +
+        `<linearGradient id="${k}-wing" x1="0" y1="0" x2="0" y2="1">` +
+        `<stop offset="0" stop-color="${P.frost}"/><stop offset="1" stop-color="${P.cloud2}"/>` +
+        `</linearGradient>` +
+        `</defs>` +
+        // Both wings as real filled shapes (a shallow M, upswept at the
+        // shoulder) rather than a single stroked curve standing in for them.
+        `<path d="M60 64 Q30 40 4 58 Q6 66 18 66 Q34 62 54 70Z" fill="url(#${k}-wing)"/>` +
+        `<path d="M60 64 Q90 40 116 58 Q114 66 102 66 Q86 62 66 70Z" fill="url(#${k}-wing)"/>` +
+        // The far wing's own underside, a shade darker, so the near one
+        // reads as closer to the light.
+        `<path d="M60 64 Q34 62 18 66 Q30 68 50 72Z" fill="${P.cloud2}" opacity="0.55"/>` +
+        `<path d="M60 64 Q86 62 102 66 Q90 68 70 72Z" fill="${P.cloud2}" opacity="0.55"/>` +
+        feathers(-1) +
+        feathers(1) +
+        // Body, head and hooked bill.
+        `<path d="M54 62 Q60 54 66 62 L64 82 Q60 88 56 82Z" fill="${P.cloud2}"/>` +
+        `<circle cx="60" cy="53" r="5.2" fill="${P.cloud}"/>` +
+        `<path d="M60 51 L67 52.5 L60.5 55Z" fill="${P.gold}"/>` +
+        `<circle cx="61.5" cy="52" r="0.9" fill="${P.slate2}"/>`
+      )
+    },
   },
   'The highest a glider has ever flown': {
     subject: 'a sailplane, engineless, banking',
@@ -148,14 +207,43 @@ export const SPACE_ELEVATOR_ART: Record<string, Scene> = {
       `<circle cx="60" cy="46" r="15" fill="${P.steel}"/>`,
   },
   'Mount Everest’s summit': {
-    subject: 'a snow-capped peak',
-    draw: () =>
-      `<path d="M2 100 L38 34 L54 58 L70 22 L118 100Z" fill="${P.slate}"/>` +
-      `<path d="M2 100 L38 34 L44 45 L20 100Z" fill="${P.umber}" opacity="0.55"/>` +
-      `<path d="M70 22 L118 100 L96 100 L82 60Z" fill="${P.umber}" opacity="0.4"/>` +
-      `<path d="M60 34 L70 22 L82 42 L70 40Z" fill="${P.frost}"/>` +
-      `<path d="M28 62 L38 34 L48 56Z" fill="${P.frost}" opacity="0.95"/>` +
-      `<path d="M64 30 L70 22 L74 30 L70 33Z" fill="${P.steel}"/>`,
+    subject: 'a snow-capped peak, sunlit on one face and shadowed on the other, a plume of blown snow off the summit',
+    draw: () => {
+      const k = slug('Mount Everest’s summit')
+      return (
+        `<defs>` +
+        `<linearGradient id="${k}-lit" x1="0" y1="0" x2="1" y2="1">` +
+        `<stop offset="0" stop-color="${P.steel}"/><stop offset="1" stop-color="${P.slate}"/>` +
+        `</linearGradient>` +
+        `<linearGradient id="${k}-shadow" x1="0" y1="0" x2="1" y2="1">` +
+        `<stop offset="0" stop-color="${P.slate}"/><stop offset="1" stop-color="${P.umber}"/>` +
+        `</linearGradient>` +
+        `<linearGradient id="${k}-snow" x1="0" y1="0" x2="0" y2="1">` +
+        `<stop offset="0" stop-color="${P.frost}"/><stop offset="1" stop-color="${P.cloud}"/>` +
+        `</linearGradient>` +
+        `<radialGradient id="${k}-halo" cx="0.55" cy="0.15" r="0.6">` +
+        `<stop offset="0" stop-color="${P.frost}" stop-opacity="0.5"/><stop offset="1" stop-color="${P.frost}" stop-opacity="0"/>` +
+        `</radialGradient>` +
+        `</defs>` +
+        `<circle cx="70" cy="22" r="34" fill="url(#${k}-halo)"/>` +
+        // Lit face (sun from the upper right) and the shadowed face behind it.
+        `<path d="M2 100 L38 34 L54 58 L70 22 L118 100Z" fill="url(#${k}-lit)"/>` +
+        `<path d="M2 100 L38 34 L44 45 L20 100Z" fill="url(#${k}-shadow)"/>` +
+        `<path d="M70 22 L118 100 L96 100 L82 60Z" fill="url(#${k}-shadow)" opacity="0.85"/>` +
+        // Ridge lines — the one piece of structure a flat gradient alone
+        // cannot give: real rock strata catching the light unevenly.
+        `<path d="M24 88 L40 62 M32 96 L48 70 M76 60 L88 78 M84 56 L98 82" stroke="${P.slate2}" stroke-width="1.3" opacity="0.5"/>` +
+        // Snow cap, with its own shaded underside so it reads as a solid
+        // mass rather than a flat sticker on the rock.
+        `<path d="M60 34 L70 22 L82 42 L70 40Z" fill="url(#${k}-snow)"/>` +
+        `<path d="M28 62 L38 34 L48 56Z" fill="url(#${k}-snow)"/>` +
+        `<path d="M70 22 L74 30 L70 33 L64 30Z" fill="${P.frost}"/>` +
+        // Blown-snow plume off the summit — the detail that says "this
+        // peak is high enough to have its own weather".
+        `<path d="M74 26 Q90 24 104 30 Q92 28 82 32" fill="none" stroke="${P.cloud}" stroke-width="1.6" opacity="0.6" stroke-linecap="round"/>` +
+        `<path d="M74 30 Q94 32 108 40" fill="none" stroke="${P.cloud}" stroke-width="1.2" opacity="0.4" stroke-linecap="round"/>`
+      )
+    },
   },
   'A bumblebee, in a lab': {
     subject: 'a bumblebee, wings a blur',

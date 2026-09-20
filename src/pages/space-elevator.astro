@@ -4,6 +4,7 @@ import { ZONES, MARKERS, TOTAL_ALTITUDE, fmtAltitude } from '../data/space-eleva
 import type { Marker } from '../data/space-elevator'
 import { SPACE_ELEVATOR_ART, MOOD, sceneSvg } from '../lib/space-elevator-art'
 import { withBase } from '../lib/base'
+import { digitCellHTML } from '../lib/seven-segment'
 
 /**
  * Space Elevator — a linear scroll from sea level to the Kármán line, the
@@ -15,6 +16,18 @@ import { withBase } from '../lib/base'
  * look nice. The one number computed live rather than looked up is the air
  * temperature, from the real US Standard Atmosphere 1976 formula
  * (`src/lib/space-elevator-model.ts`) — the same model aviation uses.
+ *
+ * **The climb runs bottom-to-top of the page, not top-to-bottom.** Ground
+ * sits at the very end of the document; the Kármán line and the finale sit
+ * at the very start. The page loads pre-scrolled to the bottom (see the
+ * client script's `scrollTo` call), and scrolling *up* — toward the top of
+ * the document — is what ascends. Every pixel offset below is computed in
+ * `d`-space first: `d` is plain distance-from-ground in pixels, exactly the
+ * quantity the old top-to-bottom version used directly as a CSS `top`. The
+ * one and only inversion point is `toReelTop(d)`, which turns that d-space
+ * value into a position measured from the *top* of `.reel` instead — every
+ * other formula (zone lookup, temperature, pressure, the sky mix) still
+ * operates on `d` and is untouched by the flip.
  */
 
 let cursor = 0
@@ -25,23 +38,36 @@ const zones = ZONES.map((z) => {
   return laid
 })
 const totalHeight = cursor
+// Blank scroll room at the *high-altitude* end of the reel now — the pause
+// between the finale (which precedes the reel in the DOM) and the first,
+// highest marker you actually reach.
 const REEL_TAIL = 520
 const reelHeight = totalHeight + REEL_TAIL
+
+/** d-space (distance from ground, px) -> position from the top of `.reel`. */
+const toReelTop = (d: number) => REEL_TAIL + (totalHeight - d)
+
+/** Real altitude (metres) -> d-space (distance from ground, px). */
+function altToD(altitude: number) {
+  const zone = zones.find((z) => altitude >= z.from && altitude <= z.to) ?? zones[zones.length - 1]
+  return zone.offset + Math.round((altitude - zone.from) * zone.pxPerMetre)
+}
 
 const CARD_H = 96
 
 type Placed = ReturnType<typeof at> & { lane: 'center' | 'left' | 'right' }
 function at(m: Marker) {
-  const zone = zones.find((z) => m.altitude >= z.from && m.altitude <= z.to) ?? zones[zones.length - 1]
-  return { ...m, top: zone.offset + Math.round((m.altitude - zone.from) * zone.pxPerMetre) }
+  return { ...m, top: toReelTop(altToD(m.altitude)) }
 }
 
-// A deterministic starfield for the upper half of the climb, fading in from
-// roughly the middle of the stratosphere onward — the same shape the sky
-// gradient itself darkens on, just given actual points of light rather than
-// a flat colour.
-const starRegionStart = Math.round(zones[1].offset + zones[1].height * 0.45)
-const starRegionHeight = totalHeight - starRegionStart
+// A deterministic starfield for the high-altitude end of the climb, fading
+// in from roughly the middle of the stratosphere onward — the same shape
+// the sky gradient itself darkens on, just given actual points of light
+// rather than a flat colour. In reel-space that's a band starting right
+// after the leading blank tail.
+const starRegionStartD = Math.round(zones[1].offset + zones[1].height * 0.45)
+const starRegionTop = REEL_TAIL
+const starRegionHeight = totalHeight - starRegionStartD
 const starRnd = (seed: number, k: number) => {
   const x = Math.sin(seed * 9301 + k * 49297) * 233280
   return x - Math.floor(x)
@@ -55,7 +81,28 @@ const stars = Array.from({ length: 160 }, (_, i) => ({
   delay: (starRnd(11, i + 2100) * 4).toFixed(2),
 }))
 
-const rough = MARKERS.map(at)
+// Rain, low in the troposphere (0-3,000m) — same deterministic-seed
+// discipline as the starfield, just anchored to the ground end instead.
+const rainRegionTop = toReelTop(altToD(3_000))
+const rainRegionHeight = reelHeight - rainRegionTop
+const rainRnd = (seed: number, k: number) => {
+  const x = Math.sin(seed * 7207 + k * 15731) * 176192
+  return x - Math.floor(x)
+}
+const raindrops = Array.from({ length: 70 }, (_, i) => ({
+  x: (rainRnd(23, i) * 100).toFixed(1),
+  y: (rainRnd(23, i + 400) * 100).toFixed(1),
+  len: (14 + rainRnd(23, i + 800) * 22).toFixed(0),
+  dur: (0.7 + rainRnd(23, i + 1200) * 0.6).toFixed(2),
+  delay: (rainRnd(23, i + 1600) * 1.4).toFixed(2),
+  o: (0.18 + rainRnd(23, i + 2000) * 0.28).toFixed(2),
+}))
+
+// Markers sort ascending by altitude (the data file guarantees this), which
+// after toReelTop() is now *descending* reel-top order — reverse it back to
+// ascending-by-top for the grouping pass below, which only cares about
+// proximity, not which end is which.
+const rough = MARKERS.map(at).slice().reverse()
 const placed: Placed[] = []
 for (let i = 0; i < rough.length; ) {
   let j = i + 1
@@ -71,80 +118,35 @@ for (let i = 0; i < rough.length; ) {
 
 const rgb = (hex: string) =>
   [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')
+
+// A big layered mountain panorama behind the Everest / Mont Blanc /
+// Kilimanjaro cluster (roughly 3,500-9,200m) — one wide background band,
+// not another card, positioned the same way the starfield is.
+const panoramaTop = toReelTop(altToD(9_200))
+const panoramaBottom = toReelTop(altToD(3_500))
+const panoramaHeight = panoramaBottom - panoramaTop
+
+const HUD_DIGITS = 6
 ---
 
 <GameLayout slug="space-elevator" bar="#0d1a2e" bodyClass="se-body">
   <div class="sky" id="sky"></div>
+  <div class="sky-grid" aria-hidden="true"></div>
   <div class="hud-scrim" aria-hidden="true"></div>
 
   <div class="hud" id="hud">
+    <button type="button" class="hud-music" id="musicToggle" aria-pressed="false" aria-label="Play elevator music">
+      <svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true"><path d="M8 3.5 L14.5 2 L14.5 12.2 A2.6 2.1 0 1 1 13 10.4 L13 5.2 L9.5 6 L9.5 14.2 A2.6 2.1 0 1 1 8 12.4Z" fill="currentColor"/></svg>
+    </button>
     <div class="hud-label" id="hudZone">the troposphere</div>
-    <div class="hud-alt" id="hudAlt">0m</div>
+    <div class="hud-alt-row">
+      <span class="odometer" id="hudOdo" set:html={Array.from({ length: HUD_DIGITS }, () => digitCellHTML()).join('')} />
+      <span class="hud-unit">m</span>
+    </div>
     <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
     <div class="hud-row">
       <span id="hudTemp">15°C outside</span>
       <span id="hudPressure">100% sea-level pressure</span>
-    </div>
-  </div>
-
-  <div class="climb">
-    <div class="cable-track" id="cableTrack" aria-hidden="true">
-      <div class="cable-line"></div>
-      <div class="cable-car" id="cableCar"><div class="cable-car-window"></div></div>
-    </div>
-
-    <div class="intro">
-      <h1>Space Elevator</h1>
-      <p>Every metre above is real. Keep scrolling to the edge of space — 100,000 real metres up.</p>
-      <div class="arrow">↑</div>
-      <div class="ground" aria-hidden="true">
-        <svg viewBox="0 0 900 160" preserveAspectRatio="xMidYMax slice">
-          <path d="M0 160 L0 96 L110 40 L180 74 L260 18 L340 66 L420 30 L500 80 L560 44 L640 92 L720 36 L800 70 L900 46 L900 160Z" fill="#173322" opacity="0.9"/>
-          <path d="M0 160 L0 118 L90 84 L170 106 L250 70 L330 100 L410 78 L490 108 L570 86 L650 112 L730 82 L810 104 L900 88 L900 160Z" fill="#0f2517"/>
-        </svg>
-      </div>
-    </div>
-
-    <div class="reel" style={`height:${reelHeight}px`}>
-    <div class="starfield" style={`top:${starRegionStart}px; height:${starRegionHeight}px`} aria-hidden="true">
-      {stars.map((s) => (
-        <i class="se-star" style={`left:${s.x}%; top:${s.y}%; width:${(Number(s.r) * 2.2).toFixed(2)}px; height:${(Number(s.r) * 2.2).toFixed(2)}px; opacity:${s.o}; animation-duration:${s.dur}s; animation-delay:-${s.delay}s`} />
-      ))}
-    </div>
-
-    {
-      zones.map((z, i) =>
-        i === 0 ? null : (
-          <div class="seam" style={`top:${z.offset}px;--from:${zones[i - 1].sky[1]};--to:${z.sky[0]}`}>
-            <span class="seam-name">{z.label}</span>
-            <span class="seam-note">
-              {z.from.toLocaleString('en-US')}m to {z.to.toLocaleString('en-US')}m — {z.note}
-            </span>
-          </div>
-        )
-      )
-    }
-    {
-      placed.map((m) => {
-        const mood = MOOD[m.title]
-        // Deterministic per-marker phase, so twenty-three windows are not all
-        // drifting in step — same trick as Deep Sea's own cards.
-        const drift = `--drift:${-((m.altitude * 7919) % 1100) / 100}s`
-        const style = mood
-          ? `top:${m.top}px;--mood:${mood};--moodRgb:${rgb(mood)};${drift}`
-          : `top:${m.top}px;${drift}`
-        return (
-          <article class:list={['ev', `lane-${m.lane}`, { big: m.big }]} style={style}>
-            {SPACE_ELEVATOR_ART[m.title] && <div class="ev-art" set:html={sceneSvg(m.title)} />}
-            <div class="ev-text">
-              <div class="ev-when">{fmtAltitude(m.altitude)} up</div>
-              <h2>{m.title}</h2>
-              <p>{m.note}</p>
-            </div>
-          </article>
-        )
-      })
-    }
     </div>
   </div>
 
@@ -185,19 +187,121 @@ const rgb = (hex: string) =>
     </div>
     <p class="outro-line">100,000 metres. The edge of space, or this page, whichever you hit first.</p>
   </footer>
+
+  <div class="climb">
+    <div class="cable-track" id="cableTrack" aria-hidden="true">
+      <div class="cable-line"></div>
+      <div class="cable-car" id="cableCar">
+        <div class="cable-car-window">
+          <span class="rider-head"></span>
+          <span class="rider-body" id="riderBody"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="reel" style={`height:${reelHeight}px`}>
+    <div class="starfield" style={`top:${starRegionTop}px; height:${starRegionHeight}px`} aria-hidden="true">
+      {stars.map((s) => (
+        <i class="se-star" style={`left:${s.x}%; top:${s.y}%; width:${(Number(s.r) * 2.2).toFixed(2)}px; height:${(Number(s.r) * 2.2).toFixed(2)}px; opacity:${s.o}; animation-duration:${s.dur}s; animation-delay:-${s.delay}s`} />
+      ))}
+    </div>
+
+    <div class="rain" style={`top:${rainRegionTop}px; height:${rainRegionHeight}px`} aria-hidden="true">
+      {raindrops.map((r) => (
+        <i class="se-rain" style={`left:${r.x}%; top:${r.y}%; height:${r.len}px; opacity:${r.o}; animation-duration:${r.dur}s; animation-delay:-${r.delay}s`} />
+      ))}
+    </div>
+
+    <div class="panorama" style={`top:${panoramaTop}px; height:${panoramaHeight}px`} aria-hidden="true">
+      <svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMax slice">
+        <path d="M0 620 L0 340 L140 220 L230 300 L330 170 L430 280 L520 150 L620 260 L720 190 L820 270 L900 210 L900 620Z" fill="#7f97b8" opacity="0.55"/>
+        <path d="M0 620 L0 400 L120 300 L210 360 L310 250 L410 340 L500 240 L600 330 L700 270 L800 350 L900 300 L900 620Z" fill="#5c7295" opacity="0.75"/>
+        <path d="M0 620 L0 460 L100 380 L190 430 L290 340 L390 410 L480 330 L580 400 L680 360 L780 420 L900 380 L900 620Z" fill="#3d4f70"/>
+        <path d="M140 220 L165 245 L188 226 M330 170 L352 194 L378 176 M520 150 L543 174 L568 156 M720 190 L742 212 L766 196" fill="none" stroke="#eaf3ff" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
+      </svg>
+    </div>
+
+    {
+      zones.map((z, i) =>
+        i === 0 ? null : (
+          <div class="seam" style={`top:${toReelTop(z.offset)}px;--from:${zones[i - 1].sky[1]};--to:${z.sky[0]}`}>
+            <div class="seam-bubble">
+              <span class="seam-name">{z.label}</span>
+              <span class="seam-note">
+                {z.from.toLocaleString('en-US')}m to {z.to.toLocaleString('en-US')}m — {z.note}
+              </span>
+            </div>
+          </div>
+        )
+      )
+    }
+    {
+      placed.map((m) => {
+        const mood = MOOD[m.title]
+        // Deterministic per-marker phase, so twenty-nine windows are not all
+        // drifting in step — same trick as Deep Sea's own cards.
+        const drift = `--drift:${-((m.altitude * 7919) % 1100) / 100}s`
+        const style = mood
+          ? `top:${m.top}px;--mood:${mood};--moodRgb:${rgb(mood)};${drift}`
+          : `top:${m.top}px;${drift}`
+        return (
+          <article class:list={['ev', `lane-${m.lane}`, { big: m.big }]} style={style}>
+            {SPACE_ELEVATOR_ART[m.title] && <div class="ev-art" set:html={sceneSvg(m.title)} />}
+            <div class="ev-text">
+              <div class="ev-when">{fmtAltitude(m.altitude)} up</div>
+              <h2>{m.title}</h2>
+              <p>{m.note}</p>
+            </div>
+          </article>
+        )
+      })
+    }
+    </div>
+
+    <div class="intro">
+      <h1>Space Elevator</h1>
+      <p>Every metre above is real, all the way to the edge of space — 100,000 real metres up.</p>
+      <div class="jacket-pick" id="jacketPick">
+        <p>It's about to get cold. Pick a jacket for the ride:</p>
+        <div class="jacket-swatches">
+          <button type="button" class="jacket-swatch" data-color="#d9534f" style="--jc:#d9534f" aria-label="Red jacket"></button>
+          <button type="button" class="jacket-swatch" data-color="#4f7fd9" style="--jc:#4f7fd9" aria-label="Blue jacket"></button>
+          <button type="button" class="jacket-swatch" data-color="#e8b84f" style="--jc:#e8b84f" aria-label="Yellow jacket"></button>
+        </div>
+      </div>
+      <div class="arrow">↑</div>
+      <p class="scroll-hint">Scroll up!</p>
+      <div class="ground" aria-hidden="true">
+        <svg viewBox="0 0 900 160" preserveAspectRatio="xMidYMax slice">
+          <path d="M0 160 L0 96 L110 40 L180 74 L260 18 L340 66 L420 30 L500 80 L560 44 L640 92 L720 36 L800 70 L900 46 L900 160Z" fill="#173322" opacity="0.9"/>
+          <path d="M0 160 L0 118 L90 84 L170 106 L250 70 L330 100 L410 78 L490 108 L570 86 L650 112 L730 82 L810 104 L900 88 L900 160Z" fill="#0f2517"/>
+        </svg>
+      </div>
+    </div>
+  </div>
 </GameLayout>
 
-<script type="application/json" id="game-data" set:html={JSON.stringify({ zones, totalHeight })} />
+<script type="application/json" id="game-data" set:html={JSON.stringify({ zones, totalHeight, reelHeight, REEL_TAIL })} />
 
 <script>
   import { ring } from '../lib/fx'
-  import { sfx, unlock } from '../lib/audio'
+  import { sfx, unlock, tone } from '../lib/audio'
+  import { segmentsFor, fitWidth } from '../lib/seven-segment'
   import { standardTemperatureK, kelvinToC, approxPressureRatio } from '../lib/space-elevator-model'
   import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
 
-  const { zones, totalHeight } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+  // The climb reads bottom-to-top now — open already scrolled to the very
+  // bottom of the document (the ground) rather than the browser's default
+  // top-of-page, and stop the browser fighting that with its own
+  // back-forward scroll memory.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+  scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+
+  const { zones, totalHeight, reelHeight, REEL_TAIL } = JSON.parse(
+    document.getElementById('game-data')!.textContent!,
+  ) as any
 
   const cards = [...document.querySelectorAll('.ev')] as HTMLElement[]
 
@@ -281,7 +385,6 @@ const rgb = (hex: string) =>
   const sky = $('sky')
   const hud = $('hud')
   const hudZone = $('hudZone')
-  const hudAlt = $('hudAlt')
   const hudFill = $('hudFill')
   const hudTemp = $('hudTemp')
   const hudPressure = $('hudPressure')
@@ -290,13 +393,93 @@ const rgb = (hex: string) =>
   const introEl = document.querySelector('.intro') as HTMLElement
   const reel = document.querySelector('.reel') as HTMLElement
 
+  // The digital-odometer altitude readout: one real seven-segment cell per
+  // digit, same shape Printing Money's debt clock and Days Since Incident's
+  // counter already use — reused wholesale rather than re-invented.
+  const odoDigits = [...$('hudOdo').children] as HTMLElement[]
+  const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  function setOdometer(metres: number) {
+    const raw = fitWidth(String(Math.max(0, Math.round(metres))), odoDigits.length)
+    for (let i = 0; i < odoDigits.length; i++) {
+      const cell = odoDigits[i]
+      const ch = raw[i]
+      if (cell.dataset.v === ch) continue
+      const changed = cell.dataset.v !== undefined
+      cell.dataset.v = ch
+      const lit = segmentsFor(ch)
+      const segs = cell.children
+      for (let s = 0; s < lit.length; s++) segs[s]!.classList.toggle('on', lit[s])
+      if (changed && !prefersReducedMotion) {
+        cell.classList.remove('flicker')
+        void cell.offsetWidth
+        cell.classList.add('flicker')
+      }
+    }
+  }
+
   // The track spans the intro's ground and the whole reel — its own height
   // depends on the intro's real, responsive height, so it is measured rather
   // than assumed.
   function sizeTrack() {
-    if (cableTrack) cableTrack.style.height = `${introEl.offsetHeight + totalHeight}px`
+    if (cableTrack) cableTrack.style.height = `${reelHeight + introEl.offsetHeight}px`
   }
   sizeTrack()
+
+  // `.reel`'s `offsetTop` is relative to its own offsetParent (`.climb`,
+  // which is `position: relative`) — it does not include `.climb`'s own
+  // position in the document, which is now substantial (`.finale` and
+  // `.outro` both precede it). `getBoundingClientRect()` gives the real
+  // viewport-relative position with no offsetParent ambiguity; adding the
+  // current scroll turns that into a document-absolute one. Measured fresh
+  // inside `update()` itself rather than cached — a cached value went stale
+  // the moment anything above the reel reflowed (a webfont swap in the long
+  // `.finale` copy was enough to shift it by thousands of pixels), and this
+  // runs at most once per animation frame already, so the extra read costs
+  // nothing worth avoiding.
+  function reelTopAbs() {
+    return reel.getBoundingClientRect().top + window.scrollY
+  }
+
+  // ---- pick a jacket ---------------------------------------------------
+  // A colour choice with a real, visible consequence: the rider inside the
+  // cable car keeps it for the rest of the climb.
+  const jacketPick = document.getElementById('jacketPick')
+  jacketPick?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.jacket-swatch') as HTMLElement | null
+    if (!btn) return
+    unlock()
+    document.documentElement.style.setProperty('--rider-color', btn.dataset.color!)
+    jacketPick.querySelectorAll('.jacket-swatch').forEach((b) => b.classList.remove('picked'))
+    btn.classList.add('picked')
+    jacketPick.classList.add('chosen')
+    sfx.click()
+  })
+
+  // ---- elevator music ----------------------------------------------------
+  // A small looping pentatonic riff via the shared tone() synth — not a new
+  // audio subsystem, just a handful of scheduled notes on an interval.
+  const musicBtn = document.getElementById('musicToggle')
+  let musicOn = false
+  let musicTimer: number | null = null
+  let musicStep = 0
+  const MUSIC_MOTIF = [0, 2, 4, 7, 4, 2]
+  function musicTick() {
+    tone({ freq: 220 * Math.pow(2, MUSIC_MOTIF[musicStep % MUSIC_MOTIF.length] / 12), dur: 0.85, type: 'triangle', gain: 0.05 })
+    musicStep++
+  }
+  musicBtn?.addEventListener('click', () => {
+    unlock()
+    musicOn = !musicOn
+    musicBtn.setAttribute('aria-pressed', String(musicOn))
+    musicBtn.classList.toggle('on', musicOn)
+    if (musicOn) {
+      musicTick()
+      musicTimer = window.setInterval(musicTick, 900)
+    } else if (musicTimer !== null) {
+      clearInterval(musicTimer)
+      musicTimer = null
+    }
+  })
 
   const fmtAltitude = (m: number) => (m >= 1000 ? `${(m / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })}km` : `${Math.round(m)}m`)
 
@@ -315,7 +498,6 @@ const rgb = (hex: string) =>
   onShare(() => shareCard, (c) => ({ title: 'Space Elevator', text: `${c.headline}.` }))
 
   let recorded = false
-  let lastWholeKm = -1
   function updateShareCard(altitude: number) {
     const t = standardTemperatureK(Math.min(altitude, 86_000))
     shareCard = {
@@ -334,38 +516,38 @@ const rgb = (hex: string) =>
   let ticking = false
   function update() {
     ticking = false
-    const raw = window.scrollY + window.innerHeight / 2 - reel.offsetTop
-    const clamped = Math.max(0, Math.min(totalHeight, raw))
+    // Position within the reel, measured from the reel's own top (the
+    // high-altitude end, since the reel now precedes the ground/intro in
+    // the DOM). `d` converts that back into the one quantity every other
+    // formula below actually wants: real distance-from-ground in pixels —
+    // identical meaning to what this function used to read directly off
+    // the scroll position, before the climb was flipped.
+    const raw = window.scrollY + window.innerHeight / 2 - reelTopAbs()
+    const topInReel = Math.max(0, Math.min(reelHeight, raw))
+    const d = Math.max(0, Math.min(totalHeight, totalHeight - (topInReel - REEL_TAIL)))
 
-    const zone = zones.find((z: any) => clamped < z.offset + z.height) ?? zones[zones.length - 1]
-    const within = clamped - zone.offset
+    const zone = zones.find((z: any) => d < z.offset + z.height) ?? zones[zones.length - 1]
+    const within = d - zone.offset
     const metres = Math.max(0, Math.min(zone.to, zone.from + within / zone.pxPerMetre))
 
     hudZone.textContent = zone.label.toLowerCase()
-    hudAlt.textContent = fmtAltitude(metres)
-    const wholeKm = Math.floor(metres / 100)
-    if (wholeKm !== lastWholeKm && lastWholeKm >= 0) {
-      hudAlt.classList.remove('se-pulse')
-      void hudAlt.offsetWidth
-      hudAlt.classList.add('se-pulse')
-    }
-    lastWholeKm = wholeKm
+    setOdometer(metres)
 
     const t = standardTemperatureK(metres)
     hudTemp.textContent = t !== null ? `${kelvinToC(t).toFixed(0)}°C outside` : 'no single temperature up here'
     const pct = approxPressureRatio(metres) * 100
     hudPressure.textContent = pct >= 1 ? `${pct.toFixed(1)}% sea-level pressure` : `${pct.toFixed(3)}% sea-level pressure`
 
-    if (cableCar) cableCar.style.top = `${introEl.offsetHeight + clamped}px`
+    if (cableCar) cableCar.style.top = `${topInReel}px`
 
-    hudFill.style.width = `${(clamped / totalHeight) * 100}%`
+    hudFill.style.width = `${(d / totalHeight) * 100}%`
     const zt = zone.height ? Math.min(1, Math.max(0, within / zone.height)) : 0
     const zoneColor = mix(zone.sky[0], zone.sky[1], zt)
     hudFill.style.background = zoneColor
     hud.style.setProperty('--glow', `rgba(${zoneColor.slice(4, -1)}, 0.4)`)
     sky.style.background = `linear-gradient(${zoneColor}, ${mix(zone.sky[0], zone.sky[1], Math.min(1, zt + 0.25))})`
 
-    if (!recorded && raw >= totalHeight - 40) {
+    if (!recorded && d >= totalHeight - 40) {
       recorded = true
       updateShareCard(metres)
     }
@@ -388,6 +570,15 @@ const rgb = (hex: string) =>
     background: linear-gradient(#8fcaf0, #2a5a86);
     transition: background 260ms linear;
   }
+  /* A faint measured-graph-paper texture over the whole climb — static, no
+     motion cost, and a small nod to how technical this page's numbers
+     actually are. */
+  .sky-grid {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.5;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 64px);
+  }
 
   .hud-scrim {
     position: fixed; inset: 0 0 auto 0; height: 172px; z-index: 39;
@@ -407,23 +598,30 @@ const rgb = (hex: string) =>
     transition: border-color 300ms linear, box-shadow 300ms linear;
   }
   .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
-  .hud-alt {
-    font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px;
-    text-shadow: 0 0 16px var(--glow, transparent);
+
+  .hud-music {
+    position: absolute; top: 8px; right: 10px; pointer-events: auto;
+    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+    color: inherit; width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+    font-size: 13px; line-height: 1; display: grid; place-items: center;
+    transition: background 160ms linear, color 160ms linear;
   }
-  .hud-alt.se-pulse { animation: se-hud-pulse 0.5s ease-out; }
-  @keyframes se-hud-pulse { 0% { transform: scale(1.08); } 100% { transform: scale(1); } }
-  @media (prefers-reduced-motion: reduce) {
-    .hud-alt.se-pulse { animation: none; }
+  .hud-music.on { background: #ffd27a; color: #2a1608; }
+
+  .hud-alt-row {
+    display: flex; align-items: baseline; justify-content: center; gap: 5px;
+    margin-top: 4px;
   }
+  .hud-unit { font-size: 13px; opacity: 0.75; }
   .hud-bar { height: 3px; background: rgba(255, 255, 255, 0.2); border-radius: 2px; margin: 9px 0 6px; }
   .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; transition: background 300ms linear; }
   .hud-row { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; gap: 10px; }
   .hud-row span:last-child { opacity: 0.85; text-align: right; }
 
-  .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; overflow: hidden; }
+  .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 40px 20px 0; overflow: hidden; }
   .intro h1 { font-size: clamp(38px, 9vw, 74px); margin: 0; letter-spacing: -0.03em; position: relative; z-index: 2; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.35); }
   .intro p { opacity: 0.85; margin: 0; font-size: 18px; max-width: 32ch; margin-inline: auto; position: relative; z-index: 2; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.3); }
+  .scroll-hint { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
   .arrow { font-size: 30px; opacity: 0.7; animation: bob 1.8s ease-in-out infinite; position: relative; z-index: 2; }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
   .ground {
@@ -432,17 +630,54 @@ const rgb = (hex: string) =>
   }
   .ground svg { width: 100%; height: 100%; display: block; }
 
+  /* ---- pick a jacket ------------------------------------------------- */
+  .jacket-pick {
+    position: relative; z-index: 2; margin-top: 6px;
+    background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px; padding: 12px 18px; backdrop-filter: blur(4px);
+  }
+  .jacket-pick p { font-size: 13.5px; opacity: 0.85; margin: 0 0 8px; max-width: none; }
+  .jacket-pick.chosen p { opacity: 0.55; }
+  .jacket-swatches { display: flex; gap: 10px; justify-content: center; }
+  .jacket-swatch {
+    appearance: none; border: 2px solid rgba(255, 255, 255, 0.3); background: var(--jc);
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    transition: transform 140ms var(--ease-bounce, ease), border-color 140ms linear;
+  }
+  .jacket-swatch:hover { transform: scale(1.12); }
+  .jacket-swatch.picked { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25); }
+
   .climb { position: relative; }
   .reel { position: relative; overflow-x: clip; }
 
   .starfield { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; overflow: hidden;
-    mask-image: linear-gradient(to bottom, transparent, #000 35%);
-    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 35%); }
+    mask-image: linear-gradient(to top, transparent, #000 35%);
+    -webkit-mask-image: linear-gradient(to top, transparent, #000 35%); }
   .se-star {
     position: absolute; display: block; border-radius: 50%; background: #eaf3ff;
     animation-name: se-twinkle; animation-iteration-count: infinite; animation-timing-function: ease-in-out;
   }
   @keyframes se-twinkle { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
+
+  /* ---- rain, low in the troposphere ----------------------------------- */
+  .rain { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, #000 20%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20%); }
+  .se-rain {
+    position: absolute; width: 1.4px; background: linear-gradient(rgba(200, 220, 240, 0), rgba(200, 220, 240, 0.8));
+    animation-name: se-fall; animation-iteration-count: infinite; animation-timing-function: linear;
+    transform: rotate(11deg);
+  }
+  @keyframes se-fall { 0% { transform: translateY(-40px) rotate(11deg); } 100% { transform: translateY(60px) rotate(11deg); } }
+
+  /* ---- the Everest / Mont Blanc / Kilimanjaro panorama ------------------ */
+  /* The band this sits in is tall (it spans a real altitude range), but the
+     artwork itself is a fixed-proportion illustration — pinned to the
+     bottom of that band (the lower, closer altitude) so it reads as one
+     mountain range you climb past, rather than a single image stretched
+     to fill however many pixels of scroll the range happens to take. */
+  .panorama { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .panorama svg { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: auto; display: block; }
 
   .cable-track { position: absolute; top: 0; left: 7px; width: 12px; height: 0; z-index: 1; pointer-events: none; }
   .cable-line {
@@ -457,12 +692,15 @@ const rgb = (hex: string) =>
     box-shadow: 0 0 10px -1px rgba(255, 200, 140, 0.7), 0 2px 5px rgba(0, 0, 0, 0.5);
     transition: top 60ms linear;
   }
-  .cable-car-window { position: absolute; inset: 3px 2px; background: #ffd27a; opacity: 0.9; border-radius: 1px; }
+  .cable-car-window { position: absolute; inset: 2px; background: #16233c; border-radius: 1px; overflow: hidden; }
+  .rider-head { position: absolute; left: 50%; top: 1px; transform: translateX(-50%); width: 2.4px; height: 2.4px; border-radius: 50%; background: #ffe3c2; }
+  .rider-body { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 3.4px; height: 4px; border-radius: 1px 1px 0 0; background: var(--rider-color, #ffd27a); }
   @media (max-width: 460px) {
     .cable-track { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .se-star { animation: none; }
+    .se-rain { animation: none; }
     .cable-car { transition: none; }
   }
 
@@ -550,18 +788,30 @@ const rgb = (hex: string) =>
     .arrow { animation: none; }
   }
 
-  .seam { position: absolute; left: 0; right: 0; z-index: 1; text-align: center; padding-top: 11px; }
+  /* Comic-style fact bubbles at each zone seam — the one place this page
+     deliberately borrows neal.fun's white speech-bubble look rather than
+     its own dark/atmospheric chrome, because a fact card is meant to read
+     like an aside pinned onto the sky, not part of the sky itself. */
+  .seam { position: absolute; left: 0; right: 0; z-index: 1; text-align: center; padding-top: 8px; }
   .seam::before {
     content: ''; position: absolute; left: 9%; right: 9%; top: 0; height: 2px; border-radius: 2px;
     background: linear-gradient(90deg, var(--from), var(--to)); opacity: 0.65;
   }
-  .seam-name, .seam-note {
-    position: relative; display: block;
-    background: rgb(0 0 0 / 0.46); border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: 999px; padding: 4px 13px; margin: 0 auto 4px; width: fit-content; max-width: 90%;
+  .seam-bubble {
+    position: relative; display: inline-block; margin-top: 16px;
+    background: #fff; color: #1a2233;
+    border: 2px solid #1a2233; border-radius: 18px;
+    padding: 10px 18px 11px; max-width: min(84vw, 420px);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
   }
-  .seam-name { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.9; font-weight: 600; }
-  .seam-note { font-size: 11.5px; opacity: 0.72; margin-top: 6px; }
+  .seam-bubble::after {
+    content: ''; position: absolute; left: 50%; top: -8px; margin-left: -8px;
+    width: 14px; height: 14px; background: #fff;
+    border-left: 2px solid #1a2233; border-top: 2px solid #1a2233;
+    border-radius: 3px 0 0 0; transform: rotate(45deg);
+  }
+  .seam-name { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; color: #5a6478; display: block; }
+  .seam-note { font-size: 13.5px; opacity: 0.92; margin-top: 4px; display: block; }
 
   .finale { max-width: 640px; margin: 10vh auto 0; padding: 0 22px 8vh; text-align: left; }
   .fin-kicker { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #ff9d5c; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
@@ -581,4 +831,33 @@ const rgb = (hex: string) =>
   .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
   .acts a:hover { opacity: 1; }
   .outro-line { font-size: 15px; opacity: 0.6; margin: 0; }
+</style>
+
+<style is:global>
+  /* ---- the HUD odometer: a real seven-segment display -------------------
+     `#hudOdo`'s digit cells come from `digitCellHTML()` via `set:html`, so
+     they never get Astro's scoped-style attribute — same trap this site's
+     other odometers (Printing Money, Days Since Incident) already hit, and
+     the same fix: a plain global selector, not `:global(...)`, because this
+     whole block is already `is:global` and that wrapper only means
+     something inside a *scoped* block. */
+  .odometer { display: inline-flex; line-height: 1; --seg-on: #eaf3ff; --seg-off: rgba(255, 255, 255, 0.14); }
+  .digit { position: relative; display: inline-block; width: 0.6em; height: 1em; margin: 0 0.05em; flex: none; font-size: 19px; }
+  .digit.flicker { animation: se-odo-flicker 320ms steps(1, end); }
+  @keyframes se-odo-flicker { 0%, 18%, 36% { filter: brightness(1.7); } 9%, 27%, 100% { filter: brightness(1); } }
+  .seg { position: absolute; background: var(--seg-off); transition: background 140ms linear, box-shadow 140ms linear; }
+  .seg.on { background: var(--seg-on); box-shadow: 0 0 0.08em var(--seg-on), 0 0 0.3em rgba(234, 243, 255, 0.55); }
+  .seg-a, .seg-g, .seg-d {
+    left: 0.065em; width: 0.43em; height: 0.09em;
+    clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
+  }
+  .seg-a { top: 0; } .seg-g { top: 0.455em; } .seg-d { top: 0.91em; }
+  .seg-f, .seg-b, .seg-e, .seg-c {
+    width: 0.09em; height: 0.41em; clip-path: polygon(0 14%, 50% 0, 100% 14%, 100% 86%, 50% 100%, 0 86%);
+  }
+  .seg-f, .seg-e { left: 0; } .seg-b, .seg-c { right: 0; }
+  .seg-f, .seg-b { top: 0.09em; } .seg-e, .seg-c { top: 0.5em; }
+  @media (prefers-reduced-motion: reduce) {
+    .digit.flicker { animation: none; }
+  }
 </style>
