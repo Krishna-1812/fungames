@@ -350,6 +350,49 @@ import GameLayout from '../layouts/GameLayout.astro'
       host.appendChild(c)
     }
 
+    // A twinkle layer — the one thing a static field of painted points can't
+    // do. A few dozen of the brighter, nearer stars, each cycling its own
+    // brightness on its own phase and speed, so the sky reads as something
+    // happening rather than as a photograph of one. Kept to a small count
+    // and drawn on its own canvas so the other 500-odd stars stay a single
+    // cheap paint instead of every one of them re-rendering every frame.
+    if (!prefersReducedMotion) {
+      const c = document.createElement('canvas')
+      c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr)
+      c.style.width = '100%'; c.style.height = '100%'
+      c.className = 'star-layer'
+      c.dataset.par = '0.06'
+      const g = c.getContext('2d')!
+      g.scale(dpr, dpr)
+      const twinklers = Array.from({ length: 34 }, () => ({
+        x: rnd() * w,
+        y: rnd() * h * 0.88,
+        r: 0.9 + rnd() * 1.7,
+        col: STAR_COLOURS[Math.floor(rnd() * STAR_COLOURS.length)],
+        floor: 0.35 + rnd() * 0.3,
+        speed: 0.35 + rnd() * 0.85,
+        phase: rnd() * Math.PI * 2,
+      }))
+      const tick = (t: number) => {
+        g.clearRect(0, 0, w, h)
+        for (const s of twinklers) {
+          const a = s.floor + (1 - s.floor) * 0.5 * (1 + Math.sin(t * 0.001 * s.speed + s.phase))
+          g.globalAlpha = a
+          g.fillStyle = s.col
+          if (s.r > 1.6) { g.shadowBlur = 5; g.shadowColor = s.col }
+          g.beginPath()
+          g.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+          g.fill()
+          g.shadowBlur = 0
+        }
+        g.globalAlpha = 1
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+      host.appendChild(c)
+      layers.push(c)
+    }
+
     return layers
   }
 
@@ -1919,6 +1962,22 @@ import GameLayout from '../layouts/GameLayout.astro'
       radial-gradient(ellipse 80% 55% at 88% 108%, #123049 0%, transparent 60%),
       radial-gradient(ellipse 60% 44% at 8% 72%, #241a48 0%, transparent 62%);
   }
+  /* A nebula that genuinely drifts — slowly enough that nobody ever catches
+     it moving, just enough that the sky stops reading as a fixed image sitting
+     behind the page. The one kind of atmosphere a real, computed starfield can
+     offer that a painted illustration can't: light that is actually alive. */
+  .sky-body .sky::after {
+    content: ''; position: absolute; inset: -12%;
+    background:
+      radial-gradient(ellipse 46% 34% at 24% 28%, rgba(150, 100, 230, 0.16) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 30% at 80% 66%, rgba(90, 150, 230, 0.14) 0%, transparent 70%);
+    animation: nebula-drift 70s ease-in-out infinite alternate;
+  }
+  @keyframes nebula-drift {
+    0%   { transform: translate(0, 0) scale(1); opacity: 0.7; }
+    50%  { transform: translate(-2.5%, 2%) scale(1.06); opacity: 1; }
+    100% { transform: translate(2%, -1.5%) scale(1.02); opacity: 0.82; }
+  }
   .sky-body .star-layer {
     position: absolute; top: 0; left: 0;
     will-change: transform;
@@ -1968,6 +2027,14 @@ import GameLayout from '../layouts/GameLayout.astro'
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(180, 200, 255, 0.08);
+    /* A slow aureole breathing round the whole card — the one piece of pure
+       charm this page borrows from the idea of a crystal ball without ever
+       drawing one: the instrument itself glows, gently, on its own. */
+    animation: hero-aureole 6.5s ease-in-out infinite;
+  }
+  @keyframes hero-aureole {
+    0%, 100% { box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(180, 200, 255, 0.08), 0 0 0 rgba(160, 140, 255, 0); }
+    50%      { box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(180, 200, 255, 0.08), 0 0 52px rgba(160, 140, 255, 0.24); }
   }
   .sky-body .hero-stage { position: relative; min-height: 300px; background: #05081c; }
   .sky-body .stage-canvas { display: block; width: 100%; height: 100%; min-height: 300px; }
@@ -2472,5 +2539,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   @media (prefers-reduced-motion: reduce) {
     .sky-body .ev { animation: none; }
     .sky-body .ev-node:hover, .sky-body .ev-node:focus-visible { transform: none; }
+    .sky-body .sky::after { animation: none; opacity: 0.85; }
+    .sky-body .hero { animation: none; }
   }
 </style>
