@@ -68,8 +68,8 @@ const check = (c, m) => (c ? ok(m) : fail(m))
 console.log('catalogue')
 {
   check(
-    PHENOMENA.length >= 20 && PHENOMENA.length <= 24,
-    `between 20 and 24 phenomena (${PHENOMENA.length})`,
+    PHENOMENA.length >= 30 && PHENOMENA.length <= 34,
+    `between 30 and 34 phenomena (${PHENOMENA.length})`,
   )
   const ids = PHENOMENA.map((p) => p.id)
   check(new Set(ids).size === ids.length, 'every id is unique')

@@ -641,6 +641,69 @@ export const ART: Record<string, Drawing> = {
       )
     },
   },
+
+  /* ---- the second wave ---------------------------------------------------- */
+
+  rainbows: {
+    subject: 'seven concentric arced bands rising from a rounded hill, a soft cloud at each foot of the arc',
+    palette: ['#6b5b95', '#eef2f7', '#e0453c', '#f2843c', '#f5cd4a', '#63b76c', '#4a90c9', '#5c6bc0', '#8a5cbf'],
+    draw: () => {
+      const bands: [number, string][] = [
+        [52, '#e0453c'],
+        [47, '#f2843c'],
+        [42, '#f5cd4a'],
+        [37, '#63b76c'],
+        [32, '#4a90c9'],
+        [27, '#5c6bc0'],
+        [22, '#8a5cbf'],
+      ]
+      return (
+        `<ellipse cx="60" cy="150" rx="92" ry="50" fill="#6b5b95"/>` +
+        bands
+          .map(
+            ([r, c]) =>
+              `<path d="M${60 - r} 118 A ${r} ${r} 0 0 1 ${60 + r} 118" fill="none" stroke="${c}" stroke-width="5.2" stroke-linecap="round"/>`,
+          )
+          .join('') +
+        `<ellipse cx="19" cy="103" rx="14" ry="9" fill="#eef2f7"/>` +
+        `<ellipse cx="27" cy="98" rx="10" ry="7" fill="#eef2f7"/>` +
+        `<ellipse cx="101" cy="103" rx="14" ry="9" fill="#eef2f7"/>` +
+        `<ellipse cx="93" cy="98" rx="10" ry="7" fill="#eef2f7"/>`
+      )
+    },
+  },
+
+  'traffic-jams': {
+    subject: 'three cars queued nose to tail on a dark road, brake lights lit, a skyline waiting behind them',
+    palette: ['#232733', '#33363d', '#e8c34a', '#3d5a80', '#8f3985', '#c9a227', '#c9dcea', '#ff4d4d'],
+    draw: () => {
+      const cars: [number, number, number, number, string][] = [
+        [24, 78, 30, 20, '#3d5a80'],
+        [56, 66, 26, 18, '#8f3985'],
+        [84, 56, 22, 15, '#c9a227'],
+      ]
+      return (
+        `<rect x="0" y="0" width="120" height="70" fill="#232733"/>` +
+        `<rect x="4" y="20" width="10" height="34" fill="#33363d" opacity="0.6"/>` +
+        `<rect x="18" y="10" width="14" height="44" fill="#33363d" opacity="0.6"/>` +
+        `<rect x="96" y="14" width="12" height="40" fill="#33363d" opacity="0.6"/>` +
+        `<rect x="0" y="52" width="120" height="68" fill="#33363d"/>` +
+        Array.from(
+          { length: 5 },
+          (_, i) => `<rect x="${8 + i * 24}" y="84" width="12" height="4" fill="#e8c34a"/>`,
+        ).join('') +
+        cars
+          .map(
+            ([x, y, w, h, c]) =>
+              `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${c}"/>` +
+              `<rect x="${x + w * 0.18}" y="${y - h * 0.32}" width="${w * 0.64}" height="${h * 0.4}" rx="3" fill="${c}"/>` +
+              `<rect x="${x + w * 0.24}" y="${y - h * 0.24}" width="${w * 0.52}" height="${h * 0.28}" rx="2" fill="#c9dcea"/>` +
+              `<circle cx="${x + w * 0.86}" cy="${y + h * 0.5}" r="${h * 0.16}" fill="#ff4d4d"/>`,
+          )
+          .join('')
+      )
+    },
+  },
 }
 
 /* ---- mood, the same contract the rest of the site's art uses ------------- */
