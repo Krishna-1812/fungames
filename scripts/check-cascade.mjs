@@ -17,7 +17,7 @@
  */
 import {
   RULES, MONTHS, GREEK, SINS, COLOURS, PLANETS, SHAPES, NUMBER_WORDS,
-  APOLOGIES, NOBLE_GASES, COUNTRY_CODES, chars, hour24, digitSum, vowelCount, isPrime,
+  APOLOGIES, NOBLE_GASES, COUNTRY_CODES, ZODIAC, chars, hour24, digitSum, vowelCount, isPrime,
 } from '../src/lib/cascade-rules.ts'
 
 const VERBOSE = process.argv.includes('--verbose')
@@ -47,6 +47,7 @@ function core(hour, banned, count = RULES.length) {
     pick(PLANETS), pick(SHAPES), pick(NUMBER_WORDS), pick(APOLOGIES),
     pick(NOBLE_GASES, (w) => !hasRoman(w)),   // also the chemical element
     pick(COUNTRY_CODES, (w) => !hasRoman(w)), // also the uppercase letter
+    pick(ZODIAC),
   ]
 
   // 50 outright, or 10 x 5 when the sacrifice takes the L.
@@ -276,6 +277,7 @@ const LISTS = {
   shapes: SHAPES, numbers: NUMBER_WORDS, apologies: APOLOGIES,
   'noble gases': NOBLE_GASES.filter((w) => !hasRoman(w)),
   'country codes': COUNTRY_CODES.filter((w) => !hasRoman(w)),
+  zodiac: ZODIAC,
 }
 for (const [name, list] of Object.entries(LISTS)) {
   const dead = 'abcdefghijklmnopqrstuvwxyz'.split('').filter(

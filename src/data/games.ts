@@ -266,9 +266,9 @@ export const GAMES: Game[] = [
   {
     slug: 'rule-cascade',
     title: 'Rule Cascade',
-    blurb: 'Thirty rules. One of them eats your typing.',
+    blurb: 'Thirty-one rules. One of them eats your typing.',
     description:
-      'It is just a username field. Then it wants a prime number, then the time, then a chess square. Then a moth gets in and starts eating characters, and a letter of the alphabet is taken away from you permanently. Thirty rules, and none of them ever switches off.',
+      'It is just a username field. Then it wants a prime number, then the time, then a chess square. Then a moth gets in and starts eating characters, and a letter of the alphabet is taken away from you permanently. Thirty-one rules, and none of them ever switches off.',
     accent: '#0d3b2b', accent2: '#5cb872',
     category: 'fun',
     added: '2026-09-10',

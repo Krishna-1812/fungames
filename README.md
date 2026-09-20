@@ -589,7 +589,7 @@ universe. Scroll position sets how wide the screen is in metres; objects are
 drawn at their true size relative to that. *No blank stretch across 40 sampled
 positions.*
 
-**Rule Cascade** — thirty escalating username rules, none of which ever switch
+**Rule Cascade** — thirty-one escalating username rules, none of which ever switch
 off. Three of them do something rather than just checking: a moth eats one
 character every six seconds until you put a spider in, a sacrifice takes
 whichever letter you have leaned on hardest and never gives it back, and one

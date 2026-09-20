@@ -80,6 +80,11 @@ export const NUMBER_WORDS = [
 
 export const APOLOGIES = ['sorry', 'apologies', 'my bad', 'forgive me', 'regret']
 
+export const ZODIAC = [
+  'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio',
+  'sagittarius', 'capricorn', 'aquarius', 'pisces',
+]
+
 /** A spread wide enough that losing any one letter leaves plenty. */
 export const COUNTRY_CODES = [
   'BR', 'SE', 'AT', 'NO', 'FR', 'DE', 'JP', 'KE', 'PE', 'TH', 'ZA', 'NZ', 'GB',
@@ -228,4 +233,5 @@ export const RULES: Rule[] = [
   { id: 28, text: () => 'The number of digits must be even.', ok: (s) => (s.match(/\d/g) || []).length % 2 === 0 },
   { id: 29, text: () => 'It must not contain the word “username”.', ok: (s) => !s.toLowerCase().includes('username') },
   { id: 30, text: () => 'It must contain an apology.', ok: (s) => has(s, APOLOGIES) },
+  { id: 31, text: () => 'It must include a zodiac sign.', ok: (s) => has(s, ZODIAC) },
 ]
