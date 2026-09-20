@@ -131,7 +131,7 @@ src/
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished
     icons.ts            eighty-three drawn icons, shared across the games
-    fusion-art.ts       the thirty-nine elements of Fusion, drawn
+    fusion-art.ts       the forty-four elements of Fusion, drawn
     icon-uses.ts        which game asks for which icon, and on what background
     audio.ts            the synthesiser: every sound on the site, no audio files
     fx.ts               particles, screen shake, floating text
@@ -633,7 +633,7 @@ table; the Cloudflare Worker takes over when deployed.
 
 Every element is drawn (`lib/fusion-art.ts`). It used to render an emoji per
 piece, grandfathered on the argument that an open-ended tree leaves nothing to
-draw in advance — but the tree is a closed set of thirty-nine elements, all
+draw in advance — but the tree is a closed set of forty-four elements, all
 reachable from the four starters and all known at build time. These follow the
 icon conventions rather than the product-art ones, because each renders at
 about 20px inline in a light pill and again in a dark tray chip: one drawing,

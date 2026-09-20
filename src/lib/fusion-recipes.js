@@ -41,6 +41,11 @@ export const RECIPES = [
   ['sun', 'water', 'Rainbow'],
   ['sun', 'plant', 'Sunflower'],
   ['lake', 'fire', 'Steam'],
+  ['volcano', 'water', 'Island'],
+  ['desert', 'water', 'Oasis'],
+  ['city', 'fire', 'Ruins'],
+  ['swamp', 'wind', 'Fog'],
+  ['tornado', 'sand', 'Sandstorm'],
 ]
 
 export const LOCAL = Object.fromEntries(RECIPES.map(([a, b, text]) => [pairKey(a, b), { text }]))

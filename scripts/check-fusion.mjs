@@ -19,7 +19,7 @@ assert.equal(loadState({ getItem() { return '{broken' } }).items.length, 4)
 const cacheKey = pairKey('Fire', 'Sand')
 assert.deepEqual(restoreState({ version: 2, items: [], recipes: { [cacheKey]: discovered, '__proto__': {}, bad: discovered } }).recipes, { [cacheKey]: discovered })
 
-assert.equal(RECIPES.length, 36)
+assert.equal(RECIPES.length, 41)
 assert.equal(Object.keys(LOCAL).length, RECIPES.length, 'duplicate recipe pair')
 for (const [a, b, text] of RECIPES) {
   assert.equal(LOCAL[pairKey(a, b)].text, text)
@@ -82,4 +82,4 @@ env.AI.run = async () => ({ response: '{"result":{}}' })
 assert.equal((await request(undefined, 'Bad', 'Shape')).status, 502)
 env.AI.run = async () => { throw new Error('offline') }
 assert.equal((await request(undefined, 'No', 'Network')).status, 502)
-console.log('Fusion: 36 recipes reachable in both orders; origin, validation, cache and failure regressions passed.')
+console.log('Fusion: 41 recipes reachable in both orders; origin, validation, cache and failure regressions passed.')

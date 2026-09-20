@@ -446,6 +446,59 @@ export const FUSION_ART: Record<string, Element> = {
       </g>
       <circle cx="12" cy="10" r="3.2" fill="${P.rust}"/>`,
   },
+
+  /* ---- the five newest ---------------------------------------------------- */
+  Island: {
+    subject: 'a small landmass ringed by open water, a single leaning palm',
+    draw: () => `
+      <ellipse cx="12" cy="16.2" rx="10.6" ry="4.4" fill="${P.blue}"/>
+      <path d="M5.4 16c.8-2.4 3.2-4 6.6-4s5.8 1.6 6.6 4c-2.1.9-4.2 1.3-6.6 1.3s-4.5-.4-6.6-1.3Z" fill="${P.olive}"/>
+      <path d="M12.4 12.4c.4-3.4 1.6-5.6 3.6-6.8" fill="none" stroke="${P.clay}" stroke-width="2.2" stroke-linecap="round"/>
+      <g fill="${P.green}">
+        <path d="M16 5.6c1.6-.6 3-.4 4 .6-1.4.8-2.8.8-4-.6Z"/>
+        <path d="M16 5.6c-.2-1.6.4-2.8 1.6-3.6-.2 1.6.2 2.8-1.6 3.6Z"/>
+        <path d="M16 5.6c1.6.4 2.6 1.4 2.8 2.8-1.6-.2-2.6-1-2.8-2.8Z"/>
+      </g>`,
+  },
+  Oasis: {
+    subject: 'a ring of dunes around a small pool of water, one palm',
+    draw: () => `
+      <path d="M1 21c1.4-5.6 4.4-8.4 7.6-8.4s6.2 2.8 7.6 8.4Z" fill="${P.clay}" opacity="0.55"/>
+      <path d="M8 21c1-4.4 3.4-6.6 7-6.6s6 2.2 7 6.6Z" fill="${P.clay}"/>
+      <ellipse cx="12" cy="19.6" rx="4.2" ry="1.8" fill="${P.blue}"/>
+      <path d="M9.4 15c.2-3.2 1.2-5.2 3-6.4" fill="none" stroke="${P.clay}" stroke-width="2.2" stroke-linecap="round"/>
+      <g fill="${P.green}">
+        <path d="M12.4 8.6c1.4-.8 2.8-.8 3.8 0-1.2 1-2.6 1-3.8 0Z"/>
+        <path d="M12.4 8.6c-.4-1.4.2-2.6 1.4-3.4 0 1.4-.2 2.6-1.4 3.4Z"/>
+      </g>`,
+  },
+  Ruins: {
+    subject: 'three broken wall stumps at different heights, rubble at their feet',
+    draw: () => `
+      <path d="M3 21V12l1.6 2 1-2.6 1.4 2.4V21Z" fill="${P.slate}"/>
+      <path d="M9.4 21V8.4l1.8 2.6 1.2-3 1.6 2.8V21Z" fill="${P.ash}"/>
+      <path d="M16 21V14l1.4 1.8.9-2.2 1.3 2V21Z" fill="${P.slate}" opacity="0.85"/>
+      <path d="M2 21h20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.28"/>
+      <g ${soft(0.3)}><circle cx="6.4" cy="20" r="1"/><circle cx="13" cy="20.2" r="0.8"/></g>`,
+  },
+  Fog: {
+    subject: 'a low bank of fog with two wisps drifting above it',
+    draw: () => `
+      <path d="M2.4 21c-.2-3.6 2.2-6.2 5.6-6.2h8c3.4 0 5.8 2.6 5.6 6.2Z" fill="${P.teal}"/>
+      <path d="M3 9.4c2.6-1.6 5-1.6 7.4 0s5 1.6 7.6 0 4-1.6 5-1" fill="none" stroke="currentColor"
+            stroke-width="2.6" stroke-linecap="round" opacity="0.6"/>
+      <path d="M4 14c2.4-1.4 4.6-1.4 6.8 0s4.6 1.4 7 0 3.6-1.4 4.6-.9" fill="none" stroke="currentColor"
+            stroke-width="2.6" stroke-linecap="round" opacity="0.4"/>`,
+  },
+  Sandstorm: {
+    subject: 'a leaning wall of blowing dust with a curling top and streaming grit',
+    draw: () => `
+      <path d="M2 21c.4-6.4 3-11.4 7.4-13.4-2.6 3.6-3.4 8-3 13.4Z" fill="${P.clay}"/>
+      <path d="M9.4 7.6c3-.6 5 1 5.4 3.6.3 2-1 3.4-3 3-1.3-.3-1.8-1.4-1.2-2.4" fill="none"
+            stroke="${P.gold}" stroke-width="2.4" stroke-linecap="round" opacity="0.85"/>
+      <path d="M13 15.4h7.4M15 18.4h6.4M12.4 21h6.6" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" opacity="0.4"/>`,
+  },
 }
 
 /**

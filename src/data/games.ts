@@ -296,9 +296,9 @@ export const GAMES: Game[] = [
   {
     slug: 'fusion',
     title: 'Fusion',
-    blurb: 'Thirty-nine things, and four to start with',
+    blurb: 'Forty-four things, and four to start with',
     description:
-      'Water, fire, earth and wind, and thirty-five things to make out of them — stone, glass, a blade, an hourglass, a city. Every element is drawn rather than borrowed from an emoji set, and the whole tree works offline; deploy the bundled Cloudflare Worker and it will invent new ones beyond it.',
+      'Water, fire, earth and wind, and forty things to make out of them — stone, glass, a blade, an hourglass, a city. Every element is drawn rather than borrowed from an emoji set, and the whole tree works offline; deploy the bundled Cloudflare Worker and it will invent new ones beyond it.',
     accent: '#1e1a45', accent2: '#b44cf0',
     category: 'fun',
     added: '2026-09-07',
