@@ -18,6 +18,38 @@ function rgb(hex: string) {
   const v = parseInt(hex.slice(1), 16)
   return `${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}`
 }
+
+/**
+ * Each volume control is a real rotary knob rather than a linear slider — the
+ * one mechanic neal.fun's own mixer has that this page didn't. A 270-degree
+ * sweep, 135deg to 405deg, is the standard hardware-pot layout: a ninety-degree
+ * dead zone at the bottom, full off at seven o'clock, full on at five.
+ *
+ * The same trig runs again, client-side, in the script below — it has to,
+ * since nothing from this frontmatter ships to the browser — so both copies
+ * are kept to these same few lines on purpose.
+ */
+const KNOB = { cx: 22, cy: 22, track: 17, ptrIn: 13, ptrOut: 16, start: 135, sweep: 270 }
+const toRad = (d: number) => (d * Math.PI) / 180
+function knobPoint(r: number, deg: number) {
+  return {
+    x: (KNOB.cx + r * Math.cos(toRad(deg))).toFixed(2),
+    y: (KNOB.cy + r * Math.sin(toRad(deg))).toFixed(2),
+  }
+}
+function knobArc(r: number, startDeg: number, endDeg: number) {
+  if (endDeg <= startDeg + 0.01) return ''
+  const s = knobPoint(r, startDeg)
+  const e = knobPoint(r, endDeg)
+  const large = endDeg - startDeg > 180 ? 1 : 0
+  return `M${s.x} ${s.y} A${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`
+}
+const KNOB_DEFAULT = 45
+const KNOB_TRACK_D = knobArc(KNOB.track, KNOB.start, KNOB.start + KNOB.sweep)
+const KNOB_DEFAULT_ANGLE = KNOB.start + (KNOB_DEFAULT / 100) * KNOB.sweep
+const KNOB_DEFAULT_FILL_D = knobArc(KNOB.track, KNOB.start, KNOB_DEFAULT_ANGLE)
+const KNOB_DEFAULT_P1 = knobPoint(KNOB.ptrIn, KNOB_DEFAULT_ANGLE)
+const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 ---
 
 <GameLayout slug="ambient-mix" bar="#132a3f" bodyClass="mix-body">
@@ -65,9 +97,28 @@ function rgb(hex: string) {
               </span>
               <span class="viz" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
             </button>
+            <div class="knob-row">
+              <div
+                class="knob" role="slider" tabindex="0"
+                aria-label={`${l.name} volume`} aria-valuemin="0" aria-valuemax="100"
+                aria-valuenow={KNOB_DEFAULT} aria-orientation="vertical"
+              >
+                <svg viewBox="0 0 44 44" class="knob-face" aria-hidden="true">
+                  <path class="knob-track" d={KNOB_TRACK_D} />
+                  <path class="knob-fill" d={KNOB_DEFAULT_FILL_D} />
+                  <circle class="knob-cap" cx="22" cy="22" r="12" />
+                  <line
+                    class="knob-pointer"
+                    x1={KNOB_DEFAULT_P1.x} y1={KNOB_DEFAULT_P1.y}
+                    x2={KNOB_DEFAULT_P2.x} y2={KNOB_DEFAULT_P2.y}
+                  />
+                </svg>
+              </div>
+              <span class="knob-val" aria-hidden="true">{KNOB_DEFAULT}%</span>
+            </div>
             <input
               class="vol" type="range" min="0" max="100" value="45"
-              aria-label={`${l.name} volume`}
+              aria-hidden="true" tabindex="-1"
             />
           </li>
         ))
@@ -342,6 +393,97 @@ function rgb(hex: string) {
     }, 200)
   }
 
+  /* ---- the knobs ----------------------------------------------------------
+     Same 270-degree sweep as the frontmatter's server-rendered default state
+     (see the comment there for why the trig is duplicated rather than
+     shared), driving the hidden native range input rather than replacing it —
+     everything downstream (the audio graph, the URL codec, presets, shared
+     links) already reads that input and stays untouched. */
+  const KNOB = { cx: 22, cy: 22, track: 17, ptrIn: 13, ptrOut: 16, start: 135, sweep: 270 }
+  const toRad = (d) => (d * Math.PI) / 180
+  function knobPoint(r, deg) {
+    return { x: (KNOB.cx + r * Math.cos(toRad(deg))).toFixed(2), y: (KNOB.cy + r * Math.sin(toRad(deg))).toFixed(2) }
+  }
+  function knobArc(r, startDeg, endDeg) {
+    if (endDeg <= startDeg + 0.01) return ''
+    const s = knobPoint(r, startDeg), e = knobPoint(r, endDeg)
+    const large = endDeg - startDeg > 180 ? 1 : 0
+    return `M${s.x} ${s.y} A${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`
+  }
+
+  const knobPaints = new Map()
+  function bindKnobs() {
+    for (const li of grid.querySelectorAll('.layer')) {
+      const knob = li.querySelector('.knob')
+      const input = li.querySelector('.vol')
+      const fill = knob.querySelector('.knob-fill')
+      const pointer = knob.querySelector('.knob-pointer')
+      const val = li.querySelector('.knob-val')
+
+      function paint(v) {
+        v = Math.max(0, Math.min(100, v))
+        const angle = KNOB.start + (v / 100) * KNOB.sweep
+        fill.setAttribute('d', knobArc(KNOB.track, KNOB.start, angle))
+        const p1 = knobPoint(KNOB.ptrIn, angle), p2 = knobPoint(KNOB.ptrOut, angle)
+        pointer.setAttribute('x1', p1.x); pointer.setAttribute('y1', p1.y)
+        pointer.setAttribute('x2', p2.x); pointer.setAttribute('y2', p2.y)
+        knob.setAttribute('aria-valuenow', String(Math.round(v)))
+        val.textContent = `${Math.round(v)}%`
+      }
+      knobPaints.set(li.dataset.id, paint)
+
+      function setValue(v, commit) {
+        v = Math.max(0, Math.min(100, Math.round(v)))
+        input.value = String(v)
+        paint(v)
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        if (commit) input.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+
+      let dragging = false, startY = 0, startV = 45
+      knob.addEventListener('pointerdown', (e) => {
+        dragging = true
+        startY = e.clientY
+        startV = Number(input.value)
+        knob.setPointerCapture(e.pointerId)
+        knob.classList.add('grabbed')
+      })
+      knob.addEventListener('pointermove', (e) => {
+        if (!dragging) return
+        // A full-range drag (0 to 100) in about 165px — vertical, because
+        // that is how a real hand actually turns a small knob: up to open it,
+        // down to close it, no need to trace the arc itself.
+        setValue(startV + (startY - e.clientY) * 0.6, false)
+      })
+      const release = () => {
+        if (!dragging) return
+        dragging = false
+        knob.classList.remove('grabbed')
+        setValue(Number(input.value), true)
+      }
+      knob.addEventListener('pointerup', release)
+      knob.addEventListener('pointercancel', release)
+
+      knob.addEventListener('keydown', (e) => {
+        const cur = Number(input.value)
+        const STEP = { ArrowUp: 2, ArrowRight: 2, ArrowDown: -2, ArrowLeft: -2, PageUp: 10, PageDown: -10 }
+        if (e.key === 'Home') { setValue(0, true); e.preventDefault() }
+        else if (e.key === 'End') { setValue(100, true); e.preventDefault() }
+        else if (e.key in STEP) { setValue(cur + STEP[e.key], true); e.preventDefault() }
+      })
+
+      knob.addEventListener('wheel', (e) => {
+        e.preventDefault()
+        setValue(Number(input.value) - Math.sign(e.deltaY) * 3, true)
+      }, { passive: false })
+
+      knob.addEventListener('dblclick', () => setValue(45, true))
+
+      paint(Number(input.value))
+    }
+  }
+  bindKnobs()
+
   function setLayer(L, on) {
     L.on = on
     const target = on ? L.vol : 0
@@ -483,7 +625,9 @@ function rgb(hex: string) {
       if (!li) continue
       const v = mix.levels[l.id] ?? 0
       const on = v > 0
-      li.querySelector('.vol').value = String(Math.round((on ? v : 0.45) * 100))
+      const pct = Math.round((on ? v : 0.45) * 100)
+      li.querySelector('.vol').value = String(pct)
+      knobPaints.get(l.id)?.(pct)
       const L = layers.get(l.id)
       if (L) { L.vol = on ? v : 0.45; setLayer(L, on) }
       else {
@@ -668,6 +812,48 @@ function rgb(hex: string) {
   .name { font-weight: 600; font-size: 15.5px; }
   .hint { font-size: 12px; color: #7f99b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  /* Present only as an event bus for the knob below — see the script comment
+     on bindKnobs() for why the audio graph, URL codec and presets still read
+     this element instead of the knob directly. */
+  .vol {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    opacity: 0; pointer-events: none;
+  }
+
+  .knob-row {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-top: 12px;
+  }
+  .knob {
+    width: 44px; height: 44px; flex: none; cursor: grab; touch-action: none;
+    border-radius: 50%; outline-offset: 3px;
+  }
+  .knob:active, .knob.grabbed { cursor: grabbing; }
+  .knob:focus-visible { outline: 2px solid #7ad4a0; }
+  .knob-face { width: 100%; height: 100%; display: block; }
+  .knob-track {
+    fill: none; stroke: #24405a; stroke-width: 4; stroke-linecap: round;
+  }
+  .knob-fill {
+    fill: none; stroke: var(--mood); stroke-width: 4; stroke-linecap: round;
+    transition: stroke 200ms var(--ease);
+  }
+  .knob-cap {
+    fill: #0e1b28; stroke: #24405a; stroke-width: 1;
+    transition: fill 160ms var(--ease);
+  }
+  .knob:hover .knob-cap, .knob.grabbed .knob-cap { fill: #16283a; }
+  .knob-pointer {
+    stroke: #cfe0ee; stroke-width: 2.4; stroke-linecap: round;
+    transition: x1 90ms var(--ease), y1 90ms var(--ease), x2 90ms var(--ease), y2 90ms var(--ease);
+  }
+  .knob.grabbed .knob-pointer { transition: none; }
+  .layer.on .knob-pointer { stroke: var(--mood); }
+  .knob-val {
+    font-size: 12px; font-variant-numeric: tabular-nums; color: #7f99b0;
+    min-width: 3ch;
+  }
+
   .viz { display: flex; align-items: flex-end; gap: 2px; height: 20px; flex: none; }
   /* --v is set from real per-band analyser data every frame. scaleY keeps it
      off the layout path; animating height would reflow the card. */
@@ -681,8 +867,6 @@ function rgb(hex: string) {
     transition: background 200ms var(--ease);
   }
   .layer.on .viz :global(i) { background: #7ad4a0; }
-
-  .vol { width: 100%; margin-top: 12px; }
 
   .note { text-align: center; color: #7f99b0; font-size: 13.5px; margin-top: 26px; }
 </style>
