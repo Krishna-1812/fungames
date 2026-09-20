@@ -65,9 +65,9 @@ export const GAMES: Game[] = [
   {
     slug: 'earth-reviews',
     title: 'Earth Reviews',
-    blurb: 'Twenty-two things you cannot return',
+    blurb: 'Thirty-two things you cannot return',
     description:
-      'A consumer-reviews site for twenty-two real natural phenomena — gravity, the Moon, entropy, mosquitoes, Mondays, the ocean — each listed as a product and reviewed by people who never asked for it. The reviewers and their dates are invented; the star averages and the five rating bars on every product page are the real arithmetic over what they wrote, checked against means worked out by hand before it ships.',
+      'A consumer-reviews site for thirty-two real natural phenomena — gravity, the Moon, entropy, mosquitoes, Mondays, the ocean, solar eclipses, déjà vu — each listed as a product and reviewed by people who never asked for it. The reviewers and their dates are invented; the star averages and the five rating bars on every product page are the real arithmetic over what they wrote, checked against means worked out by hand before it ships.',
     accent: '#42281c', accent2: '#ffd96b',
     category: 'fun',
     added: '2026-09-30',

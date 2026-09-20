@@ -1,5 +1,5 @@
 /**
- * Earth Reviews — twenty-two real natural phenomena, physical laws and facts
+ * Earth Reviews — thirty-two real natural phenomena, physical laws and facts
  * of existence, reviewed by invented customers who did not ask for any of them.
  *
  * This is the one file on this site where the writing is deliberately comic
@@ -29,7 +29,7 @@
  * so the division happens exactly once: `sum` and `n` are integers, so
  * `sum * 10 / n` lands on a representable half whenever the true mean has one,
  * and 2.25 rounds to 2.3 rather than to whatever a second float operation
- * happened to leave it just under. Thirteen of the twenty-two phenomena average
+ * happened to leave it just under. 18 of the 32 phenomena average
  * exactly x.x5, so this is not a theoretical distinction.
  *
  * ### The dates

@@ -101,7 +101,7 @@ src/
     scale-art.ts        twenty-six of those drawn, with both their real axes
     deep-sea-art.ts     twenty-two cut-out subjects, no water of their own
     spend-art.ts        the thirty things you can buy, drawn as products
-    earth-reviews-art.ts  twenty-two phenomena drawn as product shots, plus
+    earth-reviews-art.ts  thirty-two phenomena drawn as product shots, plus
                         the star row every rating on that page is drawn with
     time-events.ts      Deep Time's forty-four events and when they happened
     time-art.ts         a scene for each, flat colour on one palette
@@ -502,10 +502,10 @@ a year" parser stripped full stops as separators along with commas, which
 silently turned a typed `12.5` into the year 125 — a box that answers a
 question nobody asked.*
 
-**Earth Reviews** — a consumer-reviews site for twenty-two real natural
+**Earth Reviews** — a consumer-reviews site for thirty-two real natural
 phenomena, physical laws and facts of existence: gravity, the Moon, entropy,
-mosquitoes, quicksand, Mondays, photosynthesis. Ninety-three reviews across
-them, all written for this page, by reviewers who are all invented — a
+mosquitoes, quicksand, Mondays, photosynthesis, solar eclipses, déjà vu. 133
+reviews across them, all written for this page, by reviewers who are all invented — a
 storefront grid with a live search over the whole catalogue and three
 orderings, a department and a breadcrumb per product, and a product page
 carrying a star-distribution bar chart, a review list with a working sort, a
@@ -524,8 +524,9 @@ proves every one of them three ways — against sums typed out by hand with the
 rating list beside them, against integer arithmetic over the reviews, and
 against a mean rebuilt from the five bar counts alone, which never see an
 individual review. It found the number that justifies stating the rounding
-rule at all: thirteen of the twenty-two averages land on exactly x.x5.* Two
-bugs came out of running it rather than reading it: every product shot
+rule at all: 18 of the 32 averages land on exactly x.x5.* Two
+bugs came out of running it rather than reading it, back when there were
+twenty-two products: every product shot
 rendered as a pale wash, because a radial gradient whose stops are all `rgba`
 has nothing behind it but the white card and so composited twenty-two dark
 moods against white; and all twenty-two drawings shipped a second time inside

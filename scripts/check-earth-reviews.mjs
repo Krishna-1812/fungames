@@ -18,7 +18,7 @@
  *      that had drifted out of step with the reviews could not agree with the
  *      other two by accident.
  *
- * Twelve of the twenty-two phenomena average to exactly x.x5, so the stated
+ * 18 of the 32 phenomena average to exactly x.x5, so the stated
  * rounding rule (one decimal place, halves away from zero) is doing real work
  * rather than being a formality — it decides more than half the numbers on the
  * page. There is a direct test of it below on synthetic input.
@@ -29,7 +29,7 @@
  * nothing, a cross-sell pointing at a product that no longer exists, a
  * phenomenon with no drawing or a drawing with no phenomenon, and an SVG id
  * that is not prefixed with its own key — which on this page, where all
- * twenty-two drawings inline into one document, means one of them silently
+ * thirty-two drawings inline into one document, means one of them silently
  * renders with another's gradient.
  *
  *   node scripts/check-earth-reviews.mjs [--sheet out.png]
@@ -435,9 +435,9 @@ console.log('\nevery product is drawn')
   check(VIEWBOX === '0 0 120 120', `all drawings share one stage (${VIEWBOX})`)
 }
 
-/* ---- 13. ids are safe to inline twenty-two at a time ----------------------- */
+/* ---- 13. ids are safe to inline thirty-two at a time ----------------------- */
 
-console.log('\nids are safe to inline twenty-two at a time')
+console.log('\nids are safe to inline thirty-two at a time')
 {
   const seen = new Map()
   let bad = 0

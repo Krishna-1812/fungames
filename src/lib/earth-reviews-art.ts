@@ -1,5 +1,5 @@
 /**
- * Earth Reviews' twenty-two phenomena, drawn.
+ * Earth Reviews' thirty-two phenomena, drawn.
  *
  * A parody storefront whose product tiles carry an emoji, a stock photograph
  * or a generic icon is not a parody storefront — it is a list. Every product
@@ -14,10 +14,10 @@
  *    `deep-sea-art.ts`: no card box, no painted backdrop of its own, bled to
  *    the tile's own edges, and a `dominantMood` colour computed from the
  *    drawing's own fills by drawn area so a tile's glow is the thing's own
- *    colour rather than one site accent applied to twenty-two different
+ *    colour rather than one site accent applied to thirty-two different
  *    subjects. `MOOD` below is that, precomputed.
  *  - **The id-prefixing convention** from `spend-art.ts`: every `id=` starts
- *    with that phenomenon's own key. All twenty-two inline into one document
+ *    with that phenomenon's own key. All thirty-two inline into one document
  *    — the storefront grid shows every one of them at once — and SVG ids are
  *    global to the document, so two drawings sharing an id means one of them
  *    silently renders with the other's gradient. `check-earth-reviews.mjs`
@@ -29,7 +29,7 @@
  * reference with `<use>` — the same trick `robot-scene.ts` uses to put nine
  * copies of one street on a page without nine copies of its markup. That is
  * also the reason the prefixing is load-bearing rather than tidy: the symbol
- * defines its gradients once, in a document that has twenty-one other
+ * defines its gradients once, in a document that has thirty-one other
  * drawings' gradients in it.
  */
 
@@ -701,6 +701,299 @@ export const ART: Record<string, Drawing> = {
               `<circle cx="${x + w * 0.86}" cy="${y + h * 0.5}" r="${h * 0.16}" fill="#ff4d4d"/>`,
           )
           .join('')
+      )
+    },
+  },
+
+  puberty: {
+    subject: 'a nursery growth chart on a painted wall, pencil ticks rising beside a post, two sprouts at its foot',
+    palette: ['#be377a', '#7a2a52', '#6b4a35', '#8a6248', '#2e2018', '#f5e6d8', '#8fbf9e', '#5c8f4a'],
+    draw: () =>
+      `<rect x="4" y="4" width="112" height="112" rx="10" fill="#be377a"/>` +
+      `<rect x="4" y="100" width="112" height="16" rx="4" fill="#7a2a52" opacity="0.55"/>` +
+      `<rect x="50" y="8" width="16" height="104" rx="3" fill="#6b4a35"/>` +
+      `<path d="M54 14 C56 40 52 70 55 108 M62 14 C60 44 64 74 61 108" fill="none" stroke="#8a6248" stroke-width="1.1" opacity="0.55"/>` +
+      // Five pencil ticks, oldest (bottom) shortest, most recent (top) longest —
+      // the mark of a chart kept up for years rather than one measurement.
+      `<path d="M66 96 L80 96 M66 80 L84 80 M66 64 L88 64 M66 48 L92 48 M66 32 L96 32" fill="none" stroke="#2e2018" stroke-width="2" stroke-linecap="round" opacity="0.85"/>` +
+      `<circle cx="80" cy="96" r="2.2" fill="#f5e6d8"/>` +
+      `<circle cx="84" cy="80" r="2.2" fill="#8fbf9e"/>` +
+      `<circle cx="88" cy="64" r="2.2" fill="#f5e6d8"/>` +
+      `<circle cx="92" cy="48" r="2.2" fill="#8fbf9e"/>` +
+      `<circle cx="96" cy="32" r="2.4" fill="#f5e6d8"/>` +
+      `<path d="M40 100 C48 88 56 66 66 46 C71 36 76 28 82 21" fill="none" stroke="#f5e6d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="1 6" opacity="0.85"/>` +
+      `<path d="M82 21 L76 26 L80 30Z" fill="#f5e6d8"/>` +
+      `<path d="M18 108 L18 92" fill="none" stroke="#5c8f4a" stroke-width="3" stroke-linecap="round"/>` +
+      `<path d="M18 96 C12 92 8 94 6 100 C12 100 16 99 18 96Z" fill="#5c8f4a"/>` +
+      `<path d="M18 92 C24 88 28 90 30 96 C24 97 20 95 18 92Z" fill="#5c8f4a" opacity="0.85"/>` +
+      `<path d="M30 108 L30 78" fill="none" stroke="#5c8f4a" stroke-width="3.4" stroke-linecap="round"/>` +
+      `<path d="M30 84 C22 78 16 80 13 88 C21 90 27 88 30 84Z" fill="#5c8f4a"/>` +
+      `<path d="M30 78 C38 72 44 75 46 83 C38 85 33 82 30 78Z" fill="#5c8f4a" opacity="0.85"/>`,
+  },
+
+  'wisdom-teeth': {
+    subject: 'a back molar in an X-ray lightbox, crown cusps up top and two roots tapering into the jaw below',
+    palette: ['#2e9e75', '#1c2321', '#eef2f0', '#a9bdb8', '#26332f', '#7fd9b0'],
+    draw: () => {
+      const defs =
+        `<defs><radialGradient id="wisdom-teeth-glow" cx="50%" cy="42%" r="65%">` +
+        `<stop offset="0%" stop-color="#7fd9b0" stop-opacity="0.35"/>` +
+        `<stop offset="100%" stop-color="#2e9e75" stop-opacity="0"/>` +
+        `</radialGradient></defs>`
+      return (
+        defs +
+        `<rect x="0" y="0" width="120" height="120" fill="#2e9e75"/>` +
+        `<rect x="0" y="0" width="120" height="120" fill="url(#wisdom-teeth-glow)"/>` +
+        `<rect x="10" y="10" width="100" height="100" rx="6" fill="none" stroke="#1c2321" stroke-width="5"/>` +
+        // Readout scan-lines and corner brackets — the framing device that
+        // marks this as a lightbox view rather than a floating tooth.
+        `<path d="M14 30 L106 30 M14 46 L106 46 M14 90 L106 90 M14 104 L106 104" fill="none" stroke="#7fd9b0" stroke-width="1" opacity="0.22"/>` +
+        `<path d="M18 16 L18 26 M18 16 L28 16 M102 16 L102 26 M102 16 L92 16 M18 104 L18 94 M18 104 L28 104 M102 104 L102 94 M102 104 L92 104" fill="none" stroke="#7fd9b0" stroke-width="1.6" opacity="0.6"/>` +
+        // One wavy-topped crown — three cusps folded into a single path rather
+        // than separate bumps — sitting flush on two short, thick roots, so it
+        // reads as one molar rather than a head on stilts.
+        `<path d="M32 56 C29 42 33 28 42 24 C46 20 51 25 56 23 C61 25 66 20 70 24 C79 28 83 42 80 56 C74 51 66 48 56 48 C46 48 38 51 32 56Z" fill="#eef2f0"/>` +
+        `<path d="M38 50 C34 62 33 78 37 100 C42 100 45 90 45 76 C45 68 46 58 48 50 C44 52 41 52 38 50Z" fill="#eef2f0"/>` +
+        `<path d="M74 50 C78 62 79 78 75 100 C70 100 67 90 67 76 C67 68 66 58 64 50 C68 52 71 52 74 50Z" fill="#eef2f0"/>` +
+        `<path d="M48 50 C51 54 61 54 64 50 L64 44 L48 44Z" fill="#a9bdb8" opacity="0.6"/>` +
+        `<path d="M42 30 C46 26 51 30 56 28 C61 30 66 26 70 30" fill="none" stroke="#a9bdb8" stroke-width="1.6" opacity="0.6"/>` +
+        `<path d="M41 60 L39 96 M56 58 L56 46 M71 60 L73 96" fill="none" stroke="#26332f" stroke-width="1.3" opacity="0.75"/>`
+      )
+    },
+  },
+
+  'brain-freeze': {
+    subject: 'a head in profile built from one silhouette, ice shards bursting off the forehead and palate',
+    palette: ['#36a19d', '#1f5f5c', '#173f3d', '#eafcff', '#b6eef0'],
+    draw: () =>
+      ground(50, 104, 26, 6, '#173f3d') +
+      `<rect x="34" y="90" width="24" height="18" rx="6" fill="#1f5f5c"/>` +
+      // Cranium, jaw and a small nose bump are three shapes in the same fill
+      // rather than one hand-fitted outline — the same trick the apple in
+      // `gravity` uses to get a custom silhouette without a clip path.
+      `<ellipse cx="52" cy="52" rx="28" ry="30" fill="#36a19d"/>` +
+      `<path d="M24 58 C24 74 34 88 52 92 C64 92 74 84 78 70 C70 76 60 80 50 78 C36 76 26 68 24 58Z" fill="#36a19d"/>` +
+      `<path d="M76 60 C82 58 86 62 84 68 C80 70 76 68 76 60Z" fill="#36a19d"/>` +
+      `<path d="M25 46 C20 47 18 52 20 58 C22 62 26 62 27 58 C24 55 23 50 25 46Z" fill="#1f5f5c"/>` +
+      `<path d="M30 40 C40 34 52 34 60 40 M28 50 C40 44 54 44 64 50 M32 60 C42 56 52 58 60 64" fill="none" stroke="#173f3d" stroke-width="1.4" opacity="0.55"/>` +
+      `<path d="M20 46 C18 50 18 56 22 60" fill="none" stroke="#173f3d" stroke-width="1.8" opacity="0.5"/>` +
+      // Two bursts — the forehead, and the palate down near the jaw — so the
+      // cold reads as coming from inside the mouth as well as behind the eyes.
+      `<path d="M74 34 L80 18 L82 32 L92 20 L86 36 L98 30 L84 42 Z" fill="#eafcff"/>` +
+      `<path d="M58 78 L66 70 L64 80 L74 76 L64 86 L70 92 L56 88 Z" fill="#eafcff" opacity="0.9"/>` +
+      `<path d="M78 36 L86 44" fill="none" stroke="#b6eef0" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>` +
+      `<path d="M70 26 L74 14 M84 12 L86 22 M94 40 L104 42" fill="none" stroke="#eafcff" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>` +
+      `<circle cx="92" cy="16" r="1.8" fill="#eafcff" opacity="0.8"/>` +
+      `<circle cx="100" cy="34" r="1.6" fill="#b6eef0" opacity="0.7"/>` +
+      `<circle cx="66" cy="18" r="1.5" fill="#b6eef0" opacity="0.6"/>` +
+      `<circle cx="52" cy="92" r="1.6" fill="#b6eef0" opacity="0.7"/>`,
+  },
+
+  'deja-vu': {
+    subject: 'one figure mid-stride with two fainter echoes trailing it, ripples marking each repeated beat',
+    palette: ['#a64ebc', '#3a1f45', '#d9a8e8', '#f0d878'],
+    draw: () => {
+      // One pictogram, drawn once and called three times at falling opacity —
+      // the point being that the ghosts are literally the same shape, not a
+      // similar one, the way an echo is the same sound rather than a new one.
+      const figure = (x: number, o: number) =>
+        `<g opacity="${o}">` +
+        `<ellipse cx="${x}" cy="86" rx="10" ry="3" fill="#3a1f45" opacity="0.4"/>` +
+        `<circle cx="${x}" cy="30" r="8" fill="#a64ebc"/>` +
+        `<rect x="${x - 7}" y="36" width="14" height="22" rx="6" fill="#a64ebc"/>` +
+        `<path d="M${x - 2} 56 L${x - 7} 80 L${x - 2} 80 L${x + 2} 58 Z" fill="#a64ebc"/>` +
+        `<path d="M${x + 2} 56 L${x + 9} 78 L${x + 5} 79 L${x - 1} 58 Z" fill="#a64ebc"/>` +
+        `<path d="M${x - 6} 40 L${x - 14} 48" fill="none" stroke="#a64ebc" stroke-width="3" stroke-linecap="round"/>` +
+        `</g>`
+      return (
+        `<ellipse cx="60" cy="58" rx="54" ry="50" fill="#a64ebc" opacity="0.08"/>` +
+        `<circle cx="72" cy="52" r="46" fill="none" stroke="#a64ebc" stroke-width="1.4" opacity="0.28"/>` +
+        `<circle cx="72" cy="52" r="34" fill="none" stroke="#d9a8e8" stroke-width="1.2" opacity="0.4"/>` +
+        `<circle cx="72" cy="52" r="22" fill="none" stroke="#d9a8e8" stroke-width="1" opacity="0.5"/>` +
+        figure(30, 0.24) +
+        figure(56, 0.55) +
+        figure(84, 1) +
+        // A loop, because deja vu is the feeling of a moment that has come
+        // back around rather than one that simply repeats in a straight line.
+        `<path d="M22 4 A11 11 0 1 1 9 8" fill="none" stroke="#f0d878" stroke-width="2.4" stroke-linecap="round"/>` +
+        `<path d="M9 8 L5 3 L14 3Z" fill="#f0d878"/>` +
+        `<circle cx="94" cy="30" r="1.8" fill="#d9a8e8" opacity="0.8"/>` +
+        `<circle cx="100" cy="46" r="1.5" fill="#d9a8e8" opacity="0.65"/>`
+      )
+    },
+  },
+
+  fog: {
+    subject: 'a foggy street at dusk, two pine crowns and a lit lamppost standing clear above a low fog bank',
+    palette: ['#1c2321', '#171b16', '#33403a', '#2b2620', '#ffdca0', '#a7b3ad', '#c9d1cb'],
+    draw: () => {
+      // topY is the crown's own tip, not the ground the tree stands on — so
+      // the crown can be placed well clear of the fog line while the trunk
+      // still runs down into it.
+      const pine = (cx: number, topY: number, s: number) =>
+        `<path d="M${cx} ${topY} L${cx - s * 0.42} ${topY + s * 0.65} L${cx - s * 0.2} ${
+          topY + s * 0.65
+        } L${cx - s * 0.55} ${topY + s} L${cx + s * 0.55} ${topY + s} L${cx + s * 0.2} ${
+          topY + s * 0.65
+        } L${cx + s * 0.42} ${topY + s * 0.65}Z" fill="#33403a"/>` +
+        `<rect x="${cx - 2}" y="${topY + s}" width="4" height="30" fill="#2b2620"/>`
+      return (
+        // A dark sky and a darker street give the crowns and the lamp glow
+        // something to read against; the fog bank sits low across both, so
+        // the tops keep a clean silhouette and only the trunks and the
+        // ground actually disappear into it — "swallowed halfway up" as a
+        // shape you can see, not a tile of undifferentiated grey.
+        `<rect x="0" y="0" width="120" height="96" fill="#1c2321"/>` +
+        `<rect x="0" y="96" width="120" height="24" fill="#171b16"/>` +
+        `<rect x="90" y="34" width="3" height="70" fill="#2b2620"/>` +
+        `<path d="M85 32 L99 32 L92.5 22Z" fill="#2b2620"/>` +
+        `<circle cx="92.5" cy="32" r="13" fill="#ffdca0" opacity="0.32"/>` +
+        `<circle cx="92.5" cy="32" r="6" fill="#ffdca0" opacity="0.85"/>` +
+        pine(22, 14, 44) +
+        pine(50, 26, 30) +
+        `<ellipse cx="60" cy="90" rx="70" ry="20" fill="#a7b3ad" opacity="0.55"/>` +
+        `<ellipse cx="40" cy="100" rx="60" ry="18" fill="#a7b3ad" opacity="0.62"/>` +
+        `<ellipse cx="85" cy="104" rx="55" ry="16" fill="#a7b3ad" opacity="0.68"/>` +
+        `<ellipse cx="60" cy="112" rx="80" ry="14" fill="#a7b3ad" opacity="0.78"/>` +
+        `<ellipse cx="24" cy="86" rx="20" ry="6" fill="#c9d1cb" opacity="0.5"/>` +
+        `<ellipse cx="96" cy="92" rx="16" ry="5" fill="#c9d1cb" opacity="0.4"/>`
+      )
+    },
+  },
+
+  snow: {
+    subject: 'a dusk snowfall settling pink-lit drifts around two snow-capped pines, flakes still coming down',
+    palette: ['#c9d6e2', '#e8cfc9', '#f3e0da', '#314a37', '#4a3626', '#eef3f5', '#f7fbfc'],
+    draw: () => {
+      const flake = (cx: number, cy: number, r: number, o: number) =>
+        `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#f7fbfc" opacity="${o}"/>`
+      const pine = (cx: number, baseY: number, s: number) =>
+        `<path d="M${cx} ${baseY - s} L${cx - s * 0.4} ${baseY - s * 0.4} L${cx - s * 0.18} ${
+          baseY - s * 0.4
+        } L${cx - s * 0.5} ${baseY - s * 0.05} L${cx - s * 0.2} ${baseY - s * 0.05} L${cx - s * 0.58} ${baseY} L${
+          cx + s * 0.58
+        } ${baseY} L${cx + s * 0.2} ${baseY - s * 0.05} L${cx + s * 0.5} ${baseY - s * 0.05} L${
+          cx + s * 0.18
+        } ${baseY - s * 0.4} L${cx + s * 0.4} ${baseY - s * 0.4}Z" fill="#314a37"/>` +
+        `<rect x="${cx - 2.5}" y="${baseY}" width="5" height="8" fill="#4a3626"/>` +
+        `<ellipse cx="${cx}" cy="${baseY - s * 0.42}" rx="${s * 0.3}" ry="${s * 0.08}" fill="#eef3f5" opacity="0.9"/>` +
+        `<ellipse cx="${cx}" cy="${baseY - s * 0.1}" rx="${s * 0.42}" ry="${s * 0.1}" fill="#eef3f5" opacity="0.85"/>`
+      return (
+        // The drift is two ellipses in the one dusty-rose fill, which is
+        // what makes the tile glow that colour rather than the pale sky
+        // wash above it — the sky is a path, and a path's area is nominal.
+        `<path d="M0 0 L120 0 L120 36 C100 44 84 30 66 38 C48 46 30 32 14 40 C8 43 3 40 0 42Z" fill="#c9d6e2" opacity="0.85"/>` +
+        `<ellipse cx="28" cy="110" rx="58" ry="30" fill="#e8cfc9"/>` +
+        `<ellipse cx="96" cy="104" rx="40" ry="24" fill="#e8cfc9"/>` +
+        `<ellipse cx="30" cy="98" rx="30" ry="10" fill="#f3e0da" opacity="0.7"/>` +
+        pine(72, 100, 38) +
+        pine(100, 104, 26) +
+        flake(14, 20, 2.4, 0.8) +
+        flake(46, 12, 1.8, 0.7) +
+        flake(80, 18, 2.6, 0.85) +
+        flake(108, 30, 1.6, 0.6) +
+        flake(30, 46, 2, 0.75) +
+        flake(62, 34, 1.4, 0.6) +
+        flake(94, 52, 2.2, 0.8) +
+        flake(20, 68, 1.6, 0.55) +
+        flake(54, 58, 2, 0.65) +
+        flake(112, 66, 1.8, 0.6)
+      )
+    },
+  },
+
+  'solar-eclipse': {
+    subject: 'the Moon crossing dead centre over the Sun, corona streaming out around the rim',
+    palette: ['#eec2e0', '#14151d', '#fff6d8', '#ff8a5c', '#f2eef9'],
+    draw: () => {
+      // A wisp bows out to one side rather than running straight, and the
+      // set below is deliberately lopsided — two loose plumes near the
+      // poles, a scatter of shorter fuzz elsewhere — because straight
+      // spokes at even angles read as a dial rather than a corona.
+      const wisp = (angle: number, len: number, bow: number, w: number, o: number) => {
+        const a = (angle * Math.PI) / 180
+        const r0 = 39
+        const r1 = 39 + len
+        const x0 = 60 + Math.cos(a) * r0
+        const y0 = 60 + Math.sin(a) * r0
+        const x1 = 60 + Math.cos(a) * r1
+        const y1 = 60 + Math.sin(a) * r1
+        const perp = a + Math.PI / 2
+        const mr = r0 + len * 0.55
+        const cx = 60 + Math.cos(a) * mr + Math.cos(perp) * bow
+        const cy = 60 + Math.sin(a) * mr + Math.sin(perp) * bow
+        return `<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(
+          1,
+        )} ${x1.toFixed(1)} ${y1.toFixed(
+          1,
+        )}" fill="none" stroke="#eec2e0" stroke-width="${w}" stroke-linecap="round" opacity="${o}"/>`
+      }
+      const wisps = [
+        [-108, 30, 4, 2.6, 0.65], [-95, 22, -3, 1.6, 0.4], [-80, 34, 5, 2.8, 0.7],
+        [-68, 16, -2, 1.2, 0.32], [-52, 24, 3, 1.8, 0.45],
+        [78, 26, -4, 2.4, 0.6], [92, 33, 4, 2.8, 0.68], [106, 18, -3, 1.4, 0.35],
+        [120, 21, 3, 1.6, 0.42], [135, 12, -2, 1.1, 0.3],
+        [10, 13, 2, 1.2, 0.3], [175, 15, -2, 1.3, 0.32], [200, 11, 2, 1, 0.28],
+        [320, 14, -2, 1.2, 0.3],
+      ] as const
+      const streaks = wisps.map(([angle, len, bow, w, o]) => wisp(angle, len, bow, w, o)).join('')
+      // The bright limb is a short arc near the bead rather than a full
+      // ring — a complete stroked circle around the disc, combined with the
+      // wisps, read as a wristwatch bezel instead of a diamond-ring flash.
+      const limbA = { x: 75.6, y: 26.5 }
+      const limbB = { x: 95.7, y: 50.4 }
+      return (
+        // Three flat corona washes carry the tile's area — the wisps and
+        // the limb arc are stroked with no fill, so they add texture
+        // without weighing in on dominantMood, and the pale corona wins
+        // the tile easily over the near-black disc it wraps.
+        `<circle cx="60" cy="60" r="58" fill="#eec2e0" opacity="0.14"/>` +
+        `<circle cx="60" cy="60" r="50" fill="#eec2e0" opacity="0.24"/>` +
+        `<circle cx="60" cy="60" r="43" fill="#eec2e0" opacity="0.36"/>` +
+        streaks +
+        `<ellipse cx="26" cy="86" rx="3" ry="9" fill="#ff8a5c" opacity="0.8" transform="rotate(70 26 86)"/>` +
+        `<ellipse cx="96" cy="42" rx="3" ry="8" fill="#ff8a5c" opacity="0.7" transform="rotate(-30 96 42)"/>` +
+        `<circle cx="60" cy="60" r="37" fill="#14151d"/>` +
+        `<path d="M${limbA.x} ${limbA.y} A37 37 0 0 1 ${limbB.x} ${limbB.y}" fill="none" stroke="#fff6d8" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>` +
+        `<circle cx="88.3" cy="36.2" r="3.2" fill="#fff6d8"/>` +
+        `<circle cx="14" cy="16" r="1" fill="#f2eef9" opacity="0.8"/>` +
+        `<circle cx="106" cy="22" r="0.8" fill="#f2eef9" opacity="0.7"/>` +
+        `<circle cx="10" cy="98" r="0.9" fill="#f2eef9" opacity="0.6"/>` +
+        `<circle cx="112" cy="90" r="1.1" fill="#f2eef9" opacity="0.75"/>` +
+        `<circle cx="20" cy="60" r="0.8" fill="#f2eef9" opacity="0.6"/>`
+      )
+    },
+  },
+
+  magnetism: {
+    subject: 'a horseshoe magnet with iron filings tracing the invisible field between its two poles',
+    palette: ['#7fd8c9', '#c94a3d', '#c7cdd2', '#3a3d42', '#8d949b', '#2a2f33'],
+    draw: () => {
+      const filing = (cx: number, cy: number, r: number, o: number) =>
+        `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#3a3d42" opacity="${o}"/>`
+      return (
+        // The halo ellipse behind the iron is the tile's dominant colour on
+        // purpose: a magnet's field is the actual subject, the metal is just
+        // where it happens to be strongest.
+        ground(60, 108, 34, 8, '#2a2f33') +
+        `<ellipse cx="60" cy="60" rx="50" ry="42" fill="#7fd8c9" opacity="0.16"/>` +
+        `<path d="M32 40 C32 12 44 2 60 2 C76 2 88 12 88 40 L72 40 C72 22 66 18 60 18 C54 18 48 22 48 40 Z" fill="#c94a3d"/>` +
+        `<rect x="32" y="40" width="16" height="44" fill="#c94a3d"/>` +
+        `<rect x="72" y="40" width="16" height="44" fill="#c94a3d"/>` +
+        `<rect x="32" y="74" width="16" height="14" fill="#c7cdd2"/>` +
+        `<rect x="72" y="74" width="16" height="14" fill="#c7cdd2"/>` +
+        `<path d="M40 90 C50 108 70 108 80 90" fill="none" stroke="#7fd8c9" stroke-width="1.8" opacity="0.6"/>` +
+        `<path d="M36 88 C48 112 72 112 84 88" fill="none" stroke="#7fd8c9" stroke-width="1.3" opacity="0.4"/>` +
+        `<path d="M44 94 C52 104 68 104 76 94" fill="none" stroke="#7fd8c9" stroke-width="1.3" opacity="0.5"/>` +
+        filing(46, 98, 1.3, 0.8) +
+        filing(52, 104, 1.1, 0.7) +
+        filing(60, 106, 1.2, 0.75) +
+        filing(68, 104, 1.1, 0.7) +
+        filing(74, 98, 1.3, 0.8) +
+        filing(42, 90, 1, 0.6) +
+        filing(78, 90, 1, 0.6) +
+        `<path d="M18 100 L26 92 L30 96 L24 102 L28 106 L22 110 L14 104Z" fill="#8d949b"/>` +
+        `<path d="M92 98 L86 90 L82 94 L88 100 L84 104 L90 108 L98 102Z" fill="#8d949b"/>`
       )
     },
   },
