@@ -381,39 +381,52 @@ rules: flat palette, no gradients, no ids — checked the same way.
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
 
-**Space Elevator** — the same linear-scroll instrument as The Deep Sea, climbing
-instead of descending: sea level to the Kármán line, the internationally
-recognised edge of space, 100,000 real metres up, zoned by the real
-atmospheric layers (troposphere, stratosphere, mesosphere, thermosphere)
-rather than an invented scale. Every one of its twenty-nine markers is a
-genuine altitude record — Mount Everest, the highest bird ever confirmed
-flying, three real cloud genera at their real altitudes (a cumulonimbus
-flattening into its anvil right at the tropopause), Concorde's cruising
-altitude, the SR-71's speed record, three real stratospheric skydives
-(Kittinger, Baumgartner, Eustace), Tsar Bomba's mushroom cloud, and the
-Kármán line itself — every one now drawn, not just described. A single
-cable and elevator car climb continuously from a hand-drawn mountain
-horizon at the very start all the way to the edge of space, its position
-tied directly to real scroll altitude; a deterministic starfield fades in
-through the upper stratosphere; the HUD glows and pulses with the current
-zone's own sky colour. The one number computed live rather than looked up
-is the outside air temperature, from the real US Standard Atmosphere 1976
-formula — the same seven-layer model aviation uses, faithful enough that it
-reproduces the model's own textbook reference points (15°C at sea level,
--56.5°C at the tropopause, -2.5°C at the stratopause) on the nose, and
-honest enough to say "no single temperature" once you climb past its real
-86km ceiling rather than fake one. Every marker's icon is a cut-out now
-rather than a framed scene — `src/lib/space-elevator-art.ts`, the same
-contract as Deep Sea's own art module, one palette and a `dominantMood` glow
-per drawing, floating free of any card against the real sky colour of its
-own altitude instead of a painted approximation of it. The closing section doesn't reach for a
-joke ending: it explains, in real materials-science terms, why nobody has
-actually built a space elevator to geostationary orbit yet — not
+**Space Elevator** — the same linear-scroll instrument as The Deep Sea, but
+climbing the way an actual elevator would: ground sits at the very bottom of
+the document, the Kármán line at the very top, the page opens pre-scrolled
+to the ground, and scrolling *up* is what ascends — the reverse of every
+other scroll-driven game on this site, matched deliberately to neal.fun's
+own space-elevator page rather than the site's usual top-to-bottom
+convention. Sea level to the internationally recognised edge of space,
+100,000 real metres up, zoned by the real atmospheric layers (troposphere,
+stratosphere, mesosphere, thermosphere) rather than an invented scale. Every
+one of its twenty-nine markers is a genuine altitude record — Mount Everest,
+the highest bird ever confirmed flying, three real cloud genera at their
+real altitudes, Concorde's cruising altitude, the SR-71's speed record,
+three real stratospheric skydives (Kittinger, Baumgartner, Eustace), Tsar
+Bomba's mushroom cloud, and the Kármán line itself — each one a real
+shaded illustration rather than a flat cut-out: gradients are allowed now
+(`src/lib/space-elevator-art.ts`, id-prefixed the same way
+`earth-reviews-art.ts` and `deep-sea-art.ts` already do, via a `slug()`
+helper since a marker's title is a full sentence rather than a plain key),
+still composited directly over the real interpolated sky colour of its own
+altitude rather than a painted approximation of it. A single cable and
+elevator car — carrying a rider whose jacket colour you pick near the start
+— climb continuously from a hand-drawn mountain horizon at the ground all
+the way to the edge of space; a layered mountain panorama rises behind the
+Everest/Mont Blanc/Kilimanjaro cluster; rain falls low in the troposphere; a
+deterministic starfield fades in through the upper stratosphere; a real
+seven-segment odometer (`src/lib/seven-segment.ts`, the same component
+Printing Money and Days Since Incident already use) ticks the altitude up
+digit by digit; each zone boundary is a comic-style speech bubble rather
+than a plain divider; and a small "elevator music" toggle loops a few notes
+through the shared `tone()` synth. The one number computed live rather than
+looked up is the outside air temperature, from the real US Standard
+Atmosphere 1976 formula — the same seven-layer model aviation uses, faithful
+enough that it reproduces the model's own textbook reference points (15°C
+at sea level, -56.5°C at the tropopause, -2.5°C at the stratopause) on the
+nose, and honest enough to say "no single temperature" once you climb past
+its real 86km ceiling rather than fake one. The closing section doesn't
+reach for a joke ending: it explains, in real materials-science terms, why
+nobody has actually built a space elevator to geostationary orbit yet — not
 imagination, a genuine unsolved cable-strength problem. *`scripts/check-
 space-elevator.mjs` checks the temperature formula against those textbook
 values and for continuity across every layer seam, and checks that all
 twenty-nine markers are sorted by real altitude and land inside the zone
-their altitude claims.*
+their altitude claims; `scripts/check-space-elevator-art.mjs` checks that
+every gradient id is prefixed and collision-free, every colour (fills,
+strokes and gradient stops alike) comes from one shared palette, and no two
+of the twenty-nine scenes render as the same picture.*
 
 **How Fast Are You Moving?** — seven real, cited speeds stack live while you
 scroll: your tectonic plate drifting, the Earth turning beneath you (computed
