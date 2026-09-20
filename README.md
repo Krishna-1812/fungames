@@ -385,7 +385,7 @@ every marker actually lands inside the zone it claims to.*
 instead of descending: sea level to the Kármán line, the internationally
 recognised edge of space, 100,000 real metres up, zoned by the real
 atmospheric layers (troposphere, stratosphere, mesosphere, thermosphere)
-rather than an invented scale. Every one of its twenty-three markers is a
+rather than an invented scale. Every one of its twenty-nine markers is a
 genuine altitude record — Mount Everest, the highest bird ever confirmed
 flying, three real cloud genera at their real altitudes (a cumulonimbus
 flattening into its anvil right at the tropopause), Concorde's cruising
@@ -412,7 +412,7 @@ actually built a space elevator to geostationary orbit yet — not
 imagination, a genuine unsolved cable-strength problem. *`scripts/check-
 space-elevator.mjs` checks the temperature formula against those textbook
 values and for continuity across every layer seam, and checks that all
-twenty-three markers are sorted by real altitude and land inside the zone
+twenty-nine markers are sorted by real altitude and land inside the zone
 their altitude claims.*
 
 **How Fast Are You Moving?** — seven real, cited speeds stack live while you

@@ -77,6 +77,31 @@ export const MARKERS: Marker[] = [
     note: 'The cartoon cloud — flat-bottomed, cauliflower-topped — forms where a rising bubble of warm, moist air cools past its dew point. That almost always happens within the lowest two kilometres.',
   },
   {
+    altitude: 2_500, title: 'Where altitude sickness starts to bite',
+    note: 'Acute mountain sickness becomes a real risk above roughly this height — headaches, nausea and poor sleep, from a body that has not yet adjusted to thinner air. Below it, almost nobody feels a thing.',
+  },
+  {
+    altitude: 3_650, title: 'La Paz, the highest capital city on Earth',
+    note: 'Bolivia’s seat of government sits at roughly this altitude — high enough that visitors are routinely advised to spend their first day resting before doing anything strenuous.',
+  },
+  {
+    altitude: 4_808, title: 'Mont Blanc’s summit',
+    note: 'Western Europe’s highest peak, resurveyed by GPS in 2023. Thousands attempt it most years, making it one of the most climbed mountains anywhere near this height.',
+  },
+  {
+    altitude: 5_895, title: 'Kilimanjaro’s summit',
+    note: 'The highest point in Africa, and one of the few mountains this tall that needs no technical climbing gear at all — just time, altitude and persistence.',
+  },
+  {
+    altitude: 6_700, title: 'The highest-altitude spider ever found',
+    note: 'A Himalayan jumping spider — Euophrys omnisuperstes, Latin for “highest of all” — was collected near here on Everest, living on windblown insects with seemingly nothing else around it.',
+    big: true,
+  },
+  {
+    altitude: 7_290, title: 'A bar-headed goose, crossing the Himalaya',
+    note: 'This species migrates twice a year over the world’s highest mountains, tracked crossing passes around this height — thinner air than any other bird routinely tolerates in level, sustained flight.',
+  },
+  {
     altitude: 8_848.86, title: 'Mount Everest’s summit',
     note: 'Officially remeasured by Nepal and China together in December 2020 — the first time both countries agreed on one number.',
   },

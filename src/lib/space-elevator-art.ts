@@ -1,5 +1,5 @@
 /**
- * Space Elevator's twenty-three markers, drawn.
+ * Space Elevator's twenty-nine markers, drawn.
  *
  * These used to be inline SVG strings in the page itself, each one a flat
  * rect the exact colour of its zone's sky with a small scene painted on top —
@@ -26,7 +26,7 @@
  *   duplicate work that would drift out of register with the real ones.
  *
  * **No gradients, no ids, no defs, no filters.** Flat colour only, so all
- * twenty-three inline into one document without colliding.
+ * twenty-nine inline into one document without colliding.
  *
  * **One palette**, tuned for the sky rather than the sea: the pale
  * ice-and-metal tones almost everything is drawn in read against troposphere
@@ -331,6 +331,83 @@ export const SPACE_ELEVATOR_ART: Record<string, Scene> = {
       `<ellipse cx="-32" cy="0" rx="6" ry="4" fill="${P.flare}"/>` +
       `<ellipse cx="-36" cy="0" rx="3" ry="2.2" fill="${P.frost}"/>` +
       `</g>`,
+  },
+
+  /* ---- filling the 1,500m-to-Everest gap ----------------------------------- */
+
+  'Where altitude sickness starts to bite': {
+    subject: 'a hiker sitting on a boulder, head down, wrapped around their knees',
+    draw: () =>
+      `<path d="M18 100 Q22 78 44 78 Q62 78 64 96 Q66 106 48 108 L22 108 Q14 106 18 100Z" fill="${P.slate2}"/>` +
+      `<path d="M24 92 Q34 84 46 88" fill="none" stroke="${P.slate}" stroke-width="1.4" opacity="0.55"/>` +
+      `<path d="M40 68 Q40 58 50 58 Q60 58 60 70 L58 92 Q58 100 49 100 Q40 100 40 90Z" fill="${P.steel}"/>` +
+      `<circle cx="49" cy="52" r="8.5" fill="${P.skin}"/>` +
+      `<path d="M44 92 L36 104 M56 92 L64 102" stroke="${P.steel}" stroke-width="4.5" stroke-linecap="round"/>` +
+      `<path d="M42 66 L34 82 M56 66 L64 80" stroke="${P.skin}" stroke-width="3.6" stroke-linecap="round"/>` +
+      `<path d="M45 68 Q49 74 53 68" fill="none" stroke="${P.cloud2}" stroke-width="1.4" opacity="0.6"/>` +
+      `<path d="M84 30 L90 104" stroke="${P.stem}" stroke-width="2.6" stroke-linecap="round"/>`,
+  },
+  'La Paz, the highest capital city on Earth': {
+    subject: 'a city built up the walls of a bowl-shaped valley, a cable car crossing above it',
+    draw: () =>
+      `<path d="M2 108 Q30 54 60 54 Q90 54 118 108Z" fill="${P.slate2}"/>` +
+      `<path d="M2 108 Q30 54 60 54 Q90 54 118 108" fill="none" stroke="${P.slate}" stroke-width="1.6" opacity="0.6"/>` +
+      `<rect x="32" y="86" width="7" height="22" fill="${P.frost}"/>` +
+      `<rect x="41" y="78" width="6" height="30" fill="${P.steel}"/>` +
+      `<rect x="49" y="90" width="6" height="18" fill="${P.cloud}"/>` +
+      `<rect x="57" y="82" width="7" height="26" fill="${P.frost}"/>` +
+      `<rect x="66" y="94" width="6" height="14" fill="${P.steel}"/>` +
+      `<rect x="74" y="88" width="6" height="20" fill="${P.cloud}"/>` +
+      `<rect x="83" y="96" width="6" height="12" fill="${P.frost}"/>` +
+      `<circle cx="35.5" cy="92" r="0.9" fill="${P.slate}"/><circle cx="44" cy="84" r="0.9" fill="${P.slate}"/>` +
+      `<circle cx="60.5" cy="88" r="0.9" fill="${P.slate}"/><circle cx="77" cy="94" r="0.9" fill="${P.slate}"/>` +
+      `<path d="M16 62 L104 92" stroke="${P.cloud2}" stroke-width="1.3" opacity="0.7"/>` +
+      `<line x1="56" y1="80" x2="56" y2="75" stroke="${P.cloud2}" stroke-width="1"/>` +
+      `<rect x="51" y="75" width="10" height="6.5" rx="2" fill="${P.gold}"/>`,
+  },
+  'Mont Blanc’s summit': {
+    subject: 'a jagged double-peaked rock massif, snow on its two highest points and a shadowed face below',
+    draw: () =>
+      `<path d="M8 106 L50 32 L62 48 L76 20 L112 106Z" fill="${P.slate2}"/>` +
+      `<path d="M76 20 L90 42 L70 46 L62 48Z" fill="${P.frost}"/>` +
+      `<path d="M50 32 L60 44 L42 46Z" fill="${P.frost}" opacity="0.92"/>` +
+      `<path d="M62 48 L76 20 L82 32 L68 58Z" fill="${P.slate}"/>` +
+      `<path d="M42 46 L50 32 L56 40 L46 58Z" fill="${P.slate}" opacity="0.85"/>` +
+      `<path d="M66 40 L74 52 M78 34 L86 46" stroke="${P.cloud2}" stroke-width="2" opacity="0.85"/>` +
+      `<path d="M20 92 L42 60 M32 98 L52 70 M84 92 L98 66" stroke="${P.cloud2}" stroke-width="1.8" opacity="0.6"/>`,
+  },
+  'Kilimanjaro’s summit': {
+    subject: 'a broad, flat-topped massif with a band of snow along its rim and cloud below',
+    draw: () =>
+      `<path d="M6 106 L34 52 Q60 38 86 52 L114 106Z" fill="${P.slate2}"/>` +
+      `<path d="M34 52 Q60 40 86 52 L82 60 Q60 50 38 60Z" fill="${P.frost}"/>` +
+      `<path d="M28 92 L44 64 M50 98 L64 66 M76 94 L92 64" stroke="${P.slate}" stroke-width="1.3" opacity="0.5"/>` +
+      `<ellipse cx="60" cy="80" rx="58" ry="10" fill="${P.cloud}" opacity="0.6"/>` +
+      `<ellipse cx="60" cy="86" rx="48" ry="8" fill="${P.cloud2}" opacity="0.5"/>`,
+  },
+  'The highest-altitude spider ever found': {
+    subject: 'a jumping spider, eight legs splayed, on a bare patch of rock',
+    draw: () =>
+      `<ellipse cx="60" cy="100" rx="30" ry="7" fill="${P.slate2}" opacity="0.7"/>` +
+      `<path d="M53 50 L36 40 M53 56 L32 55 M53 63 L34 70 M53 70 L38 84" fill="none" stroke="${P.steel}" stroke-width="2" stroke-linecap="round"/>` +
+      `<path d="M67 50 L84 40 M67 56 L88 55 M67 63 L86 70 M67 70 L82 84" fill="none" stroke="${P.steel}" stroke-width="2" stroke-linecap="round"/>` +
+      `<ellipse cx="60" cy="63" rx="11" ry="14" fill="${P.umber}"/>` +
+      `<circle cx="60" cy="47" r="7.5" fill="${P.umber}"/>` +
+      `<circle cx="57" cy="45" r="1.3" fill="${P.frost}"/><circle cx="63" cy="45" r="1.3" fill="${P.frost}"/>` +
+      `<path d="M52 60 Q60 66 68 60" fill="none" stroke="${P.slate}" stroke-width="1.2" opacity="0.5"/>`,
+  },
+  'A bar-headed goose, crossing the Himalaya': {
+    subject: 'a goose in level flight, neck extended, black bars across a pale head',
+    draw: () =>
+      `<path d="M10 106 L30 88 L46 102 L64 82 L84 102 L104 90 L118 106Z" fill="${P.slate2}" opacity="0.6"/>` +
+      `<path d="M52 62 Q30 42 14 48 Q28 60 50 68Z" fill="${P.steel}"/>` +
+      `<path d="M70 62 Q92 42 108 48 Q94 60 72 68Z" fill="${P.steel}"/>` +
+      `<path d="M40 66 Q60 54 82 62 Q76 70 60 70 Q46 70 40 66Z" fill="${P.frost}"/>` +
+      `<path d="M78 62 Q92 58 99 66" fill="none" stroke="${P.frost}" stroke-width="5" stroke-linecap="round"/>` +
+      `<circle cx="101" cy="67" r="5" fill="${P.frost}"/>` +
+      `<path d="M97 63 Q101 61 105 63" fill="none" stroke="${P.slate}" stroke-width="1.6"/>` +
+      `<path d="M98 70 Q101 72 104 70" fill="none" stroke="${P.slate}" stroke-width="1.6"/>` +
+      `<path d="M106 66 L111 67 L106 69Z" fill="${P.gold}"/>`,
   },
 } as const
 
