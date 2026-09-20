@@ -18,6 +18,11 @@ export type Marker = {
   note: string
   /** The turning points — a zone's defining fact, or a genuine record. */
   big?: boolean
+  /** The signature animals — the ones a scroll like this lives or dies on.
+   *  Rendered at portrait scale regardless of whether they also mark a
+   *  turning point, because the thing that makes a giant squid worth
+   *  looking at has nothing to do with whether it is also a record. */
+  hero?: boolean
 }
 
 export type Zone = {
@@ -93,14 +98,17 @@ export const MARKERS: Marker[] = [
   {
     depth: 500, title: 'Giant squid',
     note: 'Architeuthis dux — up to twelve metres long, almost never seen alive. Most of what is known about it comes from bodies that washed ashore, or turned up in a sperm whale’s stomach.',
+    hero: true,
   },
   {
     depth: 700, title: 'Vampire squid',
     note: 'Vampyroteuthis infernalis lives inside the ocean’s oxygen-minimum zone, where there is too little dissolved oxygen for almost anything else to survive. Huge gills and a metabolism turned down to almost nothing are what let it stay there, safe from nearly every predator.',
+    hero: true,
   },
   {
     depth: 900, title: 'Blobfish',
     note: 'Psychrolutes marcidus is only famous for looking wrong out of water. Down here, under roughly ninety times the surface pressure, its gelatinous, nearly boneless body is simply what a fish looks like once it stops needing to fight gravity.',
+    hero: true,
   },
   {
     depth: 1050, title: 'Below this, no light has ever reached',
@@ -110,10 +118,12 @@ export const MARKERS: Marker[] = [
   {
     depth: 1300, title: 'Anglerfish',
     note: 'The lure is grown out of its own spine, and in some species it runs on bacteria the fish cultivates inside it on purpose. The rest of the fish is built around one thing: a mouth big enough for whatever swims up to look.',
+    hero: true,
   },
   {
     depth: 1600, title: 'Sperm whales hunt here',
     note: 'A sperm whale can dive more than two kilometres chasing giant squid — deeper than eleven Empire State Buildings stacked end to end — and hold its breath for over an hour to do it.',
+    hero: true,
   },
   {
     depth: 2100, title: 'A hydrothermal vent',
@@ -123,6 +133,7 @@ export const MARKERS: Marker[] = [
   {
     depth: 2200, title: 'Colossal squid',
     note: 'Mesonychoteuthis hamiltoni is heavier than a giant squid and carries swivelling hooks instead of plain suckers. The evidence that it lives this deep is indirect: intact adult beaks, recovered from the stomachs of the sperm whales that hunt it.',
+    hero: true,
   },
   {
     depth: 2992, title: 'The deepest dive any mammal has ever made',
@@ -154,6 +165,7 @@ export const MARKERS: Marker[] = [
   {
     depth: 6957, title: 'The deepest-living octopus ever filmed',
     note: 'A dumbo octopus, recorded on camera in the Java Trench in 2020 — the first confirmed sighting of any octopus this deep, and further down than most researchers expected to find one at all.',
+    hero: true,
   },
   {
     depth: 8336, title: 'The deepest fish ever recorded',
