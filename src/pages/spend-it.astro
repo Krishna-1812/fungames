@@ -1,46 +1,54 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { ITEMS, BUDGET } from '../lib/spend-items'
 import { iconSvg } from '../lib/icons'
 import { productSvg } from '../lib/spend-art'
 
-/** Spend It — the resource-disposal archetype. The list lives in lib/spend-items. */
+/**
+ * Spend It — the resource-disposal archetype. The list lives in lib/spend-items.
+ *
+ * In the shell: Score is what is left, Kinds and Things count what you have
+ * bought, Best is the least you have ever had left, and getting to exactly
+ * zero is the ending — the receipt is its result card. Sell anything after
+ * that and the card goes away until you get back to zero.
+ */
 
 ---
 
-<GameLayout slug="spend-it" bar="#0f3d3e" bodyClass="spend-body">
-  <div class="bar">
-    <div class="bar-inner">
-      <div class="money" id="money" aria-live="polite" aria-atomic="true">$100,000,000,000</div>
-      <div class="track" id="track" aria-hidden="true"><div class="track-fill" id="trackFill"></div></div>
-      <div class="bar-actions">
-        <button type="button" id="receiptBtn" class="ghost">Receipt</button>
-        <button type="button" id="resetBtn" class="ghost">Reset</button>
+<GameShell
+  slug="spend-it"
+  labels={{ score: 'Left', best: 'Least left', level: 'Kinds', moves: 'Things' }}
+  initial={{ score: '$100B', level: `0 / ${ITEMS.length}`, moves: '0' }}
+>
+  <div class="sp">
+    {/* The balance stays in view while the shop scrolls under it. */}
+    <div class="sp-bar">
+      <div class="sp-money num" id="money" aria-live="polite" aria-atomic="true">$100,000,000,000</div>
+      <div class="sp-acts">
+        <button type="button" id="receiptBtn" class="pill pill--line pill--sm"><span>Receipt</span></button>
       </div>
+      <div class="sp-track" id="track" aria-hidden="true"><div class="sp-track-fill" id="trackFill"></div></div>
     </div>
-  </div>
 
-  <div class="wrap">
-    <h1 class="title">Spend It</h1>
-    <p class="lede">
+    <p class="sp-lede">
       You have one hundred billion dollars. Buying one of everything costs about
       ninety-seven billion, so getting to exactly zero is going to take some care.
     </p>
 
-    <ul class="grid">
+    <ul class="sp-grid">
       {
         ITEMS.map((item, i) => (
-          <li class="item" data-price={item.price} data-name={item.name} data-i={i}>
-            <div class="shot" aria-hidden="true" set:html={productSvg(item.name)} />
-            <div class="name">{item.name}</div>
-            <div class="price">${item.price.toLocaleString('en-US')}</div>
-            <div class="controls">
-              <button type="button" class="sell" data-act="sell" aria-label={`Sell one ${item.name}`}>Sell</button>
+          <li class="sp-item" data-price={item.price} data-name={item.name} data-i={i}>
+            <div class="sp-shot" aria-hidden="true" set:html={productSvg(item.name)} />
+            <div class="sp-name">{item.name}</div>
+            <div class="sp-price">${item.price.toLocaleString('en-US')}</div>
+            <div class="sp-controls">
+              <button type="button" class="sp-sell" data-buy="sell" aria-label={`Sell one ${item.name}`}>Sell</button>
               <input
-                class="qty" type="text" inputmode="numeric" value="0"
+                class="sp-qty" type="text" inputmode="numeric" value="0"
                 aria-label={`Quantity of ${item.name}`}
               />
-              <button type="button" class="buy" data-act="buy" aria-label={`Buy one ${item.name}`}>Buy</button>
+              <button type="button" class="sp-buy" data-buy="buy" aria-label={`Buy one ${item.name}`}>Buy</button>
             </div>
           </li>
         ))
@@ -48,25 +56,32 @@ import { productSvg } from '../lib/spend-art'
     </ul>
   </div>
 
-  <div class="sheet" id="sheet" hidden>
-    <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
-      <h2 id="receiptTitle">Your receipt</h2>
-      <ul class="lines" id="lines"></ul>
-      <div class="totals">
-        <span>Total spent</span>
-        <b id="spent">$0</b>
-      </div>
-      <div class="totals">
-        <span>Left over</span>
-        <b id="left">$100,000,000,000</b>
-      </div>
-      <div class="sheet-actions">
-        <button type="button" data-share data-title="Spend It">Share</button>
-        <button type="button" id="closeSheet" class="ghost">Keep spending</button>
-      </div>
+  <dialog class="panel" id="sheet" aria-labelledby="receiptTitle">
+    <p class="label meta">Spend It</p>
+    <h2 id="receiptTitle" style="margin-top:10px">Your receipt</h2>
+    <div class="panel-body">
+      <ul class="sp-lines" id="lines"></ul>
+      <div class="sp-totals"><span>Total spent</span><b id="spent">$0</b></div>
+      <div class="sp-totals"><span>Left over</span><b id="left">$100,000,000,000</b></div>
     </div>
-  </div>
-</GameLayout>
+    <div class="panel-actions">
+      <button type="button" class="pill pill--hero" id="closeSheet"><span>Keep spending</span><span class="arrow" aria-hidden="true">→</span></button>
+    </div>
+  </dialog>
+
+  <Fragment slot="howto">
+    <p>
+      You have $100,000,000,000. Spend every dollar of it: the game ends at
+      exactly zero.
+    </p>
+    <ul>
+      <li><b>Buy</b> and <b>Sell</b> one at a time, or hold <kbd>Shift</kbd> for ten. You can also type a quantity straight in.</li>
+      <li>You can never go below zero; anything you can no longer afford greys out.</li>
+      <li><b>Receipt</b> shows what you have bought so far. What you have bought is remembered on this device.</li>
+    </ul>
+    <p>Your best is the least you have ever had left. <b>Restart</b> gives all of it back.</p>
+  </Fragment>
+</GameShell>
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
@@ -77,27 +92,44 @@ import { productSvg } from '../lib/spend-art'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
   import { VAULT_FRAG } from '../lib/spend-vault'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
+  import { createShell } from '../lib/game-shell'
+  import { recordPlay } from '../lib/stats'
     const { BUDGET, ICONS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const money = document.getElementById('money')
   const trackFill = document.getElementById('trackFill')
-  const sheet = document.getElementById('sheet')
   let shareCard = null
   const lines = document.getElementById('lines')
   const spentEl = document.getElementById('spent')
   const leftEl = document.getElementById('left')
-  const items = [...document.querySelectorAll('.item')].map((el) => ({
+  const items = [...document.querySelectorAll('.sp-item')].map((el) => ({
     el,
     price: Number(el.dataset.price),
     name: el.dataset.name,
-    input: el.querySelector('.qty'),
-    sell: el.querySelector('.sell'),
-    buy: el.querySelector('.buy'),
-    glyph: el.querySelector('.shot'),
+    input: el.querySelector('.sp-qty'),
+    sell: el.querySelector('.sp-sell'),
+    buy: el.querySelector('.sp-buy'),
+    glyph: el.querySelector('.sp-shot'),
     n: 0,
   }))
+
+  const shell = createShell({
+    slug: 'spend-it',
+    // A fortune is not given back without asking.
+    onRestart: () => {
+      if (items.some((i) => i.n > 0) && !confirm('Give all of it back?')) return
+      items.forEach((i) => (i.n = 0))
+      shareCard = null
+      won = false
+      render()
+    },
+  })
+
+  const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 })
+  /** Money short enough for a score tile: "$100B", "$62.4M", "$0". */
+  const short = (n) => (n <= 0 ? '$0' : n < 1000 ? '$' + Math.round(n) : '$' + compact.format(n))
 
   const KEY = 'spend-it:v1'
   const usd = (n) => '$' + Math.round(n).toLocaleString('en-US')
@@ -137,8 +169,19 @@ import { productSvg } from '../lib/spend-art'
   }
 
   let flashTimer
+  let won = false
+
   function render(flash) {
     const left = balance()
+    const bought = items.filter((i) => i.n > 0)
+    shell.setScore(short(left))
+    shell.setLevel(`${bought.length} / ${items.length}`)
+    shell.setMoves(compact.format(bought.reduce((a, i) => a + i.n, 0)))
+    if (left < BUDGET) shell.considerBest(BUDGET - left, `${short(left)} left`)
+    // Zero is the ending; selling anything afterwards takes it back.
+    if (left === 0 && !won) { won = true; finish() }
+    else if (left > 0 && won) { won = false; shell.reset() }
+
     money.textContent = usd(left)
     money.classList.toggle('low', left < BUDGET * 0.1)
     // The CSS fallback keeps the original fill-as-you-spend direction; the
@@ -202,9 +245,9 @@ import { productSvg } from '../lib/spend-art'
       sfx.pop(combo)
       splashAt = performance.now()
       const r = it.el.getBoundingClientRect()
-      floatText(r.left + r.width / 2, r.top + 24, '-' + usd(got * it.price), '#0f3d3e')
+      floatText(r.left + r.width / 2, r.top + 24, '-' + usd(got * it.price), '#111318')
       burst(r.left + r.width / 2, r.top + 30, {
-        count: 8, colors: ['#63c9a4', '#0f3d3e'], speed: 2.6, gravity: 0.2, life: 26, size: 3,
+        count: 8, colors: ['#4fe3c1', '#5b82ff'], speed: 2.6, gravity: 0.2, life: 26, size: 3,
       })
     } else {
       it.n = Math.max(0, it.n + delta)
@@ -215,11 +258,11 @@ import { productSvg } from '../lib/spend-art'
 
   for (const it of items) {
     it.el.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-act]')
+      const btn = e.target.closest('[data-buy]')
       if (!btn) return
       // Shift buys or sells ten at a time — the only way to finish this game.
       const step = e.shiftKey ? 10 : 1
-      change(it, btn.dataset.act === 'buy' ? step : -step)
+      change(it, btn.dataset.buy === 'buy' ? step : -step)
     })
     it.input.addEventListener('input', () => {
       const want = Math.max(0, Math.floor(Number(it.input.value.replace(/\D/g, '')) || 0))
@@ -231,31 +274,25 @@ import { productSvg } from '../lib/spend-art'
     it.input.addEventListener('blur', () => render())
   }
 
-  document.getElementById('receiptBtn').addEventListener('click', () => {
-    unlock(); sfx.good()
-    const bought = items.filter((i) => i.n > 0)
-    lines.replaceChildren(
-      ...(bought.length
-        ? bought.map((i) => {
-            const li = document.createElement('li')
-            li.innerHTML =
-              `<span class="l-icon" aria-hidden="true">${ICONS[i.name] ?? ''}</span>` +
-              `<span class="l-name">${i.name}</span>` +
-              `<span class="l-qty">×${i.n.toLocaleString('en-US')}</span>` +
-              `<span class="l-sum">${usd(i.n * i.price)}</span>`
-            return li
-          })
-        : [Object.assign(document.createElement('li'), { className: 'empty', textContent: 'You have not bought anything yet.' })])
-    )
-    const left = balance()
-    const spent = BUDGET - left
-    spentEl.textContent = usd(spent)
-    leftEl.textContent = usd(left)
-    sheet.hidden = false
+  /** The lines of the receipt, as list items. */
+  function receiptLines(bought) {
+    return bought.length
+      ? bought.map((i) => {
+          const li = document.createElement('li')
+          li.innerHTML =
+            `<span class="sp-l-icon" aria-hidden="true">${ICONS[i.name] ?? ''}</span>` +
+            `<span class="sp-l-name">${i.name}</span>` +
+            `<span class="sp-l-qty">×${i.n.toLocaleString('en-US')}</span>` +
+            `<span class="sp-l-sum">${usd(i.n * i.price)}</span>`
+          return li
+        })
+      : [Object.assign(document.createElement('li'), { className: 'empty', textContent: 'You have not bought anything yet.' })]
+  }
 
-    /* The receipt is the ending, so the Share button inside it shares the
-       receipt. Nothing bought is not a result — the card would read
-       "$0 spent", which is a screenshot of not having played. */
+  /* Nothing bought is not a result — the card would read "$0 spent", which
+     is a screenshot of not having played. */
+  function buildShareCard(bought, left) {
+    const spent = BUDGET - left
     const units = bought.reduce((a, i) => a + i.n, 0)
     const biggest = bought.slice().sort((a, b) => b.n * b.price - a.n * a.price)[0]
     const pct = (left / BUDGET) * 100
@@ -281,213 +318,173 @@ import { productSvg } from '../lib/spend-art'
                  something you bought reads as a bug. */
               label: 'Left',
               value:
-                pct === 0
-                  ? '0%'
-                  : pct < 0.01
-                    ? '<0.01%'
-                    : pct > 99.99
-                      ? '>99.99%'
-                      : pct.toFixed(2) + '%',
+                pct === 0 ? '0%'
+                : pct < 0.01 ? '<0.01%'
+                : pct > 99.99 ? '>99.99%'
+                : pct.toFixed(2) + '%',
             },
           ],
         }
+    return { units, biggest }
+  }
+
+  const sheet = document.getElementById('sheet')
+  document.getElementById('receiptBtn').addEventListener('click', () => {
+    unlock(); sfx.good()
+    const bought = items.filter((i) => i.n > 0)
+    lines.replaceChildren(...receiptLines(bought))
+    const left = balance()
+    spentEl.textContent = usd(BUDGET - left)
+    leftEl.textContent = usd(left)
+    buildShareCard(bought, left)
+    sheet.showModal()
   })
+  document.getElementById('closeSheet').addEventListener('click', () => sheet.close())
+  sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.close() })
 
-  const close = () => (sheet.hidden = true)
-  document.getElementById('closeSheet').addEventListener('click', close)
-  sheet.addEventListener('click', (e) => { if (e.target === sheet) close() })
-  addEventListener('keydown', (e) => { if (e.key === 'Escape') close() })
-
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if (!confirm('Give all of it back?')) return
-    items.forEach((i) => (i.n = 0))
-    // The old receipt describes a fortune you no longer have.
-    shareCard = null
-    render()
-  })
-
-  onShare(() => shareCard, (c) => ({
-    title: 'Spend It',
-    text: `${c.headline}.`,
-  }))
+  /** Exactly zero: the receipt becomes the result card. */
+  function finish() {
+    const bought = items.filter((i) => i.n > 0)
+    const { units, biggest } = buildShareCard(bought, 0)
+    recordPlay('spend-it', { kinds: bought.length, things: units }, {})
+    shell.win({
+      kicker: 'Spent, to the dollar',
+      title: 'Not a dollar left.',
+      score: '$100,000,000,000',
+      from: '$000,000,000,000',
+      lines: [
+        `${units.toLocaleString('en-US')} things, ${bought.length} of the ${items.length} kinds.`,
+        `Mostly on ${biggest.name.toLowerCase()}: ${usd(biggest.n * biggest.price)} of it.`,
+      ],
+      againLabel: 'Give it back and start again',
+    })
+    const ul = document.createElement('ul')
+    ul.className = 'sp-lines sp-lines--ink'
+    ul.replaceChildren(...receiptLines(bought))
+    const acts = document.createElement('div')
+    acts.className = 'sp-report-acts'
+    acts.innerHTML = '<button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share the receipt</span></button>'
+    shell.resultExtra.replaceChildren(ul, acts)
+    document.getElementById('shareBtn').addEventListener('click', async (e) => {
+      if (!shareCard) return
+      const label = e.currentTarget.querySelector('span')
+      const outcome = await shareResult(shareCard, { title: 'Spend It', text: `${shareCard.headline}.`, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share the receipt'), 1600)
+    })
+  }
 
   load()
   render()
 </script>
 
 <style is:global>
-  /* Receipt lines are built at runtime, so these rules cannot be scoped. */
-  .spend-body { background: #f2f6f4; }
+  /* Receipt lines are built at runtime, so these rules cannot be scoped.
+     Everything is prefixed. */
+  .sp { display: grid; gap: 18px; }
+  .sp [hidden] { display: none !important; }
 
-  .bar {
-    position: sticky; top: 48px; z-index: 30;
-    background: rgba(242, 246, 244, 0.92);
+  /* The balance: sticky, so it stays in view while the shop scrolls under it. */
+  .sp-bar {
+    position: sticky; top: 0; z-index: 30;
+    display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center;
+    margin: calc(-1 * clamp(16px, 3vw, 36px)) calc(-1 * clamp(16px, 3vw, 36px)) 0;
+    padding: 14px clamp(16px, 3vw, 36px) 16px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    background: rgba(255, 255, 255, 0.94);
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--line);
+    box-shadow: 0 1px 0 var(--paper3);
   }
-  .bar-inner {
-    max-width: 1120px; margin: 0 auto; padding: 12px 22px 14px;
-    display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center;
-  }
-  .money {
-    font-family: var(--display);
-    font-size: clamp(24px, 4.4vw, 40px);
-    font-weight: 800; letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-    color: #0f3d3e;
+  .sp-money {
+    font-size: clamp(28px, 4.6vw, 48px); color: var(--ink);
     transition: color 160ms var(--ease);
   }
-  .money.low { color: #b8442c; }
-  .money.flash-buy { animation: pulseDown 320ms var(--ease); }
-  .money.flash-sell { animation: pulseUp 320ms var(--ease); }
-  @keyframes pulseDown { 0% { transform: translateY(-4px); opacity: 0.55; } }
-  @keyframes pulseUp { 0% { transform: translateY(4px); opacity: 0.55; } }
+  .sp-money.low { color: var(--t-red); }
+  html.play .sp-money.flash-buy { animation: sp-down 320ms var(--ease); }
+  html.play .sp-money.flash-sell { animation: sp-up 320ms var(--ease); }
+  @keyframes sp-down { 0% { transform: translateY(-4px); opacity: 0.55; } }
+  @keyframes sp-up { 0% { transform: translateY(4px); opacity: 0.55; } }
 
-  /* A channel with something in it, rather than a 4px progress rule. The
-     inner shadow is what makes it read as cut into the bar. */
-  .track {
-    grid-column: 1 / -1; position: relative; height: 13px;
-    background: #d8e4df; border-radius: 7px; overflow: hidden;
-    box-shadow: inset 0 1px 2px rgba(15, 61, 62, 0.22);
+  /* A channel with something in it, rather than a 4px progress rule. */
+  .sp-track {
+    grid-column: 1 / -1; position: relative; height: 14px;
+    background: var(--paper3); border-radius: var(--r-pill); overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(17, 19, 24, 0.2);
   }
-  .track .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  /* The still fallback for anything without WebGL2, which keeps the original
-     fill-as-you-spend direction it was written for. */
-  .track-fill { height: 100%; width: 0; background: linear-gradient(90deg, #63c9a4, #0f3d3e); transition: width 200ms var(--ease); }
-  .bar-actions { display: flex; gap: 8px; }
-  .ghost {
-    background: #fff; border: 1px solid var(--line-strong); border-radius: 999px;
-    padding: 7px 15px; font-size: 13.5px; cursor: pointer;
-    transition: border-color 140ms var(--ease), transform 180ms var(--ease-bounce);
-  }
-  .ghost:hover { border-color: #0f3d3e; transform: translateY(-2px) scale(1.04); }
-  .ghost:active { transform: scale(0.95); }
+  .sp-track .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* The still fallback for anything without WebGL2. */
+  .sp-track-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--mint), var(--cobalt)); }
+  html.play .sp-track-fill { transition: width 200ms var(--ease); }
 
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 30px 22px 90px; }
-  .title { font-size: clamp(30px, 5vw, 46px); }
-  .lede { color: var(--ink-soft); max-width: 56ch; margin: 10px 0 30px; }
+  .sp-lede { font-size: var(--fs-lead); color: var(--ink2); max-width: 56ch; }
 
-  .grid {
+  .sp-grid {
     list-style: none; margin: 0; padding: 0;
-    display: grid; gap: 14px;
-    grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+    display: grid; gap: 12px;
+    /* Two across even on a phone: thirty cards one per row is a very long shop. */
+    grid-template-columns: repeat(auto-fill, minmax(min(210px, calc(50% - 6px)), 1fr));
   }
-  .item {
-    background: linear-gradient(178deg, #ffffff, #fbfcfb);
-    border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 16px 14px 14px; text-align: center;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      0 1px 2px rgba(15, 40, 38, 0.05),
-      0 7px 18px rgba(15, 40, 38, 0.055);
-    transition:
-      border-color 160ms var(--ease), box-shadow 160ms var(--ease),
-      transform 160ms var(--ease), background 160ms var(--ease);
+  /* The card these drawings are checked against (check-spend-art's CARD). */
+  .sp-item {
+    background: #fdfdfc; border-radius: var(--r); padding: 16px 14px 14px; text-align: center;
+    box-shadow: inset 0 0 0 1.5px var(--paper3);
   }
-  .item.owned {
-    border-color: #63c9a4;
-    background: linear-gradient(178deg, #ffffff, #f2fbf7);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      0 0 0 3px rgba(99, 201, 164, 0.18),
-      0 8px 20px rgba(15, 61, 62, 0.09);
-  }
-  /* Deliberately not 'opacity'.
+  html.play .sp-item { transition: box-shadow 160ms var(--ease), background 160ms var(--ease); }
+  .sp-item.owned { box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 4px var(--mint); }
+  /* Deliberately not opacity: that faded the card's figures under AA on the
+     state whose whole job is to keep the endgame legible. */
+  .sp-item.unaffordable { background: var(--paper2); box-shadow: none; }
+  .sp-item.unaffordable .sp-shot { filter: saturate(0.2) opacity(0.75); }
+  .sp-item.unaffordable .sp-name { color: var(--ink2); }
+  /* The product shot sizes itself from inside (see productSvg); a rule
+     targeting the <svg> would not reach it, because it arrives via set:html. */
+  .sp-shot { width: 100%; max-width: 124px; aspect-ratio: 1 / 1; margin: 0 auto; display: block; }
+  html.play .sp-shot { transition: filter 160ms var(--ease), transform 220ms var(--spring); }
+  html.play .sp-item:hover .sp-shot { transform: translateY(-3px) scale(1.04); }
+  html.play .sp-shot.jump { animation: sp-jump 340ms var(--spring); }
+  @keyframes sp-jump { 40% { transform: translateY(-9px) scale(1.09); } }
+  .sp-name { font-weight: 700; margin-top: 8px; font-size: 15px; }
+  .sp-price { color: var(--ink2); font-size: 14px; }
 
-     That is what this used to be, and it faded the white card along with its
-     contents: measured against the page it left the item name at 2.77:1, the
-     price at 1.93:1 and the Buy label at 2.37:1, all well under the 4.5 AA
-     needs -- on the state whose entire job is to keep the endgame legible.
-     Desaturating the glyph and quietening the border says the same thing while
-     the card stays opaque and every figure stays readable. */
-  .item.unaffordable {
-    background: linear-gradient(178deg, #fbfbfa, #f5f6f5);
-    border-color: #e7e9e6;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(15, 40, 38, 0.04);
+  .sp-controls { display: flex; gap: 6px; margin-top: 12px; }
+  .sp-controls button {
+    flex: 1; min-height: 38px; border: 0; border-radius: var(--r-pill);
+    font: 700 13.5px var(--sans); cursor: pointer;
   }
-  .item.unaffordable .shot { filter: saturate(0.2) opacity(0.75); }
-  .item.unaffordable .name { color: var(--ink-soft); }
-  /* The drawing sizes itself from inside — see iconSvg. A rule here that
-     targeted the <svg> would not apply to it, because it arrives via set:html. */
-  /* The product shot. It sizes itself from inside — see productSvg — so a
-     rule here targeting the <svg> would not apply to it, because it arrives
-     via set:html. */
-  .shot {
-    width: 100%; max-width: 130px; aspect-ratio: 1 / 1; margin: 0 auto;
-    transition: filter 160ms var(--ease), transform 220ms var(--ease-bounce);
-    display: block;
-  }
-  .item:hover .shot { transform: translateY(-3px) scale(1.04); }
-  /* The small drawn glyph, in the receipt, where a dense list is exactly the
-     size that set was drawn for. */
-  .l-icon { width: 22px; height: 22px; display: inline-block; flex: none; }
-  /* A one-shot jump on the glyph itself when it's actually bought or sold —
-     the burst of confetti already says "something happened"; this says
-     "to this specific thing". Toggled by class, not tied to .owned, since
-     .owned stays applied between purchases and would only fire once. */
-  .shot.jump { animation: jump-glyph 340ms var(--ease-bounce); }
-  @keyframes jump-glyph { 40% { transform: translateY(-9px) scale(1.09); } }
-  .item .name { font-weight: 600; margin-top: 8px; font-size: 15px; }
-  .item .price { color: var(--ink-soft); font-size: 13.5px; font-variant-numeric: tabular-nums; }
-
-  .controls { display: flex; gap: 6px; margin-top: 12px; }
-  .controls button {
-    flex: 1; border: 0; border-radius: 8px; padding: 8px 0;
-    font-size: 13px; font-weight: 600; cursor: pointer;
-    transition: filter 140ms var(--ease);
-  }
-  .controls button:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
-  .controls button { transition: filter 140ms var(--ease), transform 140ms var(--ease); }
-  .sell { background: #f0e2e2; color: #8d3a2a; }
-  .sell:disabled { background: #f1ecec; color: #6b6060; cursor: default; }
-  .buy { background: #0f3d3e; color: #fff; }
-  /* An inactive control, so 1.4.3 does not apply to it -- but it is kept well
-     clear of the threshold anyway rather than relying on that. */
-  .buy:disabled { background: #dfe5e2; color: #55605c; cursor: default; }
-  .qty {
-    width: 54px; text-align: center; border: 1px solid var(--line-strong);
-    border-radius: 8px; font-variant-numeric: tabular-nums; font-size: 14px; padding: 6px 2px;
-    background: #fff;
+  .sp-sell { background: var(--paper2); color: var(--t-red); }
+  .sp-sell:hover:not(:disabled) { background: var(--paper3); }
+  .sp-sell:disabled { color: var(--ink3); cursor: default; }
+  .sp-buy { background: var(--ink); color: var(--ink-paper); }
+  .sp-buy:hover:not(:disabled) { background: var(--cobalt); color: var(--ink); }
+  .sp-buy:disabled { background: var(--paper3); color: var(--ink2); cursor: default; }
+  .sp-qty {
+    width: 56px; text-align: center; border: 1.5px solid var(--paper3);
+    border-radius: var(--r-pill); font: 600 14px var(--sans); padding: 6px 2px;
+    background: var(--card); color: var(--ink);
   }
 
-  .sheet {
-    position: fixed; inset: 0; z-index: 80;
-    background: rgba(10, 24, 22, 0.5);
-    display: grid; place-items: center; padding: 20px;
-    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  /* The receipt, in the panel and on the ink result card. */
+  .sp-l-icon { width: 22px; height: 22px; display: inline-block; flex: none; }
+  .sp-lines { list-style: none; margin: 0 0 14px; padding: 0; }
+  .sp-lines li {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
+    padding: 8px 0; border-bottom: 1px dashed var(--paper3); font-size: 15px;
   }
-  .sheet[hidden] { display: none; }
-  .sheet-card {
-    background: #fff; border-radius: var(--radius-lg); padding: 26px 24px;
-    width: min(520px, 100%); max-height: 82vh; overflow: auto; box-shadow: var(--shadow-lg);
-  }
-  .sheet-card h2 { font-size: 26px; margin-bottom: 14px; }
-  .lines { list-style: none; margin: 0 0 16px; padding: 0; font-variant-numeric: tabular-nums; }
-  .lines li {
-    display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center;
-    padding: 7px 0; border-bottom: 1px dashed var(--line);
-    font-size: 14.5px;
-  }
-  .lines li.empty { display: block; color: var(--ink-soft); border: 0; }
-  .l-qty { color: var(--ink-soft); }
-  .l-sum { font-weight: 600; min-width: 96px; text-align: right; }
-  .totals {
-    display: flex; justify-content: space-between; padding: 8px 0;
-    font-variant-numeric: tabular-nums; border-top: 1px solid var(--line);
-  }
-  .sheet-actions { display: flex; gap: 10px; margin-top: 18px; }
-  .sheet-actions button {
-    flex: 1; border: 0; border-radius: 999px; padding: 11px 0;
-    font-weight: 600; cursor: pointer; background: #0f3d3e; color: #fff;
-  }
-  .sheet-actions .ghost { background: #fff; color: var(--ink); border: 1px solid var(--line-strong); }
-
-  @media (prefers-reduced-motion: reduce) {
-    .item, .controls button, .track-fill { transition: none; }
-  }
+  .sp-lines li.empty { display: block; color: var(--ink2); border: 0; }
+  .sp-l-qty { color: var(--ink2); }
+  .sp-l-sum { font-weight: 700; min-width: 96px; text-align: right; }
+  .sp-totals { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1.5px solid var(--ink); font-size: 16px; }
+  .sp-lines--ink { max-width: 640px; }
+  .sp-lines--ink li { border-color: rgba(243, 245, 248, 0.22); }
+  .sp-lines--ink .sp-l-qty { color: rgba(243, 245, 248, 0.72); }
+  .sp-lines--ink .sp-l-icon { background: var(--ink-paper); border-radius: 6px; padding: 2px; box-sizing: content-box; }
+  .sp-report-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 
   @media (max-width: 620px) {
-    .bar-inner { grid-template-columns: 1fr; }
-    .bar-actions { justify-content: flex-start; }
+    .sp-item { padding: 12px 10px; }
+    .sp-controls { display: grid; grid-template-columns: 1fr 1fr; }
+    .sp-qty { grid-column: 1 / -1; order: -1; width: 100%; box-sizing: border-box; }
+    .sp-bar { grid-template-columns: 1fr; }
+    .sp-acts { justify-self: start; }
   }
 </style>

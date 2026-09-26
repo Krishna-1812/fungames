@@ -2429,7 +2429,30 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     On all four scroll pages, figures are proportional now: the gauges and
     dates were tabular, which in this sans draws a slashed zero.
 
-50. Then reassess again.
+50. ~~**Paper & Ink, phase 8: Spend It and Printing Money.**~~ **done.**
+
+    Both are paper pages in the shell now, with their pictures (the
+    products, the debt clock, the bills) kept.
+
+    **Spend It**: Score is what is left, Kinds and Things count the
+    shopping, Best is the least you have ever had left, and exactly zero is
+    the ending — the receipt is its result card, with a share button. Sell
+    anything afterwards and the card goes away until you are back at zero.
+    Restart asks before giving a fortune back. The balance bar stays sticky
+    over the shop, its liquid turns raspberry rather than amber as it runs
+    low, and the shop is two across on a phone, where it was one card per
+    row for thirty rows.
+
+    **Printing Money** had no ending, so the read is the game: Score is what
+    the US government has spent since you opened the page, Rates read counts
+    the nine as you pass them, Moves is time on the page, and the bottom is
+    the ending — what was spent while you read, in working years of your own
+    wage (or the minimum wage). It ends without fanfare. The gold went: the
+    page is paper, and the debt clock keeps its own LED red as the picture.
+    Fixed on the way: "the median us worker" — the wage line lowercased a
+    whole label, acronym and all.
+
+51. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

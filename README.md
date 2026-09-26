@@ -27,7 +27,7 @@ layer that is typographic rather than decorative. The rules are in
 | `scripts/check-paper.mjs` | holds the system to its own rules |
 
 Games move into the shell two at a time. **Done:** Rule Cascade, The Auction
-Game, Dark Patterns, Trolley, I'm Not a Robot, From Memory, Steady Hand, Paper Folds, Constellation Draw, Asteroid Launcher, The Deep Sea, Space Elevator, Deep Time, Scale. Everything else still runs on the previous
+Game, Dark Patterns, Trolley, I'm Not a Robot, From Memory, Steady Hand, Paper Folds, Constellation Draw, Asteroid Launcher, The Deep Sea, Space Elevator, Deep Time, Scale, Spend It, Printing Money. Everything else still runs on the previous
 `GameLayout` until its turn. The daily challenge rotates through the shell
 games only; `dailyTarget` in `game-meta.ts` gives each game the same number
 the homepage printed.

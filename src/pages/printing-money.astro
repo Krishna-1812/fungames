@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { withBase } from '../lib/base'
 import {
   TIERS, dollarsPerHour, billCount, billStripLengthM, LITERAL_RENDER_MAX_BILLS,
@@ -29,6 +29,14 @@ import { digitCellHTML } from '../lib/seven-segment'
  * Every number below the hero is precomputed at build time from the real
  * model — nothing here is typed in independently of `printing-money.ts`.
  * Only the live "since you opened this page" counters run client-side.
+ *
+ * In the shell it is a read with a clock running: Score is what the US
+ * government has spent since you opened the page, Rates read counts the nine
+ * rates you have scrolled past, Moves is how long you have been here, and
+ * reaching the bottom is the ending — the report says what was spent while
+ * you read, measured in working years of your own wage (or the minimum wage,
+ * if you did not give one). Best is your longest read. The page is paper; the
+ * debt clock and the bills keep their own dark ground, as the pictures.
  */
 
 const BILL_PX_W = 132
@@ -54,13 +62,15 @@ const rows = TIERS.map((t) => {
 const spending = rows.find((r) => r.tier.id === 'spending')!
 ---
 
-<GameLayout slug="printing-money" bar="#0c0704" bodyClass="pm-body" fonts={['Playfair+Display:wght@600;700;800;900']}>
-  <div class="pm-bg" aria-hidden="true"></div>
-
+<GameShell
+  slug="printing-money"
+  labels={{ score: 'Spent', best: 'Longest read', level: 'Rates read', moves: 'On this page' }}
+  initial={{ score: '$0', level: `0 / ${TIERS.length}`, moves: '0:00' }}
+>
+  <div class="pm">
   <header class="pm-head">
-    <p class="pm-eyebrow">Nine real rates, one dollar bill at a time</p>
-    <h1>Printing Money</h1>
-    <p>
+    <p class="label meta pm-eyebrow">Nine real rates, one dollar bill at a time</p>
+    <p class="pm-lead">
       A wage, a salary, a government's own hourly rate of spending — nine
       real figures that live at wildly different scales, all reduced to the
       one thing that makes them comparable: how many one-dollar bills that
@@ -85,7 +95,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
           ))
         }
       </div>
-      <p class="visually-hidden" id="heroAmount" aria-live="polite">$0.00</p>
+      <p class="sr-only" id="heroAmount">$0.00</p>
       <div class="screen-glass" aria-hidden="true"></div>
     </div>
     <p class="pm-hero-note">
@@ -98,7 +108,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     <p class="pm-hero-ref" id="heroRef"></p>
   </section>
 
-  <main class="pm-body-content">
+  <div class="pm-body-content">
     {
       rows.slice(0, 6).map((r, i) => (
         <section class="pm-stage" data-tier={r.tier.id} data-rate={r.rate}>
@@ -191,11 +201,6 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     }
 
     <footer class="pm-outro">
-      <div class="acts">
-        <button type="button" data-share data-title="Printing Money">Share this</button>
-        <a href={withBase('/')}>try something else →</a>
-      </div>
-
       <details class="how">
         <summary>Which of this is real</summary>
         <p>
@@ -226,9 +231,26 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
           other one about money at a size nobody actually holds.
         </p>
       </details>
+      {/* Reaching this is the ending. */}
+      <div id="pmEnd" aria-hidden="true"></div>
     </footer>
-  </main>
-</GameLayout>
+  </div>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Nine real rates of earning, from the minimum wage to the US government's
+      own spending, all reduced to one thing: how many one-dollar bills an hour
+      of each buys, laid end to end.
+    </p>
+    <ul>
+      <li>The clock at the top is live: it is what the government has spent since you opened the page.</li>
+      <li>Scroll down through the rates. Where the bills are few enough, they are drawn; past that, they are measured against something real.</li>
+      <li>Put your own hourly wage in to see where you fit. It is not stored anywhere.</li>
+    </ul>
+    <p>The bottom of the page is the end. Your best is your longest read.</p>
+  </Fragment>
+</GameShell>
 
 {/* Data for the module below: modules cannot take define:vars, and modules
     are what let every game share one synthesiser. */}
@@ -239,9 +261,11 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     billCount, billStripLengthM, LITERAL_RENDER_MAX_BILLS, formatMoney, parseWage, withCustomWage,
   } from '../lib/printing-money'
   import { segmentsFor, fitWidth, SEGMENT_KEYS } from '../lib/seven-segment'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
 
   const { BILL_PX_W, BILL_PX_H, billUri } = JSON.parse(document.getElementById('pm-data')!.textContent!) as {
     BILL_PX_W: number; BILL_PX_H: number; billUri: string
@@ -260,7 +284,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   // Same toggle-the-segments approach as Days Since Incident's own odometer:
   // a changed digit flickers the way a real display does rather than the
   // text silently becoming a different string.
-  const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const prefersReducedMotion = !PLAY
   const heroGroups = [...document.querySelectorAll<HTMLElement>('[data-grp]')].sort(
     (a, b) => Number(a.dataset.grp) - Number(b.dataset.grp),
   )
@@ -324,6 +348,9 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   const stripCaption = $('wageStripCaption')
   const sinceWrap = $('wageSinceWrap')
 
+  /** A label mid-sentence: only its first letter drops, so "US" stays "US". */
+  const inSentence = (label: string) => label.charAt(0).toLowerCase() + label.slice(1)
+
   function paintWage() {
     const hourly = parseWage(wageBox.value)
     currentWageRate = hourly
@@ -338,11 +365,11 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     const below = withYou[idx - 1]
     const above = withYou[idx + 1]
     const placement = below && above
-      ? `That puts you between ${below.label.toLowerCase()} and ${above.label.toLowerCase()}.`
+      ? `That puts you between ${inSentence(below.label)} and ${inSentence(above.label)}.`
       : above
-        ? `That's below every other rate on this page — even ${above.label.toLowerCase()}.`
+        ? `That's below every other rate on this page — even ${inSentence(above.label)}.`
         : below
-          ? `That's above every other rate on this page — including ${below.label.toLowerCase()}.`
+          ? `That's above every other rate on this page — including ${inSentence(below.label)}.`
           : ''
     wageOut.hidden = false
     wageOut.textContent = `${formatMoney(hourly)}/hr. ${placement}`
@@ -380,79 +407,132 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     }
   }
 
-  // ---- share ------------------------------------------------------------------
-  onShare(
-    () => {
-      const elapsed = (performance.now() - t0) / 1000
-      const dollars = (spendingRate / 3600) * elapsed
-      return {
-        slug: 'printing-money',
-        siteName: SITE.name,
-        headline: `The government spent ${formatMoney(dollars)} while you read this`,
-        sub: 'Nine real rates of earning, from minimum wage to a government.',
-        stats: [
-          { label: 'Time on page', value: `${elapsed.toFixed(0)}s` },
-          { label: 'Govt. spending', value: formatMoney(dollars) },
-          { label: 'Your rate', value: currentWageRate != null ? formatMoney(currentWageRate) + '/hr' : 'not entered' },
-        ],
-      }
-    },
-    (c) => ({ title: 'Printing Money', text: c.headline }),
-  )
+  // ---- the shell ----------------------------------------------------------------
+
+  // Restart is a reload, the default: the clock starting again from zero is
+  // exactly what starting again means here.
+  const shell = createShell({ slug: 'printing-money' })
+  const minWageRate = Number((document.querySelector('[data-tier="min-wage"]') as HTMLElement).dataset.rate)
+  const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 })
+  const shortMoney = (n: number) => (n < 1000 ? '$' + Math.floor(n) : '$' + compact.format(n))
+  const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
+  const elapsedS = () => (performance.now() - t0) / 1000
+
+  // A rate counts as read once most of it has been on screen.
+  const read = new Set<Element>()
+  if ('IntersectionObserver' in window) {
+    const seen = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { read.add(e.target); seen.unobserve(e.target) }
+    }, { threshold: 0.5 })
+    for (const st of stages) seen.observe(st.el)
+  }
+
+  // The strip rolls its digits, so it is told once a second rather than
+  // every frame; the debt clock is the live one.
+  function paintStrip() {
+    shell.setScore(shortMoney((spendingRate / 3600) * elapsedS()))
+    shell.setLevel(`${read.size} / ${stages.length}`)
+    shell.setMoves(clock(elapsedS()))
+  }
+  paintStrip()
+  setInterval(paintStrip, 1000)
+
+  function shareCardNow() {
+    const elapsed = elapsedS()
+    const dollars = (spendingRate / 3600) * elapsed
+    return {
+      slug: 'printing-money',
+      siteName: SITE.name,
+      headline: `The government spent ${formatMoney(dollars)} while you read this`,
+      sub: 'Nine real rates of earning, from minimum wage to a government.',
+      stats: [
+        { label: 'Time on page', value: `${elapsed.toFixed(0)}s` },
+        { label: 'Govt. spending', value: formatMoney(dollars) },
+        { label: 'Your rate', value: currentWageRate != null ? formatMoney(currentWageRate) + '/hr' : 'not entered' },
+      ],
+    }
+  }
+
+  /** The bottom of the page: what was spent while you read it. */
+  let ended = false
+  function finish() {
+    if (ended) return
+    ended = true
+    const elapsed = elapsedS()
+    const dollars = (spendingRate / 3600) * elapsed
+    const wage = currentWageRate ?? minWageRate
+    const years = dollars / (wage * 2080)
+    const yearsText = years >= 10 ? Math.round(years).toLocaleString('en-US') : years.toFixed(1)
+    paintStrip()
+    shell.considerBest(Math.round(elapsed), clock(elapsed))
+    shell.win({
+      celebrate: false,
+      kicker: `While you read · ${clock(elapsed)}`,
+      title: `The US government spent ${formatMoney(dollars)}.`,
+      score: shortMoney(dollars),
+      from: '$0',
+      lines: [
+        currentWageRate != null
+          ? `At your ${formatMoney(wage)} an hour, earning that would take ${yearsText} working years.`
+          : `At the federal minimum wage, earning that would take ${yearsText} working years.`,
+        'And it is still going.',
+      ],
+      againLabel: 'Start the clock again',
+    })
+    shell.resultExtra.innerHTML =
+      '<div class="pm-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share this</span></button></div>'
+    $('shareBtn').addEventListener('click', async (e) => {
+      const label = (e.currentTarget as HTMLElement).querySelector('span')!
+      const c = shareCardNow()
+      const outcome = await shareResult(c, { title: 'Printing Money', text: c.headline, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share this'), 1600)
+    })
+  }
+  if ('IntersectionObserver' in window) {
+    const end = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { end.disconnect(); finish() }
+    })
+    end.observe($('pmEnd'))
+  }
 
   recordPlay('printing-money')
 </script>
 
 <style is:global>
-  .pm-body {
-    background: #07090a; color: #ece7d8;
-    --money-gold: #d4af5a; --money-gold-lt: #f0d896; --money-green: #6fcf87;
-    --money-led: #ff5a3c; --money-led-lt: #ffb08c;
+  /* The page is paper. The debt clock and the bills keep their own dark
+     ground — they are the pictures — and the LED red is the clock's own. */
+  .pm {
+    --money-led: #ff5a3c;
+    --money-green: var(--t-green);
   }
-  .pm-bg {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background:
-      radial-gradient(60vmax 60vmax at 12% -8%, rgba(212, 175, 90, 0.09), transparent 70%),
-      radial-gradient(70vmax 70vmax at 92% 8%, rgba(111, 207, 135, 0.07), transparent 70%),
-      radial-gradient(90vmax 60vmax at 50% 115%, rgba(255, 90, 60, 0.05), transparent 70%);
-  }
-  .pm-body .game { position: relative; }
-  .pm-body .game > * { position: relative; z-index: 1; }
+  .pm [hidden] { display: none !important; }
 
-  .pm-head { max-width: 660px; margin: 6vh auto 0; padding: 0 22px; text-align: center; }
-  .pm-eyebrow {
-    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--money-gold-lt);
-    opacity: 0.9; margin: 0 0 14px; font-weight: 700;
-  }
-  .pm-head h1 {
-    font-family: 'Playfair Display', Georgia, serif; font-weight: 800;
-    font-size: clamp(38px, 7.4vw, 62px); margin: 0 0 16px; letter-spacing: -0.01em;
-    background: linear-gradient(180deg, #fff4d6, var(--money-gold) 65%, #a9863c);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    text-shadow: 0 2px 24px rgba(212, 175, 90, 0.25);
-  }
-  .pm-head p { font-size: 16.5px; line-height: 1.7; opacity: 0.78; max-width: 56ch; margin: 0 auto; }
+  .pm-head { max-width: 660px; margin: 2vh auto 0; text-align: center; }
+  .pm-eyebrow { display: block; margin-bottom: 14px; color: var(--ink2); }
+  .pm-lead { font-size: var(--fs-lead); line-height: 1.6; color: var(--ink2); max-width: 56ch; margin: 0 auto; }
 
   /* ---- the hero: a real debt-clock signboard, bolted to the page --------- */
   .pm-hero {
-    position: relative; max-width: 640px; margin: 6vh auto 0; padding: 30px clamp(14px, 4vw, 30px) 26px;
-    border-radius: 20px; text-align: center;
+    position: relative; max-width: 640px; margin: 5vh auto 0; padding: 30px clamp(14px, 4vw, 30px) 26px;
+    border-radius: var(--r-lg); text-align: center; color: #eef1f5;
     background:
       linear-gradient(155deg, rgba(255, 255, 255, 0.05), transparent 40%),
-      linear-gradient(175deg, #1c1a16, #100e0b 60%, #0a0908);
-    border: 1px solid rgba(212, 175, 90, 0.22);
+      linear-gradient(175deg, #1a1d24, #0f1116 60%, #090a0d);
+    border: 2px solid var(--ink);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 40px rgba(0, 0, 0, 0.5),
       0 40px 80px -30px rgba(0, 0, 0, 0.9), 0 2px 0 rgba(255, 255, 255, 0.03);
   }
   .hero-label {
     display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 16px;
-    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #c9b98a;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #c4ccd8;
   }
   .live-dot {
     width: 7px; height: 7px; border-radius: 50%; background: var(--money-led);
-    box-shadow: 0 0 8px var(--money-led); animation: pm-live 1.7s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--money-led);
   }
+  html.play .live-dot { animation: pm-live 1.7s ease-in-out infinite; }
   @keyframes pm-live { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
   .hero-screen {
@@ -462,11 +542,11 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   }
   .hero-clock { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 0.02em; flex-wrap: wrap; }
   .ccy {
-    font-family: 'Playfair Display', Georgia, serif; font-weight: 800; margin-right: 0.08em;
+    font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 700; margin-right: 0.08em;
     font-size: clamp(24px, 6.6vw, 40px); color: var(--money-led); text-shadow: 0 0 0.2em rgba(255, 90, 60, 0.6);
   }
   .hero-comma {
-    align-self: flex-end; margin: 0 0.03em 0.06em; font-family: var(--mono); font-weight: 700;
+    align-self: flex-end; margin: 0 0.03em 0.06em; font-family: var(--sans); font-weight: 700;
     font-size: clamp(16px, 4vw, 26px); color: rgba(255, 90, 60, 0.55);
   }
   .hero-odo { font-size: clamp(24px, 6.6vw, 40px); }
@@ -510,7 +590,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   .pm-hero-bar { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); overflow: hidden; position: relative; margin: 16px auto 0; max-width: 440px; }
   .pm-hero-fill {
     height: 100%; width: 0%; border-radius: 4px;
-    background: linear-gradient(90deg, var(--money-gold), var(--money-led));
+    background: linear-gradient(90deg, #ff9a86, var(--money-led));
     box-shadow: 0 0 12px rgba(255, 90, 60, 0.45); transition: width 120ms linear;
   }
   .pm-hero-ref { margin: 8px 0 0; font-size: 11.5px; opacity: 0.55; }
@@ -528,36 +608,30 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   .bolt-bl { bottom: 10px; left: 11px; } .bolt-br { bottom: 10px; right: 11px; }
 
   /* ---- the stages ---------------------------------------------------------- */
-  .pm-body-content { max-width: 660px; margin: 0 auto; padding: 0 22px; }
+  .pm-body-content { max-width: 660px; margin: 0 auto; }
   .pm-stage {
-    padding: 8vh 0; border-top: 1px solid rgba(255, 255, 255, 0.07);
-    opacity: 1; transform: none; transition: opacity 640ms var(--ease, ease), transform 640ms var(--ease, ease);
+    padding: 7vh 0; border-top: 1.5px solid var(--paper3);
+    opacity: 1; transform: none;
   }
+  html.play .pm-stage { transition: opacity 640ms var(--ease), transform 640ms var(--ease); }
   /* Visible by default — `.pm-pending` (JS-applied only to sections still
      below the fold at load) is what actually hides a stage, so a slow or
      failed script leaves every section visible rather than stuck invisible.
      `.pm-in` just clears it back to the same default. */
-  .pm-stage.pm-pending { opacity: 0; transform: translateY(18px); }
+  html.play .pm-stage.pm-pending { opacity: 0; transform: translateY(18px); }
   .pm-stage.pm-in { opacity: 1; transform: translateY(0); }
   .pm-stage:first-of-type { border-top: 0; }
-  .pm-kicker { font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.48; margin: 0 0 10px; font-weight: 600; }
-  .pm-stage h2 {
-    font-family: 'Playfair Display', Georgia, serif; font-weight: 700;
-    font-size: clamp(22px, 3.8vw, 30px); margin: 0 0 12px; letter-spacing: -0.01em; color: #f4ecd8;
-  }
-  .pm-rate {
-    margin: 0 0 12px; font-size: clamp(26px, 5.4vw, 36px); font-weight: 800;
-    font-variant-numeric: tabular-nums; color: var(--money-gold-lt);
-    text-shadow: 0 0 24px rgba(212, 175, 90, 0.2);
-  }
-  .pm-rate span { font-size: 15px; opacity: 0.55; font-weight: 600; margin-left: 4px; }
-  .pm-note { font-size: 14px; line-height: 1.65; opacity: 0.66; margin: 0 0 16px; max-width: 54ch; }
-  .pm-since { font-size: 14.5px; opacity: 0.85; margin: 0 0 18px; }
-  .pm-since b { font-variant-numeric: tabular-nums; color: var(--money-green); }
+  .pm-kicker { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); margin: 0 0 10px; font-weight: 700; }
+  .pm-stage h2 { font-size: clamp(26px, 3.8vw, 38px); margin: 0 0 12px; line-height: 1.1; }
+  .pm-rate { margin: 0 0 12px; font-size: clamp(28px, 5.4vw, 40px); font-weight: 800; color: var(--ink); }
+  .pm-rate span { font-size: 15px; color: var(--ink2); font-weight: 600; margin-left: 4px; }
+  .pm-note { font-size: 15px; line-height: 1.65; color: var(--ink2); margin: 0 0 16px; max-width: 54ch; }
+  .pm-since { font-size: 15px; margin: 0 0 18px; }
+  .pm-since b { color: var(--money-green); }
 
   /* ---- the literal strip: a real tiled wall of bills, on its own felt ---- */
   .pm-strip-wrap {
-    border-radius: 12px; overflow: hidden; padding: 18px 0;
+    border-radius: var(--r); overflow: hidden; padding: 18px 0; color: #eef1f5;
     background:
       radial-gradient(120% 160% at 50% -30%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.35) 100%),
       linear-gradient(180deg, #0e2417, #081712);
@@ -573,75 +647,53 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
 
   /* ---- the comparison, for anything too big to draw ---------------------- */
   .pm-compare-track {
-    height: 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.07); overflow: hidden; position: relative;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    height: 16px; border-radius: 8px; background: var(--paper3); overflow: hidden; position: relative;
+    box-shadow: inset 0 1px 3px rgba(17, 19, 24, 0.2);
   }
   .pm-compare-fill {
     height: 100%; border-radius: 8px; position: relative; overflow: hidden;
-    background: linear-gradient(90deg, var(--money-gold), var(--money-led));
-    box-shadow: 0 0 14px rgba(255, 90, 60, 0.35);
+    background: linear-gradient(90deg, var(--mint), var(--cobalt));
   }
   .pm-compare-fill::after {
     content: ''; position: absolute; inset: 0; border-radius: 8px 8px 0 0;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent 60%);
   }
-  .pm-compare-caption { margin: 10px 0 0; font-size: 13.5px; line-height: 1.6; opacity: 0.76; }
+  .pm-compare-caption { margin: 10px 0 0; font-size: 14px; line-height: 1.6; color: var(--ink2); }
 
-  .pm-institution h2 { color: var(--money-led-lt); }
+  .pm-institution h2 { color: var(--t-cobalt); }
 
   /* ---- your own wage ------------------------------------------------------ */
-  .pm-wage {
-    background:
-      radial-gradient(120% 160% at 50% -20%, rgba(212, 175, 90, 0.08), transparent 60%),
-      rgba(255, 255, 255, 0.02);
-    border-radius: 18px; padding: 6vh 24px; margin: 0 -24px; border: 1px solid rgba(212, 175, 90, 0.12);
-  }
+  .pm-wage { background: var(--mint); border-radius: var(--r-lg); padding: 6vh clamp(18px, 3vw, 32px); border-top: 0; }
+  .pm-wage + .pm-stage { border-top: 0; }
+  .pm-wage .pm-kicker { color: var(--ink); }
+  .pm-wage .pm-note { color: var(--ink); }
   .pm-wage-input {
-    display: flex; align-items: center; gap: 6px; max-width: 240px;
-    background: #0a0908; border: 1px solid rgba(212, 175, 90, 0.35); border-radius: 12px;
-    padding: 12px 16px; margin-bottom: 16px;
-    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.55);
-    transition: border-color 160ms ease, box-shadow 160ms ease;
+    display: flex; align-items: center; gap: 6px; max-width: 260px;
+    background: var(--card); border: 2px solid var(--ink); border-radius: var(--r-pill);
+    padding: 10px 18px; margin-bottom: 16px;
   }
-  .pm-wage-input:focus-within {
-    border-color: var(--money-gold); box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(212, 175, 90, 0.15);
-  }
-  .pm-wage-input span { opacity: 0.55; font-size: 16px; }
+  .pm-wage-input span { color: var(--ink2); font-size: 17px; }
   .pm-wage-input input {
-    flex: 1; min-width: 0; background: none; border: 0; color: var(--money-gold-lt); font-size: 18px;
-    font-variant-numeric: tabular-nums; outline: none; font-weight: 700;
+    flex: 1; min-width: 0; background: none; border: 0; color: var(--ink); font: 700 19px var(--sans); outline: none;
   }
-  .pm-wage-out { font-size: 15px; margin: 0 0 16px; color: var(--money-green); }
+  .pm-wage-out { font-size: 16px; font-weight: 600; margin: 0 0 16px; color: var(--ink); }
+  .pm-wage .pm-since b { color: var(--ink); }
   .pm-wage-strip-wrap { margin-bottom: 16px; }
 
   /* ---- outro --------------------------------------------------------------- */
   .pm-outro { padding: 6vh 0 14vh; }
-  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 24px; }
-  .acts button {
-    appearance: none; border: 0; cursor: pointer; padding: 12px 22px; border-radius: 999px;
-    font-size: 14.5px; font-weight: 700; color: #2a1c05;
-    background: linear-gradient(165deg, var(--money-gold-lt), var(--money-gold));
-    box-shadow: 0 10px 24px -10px rgba(212, 175, 90, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    transition: transform 180ms var(--ease-bounce, ease), box-shadow 180ms ease;
-  }
-  .acts button:hover { transform: translateY(-2px) scale(1.03); }
-  .acts button:active { transform: scale(0.96); }
-  .acts a { color: inherit; opacity: 0.65; font-size: 14px; text-decoration: none; }
-  .acts a:hover { opacity: 1; }
+  .pm-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
-  .how { text-align: left; font-size: 14px; opacity: 0.8; }
-  .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; text-align: center; }
+  .how { text-align: left; font-size: 15px; color: var(--ink2); }
+  .how summary { cursor: pointer; font-weight: 700; color: var(--ink); margin-bottom: 8px; text-align: center; }
   .how p { line-height: 1.6; margin: 10px 0; }
-  .how a { color: var(--money-green); }
-  .how code { font-size: 12.5px; background: rgba(255, 255, 255, 0.06); padding: 1px 5px; border-radius: 4px; }
+  .how a { color: var(--t-cobalt); }
+  .how code { font-size: 13px; background: var(--paper2); padding: 1px 5px; border-radius: 4px; }
 
   @media (max-width: 560px) {
-    .pm-wage { margin: 0 -22px; border-radius: 0; }
     .pm-strip { margin: 0 12px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .live-dot { animation: none; }
     .digit.flicker { animation: none; }
-    .pm-stage, .pm-stage.pm-pending { opacity: 1; transform: none; transition: none; }
   }
 </style>

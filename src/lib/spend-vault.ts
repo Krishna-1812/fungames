@@ -35,8 +35,8 @@ void main() {
   /* Authored in sRGB and converted, rather than guessed at in linear. And no
      ACES: this is a UI element with chosen colours and nothing above 1.0, and
      the tonemap was dragging the empty channel toward black on a light page. */
-  vec3 emptyTop = toLinear(vec3(0.855, 0.898, 0.878));
-  vec3 emptyBot = toLinear(vec3(0.792, 0.851, 0.827));
+  vec3 emptyTop = toLinear(vec3(0.898, 0.910, 0.929));
+  vec3 emptyBot = toLinear(vec3(0.827, 0.847, 0.878));
   vec3 col = mix(emptyBot, emptyTop, y);
 
   /* The surface. A vertical edge, softened and given a small wobble so it
@@ -47,10 +47,10 @@ void main() {
   float edge = u_level + wob;
   float body = smoothstep(edge + 0.004, edge - 0.004, x);
 
-  /* The liquid. Green while there is plenty, amber then red as it runs out,
+  /* The liquid. Teal while there is plenty, raspberry as it runs out,
      which is the same signal the balance figure gives when it turns red. */
   vec3 deep = mix(toLinear(vec3(0.059, 0.239, 0.243)), toLinear(vec3(0.290, 0.729, 0.596)), y);
-  vec3 low  = mix(toLinear(vec3(0.451, 0.153, 0.106)), toLinear(vec3(0.859, 0.502, 0.259)), y);
+  vec3 low  = mix(toLinear(vec3(0.494, 0.071, 0.180)), toLinear(vec3(1.000, 0.310, 0.431)), y);
   /* A narrow crossover. Over a wide one the mix sits halfway between teal and
      red for most of the endgame, which is olive -- it read as murky rather than
      as a warning. */
