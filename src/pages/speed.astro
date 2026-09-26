@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { withBase } from '../lib/base'
 
 /**
@@ -17,10 +17,23 @@ import { withBase } from '../lib/base'
  * paced, the same scroll-driven mechanism `day-go.astro` proved out (a
  * single synchronous scroll+rAF check, not IntersectionObserver, which is
  * asynchronous by spec and let a fast jump show stale numbers there).
+ *
+ * In the shell the night is the stage, edge to edge, with the live readout
+ * pinned to the top of it. Score is the distance travelled so far, Speeds how
+ * many of the seven have been counted in, Time how long the page has been
+ * open, and Best the furthest you have gone by the time you reach the edge of
+ * the observable universe — which is the ending. The clock does not stop for
+ * the pause button, because the Earth does not. Pointers and readouts are
+ * mint rather than gold; the Sun and the magma keep their own colours.
  */
 ---
 
-<GameLayout slug="speed" bar="#0a0e1e" bodyClass="speed-body">
+<GameShell
+  slug="speed"
+  labels={{ score: 'Travelled', best: 'Furthest', level: 'Speeds', moves: 'Time' }}
+  initial={{ score: '0 m', level: '0 / 7', moves: '0s' }}
+>
+  <div class="speed-body">
   <div class="sp-bg" aria-hidden="true"></div>
 
   <div class="sp-hud" id="hud">
@@ -33,7 +46,6 @@ import { withBase } from '../lib/base'
 
   <header class="sp-head">
     <p class="sp-eyebrow">Seven real speeds, stacking live</p>
-    <h1>How Fast Are You Moving?</h1>
     <p>
       Right now, doing nothing, you are moving. Not metaphorically — seven
       real, measured motions, each one a real frame of reference nested
@@ -74,9 +86,9 @@ import { withBase } from '../lib/base'
           </g>
           <line x1="30" y1="75" x2="58" y2="75" stroke="#6ee7ff" stroke-width="2" stroke-linecap="round"/>
           <line x1="178" y1="83" x2="206" y2="83" stroke="#6ee7ff" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="118" cy="106" r="3" fill="#ffd27a"/>
-          <circle cx="118" cy="106" r="3" fill="none" stroke="#ffd27a" stroke-width="1.4" class="sp-ping"/>
-          <text x="126" y="110" fill="#ffd27a" font-size="8.5" font-family="sans-serif" opacity="0.9">you're here</text>
+          <circle cx="118" cy="106" r="3" fill="#4fe3c1"/>
+          <circle cx="118" cy="106" r="3" fill="none" stroke="#4fe3c1" stroke-width="1.4" class="sp-ping"/>
+          <text x="126" y="110" fill="#4fe3c1" font-size="8.5" font-family="sans-serif" opacity="0.9">you're here</text>
         </svg>
       </div>
       <p class="sp-kicker">Stage 1 of 7</p>
@@ -130,8 +142,8 @@ import { withBase } from '../lib/base'
             <path d="M90 118 q30 12 60 0" fill="none" stroke="#eaf6ff" stroke-width="1" opacity="0.22"/>
             <circle cx="120" cy="80" r="52" fill="url(#sp-earth-term)"/>
           </g>
-          <line id="sp-lat-line" x1="68" y1="80" x2="172" y2="80" stroke="#ffd27a" stroke-width="1.6" stroke-dasharray="2 3"/>
-          <circle id="sp-lat-dot" cx="172" cy="80" r="3" fill="#ffd27a"/>
+          <line id="sp-lat-line" x1="68" y1="80" x2="172" y2="80" stroke="#4fe3c1" stroke-width="1.6" stroke-dasharray="2 3"/>
+          <circle id="sp-lat-dot" cx="172" cy="80" r="3" fill="#4fe3c1"/>
         </svg>
       </div>
       <p class="sp-kicker">Stage 2 of 7</p>
@@ -295,9 +307,9 @@ import { withBase } from '../lib/base'
             <path d="M0 0 q-20 24 -3 34" fill="none" stroke="#d8ccff" stroke-width="3" opacity="0.4" stroke-linecap="round"/>
             <circle r="8" fill="#f2ecff"/>
           </g>
-          <path d="M110 80 L130 80" stroke="#ffd27a" stroke-width="1.6" stroke-dasharray="3 3"/>
-          <path d="M116 74 L108 80 L116 86" fill="none" stroke="#ffd27a" stroke-width="1.6"/>
-          <path d="M124 74 L132 80 L124 86" fill="none" stroke="#ffd27a" stroke-width="1.6"/>
+          <path d="M110 80 L130 80" stroke="#4fe3c1" stroke-width="1.6" stroke-dasharray="3 3"/>
+          <path d="M116 74 L108 80 L116 86" fill="none" stroke="#4fe3c1" stroke-width="1.6"/>
+          <path d="M124 74 L132 80 L124 86" fill="none" stroke="#4fe3c1" stroke-width="1.6"/>
         </svg>
       </div>
       <p class="sp-kicker">Stage 6 of 7</p>
@@ -361,9 +373,9 @@ import { withBase } from '../lib/base'
           <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2" class="sp-horizon-ring" style="animation-delay:0s"/>
           <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2" class="sp-horizon-ring" style="animation-delay:-1.3s"/>
           <circle cx="120" cy="80" r="34" fill="none" stroke="#3a4a7a" stroke-width="1.2" class="sp-horizon-ring" style="animation-delay:-2.6s"/>
-          <circle cx="120" cy="80" r="82" fill="none" stroke="#ff8a5c" stroke-width="1.6" stroke-dasharray="4 4"/>
+          <circle cx="120" cy="80" r="82" fill="none" stroke="#b8a1ff" stroke-width="1.6" stroke-dasharray="4 4"/>
           <circle cx="120" cy="80" r="10" fill="url(#sp-horizon-core)"/>
-          <text x="150" y="8" fill="#ff8a5c" font-size="10" font-family="sans-serif">faster than light, out here</text>
+          <text x="150" y="8" fill="#b8a1ff" font-size="10" font-family="sans-serif">faster than light, out here</text>
         </svg>
       </div>
       <p class="sp-kicker">Past all seven, one thing left</p>
@@ -399,12 +411,6 @@ import { withBase } from '../lib/base'
     </section>
 
     <footer class="sp-outro">
-      <div class="acts">
-        <button type="button" data-share data-title="How Fast Are You Moving?">Share this</button>
-        <button type="button" id="again">Start over</button>
-        <a href={withBase('/')}>try something else →</a>
-      </div>
-
       <details class="how">
         <summary>How this actually works</summary>
         <p>
@@ -426,7 +432,22 @@ import { withBase } from '../lib/base'
       </details>
     </footer>
   </main>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Right now, sitting still, you are moving seven different ways at once,
+      each one measured and cited. Scroll down and each speed is counted in as
+      you reach it.
+    </p>
+    <ul>
+      <li>The readout at the top is the distance you have covered since the page opened, with every speed counted so far.</li>
+      <li>Earth's spin depends on how far you are from the equator. Share your location and it is worked out for you; nothing leaves this tab.</li>
+      <li>The clock keeps running when you pause. So does the Earth.</li>
+    </ul>
+    <p>Reach the edge of the observable universe to finish. Best is the furthest you have gone by then.</p>
+  </Fragment>
+</GameShell>
 
 <script>
   import {
@@ -435,9 +456,15 @@ import { withBase } from '../lib/base'
     type Stage,
   } from '../lib/speed-model'
   import { recordPlay } from '../lib/stats'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
-  import { prefersReducedMotion } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+
+  const prefersReducedMotion = !PLAY
+  // Restart is a reload, the default: the clock starts again from the moment
+  // the page opens, which is the only honest place to start it.
+  const shell = createShell({ slug: 'speed' })
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -455,6 +482,18 @@ import { withBase } from '../lib/base'
     const sec = s - m * 60
     return m > 0 ? `${m}m ${sec.toFixed(0)}s` : `${s.toFixed(1)}s`
   }
+  /** The strip is narrow: "1.24M km", not "1.24 million km". */
+  const shortKm = (km: number) => {
+    if (km >= 1_000_000) return `${(km / 1_000_000).toFixed(2)}M km`
+    if (km >= 1000) return `${Math.round(km).toLocaleString('en-US')} km`
+    if (km >= 1) return `${km.toFixed(1)} km`
+    return `${Math.round(km * 1000)} m`
+  }
+  const shortTime = (s: number) => {
+    const m = Math.floor(s / 60)
+    return m > 0 ? `${m}m ${String(Math.floor(s - m * 60)).padStart(2, '0')}s` : `${Math.floor(s)}s`
+  }
+  const SPEED_NAMES = ['Plate drift', "Earth's spin", "Earth's orbit", 'The solar apex', 'The galactic orbit', 'Toward Andromeda', 'Against the Big Bang']
 
   /* ---------------------------------------------------------------------- */
   /* Starfields — one small scattered set of dots per scene, deterministic. */
@@ -557,6 +596,7 @@ import { withBase } from '../lib/base'
   let activeCount = 0
   const t0 = performance.now()
   let lastWholeKm = -1
+  let lastStrip = -1e9
   const hud = $('hud')
 
   function tick(now: number) {
@@ -566,13 +606,19 @@ import { withBase } from '../lib/base'
     const distEl = $('hudDist')
     distEl.textContent = fmtKm(dist)
     const wholeKm = Math.floor(dist)
-    if (wholeKm !== lastWholeKm && lastWholeKm >= 0) {
+    if (PLAY && wholeKm !== lastWholeKm && lastWholeKm >= 0) {
       distEl.classList.remove('sp-pulse')
       void distEl.offsetWidth
       distEl.classList.add('sp-pulse')
     }
     lastWholeKm = wholeKm
     hud.style.setProperty('--sp-glow-x', `${10 + (activeCount / STAGE_IDS.length) * 80}%`)
+    // The strip is a summary, not the instrument: four writes a second.
+    if (now - lastStrip > 250) {
+      lastStrip = now
+      shell.setScore(shortKm(dist))
+      shell.setMoves(shortTime(elapsed))
+    }
     requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)
@@ -590,7 +636,6 @@ import { withBase } from '../lib/base'
 
   let recorded = false
   let shareCard: import('../lib/result-card').ResultCard | null = null
-  onShare(() => shareCard, (c) => ({ title: 'How Fast Are You Moving?', text: `${c.headline}.` }))
 
   function updateShareCard() {
     const elapsed = (performance.now() - t0) / 1000
@@ -608,6 +653,39 @@ import { withBase } from '../lib/base'
       ],
     }
     recordPlay('speed', { combinedKmS, distanceKm: dist }, { combinedKmS: 'high' })
+    finish(dist, combinedKmS, elapsed)
+  }
+
+  /** The edge of the observable universe is the ending. The card waits under
+      the closing paragraph; the page is not pulled past what it is saying. */
+  function finish(dist: number, combinedKmS: number, elapsed: number) {
+    shell.considerBest(Math.round(dist), shortKm(dist))
+    shell.win({
+      celebrate: false,
+      scroll: false,
+      kicker: 'Just reading this, you travelled',
+      title: `${fmtKm(dist)}.`,
+      score: shortKm(dist),
+      lines: [
+        `All seven at once come to about ${Math.round(combinedKmS).toLocaleString('en-US')} km/s, and you have been here ${fmtTime(elapsed)}.`,
+        'Measured against something else, every one of them is zero.',
+      ],
+      againLabel: 'Start the clock again',
+    })
+    shell.resultExtra.innerHTML =
+      '<div class="sp-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share this</span></button></div>'
+    $('shareBtn').addEventListener('click', async (e) => {
+      if (!shareCard) return
+      const label = (e.currentTarget as HTMLElement).querySelector('span')!
+      const outcome = await shareResult(shareCard, { title: 'How Fast Are You Moving?', text: `${shareCard.headline}.`, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share this'), 1600)
+    })
+  }
+
+  function paintLevel(before: number) {
+    shell.setLevel(`${activeCount} / ${STAGE_IDS.length}`)
+    if (activeCount > before && before > 0 && !recorded) shell.levelUp(`+ ${SPEED_NAMES[activeCount - 1]}`)
   }
 
   /* ---------------------------------------------------------------------- */
@@ -616,6 +694,7 @@ import { withBase } from '../lib/base'
   /* ---------------------------------------------------------------------- */
 
   function checkStages() {
+    const before = activeCount
     let n = 0
     for (const id of STAGE_IDS) {
       const el = document.getElementById(id)
@@ -630,39 +709,41 @@ import { withBase } from '../lib/base'
         updateShareCard()
       }
     }
+    if (activeCount !== before) paintLevel(before)
   }
 
-  if (prefersReducedMotion) {
-    activeCount = STAGE_IDS.length
-  } else {
-    let ticking = false
-    addEventListener('scroll', () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(() => { ticking = false; checkStages() })
-    }, { passive: true })
-    checkStages()
-  }
-
-  $('again').addEventListener('click', () => location.reload())
+  /* Under reduced motion every speed counts from the start, but reaching the
+     edge still has to end the piece, so the scroll check runs either way. */
+  if (prefersReducedMotion) { activeCount = STAGE_IDS.length; paintLevel(activeCount) }
+  let ticking = false
+  addEventListener('scroll', () => {
+    if (ticking) return
+    ticking = true
+    requestAnimationFrame(() => { ticking = false; checkStages() })
+  }, { passive: true })
+  checkStages()
 </script>
 
 <style is:global>
-  .speed-body { background: #05060f; color: #eaf0ff; }
-  .speed-body .game { position: relative; }
+  /* The night fills the stage edge to edge. overflow: clip rather than
+     hidden, which would make the stage a scroll container and stop the
+     readout and the backdrop sticking. */
+  .stage:has(> .speed-body) { padding: 0; overflow: clip; background: #05060f; }
+  .speed-body { position: relative; color: #eaf0ff; }
 
+  /* Sticky, not fixed: pinned while the page scrolls over it, but inside the frame. */
   .sp-bg {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; z-index: 0; pointer-events: none;
     background:
       radial-gradient(70vmax 70vmax at 20% -10%, rgba(110, 231, 255, 0.08), transparent 70%),
       radial-gradient(70vmax 70vmax at 85% 105%, rgba(143, 123, 255, 0.09), transparent 70%);
   }
-  .speed-body .game > * { position: relative; z-index: 1; }
-  .speed-body .game > .sp-hud { position: sticky; z-index: 5; }
+  .speed-body > :not(.sp-bg) { position: relative; z-index: 1; }
+  .speed-body > .sp-hud { position: sticky; z-index: 5; }
 
   /* ---- the live HUD: the page's one persistent, undeniable fact ---------- */
   .sp-hud {
-    position: sticky; top: 48px; z-index: 5;
+    position: sticky; top: 0; z-index: 5;
     width: 100%; overflow: hidden;
     background: linear-gradient(100deg, #131a3a, #1d1240 55%, #2a1240);
     border-bottom: 1px solid rgba(110, 231, 255, 0.25);
@@ -679,7 +760,7 @@ import { withBase } from '../lib/base'
     column-gap: 14px; row-gap: 2px; text-align: center;
   }
   .sp-hud-time {
-    margin: 0; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+    margin: 0; font-size: 13.5px; font-weight: 700;
     color: #9fe8ff; letter-spacing: 0.01em; opacity: 0.9; order: 2;
   }
   .sp-hud-time span { color: #fff; }
@@ -687,7 +768,7 @@ import { withBase } from '../lib/base'
     margin: 0; order: 1; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; justify-content: center;
   }
   .sp-hud-dist span {
-    font-size: clamp(28px, 6vw, 44px); font-weight: 800; font-variant-numeric: tabular-nums;
+    font-size: clamp(28px, 6vw, 44px); font-weight: 800;
     color: #fff; letter-spacing: -0.01em; text-shadow: 0 0 30px rgba(110, 231, 255, 0.5);
   }
   .sp-hud-dist span.sp-pulse { animation: sp-pulse 0.5s ease-out; }
@@ -698,9 +779,8 @@ import { withBase } from '../lib/base'
     .sp-hud-dist, .sp-hud-time { order: initial; width: 100%; }
   }
 
-  .sp-head { max-width: 640px; margin: 7vh auto 0; padding: 0 22px; text-align: center; }
+  .sp-head { max-width: 640px; margin: 6vh auto 0; padding: 0 22px; text-align: center; }
   .sp-eyebrow { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #8f7bff; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
-  .sp-head h1 { font-size: clamp(32px, 6.4vw, 50px); margin: 0 0 14px; letter-spacing: -0.03em; }
   .sp-head p { font-size: 16.5px; line-height: 1.65; opacity: 0.8; max-width: 54ch; margin: 0 auto; }
 
   .sp-body-content { max-width: 620px; margin: 0 auto; padding: 0 22px; }
@@ -741,8 +821,8 @@ import { withBase } from '../lib/base'
   .sp-geo:disabled { opacity: 0.7; cursor: default; }
 
   .sp-fact {
-    font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
-    color: #ffd27a; margin: 0 0 8px;
+    font-size: 16px; font-weight: 700;
+    color: #4fe3c1; margin: 0 0 8px;
   }
   .sp-source { font-size: 12.5px; opacity: 0.55; line-height: 1.55; margin: 0; }
   .sp-more {
@@ -752,30 +832,20 @@ import { withBase } from '../lib/base'
   .sp-more span { display: inline-block; animation: sp-bob 1.6s ease-in-out infinite; }
   @keyframes sp-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
 
-  .sp-finale h2 { color: #ff9d6e; }
+  .sp-finale h2 { color: #b8a1ff; }
   .sp-closer {
     font-size: 16px; line-height: 1.7; opacity: 0.9; margin-top: 26px;
     padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .sp-outro { padding: 6vh 0 14vh; }
-  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 24px; }
-  .acts button {
-    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
-    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
-  }
-  .acts button:first-child { background: linear-gradient(165deg, #8fe3ff, #6ee7ff); color: #06202b; border: 0; }
-  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
-  .acts a:hover { opacity: 1; }
+  .sp-outro { padding: 2vh 0 8vh; }
+  .sp-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
   .how { text-align: left; font-size: 14px; opacity: 0.8; }
   .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; text-align: center; }
   .how p { line-height: 1.6; margin: 10px 0; }
   .how a { color: #6ee7ff; }
 
-  @media (prefers-reduced-motion: reduce) {
-    .sp-spin, .sp-orbit-dot, .sp-orbit-dot-slow, .sp-flare, .sp-gal-spin { animation: none; }
-    .sp-hud-dist span.sp-pulse { animation: none; }
-    .sp-star, .sp-ping, .sp-horizon-ring, .sp-more span { animation: none !important; }
-  }
+  /* The site's motion setting, not only the system one. */
+  html:not(.play) :is(.sp-spin, .sp-orbit-dot, .sp-orbit-dot-slow, .sp-flare, .sp-gal-spin, .sp-star, .sp-ping, .sp-horizon-ring, .sp-more span, .sp-hud-dist span.sp-pulse) { animation: none !important; }
 </style>

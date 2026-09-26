@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 
 /**
  * Progress — every unit of time you are currently inside, draining live.
@@ -15,20 +15,27 @@ import GameLayout from '../layouts/GameLayout.astro'
  * plate under that. The register at the bottom is the readout — everything the
  * dial shows, in text, which is also what a screen reader gets, since the dial
  * itself is a canvas and says nothing.
+ *
+ * In the shell the wall panel is the stage, a sticky backdrop inside the frame
+ * rather than fixed to the window. Score is how much of the year is gone, Day
+ * how much of today, Read how many channels you have looked at properly — a
+ * tap, a click, keyboard focus, or the pointer resting on one for a moment,
+ * not a sweep across the dial — and reading every one of them is the ending.
+ * The clock does not stop for the pause button; nothing on this page would.
  */
 ---
 
-<GameLayout
+<GameShell
   slug="progress"
-  bar="#2c1440"
-  bodyClass="progress-body"
+  labels={{ score: 'Year gone', best: 'Most read', level: 'Read', moves: 'Day gone' }}
+  initial={{ score: '—', level: '0', moves: '—' }}
   fonts={['IBM+Plex+Mono:wght@400;500;600']}
 >
-  <div class="panel" id="panel" aria-hidden="true"></div>
+  <div class="progress-body">
+  <div class="pg-panel" id="panel" aria-hidden="true"></div>
 
-  <div class="wrap">
+  <div class="pg-wrap">
     <header class="head">
-      <h1>Progress</h1>
       <p class="lede">
         Everything you are currently inside of, and how much of it is already gone.
       </p>
@@ -67,10 +74,33 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     <p class="foot">Updates every frame. This does not help.</p>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Every span of time you are inside right now — this second, this week,
+      this year, this century, the Sun's life — and how much of each is
+      already gone, worked out from your own clock.
+    </p>
+    <ul>
+      <li>The dial has one channel for each, fastest at the rim. Point at one, or tap it, and the middle reads it out.</li>
+      <li>The list underneath says the same thing in words. Click a row to keep its channel lit.</li>
+      <li>Nothing pauses. That is rather the point.</li>
+    </ul>
+    <p>Read every channel to finish.</p>
+  </Fragment>
+</GameShell>
 
 <script>
-  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { ShaderSurface } from '../lib/gl'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+  import { recordPlay } from '../lib/stats'
+
+  const prefersReducedMotion = !PLAY
+  // Restart is a reload, the default: there is nothing to reset but the list
+  // of channels read.
+  const shell = createShell({ slug: 'progress' })
   import { PANEL_FRAG } from '../lib/progress-panel'
   import { DIAL_FRAG } from '../lib/progress-dial'
   import { DIAL, ringAt, lumeCss } from '../lib/progress-geom'
@@ -168,6 +198,50 @@ import GameLayout from '../layouts/GameLayout.astro'
   let focusMix = 0
 
   const focus = () => (pinned >= 0 ? pinned : hovered)
+
+  /* ------------------------------------------------------------------------
+     Reading. A channel counts once it has been looked at properly: pinned, or
+     held in focus for a moment. Sweeping the pointer across the dial passes
+     over all fifteen in half a second and reads none of them.
+     ------------------------------------------------------------------------ */
+
+  const DWELL_MS = 650
+  const seen = new Set<number>()
+  let dwellOn = -1
+  let dwellFrom = 0
+  let ended = false
+  const YEAR = DEFAULT
+  const DAY = Math.max(0, RINGS.findIndex((u) => u.id === 'day'))
+
+  function markRead(i: number) {
+    if (i < 0 || seen.has(i)) return
+    seen.add(i)
+    rows[i].btn.classList.add('read')
+    shell.setLevel(`${seen.size} / ${N}`)
+    shell.considerBest(seen.size, `${seen.size} / ${N}`)
+    if (seen.size === N && !ended) finish()
+  }
+
+  function finish() {
+    ended = true
+    const d = new Date()
+    const year = read(RINGS[YEAR], d)
+    const last = read(RINGS[N - 1], d)
+    recordPlay('progress', { read: N }, { read: 'high' })
+    shell.win({
+      celebrate: false,
+      // The card waits under the register; the dial stays where it is.
+      scroll: false,
+      kicker: 'Every channel, read',
+      title: 'All of them are still going.',
+      score: `${N} / ${N}`,
+      lines: [
+        `${year.pct} of ${d.getFullYear()} is gone, and it has gone up while you read this.`,
+        `${last.name}: ${last.pct}.`,
+      ],
+      againLabel: 'Read them again',
+    })
+  }
   const shown = () => { const f = focus(); return f >= 0 ? f : DEFAULT }
 
   function syncPressed() {
@@ -183,7 +257,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     // Focus follows the keyboard as well, or the dial would be inert to it.
     row.btn.addEventListener('focus', () => { hovered = i; syncPressed() })
     row.btn.addEventListener('blur', () => { if (hovered === i) hovered = -1; syncPressed() })
-    row.btn.addEventListener('click', () => { pinned = pinned === i ? -1 : i; syncPressed() })
+    row.btn.addEventListener('click', () => { pinned = pinned === i ? -1 : i; syncPressed(); markRead(i) })
   })
 
   /* ------------------------------------------------------------------------
@@ -221,7 +295,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   dialHost.addEventListener('pointerdown', (e) => {
     aim(e)
     // On a touchscreen there is no hover, so the tap has to do the pinning.
-    if (hovered >= 0) { pinned = pinned === hovered ? -1 : hovered; syncPressed() }
+    if (hovered >= 0) { pinned = pinned === hovered ? -1 : hovered; syncPressed(); markRead(hovered) }
   })
   dialHost.addEventListener('pointerleave', () => {
     hovered = -1
@@ -263,6 +337,8 @@ import GameLayout from '../layouts/GameLayout.astro'
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   })
   let lastSecond = -1
+  let lastStripSec = -1
+  const stripPct = (frac: number) => (frac * 100).toFixed(1) + '%'
   let lastTag = ''
   let lastApPct = ''
   let lastPlName = ''
@@ -309,6 +385,18 @@ import GameLayout from '../layouts/GameLayout.astro'
       if (v.left !== row.lastLeft) { row.lastLeft = v.left; row.left.textContent = v.left }
     }
 
+    // The strip: once a second is plenty for a percentage of a year.
+    if (sec !== lastStripSec) {
+      lastStripSec = sec
+      shell.setScore(stripPct(fracs[YEAR]))
+      shell.setMoves(stripPct(fracs[DAY]))
+    }
+
+    // Dwell: the same ring in focus, uninterrupted, for long enough to read.
+    const f = focus()
+    if (f !== dwellOn) { dwellOn = f; dwellFrom = +d }
+    else if (f >= 0 && !seen.has(f) && +d - dwellFrom >= DWELL_MS) markRead(f)
+
     // The aperture and the plate read whichever ring is under the pointer.
     if (sv) {
       if (sv.pct !== lastApPct) { lastApPct = sv.pct; apPct.textContent = sv.pct }
@@ -332,6 +420,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   syncPressed()
+  shell.setLevel(`0 / ${N}`)
   frame()
 
   /* The count is written from the count. It says fifteen today and will say
@@ -346,8 +435,12 @@ import GameLayout from '../layouts/GameLayout.astro'
 
 <style is:global>
   /* Rows are built at runtime, so these cannot be scoped. */
+  /* The wall panel fills the stage edge to edge. overflow: clip rather than
+     hidden, which would make the stage a scroll container and stop the panel
+     sticking. */
+  .stage:has(> .progress-body) { padding: 0; overflow: clip; background: #14091f; }
   .progress-body {
-    background: #14091f;
+    position: relative;
     color: #f1eaf8;
     --ink: #f1eaf8;
     --ink2: #b3a1c9;
@@ -355,33 +448,36 @@ import GameLayout from '../layouts/GameLayout.astro'
     --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
-  .progress-body .panel {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  /* Sticky, not fixed: pinned behind the page while it scrolls, but inside the frame. */
+  .progress-body .pg-panel {
+    position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; z-index: 0; pointer-events: none; overflow: hidden;
     /* The still fallback, roughly what the shader settles to: without WebGL2
        this is the page's own background and nothing looks missing. */
     background:
       radial-gradient(105% 55% at 44% -6%, #2a1547 0%, transparent 60%),
       linear-gradient(180deg, #190c28, #120817 58%, #0d0512);
   }
-  .progress-body .panel .gl-surface,
+  .progress-body .pg-panel .gl-surface,
   .progress-body .dial .gl-surface {
     position: absolute; inset: 0; width: 100%; height: 100%; display: block;
   }
 
-  .progress-body .wrap {
+  .progress-body .pg-wrap {
     position: relative; z-index: 1;
     /* 900 rather than a text measure: the dial is the widest thing here and
        820 was fencing it in. The prose inside sets its own measure. */
-    max-width: 900px; margin: 0 auto; padding: 40px 22px 84px;
+    max-width: 900px; margin: 0 auto; padding: 32px 22px 64px;
   }
 
   .progress-body .head { text-align: center; }
-  .progress-body .head h1 { font-size: clamp(34px, 6vw, 54px); }
-  .progress-body .lede { color: var(--ink2); margin: 10px auto 0; max-width: 42ch; }
+  .progress-body .lede { color: var(--ink2); margin: 0 auto; max-width: 42ch; font-size: 17px; }
 
   /* ---------------------------------------------------------------- rig -- */
 
-  .progress-body .rig { display: grid; justify-items: center; margin: 26px 0 34px; }
+  /* One column that is exactly the wrap's width: an auto track sizes itself
+     off the widest item, and the plate's min-width was pushing the track, and
+     the dial at 100% of it, past the edge of the frame. */
+  .progress-body .rig { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; margin: 26px 0 34px; }
 
   .progress-body .dial {
     /* 100%, not 96vw: the wrap has 22px of padding either side, and a viewport
@@ -454,7 +550,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   .progress-body .ap-pct {
     font-family: var(--mono);
-    font-variant-numeric: tabular-nums;
+   
     /* Sized off the aperture, not off taste. The widest thing this can ever
        read is "100.0000%" — nine characters at 0.6em each in Plex Mono — and
        at 5.8cqw that was 117px of number in a 92px recess on a phone. */
@@ -481,7 +577,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .progress-body .plate {
     position: relative;
     margin-top: -6px;
-    min-width: min(92vw, 380px);
+    min-width: min(100%, 380px);
     padding: 13px 30px 12px;
     text-align: center;
     border-radius: 8px;
@@ -508,11 +604,11 @@ import GameLayout from '../layouts/GameLayout.astro'
     color: var(--ink);
   }
   .progress-body .pl-left {
-    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-family: var(--mono);
     font-size: 13px; color: var(--ink2); margin-top: 3px;
   }
   .progress-body .pl-clock {
-    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-family: var(--mono);
     font-size: 11px; color: var(--ink3); margin-top: 7px;
     padding-top: 7px; border-top: 1px solid rgb(255 255 255 / 0.06);
   }
@@ -567,6 +663,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   .progress-body .row:active { transform: scale(0.997); }
   .progress-body .row:focus-visible { outline: 2px solid #c79bff; outline-offset: -2px; }
+  /* Read: a small tick after the name, so the list says what is left to read. */
+  .progress-body .row.read .r-name b::after { content: '✓'; font-size: 12px; color: #4fe3c1; margin-left: 6px; }
 
   .progress-body .r-i {
     grid-area: i;
@@ -644,12 +742,12 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   .progress-body .r-pct {
     grid-area: p; text-align: right;
-    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-family: var(--mono);
     font-size: 13px; font-weight: 500;
   }
   .progress-body .r-left {
     grid-area: l;
-    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-family: var(--mono);
     font-size: 11.5px; color: var(--ink3);
   }
 
@@ -658,6 +756,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   @media (max-width: 620px) {
+    /* The frame is narrower than the window, so the gutter gives some back. */
+    .progress-body .pg-wrap { padding-left: 12px; padding-right: 12px; }
     .progress-body .row {
       grid-template-columns: 2.1rem minmax(0, 1fr) 4.6rem;
       grid-template-areas: 'i n p' 'i r r' 'i l l';
@@ -665,8 +765,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     .progress-body .dial { width: min(100%, 560px, 90vh); }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .progress-body .row { transition: none; }
-    .progress-body .row:active { transform: none; }
-  }
+  /* The site's motion setting, not only the system one. */
+  html:not(.play) .progress-body .row { transition: none; }
+  html:not(.play) .progress-body .row:active { transform: none; }
 </style>

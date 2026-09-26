@@ -274,7 +274,8 @@ for (const when of ['2026-02-14', '2026-03-14', '2026-06-14', '2026-12-14']) {
    and a colour chosen to look right as a 4px rule is not automatically legible
    as 11px type. `--lume-lit` is the lifted version; every unit's has to clear
    4.5:1 on the page, including the slowest, whose unlifted lume is 3.33:1. */
-const pageBg = page.match(/\.progress-body\s*\{[^}]*background:\s*(#[0-9a-f]{3,8})/i)
+// In the shell the background is painted by the stage the page sits in.
+const pageBg = page.match(/\.stage:has\(>\s*\.progress-body\)\s*\{[^}]*background:\s*(#[0-9a-f]{3,8})/i)
 assert.ok(pageBg, 'could not find the page background to measure against')
 const bgL = hexLum(pageBg[1])
 const gainM = page.match(/setProperty\('--lume-lit',\s*lumeCss\(rate,\s*([\d.]+)\)\)/)

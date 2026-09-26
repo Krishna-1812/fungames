@@ -2520,7 +2520,30 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     phone its one-column hero let the canvas push the column wider than the
     frame (`1fr` rather than `minmax(0, 1fr)`), which is fixed.
 
-54. Then reassess again.
+54. ~~**Paper & Ink, phase 12: Speed and Progress.**~~ **done.**
+
+    **How Fast Are You Moving?** keeps its night, edge to edge in the
+    stage, with the live distance readout pinned to the top of it rather
+    than 48px down for a chrome bar that is gone. Score is the distance so
+    far, Speeds how many of the seven have been counted in, Time how long
+    the page has been open. Reaching the edge of the observable universe is
+    the ending — a quiet card with the distance and a share — and Best is
+    the furthest you had gone by then. Under reduced motion it used to count
+    all seven speeds and never record anything, because the scroll check was
+    only wired up with motion on; it runs either way now. The pointers and
+    readouts are mint instead of gold; the Sun and the magma keep theirs.
+
+    **Progress** had no goal, so it has one that was already in it: read
+    every channel. A channel counts when it is tapped, clicked, pinned, or
+    held under the pointer for a moment — sweeping across the dial reads
+    none of them — and a small tick in the register says which are left.
+    Score is how much of the year is gone, Day gone how much of today. Its
+    wall panel is a sticky backdrop inside the stage, two class names that
+    were the system's (`.panel`, `.wrap`) are prefixed, and on a phone the
+    data plate's `92vw` min-width was pushing the dial's grid track wider
+    than the frame; the track is `minmax(0, 1fr)` now.
+
+55. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
