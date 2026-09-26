@@ -51,7 +51,7 @@ export const META: Record<string, GameMeta> = {
 }
 
 /** Games already running inside the shared shell. Grows two per phase. */
-export const SHELL_GAMES = new Set(['rule-cascade', 'auction', 'dark-patterns', 'trolley', 'not-a-robot', 'from-memory', 'steady-hand', 'paper-folds'])
+export const SHELL_GAMES = new Set(['rule-cascade', 'auction', 'dark-patterns', 'trolley', 'not-a-robot', 'from-memory', 'steady-hand', 'paper-folds', 'constellation-draw', 'asteroid'])
 
 /** localStorage key the shell keeps a game's personal best under. */
 export const bestKey = (slug: string) => `paper:best:${slug}`

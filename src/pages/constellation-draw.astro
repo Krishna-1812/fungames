@@ -1,7 +1,7 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
-import { iconSvg } from '../lib/icons'
+import GameShell from '../layouts/GameShell.astro'
 import { DRAW_COLORS } from '../lib/constellation-code'
+import { TIERS } from '../lib/constellation-trace'
 
 /**
  * Constellation Draw — almost 9,000 real stars, at their real position and
@@ -19,119 +19,453 @@ import { DRAW_COLORS } from '../lib/constellation-code'
  * each star's real B-V colour index into a real approximate RGB colour via
  * a real published temperature formula, so Betelgeuse actually looks
  * redder than Rigel rather than every star being a plain white dot.
+ *
+ * In the shell it is a memory round: five real figures, smallest first. Each
+ * is shown for a few seconds, then the lines go and you join the stars back
+ * up from memory. lib/constellation-trace.ts scores the drawing against the
+ * real figure, edge for edge. Score is the round's average so far, Figure is
+ * progress, Moves are the lines in the current drawing, and Best is your best
+ * round. The free sky — draw anything, name it, share the link — is the
+ * other tab, and a shared link opens straight into it.
  */
+const ROUND = TIERS.length
 ---
 
-<GameLayout slug="constellation-draw" bar="#0a0612" fixed bodyClass="cdraw-body">
-  <canvas id="sky" aria-label="A real, navigable map of the night sky"></canvas>
-
-  <div class="chrome" aria-hidden="true">
-    <div class="coords" id="coords">RA 00h 00m 00s Dec +00° 00&prime;</div>
-    <p class="hint" id="hint">Drag to look around. Click two stars to connect them.</p>
-
-    <div class="search-wrap">
-      <input id="search" type="text" placeholder="Fly to a star or constellation…" autocomplete="off" />
-      <ul id="searchResults" class="search-results" hidden></ul>
-    </div>
-
-    <div class="card" id="infoCard" hidden>
-      <button class="card-close" id="infoClose" type="button" aria-label="Close">&times;</button>
-      <p class="card-kicker" id="infoKicker"></p>
-      <h2 id="infoName"></h2>
-      <p id="infoFact"></p>
-    </div>
-
-    <div class="toolbar">
-      <div class="swatch-wrap">
-        <button class="swatch-btn" id="swatchBtn" type="button" style={`--sw:${DRAW_COLORS[0].css}`} aria-label="Choose a draw colour"></button>
-        <div class="swatches" id="swatches" hidden>
-          {DRAW_COLORS.map((c, i) => (
-            <button class="swatch" data-color={c.key} style={`--sw:${c.css}`} aria-label="Draw in this colour" aria-pressed={i === 0 ? 'true' : 'false'}></button>
-          ))}
-        </div>
+<GameShell
+  slug="constellation-draw"
+  labels={{ score: 'Accuracy', best: 'Best round', level: 'Figure', moves: 'Lines' }}
+  initial={{ score: '—', level: `1 / ${ROUND}`, moves: '0' }}
+>
+  <div class="cd" id="cd" data-mode="round">
+    <div class="cd-top">
+      <ol class="cd-rail" id="rail" aria-label="The round">
+        {TIERS.map((_, i) => (
+          <li class={i === 0 ? 'is-now' : ''}>
+            <span class="label">{i + 1}</span>
+            <b data-name>?</b>
+            <span class="num cd-got" data-got>—</span>
+          </li>
+        ))}
+      </ol>
+      <div class="cd-modes" role="group" aria-label="Mode">
+        <button type="button" class="pill pill--sm" data-mode-btn="round" aria-pressed="true"><span>Memory round</span></button>
+        <button type="button" class="pill pill--sm" data-mode-btn="free" aria-pressed="false"><span>Free sky</span></button>
       </div>
-      <span class="tsep" aria-hidden="true"></span>
-      <button class="tbtn" id="toggleReal" type="button" aria-pressed="true" data-tip="Real constellations">
-        <span class="tbtn-icon" set:html={iconSvg('star')} />
-      </button>
-      <button class="tbtn" id="randomBtn" type="button" data-tip="Surprise me">
-        <span class="tbtn-icon" set:html={iconSvg('compass')} />
-      </button>
-      <button class="tbtn" id="undoBtn" type="button" data-tip="Undo">
-        <span class="tbtn-icon" set:html={iconSvg('undo')} />
-      </button>
-      <button class="tbtn" id="clearBtn" type="button" data-tip="Clear">
-        <span class="tbtn-icon" set:html={iconSvg('trash')} />
-      </button>
-      <button class="tbtn primary" id="saveBtn" type="button" data-tip="Name &amp; save">
-        <span class="tbtn-icon" set:html={iconSvg('link')} />
-      </button>
     </div>
+
+    {/* What the current figure is and what to do about it; the verdict
+        replaces it once a figure is checked. A bar above the sky rather than
+        a card on it, so it never sits on the stars it is talking about. */}
+    <div class="cd-head" data-for="round">
+      <div class="cd-brief" id="brief">
+        <p class="label meta" id="briefKicker">Figure 1 of {ROUND} · memorise it</p>
+        <h2 class="cd-name" id="briefName">—</h2>
+        <p class="cd-sub" id="briefSub"></p>
+      </div>
+      <div class="cd-memo" id="memo">
+        <div class="cd-timer" aria-hidden="true"><i id="timerBar"></i></div>
+        <span class="num cd-secs" id="timerSecs">0s</span>
+        <button type="button" class="pill pill--ink pill--sm" id="gotIt"><span>Got it</span><span aria-hidden="true">→</span></button>
+      </div>
+      <div class="cd-verdict" id="verdict" hidden tabindex="-1">
+        <span class="num cd-big" id="vScore">0%</span>
+        <ul class="cd-facts" id="vFacts"></ul>
+        <button type="button" class="pill pill--ink" id="nextBtn"><span id="nextLbl">Next figure</span><span aria-hidden="true">→</span></button>
+      </div>
+    </div>
+
+    <div class="cd-head" data-for="free" hidden>
+      <div class="cd-search">
+        <label class="sr-only" for="search">Fly to a star</label>
+        <input id="search" type="search" placeholder="Fly to a star — try Vega" autocomplete="off" spellcheck="false" />
+        <ul id="searchResults" class="cd-results" hidden></ul>
+      </div>
+      <div class="cd-info" id="infoCard" hidden>
+        <p class="label meta" id="infoKicker"></p>
+        <p class="cd-info-name" id="infoName"></p>
+        <p class="cd-info-fact" id="infoFact"></p>
+      </div>
+    </div>
+
+    <div class="cd-scene" id="scene">
+      <canvas id="sky" aria-label="A real, navigable map of the night sky. Drag to look around; click stars to join them."></canvas>
+      <p class="cd-coords" id="coords" aria-hidden="true">RA 00h 00m · Dec +00°</p>
+      <div class="cd-zoom" role="group" aria-label="Zoom">
+        <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+      </div>
+      <p class="cd-hint" id="hint">Drag to look around.</p>
+      <p class="cd-wheel" id="wheelNote" hidden aria-hidden="true">Hold <kbd>Ctrl</kbd> and scroll to zoom</p>
+    </div>
+
+    <div class="cd-tools" data-for="round">
+      <button type="button" class="pill pill--line pill--sm" id="peekBtn"><span>Peek</span><span class="cd-cost">−10</span></button>
+      <button type="button" class="pill pill--line pill--sm" id="undoBtn"><span>Undo</span></button>
+      <button type="button" class="pill pill--line pill--sm" id="clearBtn"><span>Clear</span></button>
+      <span class="cd-keys"><kbd>Enter</kbd> check · <kbd>U</kbd> undo · <kbd>R</kbd> peek</span>
+      <button type="button" class="pill pill--ink" id="checkBtn"><span>Check it</span><span aria-hidden="true">→</span></button>
+    </div>
+
+    <div class="cd-tools" data-for="free" hidden>
+      <div class="cd-swatches" role="group" aria-label="Draw colour">
+        {DRAW_COLORS.map((c) => (
+          <button type="button" class="cd-swatch" data-color={c.key} style={`--sw:${c.css}`} aria-label={`Draw in ${c.key}`} aria-pressed={c.key === 'c' ? 'true' : 'false'}></button>
+        ))}
+      </div>
+      <button type="button" class="pill pill--line pill--sm" id="toggleReal" aria-pressed="true"><span>Real lines</span></button>
+      <button type="button" class="pill pill--line pill--sm" id="randomBtn"><span>Surprise me</span></button>
+      <button type="button" class="pill pill--line pill--sm" id="freeUndo"><span>Undo</span></button>
+      <button type="button" class="pill pill--line pill--sm" id="freeClear"><span>Clear</span></button>
+      <button type="button" class="pill pill--ink" id="saveBtn"><span>Name &amp; share</span><span aria-hidden="true">→</span></button>
+    </div>
+
+    <dialog id="saveDialog" class="panel" aria-labelledby="saveTitle">
+      <p class="label meta">Free sky</p>
+      <h2 id="saveTitle" style="margin-top:10px">Name your constellation</h2>
+      <div class="panel-body">
+        <label class="sr-only" for="nameInput">Name</label>
+        <input id="nameInput" class="cd-name-input" type="text" maxlength="40" placeholder="e.g. The Kettle" />
+        <p class="cd-save-status" id="saveStatus" aria-live="polite"></p>
+      </div>
+      <div class="panel-actions">
+        <button type="button" class="pill pill--hero" id="saveConfirm"><span>Copy the link</span><span class="arrow" aria-hidden="true">→</span></button>
+        <button type="button" class="pill pill--line" id="saveCancel"><span>Close</span></button>
+      </div>
+    </dialog>
   </div>
 
-  <dialog id="saveDialog" class="save-dialog" aria-labelledby="saveTitle">
-    <h2 id="saveTitle">Name your constellation</h2>
-    <input id="nameInput" type="text" maxlength="40" placeholder="e.g. The Kettle" />
-    <div class="save-actions">
-      <button id="saveCancel" type="button">Cancel</button>
-      <button id="saveConfirm" type="button" class="primary">Save &amp; copy link</button>
-    </div>
-    <p class="save-status" id="saveStatus" aria-live="polite"></p>
-  </dialog>
-</GameLayout>
+  <Fragment slot="howto">
+    <p>
+      Five real constellations, smallest first. Each one is shown for a few
+      seconds; then its lines disappear and you join its stars back up from
+      memory.
+    </p>
+    <ul>
+      <li>Click a star, then the next. Click the last star again, or empty sky, to lift the pen. Drag to look around. To zoom, pinch, use <b>+</b> and <b>−</b>, or hold <kbd>Ctrl</kbd> and scroll.</li>
+      <li>Your score is how many of the real lines you drew, balanced against how many of yours are not in the figure. Order and direction do not matter.</li>
+      <li><b>Peek</b> shows the figure again for a moment, for 10 points off that figure.</li>
+      <li><kbd>Enter</kbd> checks and moves on, <kbd>U</kbd> undoes, <kbd>R</kbd> peeks.</li>
+    </ul>
+    <p>The round's score is the average of the five. <b>Free sky</b> is the whole sky with nothing to score: draw your own, name it and share the link.</p>
+  </Fragment>
+</GameShell>
 
 <script>
-  import { STARS, CONSTELLATIONS, constellationName, starLabel, brightestIn, nearestStar, searchStars, type Star } from '../lib/star-catalog'
-  import { project, unproject, angularSeparationDeg, wrapRa, clampDec } from '../lib/sky-projection'
+  import { STARS, starById, constellationName, starLabel, brightestIn, searchStars, CONSTELLATIONS, type Star } from '../lib/star-catalog'
+  import { project, unproject, wrapRa, clampDec } from '../lib/sky-projection'
   import { starRgb } from '../lib/star-color'
-  import { encodeStrokes, decodeStrokes, colorCss, DRAW_COLORS, type Stroke } from '../lib/constellation-code'
+  import { encodeStrokes, decodeStrokes, colorCss, type Stroke } from '../lib/constellation-code'
+  import {
+    figureEdges, figureStars, figureView, figureName, chainsToEdges, traceScore, withPeeks,
+    pickRound, memoMs, verdictFor, edgeKey, fitView, pickStar, PEEK_COST, type Trace,
+  } from '../lib/constellation-trace'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
   import { sfx } from '../lib/audio'
+  import { recordPlay } from '../lib/stats'
 
-  const canvas = document.getElementById('sky') as HTMLCanvasElement
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+  const root = $('cd')
+  const scene = $('scene')
+  const canvas = $<HTMLCanvasElement>('sky')
   const ctx = canvas.getContext('2d')!
-  const hint = document.getElementById('hint')!
-  const coordsEl = document.getElementById('coords')!
+  const hint = $('hint')
+  const coordsEl = $('coords')
+  const SANS = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim() || 'sans-serif'
+
+  /* Colours on the night sky. These are the picture, not the page, so they
+     are literal: the system's blocks, tuned for a black ground. */
+  const MINT = '#4fe3c1'
+  const SKY = '#8ccbff'
+  const RED = '#ff4f6e'
+  const MISSED = 'rgba(243,245,248,0.72)'
+
+  /* ---- view ----------------------------------------------------------- */
 
   let W = 0, H = 0, dpr = 1
-  function resize() {
-    W = innerWidth
-    H = innerHeight
-    dpr = Math.min(devicePixelRatio || 1, 2)
-    canvas.width = Math.round(W * dpr)
-    canvas.height = Math.round(H * dpr)
-    canvas.style.width = W + 'px'
-    canvas.style.height = H + 'px'
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  }
-  resize()
-  let resizeTimer = 0
-  addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = window.setTimeout(resize, 150) })
-
-  /* ---- view state ----------------------------------------------------- */
-
-  // Start looking at Orion, the most recognisable real constellation there is.
+  // Orion to begin with, until a figure is picked.
   let ra0 = 83.0
   let dec0 = 0.0
-  // Pixels per radian of arc at the tangent point. ~110deg field of view at start.
+  /** Pixels per radian at the tangent point. */
   let scale = 480
   const SCALE_MIN = 120
-  const SCALE_MAX = 6000
+  const SCALE_MAX = 6400
 
-  let showReal = true
-  let strokes: Stroke[] = []
-  let currentChain: number[] = []
-  let armedStar: Star | null = null
-  let drawColor = DRAW_COLORS[0].css
-
-  function toScreen(x: number, y: number): [number, number] {
-    return [W / 2 + x * scale, H / 2 - y * scale]
-  }
-  function project2(star: Star) {
-    const p = project(star.ra, star.dec, ra0, dec0)
+  const toScreen = (x: number, y: number): [number, number] => [W / 2 + x * scale, H / 2 - y * scale]
+  function screenOf(ra: number, dec: number, pad = 40) {
+    const p = project(ra, dec, ra0, dec0)
     if (!p.visible) return null
     const [sx, sy] = toScreen(p.x, p.y)
-    if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) return null
+    if (sx < -pad || sx > W + pad || sy < -pad || sy > H + pad) return null
     return { sx, sy }
+  }
+  const starScreen = (id: number) => { const s = starById(id); return s ? screenOf(s.ra, s.dec, 400) : null }
+
+  /* ---- drawing state, one pad per mode -------------------------------- */
+
+  type Pad = { chains: number[][]; chain: number[] }
+  const roundPad: Pad = { chains: [], chain: [] }
+  const freePad: Pad = { chains: [], chain: [] }
+  let mode: 'round' | 'free' = 'round'
+  const pad = () => (mode === 'round' ? roundPad : freePad)
+  const armed = () => { const c = pad().chain; return c.length ? c[c.length - 1] : null }
+  function commitChain(p = pad()) {
+    if (p.chain.length >= 2) p.chains.push(p.chain)
+    p.chain = []
+  }
+  const padEdges = (p: Pad) => chainsToEdges([...p.chains, p.chain])
+  const lineCount = (p: Pad) => new Set(padEdges(p).map(([a, b]) => edgeKey(a, b))).size
+
+  /* ---- the round ------------------------------------------------------ */
+
+  type Phase = 'memo' | 'draw' | 'checked' | 'done'
+  type Result = { id: string; trace: Trace; peeks: number; score: number }
+  let figures: string[] = []
+  let idx = 0
+  let phase: Phase = 'memo'
+  let results: Result[] = []
+  let peeks = 0
+  let peeking = false
+  let current: Result | null = null
+
+  const shell = createShell({
+    slug: 'constellation-draw',
+    onRestart: () => { newRound(); scene.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'center' }) },
+    onPause: pauseMemo,
+    onResume: resumeMemo,
+  })
+
+  const railEls = [...$('rail').children] as HTMLLIElement[]
+  const avg = () => (results.length ? Math.round(results.reduce((a, r) => a + r.score, 0) / results.length) : 0)
+
+  function paintStrip() {
+    shell.setScore(results.length ? `${avg()}%` : '—')
+    shell.setLevel(`${Math.min(idx + 1, figures.length)} / ${figures.length}`)
+    shell.setMoves(String(lineCount(roundPad)))
+  }
+
+  function paintRail() {
+    railEls.forEach((li, i) => {
+      const r = results[i]
+      li.classList.toggle('is-now', i === idx && phase !== 'done')
+      li.classList.toggle('is-done', !!r)
+      // A figure's name is only given away once it is the one being drawn.
+      li.querySelector('[data-name]')!.textContent = i <= idx || r ? figureName(figures[i]) : '?'
+      li.querySelector('[data-got]')!.textContent = r ? `${r.score}%` : '—'
+    })
+  }
+
+  function newRound() {
+    figures = pickRound()
+    idx = 0
+    results = []
+    shell.resultExtra.innerHTML = ''
+    startFigure(false)
+  }
+
+  function startFigure(animate = true) {
+    const id = figures[idx]
+    roundPad.chains = []
+    roundPad.chain = []
+    peeks = 0
+    peeking = false
+    current = null
+    phase = 'memo'
+    const meta = constellationName(id)
+    $('briefKicker').textContent = `Figure ${idx + 1} of ${figures.length} · memorise it`
+    $('briefName').textContent = figureName(id)
+    $('briefSub').textContent = meta && meta.english !== meta.name ? `${meta.english}. ${figureEdges(id).length} lines.` : `${figureEdges(id).length} lines.`
+    $('memo').hidden = false
+    $('verdict').hidden = true
+    $('brief').hidden = false
+    hint.textContent = 'Take it in. You will draw it from memory.'
+    paintRail()
+    paintStrip()
+    paintTools()
+    fitFigure(id, animate)
+    startMemo(memoMs(figureEdges(id).length))
+  }
+
+  /* The memorise countdown, pausable: the shell's Pause and How-to panels
+     both stop it, and it carries on with exactly what was left. */
+  let memoT = 0, memoEnd = 0, memoLeft = 0, memoTotal = 1, memoRaf = 0
+  function startMemo(ms: number) {
+    memoTotal = memoLeft = ms
+    resumeMemo()
+  }
+  function resumeMemo() {
+    if (phase !== 'memo' || mode !== 'round') return
+    clearTimeout(memoT)
+    memoEnd = performance.now() + memoLeft
+    memoT = window.setTimeout(endMemo, memoLeft)
+    tickMemo()
+  }
+  function pauseMemo() {
+    if (phase !== 'memo') return
+    clearTimeout(memoT)
+    cancelAnimationFrame(memoRaf)
+    memoLeft = Math.max(0, memoEnd - performance.now())
+  }
+  function tickMemo() {
+    cancelAnimationFrame(memoRaf)
+    const left = Math.max(0, memoEnd - performance.now())
+    $('timerBar').style.transform = `scaleX(${(left / memoTotal).toFixed(4)})`
+    $('timerSecs').textContent = `${Math.ceil(left / 1000)}s`
+    if (left > 0 && phase === 'memo') memoRaf = requestAnimationFrame(tickMemo)
+  }
+  function endMemo() {
+    if (phase !== 'memo') return
+    clearTimeout(memoT)
+    cancelAnimationFrame(memoRaf)
+    phase = 'draw'
+    $('memo').hidden = true
+    $('briefKicker').textContent = `Figure ${idx + 1} of ${figures.length} · from memory`
+    hint.textContent = 'Click the stars to join them. Click the last one again, or empty sky, to lift the pen.'
+    shell.announce(`The lines are gone. Draw ${figureName(figures[idx])}.`)
+    sfx.blip(1)
+    paintTools()
+    invalidate()
+  }
+
+  let peekT = 0
+  function peek() {
+    if (mode !== 'round' || phase !== 'draw' || peeking || shell.paused) return
+    peeks++
+    peeking = true
+    sfx.blip(3)
+    $('briefSub').textContent = `${figureEdges(figures[idx]).length} lines. Peeked ${peeks} time${peeks === 1 ? '' : 's'} (−${PEEK_COST * peeks}).`
+    invalidate()
+    clearTimeout(peekT)
+    peekT = window.setTimeout(() => { peeking = false; invalidate() }, 1600)
+  }
+
+  function check() {
+    if (mode !== 'round' || phase !== 'draw' || shell.paused) return
+    commitChain(roundPad)
+    if (!roundPad.chains.length) {
+      hint.textContent = 'Join at least two stars first.'
+      shell.shake(scene)
+      sfx.bad()
+      invalidate()
+      return
+    }
+    const id = figures[idx]
+    const trace = traceScore(figureEdges(id), padEdges(roundPad))
+    const score = withPeeks(trace.score, peeks)
+    current = { id, trace, peeks, score }
+    results.push(current)
+    phase = 'checked'
+    peeking = false
+
+    const total = trace.hit.length + trace.missed.length
+    $('vScore').textContent = `${score}%`
+    const facts = [
+      `<li><b>${trace.hit.length} of ${total}</b> real lines</li>`,
+      `<li><b>${trace.extra.length}</b> not in the figure</li>`,
+    ]
+    if (peeks) facts.push(`<li><b>${peeks}</b> peek${peeks === 1 ? '' : 's'}, −${PEEK_COST * peeks}</li>`)
+    $('vFacts').innerHTML = facts.join('')
+    $('briefKicker').textContent = `Figure ${idx + 1} of ${figures.length} · ${verdictFor(score).name.replace(/\.$/, '')}`
+    $('briefSub').textContent = trace.missed.length || trace.extra.length
+      ? 'Mint you got, red is not in it, dashed you missed.'
+      : 'Every line, and nothing else.'
+    $('nextLbl').textContent = idx + 1 < figures.length ? 'Next figure' : 'See the round'
+    $('verdict').hidden = false
+    $('verdict').focus({ preventScroll: true })
+    hint.textContent = 'Here is the real figure, over yours.'
+    shell.announce(`${figureName(id)}: ${score} percent. ${trace.hit.length} of ${total} lines.`)
+    if (score >= 75) { sfx.good(); shell.pop($('verdict')) } else if (score < 35) sfx.bad()
+    else sfx.click()
+    paintRail()
+    paintStrip()
+    paintTools()
+    invalidate()
+  }
+
+  function next() {
+    if (phase !== 'checked') return
+    if (idx + 1 < figures.length) {
+      idx++
+      startFigure()
+      return
+    }
+    finish()
+  }
+
+  function finish() {
+    phase = 'done'
+    paintRail()
+    paintTools()
+    const a = avg()
+    const v = verdictFor(a)
+    const top = [...results].sort((x, y) => y.score - x.score)[0]
+    shell.considerBest(a, `${a}%`)
+    recordPlay('constellation-draw', { accuracy: a, figures: results.map((r) => r.id).join(' ') }, { accuracy: 'high' })
+    shell.resultExtra.innerHTML = `<ul class="cd-sheet" role="list">${results.map(thumb).join('')}</ul>`
+    shell.win({
+      kicker: `${results.length} figures, from memory`,
+      title: v.name,
+      score: `${a}%`,
+      from: '0%',
+      lines: [v.line, `Best: ${figureName(top.id)}, ${top.score}%.`],
+      againLabel: 'Another round',
+    })
+  }
+
+  /** A small chart of one figure for the result card: yours over the real one. */
+  function thumb(r: Result): string {
+    const view = figureView(r.id)
+    const ids = new Set<number>(figureStars(r.id))
+    const pairs = (keys: string[]) => keys.map((k) => k.split('-').map(Number) as [number, number])
+    for (const [a, b] of pairs(r.trace.extra)) { ids.add(a); ids.add(b) }
+    const pts = new Map<number, [number, number]>()
+    for (const id of ids) {
+      const s = starById(id)
+      if (!s) continue
+      const p = project(s.ra, s.dec, view.ra, view.dec)
+      if (p.visible) pts.set(id, [p.x, -p.y])
+    }
+    const xs = [...pts.values()].map((p) => p[0]), ys = [...pts.values()].map((p) => p[1])
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+    const VW = 160, VH = 110, P = 12
+    const k = Math.min((VW - 2 * P) / (maxX - minX || 1), (VH - 2 * P) / (maxY - minY || 1))
+    const ox = (VW - (maxX - minX) * k) / 2, oy = (VH - (maxY - minY) * k) / 2
+    const at = (id: number) => { const p = pts.get(id)!; return [ox + (p[0] - minX) * k, oy + (p[1] - minY) * k].map((n) => n.toFixed(1)) }
+    const line = ([a, b]: [number, number], attrs: string) => {
+      if (!pts.has(a) || !pts.has(b)) return ''
+      const [x1, y1] = at(a), [x2, y2] = at(b)
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${attrs}/>`
+    }
+    const svg =
+      pairs(r.trace.missed).map((e) => line(e, `stroke="${MISSED}" stroke-width="1.4" stroke-dasharray="3 3"`)).join('') +
+      pairs(r.trace.extra).map((e) => line(e, `stroke="${RED}" stroke-width="2"`)).join('') +
+      pairs(r.trace.hit).map((e) => line(e, `stroke="${MINT}" stroke-width="2.2"`)).join('') +
+      [...pts.keys()].map((id) => { const [x, y] = at(id); return `<circle cx="${x}" cy="${y}" r="2" fill="#f3f5f8"/>` }).join('')
+    return `<li><svg viewBox="0 0 ${VW} ${VH}" aria-hidden="true" stroke-linecap="round">${svg}</svg>` +
+      `<b class="num">${r.score}%</b><span>${figureName(r.id)}</span></li>`
+  }
+
+  /* ---- fitting and flying ---------------------------------------------- */
+
+  let fly: { from: [number, number, number]; to: [number, number, number]; t0: number; ms: number } | null = null
+  function flyTo(ra: number, dec: number, sc: number, animate = true) {
+    sc = Math.max(SCALE_MIN, Math.min(SCALE_MAX, sc))
+    if (!animate || !PLAY) {
+      fly = null
+      ra0 = wrapRa(ra); dec0 = clampDec(dec); scale = sc
+      invalidate()
+      return
+    }
+    // The short way round: RA 350° to 10° is twenty degrees, not 340.
+    let dRa = wrapRa(ra) - ra0
+    if (dRa > 180) dRa -= 360
+    if (dRa < -180) dRa += 360
+    fly = { from: [ra0, dec0, Math.log(scale)], to: [ra0 + dRa, clampDec(dec), Math.log(sc)], t0: performance.now(), ms: 950 }
+    invalidate()
+  }
+  function fitFigure(id: string, animate = true) {
+    const v = fitView(id, W, H, SCALE_MIN, SCALE_MAX)
+    flyTo(v.ra0, v.dec0, v.scale, animate)
   }
 
   /* ---- rendering -------------------------------------------------------- */
@@ -139,7 +473,7 @@ import { DRAW_COLORS } from '../lib/constellation-code'
   // A real astrophoto's brightest stars aren't flat dots: the optics bloom a
   // soft halo around them and throw a four-point diffraction spike off the
   // very brightest. Below this magnitude a halo would be sub-pixel anyway —
-  // skipping it there keeps ~8,900 stars/frame cheap.
+  // skipping it there keeps ~8,900 stars a frame cheap.
   const HALO_MAG = 4.2
   const SPIKE_MAG = 1.5
 
@@ -147,7 +481,6 @@ import { DRAW_COLORS } from '../lib/constellation-code'
     const r = Math.max(0.5, 2.6 - star.mag * 0.35)
     const [cr, cg, cb] = starRgb(star.ci)
     const rgb = `${cr},${cg},${cb}`
-
     if (star.mag < HALO_MAG) {
       const haloR = r * (star.mag < 0 ? 9 : star.mag < 1.5 ? 7 : star.mag < 3 ? 4.5 : 2.6)
       const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, haloR)
@@ -158,468 +491,600 @@ import { DRAW_COLORS } from '../lib/constellation-code'
       ctx.beginPath()
       ctx.arc(sx, sy, haloR, 0, Math.PI * 2)
       ctx.fill()
-
       if (star.mag < SPIKE_MAG) {
-        const spikeLen = haloR * 2.6
-        const spike = ctx.createLinearGradient(sx - spikeLen, sy, sx + spikeLen, sy)
-        spike.addColorStop(0, `rgba(${rgb},0)`)
-        spike.addColorStop(0.5, `rgba(${rgb},0.65)`)
-        spike.addColorStop(1, `rgba(${rgb},0)`)
-        ctx.strokeStyle = spike
-        ctx.lineWidth = 1
-        ctx.beginPath(); ctx.moveTo(sx - spikeLen, sy); ctx.lineTo(sx + spikeLen, sy); ctx.stroke()
-        const spikeV = ctx.createLinearGradient(sx, sy - spikeLen, sx, sy + spikeLen)
-        spikeV.addColorStop(0, `rgba(${rgb},0)`)
-        spikeV.addColorStop(0.5, `rgba(${rgb},0.65)`)
-        spikeV.addColorStop(1, `rgba(${rgb},0)`)
-        ctx.strokeStyle = spikeV
-        ctx.beginPath(); ctx.moveTo(sx, sy - spikeLen); ctx.lineTo(sx, sy + spikeLen); ctx.stroke()
+        const len = haloR * 2.6
+        for (const [dx, dy] of [[1, 0], [0, 1]]) {
+          const g = ctx.createLinearGradient(sx - dx * len, sy - dy * len, sx + dx * len, sy + dy * len)
+          g.addColorStop(0, `rgba(${rgb},0)`)
+          g.addColorStop(0.5, `rgba(${rgb},0.65)`)
+          g.addColorStop(1, `rgba(${rgb},0)`)
+          ctx.strokeStyle = g
+          ctx.lineWidth = 1
+          ctx.beginPath(); ctx.moveTo(sx - dx * len, sy - dy * len); ctx.lineTo(sx + dx * len, sy + dy * len); ctx.stroke()
+        }
       }
     }
-
     ctx.beginPath()
     ctx.fillStyle = `rgb(${rgb})`
     ctx.arc(sx, sy, r, 0, Math.PI * 2)
     ctx.fill()
   }
 
-  // A constellation's name, floating over its own figure — the same way a
-  // planetarium labels one — rather than only on click. Anchored to whichever
-  // of its projected points lands highest on screen this frame.
-  function drawConstellationLabels() {
-    ctx.font = '500 12.5px "Bricolage Grotesque", sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillStyle = 'rgba(229,219,250,0.62)'
-    for (const c of CONSTELLATIONS) {
-      let top: { sx: number; sy: number } | null = null
-      let visiblePoints = 0
-      for (const seg of c.segments) {
-        for (const [ra, dec] of seg) {
-          const p = project(ra, dec, ra0, dec0)
-          if (!p.visible) continue
-          const [sx, sy] = toScreen(p.x, p.y)
-          if (sx < 0 || sx > W || sy < 0 || sy > H) continue
-          visiblePoints++
-          if (!top || sy < top.sy) top = { sx, sy }
-        }
-      }
-      if (!top || visiblePoints < 2) continue
-      const meta = constellationName(c.id)
-      ctx.fillText((meta?.name ?? c.id).toUpperCase(), top.sx, top.sy - 10)
+  function strokeEdges(edges: readonly (readonly [number, number])[], colour: string, width: number, dash: number[] = []) {
+    ctx.strokeStyle = colour
+    ctx.lineWidth = width
+    ctx.setLineDash(dash)
+    ctx.beginPath()
+    for (const [a, b] of edges) {
+      const p = starScreen(a), q = starScreen(b)
+      if (!p || !q) continue
+      ctx.moveTo(p.sx, p.sy)
+      ctx.lineTo(q.sx, q.sy)
+    }
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+  const keysToEdges = (keys: string[]) => keys.map((k) => k.split('-').map(Number) as [number, number])
+
+  /** The real figure, lit: what you are memorising, or peeking at. */
+  function drawFigure(id: string) {
+    ctx.save()
+    ctx.shadowColor = MINT
+    ctx.shadowBlur = 12
+    strokeEdges(figureEdges(id), 'rgba(79,227,193,0.9)', 2.2)
+    ctx.restore()
+    for (const sid of figureStars(id)) {
+      const p = starScreen(sid)
+      if (!p) continue
+      ctx.beginPath()
+      ctx.arc(p.sx, p.sy, 7, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(79,227,193,0.55)'
+      ctx.lineWidth = 1.2
+      ctx.stroke()
     }
   }
 
-  function render() {
-    ctx.clearRect(0, 0, W, H)
-    ctx.fillStyle = '#05040a'
-    ctx.fillRect(0, 0, W, H)
-
-    if (showReal) {
-      ctx.strokeStyle = 'rgba(201,184,255,0.22)'
-      ctx.lineWidth = 1
-      for (const c of CONSTELLATIONS) {
-        for (const seg of c.segments) {
-          ctx.beginPath()
-          let started = false
-          for (const [ra, dec] of seg) {
-            const p = project(ra, dec, ra0, dec0)
-            if (!p.visible) { started = false; continue }
-            const [sx, sy] = toScreen(p.x, p.y)
-            if (!started) { ctx.moveTo(sx, sy); started = true } else ctx.lineTo(sx, sy)
-          }
-          ctx.stroke()
-        }
-      }
-      drawConstellationLabels()
-    }
-
-    for (const star of STARS) {
-      const p = project2(star)
-      if (!p) continue
-      drawStar(star, p.sx, p.sy)
-    }
-
-    // the visitor's own strokes
-    ctx.lineWidth = 2.4
-    ctx.lineCap = 'round'
-    for (const stroke of [...strokes, { starIds: currentChain }] as Stroke[]) {
-      if (stroke.starIds.length < 2) continue
-      ctx.strokeStyle = drawColor
-      ctx.beginPath()
-      let started = false
-      for (const id of stroke.starIds) {
-        const star = STARS.find((s) => s.id === id)
-        if (!star) continue
-        const p = project2(star)
-        if (!p) { started = false; continue }
-        if (!started) { ctx.moveTo(p.sx, p.sy); started = true } else ctx.lineTo(p.sx, p.sy)
-      }
-      ctx.stroke()
-    }
-
-    if (armedStar) {
-      const p = project2(armedStar)
-      if (p) {
+  function drawAllFigures() {
+    ctx.strokeStyle = 'rgba(184,161,255,0.24)'
+    ctx.lineWidth = 1
+    for (const c of CONSTELLATIONS) {
+      for (const seg of c.segments) {
         ctx.beginPath()
-        ctx.arc(p.sx, p.sy, 7, 0, Math.PI * 2)
-        ctx.strokeStyle = drawColor
-        ctx.lineWidth = 1.6
+        let started = false
+        for (const [ra, dec] of seg) {
+          const p = project(ra, dec, ra0, dec0)
+          if (!p.visible) { started = false; continue }
+          const [sx, sy] = toScreen(p.x, p.y)
+          if (!started) { ctx.moveTo(sx, sy); started = true } else ctx.lineTo(sx, sy)
+        }
         ctx.stroke()
       }
     }
-
-    const raHours = wrapRa(ra0) / 15
-    const h = String(Math.floor(raHours)).padStart(2, '0')
-    const raMinFull = (raHours % 1) * 60
-    const m = String(Math.floor(raMinFull)).padStart(2, '0')
-    const s = String(Math.floor((raMinFull % 1) * 60)).padStart(2, '0')
-    const decSign = dec0 >= 0 ? '+' : '−'
-    const decAbs = Math.abs(dec0)
-    const decDeg = String(Math.floor(decAbs)).padStart(2, '0')
-    const decMin = String(Math.floor((decAbs % 1) * 60)).padStart(2, '0')
-    coordsEl.textContent = `RA ${h}h ${m}m ${s}s Dec ${decSign}${decDeg}° ${decMin}′`
+    // Each name over its own figure, anchored to whichever of its points is
+    // highest on screen this frame — the way a planetarium labels one.
+    ctx.font = `600 12px ${SANS}`
+    ctx.textAlign = 'center'
+    ctx.fillStyle = 'rgba(214,222,240,0.62)'
+    for (const c of CONSTELLATIONS) {
+      let top: { sx: number; sy: number } | null = null
+      let n = 0
+      for (const seg of c.segments) for (const [ra, dec] of seg) {
+        const p = screenOf(ra, dec, 0)
+        if (!p) continue
+        n++
+        if (!top || p.sy < top.sy) top = p
+      }
+      if (top && n >= 2) ctx.fillText(figureName(c.id).toUpperCase(), top.sx, top.sy - 10)
+    }
   }
 
+  let drawColor = colorCss('c')
+
+  function render() {
+    ctx.clearRect(0, 0, W, H)
+    const bg = ctx.createRadialGradient(W * 0.5, H * 0.35, 0, W * 0.5, H * 0.35, Math.max(W, H) * 0.8)
+    bg.addColorStop(0, '#0b1224')
+    bg.addColorStop(1, '#04060c')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+
+    if (mode === 'free' && showReal) drawAllFigures()
+    const id = figures[idx]
+    if (mode === 'round' && id && (phase === 'memo' || peeking)) drawFigure(id)
+
+    for (const star of STARS) {
+      const p = screenOf(star.ra, star.dec)
+      if (p) drawStar(star, p.sx, p.sy)
+    }
+
+    ctx.lineCap = 'round'
+    if (mode === 'round' && (phase === 'checked' || phase === 'done') && current) {
+      strokeEdges(keysToEdges(current.trace.missed), MISSED, 1.6, [5, 6])
+      strokeEdges(keysToEdges(current.trace.extra), RED, 2.6)
+      strokeEdges(keysToEdges(current.trace.hit), MINT, 2.8)
+    } else {
+      const p = pad()
+      strokeEdges(padEdges(p), mode === 'round' ? SKY : drawColor, 2.4)
+      const a = armed()
+      if (a !== null) {
+        const s = starScreen(a)
+        if (s) {
+          ctx.beginPath()
+          ctx.arc(s.sx, s.sy, 8, 0, Math.PI * 2)
+          ctx.strokeStyle = mode === 'round' ? SKY : drawColor
+          ctx.lineWidth = 1.6
+          ctx.stroke()
+        }
+      }
+    }
+
+    const raH = wrapRa(ra0) / 15
+    const h = String(Math.floor(raH)).padStart(2, '0')
+    const m = String(Math.floor((raH % 1) * 60)).padStart(2, '0')
+    const dAbs = Math.abs(dec0)
+    const text = `RA ${h}h ${m}m · Dec ${dec0 >= 0 ? '+' : '−'}${String(Math.floor(dAbs)).padStart(2, '0')}° ${String(Math.floor((dAbs % 1) * 60)).padStart(2, '0')}′`
+    if (coordsEl.textContent !== text) coordsEl.textContent = text
+  }
+
+  /* Drawn on demand, not every frame: nine thousand stars is cheap once and
+     wasteful sixty times a second while nothing is moving. */
   let raf = 0
-  function loop() { render(); raf = requestAnimationFrame(loop) }
-  loop()
+  function invalidate() {
+    if (!raf) raf = requestAnimationFrame(frame)
+  }
+  function frame(now: number) {
+    raf = 0
+    if (fly) {
+      const t = Math.min(1, (now - fly.t0) / fly.ms)
+      const e = 1 - Math.pow(1 - t, 3)
+      ra0 = wrapRa(fly.from[0] + (fly.to[0] - fly.from[0]) * e)
+      dec0 = fly.from[1] + (fly.to[1] - fly.from[1]) * e
+      scale = Math.exp(fly.from[2] + (fly.to[2] - fly.from[2]) * e)
+      if (t >= 1) fly = null
+    }
+    render()
+    if (fly) invalidate()
+  }
 
-  /* ---- pan / zoom --------------------------------------------------------- */
+  function resize() {
+    const r = scene.getBoundingClientRect()
+    W = Math.max(1, Math.round(r.width))
+    H = Math.max(1, Math.round(r.height))
+    dpr = Math.min(devicePixelRatio || 1, 2)
+    canvas.width = Math.round(W * dpr)
+    canvas.height = Math.round(H * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    invalidate()
+  }
+  resize()
+  new ResizeObserver(resize).observe(scene)
 
-  let dragging = false
+  /* ---- pan, zoom, pinch -------------------------------------------------- */
+
+  const pointers = new Map<number, { x: number; y: number }>()
   let dragMoved = false
   let dragStart = { x: 0, y: 0, ra0: 0, dec0: 0 }
+  let pinch: { d: number; scale: number } | null = null
+
+  function zoomBy(f: number) {
+    fly = null
+    scale = Math.max(SCALE_MIN, Math.min(SCALE_MAX, scale * f))
+    invalidate()
+  }
 
   canvas.addEventListener('pointerdown', (e) => {
-    dragging = true
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    canvas.setPointerCapture(e.pointerId)
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()]
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), scale }
+      dragMoved = true
+      return
+    }
     dragMoved = false
     dragStart = { x: e.clientX, y: e.clientY, ra0, dec0 }
-    canvas.setPointerCapture(e.pointerId)
   })
   canvas.addEventListener('pointermove', (e) => {
-    if (!dragging) return
+    if (!pointers.has(e.pointerId)) return
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pinch && pointers.size === 2) {
+      const [a, b] = [...pointers.values()]
+      scale = Math.max(SCALE_MIN, Math.min(SCALE_MAX, pinch.scale * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d)))
+      invalidate()
+      return
+    }
     const dx = e.clientX - dragStart.x
     const dy = e.clientY - dragStart.y
-    if (Math.hypot(dx, dy) > 4) dragMoved = true
+    if (!dragMoved && Math.hypot(dx, dy) > 5) dragMoved = true
     if (!dragMoved) return
-    const x = -dx / scale
-    const y = dy / scale
-    const moved = unproject(x, y, dragStart.ra0, dragStart.dec0)
+    fly = null
+    const moved = unproject(-dx / scale, dy / scale, dragStart.ra0, dragStart.dec0)
     ra0 = wrapRa(moved.ra)
     dec0 = clampDec(moved.dec)
+    invalidate()
   })
-  canvas.addEventListener('pointerup', (e) => {
-    dragging = false
-    if (!dragMoved) handleClick(e.clientX, e.clientY)
-  })
-
+  const lift = (e: PointerEvent) => {
+    const was = pointers.has(e.pointerId)
+    pointers.delete(e.pointerId)
+    if (pointers.size < 2) pinch = null
+    if (was && e.type === 'pointerup' && !dragMoved && pointers.size === 0) {
+      const r = canvas.getBoundingClientRect()
+      handleClick(e.clientX - r.left, e.clientY - r.top)
+    }
+    if (pointers.size === 1) {
+      const [p] = [...pointers.values()]
+      dragStart = { x: p.x, y: p.y, ra0, dec0 }
+    }
+  }
+  canvas.addEventListener('pointerup', lift)
+  canvas.addEventListener('pointercancel', lift)
+  // A plain wheel scrolls the page past the sky, the way an embedded map does;
+  // Ctrl or ⌘ with it zooms, and so does a trackpad pinch, which arrives as a
+  // wheel event with ctrlKey set.
+  let wheelHintT = 0
   canvas.addEventListener('wheel', (e) => {
-    e.preventDefault()
-    const factor = Math.exp(-e.deltaY * 0.0012)
-    scale = Math.max(SCALE_MIN, Math.min(SCALE_MAX, scale * factor))
-  }, { passive: false })
-
-  /* ---- click to connect ---------------------------------------------------- */
-
-  function handleClick(clientX: number, clientY: number) {
-    const rect = canvas.getBoundingClientRect()
-    const x = (clientX - rect.left - W / 2) / scale
-    const y = -(clientY - rect.top - H / 2) / scale
-    const { ra, dec } = unproject(x, y, ra0, dec0)
-    const maxDeg = (16 / scale) * (180 / Math.PI)
-    const hit = nearestStar(ra, dec, maxDeg)
-
-    if (!hit) {
-      if (currentChain.length >= 2) strokes.push({ starIds: currentChain })
-      currentChain = []
-      armedStar = null
+    if (!e.ctrlKey && !e.metaKey) {
+      $('wheelNote').hidden = false
+      clearTimeout(wheelHintT)
+      wheelHintT = window.setTimeout(() => { $('wheelNote').hidden = true }, 1400)
       return
+    }
+    e.preventDefault()
+    zoomBy(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0025)))
+  }, { passive: false })
+  $('zoomIn').addEventListener('click', () => zoomBy(1.4))
+  $('zoomOut').addEventListener('click', () => zoomBy(1 / 1.4))
+
+  /* ---- joining stars ----------------------------------------------------- */
+
+  const DRAW_HINT = 'Click the stars to join them. Click the last one again, or empty sky, to lift the pen.'
+
+  function handleClick(cx: number, cy: number) {
+    if (shell.paused) return
+    if (mode === 'round' && phase === 'memo') {
+      hint.textContent = 'Not yet: take it in first. Press Got it when you are ready.'
+      return
+    }
+    if (mode === 'round' && phase !== 'draw') return
+    const p = pad()
+    const hit = pickStar(cx, cy, { ra0, dec0, scale, W, H })
+    if (!hit) {
+      commitChain(p)
+      hint.textContent = mode === 'round' ? DRAW_HINT : 'Drag to look around. Click two stars to join them.'
+    } else if (armed() === hit.id) {
+      commitChain(p)
+      hint.textContent = `Pen lifted at ${starLabel(hit)}.`
+    } else {
+      sfx.click()
+      p.chain.push(hit.id)
+      hint.textContent = p.chain.length === 1
+        ? `${starLabel(hit)}. Now the next star.`
+        : `${starLabel(hit)}. Keep going, or click it again to lift the pen.`
+    }
+    changed()
+  }
+
+  function undo() {
+    const p = pad()
+    if (p.chain.length > 1) p.chain.pop()
+    else if (p.chain.length === 1) p.chain = []
+    else if (p.chains.length) { p.chain = p.chains.pop()!; p.chain.pop() }
+    const a = armed()
+    const s = a !== null ? starById(a) : null
+    hint.textContent = s ? `${starLabel(s)}. Pick the next star.` : 'Undone.'
+    changed()
+  }
+  function clearPad() {
+    const p = pad()
+    p.chains = []
+    p.chain = []
+    hint.textContent = 'Cleared.'
+    changed()
+  }
+  function changed() {
+    if (mode === 'round') shell.setMoves(String(lineCount(roundPad)))
+    invalidate()
+  }
+
+  $('undoBtn').addEventListener('click', () => { if (phase === 'draw') undo() })
+  $('clearBtn').addEventListener('click', () => { if (phase === 'draw') clearPad() })
+  $('peekBtn').addEventListener('click', peek)
+  $('checkBtn').addEventListener('click', check)
+  $('gotIt').addEventListener('click', endMemo)
+  $('nextBtn').addEventListener('click', next)
+
+  function paintTools() {
+    const drawing = phase === 'draw'
+    for (const id of ['peekBtn', 'undoBtn', 'clearBtn', 'checkBtn']) $<HTMLButtonElement>(id).disabled = !drawing
+  }
+
+  addEventListener('keydown', (e) => {
+    if (mode !== 'round' || shell.paused || e.metaKey || e.ctrlKey || e.altKey) return
+    const t = e.target as HTMLElement
+    if (t.closest('input, textarea, select, dialog[open]')) return
+    if (e.key === 'Enter') {
+      // A focused button already answers Enter with its own click.
+      if (t.closest('button, a')) return
+      e.preventDefault()
+      if (phase === 'memo') endMemo()
+      else if (phase === 'draw') check()
+      else if (phase === 'checked') next()
+    } else if (e.key === 'u' || e.key === 'U') { if (phase === 'draw') undo() }
+    else if (e.key === 'r' || e.key === 'R') peek()
+  })
+
+  /* ---- modes --------------------------------------------------------------- */
+
+  function setMode(m: 'round' | 'free') {
+    if (m === mode) return
+    if (mode === 'round') pauseMemo()
+    mode = m
+    root.dataset.mode = m
+    for (const b of root.querySelectorAll<HTMLButtonElement>('[data-mode-btn]')) b.setAttribute('aria-pressed', String(b.dataset.modeBtn === m))
+    for (const el of root.querySelectorAll<HTMLElement>('[data-for]')) el.hidden = el.dataset.for !== m
+    if (m === 'round') {
+      hint.textContent = phase === 'memo' ? 'Take it in. You will draw it from memory.' : phase === 'draw' ? DRAW_HINT : 'Here is the real figure, over yours.'
+      if (figures[idx]) fitFigure(figures[idx])
+      resumeMemo()
+    } else {
+      hint.textContent = 'The whole sky. Drag to look around; click two stars to join them.'
     }
     sfx.click()
-    if (!armedStar) {
-      armedStar = hit
-      currentChain = [hit.id]
-      hint.textContent = `${starLabel(hit)} — pick another star to connect it to.`
-      return
-    }
-    if (armedStar.id === hit.id) {
-      if (currentChain.length >= 2) strokes.push({ starIds: currentChain })
-      currentChain = []
-      armedStar = null
-      hint.textContent = 'Drag to look around. Click two stars to connect them.'
-      return
-    }
-    currentChain.push(hit.id)
-    armedStar = hit
-    hint.textContent = `${starLabel(hit)} — keep going, or click it again to finish.`
+    invalidate()
   }
+  root.querySelector('.cd-modes')!.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-mode-btn]')
+    if (b) setMode(b.dataset.modeBtn as 'round' | 'free')
+  })
 
-  /* ---- toolbar ------------------------------------------------------------- */
+  /* ---- the free sky ---------------------------------------------------------- */
 
-  document.getElementById('toggleReal')!.addEventListener('click', (e) => {
+  let showReal = true
+  $('toggleReal').addEventListener('click', (e) => {
     showReal = !showReal
     ;(e.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(showReal))
+    invalidate()
   })
-  document.getElementById('undoBtn')!.addEventListener('click', () => {
-    if (currentChain.length > 1) currentChain.pop()
-    else if (currentChain.length === 1) currentChain = [] // a lone armed star with nothing connected yet: cancel it
-    else if (strokes.length) { currentChain = strokes.pop()!.starIds; currentChain.pop() }
-    armedStar = currentChain.length ? STARS.find((s) => s.id === currentChain[currentChain.length - 1]) ?? null : null
-    hint.textContent = armedStar ? `${starLabel(armedStar)} — pick another star to connect it to.` : 'Drag to look around. Click two stars to connect them.'
-  })
-  document.getElementById('clearBtn')!.addEventListener('click', () => {
-    strokes = []
-    currentChain = []
-    armedStar = null
-    hint.textContent = 'Drag to look around. Click two stars to connect them.'
-  })
-  const swatchBtn = document.getElementById('swatchBtn') as HTMLButtonElement
-  const swatchesEl = document.getElementById('swatches') as HTMLElement
-  swatchBtn.addEventListener('click', () => { swatchesEl.hidden = !swatchesEl.hidden })
-  document.querySelectorAll<HTMLButtonElement>('.swatch').forEach((btn) => {
+  $('freeUndo').addEventListener('click', undo)
+  $('freeClear').addEventListener('click', clearPad)
+  root.querySelectorAll<HTMLButtonElement>('.cd-swatch').forEach((btn) => {
     btn.addEventListener('click', () => {
       drawColor = colorCss(btn.dataset.color!)
-      swatchBtn.style.setProperty('--sw', drawColor)
-      document.querySelectorAll('.swatch').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
-      swatchesEl.hidden = true
+      root.querySelectorAll('.cd-swatch').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
+      invalidate()
     })
   })
-  document.addEventListener('click', (e) => {
-    if (!swatchesEl.hidden && !(e.target as HTMLElement).closest('.swatch-wrap')) swatchesEl.hidden = true
-  })
 
-  /* ---- info card: constellation facts, and "surprise me" ------------------- */
-
-  const infoCard = document.getElementById('infoCard') as HTMLElement
-  const infoKicker = document.getElementById('infoKicker')!
-  const infoName = document.getElementById('infoName')!
-  const infoFact = document.getElementById('infoFact')!
-  document.getElementById('infoClose')!.addEventListener('click', () => (infoCard.hidden = true))
-
-  function flyTo(ra: number, dec: number) {
-    ra0 = wrapRa(ra)
-    dec0 = clampDec(dec)
-  }
-
-  function showConstellationCard(id: string) {
+  function showConstellation(id: string) {
     const meta = constellationName(id)
     if (!meta) return
     const brightest = brightestIn(id)
-    infoKicker.textContent = meta.english !== meta.name ? meta.english : 'A real IAU constellation'
-    infoName.textContent = meta.name
-    infoFact.textContent = brightest
-      ? `Genitive: ${meta.genitive}. Its brightest catalogued star is ${starLabel(brightest)}, real magnitude ${brightest.mag.toFixed(2)}.`
+    $('infoKicker').textContent = meta.english !== meta.name ? meta.english : 'A real IAU constellation'
+    $('infoName').textContent = meta.name
+    $('infoFact').textContent = brightest
+      ? `Genitive: ${meta.genitive}. Its brightest star is ${starLabel(brightest)}, magnitude ${brightest.mag.toFixed(2)}.`
       : `Genitive: ${meta.genitive}. Nothing in it is bright enough for this catalogue's naked-eye cutoff.`
-    infoCard.hidden = false
+    $('infoCard').hidden = false
   }
 
-  document.getElementById('randomBtn')!.addEventListener('click', () => {
+  $('randomBtn').addEventListener('click', () => {
     const c = CONSTELLATIONS[Math.floor(Math.random() * CONSTELLATIONS.length)]
-    const pts = c.segments.flat()
-    const ra = pts.reduce((a, [r]) => a + r, 0) / pts.length
-    const dec = pts.reduce((a, [, d]) => a + d, 0) / pts.length
-    flyTo(ra, dec)
-    scale = 700
-    showConstellationCard(c.id)
+    fitFigure(c.id)
+    showConstellation(c.id)
+    sfx.blip(2)
   })
 
-  /* ---- search --------------------------------------------------------------- */
-
-  const searchInput = document.getElementById('search') as HTMLInputElement
-  const resultsEl = document.getElementById('searchResults') as HTMLUListElement
+  const searchInput = $<HTMLInputElement>('search')
+  const resultsEl = $<HTMLUListElement>('searchResults')
   searchInput.addEventListener('input', () => {
-    const q = searchInput.value
-    const stars = searchStars(q, 6)
+    const stars = searchStars(searchInput.value, 6)
     resultsEl.innerHTML = ''
     for (const s of stars) {
       const li = document.createElement('li')
-      li.textContent = `${starLabel(s)} — ${constellationName(s.con)?.name ?? s.con}`
-      li.addEventListener('click', () => {
-        flyTo(s.ra, s.dec)
-        scale = 900
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = `${starLabel(s)} · ${constellationName(s.con)?.name ?? s.con}`
+      b.addEventListener('click', () => {
+        flyTo(s.ra, s.dec, 1100)
         resultsEl.hidden = true
         searchInput.value = ''
+        showConstellation(s.con)
+        hint.textContent = `${starLabel(s)}, magnitude ${s.mag.toFixed(2)}.`
       })
+      li.append(b)
       resultsEl.append(li)
     }
     resultsEl.hidden = stars.length === 0
   })
 
-  /* ---- save / share ----------------------------------------------------------- */
-
-  const saveDialog = document.getElementById('saveDialog') as HTMLDialogElement
-  const nameInput = document.getElementById('nameInput') as HTMLInputElement
-  const saveStatus = document.getElementById('saveStatus')!
-
-  document.getElementById('saveBtn')!.addEventListener('click', () => {
-    if (currentChain.length >= 2) strokes.push({ starIds: currentChain })
-    currentChain = []
-    armedStar = null
-    if (!strokes.length) {
-      hint.textContent = 'Connect at least two stars first.'
+  const saveDialog = $<HTMLDialogElement>('saveDialog')
+  const nameInput = $<HTMLInputElement>('nameInput')
+  const saveStatus = $('saveStatus')
+  $('saveBtn').addEventListener('click', () => {
+    commitChain(freePad)
+    invalidate()
+    if (!freePad.chains.length) {
+      hint.textContent = 'Join at least two stars first.'
+      shell.shake(scene)
       return
     }
     saveStatus.textContent = ''
     saveDialog.showModal()
   })
-  document.getElementById('saveCancel')!.addEventListener('click', () => saveDialog.close())
-  document.getElementById('saveConfirm')!.addEventListener('click', async () => {
-    const code = encodeStrokes(strokes)
-    const name = nameInput.value.trim() || 'Untitled'
+  $('saveCancel').addEventListener('click', () => saveDialog.close())
+  saveDialog.addEventListener('click', (e) => { if (e.target === saveDialog) saveDialog.close() })
+  $('saveConfirm').addEventListener('click', async () => {
+    const strokes: Stroke[] = freePad.chains.map((starIds) => ({ starIds }))
     const url = new URL(location.href)
-    url.searchParams.set('c', code)
-    url.searchParams.set('n', name)
+    url.searchParams.set('c', encodeStrokes(strokes))
+    url.searchParams.set('n', nameInput.value.trim() || 'Untitled')
     try {
       await navigator.clipboard.writeText(url.toString())
-      saveStatus.textContent = 'Link copied.'
+      saveStatus.textContent = 'Link copied. Anyone who opens it sees your constellation.'
       sfx.good()
     } catch {
       saveStatus.textContent = url.toString()
     }
   })
 
-  /* ---- load a shared drawing from the URL -------------------------------------- */
+  /* ---- boot: a shared drawing opens the free sky, anything else the round ---- */
 
+  newRound()
   {
     const params = new URLSearchParams(location.search)
-    const code = params.get('c')
-    if (code) {
-      const loaded = decodeStrokes(code)
-      if (loaded.length) {
-        strokes = loaded
-        const allIds = loaded.flatMap((s) => s.starIds)
-        const pts = allIds.map((id) => STARS.find((s) => s.id === id)).filter((s): s is Star => !!s)
-        if (pts.length) {
-          flyTo(pts.reduce((a, s) => a + s.ra, 0) / pts.length, pts.reduce((a, s) => a + s.dec, 0) / pts.length)
-          scale = 700
+    const loaded = decodeStrokes(params.get('c') ?? '')
+    if (loaded.length) {
+      freePad.chains = loaded.map((s) => s.starIds)
+      setMode('free')
+      const pts = loaded.flatMap((s) => s.starIds).map(starById).filter((s): s is Star => !!s)
+      if (pts.length) {
+        // The mean direction on the sphere, so a drawing across RA 0° centres on itself.
+        let x = 0, y = 0, z = 0
+        for (const s of pts) {
+          const r = (s.ra * Math.PI) / 180, d = (s.dec * Math.PI) / 180
+          x += Math.cos(d) * Math.cos(r); y += Math.cos(d) * Math.sin(r); z += Math.sin(d)
         }
-        const name = params.get('n')
-        if (name) hint.textContent = `Viewing "${name}" — drag to look around.`
+        flyTo((Math.atan2(y, x) * 180) / Math.PI, (Math.atan2(z, Math.hypot(x, y)) * 180) / Math.PI, 700, false)
       }
+      const name = params.get('n')
+      if (name) hint.textContent = `“${name}”, drawn by someone on this sky. Drag to look around.`
     }
   }
 </script>
 
-<style>
-  :global(.cdraw-body) { background: #05040a; overflow: hidden; }
+<style is:global>
+  /* The head, the verdict and the result sheet are filled in by the script,
+     so these rules are global on purpose. Everything is prefixed. */
+  .cd { display: grid; gap: 12px; container-type: inline-size; }
+  .cd [hidden] { display: none !important; }
 
-  #sky { position: fixed; inset: 0; touch-action: none; cursor: grab; }
-  #sky:active { cursor: grabbing; }
-
-  .chrome { position: fixed; inset: 0; pointer-events: none; font-family: 'Bricolage Grotesque', sans-serif; }
-  .chrome > * { pointer-events: auto; }
-
-  .coords {
-    position: absolute; top: 58px; right: 16px;
-    font-family: 'Space Mono', monospace; font-size: 12px; color: #d8cdf0;
-    opacity: 0.55; white-space: nowrap; letter-spacing: 0.01em;
+  .cd-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; justify-content: space-between; }
+  .cd-rail { list-style: none; margin: 0; padding: 0; flex: 1 1 520px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .cd-rail li {
+    display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 8px;
+    padding: 10px 12px; border-radius: var(--r); background: var(--paper2); min-width: 0;
   }
-  .hint {
-    position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%);
-    margin: 0; width: max-content; max-width: min(560px, calc(100vw - 40px)); text-align: center;
-    color: #f1ecfb; font-size: 15px; letter-spacing: 0.01em;
-    text-shadow: 0 1px 10px rgba(0,0,0,0.7), 0 0 26px rgba(0,0,0,0.5);
-    opacity: 0.92; transition: opacity 200ms var(--ease, ease);
-  }
+  .cd-rail li .label { color: var(--ink3); }
+  .cd-rail li b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cd-rail .cd-got { grid-column: 1 / -1; font-size: 18px; }
+  .cd-rail li.is-now { background: var(--card); box-shadow: inset 0 0 0 2px var(--ink); }
+  .cd-rail li.is-done { background: var(--mint); }
+  .cd-rail li.is-done .label { color: var(--ink); }
+  .cd[data-mode='free'] .cd-rail { opacity: 0.5; }
 
-  .search-wrap { position: absolute; top: 92px; left: 16px; width: min(280px, calc(100vw - 32px)); }
-  #search {
-    width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px;
-    border: 1px solid rgba(201,184,255,0.25); background: rgba(10,6,18,0.75); color: #eee5ff;
-    font: inherit; font-size: 13px; backdrop-filter: blur(6px);
-  }
-  #search::placeholder { color: rgba(216,205,240,0.45); }
-  .search-results {
-    list-style: none; margin: 6px 0 0; padding: 4px; border-radius: 10px;
-    background: rgba(10,6,18,0.92); border: 1px solid rgba(201,184,255,0.2);
-    font-size: 12.5px; color: #d8cdf0; max-height: 220px; overflow-y: auto;
-  }
-  .search-results li { padding: 7px 8px; border-radius: 6px; cursor: pointer; }
-  .search-results li:hover { background: rgba(201,184,255,0.14); }
+  .cd-modes { display: flex; gap: 6px; align-items: center; flex: none; }
+  .cd-modes .pill { background: var(--paper2); color: var(--ink); }
+  .cd-modes .pill[aria-pressed='true'] { background: var(--ink); color: var(--ink-paper); }
 
-  .card {
-    position: absolute; top: 92px; right: 16px; width: min(280px, calc(100vw - 32px));
-    padding: 16px 18px; border-radius: 14px; background: rgba(12,8,22,0.88);
-    border: 1px solid rgba(201,184,255,0.22); color: #e5dbfa; backdrop-filter: blur(8px);
+  /* The bar above the sky: the figure's name and the countdown, then the
+     verdict. A fixed minimum height, so the sky under it never jumps. */
+  .cd-head {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
+    min-height: 92px; padding: 14px 18px; border-radius: var(--r); background: var(--paper2);
   }
-  .card-close { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: #b7a6dd; font-size: 16px; cursor: pointer; }
-  .card-kicker { margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #b39ce8; }
-  .card h2 { margin: 2px 0 8px; font-family: 'Oswald', sans-serif; font-size: 20px; }
-  .card p:not(.card-kicker) { margin: 0; font-size: 12.5px; line-height: 1.5; color: #c9bce8; }
+  .cd-brief { flex: 1 1 260px; min-width: 0; display: grid; gap: 2px; }
+  .cd-name {
+    font-family: var(--display); font-variation-settings: var(--display-axes);
+    font-size: clamp(26px, 3.2vw, 38px); line-height: 1.05; letter-spacing: -0.02em; font-weight: 600;
+  }
+  .cd-sub { font-size: 14px; color: var(--ink2); }
+  .cd-memo { display: flex; align-items: center; gap: 12px; flex: 0 1 360px; }
+  .cd-timer { flex: 1; height: 10px; border-radius: var(--r-pill); background: var(--paper3); overflow: hidden; min-width: 90px; }
+  .cd-timer i { display: block; height: 100%; background: var(--ink); transform-origin: left center; border-radius: inherit; }
+  .cd-secs { font-size: 20px; min-width: 2.2em; text-align: right; }
+  .cd-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; outline: none; }
+  .cd-big { font-size: clamp(40px, 5vw, 56px); line-height: 1; }
+  .cd-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 14px; color: var(--ink2); }
+  .cd-facts b { color: var(--ink); }
 
-  .toolbar {
+  /* The free sky's bar: search and whatever constellation you just flew to. */
+  .cd-search { position: relative; flex: 0 1 320px; min-width: 220px; }
+  .cd-search input {
+    width: 100%; box-sizing: border-box; padding: 11px 16px; border-radius: var(--r-pill);
+    border: 2px solid var(--ink); background: var(--card); color: var(--ink); font: 500 15px var(--sans);
+  }
+  .cd-results {
+    position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 6px);
+    list-style: none; margin: 0; padding: 6px; border-radius: var(--r);
+    background: var(--card); box-shadow: var(--shadow-block), 0 0 0 1.5px var(--paper3);
+    max-height: 240px; overflow-y: auto;
+  }
+  .cd-results button {
+    width: 100%; text-align: left; padding: 9px 10px; border: 0; border-radius: 10px;
+    background: none; color: var(--ink); font: 500 14px var(--sans); cursor: pointer;
+  }
+  .cd-results button:hover, .cd-results button:focus-visible { background: var(--paper2); }
+  .cd-info { flex: 1 1 280px; min-width: 0; display: grid; gap: 2px; }
+  .cd-info-name { font-family: var(--display); font-variation-settings: var(--display-axes); font-size: 26px; font-weight: 600; line-height: 1.1; }
+  .cd-info-fact { font-size: 14px; color: var(--ink2); }
+
+  /* The sky itself: the one dark thing on the page, framed like a picture. */
+  .cd-scene {
+    position: relative; overflow: hidden; isolation: isolate;
+    height: clamp(420px, 68vh, 760px);
+    border: 2px solid var(--ink); border-radius: var(--r-lg); background: #04060c;
+  }
+  .cd-scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  .cd-coords {
+    position: absolute; top: 14px; right: 16px; pointer-events: none;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: rgba(214, 222, 240, 0.6);
+  }
+  .cd-zoom { position: absolute; right: 14px; bottom: 14px; display: grid; gap: 6px; }
+  .cd-zoom button {
+    width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid rgba(214, 222, 240, 0.35);
+    background: rgba(4, 6, 12, 0.7); color: #f3f5f8; font: 600 20px/1 var(--sans); cursor: pointer;
+  }
+  .cd-zoom button:hover { background: rgba(40, 52, 80, 0.85); }
+  .cd-wheel {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none;
+    padding: 12px 18px; border-radius: var(--r-pill); background: rgba(4, 6, 12, 0.82);
+    color: #f3f5f8; font-size: 15px; font-weight: 600;
+  }
+  .cd-wheel kbd { padding: 1px 6px; border-radius: 6px; border: 1.5px solid currentColor; font: 700 12px/1.4 var(--sans); }
+  .cd-hint {
     position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px; border-radius: 999px;
-    background: rgba(10,6,18,0.82); border: 1px solid rgba(201,184,255,0.18); backdrop-filter: blur(10px);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    width: min(78%, 620px); text-align: center; pointer-events: none;
+    color: rgba(243, 245, 248, 0.9); font-size: 15px; font-weight: 500;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
   }
-  .swatch-wrap { position: relative; }
-  .swatch-btn {
-    width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5);
-    background: var(--sw); cursor: pointer; padding: 0; flex: none;
-    transition: transform 140ms var(--ease-bounce, ease);
-  }
-  .swatch-btn:hover { transform: scale(1.08); }
-  .swatches {
-    position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
-    display: flex; gap: 6px; padding: 8px; border-radius: 999px;
-    background: rgba(10,6,18,0.92); border: 1px solid rgba(201,184,255,0.22); backdrop-filter: blur(10px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
-  }
-  .swatches[hidden] { display: none; }
-  .swatch {
-    width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent;
-    background: var(--sw); cursor: pointer; padding: 0;
-  }
-  .swatch[aria-pressed="true"] { border-color: #fff; }
-  .tsep { width: 1px; height: 22px; background: rgba(201,184,255,0.2); flex: none; margin: 0 2px; }
-  .tbtn {
-    position: relative;
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(201,184,255,0.2);
-    background: rgba(255,255,255,0.04); color: #e5dbfa; cursor: pointer; padding: 0; flex: none;
-    transition: background 140ms var(--ease, ease), transform 140ms var(--ease-bounce, ease);
-  }
-  /* iconSvg() draws to fill whatever box it's given (width/height:100% is
-     inline on the svg itself, so only sizing the wrapper span works — see
-     lib/icons.ts's own iconSvg doc comment). */
-  .tbtn-icon { width: 16px; height: 16px; flex: none; display: inline-block; }
-  .tbtn:hover { background: rgba(255,255,255,0.1); transform: scale(1.06); }
-  .tbtn[aria-pressed="false"] { opacity: 0.5; }
-  .tbtn.primary { background: #c9b8ff; color: #1a0f2e; border-color: #c9b8ff; }
-  .tbtn.primary:hover { background: #d8ccff; }
 
-  /* A tooltip label above each icon button, the same way the real thing
-     names an icon-only control only once you're actually pointing at it. */
-  .tbtn[data-tip]::after {
-    content: attr(data-tip);
-    position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
-    white-space: nowrap; padding: 6px 10px; border-radius: 8px;
-    background: #eee5ff; color: #1a0f2e; font-size: 12px; font-weight: 600;
-    opacity: 0; pointer-events: none; transition: opacity 120ms var(--ease, ease);
+  .cd-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .cd-tools [id='checkBtn'], .cd-tools [id='saveBtn'] { margin-left: auto; }
+  .cd-tools .pill[disabled] { opacity: 0.4; cursor: default; }
+  .cd-cost { font-size: 12px; color: var(--t-red); font-weight: 700; }
+  .cd-keys { font-size: 12px; color: var(--ink3); padding: 0 6px; }
+  .cd-keys kbd {
+    display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 6px;
+    border: 1.5px solid currentColor; font: 700 11px/1.5 var(--sans); text-align: center;
   }
-  .tbtn[data-tip]:hover::after, .tbtn[data-tip]:focus-visible::after { opacity: 1; }
+  .cd-swatches { display: flex; gap: 6px; padding: 5px 8px; border-radius: var(--r-pill); background: var(--ink); }
+  .cd-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; background: var(--sw); cursor: pointer; padding: 0; }
+  .cd-swatch[aria-pressed='true'] { border-color: #f3f5f8; box-shadow: 0 0 0 2px var(--ink); }
 
-  .save-dialog {
-    margin: auto; width: min(360px, calc(100vw - 32px)); padding: 22px;
-    border-radius: 14px; border: 1px solid rgba(201,184,255,0.25);
-    background: #130c22; color: #eee5ff; font-family: 'Bricolage Grotesque', sans-serif;
+  .cd-name-input {
+    width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: var(--r);
+    border: 2px solid var(--ink); background: var(--card); color: var(--ink); font: 500 16px var(--sans);
   }
-  .save-dialog::backdrop { background: rgba(4,2,10,0.72); }
-  .save-dialog h2 { margin: 0 0 12px; font-family: 'Oswald', sans-serif; font-size: 19px; }
-  #nameInput {
-    width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px;
-    border: 1px solid rgba(201,184,255,0.3); background: #0c0816; color: #eee5ff; font: inherit;
-  }
-  .save-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-  .save-actions button { padding: 9px 14px; border-radius: 8px; border: 1px solid rgba(201,184,255,0.25); background: transparent; color: #e5dbfa; font: inherit; cursor: pointer; }
-  .save-actions .primary { background: #c9b8ff; color: #1a0f2e; border-color: #c9b8ff; font-weight: 600; }
-  .save-status { min-height: 1.2em; margin: 10px 0 0; font-size: 12px; color: #b7a6dd; word-break: break-all; }
+  .cd-save-status { min-height: 1.3em; margin-top: 10px; font-size: 14px; color: var(--ink2); word-break: break-all; }
 
-  @media (max-width: 640px) {
-    .coords { top: 54px; font-size: 11px; }
-    .hint { font-size: 13px; bottom: 86px; }
-    .card { left: 16px; right: 16px; width: auto; }
+  /* The round, inside the ink result card: each figure as a small chart. */
+  .cd-sheet { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .cd-sheet li { display: grid; gap: 6px; padding: 14px; border-radius: var(--r); box-shadow: inset 0 0 0 1.5px rgba(243, 245, 248, 0.28); }
+  .cd-sheet svg { width: 100%; height: auto; display: block; }
+  .cd-sheet b { font-size: clamp(24px, 2.6vw, 32px); }
+  .cd-sheet span { font-size: 14px; opacity: 0.8; }
+
+  @container (max-width: 760px) {
+    .cd-rail { grid-template-columns: repeat(5, minmax(0, 1fr)); flex-basis: 100%; }
+    .cd-rail li { padding: 8px; grid-template-columns: 1fr; }
+    .cd-rail li b { display: none; }
+    .cd-rail .cd-got { font-size: 15px; }
+    .cd-keys { display: none; }
+    .cd-tools [id='checkBtn'], .cd-tools [id='saveBtn'] { margin-left: 0; }
+  }
+  @media (max-width: 760px) {
+    .cd-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cd-scene { height: clamp(380px, 62vh, 560px); }
+    .cd-hint { font-size: 13px; width: calc(100% - 90px); left: 16px; transform: none; text-align: left; }
   }
 </style>

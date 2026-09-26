@@ -27,7 +27,7 @@ layer that is typographic rather than decorative. The rules are in
 | `scripts/check-paper.mjs` | holds the system to its own rules |
 
 Games move into the shell two at a time. **Done:** Rule Cascade, The Auction
-Game, Dark Patterns, Trolley, I'm Not a Robot, From Memory, Steady Hand, Paper Folds. Everything else still runs on the previous
+Game, Dark Patterns, Trolley, I'm Not a Robot, From Memory, Steady Hand, Paper Folds, Constellation Draw, Asteroid Launcher. Everything else still runs on the previous
 `GameLayout` until its turn. The daily challenge rotates through the shell
 games only; `dailyTarget` in `game-meta.ts` gives each game the same number
 the homepage printed.
@@ -1039,6 +1039,7 @@ simulation:
 ```bash
 node scripts/check-impact.mjs      # Asteroid Launcher, vs four real impacts
 node scripts/check-asteroid-art.mjs # the rock: uniform on a sphere, a picture not a ball
+node scripts/check-constellation-trace.mjs # the memory round: real figures, a fair score, every star clickable
 node scripts/check-telemetry.mjs   # I'm Not a Robot, vs known geometry
 node scripts/check-robot-scene.mjs # the CAPTCHA street, and its answer key, in pixels
 node scripts/check-auction.mjs     # The Auction Game, over 28,000 lots

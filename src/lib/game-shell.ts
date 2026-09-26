@@ -25,6 +25,12 @@ export type Ending = {
   kicker?: string
   lines?: string[]
   againLabel?: string
+  /**
+   * A win that is only an ending, not a triumph: no fanfare, no confetti. For
+   * a result that is a report of something grim — an impact's death toll is
+   * finished, not celebrated.
+   */
+  celebrate?: boolean
 }
 
 export type Best = { value: number; text: string }
@@ -164,7 +170,9 @@ export function createShell(opts: ShellOptions) {
     result.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'center' })
     result.focus({ preventScroll: true })
     announce(`${e.title}. ${e.score}.`)
-    if (kind === 'win') {
+    if (kind === 'win' && e.celebrate === false) {
+      sfx.click()
+    } else if (kind === 'win') {
       sfx.great()
       if (PLAY) {
         const r = result.getBoundingClientRect()

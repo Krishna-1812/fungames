@@ -148,7 +148,7 @@ console.log('\nprojectFeature — real foreshortening')
 
 /* ---- rendering harness -------------------------------------------------------- */
 
-const STAGE_BG = '#1c0a06' // the .rockStage backdrop in asteroid.astro
+const STAGE_BG = '#0b1020' // the .rockStage backdrop in asteroid.astro
 
 function frame(comp, rotation, bg = STAGE_BG) {
   const stars = starField(51, 60)

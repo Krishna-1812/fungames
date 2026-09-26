@@ -2352,7 +2352,35 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
 
     The daily rotation is seven games now, nudged by the seven-day cycle.
 
-47. Then reassess again.
+47. ~~**Paper & Ink, phase 5: Constellation Draw and Asteroid.**~~ **done.**
+
+    Neither had an ending, so each got one that grows out of what it
+    already was.
+
+    **Constellation Draw** is a memory round now: five real figures, one
+    from each of five tiers (Crux up to Scorpius), each shown for a few
+    seconds and then drawn back from memory by joining its stars.
+    `lib/constellation-trace.ts` resolves every figure to edges between
+    real star ids and scores a drawing as the F-score of the two, so order,
+    direction and strokes do not matter, and neither one safe line nor
+    joining everything pays. A peek costs 10. Writing the checker found two
+    things a player would have hit: γ Delphini is a double star 9″ apart,
+    and the figure used the fainter half, which no click could ever pick —
+    figures now use the brighter star of any unresolvable pair; and the
+    checker now proves every figure star picks itself at three sky sizes.
+    The free sky, with sharing, is the other tab, and a shared link opens
+    straight into it. The sky is drawn on demand rather than every frame,
+    and a plain wheel scrolls the page past it the way an embedded map does
+    (Ctrl-scroll, pinch or the buttons zoom).
+
+    **Asteroid Launcher** keeps the whole model. The builder and the impact
+    are two views of one stage; the tour's last step opens the report —
+    the shell's result card, with the steps summarised and a share button.
+    It ends with `celebrate: false`, new in the shell: an ending with no
+    fanfare and no confetti, because the card is a death toll. Best is the
+    biggest impact.
+
+48. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
