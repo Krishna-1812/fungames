@@ -2128,7 +2128,87 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     from any other product's page, which is the kind of hole that only shows
     up if something counts.
 
-41. Then reassess again.
+41. ~~**Internet Artifacts.**~~ **done.** A ninth pick from neal.fun's own
+    catalogue: the same linear-scroll instrument Space Elevator and Deep Sea
+    already proved, run forward through twenty-five real, dated moments from
+    the internet's own history — the first message ever sent between two
+    computers (October 29, 1969) to Nyan Cat (April 5, 2011) — zoned into
+    five eras, each with its own two-tone sky running the same visual arc the
+    internet itself did: dim terminal green warming through blue and teal
+    into the saturated colour of the dot-com and video years. Every `date`
+    string is as precise as a real source actually allows and no more, kept
+    independent of the `year` float used to lay it out so precision can never
+    get rounded up for a tidier layout.
+
+    Shipped once, then reopened on "make this extremely beautiful and cool":
+    the honest problem was a genuinely empty background — around 900px of
+    dead scroll buffer with no motion or texture. Fixed with an ambient field
+    of era-coloured drifting glyphs (binary in the ARPANET years, `<>` once
+    the Web exists, `$` once commerce does, `@#~` through the viral-video
+    years) plus CRT vignette, flicker and a title with its own boot-line and
+    blinking cursor. The first version coloured every glyph from the zone's
+    own `sky` value, which is nearly the value the background is already
+    painted in — 170 elements sat in the DOM, confirmed by inspection, and
+    were still invisible, found only by scrolling to the dead zone and
+    actually looking rather than trusting the element count. A separate,
+    deliberately bright `GLYPH_COLOR` table fixed it.
+
+    `scripts/check-internet-artifacts.mjs` pins headline facts (the Web's
+    public announcement, Google's incorporation date rather than its earlier
+    domain registration, the first Wikipedia edit landing the day after
+    launch) and validates every date string against a recognised precision
+    format; `scripts/check-internet-artifacts-art.mjs` is
+    `check-space-elevator-art.mjs`'s battery again, and caught the same class
+    of bug Space Elevator shipped with — art raised from a small badge to
+    fill its own card made the four densest real years too tall for their
+    zone's pixel density, silently pushing markers past even the compact
+    fallback into text-only. Re-tuning each era's `pxPerYear` against its own
+    tightest real gap, not just its artifact count, fixed it.
+
+42. ~~**Share This Page.**~~ **done.** A tenth pick from neal.fun's own
+    catalogue, and a different shape from everything built so far: not a
+    scroll, not a sandbox, not a live counter — a grid of thirty tiles, each
+    a different way to send one message you type yourself. Seventeen are
+    genuine, checkable encodings run against whatever you actually typed:
+    the real International Morse alphabet at the real 1:3 dot-to-dash ratio,
+    played as real beeps; real grade-1 Braille; the real Tap Code prisoners
+    of war have used since the 1960s; the real ICAO phonetic alphabet; the
+    real DTMF dual-tone pairs a phone keypad dials; real note names at their
+    real equal-tempered frequency, derived from one 440Hz reference rather
+    than typed in twelve times; a binary bitmap laid out the way the real
+    1974 Arecibo message was. Ten more are jokes, and say so in their own
+    blurb rather than dressing up an invented fact as a real one.
+
+    Semaphore flags were planned and cut: every source that documents the
+    real arm-angle table does it as an image, and transcribing twenty-six
+    flag positions from a picture with no way to check the transcription is
+    exactly the kind of unverifiable content this site refuses to ship.
+    Tap Code took its place — equally real, and a text table rather than a
+    diagram, so it can actually be gotten right.
+
+    `scripts/check-share-page.mjs` leans hardest on the checks that need no
+    external reference at all: ROT13 and Atbash are proved to be their own
+    inverse over random strings, not spot-checked against one example, and
+    binary/hex/base64 are proved to round-trip. Everything with a real
+    external standard (Morse, Braille's Unicode dot numbering, DTMF's ITU-T
+    Q.23 frequencies, NATO's official ICAO spellings) is checked against a
+    literal known-correct value, not against the same table the encoder
+    itself uses.
+
+    The checker is static and cannot see a page render, and two real bugs
+    shipped past it for exactly that reason. The modal — built `hidden` by
+    default — opened on page load anyway, because `.stp-modal { display:
+    grid }` outranks the browser's own `[hidden] { display: none }`: the same
+    scoped-style-adjacent trap this codebase has now hit on four different
+    games, fixed the same way each time with an explicit `[hidden]`
+    override. And the per-letter badge in the Musical Notes tile was styled
+    under the class `.stp-note` — the same name three other tiles' plain
+    explanatory paragraphs already used for unrelated text, both named for
+    what they *are* rather than for the one thing that actually needed to
+    stay unique, so those captions rendered squeezed into a 30px circle
+    regardless of which tile opened first.
+
+43. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

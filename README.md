@@ -469,6 +469,39 @@ text-only. Re-tuning each era's `pxPerYear` against its own tightest real
 gap, not just its artifact count, fixed it without shrinking anything back
 down.*
 
+**Share This Page** — one typed message, thirty ways to send it, in a grid of
+tiles rather than a scroll. Seventeen are genuine, checkable encodings run
+against whatever the visitor actually types, not a canned example: the real
+International Morse alphabet at the real 1:3 dot-to-dash ratio, played as real
+beeps through the shared `tone()` synth; real grade-1 English Braille, spot-
+checked against the Unicode Braille Patterns block's own codepoints rather than
+against the same dot table the encoder itself uses; the real Tap Code
+prisoners-of-war have used since the 1960s, C and K sharing one square; the
+real ICAO phonetic alphabet ("Alfa", "Juliett", not the common misspellings);
+the real DTMF dual-tone pairs behind a phone keypad, ITU-T Q.23, played two
+oscillators at once; real note names at their real equal-tempered frequency,
+every one of them *derived* from a single 440Hz reference via `440 *
+2^(n/12)` rather than typed in twelve times; a binary bitmap laid into a
+grid the way the real 1974 Arecibo message was. Ten more are jokes, and their
+blurb says so rather than dressing an invented fact up as a real one.
+*`scripts/check-share-page.mjs` leans hardest on the checks that need no
+external reference at all: ROT13 and the Atbash cipher are proved to be their
+own inverse over random strings, not spot-checked against one example, and
+binary/hex/base64 are proved to round-trip rather than just to produce
+plausible-looking output.* The checker is static and cannot see a page render,
+which is exactly how two real bugs shipped past it: the modal, built `hidden`
+by default, opened on page load anyway, because `.stp-modal { display: grid }`
+outranks the browser's own `[hidden] { display: none }` — the same scoped-
+style-adjacent trap this codebase has now hit on four different games, fixed
+the same way each time, with an explicit `[hidden]` override. And the
+per-letter note badge in the Musical Notes tile was styled under the class
+`.stp-note` — the same name three other tiles' plain explanatory paragraphs
+already used for unrelated text, since both were named for what they *are*
+("a note") rather than for the one thing that actually has to stay unique, so
+every one of those captions rendered squeezed into a 30px circle regardless
+of which tile opened first. Neither is a fact a data checker can hold
+opinions about; both only exist once the thing actually renders.
+
 **How Fast Are You Moving?** — seven real, cited speeds stack live while you
 scroll: your tectonic plate drifting, the Earth turning beneath you (computed
 from your real latitude via `navigator.geolocation`, with a graceful 40°N
@@ -996,6 +1029,7 @@ node scripts/check-steady.mjs      # Steady Hand, is the scoring fair
 node scripts/check-earth-reviews.mjs # Earth Reviews, do the stars actually add up
 node scripts/check-internet-artifacts.mjs # the timeline, dates honest about their own precision
 node scripts/check-internet-artifacts-art.mjs # its twenty-five scenes, over their own era-sky
+node scripts/check-share-page.mjs  # every encoding, self-inverse, round-tripped, or vs the real standard
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky

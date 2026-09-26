@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'share-this-page',
+    title: 'Share This Page',
+    blurb: 'One message, thirty genuinely different ways to send it',
+    description:
+      'Type any message and pick a way to send it: real Morse code timed at the real 1:3 dot-to-dash ratio and played as real beeps, real grade-1 Braille rendered dot for dot, the real dual-tone frequencies a phone keypad dials, the real note names and equal-tempered frequencies of a piano, real ROT13 and Atbash ciphers, and a binary bitmap laid out the way Arecibo Observatory actually beamed a message outward in 1974. Seventeen of the thirty methods are genuine, checkable encodings; the other ten are jokes, and say so themselves.',
+    accent: '#241a3d', accent2: '#ffcf5c',
+    category: 'fun',
+    added: '2026-10-02',
+  },
+  {
     slug: 'internet-artifacts',
     title: 'Internet Artifacts',
     blurb: 'Twenty-five real, dated moments from the internet’s own history',

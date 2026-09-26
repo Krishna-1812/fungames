@@ -76,6 +76,47 @@ const starPath = (cx: number, cy: number, r: number) => {
 }
 
 export const ART: Record<string, Illustration> = {
+  /* ---- Share This Page -------------------------------------------------- */
+  'share-this-page': {
+    subject: 'a telephone handset trailing a real string of Morse dots and dashes toward a small lit star',
+    slot: 'band-right',
+    viewBox: '0 0 170 76',
+    palette: ['#1b2740', '#3a4d78', '#8caaff', '#ffd76b', '#e9eefc'],
+    draw: () => {
+      const defs = `<defs><linearGradient id="share-this-page-body" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#3a4d78"/>
+        <stop offset="100%" stop-color="#1b2740"/>
+      </linearGradient></defs>`
+      // A handset, filling most of the frame's height so it survives the
+      // narrowest crop — two big bells joined by a waisted bar, angled like
+      // it was just set down mid-call.
+      const handset =
+        `<g transform="rotate(-16 40 40)">` +
+        `<rect x="0" y="16" width="42" height="42" rx="21" fill="url(#share-this-page-body)"/>` +
+        `<rect x="46" y="16" width="42" height="42" rx="21" fill="url(#share-this-page-body)"/>` +
+        `<path d="M32 37 Q44 20 56 37" fill="none" stroke="#1b2740" stroke-width="17" stroke-linecap="round"/>` +
+        `<path d="M32 37 Q44 20 56 37" fill="none" stroke="#3a4d78" stroke-width="9" stroke-linecap="round"/>` +
+        `</g>`
+      // Real Morse for "HI" (.... ..) — dots and dashes, not decoration
+      // standing in for them — drawn big and near-solid so it reads even in
+      // the narrowest crop, brightening toward the star it is sending to.
+      const dots = [true, true, true, true, true, true]
+      const gapAfter = 3 // the letter gap between H and I
+      let x = 98
+      const morse = dots
+        .map((dot, i) => {
+          const w = dot ? 10 : 20
+          const el = `<rect x="${n(x)}" y="30" width="${w}" height="14" rx="7" fill="#8caaff" opacity="${(0.55 + (i / dots.length) * 0.45).toFixed(2)}"/>`
+          x += w + (i === gapAfter ? 14 : 8)
+          return el
+        })
+        .join('')
+      const star = starPath(158, 37, 15)
+      return `${defs}<circle cx="158" cy="37" r="24" fill="#ffd76b" opacity="0.26"/>` +
+        `${handset}${morse}<path d="${star}" fill="#ffd76b"/>`
+    },
+  },
+
   /* ---- Earth Reviews --------------------------------------------------------- */
   'earth-reviews': {
     subject: 'the planet with one gold star awarded to it, the four it did not get trailing away',
