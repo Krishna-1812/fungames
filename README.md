@@ -428,6 +428,47 @@ every gradient id is prefixed and collision-free, every colour (fills,
 strokes and gradient stops alike) comes from one shared palette, and no two
 of the twenty-nine scenes render as the same picture.*
 
+**Internet Artifacts** — the same linear-scroll instrument again, running
+forward this time: the first message ever sent between two computers
+(UCLA to Stanford Research Institute, October 29, 1969) at the top, Nyan Cat
+(April 5, 2011) at the bottom, twenty-five real internet-history milestones
+in between, zoned into five eras — the ARPANET era, before the Web, the Web
+goes public, the dot-com years, Web 2.0 and viral video — each with its own
+`pxPerYear` density and its own two-tone sky, running the same visual arc
+the internet itself did: dim terminal green warming through blue and teal
+into the saturated colour of the dot-com and video years. Every date is as
+precise as a real source actually allows and no more: a full day where one
+is documented (Scott Fahlman's original 11:44am CMU bulletin-board post
+proposing `:-)`, recovered from a 2002 backup-tape excavation after twenty
+years), a month where that's the limit of what's known (the Trojan Room
+coffee pot's move onto the public Web, November 1993), a bare year where not
+even the person involved could say more (Ray Tomlinson never recorded which
+day in 1971 he sent the first network email) — the `date` string shown on
+each card is independent of the `year` float used to position it, so
+precision can never accidentally get rounded up for the sake of a tidier
+layout. A small "play dial-up modem sound" toggle loops a handshake warble
+through the shared `tone()` synth, and a blinking terminal-cursor dot travels
+a rail down the left edge in place of Space Elevator's cable car. Twenty-five
+scenes were drawn by four parallel agents from one written contract and three
+exemplars (a CRT terminal mid-crash, a recovered bulletin-board smiley, Nyan
+Cat), each real gradient-shaded rather than a flat cut-out, none reproducing
+an actual company trademark — an original search-and-garage motif for
+Google's founding, an original bird for the first tweet, no real Twitter or
+YouTube wordmark anywhere. *`scripts/check-internet-artifacts.mjs` checks
+that every `date` string matches a recognised precision format and that a
+handful of headline facts (the Web's public announcement, Google's
+incorporation date rather than its earlier domain registration, the first
+Wikipedia edit landing the day after launch) are pinned to their real,
+sourced values; `scripts/check-internet-artifacts-art.mjs` is
+`check-space-elevator-art.mjs`'s whole battery again, and caught the same
+class of bug Space Elevator shipped with — raising each scene from a small
+fixed-size badge to art that fills its own card made the four densest real
+years (1991-1995, six artifacts) too tall for their own zone's pixel
+density, silently pushing markers past even the compact fallback into
+text-only. Re-tuning each era's `pxPerYear` against its own tightest real
+gap, not just its artifact count, fixed it without shrinking anything back
+down.*
+
 **How Fast Are You Moving?** — seven real, cited speeds stack live while you
 scroll: your tectonic plate drifting, the Earth turning beneath you (computed
 from your real latitude via `navigator.geolocation`, with a graceful 40°N
@@ -953,6 +994,8 @@ node scripts/check-mix.mjs         # Ambient Mix, do shared links survive
 node scripts/check-who-was-alive.mjs # Who Was Alive, and the missing year zero
 node scripts/check-steady.mjs      # Steady Hand, is the scoring fair
 node scripts/check-earth-reviews.mjs # Earth Reviews, do the stars actually add up
+node scripts/check-internet-artifacts.mjs # the timeline, dates honest about their own precision
+node scripts/check-internet-artifacts-art.mjs # its twenty-five scenes, over their own era-sky
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky

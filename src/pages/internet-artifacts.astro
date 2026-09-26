@@ -1,0 +1,635 @@
+---
+import GameLayout from '../layouts/GameLayout.astro'
+import { ZONES, MARKERS } from '../data/internet-artifacts'
+import type { Marker } from '../data/internet-artifacts'
+import { INTERNET_ARTIFACTS_ART, MOOD, sceneSvg } from '../lib/internet-artifacts-art'
+import { withBase } from '../lib/base'
+import { digitCellHTML } from '../lib/seven-segment'
+
+/**
+ * Internet Artifacts — a linear scroll from the first message ever sent
+ * between two computers (1969) to Nyan Cat (2011), twenty-five real, dated
+ * moments in the order they actually happened.
+ *
+ * Same shape as `space-elevator.astro`, running the ordinary direction this
+ * time: oldest at the top, scrolling down moves forward through time. `d` is
+ * plain distance-from-the-start in pixels; `TOP_PAD`/`BOTTOM_PAD` give the
+ * intro and the finale real breathing room the same way `REEL_TAIL` did on
+ * Space Elevator, learned from the bug that page shipped with — a card's own
+ * height, once art fills the card instead of sitting in a corner of it, can
+ * be taller than the gap between it and the next section, and needs a real
+ * buffer rather than however much space happens to be left over.
+ */
+
+let cursor = 0
+const zones = ZONES.map((z) => {
+  const height = Math.round((z.to - z.from) * z.pxPerYear)
+  const laid = { ...z, height, offset: cursor }
+  cursor += height
+  return laid
+})
+const totalHeight = cursor
+const TOP_PAD = 480
+const BOTTOM_PAD = 420
+const reelHeight = TOP_PAD + totalHeight + BOTTOM_PAD
+
+const toReelTop = (d: number) => TOP_PAD + d
+
+/** Real year -> d-space (distance from the timeline's start, px). */
+function yearToD(year: number) {
+  const zone = zones.find((z) => year >= z.from && year <= z.to) ?? zones[zones.length - 1]
+  return zone.offset + Math.round((year - zone.from) * zone.pxPerYear)
+}
+
+const CARD_H = 96
+type Placed = ReturnType<typeof at> & { lane: 'center' | 'left' | 'right' }
+function at(m: Marker) {
+  return { ...m, top: toReelTop(yearToD(m.year)) }
+}
+
+// MARKERS is already ascending by year (checked), and so is top after at() —
+// no reversal needed, unlike Space Elevator's inverted coordinate space.
+const rough = MARKERS.map(at)
+const placed: Placed[] = []
+for (let i = 0; i < rough.length; ) {
+  let j = i + 1
+  while (j < rough.length && rough[j].top < rough[j - 1].top + CARD_H) j++
+  const group = rough.slice(i, j)
+  if (group.length === 1) {
+    placed.push({ ...group[0], lane: 'center' })
+  } else {
+    group.forEach((g, k) => placed.push({ ...g, lane: k % 2 === 0 ? 'left' : 'right' }))
+  }
+  i = j
+}
+
+const rgb = (hex: string) =>
+  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')
+
+const HUD_DIGITS = 4
+---
+
+<GameLayout slug="internet-artifacts" bar="#0b2b12" bodyClass="ia-body">
+  <div class="sky" id="sky"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="hud-scrim" aria-hidden="true"></div>
+
+  <div class="hud" id="hud">
+    <button type="button" class="hud-dial" id="dialToggle" aria-pressed="false" aria-label="Play dial-up modem sound">
+      <svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true"><path d="M4 8a6 6 0 0 1 12 0v6a1.5 1.5 0 0 1-3 0v-5a3 3 0 0 0-6 0v5a1.5 1.5 0 0 1-3 0Z" fill="currentColor"/></svg>
+    </button>
+    <div class="hud-label" id="hudZone">the arpanet era</div>
+    <div class="hud-year-row">
+      <span class="odometer" id="hudYear" set:html={Array.from({ length: HUD_DIGITS }, () => digitCellHTML()).join('')} />
+    </div>
+    <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
+  </div>
+
+  <div class="climb">
+    <div class="rail-track" id="railTrack" aria-hidden="true">
+      <div class="rail-line"></div>
+      <div class="rail-dot" id="railDot"></div>
+    </div>
+
+    <div class="intro">
+      <div class="intro-title">
+        <h1>Internet Artifacts</h1>
+      </div>
+      <p>Twenty-five real, dated moments from the internet's own history — from the first message ever sent between two computers to a cat made of Pop-Tart.</p>
+      <div class="arrow">&#8595;</div>
+      <p class="scroll-hint">Scroll down!</p>
+    </div>
+
+    <div class="reel" style={`height:${reelHeight}px`}>
+    {
+      zones.map((z, i) =>
+        i === 0 ? null : (
+          <div class="seam" style={`top:${toReelTop(z.offset)}px;--from:${zones[i - 1].sky[1]};--to:${z.sky[0]}`}>
+            <div class="seam-bubble">
+              <span class="seam-name">{z.label}</span>
+              <span class="seam-note">
+                {z.from} to {z.to} — {z.note}
+              </span>
+            </div>
+          </div>
+        )
+      )
+    }
+    {
+      placed.map((m) => {
+        const mood = MOOD[m.title]
+        const drift = `--drift:${-((Math.round(m.year * 1000) * 7919) % 1100) / 100}s`
+        const style = mood
+          ? `top:${m.top}px;--mood:${mood};--moodRgb:${rgb(mood)};${drift}`
+          : `top:${m.top}px;${drift}`
+        return (
+          <article class:list={['ev', `lane-${m.lane}`, { big: m.big }]} style={style}>
+            {INTERNET_ARTIFACTS_ART[m.title] && <div class="ev-art" set:html={sceneSvg(m.title)} />}
+            <div class="ev-text">
+              <div class="ev-when">{m.date}</div>
+              <h2>{m.title}</h2>
+              <p>{m.note}</p>
+            </div>
+          </article>
+        )
+      })
+    }
+    </div>
+
+    <section class="finale">
+      <p class="fin-kicker">Past Nyan Cat</p>
+      <h2>Twenty-five moments, out of an uncountable number</h2>
+      <p>
+        This list could have been four times as long — almost every entry
+        here has ten more almost as good sitting just outside it. What made
+        the cut is what is <em>well documented</em>: a source better than
+        "everyone on the internet remembers it happening," a date more
+        people agree on than not. A few entries above say so directly —
+        nobody, including Ray Tomlinson himself, ever recorded which day in
+        1971 he sent the first network email.
+      </p>
+      <p>
+        The gaps between entries get shorter as the list goes on, and that
+        is not nostalgia talking. Fourteen years separate the first ARPANET
+        message from the network finally agreeing on one protocol. Four
+        years later there is a Web to put a photograph on. By the time
+        Rickrolling has a name, it took about a year to go from "one 4chan
+        post" to "cliché." Culture has been compressing for over fifty
+        years, and there is no real sign it has finished.
+      </p>
+      <p class="fin-closer">
+        This page stops in 2011 on purpose. Everything since is still being
+        argued over by people who watched it happen — which is exactly the
+        kind of dispute a page built on "the note says so, not silently"
+        tries to stay out of.
+      </p>
+    </section>
+
+    <footer class="outro">
+      <div class="acts">
+        <button type="button" data-share data-title="Internet Artifacts">Share this</button>
+        <button type="button" id="again">Start over</button>
+        <a href={withBase('/')}>try something else &rarr;</a>
+      </div>
+      <p class="outro-line">Twenty-five real dates, fifty years, one cat made of Pop-Tart.</p>
+    </footer>
+  </div>
+</GameLayout>
+
+<script type="application/json" id="game-data" set:html={JSON.stringify({ zones, totalHeight, reelHeight, TOP_PAD, BOTTOM_PAD })} />
+
+<script>
+  import { ring } from '../lib/fx'
+  import { sfx, unlock, tone } from '../lib/audio'
+  import { segmentsFor, fitWidth } from '../lib/seven-segment'
+  import { onShare } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { SITE } from '../site.config'
+
+  const { zones, totalHeight, reelHeight, TOP_PAD, BOTTOM_PAD } = JSON.parse(
+    document.getElementById('game-data')!.textContent!,
+  ) as any
+
+  const cards = [...document.querySelectorAll('.ev')] as HTMLElement[]
+
+  function relayout() {
+    const measure = (lane: string) => {
+      for (const el of cards) {
+        el.classList.remove('lane-center', 'lane-left', 'lane-right', 'compact', 'compact-hard')
+        el.classList.add(lane)
+      }
+      return cards.map((el) => el.offsetHeight)
+    }
+    const wide = measure('lane-center')
+    const narrow = measure('lane-left')
+
+    const GROUP_GAP = 8
+    const boxes = cards.map((el, i) => ({
+      el, top: el.offsetTop, h: Math.max(wide[i], narrow[i]) + GROUP_GAP,
+    }))
+
+    const groups: typeof boxes[] = []
+    for (let i = 0; i < boxes.length; ) {
+      let j = i + 1
+      while (j < boxes.length && boxes[j].top < boxes[j - 1].top + boxes[j - 1].h) j++
+      groups.push(boxes.slice(i, j))
+      i = j
+    }
+
+    for (const group of groups) {
+      if (group.length === 1) {
+        group[0].el.classList.remove('lane-left')
+        group[0].el.classList.add('lane-center')
+        continue
+      }
+      const TIERS = ['', 'compact', 'compact-hard']
+      for (let attempt = 0; attempt < TIERS.length; attempt++) {
+        const bottom = { left: -Infinity, right: -Infinity }
+        let clash = false
+        for (const b of group) {
+          const h = b.el.offsetHeight
+          const GAP = 10
+          let lane =
+            bottom.left + GAP <= b.top ? 'left' : bottom.right + GAP <= b.top ? 'right' : null
+          if (!lane) {
+            clash = true
+            lane = bottom.left <= bottom.right ? 'left' : 'right'
+          }
+          b.el.classList.remove('lane-left', 'lane-right')
+          b.el.classList.add('lane-' + lane)
+          bottom[lane as 'left' | 'right'] = b.top + h
+        }
+        if (!clash) break
+        const next = TIERS[attempt + 1]
+        if (next) for (const b of group) b.el.classList.add(next)
+      }
+    }
+  }
+  relayout()
+
+  let chimeStep = 0
+  const bigCards = cards.filter((c) => c.classList.contains('big'))
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue
+          io.unobserve(e.target)
+          sfx.blip(chimeStep++)
+          const r = e.target.getBoundingClientRect()
+          ring(r.left + r.width / 2, r.top + r.height / 2, 'rgba(255,255,255,0.5)', 20)
+          e.target.classList.add('focused')
+        }
+      },
+      { rootMargin: '-42% 0px -42% 0px' },
+    )
+    bigCards.forEach((c) => io.observe(c))
+  }
+  addEventListener('pointerdown', unlock, { once: true })
+  addEventListener('scroll', unlock, { once: true, passive: true })
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+  const sky = $('sky')
+  const hud = $('hud')
+  const hudZone = $('hudZone')
+  const hudFill = $('hudFill')
+  const railDot = document.getElementById('railDot')
+  const railTrack = document.getElementById('railTrack')
+  const introEl = document.querySelector('.intro') as HTMLElement
+  const reel = document.querySelector('.reel') as HTMLElement
+
+  const yearDigits = [...$('hudYear').children] as HTMLElement[]
+  const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  function setYear(year: number) {
+    const raw = fitWidth(String(Math.max(0, Math.round(year))), yearDigits.length)
+    for (let i = 0; i < yearDigits.length; i++) {
+      const cell = yearDigits[i]
+      const ch = raw[i]
+      if (cell.dataset.v === ch) continue
+      const changed = cell.dataset.v !== undefined
+      cell.dataset.v = ch
+      const lit = segmentsFor(ch)
+      const segs = cell.children
+      for (let s = 0; s < lit.length; s++) segs[s]!.classList.toggle('on', lit[s])
+      if (changed && !prefersReducedMotion) {
+        cell.classList.remove('flicker')
+        void cell.offsetWidth
+        cell.classList.add('flicker')
+      }
+    }
+  }
+
+  function sizeTrack() {
+    if (railTrack) railTrack.style.height = `${reelHeight + introEl.offsetHeight}px`
+  }
+  sizeTrack()
+
+  // `.reel`'s document position is not fixed — `.intro` precedes it and has
+  // a responsive height — so it is measured fresh inside `update()` itself
+  // rather than cached. Space Elevator's own comment on this exact function
+  // explains why a cached value goes stale: reflow anywhere above the reel
+  // (a webfont swap in the finale's long paragraphs, here too) shifts it.
+  function reelTopAbs() {
+    return reel.getBoundingClientRect().top + window.scrollY
+  }
+
+  // ---- dial-up modem sound -----------------------------------------------
+  // A little handshake warble via the shared tone() synth, looped while on —
+  // the actual sound a 1990s modem made trying to connect, roughly.
+  const dialBtn = document.getElementById('dialToggle')
+  let dialOn = false
+  let dialTimer: number | null = null
+  const DIAL_FREQS = [1200, 2100, 1600, 2400, 1800, 1400]
+  function dialTick() {
+    DIAL_FREQS.forEach((f, i) =>
+      tone({ freq: f, dur: 0.13, type: 'square', gain: 0.045, delay: i * 0.1, filter: 3200 }),
+    )
+  }
+  dialBtn?.addEventListener('click', () => {
+    unlock()
+    dialOn = !dialOn
+    dialBtn.setAttribute('aria-pressed', String(dialOn))
+    dialBtn.classList.toggle('on', dialOn)
+    if (dialOn) {
+      dialTick()
+      dialTimer = window.setInterval(dialTick, 900)
+    } else if (dialTimer !== null) {
+      clearInterval(dialTimer)
+      dialTimer = null
+    }
+  })
+
+  const mix = (a: string, b: string, t: number) => {
+    const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const [r1, g1, b1] = p(a); const [r2, g2, b2] = p(b)
+    const c = (x: number, y: number) => Math.round(x + (y - x) * t)
+    return `rgb(${c(r1, r2)},${c(g1, g2)},${c(b1, b2)})`
+  }
+
+  let shareCard: import('../lib/result-card').ResultCard | null = null
+  onShare(() => shareCard, (c) => ({ title: 'Internet Artifacts', text: `${c.headline}.` }))
+
+  let recorded = false
+  function updateShareCard(year: number) {
+    shareCard = {
+      slug: 'internet-artifacts',
+      siteName: SITE.name,
+      headline: `Scrolled all the way to ${Math.round(year)}`,
+      sub: 'Twenty-five real, dated moments from the internet’s own history',
+      stats: [
+        { label: 'Year reached', value: String(Math.round(year)) },
+        { label: 'Years covered', value: `${Math.round(year) - zones[0].from}` },
+      ],
+    }
+    recordPlay('internet-artifacts', { yearReached: Math.round(year) }, { yearReached: 'high' })
+  }
+
+  let ticking = false
+  function update() {
+    ticking = false
+    const raw = window.scrollY + window.innerHeight / 2 - reelTopAbs()
+    const topInReel = Math.max(0, Math.min(reelHeight, raw))
+    const d = Math.max(0, Math.min(totalHeight, topInReel - TOP_PAD))
+
+    const zone = zones.find((z: any) => d < z.offset + z.height) ?? zones[zones.length - 1]
+    const within = d - zone.offset
+    const year = Math.max(zone.from, Math.min(zone.to, zone.from + within / zone.pxPerYear))
+
+    hud.classList.toggle('visible', d > 40)
+    hudZone.textContent = zone.label.toLowerCase()
+    setYear(year)
+
+    if (railDot) railDot.style.top = `${topInReel}px`
+
+    hudFill.style.width = `${(d / totalHeight) * 100}%`
+    const zt = zone.height ? Math.min(1, Math.max(0, within / zone.height)) : 0
+    const zoneColor = mix(zone.sky[0], zone.sky[1], zt)
+    hudFill.style.background = zoneColor
+    hud.style.setProperty('--glow', `rgba(${zoneColor.slice(4, -1)}, 0.4)`)
+    sky.style.background = `linear-gradient(${zoneColor}, ${mix(zone.sky[0], zone.sky[1], Math.min(1, zt + 0.25))})`
+
+    if (!recorded && d >= totalHeight - 40) {
+      recorded = true
+      updateShareCard(year)
+    }
+  }
+
+  addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update) }
+  }, { passive: true })
+  addEventListener('resize', () => { relayout(); sizeTrack(); update() }, { passive: true })
+  update()
+
+  document.getElementById('again')?.addEventListener('click', () => location.reload())
+</script>
+
+<style>
+  :global(.ia-body) { background: #03110a; color: #fff; }
+
+  .sky {
+    position: fixed; inset: 0; z-index: -2;
+    background: linear-gradient(#0b2b12, #03110a);
+    transition: background 260ms linear;
+  }
+  /* CRT scanlines — a static texture, no motion cost, the one place this
+     page borrows its chrome directly from the hardware it is describing. */
+  .scanlines {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.35;
+    background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px);
+  }
+
+  .hud-scrim {
+    position: fixed; inset: 0 0 auto 0; height: 150px; z-index: 39;
+    pointer-events: none;
+    background: linear-gradient(rgba(1, 4, 2, 0.5), rgba(1, 4, 2, 0));
+  }
+
+  .hud {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 40; width: min(92vw, 420px); text-align: center;
+    padding: 8px 16px; border-radius: 20px;
+    background: rgba(4, 12, 6, 0.55);
+    border: 1.5px solid var(--glow, rgba(124, 252, 138, 0.18));
+    box-shadow: 0 0 26px -6px var(--glow, transparent), 0 6px 18px -8px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    pointer-events: none;
+    opacity: 0;
+    transition: border-color 300ms linear, box-shadow 300ms linear, opacity 420ms var(--ease, ease);
+  }
+  .hud.visible { opacity: 1; }
+  .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
+
+  .hud-dial {
+    position: absolute; top: 8px; right: 10px; pointer-events: auto;
+    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+    color: inherit; width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+    display: grid; place-items: center;
+    transition: background 160ms linear, color 160ms linear;
+  }
+  .hud-dial.on { background: #7cfc8a; color: #03110a; }
+
+  .hud-year-row { display: flex; align-items: baseline; justify-content: center; gap: 5px; margin-top: 4px; }
+  .hud-bar { height: 3px; background: rgba(255, 255, 255, 0.2); border-radius: 2px; margin: 9px 0 6px; }
+  .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; transition: background 300ms linear; }
+
+  .intro { position: relative; min-height: 74vh; display: grid; place-content: center; text-align: center; gap: 14px; padding: 40px 20px; overflow: hidden; }
+  .intro-title { position: relative; z-index: 2; display: grid; place-items: center; }
+  .intro h1 {
+    font-size: clamp(40px, 10vw, 84px); margin: 0; letter-spacing: -0.03em;
+    color: #eaf3ff; -webkit-text-stroke: 3px #03110a; paint-order: stroke fill;
+    text-shadow: 0 4px 0 #7cfc8a, 0 9px 0 #03110a, 0 18px 34px rgba(0, 0, 0, 0.5);
+    animation: title-pop 700ms var(--ease-bounce, ease) both;
+  }
+  @keyframes title-pop { from { opacity: 0; transform: scale(0.7) rotate(-3deg); } }
+  .intro p { opacity: 0.85; margin: 0; font-size: 18px; max-width: 34ch; margin-inline: auto; position: relative; z-index: 2; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4); }
+  .scroll-hint { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
+  .arrow { font-size: 30px; opacity: 0.7; animation: bob 1.8s ease-in-out infinite; position: relative; z-index: 2; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+  .climb { position: relative; }
+  .reel { position: relative; overflow-x: clip; }
+
+  .rail-track { position: absolute; top: 0; left: 26px; width: 12px; height: 0; z-index: 1; pointer-events: none; }
+  .rail-line {
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 2.4px; transform: translateX(-50%);
+    background: linear-gradient(rgba(124, 252, 138, 0.5), rgba(124, 252, 138, 0.08));
+  }
+  .rail-dot {
+    position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%);
+    width: 10px; height: 10px; border-radius: 2px;
+    background: #7cfc8a; box-shadow: 0 0 12px 2px rgba(124, 252, 138, 0.75);
+    transition: top 60ms linear;
+    animation: rail-blink 1s steps(1, end) infinite;
+  }
+  @keyframes rail-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.35; } }
+  @media (max-width: 460px) {
+    .rail-track { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-dot { animation: none; }
+    .rail-dot, .cable-car { transition: none; }
+  }
+
+  /* Cut-outs, same contract as Deep Sea and Space Elevator: the drawing is
+     the element, not an icon pinned above a text column — it fills the
+     card's own width, learned first-time here rather than fixed after
+     shipping. */
+  .ev {
+    position: absolute; left: 50%; transform: translateX(-50%); z-index: 2;
+    width: min(88vw, 480px);
+    display: grid; justify-items: center;
+    gap: 12px; text-align: center;
+    --moodRgb: 234, 243, 255;
+  }
+  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44vw, 320px); }
+  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44vw, 320px); }
+  .ev.lane-left h2, .ev.lane-right h2 { font-size: 18px; }
+  .ev.lane-left p, .ev.lane-right p { font-size: 13.5px; }
+
+  .ev-art {
+    width: min(100%, 260px); aspect-ratio: 1 / 1;
+    filter:
+      drop-shadow(0 0 20px rgba(var(--moodRgb), 0.55))
+      drop-shadow(0 0 56px rgba(var(--moodRgb), 0.32));
+    animation: ev-drift 12s ease-in-out infinite;
+    animation-delay: var(--drift, 0s);
+  }
+  @keyframes ev-drift {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-8px) rotate(0.6deg); }
+  }
+  .ev-art svg { display: block; width: 100%; height: 100%; }
+
+  .ev.big { width: min(92vw, 560px); }
+  .ev.big h2 { font-size: 27px; }
+  .ev.big .ev-art { width: min(100%, 340px); filter: drop-shadow(0 0 26px rgba(var(--moodRgb), 0.7)) drop-shadow(0 0 74px rgba(var(--moodRgb), 0.42)); }
+  .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 19px; }
+
+  @keyframes seen-pulse {
+    0%   { filter: drop-shadow(0 0 8px rgba(var(--moodRgb), 0.3)); }
+    45%  { filter: drop-shadow(0 0 30px rgba(var(--moodRgb), 1)) drop-shadow(0 0 70px rgba(var(--moodRgb), 0.75)); }
+    100% { filter: drop-shadow(0 0 16px rgba(var(--moodRgb), 0.65)) drop-shadow(0 0 50px rgba(var(--moodRgb), 0.4)); }
+  }
+  .ev.big.focused .ev-art { animation: seen-pulse 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  .ev.compact p { display: none; }
+  .ev.compact { width: min(46vw, 220px); }
+  .ev.compact .ev-art { width: 64px; }
+  /* A turning point stays visually a little heavier than the trivia next to
+     it even when the cluster forces it to compact — the same reasoning as
+     `.ev.big`'s own larger glow, just surviving the squeeze. */
+  .ev.big.compact { width: min(52vw, 260px); }
+  .ev.big.compact .ev-art { width: 96px; }
+  .ev.compact-hard .ev-when { display: none; }
+  .ev.compact-hard .ev-art { display: none; }
+  @media (max-width: 620px) {
+    .ev { width: min(92vw, 360px); }
+    .ev.lane-left, .ev.lane-right { width: min(48vw, 240px); }
+    .ev.big { width: min(94vw, 400px); }
+  }
+  .ev-when {
+    font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
+    opacity: 0.85; font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 8px rgb(0 0 0 / 0.85);
+  }
+  .ev h2 {
+    font-size: 21px; margin: 4px 0 0; font-weight: 700;
+    text-shadow: 0 2px 12px rgb(0 0 0 / 0.9), 0 0 26px rgb(0 0 0 / 0.65);
+  }
+  .ev p {
+    margin: 6px 0 0; opacity: 0.88; font-size: 14.5px; max-width: 42ch;
+    text-shadow: 0 1px 10px rgb(0 0 0 / 0.9), 0 0 22px rgb(0 0 0 / 0.7);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ev.big.focused .ev-art { animation: none; }
+    .ev-art { animation: none; }
+    .ev { transition: none; }
+    .arrow { animation: none; }
+  }
+
+  .seam { position: absolute; left: 0; right: 0; z-index: 1; text-align: center; padding-top: 8px; }
+  .seam::before {
+    content: ''; position: absolute; left: 9%; right: 9%; top: 0; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, var(--from), var(--to)); opacity: 0.65;
+  }
+  .seam-bubble {
+    position: relative; display: inline-block; margin-top: 16px;
+    background: #fff; color: #1a2233;
+    border: 2px solid #1a2233; border-radius: 18px;
+    padding: 10px 18px 11px; max-width: min(84vw, 420px);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
+  }
+  .seam-bubble::after {
+    content: ''; position: absolute; left: 50%; top: -8px; margin-left: -8px;
+    width: 14px; height: 14px; background: #fff;
+    border-left: 2px solid #1a2233; border-top: 2px solid #1a2233;
+    border-radius: 3px 0 0 0; transform: rotate(45deg);
+  }
+  .seam-name { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; color: #5a6478; display: block; }
+  .seam-note { font-size: 13.5px; opacity: 0.92; margin-top: 4px; display: block; }
+
+  .finale { max-width: 640px; margin: 10vh auto 0; padding: 0 22px 8vh; text-align: left; }
+  .fin-kicker { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #7cfc8a; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
+  .finale h2 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 18px; letter-spacing: -0.02em; }
+  .finale p { font-size: 16px; line-height: 1.7; opacity: 0.85; margin: 0 0 16px; }
+  .finale em { color: #7cfc8a; font-style: normal; }
+  .finale strong { color: #ffd27a; }
+  .fin-closer { opacity: 0.95; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+
+  .outro { padding: 6vh 20px 16vh; text-align: center; }
+  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 20px; }
+  .acts button {
+    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  .acts button:first-child { background: linear-gradient(165deg, #a8ffb4, #7cfc8a); color: #03110a; border: 0; }
+  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
+  .acts a:hover { opacity: 1; }
+  .outro-line { font-size: 15px; opacity: 0.6; margin: 0; }
+</style>
+
+<style is:global>
+  /* Same trap, same fix, as every other odometer on this site — `#hudYear`'s
+     digit cells come from `digitCellHTML()` via `set:html`, so they never
+     get Astro's scoped-style attribute. */
+  .odometer { display: inline-flex; line-height: 1; --seg-on: #eaf3ff; --seg-off: rgba(255, 255, 255, 0.14); }
+  .digit { position: relative; display: inline-block; width: 0.6em; height: 1em; margin: 0 0.05em; flex: none; font-size: 19px; }
+  .digit.flicker { animation: ia-odo-flicker 320ms steps(1, end); }
+  @keyframes ia-odo-flicker { 0%, 18%, 36% { filter: brightness(1.7); } 9%, 27%, 100% { filter: brightness(1); } }
+  .seg { position: absolute; background: var(--seg-off); transition: background 140ms linear, box-shadow 140ms linear; }
+  .seg.on { background: var(--seg-on); box-shadow: 0 0 0.08em var(--seg-on), 0 0 0.3em rgba(234, 243, 255, 0.55); }
+  .seg-a, .seg-g, .seg-d {
+    left: 0.065em; width: 0.43em; height: 0.09em;
+    clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
+  }
+  .seg-a { top: 0; } .seg-g { top: 0.455em; } .seg-d { top: 0.91em; }
+  .seg-f, .seg-b, .seg-e, .seg-c {
+    width: 0.09em; height: 0.41em; clip-path: polygon(0 14%, 50% 0, 100% 14%, 100% 86%, 50% 100%, 0 86%);
+  }
+  .seg-f, .seg-e { left: 0; } .seg-b, .seg-c { right: 0; }
+  .seg-f, .seg-b { top: 0.09em; } .seg-e, .seg-c { top: 0.5em; }
+  @media (prefers-reduced-motion: reduce) {
+    .digit.flicker { animation: none; }
+  }
+</style>

@@ -223,6 +223,7 @@ body.is-fixed {
 .speed-body   { --sb-a: #6ee7ff; --sb-b: #8f7bff; --sb-solid: #7fb8e8; }
 .se-body      { --sb-a: #f79564; --sb-b: #8fcaf0; --sb-solid: #e8a06e; }
 .incident-body { --sb-a: #d4ff3d; --sb-b: #8fa83e; --sb-solid: #b9e043; }
+.ia-body      { --sb-a: #7cfc8a; --sb-b: #ff6ec7; --sb-solid: #4fa8e0; }
 
 
 /* ---------------------------------------------------------------------------

@@ -47,38 +47,41 @@ export type Zone = {
 // Five eras, running the same visual arc the internet itself did: a dim,
 // monochrome terminal green at the start, warming through blue and teal as
 // the Web arrives, into the saturated, over-designed colour of the dot-com
-// and video years. Density (pxPerYear) tracks how much actually happened —
-// the sparse 1969-1983 decade gets fewer pixels per year than the four years
-// spanning the Web's public launch, which is where six of the twenty-five
-// artifacts land.
+// and video years. `pxPerYear` is tuned per era so the tightest real gap
+// between two consecutive artifacts in that era still has room for a card —
+// not simply "more artifacts means more pixels": the ARPANET era has the
+// fewest artifacts of any zone but two of them (the first message and the
+// first network email) land under two years apart, so it still needs real
+// density. The Web-goes-public zone earns its own high number honestly on
+// both counts — most artifacts of any era, packed into the fewest years.
 export const ZONES: Zone[] = [
   {
     id: 'arpanet', label: 'The ARPANET era',
-    from: 1969, to: 1983, pxPerYear: 60,
+    from: 1969, to: 1983, pxPerYear: 220,
     sky: ['#0b2b12', '#03110a'],
     note: 'Networked computers existed, but almost nobody outside a handful of universities and defence contractors had ever touched one.',
   },
   {
     id: 'early-internet', label: 'Before the Web',
-    from: 1983, to: 1991, pxPerYear: 70,
+    from: 1983, to: 1991, pxPerYear: 150,
     sky: ['#132a3d', '#081420'],
     note: 'Email and bulletin boards were the internet’s whole social life — there was no web to browse yet.',
   },
   {
     id: 'world-wide-web', label: 'The Web goes public',
-    from: 1991, to: 1995, pxPerYear: 150,
+    from: 1991, to: 1995, pxPerYear: 300,
     sky: ['#0e3b45', '#06181d'],
     note: 'Tim Berners-Lee’s web software went from an internal CERN tool to something anyone with a browser could read.',
   },
   {
     id: 'dot-com', label: 'The dot-com years',
-    from: 1995, to: 2001, pxPerYear: 110,
+    from: 1995, to: 2001, pxPerYear: 200,
     sky: ['#2a1245', '#150822'],
     note: 'The web became a place you could actually buy something, search for something, or lose an afternoon to.',
   },
   {
     id: 'web-two', label: 'Web 2.0 and viral video',
-    from: 2001, to: 2012, pxPerYear: 70,
+    from: 2001, to: 2012, pxPerYear: 170,
     sky: ['#3d0f2e', '#1c0716'],
     note: 'Video, and the crowd, took over — anyone with a webcam could reach more people than a TV network.',
   },

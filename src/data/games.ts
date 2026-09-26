@@ -63,6 +63,16 @@ export const CATEGORIES: { key: Category; label: string; note: string }[] = [
 
 export const GAMES: Game[] = [
   {
+    slug: 'internet-artifacts',
+    title: 'Internet Artifacts',
+    blurb: 'Twenty-five real, dated moments from the internet’s own history',
+    description:
+      'A scroll from the first message ever sent between two computers (October 29, 1969) to Nyan Cat (April 5, 2011) — twenty-five real internet-history milestones, each independently verified and dated as precisely as real sources actually allow. Some get a full date; the first network email only gets a year, because not even Ray Tomlinson could recall which day he sent it. The sky itself runs the same visual arc the internet did: dim terminal green warming through blue and teal into the saturated colour of the dot-com and video years.',
+    accent: '#0b2b12', accent2: '#7cfc8a',
+    category: 'fun',
+    added: '2026-10-01',
+  },
+  {
     slug: 'earth-reviews',
     title: 'Earth Reviews',
     blurb: 'Thirty-two things you cannot return',

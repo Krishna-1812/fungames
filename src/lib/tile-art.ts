@@ -1413,6 +1413,39 @@ export const ART: Record<string, Illustration> = {
         ${sparks}`
     },
   },
+  'internet-artifacts': {
+    subject: 'a CRT terminal glowing with a blinking cursor, a rainbow streak arcing off its corner',
+    slot: 'corner-tr',
+    viewBox: '0 0 120 90',
+    palette: ['#c7d4e2', '#3a4a66', '#12161f', '#7cfc8a', '#3ea24a', '#ff9d5c', '#ff6ec7', '#a78bfa', '#6ee7ff'],
+    draw: () => {
+      const defs = `<defs>
+        <linearGradient id="internet-artifacts-case" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#c7d4e2"/>
+          <stop offset="100%" stop-color="#3a4a66"/>
+        </linearGradient>
+        <radialGradient id="internet-artifacts-glow" cx="0.5" cy="0.42" r="0.65">
+          <stop offset="0" stop-color="#7cfc8a" stop-opacity="0.9"/>
+          <stop offset="1" stop-color="#3ea24a" stop-opacity="0"/>
+        </radialGradient>
+      </defs>`
+      // A small boxy terminal, camera-right so the fade never eats it.
+      const terminal =
+        `<path d="M40 30 L98 30 L102 68 L36 68Z" fill="url(#internet-artifacts-case)"/>` +
+        `<rect x="45" y="36" width="48" height="26" rx="2" fill="#12161f"/>` +
+        `<rect x="45" y="36" width="48" height="26" rx="2" fill="url(#internet-artifacts-glow)"/>` +
+        `<text x="49" y="53" font-family="monospace" font-size="11" font-weight="700" fill="#7cfc8a">&gt;_</text>` +
+        `<path d="M52 72 L86 72 L84 78 L54 78Z" fill="#3a4a66"/>`
+      // The rainbow streak — the one place this tile says "and it got a lot
+      // more colourful" without needing a second character to draw.
+      const trail =
+        `<path d="M2 20 Q40 4 78 14" fill="none" stroke="#ff9d5c" stroke-width="4.5" stroke-linecap="round" opacity="0.85"/>` +
+        `<path d="M2 26 Q40 10 78 20" fill="none" stroke="#ff6ec7" stroke-width="4.5" stroke-linecap="round" opacity="0.85"/>` +
+        `<path d="M2 32 Q40 16 78 26" fill="none" stroke="#a78bfa" stroke-width="4.5" stroke-linecap="round" opacity="0.85"/>` +
+        `<path d="M2 38 Q40 22 78 32" fill="none" stroke="#6ee7ff" stroke-width="4.5" stroke-linecap="round" opacity="0.85"/>`
+      return defs + trail + terminal
+    },
+  },
 }
 
 /* ---- how each slot is cropped ------------------------------------------- */
