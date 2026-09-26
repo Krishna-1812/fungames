@@ -1,9 +1,8 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { MARKERS, ZONES, TOTAL_DEPTH } from '../data/deep-sea'
 import type { Marker } from '../data/deep-sea'
 import { DEEP_SEA_ART, MOOD, sceneSvg } from '../lib/deep-sea-art'
-import { withBase } from '../lib/base'
 
 /**
  * The Deep Sea — a linear scroll from the surface to Challenger Deep, the
@@ -17,6 +16,12 @@ import { withBase } from '../lib/base'
  * and the trenches get the most total height of any zone despite being the
  * emptiest, because they hold the back half of the page's real story: the
  * handful of records and the handful of people.
+ *
+ * In the shell the dive is the stage: the water column is pinned behind it
+ * (a sticky backdrop, not a fixed one, so it stays inside the frame) and the
+ * depth gauge sticks to the top of it as you go. Score is the depth you are
+ * at, Zone is which of the five you are in, Moves is the pressure, and Best
+ * is the deepest you have been. Challenger Deep is the ending.
  */
 
 const rgb = (hex: string) =>
@@ -60,77 +65,92 @@ for (let i = 0; i < rough.length; ) {
 }
 
 const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`)
-const fmtPressure = (m: number) => {
-  const atm = 1 + m / 10
-  return atm >= 100 ? `${Math.round(atm).toLocaleString('en-US')} atm` : `${atm.toFixed(1)} atm`
-}
 ---
 
-<GameLayout slug="deep-sea" bar="#0e4a68" bodyClass="night-body">
-  <div class="sky" id="sky"></div>
-  {/* The rendered water column sits over the CSS gradient, which stays as
-      the fallback for anything without WebGL2. */}
-  <div class="skygl" id="skygl" aria-hidden="true"></div>
-
-  <div class="hud-scrim" aria-hidden="true"></div>
-
-  <div class="hud">
-    <div class="hud-label" id="hudZone">the sunlight zone</div>
-    <div class="hud-depth" id="hudDepth">0m</div>
-    <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
-    <div class="hud-row">
-      <span id="hudPressure">1.0 atm</span>
-      <span id="hudLight">full daylight, fading fast</span>
+<GameShell
+  slug="deep-sea"
+  labels={{ score: 'Depth', best: 'Deepest', level: 'Zone', moves: 'Pressure' }}
+  initial={{ score: '0 m', level: `1 / ${ZONES.length}`, moves: '1 atm' }}
+>
+  <div class="ds" id="dive">
+    {/* The water, pinned to the viewport while the dive scrolls past it. The
+        rendered column sits over the CSS gradient, which stays as the fallback
+        for anything without WebGL2. */}
+    <div class="ds-back" aria-hidden="true">
+      <div class="sky" id="sky"></div>
+      <div class="skygl" id="skygl"></div>
     </div>
-  </div>
 
-  <div class="intro">
-    <h1>The Deep Sea</h1>
-    <p>Every metre below is real. Keep scrolling to the deepest point in any ocean on Earth.</p>
-    <div class="arrow">↓</div>
-  </div>
+    <div class="ds-hud-pin">
+      <div class="hud-scrim" aria-hidden="true"></div>
+      <div class="hud" role="group" aria-label="Depth gauge">
+        <div class="hud-label" id="hudZone">the sunlight zone</div>
+        <div class="hud-depth" id="hudDepth">0m</div>
+        <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
+        <div class="hud-row">
+          <span id="hudPressure">1.0 atm</span>
+          <span id="hudLight">full daylight, fading fast</span>
+        </div>
+      </div>
+    </div>
 
-  <div class="reel" style={`height:${reelHeight}px`}>
-    {
-      zones.map((z, i) =>
-        i === 0 ? null : (
-          <div class="seam" style={`top:${z.offset}px;--from:${zones[i - 1].sky[1]};--to:${z.sky[0]}`}>
-            <span class="seam-name">{z.label}</span>
-            <span class="seam-note">
-              {z.from.toLocaleString('en-US')}m to {z.to.toLocaleString('en-US')}m — {z.light}
-            </span>
-          </div>
-        )
-      )
-    }
-    {
-      placed.map((m) => {
-        const mood = MOOD[m.title]
-        // Deterministic per-marker phase, so twenty-two windows drifting in
-        // the same water are not all drifting in step.
-        const drift = `--drift:${-((m.depth * 7919) % 1100) / 100}s`
-        const style = mood
-          ? `top:${m.top}px;--mood:${mood};--moodRgb:${rgb(mood)};${drift}`
-          : `top:${m.top}px;${drift}`
-        return (
-          <article class:list={['ev', `lane-${m.lane}`, { big: m.big, hero: m.hero }]} style={style}>
-            {DEEP_SEA_ART[m.title] && <div class="ev-art" set:html={sceneSvg(m.title)} />}
-            <div class="ev-text">
-              <div class="ev-when">{fmtDepth(m.depth)} down</div>
-              <h2>{m.title}</h2>
-              <p>{m.note}</p>
+    <div class="intro">
+      <p class="intro-title">The Deep Sea</p>
+      <p>Every metre below is real. Keep scrolling to the deepest point in any ocean on Earth.</p>
+      <div class="arrow" aria-hidden="true">↓</div>
+    </div>
+
+    <div class="reel" style={`height:${reelHeight}px`}>
+      {
+        zones.map((z, i) =>
+          i === 0 ? null : (
+            <div class="seam" style={`top:${z.offset}px;--from:${zones[i - 1].sky[1]};--to:${z.sky[0]}`}>
+              <span class="seam-name">{z.label}</span>
+              <span class="seam-note">
+                {z.from.toLocaleString('en-US')}m to {z.to.toLocaleString('en-US')}m — {z.light}
+              </span>
             </div>
-          </article>
+          )
         )
-      })
-    }
+      }
+      {
+        placed.map((m) => {
+          const mood = MOOD[m.title]
+          // Deterministic per-marker phase, so twenty-two windows drifting in
+          // the same water are not all drifting in step.
+          const drift = `--drift:${-((m.depth * 7919) % 1100) / 100}s`
+          const style = mood
+            ? `top:${m.top}px;--mood:${mood};--moodRgb:${rgb(mood)};${drift}`
+            : `top:${m.top}px;${drift}`
+          return (
+            <article class:list={['ev', `lane-${m.lane}`, { big: m.big, hero: m.hero }]} style={style}>
+              {DEEP_SEA_ART[m.title] && <div class="ev-art" set:html={sceneSvg(m.title)} />}
+              <div class="ev-text">
+                <div class="ev-when">{fmtDepth(m.depth)} down</div>
+                <h2>{m.title}</h2>
+                <p>{m.note}</p>
+              </div>
+            </article>
+          )
+        })
+      }
+    </div>
+
+    <p class="ds-floor">10,935 metres. The deepest the ocean, or this page, goes.</p>
   </div>
 
-  <footer class="outro">
-    <p>10,935 metres. The deepest the ocean, or this page, goes.</p>
-    <a href={withBase('/')}>← more things like this</a>
-  </footer>
-</GameLayout>
+  <Fragment slot="howto">
+    <p>
+      Scroll down, from the surface to Challenger Deep, 10,935 metres below the
+      Pacific: the deepest known point in any ocean on Earth.
+    </p>
+    <ul>
+      <li>Every animal, wreck and record is placed at its real depth. The five zones are the standard oceanographic ones, each given as much room as it needs.</li>
+      <li>The gauge at the top gives your depth, the pressure (one more atmosphere every ten metres) and how much light is left.</li>
+    </ul>
+    <p>The bottom is the end. Your best is the deepest you have been.</p>
+  </Fragment>
+</GameShell>
 
   {/* Data for the module below: modules cannot take define:vars, and modules
       are what let every game share one synthesiser. */}
@@ -141,6 +161,8 @@ const fmtPressure = (m: number) => {
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
   import { DEEP_SEA_FRAG } from '../lib/deep-sea-sky'
+  import { createShell } from '../lib/game-shell'
+  import { recordPlay } from '../lib/stats'
     const { zones, totalHeight } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   // --- lane layout, identical in shape to Deep Time's own pass -----------
@@ -234,6 +256,53 @@ const fmtPressure = (m: number) => {
   const hudPressure = document.getElementById('hudPressure')
   const hudLight = document.getElementById('hudLight')
   const reel = document.querySelector('.reel')
+  const dive = document.getElementById('dive')
+  const TOTAL = zones[zones.length - 1].to
+
+  /* ---- the shell ------------------------------------------------------ */
+
+  let ended = false
+  let deepestZone = 0
+  const shell = createShell({
+    slug: 'deep-sea',
+    // Back to the surface, not a reload: nothing about the dive needs resetting
+    // except where you are and whether the bottom has been reached.
+    onRestart: () => {
+      ended = false
+      deepestZone = 0
+      scrollTo({ top: dive.getBoundingClientRect().top + scrollY - 16, behavior: 'instant' })
+    },
+  })
+
+  /* The strip rolls its digits, so it is told once the scroll settles rather
+     than on every frame of it; the gauge above the water is the live one. */
+  let stripT = 0
+  let at = { metres: 0, zoneIdx: 0 }
+  function paintStrip() {
+    const { metres, zoneIdx } = at
+    shell.setScore(fmtDepth(metres).replace(/(\d)(k?m)$/, '$1 $2'))
+    shell.setLevel(`${zoneIdx + 1} / ${zones.length}`)
+    shell.setMoves(fmtPressure(metres))
+    if (metres >= 1) shell.considerBest(Math.round(metres), fmtDepth(metres).replace(/(\d)(k?m)$/, '$1 $2'))
+  }
+
+  function reachedBottom() {
+    ended = true
+    clearTimeout(stripT)
+    paintStrip()
+    recordPlay('deep-sea', { depthM: TOTAL }, { depthM: 'high' })
+    shell.win({
+      kicker: 'Challenger Deep · Mariana Trench',
+      title: 'The bottom of the ocean.',
+      score: '10,935 m',
+      from: '0 m',
+      lines: [
+        `${fmtPressure(TOTAL).replace('atm', 'atmospheres')} of pressure: over a tonne pressing on every square centimetre.`,
+        'The last of the sunlight gave out nearly ten kilometres ago.',
+      ],
+      againLabel: 'Dive again',
+    })
+  }
 
   const fmtDepth = (m) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`)
   const fmtPressure = (m) => {
@@ -259,7 +328,9 @@ const fmtPressure = (m: number) => {
   let ticking = false
   function update() {
     ticking = false
-    const depth = window.scrollY + window.innerHeight / 2 - reel.offsetTop
+    // Measured against the viewport, not offsetTop: the reel sits inside the
+    // shell's stage now, and offsetTop is only relative to that.
+    const depth = window.innerHeight / 2 - reel.getBoundingClientRect().top
     const clamped = Math.max(0, Math.min(totalHeight, depth))
 
     const zone = zones.find((z) => clamped < z.offset + z.height) ?? zones[zones.length - 1]
@@ -278,6 +349,17 @@ const fmtPressure = (m: number) => {
 
     curD = metres
     if (prefersReducedMotion) surface.redraw()
+
+    const zoneIdx = zones.indexOf(zone)
+    at = { metres, zoneIdx }
+    // Each zone announces itself the first time you sink into it.
+    if (zoneIdx > deepestZone) {
+      deepestZone = zoneIdx
+      shell.levelUp(zone.label)
+    }
+    clearTimeout(stripT)
+    stripT = window.setTimeout(paintStrip, 180)
+    if (!ended && metres >= TOTAL - 0.5) reachedBottom()
   }
 
   addEventListener(
@@ -295,44 +377,59 @@ const fmtPressure = (m: number) => {
 </script>
 
 <style>
-  .skygl { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+  /* The dive fills the stage edge to edge: no padding, no card, the water is
+     the whole frame. overflow: clip rather than hidden, which would make the
+     stage a scroll container and stop the backdrop and gauge sticking. */
+  :global(.stage:has(> .ds)) { padding: 0; overflow: clip; background: #04101c; }
+  .ds { position: relative; color: #f3f5f8; container-type: inline-size; }
+
+  /* Sticky, not fixed: pinned to the viewport while the dive is on screen,
+     but it stays inside the frame. The negative margin takes it back out of
+     the flow so the dive scrolls over it rather than after it. */
+  .ds-back { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; }
+  .skygl { position: absolute; inset: 0; pointer-events: none; }
   .skygl :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   .sky {
-    position: fixed; inset: 0; z-index: -2;
+    position: absolute; inset: 0;
     background: linear-gradient(#bdeaf5, #0e4a68);
     transition: background 260ms linear;
   }
-  :global(.night-body) { background: #04101c; color: #fff; }
 
   /* A soft fade at the very top of the viewport, under the HUD but over the
      reel, so a card sliding up to meet the HUD loses contrast gradually
      instead of vanishing behind a hard-edged bar. */
+  /* The gauge's own pin: zero height, so it takes no room in the dive. */
+  .ds-hud-pin { position: sticky; top: 0; height: 0; z-index: 40; }
   .hud-scrim {
-    position: fixed; inset: 0 0 auto 0; height: 172px; z-index: 39;
+    position: absolute; inset: 0 0 auto 0; height: 172px;
     pointer-events: none;
     background: linear-gradient(rgba(0, 4, 8, 0.5), rgba(0, 4, 8, 0));
   }
 
   .hud {
-    position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
-    z-index: 40; width: min(92vw, 520px); text-align: center;
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: min(calc(100% - 24px), 520px); text-align: center;
     padding: 10px 16px; border-radius: 12px;
     background: rgba(0, 0, 0, 0.66);
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     pointer-events: none;
   }
   .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
-  .hud-depth { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .hud-depth { font-size: 19px; font-weight: 700; margin-top: 2px; }
   .hud-bar { height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 9px 0 6px; }
   .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; transition: background 300ms linear; }
   .hud-row { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; gap: 10px; }
   .hud-row span:last-child { opacity: 0.85; text-align: right; }
 
-  .intro { min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
-  .intro h1 { font-size: clamp(38px, 9vw, 74px); margin: 0; letter-spacing: -0.03em; }
+  .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
+  .intro-title {
+    font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600;
+    font-size: clamp(40px, 9cqw, 84px); line-height: 1; letter-spacing: -0.03em;
+  }
   .intro p { opacity: 0.75; margin: 0; font-size: 18px; max-width: 32ch; margin-inline: auto; }
-  .arrow { font-size: 30px; opacity: 0.6; animation: bob 1.8s ease-in-out infinite; }
+  .arrow { font-size: 30px; opacity: 0.6; }
+  :global(html.play) .arrow { animation: bob 1.8s ease-in-out infinite; }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
 
   .reel { position: relative; overflow-x: clip; }
@@ -349,13 +446,13 @@ const fmtPressure = (m: number) => {
      is allowed to look like one.) */
   .ev {
     position: absolute; left: 50%; transform: translateX(-50%);
-    width: min(88vw, 460px);
+    width: min(88cqw, 460px);
     display: grid; justify-items: center;
     gap: 12px; text-align: center;
     --moodRgb: 138, 148, 160;
   }
-  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44vw, 300px); }
-  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44vw, 300px); }
+  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44cqw, 300px); }
+  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44cqw, 300px); }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 19px; }
   .ev.lane-left p, .ev.lane-right p { font-size: 13.5px; }
 
@@ -380,10 +477,10 @@ const fmtPressure = (m: number) => {
     50% { transform: translateY(-9px) rotate(-0.5deg); }
   }
 
-  .ev.big { width: min(92vw, 620px); }
+  .ev.big { width: min(92cqw, 620px); }
   .ev.big h2 { font-size: 30px; }
   .ev.big .ev-art { filter: drop-shadow(0 0 18px rgba(var(--moodRgb), 0.7)) drop-shadow(0 0 60px rgba(var(--moodRgb), 0.45)); }
-  .ev.lane-left.big, .ev.lane-right.big { width: min(46vw, 340px); }
+  .ev.lane-left.big, .ev.lane-right.big { width: min(46cqw, 340px); }
   .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 22px; }
 
   /* The named animals — giant squid, anglerfish, colossal squid, the ones a
@@ -391,11 +488,11 @@ const fmtPressure = (m: number) => {
      above everything but the record markers, on the same "the drawing is
      the element" cut-out rule, so the size read as impact rather than as a
      bigger card around the same small picture. */
-  .ev.hero { width: min(94vw, 700px); }
+  .ev.hero { width: min(94cqw, 700px); }
   .ev.hero h2 { font-size: 32px; }
   .ev.hero p { font-size: 16px; max-width: 50ch; }
   .ev.hero .ev-art { filter: drop-shadow(0 0 20px rgba(var(--moodRgb), 0.72)) drop-shadow(0 0 68px rgba(var(--moodRgb), 0.46)); }
-  .ev.lane-left.hero, .ev.lane-right.hero { width: min(48vw, 370px); }
+  .ev.lane-left.hero, .ev.lane-right.hero { width: min(48cqw, 370px); }
   .ev.lane-left.hero h2, .ev.lane-right.hero h2 { font-size: 23px; }
 
   @keyframes seen-pulse {
@@ -409,17 +506,17 @@ const fmtPressure = (m: number) => {
      lose the prose, then shrink the window, rather than letting two of them
      overlap. */
   .ev.compact p { display: none; }
-  .ev.compact { width: min(40vw, 230px); }
+  .ev.compact { width: min(40cqw, 230px); }
   .ev.compact-hard p { display: none; }
   .ev.compact-hard .ev-art { width: 74px; }
-  @media (max-width: 620px) {
-    .ev { width: min(92vw, 330px); }
-    .ev.lane-left, .ev.lane-right { width: min(46vw, 190px); }
-    .ev.lane-left { transform: translateX(-106%); }
-    .ev.big { width: min(94vw, 360px); }
-    .ev.lane-left.big, .ev.lane-right.big { width: min(46vw, 200px); }
-    .ev.hero { width: min(96vw, 400px); }
-    .ev.lane-left.hero, .ev.lane-right.hero { width: min(48vw, 220px); }
+  @container (max-width: 620px) {
+    .ev { width: min(92cqw, 330px); }
+    .ev.lane-left, .ev.lane-right { width: min(46cqw, 190px); }
+    .ev.lane-left { transform: translateX(-103%); }
+    .ev.big { width: min(94cqw, 360px); }
+    .ev.lane-left.big, .ev.lane-right.big { width: min(46cqw, 200px); }
+    .ev.hero { width: min(96cqw, 400px); }
+    .ev.lane-left.hero, .ev.lane-right.hero { width: min(48cqw, 220px); }
   }
   .ev-when {
     font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
@@ -462,7 +559,5 @@ const fmtPressure = (m: number) => {
   .seam-name { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.9; font-weight: 600; }
   .seam-note { font-size: 11.5px; opacity: 0.72; margin-top: 6px; }
 
-  .outro { padding: 22vh 20px 18vh; text-align: center; }
-  .outro p { font-size: 20px; opacity: 0.8; }
-  .outro a { display: inline-block; margin-top: 12px; opacity: 0.75; }
+  .ds-floor { position: relative; padding: 12vh 20px 16vh; text-align: center; font-size: 20px; opacity: 0.8; }
 </style>

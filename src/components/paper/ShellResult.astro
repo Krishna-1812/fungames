@@ -1,0 +1,23 @@
+---
+import { withBase } from '../../lib/base'
+
+/**
+ * The shell's result card: an ink block the runtime (lib/game-shell.ts) fills
+ * in when a game ends. Its own component only so GameShell can put it after
+ * the stage (the usual place) or before it, for a game that is played upward.
+ */
+---
+
+<section class="result on-ink" data-result hidden tabindex="-1" aria-labelledby="result-title">
+  <p class="label" data-result-kicker>Finished</p>
+  <h2 id="result-title" data-result-title>Well played</h2>
+  <span class="num result-score" data-result-score>0</span>
+  <div class="result-lines" data-result-lines></div>
+  <div class="result-extra" data-result-extra></div>
+  <div class="result-actions">
+    <button type="button" class="pill pill--hero" data-act="again">
+      <span data-again-label>Try again</span><span class="arrow" aria-hidden="true">→</span>
+    </button>
+    <a class="pill pill--line pill--line-paper" href={withBase('/')}><span>Back to games</span></a>
+  </div>
+</section>

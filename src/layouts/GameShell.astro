@@ -1,5 +1,6 @@
 ---
 import Paper from './Paper.astro'
+import ShellResult from '../components/paper/ShellResult.astro'
 import { SITE } from '../site.config'
 import { gameBySlug } from '../data/games'
 import { withBase } from '../lib/base'
@@ -24,9 +25,14 @@ interface Props {
   initial?: { score?: string; level?: string; moves?: string }
   /** Extra font families the game's own content needs (see Paper.astro). */
   fonts?: string[]
+  /**
+   * Put the result card above the stage instead of below it: for a game that
+   * is played by scrolling up, whose ending is at the top of the page.
+   */
+  resultFirst?: boolean
 }
 
-const { slug, labels = {}, initial = {}, fonts = [] } = Astro.props
+const { slug, labels = {}, initial = {}, fonts = [], resultFirst = false } = Astro.props
 const game = gameBySlug(slug)
 if (!game) throw new Error(`No registry entry for game "${slug}"`)
 
@@ -115,6 +121,8 @@ const structuredData = [
       </ul>
       <p class="sr-only" aria-live="polite" data-announce></p>
 
+      {resultFirst && <ShellResult />}
+
       <section class="stage" data-stage aria-label={`${game.title} — play area`}>
         <noscript>
           <div class="stage-note">
@@ -128,19 +136,7 @@ const structuredData = [
         </div>
       </section>
 
-      <section class="result on-ink" data-result hidden tabindex="-1" aria-labelledby="result-title">
-        <p class="label" data-result-kicker>Finished</p>
-        <h2 id="result-title" data-result-title>Well played</h2>
-        <span class="num result-score" data-result-score>0</span>
-        <div class="result-lines" data-result-lines></div>
-        <div class="result-extra" data-result-extra></div>
-        <div class="result-actions">
-          <button type="button" class="pill pill--hero" data-act="again">
-            <span data-again-label>Try again</span><span class="arrow" aria-hidden="true">→</span>
-          </button>
-          <a class="pill pill--line pill--line-paper" href={withBase('/')}><span>Back to games</span></a>
-        </div>
-      </section>
+      {!resultFirst && <ShellResult />}
 
       <slot name="after" />
     </main>

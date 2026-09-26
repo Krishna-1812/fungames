@@ -31,6 +31,12 @@ export type Ending = {
    * finished, not celebrated.
    */
   celebrate?: boolean
+  /**
+   * Leave the page where it is rather than bringing the card into view — for
+   * an ending the player is still scrolling toward, like the top of a climb
+   * with more to read on the way up to it.
+   */
+  scroll?: boolean
 }
 
 export type Best = { value: number; text: string }
@@ -167,7 +173,7 @@ export function createShell(opts: ShellOptions) {
     result.classList.add('is-in')
     const scoreEl = $(result, '[data-result-score]')
     roll(scoreEl, e.score, { from: e.from ?? e.score.replace(/\d/g, '0'), ms: 1400 })
-    result.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'center' })
+    if (e.scroll !== false) result.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'center' })
     result.focus({ preventScroll: true })
     announce(`${e.title}. ${e.score}.`)
     if (kind === 'win' && e.celebrate === false) {

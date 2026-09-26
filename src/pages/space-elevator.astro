@@ -1,9 +1,8 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { ZONES, MARKERS, TOTAL_ALTITUDE, fmtAltitude } from '../data/space-elevator'
 import type { Marker } from '../data/space-elevator'
 import { SPACE_ELEVATOR_ART, MOOD, sceneSvg } from '../lib/space-elevator-art'
-import { withBase } from '../lib/base'
 import { digitCellHTML } from '../lib/seven-segment'
 
 /**
@@ -28,6 +27,15 @@ import { digitCellHTML } from '../lib/seven-segment'
  * value into a position measured from the *top* of `.reel` instead — every
  * other formula (zone lookup, temperature, pressure, the sky mix) still
  * operates on `d` and is untouched by the flip.
+ *
+ * In the shell the climb is the stage. The sky is a sticky backdrop inside the
+ * frame and the gauge sticks to the top of it; the page opens at the ground,
+ * at the bottom of the stage. Because the climb ends at the top of the page,
+ * the result card sits above the stage (`resultFirst`), and the gauge carries
+ * its own How-to-play button, since the shell's bar is a hundred kilometres of
+ * scrolling away. Score is the altitude, Layer is which of the four you are
+ * in, Moves is the temperature outside, Best is the highest you have been, and
+ * the Kármán line is the ending.
  */
 
 let cursor = 0
@@ -136,15 +144,26 @@ const panoramaHeight = panoramaBottom - panoramaTop
 const HUD_DIGITS = 6
 ---
 
-<GameLayout slug="space-elevator" bar="#0d1a2e" bodyClass="se-body">
-  <div class="sky" id="sky"></div>
-  <div class="sky-grid" aria-hidden="true"></div>
-  <div class="hud-scrim" aria-hidden="true"></div>
+<GameShell
+  slug="space-elevator"
+  labels={{ score: 'Altitude', best: 'Highest', level: 'Layer', moves: 'Outside' }}
+  initial={{ score: '0 m', level: `1 / ${ZONES.length}`, moves: '15°C' }}
+  resultFirst
+>
+  <div class="se" id="climbRoot">
+  {/* The sky, pinned to the viewport while the climb scrolls past it. */}
+  <div class="se-back" aria-hidden="true">
+    <div class="sky" id="sky"></div>
+    <div class="sky-grid"></div>
+  </div>
 
-  <div class="hud" id="hud">
-    <button type="button" class="hud-music" id="musicToggle" aria-pressed="false" aria-label="Play elevator music">
+  <div class="se-hud-pin">
+  <div class="hud-scrim" aria-hidden="true"></div>
+  <div class="hud" id="hud" role="group" aria-label="Altitude gauge">
+    <button type="button" class="hud-btn hud-music" id="musicToggle" aria-pressed="false" aria-label="Play elevator music">
       <svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true"><path d="M8 3.5 L14.5 2 L14.5 12.2 A2.6 2.1 0 1 1 13 10.4 L13 5.2 L9.5 6 L9.5 14.2 A2.6 2.1 0 1 1 8 12.4Z" fill="currentColor"/></svg>
     </button>
+    <button type="button" class="hud-btn hud-help" data-act="howto" aria-haspopup="dialog" aria-label="How to play">?</button>
     <div class="hud-label" id="hudZone">the troposphere</div>
     <div class="hud-alt-row">
       <span class="odometer" id="hudOdo" set:html={Array.from({ length: HUD_DIGITS }, () => digitCellHTML()).join('')} />
@@ -155,6 +174,7 @@ const HUD_DIGITS = 6
       <span id="hudTemp">15°C outside</span>
       <span id="hudPressure">100% sea-level pressure</span>
     </div>
+  </div>
   </div>
 
   <section class="finale">
@@ -186,14 +206,6 @@ const HUD_DIGITS = 6
     </p>
   </section>
 
-  <footer class="outro">
-    <div class="acts">
-      <button type="button" data-share data-title="Space Elevator">Share this</button>
-      <button type="button" id="again">Start over</button>
-      <a href={withBase('/')}>try something else →</a>
-    </div>
-    <p class="outro-line">100,000 metres. The edge of space, or this page, whichever you hit first.</p>
-  </footer>
 
   <div class="climb">
     <div class="cable-track" id="cableTrack" aria-hidden="true">
@@ -267,10 +279,10 @@ const HUD_DIGITS = 6
 
     <div class="intro">
       <div class="intro-title">
-        <svg class="intro-spark a" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#ffd27a"/></svg>
+        <svg class="intro-spark a" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#4fe3c1"/></svg>
         <svg class="intro-spark b" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#6ee7ff"/></svg>
-        <svg class="intro-spark c" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#ff9d5c"/></svg>
-        <h1>Space Elevator</h1>
+        <svg class="intro-spark c" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#b8a1ff"/></svg>
+        <p class="se-title">Space Elevator</p>
       </div>
       <p>Every metre above is real, all the way to the edge of space — 100,000 real metres up.</p>
       <div class="jacket-pick" id="jacketPick">
@@ -294,7 +306,7 @@ const HUD_DIGITS = 6
           ))}
         </div>
       </div>
-      <div class="arrow">↑</div>
+      <div class="arrow" aria-hidden="true">↑</div>
       <p class="scroll-hint">Scroll up!</p>
       <div class="ground" aria-hidden="true">
         <svg viewBox="0 0 900 220" preserveAspectRatio="xMidYMax slice">
@@ -332,7 +344,21 @@ const HUD_DIGITS = 6
       </div>
     </div>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Scroll <b>up</b>, from sea level to the Kármán line, 100 kilometres up:
+      the internationally agreed edge of space.
+    </p>
+    <ul>
+      <li>Every bird, aircraft, balloon and record is placed at its real altitude. The four layers are the real layers of the atmosphere.</li>
+      <li>The gauge gives your altitude, the real temperature outside (from the US Standard Atmosphere, the model aviation uses) and how much air is left.</li>
+      <li>Pick a jacket before you go; the note button plays elevator music.</li>
+    </ul>
+    <p>The Kármán line is the end, and there is a little more to read above it. Your best is the highest you have been.</p>
+  </Fragment>
+</GameShell>
 
 <script type="application/json" id="game-data" set:html={JSON.stringify({ zones, totalHeight, reelHeight, REEL_TAIL })} />
 
@@ -341,16 +367,20 @@ const HUD_DIGITS = 6
   import { sfx, unlock, tone } from '../lib/audio'
   import { segmentsFor, fitWidth } from '../lib/seven-segment'
   import { standardTemperatureK, kelvinToC, approxPressureRatio } from '../lib/space-elevator-model'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
+  import { createShell } from '../lib/game-shell'
 
-  // The climb reads bottom-to-top now — open already scrolled to the very
-  // bottom of the document (the ground) rather than the browser's default
-  // top-of-page, and stop the browser fighting that with its own
-  // back-forward scroll memory.
+  // The climb reads bottom-to-top — open at the ground, the bottom of the
+  // stage, rather than the browser's default top-of-page, and stop the
+  // browser fighting that with its own back-forward scroll memory.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
-  scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+  function toGround() {
+    const intro = document.querySelector('.intro') as HTMLElement
+    scrollTo({ top: intro.getBoundingClientRect().bottom + scrollY - innerHeight + 16, behavior: 'instant' })
+  }
+  toGround()
 
   const { zones, totalHeight, reelHeight, REEL_TAIL } = JSON.parse(
     document.getElementById('game-data')!.textContent!,
@@ -450,7 +480,7 @@ const HUD_DIGITS = 6
   // digit, same shape Printing Money's debt clock and Days Since Incident's
   // counter already use — reused wholesale rather than re-invented.
   const odoDigits = [...$('hudOdo').children] as HTMLElement[]
-  const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const prefersReducedMotion = !document.documentElement.classList.contains('play') || matchMedia('(prefers-reduced-motion: reduce)').matches
   function setOdometer(metres: number) {
     const raw = fitWidth(String(Math.max(0, Math.round(metres))), odoDigits.length)
     for (let i = 0; i < odoDigits.length; i++) {
@@ -481,7 +511,7 @@ const HUD_DIGITS = 6
   // `.reel`'s `offsetTop` is relative to its own offsetParent (`.climb`,
   // which is `position: relative`) — it does not include `.climb`'s own
   // position in the document, which is now substantial (`.finale` and
-  // `.outro` both precede it). `getBoundingClientRect()` gives the real
+  // the shell above it all precede it). `getBoundingClientRect()` gives the real
   // viewport-relative position with no offsetParent ambiguity; adding the
   // current scroll turns that into a document-absolute one. Measured fresh
   // inside `update()` itself rather than cached — a cached value went stale
@@ -548,9 +578,7 @@ const HUD_DIGITS = 6
      ordering: shareCard's TDZ window has to close before anything can
      synchronously reach it. */
   let shareCard: import('../lib/result-card').ResultCard | null = null
-  onShare(() => shareCard, (c) => ({ title: 'Space Elevator', text: `${c.headline}.` }))
 
-  let recorded = false
   function updateShareCard(altitude: number) {
     const t = standardTemperatureK(Math.min(altitude, 86_000))
     shareCard = {
@@ -564,6 +592,63 @@ const HUD_DIGITS = 6
       ],
     }
     recordPlay('space-elevator', { altitudeM: altitude }, { altitudeM: 'high' })
+  }
+
+  /* ---- the shell ---------------------------------------------------------- */
+
+  const KARMAN = 100_000
+  let ended = false
+  let highestZone = 0
+  const shell = createShell({
+    slug: 'space-elevator',
+    // Back down to the ground rather than a reload: the jacket you picked
+    // stays on.
+    onRestart: () => { ended = false; highestZone = 0; toGround() },
+  })
+
+  /* The strip rolls its digits, so it is told once the scroll settles; the
+     gauge on the sky is the live one. */
+  const short = (m: number) => fmtAltitude(m).replace(/(\d)(k?m)$/, '$1 $2')
+  let stripT = 0
+  let at = { metres: 0, zoneIdx: 0 }
+  function paintStrip() {
+    const { metres, zoneIdx } = at
+    shell.setScore(short(metres))
+    shell.setLevel(`${zoneIdx + 1} / ${zones.length}`)
+    const t = standardTemperatureK(metres)
+    shell.setMoves(t !== null ? `${kelvinToC(t).toFixed(0).replace('-', '−')}°C` : '—')
+    if (metres >= 1) shell.considerBest(Math.round(metres), short(metres))
+  }
+
+  function reachedSpace(metres: number) {
+    ended = true
+    updateShareCard(metres)
+    shell.levelUp('The edge of space')
+    const pct = approxPressureRatio(KARMAN) * 100
+    // The card waits above the stage rather than pulling the page up to it:
+    // there is still the rest of the thermosphere, and the finale, to climb
+    // through on the way.
+    shell.win({
+      scroll: false,
+      kicker: 'The Kármán line · 100 km up',
+      title: 'You are in space.',
+      score: '100 km',
+      from: '000 km',
+      lines: [
+        `The air is ${pct.toPrecision(2)}% as thick as it was on the ground.`,
+        'Everything above this line is, officially, space.',
+      ],
+      againLabel: 'Ride down and go again',
+    })
+    shell.resultExtra.innerHTML =
+      '<div class="se-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share the climb</span></button></div>'
+    document.getElementById('shareBtn')!.addEventListener('click', async (e) => {
+      if (!shareCard) return
+      const label = (e.currentTarget as HTMLElement).querySelector('span')!
+      const outcome = await shareResult(shareCard, { title: 'Space Elevator', text: `${shareCard.headline}.`, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share the climb'), 1600)
+    })
   }
 
   let ticking = false
@@ -601,10 +686,16 @@ const HUD_DIGITS = 6
     hud.style.setProperty('--glow', `rgba(${zoneColor.slice(4, -1)}, 0.4)`)
     sky.style.background = `linear-gradient(${zoneColor}, ${mix(zone.sky[0], zone.sky[1], Math.min(1, zt + 0.25))})`
 
-    if (!recorded && d >= totalHeight - 40) {
-      recorded = true
-      updateShareCard(metres)
+    const zoneIdx = zones.indexOf(zone)
+    at = { metres, zoneIdx }
+    // Each layer announces itself the first time you climb into it.
+    if (zoneIdx > highestZone) {
+      highestZone = zoneIdx
+      if (metres < KARMAN) shell.levelUp(zone.label)
     }
+    clearTimeout(stripT)
+    stripT = window.setTimeout(paintStrip, 180)
+    if (!ended && metres >= KARMAN) reachedSpace(metres)
   }
 
   addEventListener('scroll', () => {
@@ -612,15 +703,23 @@ const HUD_DIGITS = 6
   }, { passive: true })
   addEventListener('resize', () => { relayout(); sizeTrack(); update() }, { passive: true })
   update()
-
-  document.getElementById('again')?.addEventListener('click', () => location.reload())
 </script>
 
 <style>
-  :global(.se-body) { background: #030510; color: #fff; }
+  /* The climb fills the stage edge to edge. overflow: clip rather than
+     hidden, which would make the stage a scroll container and stop the sky
+     and the gauge sticking. */
+  :global(.stage:has(> .se)) { padding: 0; overflow: clip; background: #030510; }
+  .se { position: relative; color: #f3f5f8; container-type: inline-size; }
+
+  /* Sticky, not fixed: pinned while the climb is on screen, but inside the
+     frame. The negative margin takes it back out of the flow. */
+  .se-back { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; }
+  .se-hud-pin { position: sticky; top: 0; height: 0; z-index: 40; }
+  .finale, .climb { position: relative; }
 
   .sky {
-    position: fixed; inset: 0; z-index: -2;
+    position: absolute; inset: 0;
     background: linear-gradient(#8fcaf0, #2a5a86);
     transition: background 260ms linear;
   }
@@ -628,21 +727,21 @@ const HUD_DIGITS = 6
      motion cost, and a small nod to how technical this page's numbers
      actually are. */
   .sky-grid {
-    position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.5;
+    position: absolute; inset: 0; pointer-events: none; opacity: 0.5;
     background-image:
       repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 64px),
       repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 64px);
   }
 
   .hud-scrim {
-    position: fixed; inset: 0 0 auto 0; height: 172px; z-index: 39;
+    position: absolute; inset: 0 0 auto 0; height: 172px;
     pointer-events: none;
     background: linear-gradient(rgba(0, 4, 8, 0.5), rgba(0, 4, 8, 0));
   }
 
   .hud {
-    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-    z-index: 40; width: min(92vw, 460px); text-align: center;
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: min(calc(100% - 24px), 460px); text-align: center;
     padding: 8px 16px; border-radius: 20px;
     background: rgba(6, 10, 20, 0.5);
     border: 1.5px solid var(--glow, rgba(255, 255, 255, 0.16));
@@ -653,16 +752,18 @@ const HUD_DIGITS = 6
     transition: border-color 300ms linear, box-shadow 300ms linear, opacity 420ms var(--ease, ease);
   }
   .hud.visible { opacity: 1; }
+  .hud:not(.visible) .hud-btn { visibility: hidden; }
   .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
 
-  .hud-music {
+  .hud-btn {
     position: absolute; top: 8px; right: 10px; pointer-events: auto;
     appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
     color: inherit; width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
     font-size: 13px; line-height: 1; display: grid; place-items: center;
     transition: background 160ms linear, color 160ms linear;
   }
-  .hud-music.on { background: #ffd27a; color: #2a1608; }
+  .hud-help { right: auto; left: 10px; font: 700 13px/1 var(--sans); }
+  .hud-music.on { background: var(--mint); color: var(--ink); }
 
   .hud-alt-row {
     display: flex; align-items: baseline; justify-content: center; gap: 5px;
@@ -676,12 +777,13 @@ const HUD_DIGITS = 6
 
   .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 40px 20px 0; overflow: hidden; }
   .intro-title { position: relative; z-index: 2; display: grid; place-items: center; }
-  .intro h1 {
-    font-size: clamp(44px, 11vw, 92px); margin: 0; letter-spacing: -0.03em;
+  .intro .se-title {
+    font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 700;
+    font-size: clamp(44px, 11cqw, 92px); line-height: 1; letter-spacing: -0.03em;
     color: #eaf3ff; -webkit-text-stroke: 3px #0a1626; paint-order: stroke fill;
-    text-shadow: 0 4px 0 #ff9d5c, 0 9px 0 #0a1626, 0 18px 34px rgba(0, 0, 0, 0.45);
-    animation: title-pop 700ms var(--ease-bounce, ease) both;
+    text-shadow: 0 4px 0 #5b82ff, 0 9px 0 #0a1626, 0 18px 34px rgba(0, 0, 0, 0.45);
   }
+  :global(html.play) .intro .se-title { animation: title-pop 700ms var(--spring) both; }
   @keyframes title-pop { from { opacity: 0; transform: scale(0.7) rotate(-3deg); } }
   .intro-spark {
     position: absolute; width: 22px; height: 22px; opacity: 0.85; pointer-events: none;
@@ -774,7 +876,7 @@ const HUD_DIGITS = 6
   .cable-car-window { position: absolute; inset: 4px; background: #16233c; border-radius: 3px; overflow: hidden; }
   .rider-head { position: absolute; left: 50%; top: 3px; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; background: #ffe3c2; }
   .rider-body { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 9px; height: 11px; border-radius: 3px 3px 0 0; background: var(--rider-color, #ffd27a); }
-  @media (max-width: 460px) {
+  @container (max-width: 460px) {
     .cable-track { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -790,13 +892,13 @@ const HUD_DIGITS = 6
      does and box-shadow cannot. */
   .ev {
     position: absolute; left: 50%; transform: translateX(-50%); z-index: 2;
-    width: min(88vw, 480px);
+    width: min(88cqw, 480px);
     display: grid; justify-items: center;
     gap: 12px; text-align: center;
     --moodRgb: 234, 243, 255;
   }
-  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44vw, 320px); }
-  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44vw, 320px); }
+  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44cqw, 320px); }
+  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44cqw, 320px); }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 18px; }
   .ev.lane-left p, .ev.lane-right p { font-size: 13.5px; }
 
@@ -820,7 +922,7 @@ const HUD_DIGITS = 6
   }
   .ev-art svg { display: block; width: 100%; height: 100%; }
 
-  .ev.big { width: min(92vw, 560px); }
+  .ev.big { width: min(92cqw, 560px); }
   .ev.big h2 { font-size: 27px; }
   .ev.big .ev-art { width: min(100%, 340px); filter: drop-shadow(0 0 26px rgba(var(--moodRgb), 0.7)) drop-shadow(0 0 74px rgba(var(--moodRgb), 0.42)); }
   .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 19px; }
@@ -839,14 +941,17 @@ const HUD_DIGITS = 6
      width, or "compact" would still be too tall to ever resolve a clash and
      everything would end up in compact-hard regardless. */
   .ev.compact p { display: none; }
-  .ev.compact { width: min(46vw, 220px); }
+  .ev.compact { width: min(46cqw, 220px); }
   .ev.compact .ev-art { width: 64px; }
   .ev.compact-hard .ev-when { display: none; }
   .ev.compact-hard .ev-art { display: none; }
-  @media (max-width: 620px) {
-    .ev { width: min(92vw, 360px); }
-    .ev.lane-left, .ev.lane-right { width: min(48vw, 240px); }
-    .ev.big { width: min(94vw, 400px); }
+  @container (max-width: 620px) {
+    .ev { width: min(92cqw, 360px); }
+    .ev.lane-left, .ev.lane-right { width: min(48cqw, 240px); }
+    .ev.big { width: min(94cqw, 400px); }
+    /* Before this, a big card in a side lane took the full-width size and
+       hung off both edges of a phone. */
+    .ev.lane-left.big, .ev.lane-right.big { width: min(48cqw, 240px); }
   }
   .ev-when {
     font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
@@ -885,7 +990,7 @@ const HUD_DIGITS = 6
     position: relative; display: inline-block; margin-top: 16px;
     background: #fff; color: #1a2233;
     border: 2px solid #1a2233; border-radius: 18px;
-    padding: 10px 18px 11px; max-width: min(84vw, 420px);
+    padding: 10px 18px 11px; max-width: min(84cqw, 420px);
     box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
   }
   .seam-bubble::after {
@@ -897,27 +1002,20 @@ const HUD_DIGITS = 6
   .seam-name { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; color: #5a6478; display: block; }
   .seam-note { font-size: 13.5px; opacity: 0.92; margin-top: 4px; display: block; }
 
-  .finale { max-width: 640px; margin: 10vh auto 0; padding: 0 22px 8vh; text-align: left; }
-  .fin-kicker { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #ff9d5c; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
-  .finale h2 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 18px; letter-spacing: -0.02em; }
+  .finale { max-width: 640px; margin: 0 auto; padding: 16vh 22px 8vh; text-align: left; }
+  .fin-kicker { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mint); opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
+  .finale h2 { font-size: clamp(24px, 4cqw, 34px); line-height: 1.15; margin: 0 0 18px; letter-spacing: -0.02em; }
   .finale p { font-size: 16px; line-height: 1.7; opacity: 0.85; margin: 0 0 16px; }
-  .finale em { color: #ff9d5c; font-style: normal; }
-  .finale strong { color: #ffd27a; }
+  .finale em { color: var(--mint); font-style: normal; }
+  .finale strong { color: var(--sky); }
   .fin-closer { opacity: 0.95; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 
-  .outro { padding: 6vh 20px 16vh; text-align: center; }
-  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 20px; }
-  .acts button {
-    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
-    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
-  }
-  .acts button:first-child { background: linear-gradient(165deg, #ffcb8f, #ff9d5c); color: #2a1608; border: 0; }
-  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
-  .acts a:hover { opacity: 1; }
-  .outro-line { font-size: 15px; opacity: 0.6; margin: 0; }
+
 </style>
 
 <style is:global>
+  .se-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
+
   /* ---- the HUD odometer: a real seven-segment display -------------------
      `#hudOdo`'s digit cells come from `digitCellHTML()` via `set:html`, so
      they never get Astro's scoped-style attribute — same trap this site's

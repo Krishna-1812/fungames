@@ -2380,7 +2380,34 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     fanfare and no confetti, because the card is a death toll. Best is the
     biggest impact.
 
-48. Then reassess again.
+48. ~~**Paper & Ink, phase 6: The Deep Sea and Space Elevator.**~~ **done.**
+
+    The first two scroll pieces, and the pattern the rest of them will use:
+    the dive (or the climb) is the stage, edge to edge; the water or the sky
+    is a *sticky* backdrop inside it rather than a fixed one, so it stays in
+    the frame; and the gauge sticks to the top of the stage on a zero-height
+    pin. The stage has to be `overflow: clip`, not `hidden` — hidden makes
+    it a scroll container and nothing inside sticks. Card widths are in
+    `cqw` of the column, not `vw`, because the stage is narrower than the
+    window by the page gutters. The strip is told the depth once the scroll
+    settles (it rolls its digits, and would roll them every frame
+    otherwise); each zone announces itself with the shell's level-up the
+    first time you reach it; the far end is the ending.
+
+    **The Deep Sea** ends at Challenger Deep; Best is the deepest you have
+    been, and Dive again goes back to the surface rather than reloading.
+
+    **Space Elevator** is played upward, so the shell grew two options for
+    it: `resultFirst` puts the result card above the stage, and an ending
+    can say `scroll: false` — the Kármán line fires it, but there is still
+    the thermosphere and the finale to read on the way up to the card. The
+    gauge carries its own How-to-play button, because the shell's bar is a
+    hundred kilometres of scrolling away from the ground. The warm accents
+    (the title's shadow, the finale's highlights, the music button) went
+    cool. Fixed on the way: at phone width a big card in a side lane took
+    the full-width size and hung off both edges of the screen.
+
+49. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
