@@ -2252,7 +2252,42 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     turn. Sound is now off by default site-wide, which is the spec and also
     simply correct.
 
-44. Then reassess again.
+44. ~~**Paper & Ink, phase 2: Dark Patterns and Trolley.**~~ **done.** Both
+    are choice-driven, keyboard-native and have a real ending, which is why
+    they went next.
+
+    **Dark Patterns** keeps all eleven mounts and all eleven citations, and
+    changes three things. The pattern's name is no longer printed above its
+    own widget — "Confirmshaming" over the confirmshaming modal was a spoiler
+    for the only thing the modal tests — so you get the site and the errand
+    first and the name only in the verdict. Each fake site now wears one of
+    the system's block colours as its brand and a wordmark voice of its own,
+    and the trick is always that site's loudest pill, ink-bordered, with the
+    honest way out in quiet ink-grey text: the house grammar used against
+    you on purpose. And the timers (the resetting countdown, the fake
+    purchase toasts) now stop while the game is paused, and a site can no
+    longer be resolved twice — the old page left the buttons live after the
+    verdict, so a second click pushed a second result.
+
+    **Trolley** moves the scene, the setup and two large pill choices onto a
+    two-column stage (← and → choose; N moves on), gives each outcome a whole
+    block for its toll — sky for nobody, amber for a few, red for five or
+    more, always with the number written — and makes Best the one thing here
+    that is a skill rather than a verdict: how consistently you argued for a
+    single position. There is no losing ending, because there is no wrong
+    answer.
+
+    Dailies now rotate through all four shell games; the dark-patterns and
+    trolley targets come from `dailyTarget`, so the game grades you against
+    the number the homepage printed.
+
+    What the browser caught: on one column the choices landed above the
+    picture of who they would kill, because a later `display: grid` beat the
+    media query's `display: contents` at equal specificity. And the position
+    bars rendered empty once their grow-in had finished — a from-only
+    keyframe resolving to an inline transform — so both ends are now explicit.
+
+45. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

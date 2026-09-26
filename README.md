@@ -27,7 +27,10 @@ layer that is typographic rather than decorative. The rules are in
 | `scripts/check-paper.mjs` | holds the system to its own rules |
 
 Games move into the shell two at a time. **Done:** Rule Cascade, The Auction
-Game. Everything else still runs on the previous `GameLayout` until its turn.
+Game, Dark Patterns, Trolley. Everything else still runs on the previous
+`GameLayout` until its turn. The daily challenge rotates through the shell
+games only; `dailyTarget` in `game-meta.ts` gives each game the same number
+the homepage printed.
 
 ---
 

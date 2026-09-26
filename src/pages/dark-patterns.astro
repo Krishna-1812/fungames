@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { PATTERNS } from '../lib/dark-patterns'
 import { withBase } from '../lib/base'
 
@@ -9,211 +9,224 @@ import { withBase } from '../lib/base'
  *
  * Every one of these is a documented pattern, not an invented vibe — see
  * src/lib/dark-patterns.ts for the citation attached to each — and every
- * fake site is its own small, convincing lie: its own name, its own colours,
- * its own reason to exist, so this reads as eleven places rather than one
+ * fake site is its own small, convincing lie: its own name, its own brand
+ * colour, its own voice, so this reads as eleven places rather than one
  * template with the copy swapped. The one thing they all share on purpose is
- * the visual grammar: the trick is always the loud, warm button; the honest
- * way through is always the small, quiet one. That contrast is the actual
- * lesson, and eleven repetitions of it are what make it recognisable
+ * the visual grammar: the trick is always the site's loudest pill; the honest
+ * way through is always the small, quiet line of text. That contrast is the
+ * actual lesson, and eleven repetitions of it are what make it recognisable
  * afterwards, on a real site, without this page open next to it.
+ *
+ * The pattern's name is not shown until you have acted. The old page printed
+ * "Confirmshaming" above the confirmshaming widget, which is a spoiler for
+ * the only thing the widget is testing.
+ *
+ * In the shell: Score is how many you dodged, Site is progress through the
+ * eleven, Moves are the ones you fell for, Best is your best run.
  *
  * Nothing here is graded on cleverness. `resolve('dodged' | 'fell', note)` is
  * the whole verdict, and it is never hidden behind a puzzle — every pattern
  * can be beaten the first time by anyone who happens to look closely, the
  * same way the real ones can.
  */
+const total = PATTERNS.length
 ---
 
-<GameLayout slug="dark-patterns" bar="#1a1206" bodyClass="dp-body">
-  <div class="dp-bg" aria-hidden="true">
-    <div class="dp-spot dp-spot-a"></div>
-    <div class="dp-spot dp-spot-b"></div>
-    <div class="dp-grain"></div>
-  </div>
-
-  <div class="intro" id="intro">
-    <p class="dp-eyebrow">Eleven fake websites · one real lesson</p>
-    <h1>Dark Patterns</h1>
-    <p>
-      Eleven interfaces, each built to get something out of you that a plain
-      ask would not. Every one is real — catalogued by the researchers who
-      study this for a living — and every one is rebuilt here as a working
-      fake site rather than a screenshot. Look closely. Some of them are
-      genuinely hard to beat.
+<GameShell
+  slug="dark-patterns"
+  labels={{ score: 'Dodged', best: 'Best run', level: 'Site', moves: 'Fell for' }}
+  initial={{ score: '0', level: `0 / ${total}`, moves: '0' }}
+>
+  <div class="dp-intro" id="intro">
+    <p class="label meta">Eleven websites · one lesson</p>
+    <h2 class="dp-intro-title">Every one of these sites wants <em class="wonk">something</em> from you.</h2>
+    <p class="lead">
+      Each is built around a trick the people who study this for a living have
+      catalogued and named. Do the ordinary errand each site gives you. Look
+      closely. Some are genuinely hard to beat.
     </p>
-    <button type="button" class="dp-begin" id="begin">
-      <span>Open the first one</span>
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <button type="button" class="pill pill--hero" id="begin">
+      <span>Open the first site</span><span class="arrow" aria-hidden="true">→</span>
     </button>
-    <ol class="dp-preview" aria-hidden="true">
-      {PATTERNS.map((p) => <li title={p.title}></li>)}
-    </ol>
+    <ul class="dp-domains" aria-label="The eleven sites">
+      {PATTERNS.map((p) => <li class="tag">{p.site}</li>)}
+    </ul>
   </div>
 
-  <section class="stage" id="stage" hidden>
-    <div class="dp-hud">
-      <p class="dp-stepline" id="stepline">Pattern 1 of {PATTERNS.length}</p>
-      <div class="dp-rail"><i id="bar"></i></div>
-    </div>
-
-    <div class="frame">
-      <i class="dp-load" id="load" aria-hidden="true"></i>
-      <div class="framebar">
-        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="addr">
-          <i class="favicon" id="favicon" aria-hidden="true"></i>
-          <span class="url" id="url">example.com</span>
+  <div class="dp-play" id="play" hidden>
+    <div class="dp-window" id="window" data-brand="sun">
+      <div class="dp-chrome">
+        <span class="dp-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="dp-addr">
+          <i class="dp-favicon" id="favicon" aria-hidden="true">F</i>
+          <span class="dp-url" id="url">example.com</span>
         </span>
-        <span class="framebar-spacer" aria-hidden="true"></span>
       </div>
-      <div class="frametop">
-        <p class="ptitle" id="ptitle">Pattern</p>
-        <p class="lede" id="lede">Setup line.</p>
+      <i class="dp-load" id="load" aria-hidden="true"></i>
+      <div class="dp-site" id="site" tabindex="-1" aria-label="The website">
+        <div class="dp-brandbar">
+          <p class="dp-wordmark" id="wordmark">Site</p>
+          <span class="dp-nav" aria-hidden="true"><span>Shop</span><span>About</span><span>Help</span></span>
+        </div>
+        <div class="dp-body" id="slot"></div>
       </div>
-      <div class="slot" id="slot"></div>
     </div>
 
-    <div class="reveal" id="reveal" hidden>
-      <p class="outcome" id="outcome"><i class="outcome-icon" id="outcomeIcon" aria-hidden="true"></i><span id="outcomeText">You spotted it.</span></p>
-      <p class="revealtext" id="revealtext"></p>
-      <p class="citation" id="citation"></p>
-      <button type="button" class="dp-begin" id="next">
-        <span>Next pattern</span>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
+    <div class="dp-notes">
+      <div class="dp-brief">
+        <p class="label meta" id="siteNo">Site 1 of {total}</p>
+        <p class="label dp-errand-lbl">Your errand</p>
+        <p class="dp-errand" id="lede">—</p>
+        <ol class="dp-tally" id="tally" aria-label="Your record so far">
+          {PATTERNS.map(() => <li><span class="sr-only">Not yet</span></li>)}
+        </ol>
+      </div>
+
+      <div class="dp-verdict" id="verdict" hidden tabindex="-1">
+        <p class="label dp-v-head"><span class="dp-v-sign" id="vSign" aria-hidden="true">✓</span><span id="vHead">You spotted it</span></p>
+        <h3 class="dp-v-title" id="vTitle">Pattern</h3>
+        <p class="dp-v-note" id="vNote"></p>
+        <p class="dp-v-reveal" id="vReveal"></p>
+        <p class="dp-v-cite" id="vCite"></p>
+        <button type="button" class="pill pill--ink" id="next">
+          <span id="nextLbl">Next site</span><span aria-hidden="true">→</span>
+        </button>
+        <p class="dp-keys"><kbd>N</kbd> or <kbd>Enter</kbd></p>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <section class="verdict" id="verdict" hidden>
-    <div class="dp-ring">
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10"/>
-        <circle id="ringFill" cx="60" cy="60" r="52" fill="none" stroke="#5cd6a0" stroke-width="10"
-          stroke-linecap="round" transform="rotate(-90 60 60)"/>
-      </svg>
-      <p class="stamp" id="stamp">6/11</p>
-    </div>
-    <p class="score"><span id="scoreline">You dodged 6 of 11.</span></p>
-    <p class="detail" id="detail"></p>
+  <Fragment slot="howto">
+    <p>
+      Eleven fake websites, one at a time. Each gives you an ordinary errand —
+      buy a thing, cancel a thing, change a setting. Each is built around a
+      real, catalogued manipulation.
+    </p>
+    <ul>
+      <li><b>The trick is always the loudest button.</b> The honest way through is usually small, plain text.</li>
+      <li>Read every sentence twice, especially checkboxes. Sometimes the right answer is to wait.</li>
+      <li>After each site you will see what the trick was called and who named it.</li>
+    </ul>
+    <p>Dodge as many as you can. Your best is your highest number dodged.</p>
+  </Fragment>
 
-    <table class="card">
-      <caption>Every pattern, and which way you went</caption>
-      <thead>
-        <tr><th scope="col">Pattern</th><th scope="col">You</th><th scope="col">Catalogued as</th></tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-
-    <div class="acts">
-      <button type="button" data-share data-title="Dark Patterns">Share this</button>
-      <button type="button" id="again">Run it again</button>
-      <a href={withBase('/')}>try something else →</a>
-    </div>
-
-    <details class="how">
-      <summary>How this actually works</summary>
-      <p>
-        Nothing here is randomised against you and nothing is a puzzle with a
-        trick answer — every pattern can be beaten the first time by looking
-        closely at the same two things every time: which option is loud and
-        which one is quiet, and what a sentence actually says once you read
-        it twice. That is also exactly how the real ones work.
-      </p>
-      <p>
-        The name under "Catalogued as" is not this site's invention. Most of
-        these come from Harry Brignull's original 2010 list — he coined the
-        term "dark pattern" cataloguing exactly these — and the newer ones
-        from a 2019 Princeton/CHI study that scraped eleven thousand shopping
-        sites looking for them, or the FTC's 2022 report to Congress on the
-        same subject.
-      </p>
-      <p>Related: <a href={withBase('/not-a-robot/')}>I'm Not a Robot</a> is the other page here built out of real interface conventions rather than a metaphor for them.</p>
-    </details>
-  </section>
-</GameLayout>
+  <details class="dp-real" slot="after">
+    <summary class="label">Where these come from</summary>
+    <p>
+      Nothing here is randomised against you and nothing is a puzzle with a
+      trick answer — every pattern can be beaten the first time by looking
+      closely at the same two things every time: which option is loud and
+      which one is quiet, and what a sentence actually says once you read it
+      twice. That is also exactly how the real ones work.
+    </p>
+    <p>
+      The names are not this site's invention. Most come from Harry
+      Brignull's original 2010 list — he coined the term "dark pattern"
+      cataloguing exactly these — and the newer ones from a 2019 Princeton/CHI
+      study that scraped eleven thousand shopping sites looking for them, or
+      the FTC's 2022 report to Congress on the same subject.
+    </p>
+    <p>Related: <a href={withBase('/not-a-robot/')}>I'm Not a Robot</a> is the other page here built out of real interface conventions rather than a metaphor for them.</p>
+  </details>
+</GameShell>
 
 <script type="application/json" id="game-data" set:html={JSON.stringify(PATTERNS)} />
 
 <script>
-  import { burst, shake, prefersReducedMotion } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
   import { sfx, unlock } from '../lib/audio'
-  import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
-  import { SITE } from '../site.config'
+  import { dailyFor, dailyTarget } from '../data/game-meta'
 
   type Pattern = { id: string; title: string; site: string; real: string; lede: string; reveal: string }
   const PATTERNS = JSON.parse(document.getElementById('game-data')!.textContent!) as Pattern[]
+  const TOTAL = PATTERNS.length
 
   const $ = (id: string) => document.getElementById(id)!
-  const intro = $('intro'), stage = $('stage')
-  const stepline = $('stepline'), bar = $('bar')
-  const url = $('url'), ptitle = $('ptitle'), lede = $('lede'), slot = $('slot')
-  const favicon = $('favicon'), loadBar = $('load')
-  const revealBox = $('reveal'), outcomeEl = $('outcome'), outcomeIcon = $('outcomeIcon'), outcomeText = $('outcomeText')
-  const revealText = $('revealtext'), citation = $('citation')
-  const nextBtn = $('next') as HTMLButtonElement
+  const intro = $('intro'), play = $('play')
+  const win = $('window'), site = $('site'), slot = $('slot')
+  const verdict = $('verdict')
+  const tally = [...$('tally').children] as HTMLLIElement[]
 
-  const TICK = '<svg viewBox="0 0 24 24"><path d="m5 12.5 5 5 9-11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-  const CROSS = '<svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>'
-  // A different hue per fake site, cycling — the one thing that stays
-  // constant is that every site gets a confident, branded-looking dot.
-  const FAVICON_HUES = ['#ffb020', '#6fe0a0', '#7ec2ff', '#ff9a7e', '#e0a4ff']
-
-  type Outcome = 'dodged' | 'fell'
-  type Api = { resolve: (outcome: Outcome, note: string) => void }
-  type Mount = (host: HTMLElement, api: Api) => void
-
-  type Result = { id: string; title: string; real: string; outcome: Outcome; note: string }
-  const results: Result[] = []
-
-  /* ---------------------------------------------------------------------- */
-  /* Small shared building blocks every mount() below reaches for            */
-  /* ---------------------------------------------------------------------- */
-
-  /** A short-lived toast — used only by the social-proof pattern, which is
-   *  the one place a notification is supposed to feel like it is piling up. */
-  function toast(host: HTMLElement, text: string) {
-    const layer = host.querySelector('.toasts')
-    if (!layer) return
-    const el = document.createElement('div')
-    el.className = 'toast'
-    el.textContent = text
-    layer.prepend(el)
-    setTimeout(() => el.remove(), 2400)
+  /**
+   * Each fake site's brand. One block colour each (the system has five and
+   * ink, so some repeat — the voice of the wordmark is what keeps two sky
+   * sites apart), and the trap button always wears it.
+   */
+  type Brand = { name: string; block: 'orange' | 'amber' | 'sky' | 'red' | 'sun' | 'ink'; voice: 'serif' | 'sans' | 'shout' | 'lower' }
+  const BRANDS: Record<string, Brand> = {
+    basket: { name: 'Fenwick & Oates', block: 'sun', voice: 'serif' },
+    confirmshame: { name: 'The Daily Brew', block: 'amber', voice: 'serif' },
+    roach: { name: 'Chorus+', block: 'red', voice: 'sans' },
+    urgency: { name: 'GET IT NOW', block: 'orange', voice: 'shout' },
+    ads: { name: 'Freeware Depot', block: 'sky', voice: 'sans' },
+    drip: { name: 'ticketloop', block: 'amber', voice: 'lower' },
+    continuity: { name: 'Loomline', block: 'sky', voice: 'serif' },
+    trick: { name: 'Account settings', block: 'ink', voice: 'sans' },
+    zuckering: { name: 'frennet', block: 'sky', voice: 'lower' },
+    social: { name: 'NIMBUS', block: 'orange', voice: 'shout' },
+    nagging: { name: 'The Daily Briefing', block: 'red', voice: 'serif' },
   }
 
+  type Outcome = 'dodged' | 'fell'
+  type Api = {
+    resolve: (outcome: Outcome, note: string) => void
+    /** An interval that stops while the game is paused and dies with the site. */
+    every: (fn: () => void, ms: number) => void
+    /** A small knock — a new wall arriving, not a wrong answer. */
+    knock: () => void
+  }
+  type Mount = (host: HTMLElement, api: Api) => void
+  type Result = { id: string; title: string; real: string; outcome: Outcome; note: string }
+
+  let results: Result[] = []
+  let idx = -1
+  let resolved = false
+  let timers: number[] = []
+  const clearTimers = () => { timers.forEach(clearInterval); timers = [] }
+
+  const shell = createShell({ slug: 'dark-patterns', onRestart: restart })
+
   /* ---------------------------------------------------------------------- */
-  /* The eleven patterns                                                     */
+  /* The eleven sites                                                        */
   /* ---------------------------------------------------------------------- */
+
+  const on = (host: HTMLElement, sel: string, fn: (e: Event) => void) =>
+    host.querySelector(sel)!.addEventListener('click', fn)
 
   const MOUNTS: Record<string, Mount> = {
     basket(host, api) {
+      const items = [['Wool scarf', 28], ['Reading lamp', 44], ['Ceramic mug', 14]] as const
       host.innerHTML = `
-        <div class="store">
-          <h3>Fenwick &amp; Oates</h3>
-          <div class="products">
-            <div class="product"><span>Wool Scarf</span><b>$28</b>
-              <button type="button" class="dp-trap buy" data-item="Wool Scarf">Add to Basket</button></div>
-            <div class="product"><span>Reading Lamp</span><b>$44</b>
-              <button type="button" class="dp-trap buy" data-item="Reading Lamp">Add to Basket</button></div>
-            <div class="product"><span>Ceramic Mug</span><b>$14</b>
-              <button type="button" class="dp-trap buy" data-item="Ceramic Mug">Add to Basket</button></div>
-          </div>
+        <p class="dp-kicker">New this week</p>
+        <h3 class="dp-h">Three things, made well.</h3>
+        <div class="dp-products">
+          ${items.map(([name, price]) => `
+            <div class="dp-product">
+              <b>${name}</b><span class="dp-price">$${price}</span>
+              <button type="button" class="dp-trap dp-buy" data-item="${name}" data-price="${price}">Add to basket</button>
+            </div>`).join('')}
         </div>`
-      host.querySelectorAll<HTMLButtonElement>('.buy').forEach((btn) =>
+      host.querySelectorAll<HTMLButtonElement>('.dp-buy').forEach((btn) =>
         btn.addEventListener('click', () => {
           sfx.tick()
-          const item = btn.dataset.item
+          const item = btn.dataset.item!
+          const price = Number(btn.dataset.price)
           host.innerHTML = `
-            <div class="cart">
-              <h3>Your Basket</h3>
-              <label class="line"><input type="checkbox" checked disabled> ${item} — $${btn.parentElement?.querySelector('b')?.textContent?.slice(1) ?? ''}</label>
-              <label class="line sneaky"><input type="checkbox" checked class="extra"> Extended Protection Plan — $4.99</label>
-              <label class="line sneaky"><input type="checkbox" checked class="extra"> Fenwick Rewards Membership — $2.99</label>
-              <button type="button" class="dp-trap" id="checkout">Complete Purchase</button>
-            </div>`
-          host.querySelector('#checkout')!.addEventListener('click', () => {
-            sfx.click()
+            <h3 class="dp-h">Your basket</h3>
+            <label class="dp-line"><input type="checkbox" checked disabled><span>${item}</span><b>$${price.toFixed(2)}</b></label>
+            <label class="dp-line"><input type="checkbox" checked class="extra" data-p="4.99"><span>Extended protection plan</span><b>$4.99</b></label>
+            <label class="dp-line"><input type="checkbox" checked class="extra" data-p="2.99"><span>Fenwick Rewards membership</span><b>$2.99</b></label>
+            <p class="dp-total"><span>Total</span><b id="total"></b></p>
+            <button type="button" class="dp-trap" id="checkout">Complete purchase</button>`
+          api.knock()
+          const paint = () => {
+            const extra = [...host.querySelectorAll<HTMLInputElement>('.extra:checked')].reduce((n, x) => n + Number(x.dataset.p), 0)
+            host.querySelector('#total')!.textContent = `$${(price + extra).toFixed(2)}`
+          }
+          host.querySelectorAll('.extra').forEach((x) => x.addEventListener('change', paint))
+          paint()
+          on(host, '#checkout', () => {
             const extras = host.querySelectorAll<HTMLInputElement>('.extra:checked').length
             if (extras === 0) api.resolve('dodged', 'You unchecked both extras before paying for anything you never chose.')
             else api.resolve('fell', `You paid for ${extras} thing${extras > 1 ? 's' : ''} that rode along with your actual order.`)
@@ -224,170 +237,135 @@ import { withBase } from '../lib/base'
 
     confirmshame(host, api) {
       host.innerHTML = `
-        <div class="modal">
-          <p class="modal-q">Join the Fenwick Circle for 15% off your next order?</p>
-          <div class="modal-acts">
+        <div class="dp-behind" aria-hidden="true">
+          <p class="dp-h">Why your morning coffee tastes flat</p>
+          <i></i><i></i><i class="short"></i><i></i><i class="short"></i>
+        </div>
+        <div class="dp-modal" role="dialog" aria-label="Newsletter">
+          <p class="dp-kicker">Before you go</p>
+          <p class="dp-modal-q">Join the Brew Circle for 15% off your next bag?</p>
+          <div class="dp-acts">
             <button type="button" class="dp-trap" id="yes">Yes, sign me up</button>
             <button type="button" class="dp-honest" id="no">No thanks, I like paying full price</button>
           </div>
         </div>`
-      host.querySelector('#yes')!.addEventListener('click', () => {
-        sfx.bad()
-        api.resolve('fell', 'You signed up rather than click a sentence written to make declining feel foolish.')
-      })
-      host.querySelector('#no')!.addEventListener('click', () => {
-        sfx.good()
-        api.resolve('dodged', 'You clicked past the guilt trip without it changing your answer.')
-      })
+      on(host, '#yes', () => api.resolve('fell', 'You signed up rather than click a sentence written to make declining feel foolish.'))
+      on(host, '#no', () => api.resolve('dodged', 'You clicked past the guilt trip without it changing your answer.'))
     },
 
     roach(host, api) {
       const step0 = () => {
         host.innerHTML = `
-          <div class="panel">
-            <p>Chorus+ — Manage your plan</p>
-            <button type="button" class="dp-trap" id="cancel">Cancel Subscription</button>
-          </div>`
-        host.querySelector('#cancel')!.addEventListener('click', () => { sfx.click(); step1() })
+          <h3 class="dp-h">Manage your plan</h3>
+          <p class="dp-line is-plain"><span>Chorus+ Premium</span><b>$17.99 / month</b></p>
+          <p class="dp-small">Renews on the 3rd. You can cancel at any time.</p>
+          <button type="button" class="dp-trap" id="cancel">Cancel subscription</button>`
+        on(host, '#cancel', () => { sfx.click(); step1() })
       }
-      const step1 = () => {
-        shake(host, 4, 180)
+      const wall = (text: string, trap: string, honest: string, onTrap: () => void, onHonest: () => void) => {
+        api.knock()
         host.innerHTML = `
-          <div class="panel stall">
-            <p>Wait — before you go, here's 50% off for the next 3 months.</p>
-            <div class="modal-acts">
-              <button type="button" class="dp-trap" id="keep">Keep My Discount</button>
-              <button type="button" class="dp-honest" id="go">No, cancel anyway</button>
+          <div class="dp-stall">
+            <p class="dp-kicker">Wait —</p>
+            <p class="dp-modal-q">${text}</p>
+            <div class="dp-acts">
+              ${trap ? `<button type="button" class="dp-trap" id="trap">${trap}</button>` : ''}
+              <button type="button" class="dp-honest" id="honest">${honest}</button>
             </div>
           </div>`
-        host.querySelector('#keep')!.addEventListener('click', () => {
-          sfx.bad(); api.resolve('fell', 'The first retention offer was enough to keep the subscription running.')
-        })
-        host.querySelector('#go')!.addEventListener('click', () => { sfx.tick(); step2() })
+        if (trap) on(host, '#trap', onTrap)
+        on(host, '#honest', onHonest)
       }
-      const step2 = () => {
-        shake(host, 4, 180)
-        host.innerHTML = `
-          <div class="panel stall">
-            <p>You will lose offline downloads, 4K streaming, and a watchlist of 214 titles.</p>
-            <div class="modal-acts">
-              <button type="button" class="dp-trap" id="stay">Stay Subscribed</button>
-              <button type="button" class="dp-honest" id="go2">Continue cancelling</button>
-            </div>
-          </div>`
-        host.querySelector('#stay')!.addEventListener('click', () => {
-          sfx.bad(); api.resolve('fell', 'The list of what you would lose was the second wall, and it worked.')
-        })
-        host.querySelector('#go2')!.addEventListener('click', () => { sfx.tick(); step3() })
-      }
-      const step3 = () => {
-        shake(host, 4, 180)
-        host.innerHTML = `
-          <div class="panel stall">
-            <p>Final step: call 1-800-555-0199, Monday to Friday, 9am to 5pm, to complete cancellation.</p>
-            <div class="modal-acts">
-              <button type="button" class="dp-honest" id="fine">...that's the final step?</button>
-            </div>
-          </div>`
-        host.querySelector('#fine')!.addEventListener('click', () => {
-          sfx.good()
-          api.resolve('dodged', 'You made it through every wall, including the one that demands a phone call during business hours.')
-        })
-      }
+      const step1 = () => wall(
+        'Before you go, here is 50% off for the next three months.', 'Keep my discount', 'No, cancel anyway',
+        () => api.resolve('fell', 'The first retention offer was enough to keep the subscription running.'),
+        () => { sfx.tick(); step2() })
+      const step2 = () => wall(
+        'You will lose offline downloads, 4K streaming, and a watchlist of 214 titles.', 'Stay subscribed', 'Continue cancelling',
+        () => api.resolve('fell', 'The list of what you would lose was the second wall, and it worked.'),
+        () => { sfx.tick(); step3() })
+      const step3 = () => wall(
+        'Final step: call 1-800-555-0199, Monday to Friday, 9am to 5pm, to complete your cancellation.', '', '…that is the final step?',
+        () => {},
+        () => api.resolve('dodged', 'You made it through every wall, including the one that demands a phone call during business hours.'))
       step0()
     },
 
     urgency(host, api) {
       let remaining = 12
       let resets = 0
-      let timer = 0
       host.innerHTML = `
-        <div class="deal">
-          <p>Sale ends in <b id="clock">00:12</b></p>
-          <button type="button" class="dp-trap" id="buy">Buy Now</button>
+        <p class="dp-kicker">Flash sale · noise-cancelling headphones</p>
+        <p class="dp-deal"><s>$249</s> <b>$99</b></p>
+        <p class="dp-clock-line">Sale ends in <b class="dp-clock" id="clock">00:12</b></p>
+        <div class="dp-acts is-stacked">
+          <button type="button" class="dp-trap" id="buy">Buy now before it ends</button>
           <button type="button" class="dp-honest" id="watch">Just watch the clock</button>
-          <p class="dp-note" id="note"></p>
-        </div>`
-      const clock = host.querySelector('#clock')!
+        </div>
+        <p class="dp-small" id="note" aria-live="polite"></p>`
+      const clock = host.querySelector('#clock') as HTMLElement
       const note = host.querySelector('#note')!
-      timer = window.setInterval(() => {
+      api.every(() => {
         remaining--
         if (remaining < 0) {
           remaining = 12
           resets++
-          clock.parentElement?.classList.add('flicker')
-          setTimeout(() => clock.parentElement?.classList.remove('flicker'), 220)
+          clock.classList.add('is-reset')
+          setTimeout(() => clock.classList.remove('is-reset'), 260)
         }
         clock.textContent = `00:${String(remaining).padStart(2, '0')}`
       }, 260)
-      host.querySelector('#buy')!.addEventListener('click', () => {
-        clearInterval(timer)
-        sfx.click()
+      on(host, '#buy', () => {
         if (resets > 0) api.resolve('dodged', `You waited long enough to see the clock reset ${resets} time${resets > 1 ? 's' : ''} before buying anything.`)
         else api.resolve('fell', 'You bought before the clock ever finished a single lap — the exact window this pattern is built for.')
       })
-      host.querySelector('#watch')!.addEventListener('click', () => {
-        if (resets > 0) {
-          clearInterval(timer)
-          sfx.good()
-          api.resolve('dodged', `You watched it reset ${resets} time${resets > 1 ? 's' : ''} instead of buying under the clock.`)
-        } else {
-          sfx.tick()
-          note.textContent = 'Keep watching…'
-        }
+      on(host, '#watch', () => {
+        if (resets > 0) api.resolve('dodged', `You watched it reset ${resets} time${resets > 1 ? 's' : ''} instead of buying under the clock.`)
+        else { sfx.tick(); note.textContent = 'Keep watching…' }
       })
     },
 
     ads(host, api) {
-      const decoys = ['DirectDownload Pro', 'FastGet Installer', 'SafeFile Setup']
+      const decoys = [['DirectDownload Pro', 'orange'], ['FastGet Installer', 'sun'], ['SafeFile Setup', 'sky']] as const
       host.innerHTML = `
-        <div class="dl">
-          <p>Download PhotoTrim 4</p>
-          <div class="dlgrid">
-            ${decoys.map((d, i) => `<button type="button" class="dp-trap decoy" data-i="${i}">${d}<small>Advertisement</small></button>`).join('')}
-            <button type="button" class="dp-honest real" id="real">Download<small>PhotoTrim 4 — 2.1 MB</small></button>
-          </div>
+        <p class="dp-kicker">PhotoTrim 4 · free · 2.1 MB</p>
+        <h3 class="dp-h">Download PhotoTrim 4</h3>
+        <div class="dp-dlgrid">
+          ${decoys.map(([d, c]) => `<button type="button" class="dp-trap dp-decoy" data-c="${c}"><span>${d}</span><small>Advertisement</small></button>`).join('')}
+          <button type="button" class="dp-real-dl" id="real"><span>Download</span><small>PhotoTrim 4 · 2.1 MB</small></button>
         </div>`
-      host.querySelectorAll<HTMLButtonElement>('.decoy').forEach((b) =>
-        b.addEventListener('click', () => {
-          sfx.bad()
-          api.resolve('fell', 'That button was an advertisement styled to match the download you actually came for.')
-        }),
-      )
-      host.querySelector('#real')!.addEventListener('click', () => {
-        sfx.good()
-        api.resolve('dodged', 'You found the real, plainest button on the page, sitting last and smallest.')
-      })
+      host.querySelectorAll<HTMLButtonElement>('.dp-decoy').forEach((b) =>
+        b.addEventListener('click', () => api.resolve('fell', 'That button was an advertisement styled to match the download you actually came for.')))
+      on(host, '#real', () => api.resolve('dodged', 'You found the real, plainest button on the page, sitting last and smallest.'))
     },
 
     drip(host, api) {
       let peeked = false
       host.innerHTML = `
-        <div class="ticket">
-          <p>General Admission — Friday</p>
-          <p class="price">$45.00</p>
-          <button type="button" class="dp-trap" id="continue">Continue</button>
-        </div>`
-      host.querySelector('#continue')!.addEventListener('click', () => {
+        <p class="dp-kicker">Friday · doors 7pm</p>
+        <h3 class="dp-h">The Weather Station, live</h3>
+        <p class="dp-line is-plain"><span>General admission</span><b class="dp-big">$45.00</b></p>
+        <button type="button" class="dp-trap" id="continue">Continue</button>`
+      on(host, '#continue', () => {
         sfx.tick()
+        api.knock()
         host.innerHTML = `
-          <div class="ticket review">
-            <p class="revtitle">Order Review</p>
-            <div class="line"><span>Ticket</span><b>$45.00</b></div>
-            <div class="line"><span>Service Fee</span><b>$9.50</b></div>
-            <div class="line"><span>Facility Fee</span><b>$6.00</b></div>
-            <div class="line"><span>Order Processing Fee</span><b>$3.25</b></div>
-            <div class="line total"><span>Total</span><b>$63.75</b></div>
-            <button type="button" class="dp-honest" id="peek">Wait, let me check that</button>
+          <h3 class="dp-h">Order review</h3>
+          <p class="dp-row"><span>Ticket</span><b>$45.00</b></p>
+          <p class="dp-row"><span>Service fee</span><b>$9.50</b></p>
+          <p class="dp-row"><span>Facility fee</span><b>$6.00</b></p>
+          <p class="dp-row"><span>Order processing fee</span><b>$3.25</b></p>
+          <p class="dp-total"><span>Total</span><b>$63.75</b></p>
+          <div class="dp-acts">
             <button type="button" class="dp-trap" id="confirm">Confirm $63.75</button>
+            <button type="button" class="dp-honest" id="peek">Wait, let me check that</button>
           </div>`
-        host.querySelector('#peek')!.addEventListener('click', (e) => {
+        on(host, '#peek', (e) => {
           peeked = true
           sfx.tick()
-          ;(e.currentTarget as HTMLButtonElement).textContent = "That's 42% more than the price you compared."
+          ;(e.currentTarget as HTMLButtonElement).textContent = 'That is 42% more than the price you compared.'
         })
-        host.querySelector('#confirm')!.addEventListener('click', () => {
-          sfx.click()
+        on(host, '#confirm', () => {
           if (peeked) api.resolve('dodged', 'You stopped to add up the fees before confirming anything.')
           else api.resolve('fell', 'You confirmed a total 42% above the price you started with, without adding it up first.')
         })
@@ -397,20 +375,19 @@ import { withBase } from '../lib/base'
     continuity(host, api) {
       let expanded = false
       host.innerHTML = `
-        <div class="signup">
-          <p>Start your free trial of Loomline Pro</p>
-          <input type="text" class="dp-field" placeholder="Card number" inputmode="numeric" autocomplete="off">
-          <button type="button" class="dp-honest fine" id="fine">+ after your trial ends…</button>
-          <label class="line"><input type="checkbox" checked disabled> I agree to the trial terms</label>
-          <button type="button" class="dp-trap" id="start">Start Free Trial</button>
-        </div>`
-      host.querySelector('#fine')!.addEventListener('click', (e) => {
+        <p class="dp-kicker">Loomline Pro · 14 days free</p>
+        <h3 class="dp-h">Start your free trial</h3>
+        <label class="dp-field"><span class="sr-only">Card number (this is a fake site: type anything or nothing)</span>
+          <input type="text" placeholder="Card number" inputmode="numeric" autocomplete="off"></label>
+        <button type="button" class="dp-honest dp-fine" id="fine">+ after your trial ends…</button>
+        <label class="dp-line"><input type="checkbox" checked disabled><span>I agree to the trial terms</span></label>
+        <button type="button" class="dp-trap" id="start">Start free trial</button>`
+      on(host, '#fine', (e) => {
         expanded = true
         sfx.tick()
-        ;(e.currentTarget as HTMLButtonElement).textContent = '$89.99/month, automatically, unless cancelled first.'
+        ;(e.currentTarget as HTMLButtonElement).textContent = '$89.99 a month, automatically, unless cancelled first.'
       })
-      host.querySelector('#start')!.addEventListener('click', () => {
-        sfx.click()
+      on(host, '#start', () => {
         if (expanded) api.resolve('dodged', 'You opened the fine print before handing over a card number.')
         else api.resolve('fell', 'You started the trial without reading what it quietly turns into.')
       })
@@ -418,14 +395,12 @@ import { withBase } from '../lib/base'
 
     trick(host, api) {
       host.innerHTML = `
-        <div class="settings">
-          <p>Update your privacy settings, then save.</p>
-          <label class="line"><input type="checkbox" id="a" checked> Don't disable anonymous usage tracking</label>
-          <label class="line"><input type="checkbox" id="b"> Send me occasional product emails</label>
-          <button type="button" class="dp-trap" id="save">Save Settings</button>
-        </div>`
-      host.querySelector('#save')!.addEventListener('click', () => {
-        sfx.click()
+        <h3 class="dp-h">Privacy</h3>
+        <p class="dp-small">Update your preferences, then save.</p>
+        <label class="dp-line"><input type="checkbox" id="a" checked><span>Don't disable anonymous usage tracking</span></label>
+        <label class="dp-line"><input type="checkbox" id="b"><span>Send me occasional product emails</span></label>
+        <button type="button" class="dp-trap" id="save">Save settings</button>`
+      on(host, '#save', () => {
         const stillOn = (host.querySelector('#a') as HTMLInputElement).checked
         if (!stillOn) api.resolve('dodged', 'Unchecking "don’t disable" is what actually disables it, and you worked that out.')
         else api.resolve('fell', 'The box stayed checked — read literally, "don’t disable" checked means tracking stayed on.')
@@ -434,119 +409,96 @@ import { withBase } from '../lib/base'
 
     zuckering(host, api) {
       host.innerHTML = `
-        <div class="privacy">
-          <button type="button" class="dp-trap big" id="shareall">Share Everything (Recommended)</button>
-          <p class="tiny"><button type="button" class="dp-honest" id="custom">Customise individual settings</button></p>
-        </div>`
-      host.querySelector('#shareall')!.addEventListener('click', () => { sfx.tick(); confirmA() })
-      host.querySelector('#custom')!.addEventListener('click', () => {
-        sfx.good()
-        api.resolve('dodged', 'You went straight past the big green button to the grey link that actually does what you want.')
-      })
+        <p class="dp-kicker">Welcome to frennet</p>
+        <h3 class="dp-h">Choose your privacy</h3>
+        <button type="button" class="dp-trap is-big" id="shareall">Share everything (recommended)</button>
+        <p class="dp-center"><button type="button" class="dp-honest" id="custom">Customise individual settings</button></p>`
+      on(host, '#shareall', () => { sfx.tick(); confirmA() })
+      on(host, '#custom', () => api.resolve('dodged', 'You went straight past the big button to the grey link that actually does what you want.'))
       function confirmA() {
+        api.knock()
         host.innerHTML = `
-          <div class="privacy">
-            <p>Also share your contacts, so we can find your friends?</p>
-            <div class="modal-acts">
-              <button type="button" class="dp-trap" id="y1">Yes, share contacts</button>
-              <button type="button" class="dp-honest" id="n1">Ask me later</button>
-            </div>
+          <h3 class="dp-h">Also share your contacts, so we can find your friends?</h3>
+          <div class="dp-acts">
+            <button type="button" class="dp-trap" id="y1">Yes, share contacts</button>
+            <button type="button" class="dp-honest" id="n1">Ask me later</button>
           </div>`
-        host.querySelector('#y1')!.addEventListener('click', () => { sfx.tick(); confirmB() })
-        host.querySelector('#n1')!.addEventListener('click', () => {
-          sfx.bad()
-          api.resolve('fell', 'You still ended up on "Share Everything" — declining one follow-up does not undo the button already pressed.')
-        })
+        on(host, '#y1', () => { sfx.tick(); confirmB() })
+        on(host, '#n1', () => api.resolve('fell', 'You still ended up on "Share everything" — declining one follow-up does not undo the button already pressed.'))
       }
       function confirmB() {
+        api.knock()
         host.innerHTML = `
-          <div class="privacy">
-            <p>Last thing — share your activity with advertising partners too?</p>
-            <div class="modal-acts">
-              <button type="button" class="dp-trap" id="y2">Yes, share activity</button>
-              <button type="button" class="dp-honest" id="n2">Ask me later</button>
-            </div>
+          <h3 class="dp-h">Last thing — share your activity with advertising partners too?</h3>
+          <div class="dp-acts">
+            <button type="button" class="dp-trap" id="y2">Yes, share activity</button>
+            <button type="button" class="dp-honest" id="n2">Ask me later</button>
           </div>`
-        ;['y2', 'n2'].forEach((id) =>
-          host.querySelector('#' + id)!.addEventListener('click', () => {
-            sfx.bad()
-            api.resolve('fell', 'Every path out of "Share Everything" turned out to be another version of yes.')
-          }),
-        )
+        for (const id of ['#y2', '#n2'])
+          on(host, id, () => api.resolve('fell', 'Every path out of "Share everything" turned out to be another version of yes.'))
       }
     },
 
     social(host, api) {
       const names = ['Jordan in Austin', 'Casey in Denver', 'Morgan in Miami']
       let count = 0
-      let iv = 0
       host.innerHTML = `
-        <div class="product2">
-          <p>Weekender Duffel — $68</p>
-          <button type="button" class="dp-trap" id="buy">Buy Now — Almost Gone</button>
+        <p class="dp-kicker">Only 3 left</p>
+        <h3 class="dp-h">The Weekender duffel</h3>
+        <p class="dp-line is-plain"><span>Waxed canvas, brass fittings</span><b class="dp-big">$68</b></p>
+        <div class="dp-acts is-stacked">
+          <button type="button" class="dp-trap" id="buy">Buy now — almost gone</button>
           <button type="button" class="dp-honest" id="watch">Just watch the corner for a bit</button>
-          <div class="toasts"></div>
-        </div>`
-      const spawn = () => {
-        count++
-        toast(host, `${names[count % names.length]} just bought this — 2 minutes ago`)
-      }
-      host.querySelector('#watch')!.addEventListener('click', (e) => {
+        </div>
+        <div class="dp-toasts" aria-live="polite"></div>`
+      const layer = host.querySelector('.dp-toasts')!
+      on(host, '#watch', (e) => {
         const btn = e.currentTarget as HTMLButtonElement
         btn.disabled = true
         btn.textContent = 'Watching…'
-        iv = window.setInterval(spawn, 650)
-        setTimeout(() => {
-          clearInterval(iv)
-          sfx.good()
-          api.resolve('dodged', `You watched ${count} of them cycle through the same three names and the same three cities, always "2 minutes ago".`)
-        }, 3200)
+        api.every(() => {
+          count++
+          const el = document.createElement('p')
+          el.className = 'dp-toast'
+          el.textContent = `${names[count % names.length]} just bought this · 2 minutes ago`
+          layer.prepend(el)
+          while (layer.children.length > 2) layer.lastElementChild!.remove()
+          sfx.tick()
+          if (count >= 6)
+            api.resolve('dodged', `You watched ${count} of them cycle through the same three names and the same three cities, always "2 minutes ago".`)
+        }, 650)
       })
-      host.querySelector('#buy')!.addEventListener('click', () => {
-        clearInterval(iv)
-        sfx.bad()
-        api.resolve('fell', 'You bought under the pressure of activity that was never real.')
-      })
+      on(host, '#buy', () => api.resolve('fell', 'You bought under the pressure of activity that was never real.'))
     },
 
     nagging(host, api) {
       let asks = 0
       const MAX = 3
+      const prompt = (last: boolean) => `
+        <div class="dp-behind" aria-hidden="true">
+          <p class="dp-h">Markets open higher as rates hold</p>
+          <i></i><i class="short"></i><i></i><i></i><i class="short"></i>
+        </div>
+        <div class="dp-prompt" role="dialog" aria-label="Notification request">
+          <p><b>dailybriefing.news</b> wants to</p>
+          <p class="dp-small">Show notifications${asks > 1 ? ` · asked ${asks} times` : ''}</p>
+          <div class="dp-acts">
+            <button type="button" class="dp-trap" id="allow">Allow</button>
+            <button type="button" class="dp-honest" id="not">${last ? 'Never ask again' : 'Not now'}</button>
+          </div>
+        </div>`
       const render = () => {
         asks++
-        if (asks > MAX) {
-          host.innerHTML = `
-            <div class="nag">
-              <p>Enable notifications?</p>
-              <div class="modal-acts">
-                <button type="button" class="dp-trap" id="allow">Allow</button>
-                <button type="button" class="dp-honest" id="never">Never ask again</button>
-              </div>
-            </div>`
-          host.querySelector('#allow')!.addEventListener('click', () => {
-            sfx.bad()
-            api.resolve('fell', `You said no ${MAX} times, and said yes the moment it finally offered to stop asking.`)
-          })
-          host.querySelector('#never')!.addEventListener('click', () => {
-            sfx.good()
-            api.resolve('dodged', `You said no ${MAX + 1} times in a row rather than give in.`)
-          })
-          return
-        }
-        shake(host, 3, 150)
-        host.innerHTML = `
-          <div class="nag">
-            <p>Enable notifications?</p>
-            <div class="modal-acts">
-              <button type="button" class="dp-trap" id="allow">Allow</button>
-              <button type="button" class="dp-honest" id="not">Not now</button>
-            </div>
-          </div>`
-        host.querySelector('#allow')!.addEventListener('click', () => {
-          sfx.bad()
-          api.resolve('fell', `You gave in on ask number ${asks}.`)
+        const last = asks > MAX
+        host.innerHTML = prompt(last)
+        if (asks > 1) api.knock()
+        on(host, '#allow', () => api.resolve('fell', last
+          ? `You said no ${MAX} times, and said yes the moment it finally offered to stop asking.`
+          : `You gave in on ask number ${asks}.`))
+        on(host, '#not', () => {
+          if (last) api.resolve('dodged', `You said no ${MAX + 1} times in a row rather than give in.`)
+          else { sfx.tick(); setTimeout(render, 480) }
         })
-        host.querySelector('#not')!.addEventListener('click', () => { sfx.tick(); setTimeout(render, 480) })
       }
       render()
     },
@@ -556,468 +508,394 @@ import { withBase } from '../lib/base'
   /* Runner                                                                  */
   /* ---------------------------------------------------------------------- */
 
-  let idx = 0
+  const dodgedCount = () => results.filter((r) => r.outcome === 'dodged').length
+
+  function paintStrip() {
+    shell.setScore(String(dodgedCount()))
+    shell.setMoves(String(results.length - dodgedCount()))
+    shell.setLevel(`${Math.max(0, idx + 1)} / ${TOTAL}`)
+  }
+
+  function paintTally() {
+    tally.forEach((li, k) => {
+      const r = results[k]
+      li.className = r ? (r.outcome === 'dodged' ? 'is-dodged' : 'is-fell') : k === idx ? 'is-now' : ''
+      li.dataset.sign = r ? (r.outcome === 'dodged' ? '✓' : '✗') : ''
+      li.firstElementChild!.textContent = r
+        ? `Site ${k + 1}: ${r.outcome === 'dodged' ? 'dodged' : 'fell for it'}`
+        : k === idx ? `Site ${k + 1}: now` : `Site ${k + 1}: not yet`
+    })
+  }
 
   const api: Api = {
     resolve(outcome, note) {
+      if (resolved) return
+      resolved = true
+      clearTimers()
+      slot.inert = true
       const p = PATTERNS[idx]
       results.push({ id: p.id, title: p.title, real: p.real, outcome, note })
-      outcomeText.textContent = outcome === 'dodged' ? 'You spotted it.' : 'You fell for it.'
-      outcomeIcon.innerHTML = outcome === 'dodged' ? TICK : CROSS
-      outcomeEl.dataset.tone = outcome
-      revealText.textContent = p.reveal
-      citation.textContent = `Catalogued as: ${p.title} — ${p.real}`
-      revealBox.hidden = false
-      revealBox.classList.remove('in')
-      void (revealBox as HTMLElement).offsetWidth
-      revealBox.classList.add('in')
-      if (outcome === 'dodged') sfx.good()
-      revealBox.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' })
+      const good = outcome === 'dodged'
+      verdict.className = 'dp-verdict ' + (good ? 'is-dodged' : 'is-fell')
+      $('vSign').textContent = good ? '✓' : '✗'
+      $('vHead').textContent = good ? 'You spotted it' : 'You fell for it'
+      $('vTitle').textContent = p.title
+      $('vNote').textContent = note
+      $('vReveal').textContent = p.reveal
+      $('vCite').textContent = `Catalogued in ${p.real}`
+      $('nextLbl').textContent = idx + 1 >= TOTAL ? 'See how you did' : 'Next site'
+      verdict.hidden = false
+      if (good) { sfx.good(); shell.pop(verdict) }
+      else { sfx.bad(); shell.shake(win) }
+      shell.announce(`${good ? 'You spotted it' : 'You fell for it'}: ${p.title}.`)
+      paintStrip()
+      paintTally()
+      verdict.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      ;($('next') as HTMLButtonElement).focus({ preventScroll: true })
+    },
+    every(fn, ms) {
+      timers.push(window.setInterval(() => { if (!shell.paused && !resolved) fn() }, ms))
+    },
+    knock() {
+      site.classList.remove('is-knock')
+      void site.offsetWidth
+      site.classList.add('is-knock')
     },
   }
 
   function show(i: number) {
-    if (i >= PATTERNS.length) return finish()
+    clearTimers()
+    if (i >= TOTAL) return finish()
     idx = i
+    resolved = false
     const p = PATTERNS[i]
-    url.textContent = p.site
-    ptitle.textContent = p.title
-    lede.textContent = p.lede
-    stepline.textContent = `Pattern ${i + 1} of ${PATTERNS.length}`
-    bar.style.width = `${((i + 1) / PATTERNS.length) * 100}%`
-    revealBox.hidden = true
+    const brand = BRANDS[p.id]
+    win.dataset.brand = brand.block
+    win.dataset.voice = brand.voice
+    $('url').textContent = p.site
+    $('favicon').textContent = brand.name.replace(/^the /i, '')[0].toUpperCase()
+    $('wordmark').textContent = brand.name
+    $('siteNo').textContent = `Site ${i + 1} of ${TOTAL}`
+    $('lede').textContent = p.lede
+    verdict.hidden = true
+    slot.inert = false
     slot.innerHTML = ''
-
-    // A new "site" gets its own favicon monogram and a brief loading sweep
-    // across the top of the frame — the small tell that this is a different
-    // place loading, not the same page relabelled.
-    favicon.textContent = p.site[0].toUpperCase()
-    ;(favicon as HTMLElement).style.background = FAVICON_HUES[i % FAVICON_HUES.length]
-    loadBar.classList.remove('go')
-    void (loadBar as HTMLElement).offsetWidth
-    loadBar.classList.add('go')
-
+    // A new site: the load bar runs and the page wipes in from the top — the
+    // small tell that this is a different place loading, not a relabel.
+    for (const el of [$('load'), site]) {
+      el.classList.remove('is-loading')
+      void (el as HTMLElement).offsetWidth
+      el.classList.add('is-loading')
+    }
     MOUNTS[p.id](slot, api)
+    shell.announce(`Site ${i + 1}: ${p.site}. ${p.lede}`)
+    paintStrip()
+    paintTally()
+    if (i === TOTAL - 1) shell.levelUp('Last one.')
+    site.focus({ preventScroll: true })
   }
 
-  nextBtn.addEventListener('click', () => { sfx.click(); show(idx + 1) })
-
-  $('begin').addEventListener('click', () => {
+  function begin() {
     unlock()
     sfx.click()
     intro.hidden = true
-    stage.hidden = false
+    play.hidden = false
     show(0)
+    shell.stage.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function restart() {
+    clearTimers()
+    results = []
+    paintTally()
+    begin()
+  }
+
+  $('begin').addEventListener('click', begin)
+  $('next').addEventListener('click', () => { sfx.click(); show(idx + 1) })
+
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || shell.paused) return
+    const t = e.target as HTMLElement
+    if (t.closest('input, textarea, select, dialog')) return
+    const k = e.key.toLowerCase()
+    if (!verdict.hidden && !play.hidden && (k === 'n' || (k === 'enter' && !t.closest('button, a')))) {
+      e.preventDefault()
+      show(idx + 1)
+    } else if (!intro.hidden && k === 'enter' && !t.closest('button, a')) {
+      e.preventDefault()
+      begin()
+    }
   })
 
   /* ---------------------------------------------------------------------- */
-  /* Verdict                                                                 */
+  /* The verdict                                                             */
   /* ---------------------------------------------------------------------- */
 
-  let shareCard: import('../lib/result-card').ResultCard | null = null
-  onShare(() => shareCard, (c) => ({
-    title: 'Dark Patterns',
-    text: `${c.headline}.`,
-  }))
-
   function finish() {
-    const dodged = results.filter((r) => r.outcome === 'dodged').length
+    const dodged = dodgedCount()
     const fell = results.length - dodged
-
-    const tone = dodged === results.length ? 'good' : dodged === 0 ? 'bad' : 'mid'
-    const stampEl = $('stamp')
-    stampEl.dataset.tone = tone
-    const ringFill = $('ringFill') as unknown as SVGCircleElement
-    const CIRC = 2 * Math.PI * 52
-    ringFill.style.strokeDasharray = String(CIRC)
-    ringFill.style.strokeDashoffset = String(CIRC)
-    ringFill.style.stroke = tone === 'good' ? '#5cd6a0' : tone === 'bad' ? '#ff8a6a' : '#ffc94d'
-
-    // Count up rather than just appear — the number is the one thing on this
-    // whole page worth a beat of suspense.
-    if (prefersReducedMotion) {
-      stampEl.textContent = `${dodged}/${results.length}`
-      ringFill.style.strokeDashoffset = String(CIRC * (1 - dodged / results.length))
-    } else {
-      const t0 = performance.now()
-      const DUR = 900
-      const step = (t: number) => {
-        const p = Math.min(1, (t - t0) / DUR)
-        const eased = 1 - Math.pow(1 - p, 3)
-        const shown = Math.round(eased * dodged)
-        stampEl.textContent = `${shown}/${results.length}`
-        ringFill.style.strokeDashoffset = String(CIRC * (1 - eased * (dodged / results.length)))
-        if (p < 1) requestAnimationFrame(step)
-      }
-      requestAnimationFrame(step)
-    }
-
-    $('scoreline').textContent = `You dodged ${dodged} of ${results.length}${fell ? `, and fell for ${fell}` : ''}.`
-    $('detail').textContent =
-      fell === 0
-        ? 'Every single one, and the real versions of these are built by people paid to make that hard.'
-        : `The ${fell} you fell for are exactly the ones worth re-reading — the mechanism is named right below.`
-    $('rows').innerHTML = results
-      .map(
-        (r) =>
-          `<tr class="${r.outcome === 'dodged' ? 'yes' : 'no'}">
-             <th scope="row">${r.title}</th>
-             <td>${r.outcome === 'dodged' ? 'Dodged' : 'Fell for it'}</td>
-             <td>${r.real}</td>
-           </tr>`,
-      )
-      .join('')
+    shell.resultExtra.innerHTML = `
+      <table class="dp-sheet">
+        <caption class="label">Every site, and which way you went</caption>
+        <thead><tr><th scope="col">Pattern</th><th scope="col">You</th><th scope="col">Catalogued in</th></tr></thead>
+        <tbody>${results.map((r) => `
+          <tr class="${r.outcome === 'dodged' ? 'is-dodged' : 'is-fell'}">
+            <th scope="row">${r.title}</th>
+            <td>${r.outcome === 'dodged' ? '✓ Dodged' : '✗ Fell for it'}</td>
+            <td>${r.real}</td>
+          </tr>`).join('')}</tbody>
+      </table>`
 
     recordPlay('dark-patterns', { dodged, fell, total: results.length }, { dodged: 'high' })
-
-    shareCard = {
-      slug: 'dark-patterns',
-      siteName: SITE.name,
-      headline: `Dodged ${dodged} of ${results.length} dark patterns`,
-      sub: fell ? `Fell for ${fell} — see which ones.` : 'Every single one.',
-      stats: [
-        { label: 'Dodged', value: `${dodged}` },
-        { label: 'Fell for it', value: `${fell}` },
-        { label: 'Total', value: `${results.length}` },
-      ],
+    const beat = shell.considerBest(dodged, `${dodged} / ${TOTAL}`)
+    const lines = [
+      fell === 0
+        ? 'Every single one — and the real versions are built by people paid to make that hard.'
+        : `You fell for ${fell}. Those are exactly the ones worth re-reading below: the mechanism is named next to each.`,
+    ]
+    if (beat === 'beaten') lines.push('✓ That is a new personal best.')
+    else if (beat === 'first') lines.push('Your first run — that is the number to beat now.')
+    else if (shell.best) lines.push(`Your best run is still ${shell.best.text}.`)
+    const now = new Date()
+    if (dailyFor(now).slug === 'dark-patterns') {
+      const need = dailyTarget.dodges(now)
+      lines.push(dodged >= need ? `✓ Daily challenge beaten: ${need} or more dodged.` : `✗ Daily challenge: dodge ${need} or more.`)
     }
-
-    stage.hidden = true
-    $('verdict').hidden = false
-    sfx.great()
-    if (dodged === results.length)
-      for (let k = 0; k < 3; k++)
-        setTimeout(
-          () =>
-            burst(innerWidth * (0.3 + Math.random() * 0.4), innerHeight * 0.35, {
-              count: 16, colors: ['#ffb020', '#fff3d6', '#5cd6a0'], speed: 6, gravity: 0.2, life: 58, size: 5,
-            }),
-          k * 120,
-        )
-    $('verdict').scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const ending = { kicker: `Site ${TOTAL} of ${TOTAL} · the verdict`, score: `${dodged} / ${TOTAL}`, from: `0 / ${TOTAL}`, lines, againLabel: 'Run it again' }
+    if (dodged === TOTAL) shell.win({ ...ending, title: 'You saw through every one.' })
+    else if (dodged > fell) shell.win({ ...ending, title: 'You saw through most of them.' })
+    else shell.lose({ ...ending, title: 'The internet got you.' })
   }
-
-  $('again').addEventListener('click', () => location.reload())
 </script>
 
 <style is:global>
-  .dp-body {
-    background: #120b05;
-    color: #f3ead9;
-  }
+  /* The sites are built by the script, so these rules are global on purpose:
+     scoped styles never reach runtime-built nodes. Everything is prefixed. */
 
-  .dp-body .game { padding-bottom: 14vh; position: relative; }
+  /* ---- intro --------------------------------------------------------- */
+  .dp-intro { display: grid; justify-items: start; gap: 18px; padding: clamp(8px, 3vw, 40px) 0; max-width: 820px; }
+  .dp-intro-title { font-size: var(--fs-h2); line-height: 0.98; max-width: 16ch; }
+  .dp-intro .lead { max-width: 52ch; }
+  .dp-domains { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .dp-domains .tag { color: var(--ink2); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; }
 
-  /* ---- ambient background -------------------------------------------- */
-  .dp-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-  .dp-spot {
-    position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%;
-    filter: blur(60px); opacity: 0.16;
-  }
-  .dp-spot-a {
-    top: -20vmax; left: -10vmax; background: radial-gradient(circle, #ffb020, transparent 70%);
-    animation: dp-drift-a 26s ease-in-out infinite;
-  }
-  .dp-spot-b {
-    bottom: -25vmax; right: -15vmax; background: radial-gradient(circle, #5c3fd6, transparent 70%);
-    opacity: 0.14;
-    animation: dp-drift-b 32s ease-in-out infinite;
-  }
-  @keyframes dp-drift-a {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(6vmax, 4vmax) scale(1.12); }
-  }
-  @keyframes dp-drift-b {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(-5vmax, -6vmax) scale(1.08); }
-  }
-  .dp-grain {
-    position: absolute; inset: -50%; opacity: 0.05; mix-blend-mode: soft-light;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-  .dp-body .intro, .dp-body .stage, .dp-body .verdict, .dp-body .chrome { position: relative; z-index: 1; }
+  /* ---- layout -------------------------------------------------------- */
+  .dp-play { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: clamp(16px, 2.6vw, 36px); align-items: start; }
+  @media (max-width: 900px) { .dp-play { grid-template-columns: minmax(0, 1fr); } }
 
-  /* ---- intro -------------------------------------------------------- */
-  .intro {
-    max-width: 640px;
-    margin: 12vh auto 8vh;
-    padding: 0 22px;
-    text-align: center;
-  }
-  .dp-eyebrow {
-    font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #ffc94d; opacity: 0.85; margin: 0 0 14px; font-weight: 600;
-  }
-  .intro h1 {
-    font-size: clamp(34px, 7vw, 56px); margin: 0 0 16px; letter-spacing: -0.03em;
-    background: linear-gradient(165deg, #fff8ea, #ffc94d 130%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .intro p { font-size: 17px; line-height: 1.6; opacity: 0.82; margin: 0 auto 28px; max-width: 52ch; }
-
-  .dp-begin {
-    appearance: none; border: 0; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 9px;
-    background: linear-gradient(165deg, #ffc94d, #f0a020);
-    color: #241505; font-weight: 700; font-size: 16px;
-    padding: 14px 22px 14px 26px; border-radius: 999px;
-    box-shadow: 0 10px 26px -10px rgba(255, 176, 32, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    transition: transform 180ms var(--ease-bounce, ease), box-shadow 180ms ease;
-  }
-  .dp-begin svg { transition: transform 180ms var(--ease-bounce, ease); }
-  .dp-begin:hover { transform: translateY(-2px) scale(1.03); }
-  .dp-begin:hover svg { transform: translateX(3px); }
-  .dp-begin:active { transform: translateY(0) scale(0.98); }
-
-  .dp-preview {
-    display: flex; justify-content: center; gap: 7px; flex-wrap: wrap;
-    list-style: none; margin: 34px 0 0; padding: 0;
-  }
-  .dp-preview li {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: linear-gradient(165deg, #ffc94d, #f0a020);
-    opacity: 0.4;
-    animation: dp-twinkle 2.4s ease-in-out infinite;
-  }
-  .dp-preview li:nth-child(odd) { animation-delay: -1.2s; }
-  .dp-preview li:nth-child(3n) { animation-delay: -0.6s; }
-  @keyframes dp-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
-
-  @media (prefers-reduced-motion: reduce) {
-    .dp-spot, .dp-preview li { animation: none; }
-  }
-
-  /* ---- HUD ------------------------------------------------------------ */
-  .stage { max-width: 620px; margin: 6vh auto 0; padding: 0 20px 12vh; }
-  .dp-hud { text-align: center; margin-bottom: 18px; }
-  .dp-stepline { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.65; margin: 0 0 8px; }
-  .dp-rail { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
-  .dp-rail i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb020, #ffe08a); transition: width 260ms ease; }
-
-  /* ---- the fake browser window ------------------------------------- */
-  .frame {
+  /* ---- the browser window -------------------------------------------- */
+  .dp-window {
+    --brand: var(--sun);
+    --brand-ink: var(--ink);
     position: relative;
-    background: #1d140a;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
+    border: 2px solid var(--ink);
+    border-radius: var(--r-lg);
     overflow: hidden;
-    box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    background: var(--card);
   }
-  /* A thin bright line that sweeps across the top the instant a new "site"
-     loads — browsers have trained everyone to read this as a page arriving. */
-  .dp-load {
-    position: absolute; top: 0; left: 0; height: 2.5px; width: 40%;
-    background: linear-gradient(90deg, transparent, #ffe08a, transparent);
-    opacity: 0; z-index: 2;
-  }
-  .dp-load.go { animation: dp-sweep 620ms ease-out; }
-  @keyframes dp-sweep {
-    0% { opacity: 1; transform: translateX(-40%); }
-    85% { opacity: 1; }
-    100% { opacity: 0; transform: translateX(250%); }
-  }
-  .framebar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; background: #150e06; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  }
-  .dots { display: flex; gap: 6px; }
-  .dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); }
-  .addr {
-    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
-    background: rgba(0, 0, 0, 0.22); border-radius: 999px; padding: 5px 14px;
-  }
-  .favicon {
-    width: 14px; height: 14px; border-radius: 4px; flex: none;
-    display: grid; place-items: center; font-style: normal;
-    font-size: 9px; font-weight: 800; color: #241505;
-    transition: background 200ms ease;
-  }
-  .url {
-    text-align: center; font-size: 12.5px; opacity: 0.6;
-    font-family: var(--mono, monospace); letter-spacing: 0.01em;
-  }
-  .framebar-spacer { width: 27px; }
-  .frametop { padding: 18px 20px 6px; }
-  .ptitle { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-  .lede { margin: 6px 0 0; opacity: 0.7; font-size: 14.5px; }
-  .slot { padding: 18px 20px 26px; min-height: 140px; }
+  .dp-window[data-brand='orange'] { --brand: var(--orange); }
+  .dp-window[data-brand='amber'] { --brand: var(--amber); }
+  .dp-window[data-brand='sky'] { --brand: var(--sky); }
+  .dp-window[data-brand='red'] { --brand: var(--red); }
+  .dp-window[data-brand='sun'] { --brand: var(--sun); }
+  .dp-window[data-brand='ink'] { --brand: var(--ink); --brand-ink: var(--ink-paper); }
 
-  /* ---- shared widget vocabulary --------------------------------------- */
-  .dp-trap, .dp-honest {
-    appearance: none; border: 0; cursor: pointer; font: inherit; text-align: center;
+  .dp-chrome { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--paper2); border-bottom: 2px solid var(--ink); }
+  .dp-lights { display: flex; gap: 6px; }
+  .dp-lights i { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--card); }
+  .dp-addr {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+    height: 32px; padding: 0 14px; border-radius: var(--r-pill);
+    background: var(--card); border: 1.5px solid var(--paper3);
   }
+  .dp-favicon {
+    flex: none; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center;
+    background: var(--brand); color: var(--brand-ink); font: 800 10px/1 var(--sans); font-style: normal;
+  }
+  .dp-url { font-size: 13px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dp-load { position: absolute; left: 0; right: 0; height: 3px; margin-top: -1px; background: var(--brand); transform-origin: left center; transform: scaleX(0); opacity: 0; pointer-events: none; }
+
+  .dp-site { outline: none; }
+  .dp-brandbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px clamp(16px, 3vw, 28px);
+    background: var(--brand); color: var(--brand-ink);
+  }
+  .dp-wordmark { font: 800 22px/1 var(--sans); letter-spacing: -0.03em; }
+  .dp-window[data-voice='serif'] .dp-wordmark { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-style: italic; font-size: 26px; letter-spacing: -0.02em; }
+  .dp-window[data-voice='shout'] .dp-wordmark { font-weight: 900; letter-spacing: 0.08em; font-size: 19px; }
+  .dp-window[data-voice='lower'] .dp-wordmark { font-weight: 700; letter-spacing: -0.05em; font-size: 26px; }
+  .dp-nav { display: flex; gap: 16px; font-size: 13px; font-weight: 600; }
+  @media (max-width: 480px) { .dp-nav { display: none; } }
+
+  .dp-body { position: relative; padding: clamp(18px, 3vw, 30px) clamp(16px, 3vw, 28px) clamp(22px, 3.4vw, 34px); min-height: 300px; display: grid; align-content: start; gap: 12px; }
+  .dp-kicker { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+  .dp-h { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: clamp(22px, 2.4vw, 30px); line-height: 1.05; letter-spacing: -0.02em; max-width: 24ch; }
+  .dp-small { font-size: 14px; color: var(--ink2); }
+  .dp-center { text-align: center; }
+
+  /* The two voices every site shares: the loud trap, the quiet way out. */
   .dp-trap {
-    background: linear-gradient(165deg, #ffc94d, #f0a020);
-    color: #241505; font-weight: 700; font-size: 14.5px;
-    padding: 12px 18px; border-radius: 11px;
-    box-shadow: 0 8px 20px -8px rgba(255, 176, 32, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    transition: transform 150ms ease, box-shadow 150ms ease;
-    animation: dp-breathe 2.6s ease-in-out infinite;
+    justify-self: start;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 54px; padding: 0 26px;
+    border: 2px solid var(--ink); border-radius: var(--r-pill);
+    background: var(--brand); color: var(--brand-ink);
+    font: 800 15px/1.15 var(--sans); letter-spacing: 0; text-align: center;
+    box-shadow: var(--shadow-pill);
+    cursor: pointer;
   }
-  /* The one continuous animation every trap button shares — a slow, gentle
-     glow-pulse, because a real "act now" button is never quite still either.
-     Subtle on purpose: the joke is that this barely registers consciously. */
-  @keyframes dp-breathe {
-    0%, 100% { box-shadow: 0 8px 20px -8px rgba(255, 176, 32, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
-    50% { box-shadow: 0 8px 26px -6px rgba(255, 176, 32, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
-  }
-  .dp-trap:hover { transform: translateY(-1px) scale(1.015); animation-play-state: paused; }
-  .dp-trap:active { transform: translateY(0) scale(0.98); }
   .dp-honest {
-    background: none; color: #cabb9a; font-size: 12.5px; opacity: 0.7;
-    text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; padding: 6px;
-    transition: opacity 150ms ease, text-decoration-color 150ms ease;
+    justify-self: start;
+    min-height: 44px; padding: 8px 4px;
+    border: 0; background: none; cursor: pointer;
+    font: 500 13px/1.3 var(--sans); color: var(--ink3); text-align: left;
+    text-decoration: underline; text-decoration-color: var(--paper3); text-underline-offset: 3px;
   }
-  .dp-honest:hover { opacity: 1; text-decoration-color: currentColor; }
-  @media (prefers-reduced-motion: reduce) {
-    .dp-trap { animation: none; }
-  }
-  .dp-note { font-size: 12.5px; opacity: 0.55; min-height: 1.4em; margin: 10px 0 0; }
+  .dp-honest:hover { color: var(--ink); text-decoration-color: currentColor; }
+  .dp-honest:disabled { cursor: default; }
+  .dp-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 6px; }
+  .dp-acts.is-stacked { flex-direction: column; align-items: flex-start; gap: 4px; }
 
-  .modal-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; }
-  .line { display: flex; align-items: center; gap: 9px; font-size: 14px; margin: 12px 0; cursor: pointer; }
-  .line input { width: 16px; height: 16px; accent-color: #ffb020; }
+  .dp-line {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; border-radius: var(--r);
+    background: var(--paper2); font-size: 15px; cursor: pointer;
+  }
+  .dp-line.is-plain { cursor: default; }
+  .dp-line span { flex: 1; }
+  .dp-line input { width: 20px; height: 20px; flex: none; accent-color: var(--ink); }
+  .dp-line b { font-weight: 700; }
+  .dp-big { font-size: 24px; letter-spacing: -0.03em; }
+  .dp-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1.5px solid var(--paper3); font-size: 15px; }
+  .dp-total { display: flex; justify-content: space-between; gap: 12px; padding: 12px 2px 4px; border-top: 2px solid var(--ink); font-size: 18px; font-weight: 800; }
 
   /* Sneak into Basket */
-  .store h3, .cart h3 { margin: 0 0 12px; font-size: 15px; opacity: 0.6; font-weight: 600; }
-  .products { display: grid; gap: 10px; }
-  .product {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.04);
+  .dp-products { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 620px) { .dp-products { grid-template-columns: minmax(0, 1fr); } }
+  .dp-product { display: grid; gap: 6px; align-content: start; padding: 16px; border-radius: var(--r); background: var(--paper2); }
+  .dp-product .dp-price { color: var(--ink2); font-weight: 600; }
+  .dp-product .dp-trap { margin-top: 8px; min-height: 46px; padding: 0 18px; font-size: 14px; }
+
+  /* The faux page behind a modal: grey text lines, nothing to read. */
+  .dp-behind { display: grid; gap: 10px; opacity: 0.5; }
+  .dp-behind i { display: block; height: 10px; border-radius: 5px; background: var(--paper3); }
+  .dp-behind i.short { width: 62%; }
+  .dp-modal, .dp-prompt {
+    position: relative; z-index: 1;
+    margin-top: -64px;
+    display: grid; gap: 10px;
+    padding: 22px; border: 2px solid var(--ink); border-radius: var(--r-lg);
+    background: var(--card); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16);
   }
-  .product span { flex: 1; font-size: 14px; }
-  .product b { opacity: 0.6; font-size: 13px; }
-  .cart .line.sneaky { background: rgba(255, 176, 32, 0.08); padding: 8px 10px; border-radius: 8px; }
-
-  /* Confirmshaming / privacy / nag modals */
-  .modal-q, .privacy p, .nag p { font-size: 15.5px; margin: 0; }
-
-  /* Roach Motel */
-  .panel p { font-size: 15px; margin: 0 0 4px; }
-  .panel.stall { animation: dp-pop 260ms ease; }
-  @keyframes dp-pop { from { opacity: 0; transform: scale(0.96); } }
+  .dp-prompt { max-width: 360px; margin-top: -100px; padding: 18px; border-radius: var(--r); }
+  .dp-modal-q { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: clamp(20px, 2vw, 26px); line-height: 1.1; letter-spacing: -0.02em; max-width: 26ch; }
+  .dp-stall { display: grid; gap: 10px; }
 
   /* False Urgency */
-  .deal p { font-size: 15px; margin: 0 0 14px; }
-  .deal b { font-variant-numeric: tabular-nums; font-size: 20px; color: #ffb020; }
-  .deal.flicker, .deal p.flicker { animation: none; }
-  #clock.flicker, .flicker b { color: #ff5a5a; }
-  .deal .dp-trap, .deal .dp-honest { display: block; margin-top: 10px; }
+  .dp-deal { font-size: 18px; }
+  .dp-deal s { color: var(--ink3); }
+  .dp-deal b { font-size: 40px; letter-spacing: -0.04em; }
+  .dp-clock-line { font-size: 16px; font-weight: 600; }
+  .dp-clock { display: inline-block; min-width: 3.4em; font-size: 26px; letter-spacing: -0.02em; }
+  .dp-clock.is-reset { color: var(--t-red); }
 
   /* Disguised Ads */
-  .dl p { font-size: 15px; margin: 0 0 14px; opacity: 0.75; }
-  .dlgrid { display: grid; gap: 10px; }
-  .dlgrid button { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-  .dlgrid small { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.55; font-weight: 500; }
-  .decoy:nth-of-type(1) { background: linear-gradient(165deg, #6fe0a0, #2f9e5c); color: #06210f; }
-  .decoy:nth-of-type(2) { background: linear-gradient(165deg, #7ec2ff, #2f7fd6); color: #061a30; }
-  .decoy:nth-of-type(3) { background: linear-gradient(165deg, #ff9a7e, #e0563a); color: #300c06; }
-  .real { background: rgba(255, 255, 255, 0.06); color: #cabb9a; box-shadow: none; border: 1px dashed rgba(255, 255, 255, 0.18); }
-
-  /* Drip Pricing */
-  .ticket p.price { font-size: 26px; font-weight: 700; margin: 0 0 16px; }
-  .ticket .revtitle { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.55; margin-bottom: 10px; }
-  .ticket .line { display: flex; justify-content: space-between; font-size: 14px; opacity: 0.85; margin: 6px 0; }
-  .ticket .line.total { border-top: 1px solid rgba(255, 255, 255, 0.14); margin-top: 10px; padding-top: 10px; font-size: 16px; font-weight: 700; opacity: 1; }
-  .ticket .dp-honest, .ticket .dp-trap { display: inline-block; margin: 14px 12px 0 0; }
+  .dp-dlgrid { display: grid; gap: 10px; }
+  .dp-decoy, .dp-real-dl { display: grid; justify-items: center; gap: 3px; width: 100%; padding: 12px 20px; }
+  .dp-decoy { justify-self: stretch; }
+  .dp-decoy[data-c='orange'] { background: var(--orange); }
+  .dp-decoy[data-c='sun'] { background: var(--sun); }
+  .dp-decoy[data-c='sky'] { background: var(--sky); }
+  .dp-decoy small, .dp-real-dl small { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .dp-real-dl {
+    min-height: 48px; border: 1.5px dashed var(--ink3); border-radius: var(--r);
+    background: transparent; color: var(--ink2); font: 600 14px/1.2 var(--sans); cursor: pointer;
+  }
+  .dp-real-dl small { color: var(--ink3); }
+  .dp-real-dl:hover { border-style: solid; color: var(--ink); }
 
   /* Forced Continuity */
-  .dp-field {
-    width: 100%; padding: 11px 13px; border-radius: 9px; margin: 12px 0;
-    border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: inherit; font-size: 14px;
+  .dp-field input {
+    width: 100%; height: 48px; padding: 0 16px; border-radius: var(--r);
+    border: 1.5px solid var(--paper3); background: var(--card); font-size: 15px;
   }
-  .signup .fine { display: block; margin: 0 0 6px; }
-
-  /* Fake Social Proof */
-  .toasts { position: relative; height: 74px; margin-top: 14px; }
-  .toast {
-    position: absolute; left: 0; right: 0; top: 0;
-    background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 9px; padding: 9px 12px; font-size: 12.5px; opacity: 0.9;
-    animation: dp-toast-in 220ms ease;
-  }
-  @keyframes dp-toast-in { from { opacity: 0; transform: translateY(-6px); } }
-  .product2 p { font-size: 15px; margin: 0 0 12px; }
-  .product2 .dp-trap, .product2 .dp-honest { display: block; margin-top: 8px; }
+  .dp-field input:focus { border-color: var(--ink); outline: none; }
+  .dp-fine { margin: -6px 0; }
 
   /* Privacy Zuckering */
-  .privacy .big { display: block; width: 100%; padding: 18px; font-size: 16px; background: linear-gradient(165deg, #6fe0a0, #2f9e5c); color: #06210f; }
-  .privacy .tiny { text-align: center; margin-top: 10px; }
+  .dp-trap.is-big { justify-self: stretch; min-height: 72px; font-size: 17px; }
 
-  /* reveal panel */
-  .reveal {
-    position: relative;
-    max-width: 620px; margin: 18px auto 0; padding: 20px 22px 20px 26px;
-    background: #1d140a; border: 1px solid rgba(255, 176, 32, 0.24); border-radius: 14px;
-    opacity: 0; transform: translateY(6px);
-    overflow: hidden;
-  }
-  .reveal::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
-    background: currentColor; color: #ffc94d;
-  }
-  .reveal:has(.outcome[data-tone='dodged'])::before { color: #5cd6a0; }
-  .reveal:has(.outcome[data-tone='fell'])::before { color: #ff8a6a; }
-  .reveal.in { animation: dp-reveal-in 320ms ease forwards; }
-  @keyframes dp-reveal-in { to { opacity: 1; transform: none; } }
-  .outcome {
-    display: flex; align-items: center; gap: 9px;
-    margin: 0 0 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  }
-  .outcome-icon {
-    display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none;
-  }
-  .outcome-icon svg { width: 13px; height: 13px; }
-  .outcome[data-tone='dodged'] { color: #5cd6a0; }
-  .outcome[data-tone='dodged'] .outcome-icon { background: rgba(92, 214, 160, 0.16); }
-  .outcome[data-tone='fell'] { color: #ff8a6a; }
-  .outcome[data-tone='fell'] .outcome-icon { background: rgba(255, 138, 106, 0.16); }
-  .revealtext { margin: 0; font-size: 15px; line-height: 1.6; opacity: 0.9; }
-  .citation { margin: 12px 0 18px; font-size: 12.5px; opacity: 0.5; font-style: italic; }
+  /* Fake Social Proof */
+  .dp-toasts { display: grid; gap: 8px; min-height: 96px; align-content: start; }
+  .dp-toast { padding: 10px 14px; border-radius: var(--r); border: 1.5px solid var(--ink); background: var(--card); font-size: 13px; font-weight: 500; box-shadow: var(--shadow-block); }
 
-  /* ---- verdict --------------------------------------------------------- */
-  .verdict { max-width: 640px; margin: 8vh auto 10vh; padding: 0 22px; text-align: center; }
-  .dp-ring { position: relative; width: 156px; height: 156px; margin: 0 auto; }
-  .dp-ring svg { width: 100%; height: 100%; }
-  #ringFill {
-    transition: stroke-dashoffset 120ms linear, stroke 200ms ease;
-    filter: drop-shadow(0 0 8px currentColor);
+  /* ---- the notes ----------------------------------------------------- */
+  .dp-notes { display: grid; gap: 16px; position: sticky; top: 16px; }
+  .dp-brief { display: grid; gap: 10px; }
+  /* On one column the errand has to be read before the site and the verdict
+     after it, so the notes dissolve into the grid and take their places. */
+  @media (max-width: 900px) {
+    .dp-notes { display: contents; }
+    .dp-brief { order: -1; }
   }
-  .dp-ring .stamp {
-    position: absolute; inset: 0; display: grid; place-items: center;
-    font-variant-numeric: tabular-nums;
+  .dp-errand-lbl { margin-top: 6px; }
+  .dp-errand { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: var(--fs-h3); line-height: 1.05; letter-spacing: -0.02em; }
+  .dp-tally { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
+  .dp-tally li { position: relative; aspect-ratio: 1; max-width: 30px; border-radius: 8px; background: var(--paper2); display: grid; place-items: center; }
+  .dp-tally li::after { content: attr(data-sign); font: 800 13px/1 var(--sans); color: var(--ink); }
+  .dp-tally li.is-dodged { background: var(--sky); }
+  .dp-tally li.is-fell { background: var(--red); }
+  .dp-tally li.is-now { background: var(--card); box-shadow: inset 0 0 0 2px var(--ink); }
+
+  .dp-verdict { display: grid; gap: 10px; justify-items: start; padding: 22px; border-radius: var(--r-lg); color: var(--ink); box-shadow: var(--shadow-block); outline: none; }
+  .dp-verdict.is-dodged { background: var(--sky); }
+  .dp-verdict.is-fell { background: var(--red); }
+  .dp-v-head { display: flex; align-items: center; gap: 8px; }
+  .dp-v-sign { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--ink-paper); font-size: 13px; }
+  .dp-v-title { font-size: var(--fs-h3); }
+  .dp-v-note { font-weight: 700; }
+  .dp-v-reveal { font-size: 15px; line-height: 1.5; }
+  .dp-v-cite { font-size: 13px; font-weight: 600; }
+  .dp-verdict .pill { margin-top: 6px; }
+  .dp-keys { font-size: 13px; }
+  .dp-keys kbd, .dp-real kbd {
+    display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 6px;
+    border: 1.5px solid currentColor; font: 700 12px/1.5 var(--sans); text-align: center;
   }
-  .verdict .stamp { font-size: clamp(30px, 6vw, 42px); font-weight: 800; margin: 0; letter-spacing: -0.02em; }
-  .verdict .stamp[data-tone='good'] { color: #5cd6a0; }
-  .verdict .stamp[data-tone='mid'] { color: #ffc94d; }
-  .verdict .stamp[data-tone='bad'] { color: #ff8a6a; }
-  .verdict .score { font-size: 17px; opacity: 0.85; margin: 10px 0 6px; }
-  .verdict .detail { font-size: 14.5px; opacity: 0.65; max-width: 46ch; margin: 0 auto 26px; }
 
-  .card { width: 100%; border-collapse: collapse; text-align: left; margin: 0 0 26px; font-size: 13.5px; }
-  .card caption { caption-side: top; text-align: left; font-size: 12px; opacity: 0.5; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .card th, .card td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
-  .card thead th { opacity: 0.55; font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .card tbody th { font-weight: 500; }
-  .card tr.yes td:nth-child(2) { color: #5cd6a0; font-weight: 600; }
-  .card tr.no td:nth-child(2) { color: #ff8a6a; font-weight: 600; }
+  /* ---- the verdict table, inside the ink result card ----------------- */
+  .dp-sheet { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .dp-sheet caption { text-align: left; padding-bottom: 10px; }
+  .dp-sheet th, .dp-sheet td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(246, 244, 240, 0.22); vertical-align: top; }
+  .dp-sheet thead th { font-size: var(--fs-label); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .dp-sheet tbody th { font-weight: 600; }
+  .dp-sheet td:last-child { color: var(--ink-paper); opacity: 0.8; font-size: 13.5px; }
+  .dp-sheet tr.is-dodged td:nth-child(2) { color: var(--sky); font-weight: 700; white-space: nowrap; }
+  .dp-sheet tr.is-fell td:nth-child(2) { color: var(--red); font-weight: 700; white-space: nowrap; }
+  @media (max-width: 560px) { .dp-sheet td:last-child, .dp-sheet thead th:last-child { display: none; } }
 
-  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 20px; }
-  .acts button {
-    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
-    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
-  }
-  .acts button:first-child { background: linear-gradient(165deg, #ffc94d, #f0a020); color: #241505; border: 0; }
-  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
-  .acts a:hover { opacity: 1; }
+  .dp-real { margin-top: 16px; padding: 20px 24px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-block); }
+  .dp-real summary { cursor: pointer; }
+  .dp-real p { margin-top: 12px; max-width: 64ch; color: var(--ink2); }
+  .dp-real a { color: var(--t-blue); font-weight: 600; }
 
-  .how { text-align: left; font-size: 14px; opacity: 0.8; }
-  .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; }
-  .how p { line-height: 1.6; margin: 10px 0; }
-  .how a { color: #ffc94d; }
+  /* ---- motion: armed only under html.play ---------------------------- */
+  html.play .dp-trap { transition: transform var(--t-fast) var(--spring); animation: dp-breathe 2.6s var(--ease-io) infinite; }
+  html.play .dp-trap:hover { transform: translateY(-2px) scale(1.02); animation-play-state: paused; }
+  html.play .dp-trap:active { transform: scale(0.97); }
+  /* A real "act now" button is never quite still either. Subtle on purpose:
+     the joke is that this barely registers. */
+  @keyframes dp-breathe { 50% { transform: scale(1.03); } }
 
-  @media (max-width: 520px) {
-    .frametop { padding: 16px 16px 4px; }
-    .slot { padding: 14px 16px 20px; }
-  }
+  html.play .dp-load.is-loading { animation: dp-load 700ms var(--glide) both; }
+  @keyframes dp-load { 0% { opacity: 1; transform: scaleX(0); } 70% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+  html.play .dp-site.is-loading { animation: dp-wipe 620ms var(--glide) both; }
+  @keyframes dp-wipe { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+  html.play .dp-site.is-knock .dp-body > * { animation: dp-knock 380ms var(--spring) both; }
+  @keyframes dp-knock { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+  html.play .dp-toast { animation: dp-knock 300ms var(--spring) both; }
+  html.play .dp-verdict:not([hidden]) { animation: dp-settle 620ms var(--spring) both; }
+  @keyframes dp-settle { from { transform: scale(0.94); border-radius: 48px; } }
 </style>

@@ -125,7 +125,10 @@ console.log('\nno emoji')
 {
   const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u
   for (const f of ['src/lib/dark-patterns.ts', 'src/pages/dark-patterns.astro']) {
-    check(!EMOJI.test(fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8')), `${f} has no emoji`)
+    // ✓ and ✗ sit in the Dingbats block, but they are the design system's
+    // signs (colour is never the only signal), not emoji.
+    const text = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8').replace(/[✓✗]/g, '')
+    check(!EMOJI.test(text), `${f} has no emoji`)
   }
 }
 

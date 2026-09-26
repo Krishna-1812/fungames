@@ -1,5 +1,6 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
+import { DILEMMAS } from '../data/dilemmas'
 
 /**
  * Trolley — the moral-dilemma archetype.
@@ -14,153 +15,175 @@ import GameLayout from '../layouts/GameLayout.astro'
  * whole game as a strict follower of each of the four and checks it gets named
  * correctly, and that no two positions agree often enough to be the same thing
  * under different names.
+ *
+ * In the shell: Score is lives saved against the worst outcome on offer each
+ * time, Problem is progress, Moves are levers pulled. Best is the one number
+ * here that is a skill rather than a verdict — how consistently you argued
+ * for a single position. Nobody loses: there is no wrong ending.
  */
-
+const total = DILEMMAS.length
+const first = DILEMMAS[0]
 ---
 
-<GameLayout slug="trolley" bar="#3d1f14" bodyClass="trolley-body">
-  <div class="wrap">
-    <header class="head">
-      <h1>Trolley</h1>
-      <p class="lede">Twenty-six levers. There is no right answer, but there is definitely a you-shaped pattern.</p>
-    </header>
+<GameShell
+  slug="trolley"
+  labels={{ score: 'Lives saved', best: 'Most consistent', level: 'Problem', moves: 'Levers pulled' }}
+  initial={{ score: '0', level: `1 / ${total}`, moves: '0' }}
+>
+  <div class="tr">
+    <figure class="tr-scene">
+      <svg id="scene" viewBox="0 0 320 152" aria-hidden="true"></svg>
+      <ol class="tr-rail" id="rail" aria-hidden="true">
+        {DILEMMAS.map(() => <li></li>)}
+      </ol>
+    </figure>
 
-    <div class="dots" id="dots" aria-hidden="true"></div>
+    <div class="tr-side">
+      <p class="label meta" id="tag">Problem 1 of {total}</p>
+      <h2 class="tr-title" id="title">{first.title}</h2>
+      <p class="tr-setup" id="setup">{first.setup}</p>
 
-    <section class="card" id="card" aria-live="polite">
-      <div class="tag" id="tag">Problem 1 of 26</div>
-      <h2 id="title">—</h2>
-      <p class="setup" id="setup">—</p>
-
-<svg class="scene" id="scene" viewBox="0 0 320 152" aria-hidden="true"></svg>
-
-      <div class="choices">
-        <button type="button" class="choice" data-side="left" id="btnLeft"></button>
-        <button type="button" class="choice" data-side="right" id="btnRight"></button>
+      <div class="tr-choices" role="group" aria-label="Your choice">
+        <button type="button" class="pill tr-choice" data-side="left" id="btnLeft">
+          <kbd aria-hidden="true">←</kbd><span id="lblLeft">{first.left.label}</span>
+        </button>
+        <button type="button" class="pill tr-choice" data-side="right" id="btnRight">
+          <kbd aria-hidden="true">→</kbd><span id="lblRight">{first.right.label}</span>
+        </button>
       </div>
 
-      <div class="outcome" id="outcome" hidden>
-        <p id="outcomeText"></p>
-        <button type="button" id="nextBtn">Next →</button>
+      <div class="tr-outcome" id="outcome" hidden>
+        <p class="label tr-toll" id="toll">1 death</p>
+        <p class="tr-outcome-text" id="outcomeText"></p>
+        <button type="button" class="pill pill--ink" id="nextBtn">
+          <span id="nextLbl">Next problem</span><span aria-hidden="true">→</span>
+        </button>
+        <p class="tr-keys"><kbd>N</kbd> or <kbd>Enter</kbd></p>
       </div>
-    </section>
-
-    <section class="verdict" id="verdict" hidden>
-      <h2>Your verdict</h2>
-      <div class="stat-row">
-        <div class="stat"><b id="vDeaths">0</b><span>deaths</span></div>
-        <div class="stat"><b id="vPulls">0</b><span>levers pulled</span></div>
-        <div class="stat"><b id="vSaved">0</b><span>lives saved vs. doing nothing</span></div>
-      </div>
-      <h3 id="vLabel">—</h3>
-      <p id="vBlurb"></p>
-      <ul class="positions" id="vBars"></ul>
-      <p class="repeat" id="vRepeat"></p>
-      <p class="repeat" id="vPlays"></p>
-      <div class="verdict-actions">
-        <button type="button" data-share data-title="Trolley">Share</button>
-        <button type="button" id="againBtn" class="ghost">Start again</button>
-      </div>
-    </section>
+    </div>
   </div>
-</GameLayout>
 
-  <script>
-  import { burst, shake, prefersReducedMotion } from '../lib/fx'
-  import { recordPlay, readGame } from '../lib/stats'
-  import { onShare } from '../lib/share-card'
+  <Fragment slot="howto">
+    <p>
+      Twenty-six problems, one at a time. A trolley is coming. Each time you
+      get two choices — usually <b>do nothing</b> or <b>pull the lever</b>.
+    </p>
+    <ul>
+      <li>There is no right answer, and no way to lose.</li>
+      <li>At the end your choices are compared against four ethical positions, and you are told which one you actually argued for — and how consistently.</li>
+      <li>Nothing here is a crowd statistic. Every percentage is about your own answers.</li>
+    </ul>
+    <p>Keys: <kbd>←</kbd> or <kbd>1</kbd> for the left choice, <kbd>→</kbd> or <kbd>2</kbd> for the right, <kbd>N</kbd> for the next problem.</p>
+  </Fragment>
+
+  <details class="tr-real" slot="after">
+    <summary class="label">Why there are no crowd percentages</summary>
+    <p>
+      The famous version of this game tells you what percentage of other
+      players chose the same as you. That needs a server counting votes, and
+      this site has none — so rather than invent plausible-looking numbers,
+      every problem records what four named ethical positions say about it,
+      and the ending measures you against those.
+    </p>
+    <p>
+      A position that genuinely has nothing to say about a case is left out
+      of that case, so it is never scored on a side it does not hold.
+      <code>scripts/check-trolley.mjs</code> plays the whole game as a strict
+      follower of each position and checks it comes out named correctly.
+    </p>
+  </details>
+</GameShell>
+
+<script>
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+  import { recordPlay } from '../lib/stats'
   import { sfx, unlock, hit } from '../lib/audio'
   import { sceneSvg, GEO } from '../lib/trolley-scene'
   import { DILEMMAS, POSITIONS, scoreAnswers, REPEAT_OF_FIRST } from '../data/dilemmas'
+  import type { Side } from '../data/dilemmas'
+  import { dailyFor, dailyTarget } from '../data/game-meta'
 
-  const LAYOUT = JSON.parse(document.getElementById('chrome-data').textContent)
-  const el = (id) => document.getElementById(id)
-  const dots = el('dots')
-  const card = el('card')
-  const outcome = el('outcome')
-  const verdict = el('verdict')
+  const TOTAL = DILEMMAS.length
+  const $ = (id: string) => document.getElementById(id)!
+  const SCENE = $('scene')
+  const outcome = $('outcome')
+  const btn = { left: $('btnLeft') as HTMLButtonElement, right: $('btnRight') as HTMLButtonElement }
+  const rail = [...$('rail').children] as HTMLLIElement[]
 
   let i = 0
   let deaths = 0
   let pulls = 0
-  let answered = []
+  let saved = 0
+  let chosen = false
   /** One side per problem, in order — the only input the scoring needs. */
-  let picks = []
+  let picks: Side[] = []
 
-  dots.replaceChildren(
-    ...DILEMMAS.map(() => {
-      const d = document.createElement('span')
-      d.className = 'dot'
-      return d
-    })
-  )
-  const dotEls = [...dots.children]
+  const shell = createShell({ slug: 'trolley', onRestart: restart })
 
-  /* ----------------------------------------------------------------------
-     The scene.
+  /* ---- the scene ------------------------------------------------------ */
 
-     Twelve problems used to share one picture: a line, some sleepers, a dot,
-     and a diagonal. Nobody was on either track, so the one thing every dilemma
-     turns on -- who is where -- was the one thing the illustration did not say.
-     ---------------------------------------------------------------------- */
-
-  const SCENE = el('scene')
-
-  function drawScene(d) {
-    SCENE.innerHTML = sceneSvg(d.scene)
-    setTrolley(GEO.START, GEO.Y_STRAIGHT)
-  }
-
-  function setTrolley(x, y) {
-    const g = el('trolley')
-    if (g) g.setAttribute('transform', 'translate(' + x + ',' + y + ')')
+  function setTrolley(x: number, y: number) {
+    document.getElementById('trolley')?.setAttribute('transform', `translate(${x},${y})`)
   }
 
   /** Roll to the end of whichever track was chosen. */
   let rolling = 0
-  function rollTrolley(diverted, done) {
+  function rollTrolley(diverted: boolean, done: () => void) {
     cancelAnimationFrame(rolling)
     const sc = DILEMMAS[i].scene
     const endY = diverted && !sc.loop ? GEO.Y_BRANCH : GEO.Y_STRAIGHT
     const endX = GEO.STOP - 30
-    if (prefersReducedMotion) { setTrolley(endX, endY); done(); return }
+    if (!PLAY) { setTrolley(endX, endY); done(); return }
     const t0 = performance.now()
     const DUR = 780
-    const step = (now) => {
+    const step = (now: number) => {
       const u = Math.min(1, (now - t0) / DUR)
       const e = u * u * (3 - 2 * u)
       const x = GEO.START + (endX - GEO.START) * e
       // Only climbs once it is past the fork.
       const climb = Math.max(0, Math.min(1, (x - GEO.FORK) / (214 - GEO.FORK)))
-      const y = GEO.Y_STRAIGHT + (endY - GEO.Y_STRAIGHT) * climb * climb
-      setTrolley(x, y)
+      setTrolley(x, GEO.Y_STRAIGHT + (endY - GEO.Y_STRAIGHT) * climb * climb)
       if (u < 1) rolling = requestAnimationFrame(step)
       else done()
     }
     rolling = requestAnimationFrame(step)
   }
 
-  function render() {
-    const d = DILEMMAS[i]
-    drawScene(d)
-    el('tag').textContent = `Problem ${i + 1} of ${DILEMMAS.length}`
-    el('title').textContent = d.title
-    el('setup').textContent = d.setup
-    el('btnLeft').textContent = d.left.label
-    el('btnRight').textContent = d.right.label
-    el('btnLeft').disabled = false
-    el('btnRight').disabled = false
-    outcome.hidden = true
-    card.classList.remove('resolved')
-    dotEls.forEach((dot, k) => dot.classList.toggle('done', k < i))
-    card.classList.remove('enter')
-    void card.offsetWidth
-    card.classList.add('enter')
+  /* ---- a problem ------------------------------------------------------ */
+
+  function paintStrip() {
+    shell.setScore(String(saved))
+    shell.setLevel(`${Math.min(i + 1, TOTAL)} / ${TOTAL}`)
+    shell.setMoves(String(pulls))
   }
 
-  function choose(side) {
+  function render() {
     const d = DILEMMAS[i]
-    const opt = side === 'left' ? d.left : d.right
+    chosen = false
+    SCENE.innerHTML = sceneSvg(d.scene)
+    $('tag').textContent = `Problem ${i + 1} of ${TOTAL}`
+    $('title').textContent = d.title
+    $('setup').textContent = d.setup
+    $('lblLeft').textContent = d.left.label
+    $('lblRight').textContent = d.right.label
+    for (const b of [btn.left, btn.right]) { b.disabled = false; b.classList.remove('is-chosen') }
+    outcome.hidden = true
+    rail.forEach((li, k) => { li.className = k < i ? 'is-done' : k === i ? 'is-now' : '' })
+    const side = document.querySelector('.tr-side')!
+    side.classList.remove('is-turning')
+    void (side as HTMLElement).offsetWidth
+    side.classList.add('is-turning')
+    paintStrip()
+    if (i === Math.floor(TOTAL / 2)) shell.levelUp('Halfway.')
+    else if (i === TOTAL - 1) shell.levelUp('Last one.')
+  }
+
+  function choose(side: Side) {
+    if (chosen || shell.paused) return
+    chosen = true
+    const d = DILEMMAS[i]
+    const opt = d[side]
     unlock()
     if (opt.acts) {
       // A mechanical clunk for the lever, then the trolley rolling on.
@@ -169,247 +192,231 @@ import GameLayout from '../layouts/GameLayout.astro'
     } else {
       hit({ dur: 0.6, gain: 0.14, freq: 200, sweepTo: 80, type: 'lowpass' })
     }
-    if (opt.deaths >= 5) { sfx.thud(); shake(document.querySelector('.card'), 7, 300) }
-    else if (opt.deaths === 0) sfx.sparkle()
     deaths += opt.deaths
+    saved += Math.max(d.left.deaths, d.right.deaths) - opt.deaths
     if (opt.acts) pulls++
-    answered.push({ deaths: opt.deaths, acts: opt.acts, min: Math.min(d.left.deaths, d.right.deaths) })
     picks[i] = side
 
-    el('btnLeft').disabled = true
-    el('btnRight').disabled = true
-    card.classList.add('resolved')
-    // A lever that is not connected still throws; that is the joke.
-    // There is no switch rail on the footbridge problem, and no lever to throw.
-    if (opt.acts) el('switchRail')?.classList.add('thrown')
+    btn[side].classList.add('is-chosen')
+    btn.left.disabled = true
+    btn.right.disabled = true
+    // A lever that is not connected still throws; that is the joke. There is
+    // no switch rail on the footbridge problem, and no lever to throw.
+    if (opt.acts) document.getElementById('switchRail')?.classList.add('thrown')
+    paintStrip()
 
     // The outcome waits for the trolley to arrive, so the picture and the text
     // land together instead of the text pre-empting it.
-    el('outcomeText').textContent = opt.outcome
     rollTrolley(opt.acts, () => {
+      const n = opt.deaths
+      $('toll').textContent = n === 0 ? '✓ Nobody dies' : `${n} ${n === 1 ? 'death' : 'deaths'}`
+      outcome.className = 'tr-outcome ' + (n === 0 ? 'is-none' : n >= 5 ? 'is-many' : 'is-some')
+      $('outcomeText').textContent = opt.outcome
+      $('nextLbl').textContent = i + 1 >= TOTAL ? 'See your verdict' : 'Next problem'
       outcome.hidden = false
-      el('nextBtn').focus({ preventScroll: true })
+      if (n >= 5) { sfx.thud(); shell.shake($('scene').parentElement!) }
+      else if (n === 0) { sfx.sparkle(); shell.pop(outcome) }
+      shell.announce(`${$('toll').textContent}. ${opt.outcome}`)
+      rail[i].className = 'is-done'
+      ;($('nextBtn') as HTMLButtonElement).focus({ preventScroll: true })
+      outcome.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     })
   }
 
-  el('btnLeft').addEventListener('click', () => choose('left'))
-  el('btnRight').addEventListener('click', () => choose('right'))
-
-  el('nextBtn').addEventListener('click', () => {
+  function next() {
+    if (!chosen || outcome.hidden) return
     unlock(); sfx.click()
     i++
-    if (i < DILEMMAS.length) return render()
+    if (i < TOTAL) return render()
     finish()
+  }
+
+  btn.left.addEventListener('click', () => choose('left'))
+  btn.right.addEventListener('click', () => choose('right'))
+  $('nextBtn').addEventListener('click', next)
+
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || shell.paused || i >= TOTAL) return
+    const t = e.target as HTMLElement
+    if (t.closest('input, textarea, select, dialog')) return
+    const k = e.key.toLowerCase()
+    if (k === 'arrowleft' || k === '1') { e.preventDefault(); choose('left') }
+    else if (k === 'arrowright' || k === '2') { e.preventDefault(); choose('right') }
+    else if (k === 'n' || (k === 'enter' && !t.closest('button, a'))) { e.preventDefault(); next() }
   })
 
+  /* ---- the verdict ---------------------------------------------------- */
+
   function finish() {
-    card.hidden = true
-    dots.hidden = true
-    // "Saved" measured against the worst available outcome each round, so the
-    // number means something rather than being a raw body count.
-    const worst = DILEMMAS.reduce((a, d) => a + Math.max(d.left.deaths, d.right.deaths), 0)
-    const saved = worst - deaths
-    const optimal = answered.filter((a) => a.deaths === a.min).length
-
-    el('vDeaths').textContent = String(deaths)
-    el('vPulls').textContent = String(pulls)
-    el('vSaved').textContent = String(saved)
-
     /* Every percentage below is your own agreement rate with a position, over
        the problems that position actually takes a side on. Nothing here is a
        crowd statistic, because there is no crowd. */
     const scored = scoreAnswers(picks)
-    el('vBars').innerHTML = scored.map((s) =>
-      `<li class="pos${s === scored[0] ? ' top' : ''}">
-         <div class="posrow"><b>${s.name}</b><span>${s.pct}%</span></div>
-         <div class="bar"><i style="width:${s.pct}%"></i></div>
-         <p>${POSITIONS[s.key].short}</p>
-         <small>You agreed with it on ${s.agreed} of the ${s.of} problems it has a view about.</small>
-       </li>`).join('')
+    const [top, runner] = scored
+    const tie = top.pct === runner.pct
 
-    const top = scored[0]
-    const runner = scored[1]
-    el('vLabel').textContent = top.name
-    el('vBlurb').textContent =
-      top.pct === runner.pct
-        ? `You split evenly between ${top.name.toLowerCase()} and ${runner.name.toLowerCase()}, at ${top.pct}% each. No single account of your answers wins.`
-        : top.pct >= 85
-          ? `You argued for it ${top.pct}% of the time, which is more consistent than most people manage. The next closest was ${runner.name.toLowerCase()}, at ${runner.pct}%.`
-          : `You argued for it ${top.pct}% of the time — ahead of ${runner.name.toLowerCase()} at ${runner.pct}%, but not by much. Most people are a mixture, and the mixture is the interesting part.`
+    shell.resultExtra.innerHTML = `
+      <div class="tr-verdict">
+        <dl class="tr-stats">
+          <div><dt class="label">Deaths</dt><dd class="num">${deaths}</dd></div>
+          <div><dt class="label">Levers pulled</dt><dd class="num">${pulls} / ${TOTAL}</dd></div>
+          <div><dt class="label">Saved vs. the worst option</dt><dd class="num">${saved}</dd></div>
+        </dl>
+        <p class="label">How often you agreed with each</p>
+        <ul class="tr-positions">${scored.map((s, k) => `
+          <li class="${k === 0 ? 'is-top' : ''}">
+            <p class="tr-pos-row"><b>${s.name}</b><span class="num">${s.pct}%</span></p>
+            <span class="tr-bar"><i style="--w: ${s.pct / 100}"></i></span>
+            <p>${POSITIONS[s.key].short}</p>
+            <small>You agreed with it on ${s.agreed} of the ${s.of} problems it has a view about.</small>
+          </li>`).join('')}
+        </ul>
+      </div>`
 
     // The twenty-fifth problem is the first one again. Whether you answered it
     // the same way is the one thing this game can measure about you directly.
     const changed = picks[0] && picks[REPEAT_OF_FIRST] && picks[0] !== picks[REPEAT_OF_FIRST]
-    el('vRepeat').textContent = changed
-      ? 'Problem 25 was problem 1, word for word. You answered it differently the second time.'
-      : 'Problem 25 was problem 1, word for word. You gave the same answer both times.'
+    const stat = recordPlay('trolley', { position: top.name, pulls, saved, deaths }, { saved: 'high' })
+    const beat = shell.considerBest(top.pct, `${top.pct}%`)
 
-    /* The result, kept and shareable.
-       `saved` is measured against the worst available outcome each round, so
-       it is the number worth a best-of; the position is a label, not a score,
-       and a "best position" would be a category error. */
-    const stat = recordPlay(
-      'trolley',
-      { position: top.name, pulls, saved, deaths },
-      { saved: 'high' },
-    )
-    el('vPlays').textContent =
-      stat.plays === 1
-        ? 'First time through.'
-        : `Run ${stat.plays}. Your best rescue so far is ${stat.bests.saved.value}.`
-
-    shareCard = {
-      slug: 'trolley',
-      siteName: LAYOUT.siteName,
-      headline: top.name,
-      sub:
-        top.pct === runner.pct
-          ? `An even split with ${runner.name.toLowerCase()}, at ${top.pct}% each.`
-          : `You argued for it ${top.pct}% of the time, over twenty-six levers.`,
-      stats: [
-        { label: 'Pulled', value: `${pulls} / 26` },
-        { label: 'Saved', value: String(saved) },
-        { label: 'Runner-up', value: runner.name },
-      ],
+    const lines = [
+      tie
+        ? `You split evenly between ${top.name.toLowerCase()} and ${runner.name.toLowerCase()}, at ${top.pct}% each. No single account of your answers wins.`
+        : top.pct >= 85
+          ? `You argued for it ${top.pct}% of the time, which is more consistent than most people manage. Next closest: ${runner.name.toLowerCase()}, at ${runner.pct}%.`
+          : `You argued for it ${top.pct}% of the time — ahead of ${runner.name.toLowerCase()} at ${runner.pct}%, but not by much. Most people are a mixture, and the mixture is the interesting part.`,
+      changed
+        ? 'Problem 25 was problem 1, word for word. You answered it differently the second time.'
+        : 'Problem 25 was problem 1, word for word. You gave the same answer both times.',
+    ]
+    if (beat === 'beaten') lines.push('✓ Your most consistent run yet.')
+    else if (beat === 'first') lines.push('Your first run — that consistency is the number to beat now.')
+    else if (shell.best) lines.push(`Your most consistent run is still ${shell.best.text}.`)
+    if (stat.plays > 1) lines.push(`Run ${stat.plays}.`)
+    const now = new Date()
+    if (dailyFor(now).slug === 'trolley') {
+      const need = dailyTarget.consistency(now)
+      lines.push(top.pct >= need ? `✓ Daily challenge beaten: ${need}% or more for one position.` : `✗ Daily challenge: argue for one position ${need}% of the time.`)
     }
 
-    verdict.hidden = false
-    sfx.great()
-    burst(innerWidth / 2, innerHeight * 0.4, {
-      count: 26, colors: ['#d97742', '#3d1f14', '#ffd166'], speed: 5, gravity: 0.2, life: 50, size: 4,
+    const article = (name: string) => (/^[aeio]/i.test(name) ? 'an' : 'a')
+    shell.win({
+      kicker: `${TOTAL} levers later`,
+      title: tie ? 'Split down the middle.' : `You argued like ${article(top.name)} ${top.name.toLowerCase()}.`,
+      score: `${top.pct}%`,
+      from: '0%',
+      lines,
+      againLabel: 'Start again',
     })
-    verdict.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
-  /* Once there is a verdict, sharing means the verdict — a picture of what
-     you actually argued for, rather than a link to the game. Before that, the
-     chrome button keeps its default behaviour. */
-  let shareCard = null
-  onShare(() => shareCard, (c) => ({
-    title: 'Trolley',
-    text: `I came out ${c.headline.toLowerCase()}.`,
-  }))
-
-  el('againBtn').addEventListener('click', () => {
-    i = 0; deaths = 0; pulls = 0; answered = []; picks = []
-    shareCard = null
-    card.hidden = false; dots.hidden = false; verdict.hidden = true
+  function restart() {
+    cancelAnimationFrame(rolling)
+    i = 0; deaths = 0; pulls = 0; saved = 0; picks = []
     render()
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  })
+    shell.stage.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    btn.left.focus({ preventScroll: true })
+  }
 
   render()
 </script>
 
-<style>
-  :global(.trolley-body) { background: #fbf3ec; }
+<style is:global>
+  /* The scene and the verdict are built by the script, so these rules are
+     global on purpose. The drawing carries its own fills (see the header of
+     lib/trolley-scene.ts); what is here is the frame around it and the two
+     things that have to be CSS because they are animation. */
+  .tr { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(18px, 3vw, 44px); align-items: start; }
+  @media (max-width: 900px) { .tr { grid-template-columns: minmax(0, 1fr); } }
 
-  .wrap { max-width: 720px; margin: 0 auto; padding: 44px 22px 80px; }
-  .head { text-align: center; margin-bottom: 26px; }
-  .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .lede { color: var(--ink-soft); margin: 10px auto 0; max-width: 44ch; }
-
-  .dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
-  .dots :global(.dot) {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: #e2d3c6; transition: background 200ms var(--ease);
+  .tr-scene { margin: 0; position: sticky; top: 16px; }
+  /* One column: read the setup, see the picture, then choose. The side
+     column dissolves into the grid so the scene can sit between the two. */
+  @media (max-width: 900px) {
+    .tr > .tr-side { display: contents; }
+    .tr-scene { position: static; order: 1; }
+    .tr-choices { order: 2; }
+    .tr-outcome { order: 3; }
   }
-  .dots :global(.dot.done) { background: #d97742; }
-
-  .card {
-    background: #fff; border: 1px solid #ecdccd; border-radius: var(--radius-lg);
-    padding: 26px 24px 22px; box-shadow: var(--shadow);
+  .tr-scene svg {
+    display: block; width: 100%; height: auto;
+    border: 2px solid var(--ink); border-radius: var(--r-lg);
+    overflow: hidden;
   }
-  .card.enter { animation: slide 300ms var(--ease); }
-  @keyframes slide { from { opacity: 0; transform: translateY(10px); } }
+  .tr-scene .switch { transform-box: fill-box; transform-origin: 0% 100%; }
+  .tr-scene .switch.thrown { transform: rotate(38deg); }
+  html.play .tr-scene .switch { transition: transform 300ms var(--spring); }
 
-  .tag {
-    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #a3542f; font-weight: 600;
-  }
-  .card h2 { font-size: clamp(24px, 4vw, 32px); margin: 6px 0 10px; }
-  .setup { margin: 0; font-size: 16.5px; color: #4b4038; text-wrap: pretty; }
+  /* Twenty-six sleepers: the ones behind you are ink, this one is orange. */
+  .tr-rail { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: 3px; }
+  .tr-rail li { height: 10px; border-radius: 3px; background: var(--paper3); }
+  .tr-rail li.is-done { background: var(--ink); }
+  .tr-rail li.is-now { background: var(--orange); }
 
-  .scene { display: block; width: 100%; height: auto; margin: 16px 0 4px; overflow: visible; }
-/* The drawing carries its own fills — see the header of lib/trolley-scene.ts.
-     Runtime-created nodes do not get Astro's scoped-style attribute, so every
-     rule for them had to be written `:global` or it silently matched nothing
-     and the branch rail rendered as a solid black wedge. Colour in the markup
-     removes that trap instead of documenting it a sixth time.
+  .tr-side { display: grid; gap: 14px; align-content: start; }
+  .tr-title { font-size: var(--fs-h2); line-height: 0.98; }
+  .tr-setup { font-size: var(--fs-lead); line-height: 1.5; color: var(--ink2); max-width: 44ch; text-wrap: pretty; }
 
-     What is left here is the two things that have to be CSS, because both are
-     animation: the lever's rotation and the tram's position. */
-  .scene :global(.switch) {
-    transform-box: fill-box; transform-origin: 0% 100%;
-    transition: transform 300ms var(--ease);
+  .tr-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+  @media (max-width: 480px) { .tr-choices { grid-template-columns: minmax(0, 1fr); } }
+  .tr-choice {
+    --pill-flood: var(--ink);
+    --pill-flood-ink: var(--ink-paper);
+    min-height: 64px; justify-content: flex-start; padding: 0 20px 0 12px;
+    background: var(--card); color: var(--ink); border-color: var(--ink);
+    font-size: 16px; font-weight: 700; white-space: normal; text-align: left; line-height: 1.2;
   }
-  .scene :global(.switch.thrown) { transform: rotate(38deg); }
+  .tr-choice:not([disabled]):hover { background: var(--ink); color: var(--ink-paper); }
+  .tr-choice kbd {
+    flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+    background: var(--paper2); color: var(--ink); font: 700 15px/1 var(--sans);
+  }
+  .tr-choice.is-chosen, .tr-choice.is-chosen[disabled] { background: var(--ink); color: var(--ink-paper); opacity: 1; }
+  .tr-choice.is-chosen kbd { background: var(--orange); }
 
-  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
-  .choice {
-    border: 1px solid #e3cdbb; background: #fff; border-radius: 14px;
-    padding: 15px 14px; font-size: 15.5px; font-weight: 600; cursor: pointer;
-    transition: transform 140ms var(--ease), border-color 140ms var(--ease), background 140ms var(--ease);
-  }
-  .choice:hover:not(:disabled) { transform: translateY(-2px); border-color: #d97742; background: #fff8f3; }
-  .choice:disabled { opacity: 0.45; cursor: default; }
-
-  .outcome {
-    margin-top: 16px; padding-top: 16px; border-top: 1px dashed #ecdccd;
-    animation: slide 260ms var(--ease);
-  }
-  .outcome p { margin: 0 0 14px; color: #4b4038; font-size: 16px; text-wrap: pretty; }
-  .outcome button, .verdict-actions button {
-    border: 0; border-radius: 999px; padding: 11px 24px;
-    background: #3d1f14; color: #fff; font-weight: 600; cursor: pointer;
-    transition: filter 140ms var(--ease), transform 180ms var(--ease-bounce);
-  }
-  .outcome button:hover { filter: brightness(1.15); transform: translateY(-2px) scale(1.03); }
-  .outcome button:active, .verdict-actions button:active { transform: scale(0.96); }
-
-  .verdict {
-    background: #fff; border: 1px solid #ecdccd; border-radius: var(--radius-lg);
-    padding: 30px 24px; text-align: center; box-shadow: var(--shadow);
-    animation: slide 320ms var(--ease);
-  }
-  .verdict h2 { font-size: 26px; }
-  .stat-row { display: flex; justify-content: center; gap: 26px; flex-wrap: wrap; margin: 20px 0 22px; }
-  .stat { display: grid; }
-  .stat b { font-family: var(--display); font-size: 38px; font-variant-numeric: tabular-nums; }
-  .stat span { font-size: 12px; color: var(--ink-soft); max-width: 14ch; }
-  .verdict h3 { font-size: 28px; color: #b5643c; }
-  .verdict p { color: #4b4038; max-width: 48ch; margin: 10px auto 0; text-wrap: pretty; }
-  /* The four positions, best first. Left-aligned inside a centred card because
-     these are paragraphs to read, not figures to scan. */
-  /* The list items are built in JS, and JS-created nodes never get Astro's
-     scoped-style attribute — so everything below the <ul> has to be :global,
-     the same way the scene figures are. Without this the bars simply do not
-     exist and the name and percentage run together. */
-  .positions { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 16px; text-align: left; }
-  .positions :global(.pos) { border-top: 1px solid #ecdccd; padding-top: 14px; }
-  .positions :global(.posrow) { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  .positions :global(.posrow b) { font-size: 16px; }
-  .positions :global(.posrow span) { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 15px; }
-  .positions :global(.pos.top .posrow b), .positions :global(.pos.top .posrow span) { color: #a84f2a; }
-  .positions :global(.bar) { height: 7px; border-radius: 4px; background: #f0e2d6; overflow: hidden; margin: 7px 0 9px; }
-  .positions :global(.bar i) { display: block; height: 100%; background: #c98a5e; transition: width 600ms var(--ease); }
-  .positions :global(.pos.top .bar i) { background: #b5643c; }
-  .positions :global(p) { margin: 0; font-size: 14px; color: #5b4e44; max-width: none; }
-  .positions :global(small) { display: block; margin-top: 5px; font-size: 12px; color: #7b6c60; }
-  .repeat {
-    margin-top: 22px !important; padding-top: 14px; border-top: 1px solid #ecdccd;
-    font-size: 14px; color: #5b4e44;
+  /* The toll, in whole blocks: nobody is sky, a few is amber, many is red.
+     The words always say the number too. */
+  .tr-outcome { display: grid; gap: 10px; justify-items: start; margin-top: 4px; padding: 22px; border-radius: var(--r-lg); color: var(--ink); background: var(--amber); box-shadow: var(--shadow-block); }
+  .tr-outcome.is-none { background: var(--sky); }
+  .tr-outcome.is-many { background: var(--red); }
+  .tr-toll { font-size: 13px; }
+  .tr-outcome-text { font-size: 17px; line-height: 1.45; font-weight: 500; max-width: 46ch; text-wrap: pretty; }
+  .tr-keys { font-size: 13px; }
+  .tr-keys kbd, .tr-real kbd {
+    display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 6px;
+    border: 1.5px solid currentColor; font: 700 12px/1.5 var(--sans); text-align: center;
   }
 
-  .verdict-actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
-  .verdict-actions .ghost { background: #fff; color: var(--ink); border: 1px solid #e3cdbb; }
+  /* ---- the verdict, inside the ink result card ---------------------- */
+  .tr-verdict { display: grid; gap: 16px; }
+  .tr-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 12px; }
+  @media (max-width: 560px) { .tr-stats { grid-template-columns: minmax(0, 1fr); } }
+  .tr-stats div { padding: 16px 18px; border-radius: var(--r); box-shadow: inset 0 0 0 1.5px rgba(246, 244, 240, 0.28); }
+  .tr-stats dd { margin: 10px 0 0; font-size: clamp(30px, 4vw, 48px); }
+  .tr-positions { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; max-width: 70ch; }
+  .tr-positions li { display: grid; gap: 6px; padding-top: 14px; border-top: 1px solid rgba(246, 244, 240, 0.22); }
+  .tr-pos-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .tr-pos-row b { font-size: 18px; }
+  .tr-pos-row .num { font-size: 22px; }
+  .tr-positions li.is-top .tr-pos-row { color: var(--amber); }
+  .tr-bar { display: block; height: 8px; border-radius: 4px; background: rgba(246, 244, 240, 0.18); overflow: hidden; }
+  .tr-bar i { display: block; height: 100%; background: var(--ink-paper); transform-origin: left center; transform: scaleX(var(--w, 0)); }
+  .tr-positions li.is-top .tr-bar i { background: var(--amber); }
+  .tr-positions p:not(.tr-pos-row) { font-size: 15px; opacity: 0.86; }
+  .tr-positions small { font-size: 13px; opacity: 0.7; }
 
-  @media (prefers-reduced-motion: reduce) {
-    .scene .switch { transition: none; }
-    .card.enter, .outcome, .verdict { animation: none; }
-  }
+  .tr-real { margin-top: 16px; padding: 20px 24px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-block); }
+  .tr-real summary { cursor: pointer; }
+  .tr-real p { margin-top: 12px; max-width: 64ch; color: var(--ink2); }
+  .tr-real code { font-size: 13px; background: var(--paper2); padding: 1px 6px; border-radius: 6px; }
 
-  @media (max-width: 520px) {
-    .choices { grid-template-columns: 1fr; }
-  }
+  /* ---- motion: armed only under html.play --------------------------- */
+  html.play .tr-side.is-turning > * { animation: tr-turn 520ms var(--ease) both; }
+  @keyframes tr-turn { from { opacity: 0; transform: translateY(12px); } }
+  html.play .tr-outcome:not([hidden]) { animation: tr-settle 620ms var(--spring) both; }
+  @keyframes tr-settle { from { transform: scale(0.94); border-radius: 48px; } }
+  html.play .result.is-in .tr-bar i { animation: tr-bar 1100ms var(--glide) 500ms both; }
+  /* Both ends explicit: a from-only keyframe resolving to an inline
+     transform was painted at its start state once finished. */
+  @keyframes tr-bar { from { transform: scaleX(0); } to { transform: scaleX(var(--w, 0)); } }
 </style>

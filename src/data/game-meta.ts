@@ -51,7 +51,7 @@ export const META: Record<string, GameMeta> = {
 }
 
 /** Games already running inside the shared shell. Grows two per phase. */
-export const SHELL_GAMES = new Set(['rule-cascade', 'auction'])
+export const SHELL_GAMES = new Set(['rule-cascade', 'auction', 'dark-patterns', 'trolley'])
 
 /** localStorage key the shell keeps a game's personal best under. */
 export const bestKey = (slug: string) => `paper:best:${slug}`
@@ -65,7 +65,7 @@ export type Daily = { slug: string; title: string; goal: string }
 
 export function dailyFor(date: Date): Daily {
   const day = Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86_400_000)
-  const pick = day % 2
+  const pick = day % 4
   if (pick === 0) {
     const cap = 300 + (day % 5) * 40
     return {
@@ -74,10 +74,34 @@ export function dailyFor(date: Date): Daily {
       goal: `Satisfy all 31 rules in fewer than ${cap} keystrokes.`,
     }
   }
-  const lots = 2 + (day % 3)
-  return {
-    slug: 'auction',
-    title: 'The Auction Game',
-    goal: `Win at least ${lots} lots and still finish the sale up on the appraisal.`,
+  if (pick === 1) {
+    const lots = 2 + (day % 3)
+    return {
+      slug: 'auction',
+      title: 'The Auction Game',
+      goal: `Win at least ${lots} lots and still finish the sale up on the appraisal.`,
+    }
   }
+  if (pick === 2) {
+    return {
+      slug: 'dark-patterns',
+      title: 'Dark Patterns',
+      goal: `Get through at least ${dailyDodges(day)} of the 11 websites without falling for the trick.`,
+    }
+  }
+  return {
+    slug: 'trolley',
+    title: 'Trolley',
+    goal: `Argue for one ethical position at least ${dailyConsistency(day)}% of the time, across all 26 levers.`,
+  }
+}
+
+/* The daily targets, exposed so each game can grade itself against the same
+   number the homepage printed. */
+const dayOf = (date: Date) => Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86_400_000)
+function dailyDodges(day: number) { return 8 + (day % 3) }
+function dailyConsistency(day: number) { return 80 + (day % 3) * 5 }
+export const dailyTarget = {
+  dodges: (date: Date) => dailyDodges(dayOf(date)),
+  consistency: (date: Date) => dailyConsistency(dayOf(date)),
 }
