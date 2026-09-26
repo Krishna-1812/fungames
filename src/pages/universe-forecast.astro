@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 
 /**
  * Universe Forecast — the weather, for the sky.
@@ -20,17 +20,31 @@ import GameLayout from '../layouts/GameLayout.astro'
  * Rendered on the client rather than at build time for the same reason as the
  * dates. A static build would freeze "next" to whatever was true the morning it
  * was deployed, and "next" is the whole proposition.
+ *
+ * In the shell the night sky is the stage: it is a sticky backdrop inside the
+ * frame now rather than fixed to the window. Score is how long until the next
+ * big event, Kinds drawn and Moves count the kinds and the events you have
+ * drawn big at the top, and drawing one of every kind — an eclipse, a
+ * phase, a season, the Sun at its nearest or furthest, a meteor shower — is
+ * the ending. The page's own accent is mint rather than gold; the Sun is
+ * still drawn the colour of the Sun.
  */
 ---
 
-<GameLayout slug="universe-forecast" bar="#05081c" bodyClass="sky-body">
-  <div class="sky" id="sky" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
+<GameShell
+  slug="universe-forecast"
+  labels={{ score: 'Next', best: 'Most drawn', level: 'Kinds drawn', moves: 'Drawn' }}
+  initial={{ score: '—', level: '0 / 5', moves: '0' }}
+>
+  <div class="sky-body">
+  <div class="uf-back" aria-hidden="true">
+    <div class="sky" id="sky"></div>
+    <div class="vignette"></div>
+  </div>
 
-  <div class="wrap">
+  <div class="uf-wrap">
     <header class="head">
       <p class="eyebrow">Computed here, in this tab</p>
-      <h1>Universe Forecast</h1>
       <p class="lede">
         What the sky is going to do, and when. Every date and every picture below
         is worked out from the orbits themselves — nothing here was looked up.
@@ -38,7 +52,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     </header>
 
     <!-- The one event everything else is a footnote to. -->
-    <section class="hero" id="hero" aria-live="polite">
+    <section class="uf-hero" id="hero" aria-live="polite">
       <!-- The stage is an instrument, not a loop. You can stop it and drag
            through the event yourself; on a lunar eclipse the scrubber is a
            real clock, because a lunar eclipse happens at one instant for
@@ -65,7 +79,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
     <div class="panels">
       <!-- The Moon, drawn at the phase it is actually at, right now. -->
-      <section class="panel moon-panel">
+      <section class="uf-panel moon-panel">
         <h2 class="panel-h">The Moon <span id="moonWhen">right now</span></h2>
         <div class="moon-row">
           <div class="moon-art" id="moonArt"></div>
@@ -82,7 +96,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       </section>
 
       <!-- Every event in the coming year, at its true angle round the year. -->
-      <section class="panel wheel-panel">
+      <section class="uf-panel wheel-panel">
         <h2 class="panel-h">The year ahead</h2>
         <div class="wheel-wrap">
           <div class="wheel" id="wheel"></div>
@@ -155,7 +169,22 @@ import GameLayout from '../layouts/GameLayout.astro'
       </div>
     </details>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      What the sky is going to do, and when: eclipses, the phases of the Moon,
+      the seasons, the Sun at its nearest and furthest, and the meteor showers,
+      all worked out in this tab from the orbits themselves.
+    </p>
+    <ul>
+      <li>The big picture at the top is drawn to scale for the day. Play it, pause it, or drag through the event.</li>
+      <li>Every picture in the list is a button: tap one and it is drawn big at the top. The wheel shows the whole year at once.</li>
+      <li>Drag the Moon a fortnight either way to see it on another day.</li>
+    </ul>
+    <p>Draw one of every kind of event to finish. Times are UTC.</p>
+  </Fragment>
+</GameShell>
 
 <script>
   import {
@@ -164,9 +193,14 @@ import GameLayout from '../layouts/GameLayout.astro'
     type SkyEvent, type Eclipse,
   } from '../lib/sky-forecast'
   import { recordPlay } from '../lib/stats'
-  import { onShare } from '../lib/share-card'
-  import { prefersReducedMotion } from '../lib/gl'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+
+  const prefersReducedMotion = !PLAY
+  // Restart is a reload, the default: the forecast is worked out afresh.
+  const shell = createShell({ slug: 'universe-forecast' })
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -1327,6 +1361,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   /** Put an event on the stage. */
   function select(ev: SkyEvent) {
     lead = ev
+    noteDrawn(ev)
     paintHero()
     stop()
     // A new event starts at its middle and starts moving, whatever the last
@@ -1893,7 +1928,6 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* The record                                                                */
   /* ------------------------------------------------------------------------ */
 
-  recordPlay('universe-forecast')
 
   /* The card is the next real event and how long you have to wait for it,
      which is the only thing on this page anybody would want to send someone.
@@ -1909,28 +1943,81 @@ import GameLayout from '../layouts/GameLayout.astro'
     [/Penumbral lunar/, 'A faint greying of the Moon.'],
   ]
 
-  onShare(
-    () => {
-      if (!lead) return null
-      const eclipses = events.filter((e) => e.kind === 'eclipse').length
-      const tail = CARD_LINE.find(([re]) => re.test(lead.title))?.[1] ?? ''
-      return {
-        slug: 'universe-forecast',
-        siteName: SITE.name,
-        headline: lead.title,
-        sub: `${formatWhen(lead.when, lead.timed)}${tail ? '. ' + tail : ''}`,
-        stats: [
-          { label: 'From now', value: countdown(new Date(), lead.when).replace(/^in /, '') },
-          { label: 'Eclipses', value: String(eclipses) },
-          { label: 'Events', value: String(events.length) },
-        ],
-      }
-    },
-    (c) => ({
-      title: 'Universe Forecast',
-      text: `${c.headline} — ${countdown(new Date(), lead!.when)}.`,
-    }),
-  )
+  function shareCardNow() {
+    const ev = defaultLead
+    if (!ev) return null
+    const eclipses = events.filter((e) => e.kind === 'eclipse').length
+    const tail = CARD_LINE.find(([re]) => re.test(ev.title))?.[1] ?? ''
+    return {
+      slug: 'universe-forecast',
+      siteName: SITE.name,
+      headline: ev.title,
+      sub: `${formatWhen(ev.when, ev.timed)}${tail ? '. ' + tail : ''}`,
+      stats: [
+        { label: 'From now', value: countdown(new Date(), ev.when).replace(/^in /, '') },
+        { label: 'Eclipses', value: String(eclipses) },
+        { label: 'Events', value: String(events.length) },
+      ],
+    }
+  }
+
+  /* ---- the shell ----------------------------------------------------------- */
+
+  /* Drawing one of every kind of event is the ending. Only kinds the coming
+     year actually has count, so a year without a shower in range could never
+     leave the round unfinishable. */
+  const KINDS = [...new Set(events.map((e) => e.kind))]
+  const drawnKinds = new Set<string>()
+  const drawnEvents = new Set<number>()
+  let ended = false
+  /** Short enough for a score tile: "10 mo", "12 d", "5 h". */
+  function shortUntil(when: Date) {
+    const ms = +when - Date.now()
+    const d = ms / 86_400_000
+    if (d >= 60) return `${Math.round(d / 30.44)} mo`
+    if (d >= 1) return `${Math.round(d)} d`
+    return ms > 0 ? `${Math.max(1, Math.round(ms / 3_600_000))} h` : 'now'
+  }
+  function paintStrip() {
+    if (defaultLead) shell.setScore(shortUntil(defaultLead.when))
+    shell.setLevel(`${drawnKinds.size} / ${KINDS.length}`)
+    shell.setMoves(String(drawnEvents.size))
+    if (drawnEvents.size) shell.considerBest(drawnEvents.size, String(drawnEvents.size))
+  }
+  function noteDrawn(ev: SkyEvent) {
+    drawnKinds.add(ev.kind)
+    drawnEvents.add(+ev.when)
+    paintStrip()
+    if (!ended && KINDS.every((k) => drawnKinds.has(k))) {
+      ended = true
+      const c = shareCardNow()
+      recordPlay('universe-forecast', { drawn: drawnEvents.size }, { drawn: 'high' })
+      shell.win({
+        // The card waits under the forecast; the picture just drawn stays put.
+        scroll: false,
+        kicker: 'The next two years, drawn',
+        title: 'Every kind of sky, worked out.',
+        score: `${KINDS.length} / ${KINDS.length}`,
+        lines: [
+          defaultLead ? `Next worth the diary: ${defaultLead.title}, ${countdown(new Date(), defaultLead.when)}.` : '',
+          `${events.length} events in the next two years, and not one of them looked up.`,
+        ].filter(Boolean),
+        againLabel: 'Work it out again',
+      })
+      shell.resultExtra.innerHTML =
+        '<div class="uf-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share the next one</span></button></div>'
+      document.getElementById('shareBtn')!.addEventListener('click', async (e) => {
+        const card = c ?? shareCardNow()
+        if (!card) return
+        const label = (e.currentTarget as HTMLElement).querySelector('span')!
+        const outcome = await shareResult(card, { title: 'Universe Forecast', text: `${card.headline} — ${countdown(new Date(), defaultLead!.when)}.`, url: location.href })
+        label.textContent = outcomeLabel[outcome]
+        setTimeout(() => (label.textContent = 'Share the next one'), 1600)
+      })
+    }
+  }
+  paintStrip()
+  setInterval(paintStrip, 60_000)
 </script>
 
 <!-- is:global, and every rule namespaced under .sky-body.
@@ -1942,21 +2029,28 @@ import GameLayout from '../layouts/GameLayout.astro'
      going global from also meaning going loose: .wrap, .head and .ev are
      common enough names to collide with the layout's own global rules. -->
 <style is:global>
+  /* The night fills the stage edge to edge. overflow: clip rather than
+     hidden, which would make the stage a scroll container and stop the sky
+     sticking. */
+  .stage:has(> .sky-body) { padding: 0; overflow: clip; background: #05081c; }
   .sky-body {
-    background: #05081c;
+    position: relative;
     color: #e9edff;
     --sky-ink: #e9edff;
     --dim: #a3b1e4;
     --faint: #7f8dc6;
-    --gold: #ffd98a;
+    --gold: #4fe3c1;
     --line: rgba(126, 146, 226, 0.22);
     --panel: rgba(14, 20, 48, 0.72);
   }
 
   /* --- the sky ----------------------------------------------------------- */
 
+  /* Sticky, not fixed: the sky is pinned while the forecast scrolls over it,
+     but it stays inside the frame. */
+  .sky-body .uf-back { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; z-index: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
   .sky-body .sky {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
     background:
       radial-gradient(ellipse 120% 78% at 50% -12%, #16204c 0%, transparent 62%),
       radial-gradient(ellipse 80% 55% at 88% 108%, #123049 0%, transparent 60%),
@@ -1971,8 +2065,8 @@ import GameLayout from '../layouts/GameLayout.astro'
     background:
       radial-gradient(ellipse 46% 34% at 24% 28%, rgba(150, 100, 230, 0.16) 0%, transparent 70%),
       radial-gradient(ellipse 40% 30% at 80% 66%, rgba(90, 150, 230, 0.14) 0%, transparent 70%);
-    animation: nebula-drift 70s ease-in-out infinite alternate;
   }
+  html.play .sky-body .sky::after { animation: nebula-drift 70s ease-in-out infinite alternate; }
   @keyframes nebula-drift {
     0%   { transform: translate(0, 0) scale(1); opacity: 0.7; }
     50%  { transform: translate(-2.5%, 2%) scale(1.06); opacity: 1; }
@@ -1985,14 +2079,15 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* A vignette does the job a lens does: it holds the eye in the middle of a
      dark page instead of letting it slide off the corners. */
   .sky-body .vignette {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
     background: radial-gradient(ellipse 80% 70% at 50% 42%, transparent 40%, rgba(2, 4, 14, 0.72) 100%);
   }
 
-  .sky-body .wrap {
+  .sky-body .uf-wrap {
     position: relative; z-index: 1;
-    max-width: 860px; margin: 0 auto; padding: 40px 20px 110px;
+    max-width: 860px; margin: 0 auto; padding: 40px 20px 80px;
   }
+  .uf-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
   /* --- the masthead ------------------------------------------------------ */
 
@@ -2018,7 +2113,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   /* --- the hero ---------------------------------------------------------- */
 
-  .sky-body .hero {
+  .sky-body .uf-hero {
     display: grid;
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
     gap: 0;
@@ -2048,11 +2143,11 @@ import GameLayout from '../layouts/GameLayout.astro'
     font-size: clamp(24px, 3.6vw, 34px); margin: 9px 0 0; line-height: 1.08;
     letter-spacing: -0.015em;
   }
-  .sky-body .hl-when { margin: 9px 0 0; color: #b9c6f5; font-variant-numeric: tabular-nums; font-size: 14.5px; }
+  .sky-body .hl-when { margin: 9px 0 0; color: #b9c6f5; font-size: 14.5px; }
   .sky-body .hl-count {
     margin: 12px 0 0; font-size: 22px; font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    background: linear-gradient(96deg, #ffd98a, #ffb27f 60%, #ff9fd0);
+   
+    background: linear-gradient(96deg, #8ccbff, #b8a1ff 60%, #ff9fd0);
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .sky-body .hl-detail { margin: 12px 0 0; color: var(--dim); font-size: 14px; line-height: 1.6; text-wrap: pretty; }
@@ -2062,7 +2157,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     font-size: 12.5px; color: #93a1d8; line-height: 1.45;
   }
   .sky-body .hl-facts b {
-    color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 700;
+    color: var(--gold); font-weight: 700;
   }
 
   /* --- the moon and the wheel ---------------------------------------------
@@ -2076,10 +2171,10 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .panels {
     display: grid; gap: 40px; margin: 44px 0 0;
   }
-  .sky-body .panel {
+  .sky-body .uf-panel {
     padding: 0 0 30px; border-bottom: 1px solid var(--line);
   }
-  .sky-body .panel:last-child { border-bottom: 0; padding-bottom: 0; }
+  .sky-body .uf-panel:last-child { border-bottom: 0; padding-bottom: 0; }
   .sky-body .panel-h {
     margin: 0 0 18px; font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
     text-transform: uppercase; color: #7f8fd0; text-align: center;
@@ -2102,7 +2197,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .mf dt { font-size: 11.5px; color: var(--faint); letter-spacing: 0.03em; }
   .sky-body .mf dd {
     margin: 0; font-size: 13px; font-weight: 650; color: #dbe3ff;
-    font-variant-numeric: tabular-nums; text-align: right;
+    text-align: right;
   }
 
   .sky-body .wheel-wrap { position: relative; }
@@ -2149,7 +2244,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .controls {
     display: flex; flex-wrap: wrap; gap: 7px; justify-content: center;
     margin: 28px -20px 6px; padding: 10px 20px 12px;
-    position: sticky; top: 48px; z-index: 4;
+    position: sticky; top: 0; z-index: 4;
     /* Solid for its whole height, with the soft edge pushed below it by the
        pseudo-element. A gradient that fades inside the bar leaves a window for
        rows to scroll through, which reads as a rendering fault. */
@@ -2258,7 +2353,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .ev-date { text-align: right; padding-top: 5px; line-height: 1; }
   .sky-body .ev-date b {
     display: block; font-size: 20px; font-weight: 700; color: #d6dfff;
-    font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
+    letter-spacing: -0.03em;
   }
   .sky-body .ev-date i {
     display: block; font-style: normal; margin-top: 3px;
@@ -2316,7 +2411,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   .sky-body .ev-meta {
     margin: 4px 0 0; font-size: 12px; color: #8d9bd6;
-    font-variant-numeric: tabular-nums; letter-spacing: 0.015em;
+    letter-spacing: 0.015em;
   }
   .sky-body .ev-day { display: none; }
   .sky-body .ev-detail {
@@ -2328,7 +2423,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .ev-count-block {
     margin: 0; justify-self: end; padding-top: 5px;
     font-size: 12.5px; white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+   
   }
   .sky-body .ev-count-inline { display: none; }
   .sky-body .ev-count-inline::before { content: ' · '; opacity: 0.45; color: #8d9bd6; }
@@ -2336,16 +2431,16 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* Weighted by how much of a fuss the thing actually is, so a total eclipse
      does not sit in the same typography as a first quarter. */
   .sky-body .ev.rank-3 .ev-title { color: #ffe9b8; font-size: 17px; }
-  .sky-body .ev.rank-3 .ev-node { border-color: rgba(255, 217, 138, 0.34); }
+  .sky-body .ev.rank-3 .ev-node { border-color: rgba(79, 227, 193, 0.34); }
 
   /* The row whose picture is on the stage. */
   .sky-body .ev.is-lead {
-    background: linear-gradient(90deg, rgba(255, 217, 138, 0.11), rgba(255, 217, 138, 0.02) 55%, transparent);
+    background: linear-gradient(90deg, rgba(79, 227, 193, 0.11), rgba(79, 227, 193, 0.02) 55%, transparent);
   }
   .sky-body .ev.is-lead .ev-date b { color: var(--gold); }
   .sky-body .ev.is-lead .ev-node {
-    border-color: rgba(255, 217, 138, 0.62);
-    box-shadow: 0 0 0 5px rgba(8, 11, 32, 0.92), 0 0 26px -3px rgba(255, 217, 138, 0.6);
+    border-color: rgba(79, 227, 193, 0.62);
+    box-shadow: 0 0 0 5px rgba(8, 11, 32, 0.92), 0 0 26px -3px rgba(79, 227, 193, 0.6);
   }
 
   .sky-body .hl-back {
@@ -2422,7 +2517,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   .sky-body .stage-scrub { flex: 1; min-width: 0; --sl-thumb: 14px; --sl-h: 4px; }
   .sky-body .stage-read {
     flex: none; margin: 0; min-width: 12.5em; text-align: right;
-    font-size: 11.5px; color: #b9c6f5; font-variant-numeric: tabular-nums;
+    font-size: 11.5px; color: #b9c6f5;
     letter-spacing: 0.01em;
   }
   .sky-body .stage-caption {
@@ -2439,7 +2534,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     display: flex; align-items: center; gap: 10px; margin: 14px 0 0;
     padding-top: 12px; border-top: 1px solid rgba(126, 146, 226, 0.14);
   }
-  .sky-body .moon-scrubber input { flex: 1; min-width: 0; --sl-thumb: 15px; }
+  .sky-body .moon-scrubber input { flex: 1; min-width: 0; accent-color: var(--gold); }
   .sky-body .moon-now {
     flex: none; border: 1px solid var(--line); background: rgba(22, 30, 68, 0.8);
     color: #b6c3f0; border-radius: 999px; padding: 6px 12px; min-height: 26px;
@@ -2490,7 +2585,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     display: inline-block; margin-left: 7px; padding: 1px 6px;
     border-radius: 999px; font-size: 10.5px; font-weight: 700;
     background: rgba(126, 146, 226, 0.24); color: #c4d0ff;
-    font-variant-numeric: tabular-nums;
+   
   }
   .sky-body .filter.is-on .tally { background: rgba(13, 19, 48, 0.14); color: #2c3566; }
 
@@ -2518,18 +2613,18 @@ import GameLayout from '../layouts/GameLayout.astro'
   /* --- narrow ------------------------------------------------------------ */
 
   @media (max-width: 760px) {
-    .sky-body .hero { grid-template-columns: 1fr; }
+    .sky-body .uf-hero { grid-template-columns: minmax(0, 1fr); }
     .sky-body .hero-stage { min-height: 250px; }
     .sky-body .stage-canvas { min-height: 250px; }
     .sky-body .panels { grid-template-columns: 1fr; }
   }
   @media (max-width: 480px) {
-    .sky-body .wrap { padding: 30px 14px 90px; }
+    .sky-body .uf-wrap { padding: 30px 14px 90px; }
     /* Match the wrap padding, so the sticky bar reaches the viewport edge
        exactly instead of six pixels past it. */
     .sky-body .controls { margin-inline: -14px; padding-inline: 14px; }
     .sky-body .hero-text { padding: 20px 18px 22px; }
-    .sky-body .panel { padding: 15px 14px 17px; }
+    .sky-body .uf-panel { padding: 15px 14px 17px; }
     .sky-body .ev-node { width: 42px; height: 42px; }
     .sky-body .ev-node .glyph { width: 29px; height: 29px; }
     .sky-body .ev { grid-template-columns: 42px minmax(0, 1fr); }
@@ -2540,6 +2635,6 @@ import GameLayout from '../layouts/GameLayout.astro'
     .sky-body .ev { animation: none; }
     .sky-body .ev-node:hover, .sky-body .ev-node:focus-visible { transform: none; }
     .sky-body .sky::after { animation: none; opacity: 0.85; }
-    .sky-body .hero { animation: none; }
+    .sky-body .uf-hero { animation: none; }
   }
 </style>

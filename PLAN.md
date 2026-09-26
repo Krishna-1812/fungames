@@ -2497,7 +2497,30 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     than reloading into the same saved one. Best is the oldest you have been
     on a visit here.
 
-53. Then reassess again.
+53. ~~**Paper & Ink, phase 11: Day Go and Universe Forecast.**~~ **done.**
+
+    **Where Does The Day Go?** is a paper page now. Score is the real work
+    left in the day, Pieces and Interruptions the other two readings, Best
+    the most real work kept, and the reckoning at the bottom is a quiet
+    ending with a share. The day-bar's segments are the system's blocks —
+    lilac, cobalt, sky, mint, raspberry, ink — where they were yellows and
+    oranges, and the sliders are ink. (At the page's own defaults the model
+    leaves no real work at all, which it always did; the card now says so in
+    words rather than "0.0h".)
+
+    **Universe Forecast** keeps its night: the sky is a sticky backdrop
+    inside the stage, and its sticky filter bar sits at the top of the
+    viewport rather than 48px down for a chrome bar that is gone. It had no
+    goal, so it has one that was already in it — every picture is a button
+    that draws the event big at the top — and drawing one of every kind of
+    event is the ending. Score is how long until the next big one ("10 mo").
+    The page's own accent is mint instead of gold; the Sun is still drawn
+    gold, and each kind of event keeps its colour. Three of its class names
+    were the system's (`.wrap`, `.hero`, `.panel`) and are prefixed; on a
+    phone its one-column hero let the canvas push the column wider than the
+    frame (`1fr` rather than `minmax(0, 1fr)`), which is fixed.
+
+54. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

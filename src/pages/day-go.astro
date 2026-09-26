@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { withBase } from '../lib/base'
 
 /**
@@ -23,16 +23,24 @@ import { withBase } from '../lib/base'
  * `REFOCUS_MINUTES` — Gloria Mark's real, published 23-minutes-15-seconds
  * figure for how long it takes to fully refocus after an interruption.
  * `scripts/check-day-model.mjs` checks the arithmetic and the citation both.
+ *
+ * In the shell it is a paper page. Score is the real work left in the day,
+ * Pieces is how many pieces the day is in, Moves the interruptions, and Best
+ * the most real work you have kept. Reaching the reckoning at the bottom is
+ * the ending; the card under it is the summary, and a share. The day-bar's
+ * colours are the design system's blocks rather than yellows and oranges.
  */
 ---
 
-<GameLayout slug="day-go" bar="#301a10" bodyClass="day-body">
-  <div class="dg-bg" aria-hidden="true"></div>
-
+<GameShell
+  slug="day-go"
+  labels={{ score: 'Real work', best: 'Most kept', level: 'Pieces', moves: 'Interruptions' }}
+  initial={{ score: '8.0h', level: '3', moves: '0' }}
+>
+  <div class="day-body">
   <header class="dg-head">
-    <p class="dg-eyebrow">A live instrument, not a quiz</p>
-    <h1>Where Does The Day Go?</h1>
-    <p>
+    <p class="label meta dg-eyebrow">A live instrument, not a quiz</p>
+    <p class="dg-lead">
       Twenty-four hours felt like plenty this morning. Slide in what you
       think your day looks like, then keep scrolling — we're going to find
       everything that estimate left out, without ever making the day any
@@ -40,7 +48,7 @@ import { withBase } from '../lib/base'
     </p>
   </header>
 
-  <main class="dg-body-content">
+  <div class="dg-body-content">
     <section class="dg-sec" id="sec-basics">
       <h2>First, your typical day</h2>
       <p>Take your time. This is just a rough sense of things.</p>
@@ -179,11 +187,6 @@ import { withBase } from '../lib/base'
     </section>
 
     <footer class="dg-outro">
-      <div class="acts">
-        <button type="button" data-share data-title="Where Does The Day Go?">Share this</button>
-        <button type="button" id="again">Start over</button>
-        <a href={withBase('/')}>try something else →</a>
-      </div>
 
       <details class="how">
         <summary>How this actually works</summary>
@@ -214,15 +217,34 @@ import { withBase } from '../lib/base'
         <p>Related: <a href={withBase('/progress/')}>Progress</a> is the other page here about how much of something is already gone, computed live rather than looked up.</p>
       </details>
     </footer>
-  </main>
-</GameLayout>
+  </div>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Slide in what you think a typical day looks like — work, home, sleep — then
+      keep scrolling. Each section finds something that estimate left out.
+    </p>
+    <ul>
+      <li>Morning routine, meals and the commute are carved out of the day you already have; none of them makes it longer.</li>
+      <li>Then the interruptions: each one costs the real, published time it takes to get back to what you were doing.</li>
+      <li>Every slider can be moved at any time, and every bar redraws from all of them.</li>
+    </ul>
+    <p>The reckoning at the bottom is the end. Your best is the most real work you have kept in a day.</p>
+  </Fragment>
+</GameShell>
 
 <script>
   import { computeDay, hoursLeftToday, SOURCES, type DayInputs } from '../lib/day-model'
   import { recordPlay } from '../lib/stats'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
-  import { prefersReducedMotion } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+
+  const prefersReducedMotion = !PLAY
+  // Restart is a reload, the default: every slider back where it started.
+  const shell = createShell({ slug: 'day-go' })
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -289,7 +311,7 @@ import { withBase } from '../lib/base'
       .join('')
     bar.legend.innerHTML = m.segments
       .filter((s) => s.hours > 0.05)
-      .map((s) => `<span class="chip" data-key="${s.key}"><i></i>${SEG_LABEL[s.key]} · ${fmtH(s.hours)}</span>`)
+      .map((s) => `<span class="dg-chip" data-key="${s.key}"><i></i>${SEG_LABEL[s.key]} · ${fmtH(s.hours)}</span>`)
       .join('')
     bar.piece.textContent = `${m.pieceCountAfter} piece${m.pieceCountAfter === 1 ? '' : 's'}.`
   }
@@ -337,6 +359,10 @@ import { withBase } from '../lib/base'
         ? `That's ${Math.round(m.lostWorkMinutes)} minutes a day spent refocusing rather than working — about ${(m.lostWorkMinutes / 60).toFixed(1)} hours, or roughly ${Math.max(1, Math.round(m.lostWorkMinutes / 110))} average feature-length films, every single day.`
         : 'At this rate, almost none of it is lost to refocusing. Try raising how often you check your phone.'
     $('refocusSource').textContent = SOURCES.refocus
+
+    shell.setScore(fmtH(m.actualWorkHours))
+    shell.setLevel(String(m.pieceCountAfter))
+    shell.setMoves(String(m.totalInterruptions))
   }
 
   document.querySelectorAll<HTMLInputElement>('.dg-sec input[type="range"]').forEach((input) => {
@@ -368,7 +394,6 @@ import { withBase } from '../lib/base'
   /* ------------------------------------------------------------------ */
 
   let shareCard: import('../lib/result-card').ResultCard | null = null
-  onShare(() => shareCard, (c) => ({ title: 'Where Does The Day Go?', text: `${c.headline}.` }))
 
   function updateShareCard() {
     const m = computeDay(state)
@@ -384,6 +409,34 @@ import { withBase } from '../lib/base'
       ],
     }
     recordPlay('day-go', { actualWork: m.actualWorkHours, pieces: m.pieceCountAfter }, { actualWork: 'high' })
+    finish(m)
+  }
+
+  /** The reckoning, as the shell's result card. It waits under the section
+      rather than pulling the page past it. */
+  function finish(m: ReturnType<typeof computeDay>) {
+    if (m.actualWorkHours > 0) shell.considerBest(Math.round(m.actualWorkHours * 10), fmtH(m.actualWorkHours))
+    shell.win({
+      celebrate: false,
+      scroll: false,
+      kicker: `Out of ${fmtH(m.perceivedWorkHours)} you would call work`,
+      title: m.actualWorkHours < 0.05 ? 'None of it is real work.' : `${fmtH(m.actualWorkHours)} of it is real work.`,
+      score: fmtH(m.actualWorkHours),
+      lines: [
+        `${m.pieceCountAfter} pieces a day, cut apart by ${m.totalInterruptions} interruption${m.totalInterruptions === 1 ? '' : 's'}.`,
+        m.lostWorkMinutes > 0.5 ? `${Math.round(m.lostWorkMinutes)} minutes a day go on getting back to what you were doing.` : 'Almost none of it goes on refocusing.',
+      ],
+      againLabel: 'Start the day again',
+    })
+    shell.resultExtra.innerHTML =
+      '<div class="dg-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share this</span></button></div>'
+    $('shareBtn').addEventListener('click', async (e) => {
+      if (!shareCard) return
+      const label = (e.currentTarget as HTMLElement).querySelector('span')!
+      const outcome = await shareResult(shareCard, { title: 'Where Does The Day Go?', text: `${shareCard.headline}.`, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share this'), 1600)
+    })
   }
 
   /* ------------------------------------------------------------------ */
@@ -476,6 +529,11 @@ import { withBase } from '../lib/base'
   if (prefersReducedMotion) {
     for (const id of PACING_SECTIONS) activate(id)
     recorded = true
+    // Still an ending, once the reckoning is actually reached.
+    const io = new IntersectionObserver((rows) => {
+      if (rows.some((r) => r.isIntersecting)) { io.disconnect(); syncStateFromDOM(); render(); updateShareCard() }
+    })
+    io.observe(document.getElementById('sec-results')!)
   } else {
     let ticking = false
     addEventListener(
@@ -504,26 +562,19 @@ import { withBase } from '../lib/base'
   setInterval(paintClock, 30_000)
 
   render()
-
-  $('again').addEventListener('click', () => location.reload())
 </script>
 
 <style is:global>
-  .day-body { background: #12090d; color: #fbeee0; }
-  .day-body .game { position: relative; }
-
-  .dg-bg {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background:
-      radial-gradient(60vmax 60vmax at 15% -10%, rgba(126, 200, 255, 0.1), transparent 70%),
-      radial-gradient(60vmax 60vmax at 90% 110%, rgba(255, 210, 122, 0.09), transparent 70%);
+  /* A paper page. The day-bar's colours are the design system's own blocks,
+     one per part of the day, with sleep as ink. */
+  .day-body {
+    --dg-morning: var(--lilac); --dg-commute: #aab4c4; --dg-work: var(--cobalt);
+    --dg-lunch: var(--sky); --dg-home: var(--mint); --dg-dinner: var(--red); --dg-sleep: #1a2233;
   }
-  .day-body .game > * { position: relative; z-index: 1; }
-
-  .dg-head { max-width: 640px; margin: 8vh auto 0; padding: 0 22px; text-align: center; }
-  .dg-eyebrow { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #7ec8ff; opacity: 0.85; margin: 0 0 12px; font-weight: 600; }
-  .dg-head h1 { font-size: clamp(32px, 6.4vw, 50px); margin: 0 0 14px; letter-spacing: -0.03em; }
-  .dg-head p { font-size: 16.5px; line-height: 1.65; opacity: 0.8; max-width: 54ch; margin: 0 auto; }
+  .dg-head { max-width: 640px; margin: 2vh auto 0; text-align: center; }
+  .dg-eyebrow { display: block; margin: 0 0 12px; color: var(--ink2); }
+  .dg-lead { font-size: var(--fs-lead); line-height: 1.6; color: var(--ink2); max-width: 54ch; margin: 0 auto; }
+  .dg-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
   /* ---- the day-bar itself: big, vertical, and the actual point ---------
      A thin horizontal pill read as a footnote. A day is better read the way
@@ -534,122 +585,102 @@ import { withBase } from '../lib/base'
   .daybar { margin: 34px auto 0; max-width: 340px; text-align: center; }
   .daybar-title {
     font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #ffb066; opacity: 0.85; margin: 0 0 14px;
+    color: var(--ink2); margin: 0 0 14px;
   }
   .daybar-frame {
-    padding: 14px; border-radius: 22px;
-    background: linear-gradient(165deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    padding: 14px; border-radius: var(--r-lg);
+    background: var(--card);
+    border: 2px solid var(--ink);
+    box-shadow: var(--shadow-block);
   }
   .daybar-col {
     position: relative; display: flex; flex-direction: column;
     height: clamp(260px, 40vh, 420px); border-radius: 13px; overflow: hidden;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--paper2);
   }
   .daybar-big .daybar-col { height: clamp(300px, 52vh, 520px); }
-  .seg {
-    position: relative; width: 100%; height: 0;
-    transition: height 620ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  }
+  .seg { position: relative; width: 100%; height: 0; }
+  html.play .seg { transition: height 620ms cubic-bezier(0.22, 0.61, 0.36, 1); }
   .seg.is-empty { height: 0 !important; }
   /* A soft top-edge highlight on every segment — the difference between a
      flat swatch and something that reads as a material with real light on
      it, without ever touching a real gradient fill (still flat colour). */
   .seg > i { position: absolute; inset: 0 0 auto 0; height: 40%; background: rgba(255, 255, 255, 0.16); }
-  .seg[data-key='morning'] { background: #ffd27a; }
-  .seg[data-key='commute'] { background: #a7b6c9; }
-  .seg[data-key='work'] { background: #7ec8ff; }
-  .seg[data-key='lunch'] { background: #ffb3a1; }
-  .seg[data-key='home'] { background: #8fe3c8; }
-  .seg[data-key='dinner'] { background: #f0965c; }
-  .seg[data-key='sleep'] { background: #1a2740; }
+  .seg[data-key='morning'] { background: var(--dg-morning); }
+  .seg[data-key='commute'] { background: var(--dg-commute); }
+  .seg[data-key='work'] { background: var(--dg-work); }
+  .seg[data-key='lunch'] { background: var(--dg-lunch); }
+  .seg[data-key='home'] { background: var(--dg-home); }
+  .seg[data-key='dinner'] { background: var(--dg-dinner); }
+  .seg[data-key='sleep'] { background: var(--dg-sleep); }
   .seg[data-key='sleep'] > i { background: rgba(255, 255, 255, 0.05); }
 
   .cuts { position: absolute; inset: 0; pointer-events: none; }
   .cuts i {
     position: absolute; left: 0; right: 0; height: 2px;
-    background: rgba(18, 9, 13, 0.6);
+    background: rgba(17, 19, 24, 0.7);
     box-shadow: 0 0 3px rgba(255, 255, 255, 0.35);
     transform: translateY(-50%);
-    opacity: 0;
-    animation: dg-cut-in 260ms ease forwards;
   }
+  html.play .cuts i { opacity: 0; animation: dg-cut-in 260ms ease forwards; }
   @keyframes dg-cut-in { to { opacity: 1; } }
 
   .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 14px; margin: 16px 0 0; }
-  .legend .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; opacity: 0.82; }
-  .legend .chip i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
-  .legend .chip[data-key='morning'] i { background: #ffd27a; }
-  .legend .chip[data-key='commute'] i { background: #a7b6c9; }
-  .legend .chip[data-key='work'] i { background: #7ec8ff; }
-  .legend .chip[data-key='lunch'] i { background: #ffb3a1; }
-  .legend .chip[data-key='home'] i { background: #8fe3c8; }
-  .legend .chip[data-key='dinner'] i { background: #f0965c; }
-  .legend .chip[data-key='sleep'] i { background: #1a2740; border: 1px solid rgba(255,255,255,0.2); }
-  .piececount { margin: 10px 0 0; font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .seg, .cuts i { transition: none; animation: none; opacity: 1; }
-  }
+  .legend .dg-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); }
+  .legend .dg-chip i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .legend .dg-chip[data-key='morning'] i { background: var(--dg-morning); }
+  .legend .dg-chip[data-key='commute'] i { background: var(--dg-commute); }
+  .legend .dg-chip[data-key='work'] i { background: var(--dg-work); }
+  .legend .dg-chip[data-key='lunch'] i { background: var(--dg-lunch); }
+  .legend .dg-chip[data-key='home'] i { background: var(--dg-home); }
+  .legend .dg-chip[data-key='dinner'] i { background: var(--dg-dinner); }
+  .legend .dg-chip[data-key='sleep'] i { background: var(--dg-sleep); }
+  .piececount { margin: 10px 0 0; font-size: 14px; color: var(--ink2); }
 
   /* ---- sections -------------------------------------------------------- */
-  .dg-body-content { max-width: 640px; margin: 0 auto; padding: 0 22px; }
-  .dg-sec { padding: 9vh 0; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .dg-body-content { max-width: 640px; margin: 0 auto; }
+  .dg-sec { padding: 8vh 0; border-top: 1.5px solid var(--paper3); }
   .dg-sec:first-of-type { border-top: 0; }
-  .dg-sec h2 { font-size: clamp(22px, 4vw, 30px); margin: 0 0 10px; letter-spacing: -0.02em; }
-  .dg-sec > p { font-size: 15.5px; line-height: 1.6; opacity: 0.78; margin: 0 0 22px; max-width: 56ch; }
-  .dg-note { font-style: italic; opacity: 0.6 !important; }
+  .dg-sec h2 { font-size: clamp(26px, 4vw, 38px); line-height: 1.1; margin: 0 0 10px; }
+  .dg-sec > p { font-size: 16px; line-height: 1.6; color: var(--ink2); margin: 0 0 22px; max-width: 56ch; }
+  .dg-note { font-style: italic; color: var(--ink3) !important; }
 
   .dg-slider { display: block; margin: 0 0 22px; }
   .dg-slider-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 14.5px; margin-bottom: 8px; }
   .dg-slider-label b { font-weight: 600; }
-  .dg-slider-label i { font-style: normal; font-variant-numeric: tabular-nums; opacity: 0.7; }
-  .dg-slider input[type='range'] { width: 100%; }
+  .dg-slider-label i { font-style: normal; font-weight: 700; color: var(--ink2); }
+  .dg-slider input[type='range'] { width: 100%; accent-color: var(--ink); height: 22px; }
 
-  .dg-source { font-size: 12.5px; opacity: 0.5; line-height: 1.5; margin: -8px 0 20px; max-width: 56ch; }
+  .dg-source { font-size: 13px; color: var(--ink3); line-height: 1.5; margin: -8px 0 20px; max-width: 56ch; }
 
   .dg-common { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
   .dg-common li {
-    font-size: 13.5px; opacity: 0.7; padding-left: 16px; position: relative;
+    font-size: 14px; color: var(--ink2); padding-left: 16px; position: relative;
   }
   .dg-common li::before {
     content: ''; position: absolute; left: 0; top: 0.55em; width: 6px; height: 6px;
-    border-radius: 50%; background: #7ec8ff; opacity: 0.6;
+    border-radius: 50%; background: var(--cobalt);
   }
 
   /* ---- results ----------------------------------------------------------- */
   .dg-results { text-align: left; }
-  .dg-piece-line { font-size: 16px; opacity: 0.85; margin-bottom: 26px; }
+  .dg-piece-line { font-size: var(--fs-lead); margin-bottom: 26px; }
   .dg-worklines { display: grid; gap: 12px; margin-bottom: 14px; }
   .dg-workline {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 18px; border-radius: 12px; background: rgba(255, 255, 255, 0.04);
-    font-size: 14.5px;
+    padding: 14px 18px; border-radius: var(--r); background: var(--paper2);
+    font-size: 15px;
   }
-  .dg-workline b { font-size: 20px; font-variant-numeric: tabular-nums; }
-  .dg-workline.dg-actual { background: rgba(126, 200, 255, 0.1); border: 1px solid rgba(126, 200, 255, 0.25); }
-  .dg-workline.dg-actual b { color: #7ec8ff; }
-  .dg-lost { font-size: 14.5px; line-height: 1.6; opacity: 0.82; margin: 4px 0 6px; }
-  .dg-clock { font-size: 14px; opacity: 0.55; margin-top: 20px; font-variant-numeric: tabular-nums; }
+  .dg-workline b { font-size: 24px; }
+  .dg-workline.dg-actual { background: var(--mint); }
+  .dg-lost { font-size: 16px; line-height: 1.6; margin: 4px 0 6px; }
+  .dg-clock { font-size: 15px; color: var(--ink2); margin-top: 20px; }
 
   /* ---- outro --------------------------------------------------------- */
-  .dg-outro { padding: 6vh 0 14vh; }
-  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 24px; }
-  .acts button {
-    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
-    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
-  }
-  .acts button:first-child { background: linear-gradient(165deg, #a3ddff, #7ec8ff); color: #0c2033; border: 0; }
-  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
-  .acts a:hover { opacity: 1; }
+  .dg-outro { padding: 4vh 0 2vh; }
 
-  .how { text-align: left; font-size: 14px; opacity: 0.8; }
-  .how summary { cursor: pointer; opacity: 0.65; margin-bottom: 8px; text-align: center; }
+  .how { text-align: left; font-size: 15px; color: var(--ink2); }
+  .how summary { cursor: pointer; font-weight: 700; color: var(--ink); margin-bottom: 8px; text-align: center; }
   .how p { line-height: 1.6; margin: 10px 0; }
-  .how a { color: #7ec8ff; }
-
-  @media (max-width: 560px) {
-    .dg-dock { top: 48px; padding: 12px 16px; }
-  }
+  .how a { color: var(--t-cobalt); }
 </style>
