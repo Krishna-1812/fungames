@@ -67,6 +67,66 @@ const rgb = (hex: string) =>
   [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')
 
 const HUD_DIGITS = 4
+
+// A drifting field of characters behind the whole climb — the one thing
+// that kept the long stretches between markers (and the deliberate blank
+// buffers either end) reading as an empty void rather than a page with an
+// idea running through it. Each character is drawn from its own era's
+// vocabulary (binary for ARPANET, angle brackets once the Web exists,
+// currency once commerce does) and tinted with that era's own sky colour,
+// so the field itself tells the same story the seams do.
+const GLYPH_SETS: Record<string, string[]> = {
+  arpanet: ['0', '1'],
+  'early-internet': ['0', '1', '#'],
+  'world-wide-web': ['<', '>', '/'],
+  'dot-com': ['$', '%', '*'],
+  'web-two': ['@', '#', '~'],
+}
+// A zone's own `sky` tones are close enough to the page background itself
+// (the two are the same gradient) that text drawn in them nearly vanishes —
+// this needs a colour that actually reads as glowing against that sky, not
+// the sky's own colour restated.
+const GLYPH_COLOR: Record<string, string> = {
+  arpanet: '#7cfc8a',
+  'early-internet': '#8fb8ff',
+  'world-wide-web': '#6ee7ff',
+  'dot-com': '#c9a8ff',
+  'web-two': '#ff8fd6',
+}
+const glyphRnd = (seed: number, k: number) => {
+  const x = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453
+  return x - Math.floor(x)
+}
+const GLYPH_COUNT = 170
+const glyphs = Array.from({ length: GLYPH_COUNT }, (_, i) => {
+  const top = glyphRnd(7, i) * reelHeight
+  const d = top - TOP_PAD
+  const zone = zones.find((z) => d >= z.offset && d < z.offset + z.height) ?? (d < 0 ? zones[0] : zones[zones.length - 1])
+  const set = GLYPH_SETS[zone.id] ?? ['0', '1']
+  const ch = set[Math.floor(glyphRnd(7, i + 1000) * set.length)]
+  return {
+    top: top.toFixed(0),
+    x: (glyphRnd(7, i + 2000) * 100).toFixed(1),
+    ch,
+    color: GLYPH_COLOR[zone.id] ?? '#7cfc8a',
+    size: (11 + glyphRnd(7, i + 3000) * 11).toFixed(1),
+    op: (0.10 + glyphRnd(7, i + 4000) * 0.26).toFixed(2),
+    dur: (7 + glyphRnd(7, i + 5000) * 11).toFixed(1),
+    delay: (-glyphRnd(7, i + 6000) * 14).toFixed(1),
+  }
+})
+// A smaller, always-green scatter just for the intro screen — the climb's
+// glyph field doesn't reach up into `.intro`, and the opening screen was
+// otherwise a flat gradient behind the title.
+const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
+  x: (glyphRnd(11, i) * 100).toFixed(1),
+  y: (glyphRnd(11, i + 500) * 100).toFixed(1),
+  ch: ['0', '1'][Math.floor(glyphRnd(11, i + 900) * 2)],
+  size: (12 + glyphRnd(11, i + 1300) * 12).toFixed(1),
+  op: (0.10 + glyphRnd(11, i + 1700) * 0.22).toFixed(2),
+  dur: (8 + glyphRnd(11, i + 2100) * 10).toFixed(1),
+  delay: (-glyphRnd(11, i + 2500) * 12).toFixed(1),
+}))
 ---
 
 <GameLayout slug="internet-artifacts" bar="#0b2b12" bodyClass="ia-body">
@@ -92,8 +152,14 @@ const HUD_DIGITS = 4
     </div>
 
     <div class="intro">
+      <div class="intro-glyphs" aria-hidden="true">
+        {introGlyphs.map((g) => (
+          <span style={`left:${g.x}%;top:${g.y}%;font-size:${g.size}px;opacity:${g.op};animation-duration:${g.dur}s;animation-delay:${g.delay}s`}>{g.ch}</span>
+        ))}
+      </div>
       <div class="intro-title">
-        <h1>Internet Artifacts</h1>
+        <p class="boot-line">&gt; RUN INTERNET_ARTIFACTS.EXE_</p>
+        <h1>Internet Artifacts<span class="cursor">_</span></h1>
       </div>
       <p>Twenty-five real, dated moments from the internet's own history — from the first message ever sent between two computers to a cat made of Pop-Tart.</p>
       <div class="arrow">&#8595;</div>
@@ -101,6 +167,11 @@ const HUD_DIGITS = 4
     </div>
 
     <div class="reel" style={`height:${reelHeight}px`}>
+    <div class="glyphfield" aria-hidden="true">
+      {glyphs.map((g) => (
+        <span style={`left:${g.x}%;top:${g.top}px;font-size:${g.size}px;color:${g.color};opacity:${g.op};animation-duration:${g.dur}s;animation-delay:${g.delay}s`}>{g.ch}</span>
+      ))}
+    </div>
     {
       zones.map((z, i) =>
         i === 0 ? null : (
@@ -411,11 +482,24 @@ const HUD_DIGITS = 4
     background: linear-gradient(#0b2b12, #03110a);
     transition: background 260ms linear;
   }
-  /* CRT scanlines — a static texture, no motion cost, the one place this
-     page borrows its chrome directly from the hardware it is describing. */
+  /* CRT chrome: scanlines, a corner vignette like a real tube's own
+     phosphor falloff, and a barely-perceptible brightness flicker — the one
+     place this page borrows its look directly from the hardware it is
+     describing, rather than just naming it in the copy. */
   .scanlines {
-    position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.35;
-    background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px);
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0 1px, transparent 1px 4px),
+      radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+    animation: crt-flicker 6s linear infinite;
+  }
+  @keyframes crt-flicker {
+    0%, 96%, 100% { opacity: 0.55; }
+    97% { opacity: 0.62; }
+    98% { opacity: 0.48; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scanlines { animation: none; }
   }
 
   .hud-scrim {
@@ -437,7 +521,12 @@ const HUD_DIGITS = 4
     transition: border-color 300ms linear, box-shadow 300ms linear, opacity 420ms var(--ease, ease);
   }
   .hud.visible { opacity: 1; }
-  .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
+  .hud-label {
+    font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78;
+    font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
+  }
+  .hud-label::before { content: '[ '; }
+  .hud-label::after { content: ' ]'; }
 
   .hud-dial {
     position: absolute; top: 8px; right: 10px; pointer-events: auto;
@@ -453,14 +542,47 @@ const HUD_DIGITS = 4
   .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; transition: background 300ms linear; }
 
   .intro { position: relative; min-height: 74vh; display: grid; place-content: center; text-align: center; gap: 14px; padding: 40px 20px; overflow: hidden; }
-  .intro-title { position: relative; z-index: 2; display: grid; place-items: center; }
+
+  /* A quiet scatter of 0s and 1s behind the title — the climb's own
+     `.glyphfield` doesn't reach up into `.intro`, so without this the
+     opening screen was a flat gradient with nothing to look at until the
+     first marker, several hundred pixels of scroll away. */
+  .intro-glyphs { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+  .intro-glyphs span {
+    position: absolute; font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
+    color: #7cfc8a; font-weight: 600; animation: glyph-drift linear infinite;
+  }
+
+  .intro-title { position: relative; z-index: 2; display: grid; place-items: center; gap: 6px; }
+  .boot-line {
+    margin: 0; font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-size: 12.5px; letter-spacing: 0.06em; color: #7cfc8a; opacity: 0.8;
+    text-shadow: 0 0 8px rgba(124, 252, 138, 0.6);
+  }
   .intro h1 {
     font-size: clamp(40px, 10vw, 84px); margin: 0; letter-spacing: -0.03em;
     color: #eaf3ff; -webkit-text-stroke: 3px #03110a; paint-order: stroke fill;
-    text-shadow: 0 4px 0 #7cfc8a, 0 9px 0 #03110a, 0 18px 34px rgba(0, 0, 0, 0.5);
-    animation: title-pop 700ms var(--ease-bounce, ease) both;
+    text-shadow:
+      0 4px 0 #7cfc8a, 0 9px 0 #03110a, 0 18px 34px rgba(0, 0, 0, 0.5),
+      2px 0 0 rgba(255, 110, 199, 0.35), -2px 0 0 rgba(110, 231, 255, 0.35);
+    animation: title-pop 700ms var(--ease-bounce, ease) both, title-glitch 9s ease-in-out 1s infinite;
   }
+  .intro h1 .cursor { color: #7cfc8a; -webkit-text-stroke: 0; animation: cursor-blink 1s steps(1, end) infinite; }
+  @keyframes cursor-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
   @keyframes title-pop { from { opacity: 0; transform: scale(0.7) rotate(-3deg); } }
+  /* A brief CRT-glitch pulse every few seconds — a couple of frames of
+     colour-split jitter, not a constant effect, the same restraint the
+     flicker on `.scanlines` uses. */
+  @keyframes title-glitch {
+    0%, 97%, 100% { transform: translate(0, 0); filter: none; }
+    97.6% { transform: translate(-2px, 1px); filter: hue-rotate(25deg); }
+    98.2% { transform: translate(2px, -1px); filter: hue-rotate(-25deg); }
+    98.8% { transform: translate(-1px, 0); filter: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .intro h1 { animation: none; }
+    .intro h1 .cursor { animation: none; opacity: 1; }
+  }
   .intro p { opacity: 0.85; margin: 0; font-size: 18px; max-width: 34ch; margin-inline: auto; position: relative; z-index: 2; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4); }
   .scroll-hint { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
   .arrow { font-size: 30px; opacity: 0.7; animation: bob 1.8s ease-in-out infinite; position: relative; z-index: 2; }
@@ -468,6 +590,27 @@ const HUD_DIGITS = 4
 
   .climb { position: relative; }
   .reel { position: relative; overflow-x: clip; }
+
+  /* The same idea as `.intro-glyphs`, spanning the whole reel — including
+     both blank buffers either end, which is exactly where a scroll with
+     nothing to look at was most obvious. Absolutely positioned in real
+     pixels (not percent), computed once at build time against each
+     character's own era, so the field itself is part of the timeline
+     rather than a decoration layered on top of it. */
+  .glyphfield { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .glyphfield span {
+    position: absolute; font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-weight: 600; animation: glyph-drift linear infinite;
+    text-shadow: 0 0 10px currentColor;
+  }
+  @keyframes glyph-drift {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-14px); }
+    100% { transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .intro-glyphs span, .glyphfield span { animation: none; }
+  }
 
   .rail-track { position: absolute; top: 0; left: 26px; width: 12px; height: 0; z-index: 1; pointer-events: none; }
   .rail-line {
@@ -548,10 +691,12 @@ const HUD_DIGITS = 4
     .ev.big { width: min(94vw, 400px); }
   }
   .ev-when {
-    font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
+    font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
     opacity: 0.85; font-variant-numeric: tabular-nums;
     text-shadow: 0 1px 8px rgb(0 0 0 / 0.85);
   }
+  .ev-when::before { content: '// '; opacity: 0.6; }
   .ev h2 {
     font-size: 21px; margin: 4px 0 0; font-weight: 700;
     text-shadow: 0 2px 12px rgb(0 0 0 / 0.9), 0 0 26px rgb(0 0 0 / 0.65);
