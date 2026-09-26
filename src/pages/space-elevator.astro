@@ -42,7 +42,14 @@ const totalHeight = cursor
 // between the finale (which precedes the reel in the DOM) and the first,
 // highest marker you actually reach.
 const REEL_TAIL = 520
-const reelHeight = totalHeight + REEL_TAIL
+// And the same idea at the *ground* end: the lowest marker's `top` sits
+// exactly at REEL_TAIL + totalHeight regardless of this buffer (toReelTop
+// doesn't depend on reelHeight), so this is pure blank space the card's own
+// height — now much taller, with full-width art — can safely overflow into
+// without reaching into `.intro`'s title on a narrow, tall viewport where
+// the note text wraps to many lines.
+const GROUND_TAIL = 320
+const reelHeight = totalHeight + REEL_TAIL + GROUND_TAIL
 
 /** d-space (distance from ground, px) -> position from the top of `.reel`. */
 const toReelTop = (d: number) => REEL_TAIL + (totalHeight - d)
@@ -259,22 +266,68 @@ const HUD_DIGITS = 6
     </div>
 
     <div class="intro">
-      <h1>Space Elevator</h1>
+      <div class="intro-title">
+        <svg class="intro-spark a" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#ffd27a"/></svg>
+        <svg class="intro-spark b" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#6ee7ff"/></svg>
+        <svg class="intro-spark c" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="#ff9d5c"/></svg>
+        <h1>Space Elevator</h1>
+      </div>
       <p>Every metre above is real, all the way to the edge of space — 100,000 real metres up.</p>
       <div class="jacket-pick" id="jacketPick">
         <p>It's about to get cold. Pick a jacket for the ride:</p>
         <div class="jacket-swatches">
-          <button type="button" class="jacket-swatch" data-color="#d9534f" style="--jc:#d9534f" aria-label="Red jacket"></button>
-          <button type="button" class="jacket-swatch" data-color="#4f7fd9" style="--jc:#4f7fd9" aria-label="Blue jacket"></button>
-          <button type="button" class="jacket-swatch" data-color="#e8b84f" style="--jc:#e8b84f" aria-label="Yellow jacket"></button>
+          {[
+            ['#d9534f', '#a83a37', 'Red jacket'],
+            ['#4f7fd9', '#33559e', 'Blue jacket'],
+            ['#e8b84f', '#b98a2e', 'Yellow jacket'],
+          ].map(([main, shade, label]) => (
+            <button type="button" class="jacket-swatch" data-color={main} style={`--jc:${main}`} aria-label={label}>
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <path d="M13 8 L16 6 L20 10 L24 6 L27 8 L27 12 L32 15 L29 21 L27 19 L27 34 L13 34 L13 19 L11 21 L8 15 L13 12Z" fill={main}/>
+                <path d="M20 10 L24 6 L27 8 L27 12 L22 12Z" fill={shade} opacity="0.6"/>
+                <path d="M13 19 L13 34 L16 34 L16 21Z" fill={shade} opacity="0.35"/>
+                <circle cx="20" cy="17" r="1.4" fill={shade}/>
+                <circle cx="20" cy="22" r="1.4" fill={shade}/>
+                <circle cx="20" cy="27" r="1.4" fill={shade}/>
+              </svg>
+            </button>
+          ))}
         </div>
       </div>
       <div class="arrow">↑</div>
       <p class="scroll-hint">Scroll up!</p>
       <div class="ground" aria-hidden="true">
-        <svg viewBox="0 0 900 160" preserveAspectRatio="xMidYMax slice">
-          <path d="M0 160 L0 96 L110 40 L180 74 L260 18 L340 66 L420 30 L500 80 L560 44 L640 92 L720 36 L800 70 L900 46 L900 160Z" fill="#173322" opacity="0.9"/>
-          <path d="M0 160 L0 118 L90 84 L170 106 L250 70 L330 100 L410 78 L490 108 L570 86 L650 112 L730 82 L810 104 L900 88 L900 160Z" fill="#0f2517"/>
+        <svg viewBox="0 0 900 220" preserveAspectRatio="xMidYMax slice">
+          <defs>
+            <radialGradient id="se-ground-glow" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0" stop-color="#ffd27a" stop-opacity="0.55"/>
+              <stop offset="1" stop-color="#ffd27a" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="se-ground-far" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#345a72"/>
+              <stop offset="1" stop-color="#24404f"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="70" cy="196" rx="150" ry="60" fill="url(#se-ground-glow)"/>
+          <!-- far ridge, smooth and hazy -->
+          <path d="M0 220 L0 132 Q90 96 180 118 T360 108 T540 122 T720 100 T900 116 L900 220Z" fill="url(#se-ground-far)" opacity="0.65"/>
+          <!-- mid slope -->
+          <path d="M0 220 L0 160 Q120 128 240 148 T480 140 T720 156 T900 138 L900 220Z" fill="#1c3d3a" opacity="0.85"/>
+          <!-- near hill, darkest, carries the tree line -->
+          <path d="M0 220 L0 188 Q140 158 280 176 T560 168 T900 182 L900 220Z" fill="#0e2320"/>
+          <!-- a loose pine tree line along the near ridge -->
+          <g fill="#081613">
+            <path d="M46 176 L54 176 L50 158Z"/>
+            <path d="M44 176 L56 176 L50 150 L45 162 L55 162 L50 150Z"/>
+            <path d="M96 172 L106 172 L101 150Z"/>
+            <path d="M94 172 L108 172 L101 141 L95 156 L107 156 L101 141Z"/>
+            <path d="M210 168 L218 168 L214 152Z"/>
+            <path d="M600 172 L610 172 L605 152Z"/>
+            <path d="M598 172 L612 172 L605 143 L599 158 L611 158 L605 143Z"/>
+            <path d="M700 176 L708 176 L704 160Z"/>
+            <path d="M820 172 L830 172 L825 152Z"/>
+            <path d="M818 172 L832 172 L825 143 L819 158 L831 158 L825 143Z"/>
+          </g>
         </svg>
       </div>
     </div>
@@ -530,6 +583,7 @@ const HUD_DIGITS = 6
     const within = d - zone.offset
     const metres = Math.max(0, Math.min(zone.to, zone.from + within / zone.pxPerMetre))
 
+    hud.classList.toggle('visible', metres > 60)
     hudZone.textContent = zone.label.toLowerCase()
     setOdometer(metres)
 
@@ -587,16 +641,18 @@ const HUD_DIGITS = 6
   }
 
   .hud {
-    position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
-    z-index: 40; width: min(92vw, 520px); text-align: center;
-    padding: 10px 16px; border-radius: 12px;
-    background: rgba(0, 0, 0, 0.66);
-    border: 1px solid var(--glow, rgba(255, 255, 255, 0.12));
-    box-shadow: 0 0 26px -6px var(--glow, transparent);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 40; width: min(92vw, 460px); text-align: center;
+    padding: 8px 16px; border-radius: 20px;
+    background: rgba(6, 10, 20, 0.5);
+    border: 1.5px solid var(--glow, rgba(255, 255, 255, 0.16));
+    box-shadow: 0 0 26px -6px var(--glow, transparent), 0 6px 18px -8px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     pointer-events: none;
-    transition: border-color 300ms linear, box-shadow 300ms linear;
+    opacity: 0;
+    transition: border-color 300ms linear, box-shadow 300ms linear, opacity 420ms var(--ease, ease);
   }
+  .hud.visible { opacity: 1; }
   .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
 
   .hud-music {
@@ -619,33 +675,56 @@ const HUD_DIGITS = 6
   .hud-row span:last-child { opacity: 0.85; text-align: right; }
 
   .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 40px 20px 0; overflow: hidden; }
-  .intro h1 { font-size: clamp(38px, 9vw, 74px); margin: 0; letter-spacing: -0.03em; position: relative; z-index: 2; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.35); }
+  .intro-title { position: relative; z-index: 2; display: grid; place-items: center; }
+  .intro h1 {
+    font-size: clamp(44px, 11vw, 92px); margin: 0; letter-spacing: -0.03em;
+    color: #eaf3ff; -webkit-text-stroke: 3px #0a1626; paint-order: stroke fill;
+    text-shadow: 0 4px 0 #ff9d5c, 0 9px 0 #0a1626, 0 18px 34px rgba(0, 0, 0, 0.45);
+    animation: title-pop 700ms var(--ease-bounce, ease) both;
+  }
+  @keyframes title-pop { from { opacity: 0; transform: scale(0.7) rotate(-3deg); } }
+  .intro-spark {
+    position: absolute; width: 22px; height: 22px; opacity: 0.85; pointer-events: none;
+    animation: bob 3.2s ease-in-out infinite;
+  }
+  .intro-spark.a { left: 6%; top: 6%; --r: -8deg; animation-delay: -0.4s; }
+  .intro-spark.b { right: 5%; top: 44%; --r: 10deg; width: 16px; height: 16px; animation-delay: -1.6s; }
+  .intro-spark.c { left: 12%; bottom: 2%; --r: 6deg; width: 14px; height: 14px; animation-delay: -2.3s; }
   .intro p { opacity: 0.85; margin: 0; font-size: 18px; max-width: 32ch; margin-inline: auto; position: relative; z-index: 2; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.3); }
   .scroll-hint { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
   .arrow { font-size: 30px; opacity: 0.7; animation: bob 1.8s ease-in-out infinite; position: relative; z-index: 2; }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
   .ground {
-    position: absolute; left: 0; right: 0; bottom: 0; height: 20vh; min-height: 140px;
+    position: absolute; left: 0; right: 0; bottom: 0; height: 28vh; min-height: 190px;
     z-index: 1; pointer-events: none;
   }
   .ground svg { width: 100%; height: 100%; display: block; }
 
   /* ---- pick a jacket ------------------------------------------------- */
   .jacket-pick {
-    position: relative; z-index: 2; margin-top: 6px;
-    background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 16px; padding: 12px 18px; backdrop-filter: blur(4px);
+    position: relative; z-index: 2; margin-top: 10px;
+    background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 18px; padding: 14px 20px; backdrop-filter: blur(4px);
   }
-  .jacket-pick p { font-size: 13.5px; opacity: 0.85; margin: 0 0 8px; max-width: none; }
-  .jacket-pick.chosen p { opacity: 0.55; }
-  .jacket-swatches { display: flex; gap: 10px; justify-content: center; }
+  .jacket-pick p { font-size: 14px; opacity: 0.9; margin: 0 0 12px; max-width: none; font-weight: 600; }
+  .jacket-pick.chosen p { opacity: 0.6; }
+  .jacket-swatches { display: flex; gap: 12px; justify-content: center; }
+  /* A small sticker card, not a flat colour dot — the same cutout-on-a-
+     card motif the rest of the site uses (--sticker-border/-shadow), so the
+     one real UI control on this page looks made rather than default. */
   .jacket-swatch {
-    appearance: none; border: 2px solid rgba(255, 255, 255, 0.3); background: var(--jc);
-    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
-    transition: transform 140ms var(--ease-bounce, ease), border-color 140ms linear;
+    appearance: none; cursor: pointer; padding: 6px;
+    background: #eef3fa; border: var(--sticker-border, 2.5px solid #16151a);
+    border-radius: 12px; box-shadow: var(--sticker-shadow, 3px 4px 0 rgba(0, 0, 0, 0.25));
+    width: 52px; height: 52px;
+    transition: transform 160ms var(--ease-bounce, ease), box-shadow 160ms var(--ease-bounce, ease);
   }
-  .jacket-swatch:hover { transform: scale(1.12); }
-  .jacket-swatch.picked { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25); }
+  .jacket-swatch svg { display: block; width: 100%; height: 100%; }
+  .jacket-swatch:hover { transform: translateY(-3px) rotate(-3deg); }
+  .jacket-swatch.picked {
+    transform: translateY(-4px) scale(1.08) rotate(2deg);
+    box-shadow: var(--sticker-shadow-hover, 5px 7px 0 rgba(0, 0, 0, 0.3)), 0 0 0 3px var(--jc);
+  }
 
   .climb { position: relative; }
   .reel { position: relative; overflow-x: clip; }
@@ -679,22 +758,22 @@ const HUD_DIGITS = 6
   .panorama { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; overflow: hidden; }
   .panorama svg { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: auto; display: block; }
 
-  .cable-track { position: absolute; top: 0; left: 7px; width: 12px; height: 0; z-index: 1; pointer-events: none; }
+  .cable-track { position: absolute; top: 0; left: 26px; width: 30px; height: 0; z-index: 1; pointer-events: none; }
   .cable-line {
-    position: absolute; left: 50%; top: 0; bottom: 0; width: 1.6px; transform: translateX(-50%);
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 2.4px; transform: translateX(-50%);
     background: linear-gradient(#dfe6ee, rgba(223, 230, 238, 0.35));
-    opacity: 0.55;
+    opacity: 0.6;
   }
   .cable-car {
     position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%);
-    width: 11px; height: 15px; border-radius: 2.5px;
-    background: #0d1f38; border: 1.2px solid #eaf3ff;
-    box-shadow: 0 0 10px -1px rgba(255, 200, 140, 0.7), 0 2px 5px rgba(0, 0, 0, 0.5);
+    width: 28px; height: 38px; border-radius: 7px;
+    background: #0d1f38; border: 2px solid #eaf3ff;
+    box-shadow: 0 0 20px -2px rgba(255, 200, 140, 0.75), 0 3px 10px rgba(0, 0, 0, 0.5);
     transition: top 60ms linear;
   }
-  .cable-car-window { position: absolute; inset: 2px; background: #16233c; border-radius: 1px; overflow: hidden; }
-  .rider-head { position: absolute; left: 50%; top: 1px; transform: translateX(-50%); width: 2.4px; height: 2.4px; border-radius: 50%; background: #ffe3c2; }
-  .rider-body { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 3.4px; height: 4px; border-radius: 1px 1px 0 0; background: var(--rider-color, #ffd27a); }
+  .cable-car-window { position: absolute; inset: 4px; background: #16233c; border-radius: 3px; overflow: hidden; }
+  .rider-head { position: absolute; left: 50%; top: 3px; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; background: #ffe3c2; }
+  .rider-body { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 9px; height: 11px; border-radius: 3px 3px 0 0; background: var(--rider-color, #ffd27a); }
   @media (max-width: 460px) {
     .cable-track { display: none; }
   }
@@ -711,24 +790,27 @@ const HUD_DIGITS = 6
      does and box-shadow cannot. */
   .ev {
     position: absolute; left: 50%; transform: translateX(-50%); z-index: 2;
-    width: min(84vw, 420px);
+    width: min(88vw, 480px);
     display: grid; justify-items: center;
-    gap: 10px; text-align: center;
+    gap: 12px; text-align: center;
     --moodRgb: 234, 243, 255;
   }
-  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(42vw, 280px); }
-  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(42vw, 280px); }
+  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44vw, 320px); }
+  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44vw, 320px); }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 18px; }
   .ev.lane-left p, .ev.lane-right p { font-size: 13.5px; }
 
   /* Everything up here is suspended in thin air, including the window you
      are looking through — same trick as Deep Sea's water, drifting instead
-     of sinking. */
+     of sinking. The drawing is the element now, not an icon pinned to the
+     top of a text column: it fills the card's own width (Deep Sea's exact
+     move, see its `.ev-art` comment), so a scene that used to read as an
+     86px badge now reads as the thing you are passing. */
   .ev-art {
-    width: 86px; aspect-ratio: 1 / 1;
+    width: min(100%, 260px); aspect-ratio: 1 / 1;
     filter:
-      drop-shadow(0 0 12px rgba(var(--moodRgb), 0.5))
-      drop-shadow(0 0 34px rgba(var(--moodRgb), 0.3));
+      drop-shadow(0 0 20px rgba(var(--moodRgb), 0.55))
+      drop-shadow(0 0 56px rgba(var(--moodRgb), 0.32));
     animation: ev-drift 12s ease-in-out infinite;
     animation-delay: var(--drift, 0s);
   }
@@ -737,13 +819,11 @@ const HUD_DIGITS = 6
     50% { transform: translateY(-8px) rotate(0.6deg); }
   }
   .ev-art svg { display: block; width: 100%; height: 100%; }
-  .ev.lane-left .ev-art, .ev.lane-right .ev-art { width: 62px; }
 
-  .ev.big { width: min(88vw, 480px); }
-  .ev.big h2 { font-size: 25px; }
-  .ev.big .ev-art { width: 106px; filter: drop-shadow(0 0 16px rgba(var(--moodRgb), 0.65)) drop-shadow(0 0 50px rgba(var(--moodRgb), 0.4)); }
+  .ev.big { width: min(92vw, 560px); }
+  .ev.big h2 { font-size: 27px; }
+  .ev.big .ev-art { width: min(100%, 340px); filter: drop-shadow(0 0 26px rgba(var(--moodRgb), 0.7)) drop-shadow(0 0 74px rgba(var(--moodRgb), 0.42)); }
   .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 19px; }
-  .ev.lane-left.big .ev-art, .ev.lane-right.big .ev-art { width: 74px; }
 
   @keyframes seen-pulse {
     0%   { filter: drop-shadow(0 0 8px rgba(var(--moodRgb), 0.3)); }
@@ -752,17 +832,21 @@ const HUD_DIGITS = 6
   }
   .ev.big.focused .ev-art { animation: seen-pulse 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
+  /* Dense zones (upper stratosphere/mesosphere, where a few hundred real
+     metres is only a handful of scroll pixels) still need a fallback that
+     keeps SOME picture on screen rather than jumping straight to bare text
+     — a small fixed-footprint icon, not the card's own (now much wider)
+     width, or "compact" would still be too tall to ever resolve a clash and
+     everything would end up in compact-hard regardless. */
   .ev.compact p { display: none; }
-  .ev.compact { width: min(38vw, 200px); }
-  .ev.compact .ev-art { width: 46px; }
+  .ev.compact { width: min(46vw, 220px); }
+  .ev.compact .ev-art { width: 64px; }
   .ev.compact-hard .ev-when { display: none; }
   .ev.compact-hard .ev-art { display: none; }
   @media (max-width: 620px) {
-    .ev { width: min(90vw, 320px); }
-    .ev.lane-left, .ev.lane-right { width: min(46vw, 210px); }
-    .ev.lane-left .ev-art, .ev.lane-right .ev-art { width: 40px; }
-    .ev.lane-left.big .ev-art, .ev.lane-right.big .ev-art { width: 48px; }
-    .ev.big { width: min(92vw, 340px); }
+    .ev { width: min(92vw, 360px); }
+    .ev.lane-left, .ev.lane-right { width: min(48vw, 240px); }
+    .ev.big { width: min(94vw, 400px); }
   }
   .ev-when {
     font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
