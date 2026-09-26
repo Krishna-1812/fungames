@@ -29,7 +29,7 @@ export const REF_H = 140
 export type Pt = { x: number; y: number; w: number }
 export type Stroke = Pt[]
 
-const INK = '42, 16, 38'          // #2a1026
+const INK = '17, 19, 24'          // #111318, the site's ink
 
 /**
  * How hard the ink lands.

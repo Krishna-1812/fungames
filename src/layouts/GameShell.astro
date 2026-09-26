@@ -22,9 +22,11 @@ interface Props {
   labels?: { score?: string; best?: string; level?: string; moves?: string }
   /** Initial values, so the strip is finished before any script runs. */
   initial?: { score?: string; level?: string; moves?: string }
+  /** Extra font families the game's own content needs (see Paper.astro). */
+  fonts?: string[]
 }
 
-const { slug, labels = {}, initial = {} } = Astro.props
+const { slug, labels = {}, initial = {}, fonts = [] } = Astro.props
 const game = gameBySlug(slug)
 if (!game) throw new Error(`No registry entry for game "${slug}"`)
 
@@ -69,6 +71,7 @@ const structuredData = [
   masthead={false}
   colophon={false}
   structuredData={structuredData}
+  fonts={fonts}
 >
   <div class="shell" data-shell data-slug={slug}>
     <header class="wrap shell-bar">

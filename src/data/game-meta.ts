@@ -51,7 +51,7 @@ export const META: Record<string, GameMeta> = {
 }
 
 /** Games already running inside the shared shell. Grows two per phase. */
-export const SHELL_GAMES = new Set(['rule-cascade', 'auction', 'dark-patterns', 'trolley'])
+export const SHELL_GAMES = new Set(['rule-cascade', 'auction', 'dark-patterns', 'trolley', 'not-a-robot', 'from-memory'])
 
 /** localStorage key the shell keeps a game's personal best under. */
 export const bestKey = (slug: string) => `paper:best:${slug}`
@@ -64,44 +64,66 @@ export const bestKey = (slug: string) => `paper:best:${slug}`
 export type Daily = { slug: string; title: string; goal: string }
 
 export function dailyFor(date: Date): Daily {
-  const day = Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86_400_000)
-  const pick = day % 4
+  const day = dayOf(date)
+  const pick = day % 6
+  const c = cycleOf(day)
   if (pick === 0) {
-    const cap = 300 + (day % 5) * 40
     return {
       slug: 'rule-cascade',
       title: 'Rule Cascade',
-      goal: `Satisfy all 31 rules in fewer than ${cap} keystrokes.`,
+      goal: `Satisfy all 31 rules in fewer than ${300 + (c % 5) * 40} keystrokes.`,
     }
   }
   if (pick === 1) {
-    const lots = 2 + (day % 3)
     return {
       slug: 'auction',
       title: 'The Auction Game',
-      goal: `Win at least ${lots} lots and still finish the sale up on the appraisal.`,
+      goal: `Win at least ${2 + (c % 3)} lots and still finish the sale up on the appraisal.`,
     }
   }
   if (pick === 2) {
     return {
       slug: 'dark-patterns',
       title: 'Dark Patterns',
-      goal: `Get through at least ${dailyDodges(day)} of the 11 websites without falling for the trick.`,
+      goal: `Get through at least ${dailyDodges(c)} of the 11 websites without falling for the trick.`,
+    }
+  }
+  if (pick === 3) {
+    return {
+      slug: 'trolley',
+      title: 'Trolley',
+      goal: `Argue for one ethical position at least ${dailyConsistency(c)}% of the time, across all 26 levers.`,
+    }
+  }
+  if (pick === 4) {
+    return {
+      slug: 'not-a-robot',
+      title: "I'm Not a Robot",
+      goal: `Get through all twelve checks looking at least ${dailyHumanity(c)}% human.`,
     }
   }
   return {
-    slug: 'trolley',
-    title: 'Trolley',
-    goal: `Argue for one ethical position at least ${dailyConsistency(day)}% of the time, across all 26 levers.`,
+    slug: 'from-memory',
+    title: 'From Memory',
+    goal: `Draw ten everyday things from memory with an average likeness of ${dailyLikeness(c)}% or better.`,
   }
 }
 
 /* The daily targets, exposed so each game can grade itself against the same
-   number the homepage printed. */
-const dayOf = (date: Date) => Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86_400_000)
-function dailyDodges(day: number) { return 8 + (day % 3) }
-function dailyConsistency(day: number) { return 80 + (day % 3) * 5 }
+   number the homepage printed.
+
+   The nudge comes from which six-day cycle it is, not from the day itself:
+   each game only ever comes up on days with the same remainder mod 6, so a
+   `day % 3` on Trolley's day is the same number every single time. */
+function dayOf(date: Date) { return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86_400_000) }
+function cycleOf(day: number) { return Math.floor(day / 6) }
+function dailyDodges(c: number) { return 8 + (c % 3) }
+function dailyConsistency(c: number) { return 80 + (c % 3) * 5 }
+function dailyHumanity(c: number) { return c % 2 ? 100 : 80 }
+function dailyLikeness(c: number) { return 40 + (c % 3) * 5 }
 export const dailyTarget = {
-  dodges: (date: Date) => dailyDodges(dayOf(date)),
-  consistency: (date: Date) => dailyConsistency(dayOf(date)),
+  dodges: (date: Date) => dailyDodges(cycleOf(dayOf(date))),
+  consistency: (date: Date) => dailyConsistency(cycleOf(dayOf(date))),
+  humanity: (date: Date) => dailyHumanity(cycleOf(dayOf(date))),
+  likeness: (date: Date) => dailyLikeness(cycleOf(dayOf(date))),
 }

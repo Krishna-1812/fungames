@@ -24,8 +24,8 @@ import { glsl } from './gl'
 /*
  * Floor for the paper's luminance.
  *
- * The ink is #2a1026, L = 0.0098. WCAG's 4.5:1 needs the sheet under it at
- * L >= 4.5 * (0.0098 + 0.05) - 0.05 = 0.219. The floor below is far above
+ * The ink is #111318, L = 0.0068. WCAG's 4.5:1 needs the sheet under it at
+ * L >= 4.5 * (0.0068 + 0.05) - 0.05 = 0.206. The floor below is far above
  * that, which is the point: it means no amount of later fiddling with fibres
  * or shading can quietly make a drawing hard to see.
  */
@@ -40,7 +40,7 @@ void main() {
   vec2 p = vec2(uv.x * (u_res.x / max(u_res.y, 1.0)), uv.y);
 
   // Authored as sRGB, because that is how anyone picks a paper colour.
-  vec3 base = toLinear(vec3(0.992, 0.969, 0.980));
+  vec3 base = toLinear(vec3(0.988, 0.992, 1.000));
 
   /* Laid fibres. Two passes at right angles: paper is pressed from a slurry
      that is drained in one direction, so the grain is real and it is
@@ -61,7 +61,7 @@ void main() {
   float ry = fract(uv.y * 8.0 + 0.18);
   float line = smoothstep(0.030, 0.0, min(ry, 1.0 - ry));
   line *= 0.62 + 0.55 * fx;
-  col = mix(col, toLinear(vec3(0.965, 0.906, 0.941)), line);
+  col = mix(col, toLinear(vec3(0.890, 0.914, 0.957)), line);
 
   // The sheet meeting the edge of the pad. Very slight, and only a darkening:
   // a highlight here would read as a glow rather than as a shadow.

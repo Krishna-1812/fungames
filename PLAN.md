@@ -2287,7 +2287,44 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     bars rendered empty once their grow-in had finished — a from-only
     keyframe resolving to an inline transform — so both ends are now explicit.
 
-45. Then reassess again.
+45. ~~**Paper & Ink, phase 3: I'm Not a Robot and From Memory.**~~ **done.**
+    The palette went cool first (cobalt, mint, sky, lilac, raspberry, on a
+    cool paper ground), so these two are the first built in it.
+
+    **I'm Not a Robot** keeps the widget exactly as it was — it is an
+    imitation, so like the fake sites in Dark Patterns it keeps Roboto and
+    the blue-to-red header — and moves everything around it: the dimmed
+    page it floats over is now a framed scene on the stage, the behaviour
+    readout is a paper card beside it, and the verdict is the ink result
+    card with the report card inside. Score is how human you look on what
+    has been measured so far, live; Moves are rejections. The widget's own
+    headphones button and the shell's Sound toggle are one setting now.
+
+    **From Memory** never had a score, and a number that measured nothing
+    would have been worse than none, so it has a real one:
+    `lib/memo-score.ts` samples the reference and your ink in the same
+    200x140 box and takes the F-score of coverage (how much of the real
+    shape you drew) and precision (how much of your ink is on it), trying
+    your drawing both where you put it and lined up with the reference.
+    The first version scored a random scribble at 70-plus — at any
+    forgiving distance a big drawing's lines reach most of the box — so
+    ink beyond 1.6 times the reference's own length now costs precision.
+    `check-memory.mjs` pins it: traces score 98+, a 5-unit wobble
+    averages the mid-80s, the wrong object drawn perfectly the mid-30s,
+    and a random line of the right length under 30, which is where the
+    bottom band ends.
+
+    What the browser caught: From Memory's answer overlay had never been
+    visible. `hidden` is an HTMLElement property; on an `<svg>`,
+    `ref.hidden = false` only sets an expando, and the attribute from the
+    markup stayed. Not a Robot's tile labels depended on global.css's
+    `.visually-hidden` and showed as text once it was gone; its class names
+    also collided with the system's (`.stage`, `.chip`, `.card`,
+    `.wrap`). And with six shell games, every daily target was nudged by
+    `day % 3` — constant on any one game's day — so they now vary by the
+    six-day cycle instead.
+
+46. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

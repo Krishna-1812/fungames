@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { HAND_DEFS } from '../lib/robot-scene'
 import { withBase } from '../lib/base'
 
@@ -23,17 +23,25 @@ import { withBase } from '../lib/base'
  * from src/lib/robot-scene.ts and is checked by scripts/check-robot-scene.mjs.
  *
  * Nothing leaves the tab. There is no server on this site at all.
+ *
+ * In the shell: the widget is an imitation of a real one, so like the fake
+ * sites in Dark Patterns it keeps its own look — Roboto, the blue header —
+ * and only the frame around it is Paper & Ink. Score is how human you look
+ * on the channels measured so far, Check is progress through the twelve,
+ * Moves are rejections, and Best is the most human you have ever looked.
  */
 
 const sceneDefs = HAND_DEFS
 ---
 
-<GameLayout
+<GameShell
   slug="not-a-robot"
-  bar="#1b2027"
-  bodyClass="robot-body"
+  labels={{ score: 'Human', best: 'Most human', level: 'Check', moves: 'Rejections' }}
+  initial={{ score: '—', level: '0 / 12', moves: '0' }}
   fonts={['Roboto:wght@400;500;700']}
 >
+  <div class="nr" id="nr">
+  <div class="nr-scene" id="scene">
   {/* The page the challenge is sitting on top of. A verification dialog never
       appears on its own — it appears over something you were trying to do, and
       the dimming behind it is half of why it reads as one. */}
@@ -64,7 +72,6 @@ const sceneDefs = HAND_DEFS
     <defs set:html={sceneDefs} />
   </svg>
 
-  <div class="wrap">
     <div class="column">
       <section class="rc" id="rc" hidden aria-label="Verification challenge">
         <div class="rc-head" id="rcHead" aria-live="polite">
@@ -130,8 +137,9 @@ const sceneDefs = HAND_DEFS
       </div>
 
       <p class="stepline" id="stepline">Tick the box to begin</p>
-      <h1 class="sr-title">I'm Not a Robot</h1>
     </div>
+    <p class="nr-unmask" id="unmask" hidden>The page behind it was never there either.</p>
+  </div>
 
     {/* The readout is the whole conceit: while you answer the questions, the
         page is measuring you, and it shows its working the entire time. */}
@@ -147,7 +155,6 @@ const sceneDefs = HAND_DEFS
       <svg class="spark" id="spark" viewBox="0 0 200 44" aria-hidden="true"></svg>
       <p class="note">Measured in this tab. Never sent anywhere.</p>
     </aside>
-  </div>
 
   <dialog class="helpbox" id="helpbox">
     <h2>What this is measuring</h2>
@@ -167,6 +174,7 @@ const sceneDefs = HAND_DEFS
     </p>
     <form method="dialog"><button>Close</button></form>
   </dialog>
+  </div>
 
   {/* Written into the served HTML rather than built in JavaScript. It is a
       document nobody reads, and clause 4 is the page's real privacy statement,
@@ -267,71 +275,61 @@ const sceneDefs = HAND_DEFS
     <p>You may now tick the box.</p>
   </template>
 
-  <section class="verdict" id="verdict" hidden>
-    <p class="stamp" id="stamp">Human</p>
-    <p class="score"><b id="pct">100</b><span>% human on the channels we could read</span></p>
-    <p class="detail" id="detail"></p>
+  <Fragment slot="howto">
+    <p>
+      Tick the box. Then pass twelve checks that start exactly like a real
+      CAPTCHA and end somewhere else.
+    </p>
+    <ul>
+      <li>Every check can be passed — some just take patience, and one needs you to read.</li>
+      <li>While you play, the panel beside the widget measures your pointer, clicks, typing and tremor, live. At the end you get a report card.</li>
+      <li>Nothing is sent anywhere. There is no server on this site.</li>
+    </ul>
+    <p>Your score is how human you looked on the channels it could read. Your best is the most human you have ever looked.</p>
+  </Fragment>
 
-    <table class="card">
-      <caption>Report card</caption>
-      <thead>
-        <tr><th scope="col">Channel</th><th scope="col">You</th><th scope="col">A person</th><th scope="col">Verdict</th></tr>
-      </thead>
-      <tbody id="card"></tbody>
-    </table>
-
-    <ul class="extras" id="extras"></ul>
-
-    <div class="acts">
-      <button type="button" data-share data-title="I'm Not a Robot">Share this</button>
-      <button type="button" id="again">Run it again</button>
-      <a href={withBase('/')}>try something else →</a>
-    </div>
-
-    <details class="how">
-      <summary>How this actually works</summary>
-      <p>
-        Every figure above is measured from your own input while you played:
-        where your pointer went between clicks, the gaps between your clicks and
-        your keystrokes, how far your hand drifted while you held still, and the
-        isoperimetric quotient of the circle you drew.
-      </p>
-      <p>
-        <b>The measurements are real. The thresholds are not.</b> Genuine bot
-        detection uses these same channels, but the bands that decide "human"
-        here were picked so the joke lands, not from any published study. Nobody
-        should be refused anything on the strength of this page.
-      </p>
-      <p>
-        The street is a drawing, and which of its squares hold the traffic light
-        is worked out from where the light is rather than written down beside
-        it. The first square you were asked about is graded the way a person
-        would grade it: the signal head is not negotiable, the pole holding it
-        up is yours to call.
-      </p>
-      <p>
-        None of it is transmitted. This site is static files; there is no server
-        to send it to, and nothing is written to storage.
-      </p>
-      <p>Related: <a href={withBase('/steady-hand/')}>Steady Hand</a> measures a single stroke properly, and <a href={withBase('/from-memory/')}>From Memory</a> is the other game here that grades your drawing.</p>
-    </details>
-  </section>
-</GameLayout>
+  <details class="nr-how" slot="after">
+    <summary class="label">How this actually works</summary>
+    <p>
+      Every figure above is measured from your own input while you played:
+      where your pointer went between clicks, the gaps between your clicks and
+      your keystrokes, how far your hand drifted while you held still, and the
+      isoperimetric quotient of the circle you drew.
+    </p>
+    <p>
+      <b>The measurements are real. The thresholds are not.</b> Genuine bot
+      detection uses these same channels, but the bands that decide "human"
+      here were picked so the joke lands, not from any published study. Nobody
+      should be refused anything on the strength of this page.
+    </p>
+    <p>
+      The street is a drawing, and which of its squares hold the traffic light
+      is worked out from where the light is rather than written down beside
+      it. The first square you were asked about is graded the way a person
+      would grade it: the signal head is not negotiable, the pole holding it
+      up is yours to call.
+    </p>
+    <p>
+      None of it is transmitted. This site is static files; there is no server
+      to send it to, and nothing is written to storage.
+    </p>
+    <p>Related: <a href={withBase('/steady-hand/')}>Steady Hand</a> measures a single stroke properly, and <a href={withBase('/from-memory/')}>From Memory</a> is the other game here that grades your drawing.</p>
+  </details>
+</GameShell>
 
 <script>
-  import { burst, shake, prefersReducedMotion } from '../lib/fx'
-  import { sfx, tone, unlock, isMuted, setMuted } from '../lib/audio'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+  import { sfx, tone, unlock, isMuted } from '../lib/audio'
   import { Profiler, circleStats, variation, gaps, report } from '../lib/telemetry'
-  import { onShare } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
-  import { SITE } from '../site.config'
+  import { dailyFor, dailyTarget } from '../data/game-meta'
   import { STREET, ALPHABET, coreCells, mark, warpedText, hands } from '../lib/robot-scene'
 
-  let shareCard: import('../lib/result-card').ResultCard | null = null
-  onShare(() => shareCard, (c) => ({
-    title: "I'm Not a Robot",
-    text: `Twelve checks said: ${c.headline.toLowerCase()}.`,
-  }))
+  const prefersReducedMotion = !PLAY
+  // Restart reloads: the profiler has been listening to the whole page since
+  // it opened, and a fresh page is the only honest way to start it over.
+  const shell = createShell({ slug: 'not-a-robot' })
 
   const $ = (id: string) => document.getElementById(id)!
   const rc = $('rc'), slot = $('slot')
@@ -388,7 +386,7 @@ const sceneDefs = HAND_DEFS
           <span class="tile-img street" aria-hidden="true"
             style="background-position:${col * 50}% ${row * 50}%"></span>
           <span class="tile-tick" aria-hidden="true">${TICK}</span>
-          <span class="visually-hidden">Square ${i + 1}</span>
+          <span class="sr-only">Square ${i + 1}</span>
         </button>`
       }).join('')}
     </div>`
@@ -494,8 +492,8 @@ const sceneDefs = HAND_DEFS
         tail: 'The box would rather you did not',
       },
       mount(host, api) {
-        host.innerHTML = `<div class="stage" id="stage">${anchorHtml('runner')}</div>`
-        const stage = host.querySelector('#stage') as HTMLElement
+        host.innerHTML = `<div class="rc-arena" id="arena">${anchorHtml('runner')}</div>`
+        const stage = host.querySelector('#arena') as HTMLElement
         const box = host.querySelector('#runner') as HTMLElement
         const btn = box.querySelector('.anchor-hit') as HTMLButtonElement
         let dodges = 0
@@ -611,11 +609,11 @@ const sceneDefs = HAND_DEFS
              <svg class="audio-icon" viewBox="0 0 24 24" aria-hidden="true"><path
                d="M12 3a8 8 0 0 0-8 8v6a2 2 0 0 0 2 2h3v-9H6.2A5.9 5.9 0 0 1 17.8 10H15v9h3a2 2 0 0 0 2-2v-6a8 8 0 0 0-8-8Z"/></svg>
              <div class="lamp" id="lamp" aria-hidden="true"></div>
-             <button type="button" class="chip play" id="play">
+             <button type="button" class="rc-chip play" id="play">
                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg> Play
              </button>
              <div class="choices" id="choices" role="group" aria-label="How many tones">
-               ${[3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="chip" data-n="${k}">${k}</button>`).join('')}
+               ${[3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="rc-chip" data-n="${k}">${k}</button>`).join('')}
              </div>
            </div>`
         const lamp = host.querySelector('#lamp') as HTMLElement
@@ -638,10 +636,10 @@ const sceneDefs = HAND_DEFS
         }
         host.querySelector('#play')!.addEventListener('click', play)
         let chosen: number | null = null
-        host.querySelectorAll<HTMLButtonElement>('.chip[data-n]').forEach((c) =>
+        host.querySelectorAll<HTMLButtonElement>('.rc-chip[data-n]').forEach((c) =>
           c.addEventListener('click', () => {
             chosen = Number(c.dataset.n)
-            host.querySelectorAll('.chip[data-n]').forEach((o) => o.classList.remove('on'))
+            host.querySelectorAll('.rc-chip[data-n]').forEach((o) => o.classList.remove('on'))
             c.classList.add('on')
             sfx.tick()
           }))
@@ -767,8 +765,8 @@ const sceneDefs = HAND_DEFS
              <input class="slider" id="freq" type="range" min="0" max="1000" value="500"
                aria-label="Your tone, low to high">
              <div class="tonebtns">
-               <button type="button" class="chip" id="playRef">Play theirs</button>
-               <button type="button" class="chip" id="playMine">Play mine</button>
+               <button type="button" class="rc-chip" id="playRef">Play theirs</button>
+               <button type="button" class="rc-chip" id="playMine">Play mine</button>
              </div>
            </div>`
         const waves = host.querySelector('#waves') as SVGGElement
@@ -836,7 +834,7 @@ const sceneDefs = HAND_DEFS
           OPTIONS.map((o, i) =>
             `<button type="button" class="handbtn" data-i="${i}">
                <svg viewBox="0 0 120 140" aria-hidden="true">${o.svg}</svg>
-               <span class="visually-hidden">Hand ${i + 1}</span>
+               <span class="sr-only">Hand ${i + 1}</span>
              </button>`).join('')}</div>`
         host.querySelectorAll<HTMLButtonElement>('.handbtn').forEach((b) =>
           b.addEventListener('click', () => {
@@ -992,7 +990,7 @@ const sceneDefs = HAND_DEFS
                `<button type="button" class="tile trace" data-i="${i}" aria-pressed="false">
                   <span class="tile-img" aria-hidden="true"><svg viewBox="0 0 100 100">${c.svg}</svg></span>
                   <span class="tile-tick" aria-hidden="true">${TICK}</span>
-                  <span class="visually-hidden">${c.label}</span>
+                  <span class="sr-only">${c.label}</span>
                 </button>`).join('')}
            </div>`
         const chosen = new Set<number>()
@@ -1124,7 +1122,8 @@ const sceneDefs = HAND_DEFS
       ev.retries++
       say(msg, 'bad')
       sfx.bad()
-      shake(rc, 7, 300)
+      shell.shake(rc)
+      shell.setMoves(String(ev.retries))
     },
     say(msg) { say(msg, 'plain') },
     action(label, fn) {
@@ -1160,11 +1159,13 @@ const sceneDefs = HAND_DEFS
     // Which step you are on, matching the line under the widget. Checks
     // completed would read zero on the first one and look broken.
     bar.style.width = `${((i + 1) / CHECKS.length) * 100}%`
-    /* On the body, not on the widget. `--rc-blue` is declared on `.robot-body`,
-       and a custom property is substituted where it is declared rather than
-       where it is used — setting `--heat` further down the tree leaves the
-       header computing against the fallback and staying blue for all twelve. */
-    document.body.style.setProperty('--heat', String(i))
+    /* On .nr, not on the widget. `--rc-blue` is declared on `.nr`, and a
+       custom property is substituted where it is declared rather than where
+       it is used — setting `--heat` further down the tree leaves the header
+       computing against the fallback and staying blue for all twelve. */
+    $('nr').style.setProperty('--heat', String(i))
+    shell.setLevel(`${i + 1} / ${CHECKS.length}`)
+    paintHuman()
     skipBtn.hidden = true
     skipBtn.onclick = null
     slot.innerHTML = ''
@@ -1212,14 +1213,18 @@ const sceneDefs = HAND_DEFS
     show(idx)
   })
 
+  /* The widget's own headphones button and the shell's Sound toggle are one
+     setting, so each drives the other rather than keeping two answers. */
   const soundBtn = $('sound') as HTMLButtonElement
+  const shellSound = document.querySelector('[data-act="sound"]') as HTMLButtonElement
   const paintSound = () => {
     const off = isMuted()
     soundBtn.setAttribute('aria-pressed', String(!off))
     soundBtn.setAttribute('aria-label', off ? 'Turn sound on' : 'Turn sound off')
     soundBtn.classList.toggle('is-off', off)
   }
-  soundBtn.addEventListener('click', () => { unlock(); setMuted(!isMuted()); paintSound(); sfx.tick() })
+  soundBtn.addEventListener('click', () => { shellSound.click(); paintSound() })
+  shellSound.addEventListener('click', () => setTimeout(paintSound))
   paintSound()
 
   const helpbox = $('helpbox') as HTMLDialogElement
@@ -1228,6 +1233,12 @@ const sceneDefs = HAND_DEFS
   /* ------------------------------------------------------------------ */
   /* Verdict                                                             */
   /* ------------------------------------------------------------------ */
+
+  /** How human you look so far, on whatever has been measured. */
+  function paintHuman() {
+    const r = report({ path: prof.path(), clicks: prof.clicks(), keys: prof.keys(), drift: ev.drift, roundness: ev.roundness })
+    if (r.measured) shell.setScore(`${r.humanity}%`)
+  }
 
   function finish() {
     const r = report({
@@ -1238,16 +1249,12 @@ const sceneDefs = HAND_DEFS
       roundness: ev.roundness,
     })
 
-    $('stamp').textContent = r.verdict
-    $('stamp').dataset.tone = r.humanity === 100 ? 'good' : r.humanity >= 50 ? 'mid' : 'bad'
-    $('pct').textContent = String(r.humanity)
-    $('detail').textContent = r.detail
-    $('card').innerHTML = r.metrics.map((m) =>
+    const rows = r.metrics.map((m) =>
       `<tr class="${m.ok === null ? 'na' : m.ok ? 'yes' : 'no'}">
          <th scope="row">${m.label}</th>
-         <td>${m.display ?? '<span class="na">not measured</span>'}</td>
+         <td class="num">${m.display ?? '<span class="na">not measured</span>'}</td>
          <td>${m.expected}</td>
-         <td>${m.ok === null ? '—' : m.ok ? 'human' : 'flagged'}</td>
+         <td>${m.ok === null ? '—' : m.ok ? '✓ human' : '✗ flagged'}</td>
        </tr>`).join('')
 
     const secs = Math.round((Date.now() - started) / 1000)
@@ -1262,51 +1269,50 @@ const sceneDefs = HAND_DEFS
     if (ev.cents !== null) extras.push(`Your ear was ${cents(ev.cents)} off the reference tone.`)
     if (ev.dodges) extras.push(`The checkbox got away from you ${ev.dodges} times.`)
     extras.push(`Twelve checks, ${plural(ev.retries, 'rejection')}, ${Math.floor(secs / 60)}m ${secs % 60}s.`)
-    $('extras').innerHTML = extras.map((e) => `<li>${e}</li>`).join('')
-
-    const stat = recordPlay(
+    recordPlay(
       'not-a-robot',
       { verdict: r.verdict, humanity: r.humanity, retries: ev.retries, seconds: secs },
       { humanity: 'high' },
     )
 
-    /* `r.detail` is written for the page, where it sits above a table that
-       explains it. On a card with nothing around it, a sentence naming one
-       failed channel reads as the whole result, so the card says how many
-       there were and leaves the table where it is. */
-    shareCard = {
-      slug: 'not-a-robot',
-      siteName: SITE.name,
-      headline: r.verdict,
-      sub:
-        (r.measured
-          ? `${r.passed} of ${r.measured} measurable channels looked like a person.`
-          : 'Twelve checks, and not one usable signal.') +
-        ` ${plural(ev.retries, 'rejection')} along the way.` +
-        (stat.plays > 1 ? ` Attempt ${stat.plays}.` : ''),
-      stats: [
-        { label: 'Human', value: r.humanity + '%' },
-        { label: 'Channels', value: `${r.passed} / ${r.measured}` },
-        { label: 'Time', value: `${Math.floor(secs / 60)}m ${secs % 60}s` },
-      ],
+    shell.resultExtra.innerHTML = `
+      <table class="nr-sheet">
+        <caption class="label">Report card</caption>
+        <thead><tr><th scope="col">Channel</th><th scope="col">You</th><th scope="col">A person</th><th scope="col">Verdict</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <ul class="nr-extras">${extras.map((e) => `<li>${e}</li>`).join('')}</ul>`
+
+    shell.setScore(r.measured ? `${r.humanity}%` : '—')
+    const beat = shell.considerBest(r.humanity, `${r.humanity}%`)
+    const lines = [r.detail]
+    if (beat === 'beaten') lines.push('✓ The most human you have ever looked.')
+    else if (beat === 'first') lines.push('Your first verdict — that is the number to beat now.')
+    else if (shell.best) lines.push(`The most human you have looked is still ${shell.best.text}.`)
+    const now = new Date()
+    if (dailyFor(now).slug === 'not-a-robot') {
+      const need = dailyTarget.humanity(now)
+      lines.push(r.humanity >= need ? `✓ Daily challenge beaten: ${need}% human or more.` : `✗ Daily challenge: look at least ${need}% human.`)
     }
 
     rc.hidden = true
     anchor.hidden = true
     stepline.hidden = true
     // The page it was all sitting on top of goes with it.
-    document.body.classList.add('unmasked')
-    $('verdict').hidden = false
-    sfx.great()
-    if (r.humanity === 100)
-      for (let k = 0; k < 4; k++)
-        setTimeout(() => burst(innerWidth * (0.25 + Math.random() * 0.5), innerHeight * 0.35, {
-          count: 16, colors: ['#4a90e2', '#9dd6ff', '#fff'], speed: 6, gravity: 0.2, life: 58, size: 5, shape: 'square',
-        }), k * 120)
-    $('verdict').scrollIntoView({ behavior: 'smooth', block: 'start' })
+    $('scene').classList.add('is-unmasked')
+    $('unmask').hidden = false
+    const ending = {
+      kicker: `Twelve checks · ${plural(ev.retries, 'rejection')}`,
+      title: r.verdict + '.',
+      score: r.measured ? `${r.humanity}%` : '—',
+      from: '0%',
+      lines,
+      againLabel: 'Run it again',
+    }
+    if (r.humanity >= 50) shell.win(ending)
+    else shell.lose(ending)
   }
 
-  $('again').addEventListener('click', () => location.reload())
 
   /* ------------------------------------------------------------------ */
   /* Live readout                                                        */
@@ -1347,9 +1353,7 @@ const sceneDefs = HAND_DEFS
   /* A class, not a bare `body`: global.css already sets the site's paper
      background on the element selector, and two rules of equal specificity are
      settled by order, which is not something a page should be relying on. */
-  .robot-body {
-    background: #10121a;
-    color: #e6e9f2;
+  .nr {
 
     /* Roboto, because that is what the real widget is set in and the substitute
        is the first thing that gives a copy away. The fallbacks after it are the
@@ -1374,21 +1378,13 @@ const sceneDefs = HAND_DEFS
     --rc-mute: #5f6368;
     --rc-err: #c5221f;
   }
-  .robot-body .chrome { position: relative; z-index: 3; }
-
-  /* The visible <h1> would be a title bar on a dialog that does not have one,
-     so the page keeps its heading for the document outline and hides it. */
-  .sr-title {
-    position: absolute; width: 1px; height: 1px; overflow: hidden;
-    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
-  }
 
   /* --- the page it is sitting on top of -------------------------------- */
 
   /* A verification dialog never appears on its own. It appears over something
      you were in the middle of, greyed out and slightly out of focus, and that
      dimming is half of the reason the thing on top reads as a dialog. */
-  .host { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .host { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
   .host-page {
     position: absolute; inset: -30px;
     background: #eceef2; filter: blur(4px) saturate(0.35);
@@ -1408,7 +1404,7 @@ const sceneDefs = HAND_DEFS
   .host-hero i:first-child { background: #9aa1ad; margin-bottom: 18px; }
   .host u { height: 30px; background: #e2e5ea; margin-bottom: 18px; }
   .host s { height: 34px; width: 116px; background: #b6bcc6; margin: 22px 0 0; }
-  .robot-body.unmasked .host { opacity: 0; transition: opacity 800ms var(--ease); }
+  .nr-scene.is-unmasked .host { opacity: 0; transition: opacity 800ms var(--ease); }
   .host::after {
     content: ''; position: absolute; inset: 0;
     background: radial-gradient(120% 90% at 50% 34%, rgba(12, 14, 20, 0.6), rgba(8, 9, 13, 0.9));
@@ -1416,13 +1412,24 @@ const sceneDefs = HAND_DEFS
 
   /* --- layout ----------------------------------------------------------- */
 
-  .wrap {
-    position: relative; z-index: 1;
-    max-width: 1000px; margin: 0 auto; padding: 34px 18px 56px;
-    display: grid; grid-template-columns: minmax(0, 1fr) 208px; gap: 26px;
-    align-items: start; justify-items: center;
+  /* The widget floats over a dimmed page inside a framed scene on the white
+     stage, with the live readout beside it on paper. */
+  .nr { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: clamp(16px, 2.4vw, 28px); align-items: start; }
+  .nr-scene {
+    position: relative; overflow: hidden; isolation: isolate;
+    min-height: 620px; padding: clamp(28px, 5vw, 56px) 14px;
+    border: 2px solid var(--ink); border-radius: var(--r-lg);
+    background: #10121a; color: #e6e9f2;
   }
-  .column { display: grid; justify-items: center; gap: 14px; width: 100%; }
+  .column { position: relative; z-index: 1; display: grid; justify-items: center; gap: 14px; width: 100%; }
+  .nr-unmask {
+    position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 24px; text-align: center;
+    font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600;
+    font-size: var(--fs-h3); line-height: 1.05; letter-spacing: -0.02em; color: var(--ink-paper);
+  }
+  .nr-unmask[hidden] { display: none; }
+  /* Once it is over there is nothing left in the scene but that sentence. */
+  .nr-scene.is-unmasked { min-height: 180px; }
   .scene-src { position: absolute; width: 0; height: 0; overflow: hidden; }
 
   /* --- the challenge ---------------------------------------------------- */
@@ -1613,7 +1620,7 @@ const sceneDefs = HAND_DEFS
 
   /* --- the box that runs away ------------------------------------------- */
 
-  .stage { position: relative; height: 268px; border: 1px dashed #ccd0d8; border-radius: 3px; }
+  .rc-arena { position: relative; height: 268px; border: 1px dashed #ccd0d8; border-radius: 3px; }
   .anchor.loose {
     position: absolute; left: 6px; top: 80px;
     transition: left 260ms var(--ease-bounce), top 260ms var(--ease-bounce);
@@ -1644,15 +1651,15 @@ const sceneDefs = HAND_DEFS
   .lamp.lit { animation: lit 260ms var(--ease); }
   @keyframes lit { from { background: #ffd166; box-shadow: 0 0 0 12px rgba(255, 209, 102, 0.35); } }
   .choices { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
-  .chip {
+  .rc-chip {
     display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
     background: #fff; border: 1px solid #c6cbd4; border-radius: 2px;
     padding: 6px 14px; font: 500 14px/1 var(--rc-font); color: #202124; cursor: pointer;
     transition: border-color 140ms var(--ease), background 140ms var(--ease);
   }
-  .chip:hover { border-color: var(--rc-blue-d); }
-  .chip svg { width: 14px; height: 14px; fill: currentColor; }
-  .chip.on { background: var(--rc-blue); border-color: var(--rc-blue); color: #fff; }
+  .rc-chip:hover { border-color: var(--rc-blue-d); }
+  .rc-chip svg { width: 14px; height: 14px; fill: currentColor; }
+  .rc-chip.on { background: var(--rc-blue); border-color: var(--rc-blue); color: #fff; }
 
   /* --- hold still ---------------------------------------------------------- */
 
@@ -1671,7 +1678,7 @@ const sceneDefs = HAND_DEFS
   .tonebox svg { width: 100%; max-width: 300px; }
   .w-ref { stroke: #7fa8ff; }
   .w-mine { stroke: #ffd166; }
-  .slider { width: min(300px, 100%); --sl-a: #7ba4e8; --sl-b: #2f588c; --sl-track: #dfe3ea; }
+  .slider { width: min(300px, 100%); accent-color: var(--rc-blue-d); }
   .tonebtns { display: flex; gap: 8px; }
 
   /* --- hands ---------------------------------------------------------------- */
@@ -1724,27 +1731,20 @@ const sceneDefs = HAND_DEFS
   }
   .agree input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--rc-blue); }
 
-  /* --- the panel beside it --------------------------------------------------- */
+  /* --- the panel beside it: Paper & Ink ------------------------------ */
 
   .signal {
-    width: 100%;
-    background: rgba(23, 26, 33, 0.92); border: 1px solid #2b2f39; border-radius: 4px;
-    padding: 13px; position: sticky; top: 62px;
-    backdrop-filter: blur(6px);
+    width: 100%; position: sticky; top: 16px;
+    padding: 18px; border-radius: var(--r-lg);
+    background: var(--card); color: var(--ink); box-shadow: var(--shadow-block);
   }
-  .signal h2 {
-    font: 600 11px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
-    color: #8d94a4; margin: 0 0 10px;
-  }
-  .signal dl { margin: 0; display: grid; gap: 8px; }
+  .signal h2 { font: 600 var(--fs-label)/1.2 var(--sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink3); margin: 0 0 14px; }
+  .signal dl { margin: 0; display: grid; gap: 10px; }
   .signal div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-  .signal dt { font-size: 12px; color: #a2a9b8; }
-  .signal dd {
-    margin: 0; font: 600 13px/1 var(--mono); color: #d6e2f7;
-    font-variant-numeric: tabular-nums;
-  }
-  .spark { display: block; width: 100%; height: 40px; margin-top: 12px; color: #6ea8f0; }
-  .signal .note { margin: 8px 0 0; font-size: 11px; color: #8b93a3; line-height: 1.45; }
+  .signal dt { font-size: 13px; color: var(--ink2); }
+  .signal dd { margin: 0; font: 700 15px/1 var(--sans); letter-spacing: -0.02em; color: var(--ink); }
+  .spark { display: block; width: 100%; height: 44px; margin-top: 14px; color: var(--t-cobalt); }
+  .signal .note { margin: 10px 0 0; font-size: 12px; color: var(--ink3); line-height: 1.45; }
 
   /* --- help ------------------------------------------------------------------ */
 
@@ -1761,64 +1761,40 @@ const sceneDefs = HAND_DEFS
     height: 34px; padding: 0 18px; font: 500 15px/1 var(--rc-font); cursor: pointer;
   }
 
-  /* --- verdict ---------------------------------------------------------------- */
+  /* --- the report card, inside the ink result block -------------------- */
 
-  .verdict { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 0 18px 90px; }
-  .stamp {
-    display: inline-block; margin: 0 0 10px; padding: 8px 18px;
-    border: 3px solid currentColor; border-radius: 8px; transform: rotate(-2.5deg);
-    font: 700 24px/1 var(--display); letter-spacing: -0.02em; text-transform: uppercase;
-  }
-  .stamp[data-tone='good'] { color: #6fe0a4; }
-  .stamp[data-tone='mid'] { color: #ffd166; }
-  .stamp[data-tone='bad'] { color: #ff8778; }
-  .score { margin: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
-  .score b { font: 700 44px/1 var(--display); }
-  .score span { color: #a4abbb; font-size: 14px; }
-  .detail { margin: 0 0 22px; color: #c8cdd8; max-width: 54ch; }
+  .nr-sheet { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .nr-sheet caption { text-align: left; padding-bottom: 10px; }
+  .nr-sheet th, .nr-sheet td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(243, 245, 248, 0.22); }
+  .nr-sheet thead th { font-size: var(--fs-label); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .nr-sheet tbody th { font-weight: 500; }
+  .nr-sheet .num { font-size: 15px; letter-spacing: -0.01em; }
+  .nr-sheet tr.yes td:last-child { color: var(--mint); font-weight: 700; }
+  .nr-sheet tr.no td:last-child { color: var(--red); font-weight: 700; }
+  .nr-sheet .na { opacity: 0.7; font-weight: 400; }
+  @media (max-width: 560px) { .nr-sheet td:nth-child(3), .nr-sheet thead th:nth-child(3) { display: none; } }
+  .nr-extras { margin: 24px 0 0; padding-left: 1.1em; display: grid; gap: 8px; max-width: 62ch; font-size: 16px; }
 
-  .card { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .card caption {
-    text-align: left; font: 600 11px/1 var(--mono); letter-spacing: 0.14em;
-    text-transform: uppercase; color: #8d94a4; padding-bottom: 8px;
-  }
-  .card th, .card td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #2b2f39; }
-  .card thead th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #8d94a4; font-weight: 600; }
-  .card tbody th { font-weight: 500; }
-  .card td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: #d6e2f7; }
-  .card tr.yes td:last-child { color: #6fe0a4; }
-  .card tr.no td:last-child { color: #ff8778; }
-  .card .na { color: #8b93a3; font-family: var(--font); }
-
-  .extras { margin: 22px 0 0; padding-left: 20px; color: #c8cdd8; font-size: 14px; line-height: 1.7; }
-  .acts { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 26px; }
-  .acts button {
-    background: #2a6fb8; color: #fff; border: 0; border-radius: 999px;
-    padding: 10px 22px; font-weight: 600; cursor: pointer;
-    transition: transform 200ms var(--ease-bounce);
-  }
-  .acts button:hover { transform: translateY(-2px) scale(1.03); }
-  .acts button:nth-of-type(2) { background: #2b3038; }
-  .acts a { color: #a4abbb; font-size: 15px; display: inline-flex; align-items: center; min-height: 26px; }
-
-  .how { margin-top: 30px; border-top: 1px solid #2b2f39; padding-top: 16px; color: #a4abbb; font-size: 14px; }
-  .how summary { cursor: pointer; color: #d6e2f7; font-weight: 600; }
-  .how p { max-width: 62ch; line-height: 1.65; }
-  .how b { color: #d6e2f7; }
+  .nr-how { margin-top: 16px; padding: 20px 24px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-block); }
+  .nr-how summary { cursor: pointer; }
+  .nr-how p { margin-top: 12px; max-width: 64ch; color: var(--ink2); }
+  .nr-how b { color: var(--ink); }
+  .nr-how a { color: var(--t-blue); font-weight: 600; }
 
   @media (prefers-reduced-motion: reduce) {
     .rc.in, .rc-flash.in { animation: none; }
     .rc-head { transition: none; }
-    .robot-body.unmasked .host { transition: none; }
+    .nr-scene.is-unmasked .host { transition: none; }
   }
 
-  @media (max-width: 860px) {
-    .wrap { grid-template-columns: minmax(0, 1fr); }
-    .signal { position: static; order: 2; max-width: 412px; }
+  @media (max-width: 900px) {
+    .nr { grid-template-columns: minmax(0, 1fr); }
+    .signal { position: static; }
   }
   @media (max-width: 460px) {
     .rc-target { font-size: 21px; }
     .hands { gap: 3px; }
     .host-page { padding-top: 40px; }
+    .nr-scene { min-height: 560px; padding-inline: 8px; }
   }
 </style>

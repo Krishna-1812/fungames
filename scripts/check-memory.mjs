@@ -242,5 +242,71 @@ const rest = [...seen.entries()].filter(([id]) => id !== 'bicycle').map(([, n]) 
 const spread = Math.max(...rest) / Math.min(...rest)
 report('and they come up about equally often', spread < 1.25, `worst ratio ${spread.toFixed(2)}`)
 
+/* -------------------------------------------------------------------------- */
+/* The likeness score                                                         */
+/* -------------------------------------------------------------------------- */
+
+/* The score is only worth showing if it can tell a good drawing from a bad
+   one, so it is played against drawings whose answer is known: the reference
+   itself (perfect, wobbly, moved), and things that are not the reference (a
+   random line of the same length, a scribble over the whole box, the wrong
+   object drawn perfectly). */
+console.log('\nthe likeness score')
+{
+  const { refPoints, likeness, verdictFor, MIN_INK } = await import('../src/lib/memo-score.ts')
+  let s2 = 11
+  const rnd = () => { s2 = (s2 * 1664525 + 1013904223) >>> 0; return s2 / 4294967296 }
+  const toStrokes = (pts) => {
+    const out = [[pts[0]]]
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1], b = pts[k]
+      if (Math.hypot(a.x - b.x, a.y - b.y) > 4) out.push([b])
+      else out[out.length - 1].push(b)
+    }
+    return out
+  }
+  const walk = (len) => {
+    const s = []
+    let x = 40 + rnd() * 120, y = 30 + rnd() * 80, a = rnd() * 6.28
+    for (let d = 0; d < len; d += 3) {
+      a += (rnd() - 0.5) * 0.9
+      x = Math.min(195, Math.max(5, x + 3 * Math.cos(a)))
+      y = Math.min(135, Math.max(5, y + 3 * Math.sin(a)))
+      s.push({ x, y })
+    }
+    return [s]
+  }
+  const wobble = (tr, amp) => tr.map((s) => s.map((p, k) => ({ x: p.x + amp * Math.sin(k / 15 + s.length), y: p.y + amp * Math.cos(k / 11) })))
+  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length
+  const refs = Object.fromEntries(ITEMS.map((it) => [it.id, refPoints(it.svg)]))
+  const traces = Object.fromEntries(ITEMS.map((it) => [it.id, toStrokes(refs[it.id])]))
+
+  const sparse = ITEMS.filter((it) => refs[it.id].length < 120).map((it) => it.id)
+  report('every reference samples into a dense line', sparse.length === 0, sparse.join(', '))
+
+  const perfect = ITEMS.filter((it) => likeness(refs[it.id], traces[it.id]).score < 98).map((it) => it.id)
+  report('tracing the reference exactly scores 98 or more', perfect.length === 0, perfect.join(', '))
+
+  const movedBad = ITEMS.filter((it) => likeness(refs[it.id], traces[it.id].map((s) => s.map((p) => ({ x: (p.x - 100) * 0.75 + 118, y: (p.y - 70) * 0.75 + 58 })))).score < 95).map((it) => it.id)
+  report('the same drawing, smaller and off-centre, still scores 95+', movedBad.length === 0, movedBad.join(', '))
+
+  const w5 = ITEMS.map((it) => likeness(refs[it.id], wobble(traces[it.id], 5)).score)
+  report('a 5-unit wobble averages 80+ and never drops under 70', avg(w5) >= 80 && Math.min(...w5) >= 70, `avg ${avg(w5).toFixed(0)}, min ${Math.min(...w5)}`)
+  const w8 = ITEMS.map((it) => likeness(refs[it.id], wobble(traces[it.id], 8)).score)
+  report('an 8-unit wobble scores less than a 5-unit one', avg(w8) < avg(w5), `avg ${avg(w8).toFixed(0)}`)
+
+  const walks = ITEMS.flatMap((it) => Array.from({ length: 20 }, () => likeness(refs[it.id], walk(refs[it.id].length * 1.5)).score)).sort((a, b) => a - b)
+  report('a random line of the same length averages under 30', avg(walks) < 30, `avg ${avg(walks).toFixed(0)}, 90th percentile ${walks[Math.floor(walks.length * 0.9)]}`)
+  report(`…which is the bottom band, "${verdictFor(Math.round(avg(walks)))}"`, verdictFor(Math.round(avg(walks))) === verdictFor(0))
+
+  const scrib = ITEMS.map((it) => likeness(refs[it.id], [Array.from({ length: 60 }, () => ({ x: rnd() * 200, y: rnd() * 140 }))]).score)
+  report('scribbling over the whole box averages under 25', avg(scrib) < 25, `avg ${avg(scrib).toFixed(0)}`)
+
+  const cross = ITEMS.flatMap((it) => ITEMS.filter((o) => o.id !== it.id).map((o) => likeness(refs[it.id], traces[o.id]).score))
+  report('the wrong object, drawn perfectly, averages under 40', avg(cross) < 40, `avg ${avg(cross).toFixed(0)}`)
+
+  report('no ink is no score', likeness(refs.bicycle, []).score === 0 && likeness(refs.bicycle, [[{ x: 10, y: 10 }, { x: 10 + MIN_INK / 2, y: 10 }]]).score === 0)
+}
+
 console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
 process.exit(failures === 0 ? 0 : 1)

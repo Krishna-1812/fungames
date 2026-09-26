@@ -24,6 +24,9 @@ interface Props {
   structuredData?: Record<string, unknown>[]
   noindex?: boolean
   bodyClass?: string
+  /** Extra Google Fonts families a page needs for its own content, e.g.
+   *  'Roboto:wght@400;500;700' for a widget that imitates a real one. */
+  fonts?: string[]
 }
 
 const {
@@ -35,12 +38,14 @@ const {
   structuredData = [],
   noindex = false,
   bodyClass = '',
+  fonts = [],
 } = Astro.props
 
 const fontHref =
   'https://fonts.googleapis.com/css2' +
   '?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1' +
   '&family=Zalando+Sans:wght@300..900' +
+  fonts.map((f) => '&family=' + f.replace(/ /g, '+')).join('') +
   '&display=swap'
 
 const websiteLd = {

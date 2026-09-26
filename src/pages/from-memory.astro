@@ -1,5 +1,6 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
+import { ROUND_SIZE } from '../data/memory'
 
 /**
  * From Memory — draw an everyday object, then compare against the real shape.
@@ -13,111 +14,169 @@ import GameLayout from '../layouts/GameLayout.astro'
  * overlay lines up with the canvas exactly — scripts/check-memory.mjs parses
  * every coordinate and checks they really do stay inside it, which is not
  * something you can see by reading a path.
+ *
+ * In the shell: the game never had a score, and the shell wants one, so it
+ * has a real one — lib/memo-score.ts measures how much of the real shape you
+ * drew and how much of your ink lies on it, and the checker proves it can tell
+ * a traced reference from a random line of the same length. Score is your
+ * average likeness so far, Drawing is progress, Moves are strokes on this
+ * sheet, and Best is your best average over a full ten.
  */
-
 ---
 
-<GameLayout slug="from-memory" bar="#3b1338" bodyClass="mem-body">
-  <div class="wrap">
-    <header class="head">
-      <p class="edition">THE EVERYDAY SKETCHBOOK · NO. 01</p>
-      <h1>From Memory</h1>
-      <p class="lede">You see these things every day. How much stayed in your head?</p>
-    </header>
+<GameShell
+  slug="from-memory"
+  labels={{ score: 'Likeness', best: 'Best average', level: 'Drawing', moves: 'Strokes' }}
+  initial={{ score: '—', level: `1 / ${ROUND_SIZE}`, moves: '0' }}
+>
+  <div class="fm">
+    <div class="fm-brief">
+      <p class="label meta" id="tag">Drawing 1 of {ROUND_SIZE}</p>
+      <h2 class="fm-prompt" id="prompt">A bicycle</h2>
+      <p class="fm-hint">Draw it without looking anything up. Beautifully wrong is welcome.</p>
+      <ol class="fm-tally" id="tally" aria-label="Your drawings so far">
+        {Array.from({ length: ROUND_SIZE }, () => <li><span class="sr-only">Not drawn yet</span></li>)}
+      </ol>
+    </div>
 
-    <div class="dots" id="dots" aria-hidden="true"></div>
-
-    <section class="card" id="card">
-      <div class="tag"><span id="tag">1 of 10</span></div>
-      <h2 id="prompt">—</h2>
-      <p class="drawing-hint">Draw without looking. Beautifully wrong is welcome.</p>
-
-      <div class="pad">
-        <div class="sheet" id="sheet" aria-hidden="true"></div>
-        <canvas id="pad" aria-label="Drawing area"></canvas>
-        <svg
-          class="ref" id="ref" viewBox="0 0 200 140" aria-hidden="true" hidden
-        ></svg>
+    <div class="fm-desk">
+      <div class="fm-pad" id="padBox">
+        <div class="fm-sheet" id="sheet" aria-hidden="true"></div>
+        <canvas id="pad" aria-label="Drawing area — draw with a mouse, pen or finger"></canvas>
+        <svg class="fm-ref" id="ref" viewBox="0 0 200 140" aria-hidden="true" hidden></svg>
       </div>
-
-      <div class="comparison" id="comparison" hidden>
-        <figure><figcaption>What you remembered</figcaption><img id="attemptImage" alt="Your drawing" /></figure>
-        <figure><figcaption>The reference</figcaption><svg id="comparisonRef" viewBox="0 0 200 140" role="img" aria-label="Reference drawing"></svg></figure>
+      <div class="fm-compare" id="comparison" hidden>
+        <figure><figcaption class="label meta">What you remembered</figcaption><img id="attemptImage" alt="Your drawing" /></figure>
+        <figure><figcaption class="label meta">The reference</figcaption><svg id="comparisonRef" viewBox="0 0 200 140" role="img" aria-label="Reference drawing"></svg></figure>
       </div>
-      <div class="result-tools" id="resultTools" hidden>
-        <button type="button" id="compareBtn" aria-pressed="false">Side by side</button>
-        <button type="button" id="postcardBtn">Download postcard</button>
+      <div class="fm-tools" id="tools">
+        <button type="button" class="pill pill--line pill--sm" id="undoBtn"><span>Undo</span></button>
+        <button type="button" class="pill pill--line pill--sm" id="clearBtn"><span>Clear</span></button>
+        <button type="button" class="pill pill--hero fm-reveal" id="revealBtn"><span>Reveal</span><span class="arrow" aria-hidden="true">→</span></button>
       </div>
-      <p id="exportStatus" role="status"></p>
+    </div>
 
-      <div class="tools">
-        <button type="button" id="undoBtn" class="ghost">Undo</button>
-        <button type="button" id="clearBtn" class="ghost">Clear</button>
-        <button type="button" id="revealBtn" class="primary">Reveal</button>
-        <button type="button" id="nextBtn" class="primary" hidden>Next →</button>
+    <div class="fm-verdict" id="verdict" hidden tabindex="-1">
+      <p class="label">Likeness</p>
+      <p class="fm-score"><span class="num" id="vScore">0%</span><span class="fm-word" id="vWord">Close</span></p>
+      <p class="fm-why" id="vWhy"></p>
+      <p class="fm-fact" id="fact"></p>
+      <div class="fm-actions">
+        <button type="button" class="pill pill--ink" id="nextBtn"><span id="nextLbl">Next drawing</span><span aria-hidden="true">→</span></button>
+        <button type="button" class="pill pill--line pill--sm" id="compareBtn" aria-pressed="false"><span>Side by side</span></button>
+        <button type="button" class="pill pill--line pill--sm" id="postcardBtn"><span>Download postcard</span></button>
       </div>
-
-      <p class="fact" id="fact" hidden></p>
-    </section>
-
-    <section class="gallery" id="gallery" hidden>
-      <h2>Everything you drew</h2>
-      <div class="shelf" id="shelf"></div>
-      <div class="gallery-actions">
-        <button type="button" data-share data-title="From Memory">Share</button>
-        <button type="button" id="againBtn" class="ghost">Draw ten more</button>
-      </div>
-    </section>
+      <p class="fm-status" id="exportStatus" role="status"></p>
+    </div>
   </div>
-</GameLayout>
 
-  <script>
-  import { burst } from '../lib/fx'
+  <Fragment slot="howto">
+    <p>
+      Ten everyday things, one at a time. Draw each one from memory on the
+      sheet — mouse, pen or finger — then press <b>Reveal</b> to see the real
+      shape drawn over yours.
+    </p>
+    <ul>
+      <li><b>Likeness</b> measures how much of the real shape you drew and how much of your ink lies on it. Drawing it in the wrong place or at the wrong size is forgiven; drawing the wrong shape is not.</li>
+      <li>Scribbling over everything does not help — extra ink counts against you.</li>
+      <li>Keys: <kbd>R</kbd> reveals, <kbd>U</kbd> undoes a stroke, <kbd>N</kbd> moves on.</li>
+    </ul>
+    <p>Your best is your best average over a full ten.</p>
+  </Fragment>
+
+  <details class="fm-real" slot="after">
+    <summary class="label">How the likeness is measured</summary>
+    <p>
+      Both drawings live in the same 200 by 140 box. The real shape is sampled
+      into points a unit and a half apart, and so is your ink. <b>Coverage</b>
+      is how much of the real shape has some of your ink within about 1.5% of
+      the box; <b>precision</b> is how much of your ink has the real shape that
+      close. The likeness is their harmonic mean, so a single tidy line (high
+      precision, no coverage) and a scribble (coverage, no precision) both
+      score low.
+    </p>
+    <p>
+      Nobody draws from memory in exactly the right spot, so your drawing is
+      also tried moved and scaled onto the real one — its aspect ratio allowed
+      to bend by a third at most — and the better placement counts. Ink beyond
+      1.6 times the real drawing's own length costs precision in proportion.
+    </p>
+    <p>
+      <code>scripts/check-memory.mjs</code> holds the number to account: a
+      trace of every reference scores 98 or more, a 5-unit wobble averages
+      the mid-80s, the wrong object drawn perfectly averages the mid-30s, and
+      a random line of the same length averages under 30.
+    </p>
+  </details>
+</GameShell>
+
+<script>
+  import { createShell } from '../lib/game-shell'
+  import { roll, PLAY } from '../lib/motion'
   import { sfx, unlock } from '../lib/audio'
   import { pickRound } from '../data/memory'
-  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import type { Item } from '../data/memory'
+  import { ShaderSurface } from '../lib/gl'
   import { PAPER_FRAG } from '../lib/memo-paper'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
+  import type { Pt, Stroke } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
   import { memoryPostcard } from '../lib/memo-postcard'
+  import { refPoints, likeness, verdictFor } from '../lib/memo-score'
+  import type { Likeness } from '../lib/memo-score'
   import { download } from '../lib/share-card'
+  import { recordPlay } from '../lib/stats'
+  import { dailyFor, dailyTarget } from '../data/game-meta'
 
   /* Ten of the sixteen, freshly drawn each visit, with the bicycle always
      first. A pool bigger than the sitting is the difference between a thing you
      do once and a thing you can hand to somebody else afterwards. */
-  let ROUND = pickRound()
+  let ROUND: Item[] = pickRound()
 
-  const el = (id) => document.getElementById(id)
-  const pad = el('pad')
-  const ref = el('ref')
-  const dots = el('dots')
+  const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+  const pad = el<HTMLCanvasElement>('pad')
+  const ref = el('ref') as unknown as SVGSVGElement
+  const padBox = el('padBox')
+  const verdict = el('verdict')
+  const tally = [...el('tally').children] as HTMLLIElement[]
 
   let i = 0
   /* Strokes are lists of {x, y, w} in the 200x140 reference space the answers
      are drawn in, not in canvas pixels. That is what lets the same stroke be
      re-rendered into the pad at whatever size the layout gives it and into the
      gallery at thumbnail size, both sharp. */
-  let strokes = []
-  let drawing = null
+  let strokes: Stroke[] = []
+  let drawing: Stroke | null = null
   let revealed = false
   let activePointer: number | null = null
-  const saved = []       // data URLs, one per item
+  let saved: string[] = []          // data URLs, one per item
+  let scores: Likeness[] = []
 
+  const shell = createShell({ slug: 'from-memory', onRestart: restart })
   const ink = new InkSurface(pad)
   const reveal = new Reveal(ref)
 
   // Paper. Never animates: still: true is one frame on mount and one per
   // resize. A drawing surface that shimmers would be intolerable.
-  new ShaderSurface(document.getElementById('sheet'), PAPER_FRAG, { still: true })
+  new ShaderSurface(el('sheet'), PAPER_FRAG, { still: true })
 
-  let dotEls = []
-  function buildDots() {
-    dots.replaceChildren(...ROUND.map(() => {
-      const d = document.createElement('span'); d.className = 'dot'; return d
-    }))
-    dotEls = [...dots.children]
+  const band = (n: number) => (n >= 60 ? 'is-high' : n >= 45 ? 'is-mid' : 'is-low')
+  const average = () => (scores.length ? Math.round(scores.reduce((a, s) => a + s.score, 0) / scores.length) : 0)
+
+  function paintStrip() {
+    shell.setScore(scores.length ? `${average()}%` : '—')
+    shell.setLevel(`${Math.min(i + 1, ROUND.length)} / ${ROUND.length}`)
+    shell.setMoves(String(strokes.length))
   }
-  buildDots()
+
+  function paintTally() {
+    tally.forEach((li, k) => {
+      const s = scores[k]
+      li.className = s ? band(s.score) : k === i ? 'is-now' : ''
+      li.dataset.score = s ? String(s.score) : ''
+      li.firstElementChild!.textContent = s ? `${ROUND[k].reveal}: ${s.score}%` : k === i ? 'Drawing now' : 'Not drawn yet'
+    })
+  }
 
   /** Rebuild the whole sheet. Only for undo, clear and resize. */
   function rebuild() {
@@ -126,7 +185,7 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   /** Pointer position in reference units. */
-  function pos(e) {
+  function pos(e: PointerEvent) {
     const r = pad.getBoundingClientRect()
     return {
       x: ((e.clientX - r.left) / r.width) * REF_W,
@@ -134,14 +193,14 @@ import GameLayout from '../layouts/GameLayout.astro'
     }
   }
 
-  let nib = null
+  let nib: Nib | null = null
   let lastT = 0
   let lastW = 0
 
   /** One pointer sample: work out the nib width, hand it to the pen. */
-  function extend(e, at) {
+  function extend(e: PointerEvent, at: number) {
     const q = pos(e)
-    const prev = drawing[drawing.length - 1]
+    const prev = drawing![drawing!.length - 1]
     const dist = Math.hypot(q.x - prev.x, q.y - prev.y)
     // Samples that land on top of each other carry no shape and only cost fill.
     // A resting hand produces a lot of them.
@@ -149,19 +208,19 @@ import GameLayout from '../layouts/GameLayout.astro'
     const w = nibWidth(dist, at - lastT, lastW, e.pressure)
     lastT = at
     lastW = w
-    const pt = { x: q.x, y: q.y, w }
-    drawing.push(pt)
-    nib.push(pt)
+    const pt: Pt = { x: q.x, y: q.y, w }
+    drawing!.push(pt)
+    nib!.push(pt)
   }
 
   pad.addEventListener('pointerdown', (e) => {
-    if (revealed || activePointer !== null || !e.isPrimary || e.button !== 0) return
+    if (revealed || shell.paused || activePointer !== null || !e.isPrimary || e.button !== 0) return
     activePointer = e.pointerId
-    try { pad.setPointerCapture(e.pointerId) } catch {}
+    try { pad.setPointerCapture(e.pointerId) } catch { /* not fatal */ }
     unlock(); sfx.tick()
     const q = pos(e)
     lastT = e.timeStamp
-    const pt = { x: q.x, y: q.y, w: nibWidth(0, 0, 0, e.pressure) }
+    const pt: Pt = { x: q.x, y: q.y, w: nibWidth(0, 0, 0, e.pressure) }
     lastW = pt.w
     drawing = [pt]
     strokes.push(drawing)
@@ -191,95 +250,125 @@ import GameLayout from '../layouts/GameLayout.astro'
     activePointer = null
     if (!drawing) return
     drawing = null
-    nib.end()
+    nib!.end()
     nib = null
     ink.commit()
     ink.blit()
+    shell.setMoves(String(strokes.length))
   }
-  pad.addEventListener('pointerup', e => { if (e.pointerId === activePointer) end() })
-  pad.addEventListener('pointercancel', e => { if (e.pointerId === activePointer) end() })
+  pad.addEventListener('pointerup', (e) => { if (e.pointerId === activePointer) end() })
+  pad.addEventListener('pointercancel', (e) => { if (e.pointerId === activePointer) end() })
 
-  el('undoBtn').addEventListener('click', () => { end(); strokes.pop(); rebuild() })
-  el('clearBtn').addEventListener('click', () => { end(); strokes = []; rebuild() })
+  function undo() { if (revealed) return; end(); strokes.pop(); rebuild(); shell.setMoves(String(strokes.length)) }
+  function clear() { if (revealed) return; end(); strokes = []; rebuild(); shell.setMoves('0') }
+  el('undoBtn').addEventListener('click', undo)
+  el('clearBtn').addEventListener('click', clear)
 
   function render() {
     const it = ROUND[i]
-    el('tag').textContent = `${i + 1} of ${ROUND.length}`
+    el('tag').textContent = `Drawing ${i + 1} of ${ROUND.length}`
     el('prompt').textContent = it.prompt
     strokes = []
     drawing = null
     nib = null
     revealed = false
     el('comparison').hidden = true
-    el('resultTools').hidden = true
     el('compareBtn').setAttribute('aria-pressed', 'false')
-    el('compareBtn').textContent = 'Side by side'
+    el('compareBtn').firstElementChild!.textContent = 'Side by side'
     el('exportStatus').textContent = ''
-    pad.parentElement.hidden = false
+    padBox.hidden = false
     ink.resize()
     rebuild()
     reveal.stop()
-    ref.hidden = true
+    ref.toggleAttribute('hidden', true)
     ref.innerHTML = ''
-    el('fact').hidden = true
-    el('revealBtn').hidden = false
-    el('nextBtn').hidden = true
-    el('undoBtn').disabled = false
-    el('clearBtn').disabled = false
-    dotEls.forEach((d, k) => d.classList.toggle('done', k < i))
+    verdict.hidden = true
+    el('tools').hidden = false
+    for (const id of ['undoBtn', 'clearBtn', 'revealBtn']) (el(id) as HTMLButtonElement).disabled = false
+    paintStrip()
+    paintTally()
+    const brief = document.querySelector('.fm-brief')!
+    brief.classList.remove('is-turning')
+    void (brief as HTMLElement).offsetWidth
+    brief.classList.add('is-turning')
+    if (i === ROUND.length - 1) shell.levelUp('Last one.')
   }
 
-  el('revealBtn').addEventListener('click', (e) => {
+  function doReveal() {
+    if (revealed || shell.paused) return
     unlock(); sfx.sparkle()
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    burst(r.left + r.width / 2, r.top, {
-      count: 18, colors: ['#e0629b', '#fff', '#ffd166'], speed: 4, gravity: 0.14, life: 40, size: 3,
-    })
     const it = ROUND[i]
     revealed = true
     end()
+    const s = likeness(refPoints(it.svg), strokes)
+    scores[i] = s
     // Rendered from the stroke list rather than grabbed off the pad, so the
     // gallery is sharp whatever size the pad happened to be.
     saved[i] = renderStrokes(strokes, 300).toDataURL('image/png')
-    el('attemptImage').src = saved[i]
-    el('attemptImage').alt = `Your drawing: ${it.prompt}`
+    el<HTMLImageElement>('attemptImage').src = saved[i]
+    el<HTMLImageElement>('attemptImage').alt = `Your drawing: ${it.prompt}`
     el('comparisonRef').innerHTML = it.svg
     el('comparisonRef').setAttribute('aria-label', `Reference: ${it.prompt}`)
-    el('resultTools').hidden = false
-    ref.hidden = false
-    reveal.play(it.svg, prefersReducedMotion)
-    el('fact').textContent = it.fact
-    el('fact').hidden = false
-    el('revealBtn').hidden = true
-    el('nextBtn').hidden = false
-    el('undoBtn').disabled = true
-    el('clearBtn').disabled = true
-    el('nextBtn').focus({ preventScroll: true })
-  })
+    // `hidden` is an HTMLElement property; on an <svg> assigning it only sets an
+    // expando and the attribute from the markup stays, so the answer never
+    // appeared. The attribute is the thing that has to change.
+    ref.toggleAttribute('hidden', false)
+    reveal.play(it.svg, !PLAY)
 
-  el('nextBtn').addEventListener('click', () => {
+    const word = verdictFor(s.score)
+    verdict.className = 'fm-verdict ' + band(s.score)
+    el('vWord').textContent = word
+    el('vWhy').textContent = !strokes.length
+      ? 'Nothing drawn — so here is what it actually looks like.'
+      : `You drew ${Math.round(s.coverage * 100)}% of the real shape, and ${Math.round(s.precision * 100)}% of your ink was on it` +
+        (s.aligned ? ', once your drawing was lined up with it.' : '.')
+    el('fact').textContent = it.fact
+    el('nextLbl').textContent = i + 1 >= ROUND.length ? 'See all ten' : 'Next drawing'
+    el('tools').hidden = true
+    verdict.hidden = false
+    const scoreEl = el('vScore')
+    if (PLAY) roll(scoreEl, `${s.score}%`, { from: `${String(s.score).replace(/\d/g, '0')}%`, ms: 1100 })
+    else scoreEl.textContent = `${s.score}%`
+    if (s.score >= 60) shell.pop(verdict)
+    shell.announce(`${s.score}% likeness. ${word}.`)
+    paintStrip()
+    paintTally()
+    verdict.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'nearest' })
+    el('nextBtn').focus({ preventScroll: true })
+  }
+  el('revealBtn').addEventListener('click', doReveal)
+
+  function next() {
+    if (!revealed) return
     unlock(); sfx.click()
     i++
-    if (i < ROUND.length) return render()
-    showGallery()
-  })
+    if (i < ROUND.length) {
+      render()
+      padBox.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'nearest' })
+      return
+    }
+    finish()
+  }
+  el('nextBtn').addEventListener('click', next)
 
   el('compareBtn').addEventListener('click', () => {
     const sideBySide = el('comparison').hidden
     el('comparison').hidden = !sideBySide
-    pad.parentElement.hidden = sideBySide
+    padBox.hidden = sideBySide
     el('compareBtn').setAttribute('aria-pressed', String(sideBySide))
-    el('compareBtn').textContent = sideBySide ? 'Overlay drawings' : 'Side by side'
+    el('compareBtn').firstElementChild!.textContent = sideBySide ? 'Overlay drawings' : 'Side by side'
   })
+
   el('postcardBtn').addEventListener('click', async () => {
-    const button = el('postcardBtn') as HTMLButtonElement
+    const button = el<HTMLButtonElement>('postcardBtn')
     const roundIndex = i
     const it = ROUND[i]
-    const snapshot = strokes.map(stroke => stroke.map(point => ({ ...point })))
+    const s = scores[i]
+    const snapshot = strokes.map((stroke) => stroke.map((point) => ({ ...point })))
     button.disabled = true
     el('exportStatus').textContent = 'Preparing your postcard…'
     try {
-      const blob = await memoryPostcard(snapshot, it.svg, it.prompt)
+      const blob = await memoryPostcard(snapshot, it.svg, it.prompt, s ? { score: s.score, verdict: verdictFor(s.score) } : undefined)
       download(blob, 'from-memory-postcard.png')
       if (i === roundIndex) el('exportStatus').textContent = 'Postcard ready. Check your downloads.'
     } catch {
@@ -287,51 +376,73 @@ import GameLayout from '../layouts/GameLayout.astro'
     } finally { button.disabled = false }
   })
 
-  function showGallery() {
-    el('card').hidden = true
-    dots.hidden = true
-    const shelf = el('shelf')
-    shelf.replaceChildren(
-      ...ROUND.map((it, k) => {
-        const fig = document.createElement('figure')
-        fig.className = 'shot'
-        /* Both layers, the way the pad showed them. The shelf used to be eight
-           pictures of your own wrong drawings with nothing to compare them to,
-           which threw away the only thing the game had told you. */
-        const box = document.createElement('div')
-        box.className = 'shot-pad'
-        const img = document.createElement('img')
-        img.src = saved[k] || ''
-        img.alt = `Your drawing of ${it.prompt.toLowerCase()}`
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-        svg.setAttribute('viewBox', '0 0 200 140')
-        svg.setAttribute('aria-hidden', 'true')
-        svg.setAttribute('class', 'shot-ref')
-        svg.innerHTML = it.svg
-        box.append(img, svg)
-        const cap = document.createElement('figcaption')
-        cap.textContent = it.reveal
-        fig.append(box, cap)
-        return fig
-      })
-    )
-    el('gallery').hidden = false
-    el('gallery').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || shell.paused || i >= ROUND.length) return
+    const t = e.target as HTMLElement
+    if (t.closest('input, textarea, select, dialog')) return
+    const k = e.key.toLowerCase()
+    if (k === 'r' && !revealed) { e.preventDefault(); doReveal() }
+    else if (k === 'u' && !revealed) { e.preventDefault(); undo() }
+    else if ((k === 'n' || (k === 'enter' && !t.closest('button, a'))) && revealed) { e.preventDefault(); next() }
+  })
+
+  /* ---- all ten ------------------------------------------------------- */
+
+  function finish() {
+    const avg = average()
+    shell.resultExtra.innerHTML = `
+      <p class="label">Everything you drew</p>
+      <ol class="fm-shelf">${ROUND.map((it, k) => `
+        <li class="fm-shot">
+          <div class="fm-shot-pad">
+            <img src="${saved[k] || ''}" alt="Your drawing of ${it.prompt.toLowerCase()}">
+            <svg viewBox="0 0 200 140" aria-hidden="true" class="fm-shot-ref">${it.svg}</svg>
+          </div>
+          <p><b class="num">${scores[k]?.score ?? 0}%</b> ${it.reveal}</p>
+        </li>`).join('')}
+      </ol>`
+
+    recordPlay('from-memory', { average: avg, drawn: scores.filter((s) => s.score > 0).length }, { average: 'high' })
+    const beat = shell.considerBest(avg, `${avg}%`)
+    const best = [...scores.keys()].sort((a, b) => scores[b].score - scores[a].score)[0]
+    const lines = [
+      `Your best likeness was ${ROUND[best].reveal.toLowerCase()}, at ${scores[best].score}%.`,
+    ]
+    if (beat === 'beaten') lines.push('✓ That is a new best average.')
+    else if (beat === 'first') lines.push('Your first full ten — that average is the one to beat now.')
+    else if (shell.best) lines.push(`Your best average is still ${shell.best.text}.`)
+    const now = new Date()
+    if (dailyFor(now).slug === 'from-memory') {
+      const need = dailyTarget.likeness(now)
+      lines.push(avg >= need ? `✓ Daily challenge beaten: ${need}% average or better.` : `✗ Daily challenge: average ${need}% or better.`)
+    }
+    const titles: Record<string, string> = {
+      Uncanny: 'A photographic memory.',
+      Close: 'You remembered most of it.',
+      Recognisable: 'Recognisable, mostly.',
+      Loosely: 'Loosely remembered.',
+      'From another planet': 'Drawn from another planet.',
+    }
+    shell.win({
+      kicker: `${ROUND.length} drawings · average likeness`,
+      title: titles[verdictFor(avg)],
+      score: `${avg}%`,
+      from: '0%',
+      lines,
+      againLabel: 'Draw ten more',
+    })
   }
 
-  el('againBtn').addEventListener('click', () => {
+  function restart() {
     // A fresh ten out of the sixteen, not the same ten again — otherwise the
     // pool may as well not exist.
     ROUND = pickRound()
     i = 0
-    saved.length = 0
-    buildDots()
-    el('card').hidden = false
-    dots.hidden = false
-    el('gallery').hidden = true
+    saved = []
+    scores = []
     render()
-    el('card').scrollIntoView({ behavior: 'smooth', block: 'center' })
-  })
+    shell.stage.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
+  }
 
   // The backing store follows the element's real size, so a reflow — a
   // rotation, a font landing, the card growing when the fact appears — has to
@@ -341,128 +452,98 @@ import GameLayout from '../layouts/GameLayout.astro'
   render()
 </script>
 
-<style>
-  .edition { font-size: 10px; letter-spacing: .2em; color: #84644e; margin-bottom: 14px; }
-  .drawing-hint { color: #806957; font-size: 13px; margin: -5px 0 18px; }
-  .head h1 { font-family: Georgia, serif; font-weight: 500; letter-spacing: -.05em; }
-  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .comparison[hidden], .result-tools[hidden], .pad[hidden] { display: none; }
-  .comparison figure { margin: 0; min-width: 0; }
-  .comparison figcaption { font-size: 12px; color: #806957; margin-bottom: 12px; }
-  .comparison img, .comparison svg { display: block; width: 100%; aspect-ratio: 200/140; background: #fffcf7; border: 1px solid #e6dacc; border-radius: 8px; }
-  .comparison svg { fill: none; stroke: #c9346f; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: #c9346f; }
-  .result-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-  .result-tools button { border: 1px solid #c7b3a2; background: #fffcf7; color: #45332c; padding: 11px 16px; border-radius: 8px; cursor: pointer; }
-  .result-tools button[aria-pressed='true'] { background: #eee1d0; }
-  #exportStatus { font-size: 12px; color: #775f51; }
-  #exportStatus:empty { display: none; }
-  @media (max-width: 480px) { .comparison { grid-template-columns: 1fr; } }
-  :global(.mem-body) { background: #f6f0e5; }
-
-  .wrap { max-width: 700px; margin: 0 auto; padding: 44px 22px 80px; }
-  .head { text-align: center; margin-bottom: 22px; }
-  .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .lede { color: var(--ink-soft); margin: 10px auto 0; max-width: 40ch; }
-
-  .dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 16px; }
-  .dots :global(.dot) { width: 7px; height: 7px; border-radius: 50%; background: #f0d5e3; }
-  .dots :global(.dot.done) { background: #e0629b; }
-
-  .card {
-    background: #fffcf7; border: 1px solid #e6dacc; border-radius: 8px 20px 20px 8px;
-    padding: 22px 20px 20px; box-shadow: var(--shadow);
+<style is:global>
+  /* The gallery is built by the script, so these rules are global on purpose. */
+  .fm {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    grid-template-areas: 'brief desk' 'verdict desk';
+    grid-template-rows: auto 1fr;
+    gap: clamp(16px, 2.6vw, 36px);
+    align-items: start;
   }
-  .tag { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #b8497d; font-weight: 600; }
-  .card h2 { font-size: clamp(22px, 4vw, 30px); margin: 6px 0 14px; }
+  .fm-brief { grid-area: brief; display: grid; gap: 12px; }
+  .fm-desk { grid-area: desk; display: grid; gap: 14px; }
+  .fm-verdict { grid-area: verdict; }
+  @media (max-width: 900px) {
+    .fm { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'brief' 'desk' 'verdict'; grid-template-rows: none; }
+  }
 
-  .pad {
+  .fm-prompt { font-size: var(--fs-h2); line-height: 0.98; }
+  .fm-hint { color: var(--ink2); }
+  .fm-tally { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+  .fm-tally li { aspect-ratio: 1; max-width: 32px; border-radius: 8px; background: var(--paper2); display: grid; place-items: center; }
+  .fm-tally li::after { content: attr(data-score); font: 700 10px/1 var(--sans); letter-spacing: -0.02em; color: var(--ink); }
+  .fm-tally li.is-now { background: var(--card); box-shadow: inset 0 0 0 2px var(--ink); }
+  .fm-tally li.is-high { background: var(--mint); }
+  .fm-tally li.is-mid { background: var(--sky); }
+  .fm-tally li.is-low { background: var(--lilac); }
+
+  /* The sheet: a white page with its ruling printed in, framed in ink. */
+  .fm-pad {
     position: relative; aspect-ratio: 200 / 140;
-    border: 1px solid #f0d5e3; border-radius: 14px; overflow: hidden;
-    /* A sheet resting on the card rather than an empty slot cut into it. The
-       dashed outline it had reads as a dropzone waiting for a file. */
-    box-shadow: 0 1px 0 #fff inset, 0 2px 6px rgba(59, 19, 56, 0.06);
-    /* The fallback when there is no WebGL2, and the ruling the page has always
-       had in its stylesheet and never once shown: the layer order was wrong,
-       and in CSS the first background layer paints on top.
-       Eight lines, as a proportion of the height, so the fallback and the
-       shader rule the sheet identically at every size. */
+    border: 2px solid var(--ink); border-radius: var(--r-lg); overflow: hidden;
+    /* The fallback when there is no WebGL2: eight ruled lines, as a proportion
+       of the height, so it rules the sheet exactly as the shader does. */
     background:
-      repeating-linear-gradient(0deg,
-        transparent 0 calc(12.5% - 1px), #fbeaf2 calc(12.5% - 1px) 12.5%),
-      #fdf7fa;
+      repeating-linear-gradient(0deg, transparent 0 calc(12.5% - 1px), var(--paper2) calc(12.5% - 1px) 12.5%),
+      var(--card);
   }
-  .sheet { position: absolute; inset: 0; z-index: 0; }
-  .sheet :global(.gl-surface) {
-    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  .fm-pad[hidden] { display: none; }
+  .fm-sheet { position: absolute; inset: 0; z-index: 0; }
+  .fm-sheet .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .fm-pad canvas { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  .fm-ref, .fm-compare svg, .fm-shot-ref {
+    fill: none; stroke: var(--t-cobalt); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--t-cobalt);
   }
-  canvas {
-    position: absolute; inset: 0; z-index: 1;
-    width: 100%; height: 100%; touch-action: none; cursor: crosshair;
-  }
-  .ref {
-    position: absolute; inset: 0; z-index: 2;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    fill: none; stroke: #c9346f; stroke-width: 2.4;
-    stroke-linecap: round; stroke-linejoin: round;
-    color: #c9346f;
-  }
-  @keyframes fadeIn { from { opacity: 0; } }
+  .fm-ref { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; }
 
-  .tools { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-  .tools button {
-    border-radius: 999px; padding: 10px 20px; font-weight: 600; font-size: 14.5px;
-    cursor: pointer; border: 0; transition: filter 140ms var(--ease), transform 180ms var(--ease-bounce);
-  }
-  .tools button:hover:not(:disabled) { transform: translateY(-2px) scale(1.04); filter: brightness(1.05); }
-  .tools button:active:not(:disabled) { transform: scale(0.95); }
-  .tools button:disabled { cursor: default; }
-  .ghost:disabled { color: #6f6b78; border-color: #f5e3ed !important; }
-  .primary { background: #3b1338; color: #fff; margin-left: auto; }
-  .ghost { background: #fff; border: 1px solid #edcfe0 !important; color: var(--ink); }
+  .fm-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .fm-compare[hidden] { display: none; }
+  .fm-compare figure { margin: 0; min-width: 0; display: grid; gap: 8px; }
+  .fm-compare img, .fm-compare svg { display: block; width: 100%; aspect-ratio: 200 / 140; background: var(--card); border: 2px solid var(--ink); border-radius: var(--r); }
+  @media (max-width: 480px) { .fm-compare { grid-template-columns: minmax(0, 1fr); } }
 
-  .fact {
-    margin: 14px 0 0; padding-top: 14px; border-top: 1px dashed #f2d9e6;
-    color: #5b4453; font-size: 15px; text-wrap: pretty;
-    animation: fadeIn 320ms var(--ease);
-  }
+  .fm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .fm-tools[hidden] { display: none; }
+  .fm-reveal { margin-left: auto; }
 
-  .gallery {
-    background: #fff; border: 1px solid #f2d9e6; border-radius: var(--radius-lg);
-    padding: 26px 22px; margin-top: 20px; box-shadow: var(--shadow);
-  }
-  .gallery h2 { font-size: 26px; text-align: center; }
-  .shelf {
-    display: grid; gap: 12px; margin-top: 18px;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-  .shelf :global(.shot) { margin: 0; }
-  /* The paper, the attempt and the answer, stacked as they were on the pad. */
-  .shelf :global(.shot-pad) {
-    position: relative; aspect-ratio: 200/140; overflow: hidden;
-    border: 1px solid #f2d9e6; border-radius: 10px;
+  /* The verdict: one block, its colour the band, the word always written. */
+  .fm-verdict { display: grid; gap: 10px; justify-items: start; padding: 22px; border-radius: var(--r-lg); color: var(--ink); background: var(--lilac); box-shadow: var(--shadow-block); outline: none; }
+  .fm-verdict[hidden] { display: none; }
+  .fm-verdict.is-high { background: var(--mint); }
+  .fm-verdict.is-mid { background: var(--sky); }
+  .fm-score { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+  .fm-score .num { font-size: clamp(56px, 7vw, 88px); }
+  .fm-word { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-style: italic; font-size: var(--fs-h3); letter-spacing: -0.02em; }
+  .fm-why { font-weight: 600; max-width: 42ch; }
+  .fm-fact { font-size: 15px; line-height: 1.5; max-width: 46ch; }
+  .fm-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .fm-status { font-size: 13px; font-weight: 600; }
+  .fm-status:empty { display: none; }
+
+  /* The gallery, inside the ink result card. */
+  .fm-shelf { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .fm-shot { display: grid; gap: 8px; }
+  .fm-shot-pad {
+    position: relative; aspect-ratio: 200 / 140; overflow: hidden; border-radius: var(--r);
     background:
-      repeating-linear-gradient(0deg,
-        transparent 0 calc(12.5% - 1px), #fbeaf2 calc(12.5% - 1px) 12.5%),
-      #fdf7fa;
+      repeating-linear-gradient(0deg, transparent 0 calc(12.5% - 1px), var(--paper2) calc(12.5% - 1px) 12.5%),
+      var(--card);
   }
-  .shelf :global(.shot-pad img) {
-    display: block; position: absolute; inset: 0; width: 100%; height: 100%;
-  }
-  .shelf :global(.shot-ref) {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    fill: none; stroke: #c9346f; stroke-width: 2.4;
-    stroke-linecap: round; stroke-linejoin: round;
-    color: #c9346f;
-  }
-  .shelf :global(figcaption) { font-size: 12.5px; color: var(--ink-soft); margin-top: 5px; text-align: center; }
-  .gallery-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
-  .gallery-actions button {
-    border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600;
-    cursor: pointer; background: #3b1338; color: #fff;
-    transition: transform 180ms var(--ease-bounce);
-  }
-  .gallery-actions button:hover { transform: translateY(-2px) scale(1.04); }
-  .gallery-actions button:active { transform: scale(0.95); }
-  .gallery-actions .ghost { background: #fff; border: 1px solid #edcfe0 !important; color: var(--ink); }
+  .fm-shot-pad img, .fm-shot-ref { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .fm-shot p { font-size: 14px; }
+  .fm-shot b { font-size: 16px; margin-right: 4px; }
+
+  .fm-real { margin-top: 16px; padding: 20px 24px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-block); }
+  .fm-real summary { cursor: pointer; }
+  .fm-real p { margin-top: 12px; max-width: 64ch; color: var(--ink2); }
+  .fm-real b { color: var(--ink); }
+  .fm-real code { font-size: 13px; background: var(--paper2); padding: 1px 6px; border-radius: 6px; }
+
+  /* ---- motion: armed only under html.play --------------------------- */
+  html.play .fm-brief.is-turning > * { animation: fm-turn 520ms var(--ease) both; }
+  @keyframes fm-turn { from { opacity: 0; transform: translateY(12px); } }
+  html.play .fm-verdict:not([hidden]) { animation: fm-settle 620ms var(--spring) both; }
+  @keyframes fm-settle { from { transform: scale(0.94); border-radius: 48px; } }
 </style>
