@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { MARKS } from '../lib/fold-marks'
 import { SHEETS } from '../lib/fold-paper'
 import { iconSvg } from '../lib/icons'
@@ -49,6 +49,13 @@ import { iconSvg } from '../lib/icons'
  * old edge-on diagram was and is the honest picture — both axes to one scale,
  * so the bend at the crease can be seen outgrowing the paper — so it stays, as
  * an inset, labelled.
+ *
+ * In the shell: the sky and the console are the picture, so they sit in a
+ * framed scene on the stage and keep their own palette (renamed --pf-*, and
+ * set on the scene rather than the body, where --ink is the system's). Score
+ * is the stack's thickness, Fold is progress to 103, Moves are the real folds
+ * the sheet allows, and Best is the furthest fold you have reached. Fold 103
+ * is the ending.
  */
 const START_MM = 0.1
 const MAX_FOLDS = 103
@@ -72,16 +79,18 @@ const SHEET_ICONS: Record<string, string> = {
 }
 ---
 
-<GameLayout slug="paper-folds" bar="#14100b" bodyClass="fold-body">
-  <canvas class="sky" id="sky" aria-hidden="true"></canvas>
-
-  <div class="wrap">
+<GameShell
+  slug="paper-folds"
+  labels={{ score: 'Thickness', best: 'Furthest', level: 'Fold', moves: 'Real folds' }}
+  initial={{ score: '0.1 mm', level: `0 / ${MAX_FOLDS}`, moves: '0 / 7' }}
+>
+  <div class="pf-scene" id="scene">
+    <canvas class="sky" id="sky" aria-hidden="true"></canvas>
     <div class="console" id="console">
       <span class="con-glare" aria-hidden="true"></span>
 
       <header class="con-head">
         <p class="where" id="where"><i aria-hidden="true"></i><span>on the desk</span></p>
-        <h1>Paper Folds</h1>
         <p class="lede">
           A sheet of paper is a tenth of a millimetre thick. Every fold doubles
           it — and every fold is harder than the last, for a reason that is not
@@ -91,7 +100,7 @@ const SHEET_ICONS: Record<string, string> = {
 
       <div class="rail" id="picker" role="radiogroup" aria-label="Which sheet">
         {SHEETS.map((s, i) => (
-          <button type="button" class="chip" data-sheet={s.id} role="radio"
+          <button type="button" class="pf-chip" data-sheet={s.id} role="radio"
                   aria-checked={i === 0 ? 'true' : 'false'}>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d={SHEET_ICONS[s.id]} /></svg>
             <span>{s.name}</span>
@@ -178,14 +187,27 @@ const SHEET_ICONS: Record<string, string> = {
       </section>
 
       <div class="act">
-        <button type="button" id="unfoldBtn" class="ghost">Unfold</button>
-        <button type="button" id="foldBtn" class="primary">Fold in half</button>
+        <button type="button" id="unfoldBtn" class="pf-unfold">Unfold</button>
+        <button type="button" id="foldBtn" class="pf-fold">Fold in half</button>
       </div>
     </div>
 
     <p class="hint" id="hint">Everything above is a sheet you could actually hold.</p>
   </div>
-</GameLayout>
+
+  <Fragment slot="howto">
+    <p>
+      Pick a sheet. Fold it in half by dragging its right-hand edge over to the
+      left — or press <b>Fold in half</b>, <kbd>→</kbd> or <kbd>Space</kbd>.
+    </p>
+    <ul>
+      <li>It stops when a real sheet that size would stop: seven times for A4. The gauge shows why — every fold eats more of the paper's length than the last.</li>
+      <li>After that, the button carries on without the paper: the stack keeps doubling, 0.1 mm × 2ⁿ, all the way to fold 103.</li>
+      <li><kbd>←</kbd> unfolds. Changing the sheet or the way you fold starts again.</li>
+    </ul>
+    <p>Your best is the furthest fold you have reached.</p>
+  </Fragment>
+</GameShell>
 
 {/* Data for the module below: modules cannot take define:vars, and modules
     are what let every game share one synthesiser. */}
@@ -197,7 +219,10 @@ const SHEET_ICONS: Record<string, string> = {
 })} />
 
 <script>
-  import { burst, floatIcon, prefersReducedMotion } from '../lib/fx'
+  import { burst, floatIcon } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+  import { recordPlay } from '../lib/stats'
   import { sfx, unlock, tone } from '../lib/audio'
   import {
     SHEETS, sheetById, maxFolds, need, have, reach, footprint,
@@ -214,6 +239,7 @@ const SHEET_ICONS: Record<string, string> = {
     document.getElementById('game-data')!.textContent!,
   ) as any
 
+  const prefersReducedMotion = !PLAY
   const el = (id: string) => document.getElementById(id)!
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t
@@ -1480,7 +1506,7 @@ const SHEET_ICONS: Record<string, string> = {
 
     // Names, small. The target's name is in the panel's header, where it has
     // room to be a phrase; these are only so the receding shapes are placeable.
-    g.font = '600 8.5px ' + getComputedStyle(document.body).getPropertyValue('--mono')
+    g.font = '600 8.5px ' + getComputedStyle(document.body).getPropertyValue('--sans')
     g.textAlign = 'center'
     g.textBaseline = 'top'
     g.fillStyle = rgb(sky.accent)
@@ -1661,6 +1687,7 @@ const SHEET_ICONS: Record<string, string> = {
   /* ---------------------------------------------------------------------- */
 
   function reset() {
+    ended = false
     n = 0; u = 0; imaginary = false; lastMark = null
     aiming = ''; overtook = null; overtookUntil = 0
     el('passedChip').classList.remove('show')
@@ -1671,7 +1698,7 @@ const SHEET_ICONS: Record<string, string> = {
   }
 
   el('picker').addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest('.chip') as HTMLElement | null
+    const b = (e.target as HTMLElement).closest('.pf-chip') as HTMLElement | null
     if (!b) return
     const s = sheetById(b.dataset.sheet!)
     if (!s || s === sheet) return
@@ -1741,8 +1768,49 @@ const SHEET_ICONS: Record<string, string> = {
   /* Paint                                                                   */
   /* ---------------------------------------------------------------------- */
 
+  /* ---- the strip ------------------------------------------------------ */
+
+  /** A length short enough for a score tile: "0.1 mm", "3.4 km", "1.1M ly". */
+  const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 })
+  function shortLen(m: number) {
+    const LY = 9.4607e15
+    // Number() drops the trailing zeros toPrecision leaves: "0.10" is "0.1".
+    if (m < 0.01) return String(Number((m * 1000).toPrecision(2))) + ' mm'
+    if (m < 1) return String(Number((m * 100).toPrecision(3))) + ' cm'
+    if (m < 1000) return compact.format(m) + ' m'
+    if (m < LY / 100) return compact.format(m / 1000) + ' km'
+    return compact.format(m / LY) + ' ly'
+  }
+
+  let ended = false
+  const shell = createShell({ slug: 'paper-folds', onRestart: () => { reset(); el('scene').scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' }) } })
+
+  function paintStrip() {
+    const lim = limit()
+    shell.setScore(shortLen((START_MM / 1000) * Math.pow(2, n)))
+    shell.setLevel(`${n} / ${MAX_FOLDS}`)
+    shell.setMoves(`${Math.min(n, lim)} / ${lim}`)
+    if (n > 0) shell.considerBest(n, `Fold ${n}`)
+    if (n >= MAX_FOLDS && !ended) {
+      ended = true
+      recordPlay('paper-folds', { folds: n, sheet: sheet.id, real: lim }, { folds: 'high' })
+      shell.win({
+        kicker: `Fold ${MAX_FOLDS} · ${sheet.name}`,
+        title: 'Wider than the observable universe.',
+        score: shortLen((START_MM / 1000) * Math.pow(2, n)),
+        from: '0 ly',
+        lines: [
+          `The sheet itself stopped at fold ${lim}. The other ${MAX_FOLDS - lim} were only the doubling.`,
+          'A tenth of a millimetre, doubled a hundred and three times, is wider than everything there is to see.',
+        ],
+        againLabel: 'Fold another sheet',
+      })
+    }
+  }
+
   function paintText() {
     const lim = limit()
+    paintStrip()
 
     setDigits(el('thick'), fmt(START_MM * Math.pow(2, n)))
     setDigits(el('folds'), String(n))
@@ -1779,7 +1847,7 @@ const SHEET_ICONS: Record<string, string> = {
     el('scaleRel').textContent = relation(heightM(n), tgt)
     el('climbText').textContent = 'fold ' + n + ' of ' + MAX_FOLDS
 
-    for (const b of el('picker').querySelectorAll('.chip'))
+    for (const b of el('picker').querySelectorAll('.pf-chip'))
       b.setAttribute('aria-checked', String((b as HTMLElement).dataset.sheet === sheet.id))
     for (const b of document.querySelectorAll('.way'))
       b.setAttribute('aria-checked', String((b as HTMLElement).dataset.mode === mode))
@@ -1867,27 +1935,29 @@ const SHEET_ICONS: Record<string, string> = {
    * blind exactly where the design is doing something clever.
    */
   function paintPalette() {
-    const s = document.body.style
-    s.setProperty('--surface', rgb(sky.surface))
-    s.setProperty('--well', rgb(sky.well))
-    s.setProperty('--ink', rgb(sky.ink))
-    s.setProperty('--ink-soft', rgb(sky.inkSoft))
-    s.setProperty('--line', rgb(sky.line))
-    s.setProperty('--accent', rgb(sky.accent))
-    s.setProperty('--rim', rgb(sky.rim))
+    // On the scene, not the body: the page around it is the design system's,
+    // and `--ink` there means something else.
+    const s = el('scene').style
+    s.setProperty('--pf-surface', rgb(sky.surface))
+    s.setProperty('--pf-well', rgb(sky.well))
+    s.setProperty('--pf-ink', rgb(sky.ink))
+    s.setProperty('--pf-ink-soft', rgb(sky.inkSoft))
+    s.setProperty('--pf-line', rgb(sky.line))
+    s.setProperty('--pf-accent', rgb(sky.accent))
+    s.setProperty('--pf-rim', rgb(sky.rim))
     // The console's face is lit from above, so the top of it is nearer the rim
     // colour than the bottom is.
-    s.setProperty('--lift', rgb(shade(sky.surface, 0.055)))
-    s.setProperty('--sink', rgb(shade(sky.well, -0.3)))
+    s.setProperty('--pf-lift', rgb(shade(sky.surface, 0.055)))
+    s.setProperty('--pf-sink', rgb(shade(sky.well, -0.3)))
     // The label on the amber button is the console's own recess colour, which
     // is the darkest thing in the palette and therefore the safest ink on it.
-    s.setProperty('--on-accent', rgb(sky.well))
-    s.setProperty('--glow', rgba(sky.accent, 0.34))
-    s.setProperty('--glow-soft', rgba(sky.accent, 0.14))
-    s.setProperty('--rim-a', rgba(sky.rim, 0.55))
+    s.setProperty('--pf-on-accent', rgb(sky.well))
+    s.setProperty('--pf-glow', rgba(sky.accent, 0.34))
+    s.setProperty('--pf-glow-soft', rgba(sky.accent, 0.14))
+    s.setProperty('--pf-rim-a', rgba(sky.rim, 0.55))
     // The inset draws the sheet, so it draws it in the sheet's own colour.
-    s.setProperty('--paper-lit', mat().col[1])
-    s.setProperty('--line-a', rgba(sky.line, 0.85))
+    s.setProperty('--pf-paper-lit', mat().col[1])
+    s.setProperty('--pf-line-a', rgba(sky.line, 0.85))
   }
 
   /* One loop. The sky, the altimeter and the sheet all read the same eased
@@ -1956,40 +2026,39 @@ const SHEET_ICONS: Record<string, string> = {
 </script>
 
 <style is:global>
-  /* A class, not a bare `body`: global.css sets the site's paper background on
-     the element selector, and two rules of equal specificity are settled by
-     order, which is not something a page should rely on. */
-  .fold-body {
+  /* The scene: the sky and the console, framed on the stage. Everything the
+     console is drawn in lives here rather than on <body>, where the design
+     system's own --ink is. */
+  .pf-scene {
+    position: relative; isolation: isolate; overflow: hidden;
+    padding: clamp(14px, 3vw, 36px) clamp(10px, 2.4vw, 32px) clamp(18px, 3vw, 40px);
+    border: 2px solid var(--ink); border-radius: var(--r-lg);
+    text-align: center;
     background: #08080c;
     /* Set from lib/fold-sky.ts every frame. The values here are only what the
        page looks like for the instant before the first paint. */
-    --surface: #1e1812;
-    --well: #14100c;
-    --ink: #f8f0e2;
-    --ink-soft: #baaa8e;
-    --line: #3e3326;
-    --accent: #f5b242;
-    --rim: #604d36;
-    --lift: #2b241c;
-    --sink: #0e0b08;
-    --on-accent: #14100c;
-    --glow: rgb(245 178 66 / 0.34);
-    --glow-soft: rgb(245 178 66 / 0.14);
-    --rim-a: rgb(96 77 54 / 0.55);
-    --line-a: rgb(62 51 38 / 0.85);
+    --pf-surface: #1e1812;
+    --pf-well: #14100c;
+    --pf-ink: #f8f0e2;
+    --pf-ink-soft: #baaa8e;
+    --pf-line: #3e3326;
+    --pf-accent: #f5b242;
+    --pf-rim: #604d36;
+    --pf-lift: #2b241c;
+    --pf-sink: #0e0b08;
+    --pf-on-accent: #14100c;
+    --pf-glow: rgb(245 178 66 / 0.34);
+    --pf-glow-soft: rgb(245 178 66 / 0.14);
+    --pf-rim-a: rgb(96 77 54 / 0.55);
+    --pf-line-a: rgb(62 51 38 / 0.85);
   }
 
   .sky {
-    position: fixed; inset: 0; width: 100%; height: 100%;
+    position: absolute; inset: 0; width: 100%; height: 100%;
     z-index: 0; pointer-events: none;
   }
-  .fold-body .chrome { position: relative; z-index: 3; }
-
-  .wrap {
-    position: relative; z-index: 1;
-    max-width: 780px; margin: 0 auto; padding: 24px 18px 84px;
-    text-align: center;
-  }
+  .pf-scene > .console, .pf-scene > .hint { position: relative; z-index: 1; }
+  .pf-scene > .console { max-width: 780px; margin: 0 auto; }
 
   /* --- the console ------------------------------------------------------- */
 
@@ -2011,11 +2080,11 @@ const SHEET_ICONS: Record<string, string> = {
     border-radius: 26px;
     text-align: left;
     background:
-      radial-gradient(120% 60% at 50% -18%, var(--glow-soft), transparent 62%),
-      linear-gradient(180deg, var(--lift) 0, var(--surface) 210px);
-    background-color: var(--surface);
+      radial-gradient(120% 60% at 50% -18%, var(--pf-glow-soft), transparent 62%),
+      linear-gradient(180deg, var(--pf-lift) 0, var(--pf-surface) 210px);
+    background-color: var(--pf-surface);
     box-shadow:
-      inset 0 1px 0 var(--rim-a),
+      inset 0 1px 0 var(--pf-rim-a),
       inset 0 0 0 1px rgb(255 255 255 / 0.035),
       0 0 0 1px rgb(0 0 0 / 0.6),
       0 2px 6px rgb(0 0 0 / 0.4),
@@ -2026,13 +2095,13 @@ const SHEET_ICONS: Record<string, string> = {
   .console.pulse { animation: con-pulse 900ms var(--ease); }
   @keyframes con-pulse {
     0%, 100% { box-shadow:
-      inset 0 1px 0 var(--rim-a), inset 0 0 0 1px rgb(255 255 255 / 0.035),
+      inset 0 1px 0 var(--pf-rim-a), inset 0 0 0 1px rgb(255 255 255 / 0.035),
       0 0 0 1px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.4),
       0 34px 90px -26px rgb(0 0 0 / 0.85); }
     30% { box-shadow:
-      inset 0 1px 0 var(--accent), inset 0 0 0 1px var(--glow),
-      0 0 0 1px var(--glow), 0 2px 6px rgb(0 0 0 / 0.4),
-      0 20px 70px -14px var(--glow); }
+      inset 0 1px 0 var(--pf-accent), inset 0 0 0 1px var(--pf-glow),
+      0 0 0 1px var(--pf-glow), 0 2px 6px rgb(0 0 0 / 0.4),
+      0 20px 70px -14px var(--pf-glow); }
   }
 
   /* Grain and a raking sheen. Between them they turn a flat rounded rectangle
@@ -2054,25 +2123,25 @@ const SHEET_ICONS: Record<string, string> = {
   .where {
     display: inline-flex; align-items: center; gap: 7px;
     margin: 0 0 12px; padding: 5px 12px 5px 10px;
-    border-radius: 999px; background: var(--well);
-    box-shadow: inset 0 0 0 1px var(--line-a);
-    font: 600 10.5px/1 var(--mono);
-    letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent);
+    border-radius: 999px; background: var(--pf-well);
+    box-shadow: inset 0 0 0 1px var(--pf-line-a);
+    font: 600 10.5px/1 var(--sans);
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--pf-accent);
   }
   .where i {
-    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
+    width: 6px; height: 6px; border-radius: 50%; background: var(--pf-accent);
+    box-shadow: 0 0 8px var(--pf-accent);
     animation: blip 2.6s var(--ease) infinite;
   }
   @keyframes blip { 0%, 62%, 100% { opacity: 1; } 78% { opacity: 0.28; } }
 
   .con-head h1 {
     font-size: clamp(38px, 7.4vw, 62px); letter-spacing: -0.042em; margin: 0;
-    color: var(--ink); line-height: 0.96;
-    text-shadow: 0 0 46px var(--glow-soft);
+    color: var(--pf-ink); line-height: 0.96;
+    text-shadow: 0 0 46px var(--pf-glow-soft);
   }
   .lede {
-    color: var(--ink-soft); margin: 13px auto 0; max-width: 44ch;
+    color: var(--pf-ink-soft); margin: 13px auto 0; max-width: 44ch;
     font-size: 15px; line-height: 1.55; text-wrap: pretty;
   }
 
@@ -2081,28 +2150,28 @@ const SHEET_ICONS: Record<string, string> = {
   .rail {
     display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
     padding: 0 22px 18px; margin: 0 22px 16px;
-    border-bottom: 1px solid var(--line-a);
+    border-bottom: 1px solid var(--pf-line-a);
   }
-  .chip {
+  .pf-chip {
     border: 0; border-radius: 999px; padding: 7px 15px 7px 11px; min-height: 34px;
     display: inline-flex; align-items: center; gap: 7px;
     font-size: 13px; font-weight: 600; cursor: pointer;
-    background: var(--well); color: var(--ink-soft);
-    box-shadow: inset 0 0 0 1px var(--line-a);
-    transition: transform 200ms var(--ease-bounce), color 160ms var(--ease),
+    background: var(--pf-well); color: var(--pf-ink-soft);
+    box-shadow: inset 0 0 0 1px var(--pf-line-a);
+    transition: transform 200ms var(--spring), color 160ms var(--ease),
                 background 260ms var(--ease), box-shadow 260ms var(--ease);
   }
-  .chip svg {
+  .pf-chip svg {
     width: 16px; height: 16px; flex: none;
     fill: none; stroke: currentColor; stroke-width: 1.5;
     stroke-linecap: round; stroke-linejoin: round;
     opacity: 0.62; transition: opacity 200ms var(--ease);
   }
-  .chip:hover { transform: translateY(-1px); color: var(--ink); }
-  .chip:hover svg, .chip[aria-checked='true'] svg { opacity: 1; }
-  .chip[aria-checked='true'] {
-    background: var(--accent); color: var(--on-accent);
-    box-shadow: 0 0 0 1px var(--accent), 0 4px 18px -4px var(--glow);
+  .pf-chip:hover { transform: translateY(-1px); color: var(--pf-ink); }
+  .pf-chip:hover svg, .pf-chip[aria-checked='true'] svg { opacity: 1; }
+  .pf-chip[aria-checked='true'] {
+    background: var(--pf-accent); color: var(--pf-on-accent);
+    box-shadow: 0 0 0 1px var(--pf-accent), 0 4px 18px -4px var(--pf-glow);
   }
 
   /* --- the bay ----------------------------------------------------------- */
@@ -2117,37 +2186,37 @@ const SHEET_ICONS: Record<string, string> = {
      edge rather than the top. */
   .bay {
     border-radius: 18px;
-    background: var(--well);
+    background: var(--pf-well);
     box-shadow:
       inset 0 2px 5px rgb(0 0 0 / 0.55),
       inset 0 0 0 1px rgb(0 0 0 / 0.5),
-      0 1px 0 var(--rim-a);
+      0 1px 0 var(--pf-rim-a);
     padding: 13px 14px 15px;
     overflow: hidden;
   }
   .bay-top {
     display: flex; align-items: flex-start; gap: 12px;
-    padding-bottom: 11px; border-bottom: 1px solid var(--line-a);
+    padding-bottom: 11px; border-bottom: 1px solid var(--pf-line-a);
   }
   .sheet-note {
     flex: 1; margin: 0; font-size: 12.5px; line-height: 1.5;
-    color: var(--ink-soft); text-wrap: pretty;
+    color: var(--pf-ink-soft); text-wrap: pretty;
   }
   .ways {
     flex: none; display: flex; gap: 2px; padding: 3px; border-radius: 999px;
-    background: var(--sink);
+    background: var(--pf-sink);
     box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.6);
   }
   .way {
-    border: 0; background: none; cursor: pointer; color: var(--ink-soft);
-    font: 600 11.5px/1 var(--font); padding: 7px 11px; min-height: 26px;
+    border: 0; background: none; cursor: pointer; color: var(--pf-ink-soft);
+    font: 600 11.5px/1 var(--sans); padding: 7px 11px; min-height: 26px;
     border-radius: 999px; white-space: nowrap;
     transition: background 150ms var(--ease), color 150ms var(--ease);
   }
-  .way:hover { color: var(--ink); }
+  .way:hover { color: var(--pf-ink); }
   .way[aria-checked='true'] {
-    background: var(--lift); color: var(--ink);
-    box-shadow: 0 1px 0 var(--rim-a), 0 2px 6px rgb(0 0 0 / 0.45);
+    background: var(--pf-lift); color: var(--pf-ink);
+    box-shadow: 0 1px 0 var(--pf-rim-a), 0 2px 6px rgb(0 0 0 / 0.45);
   }
 
   .stage-hold { position: relative; margin-top: 10px; }
@@ -2155,7 +2224,7 @@ const SHEET_ICONS: Record<string, string> = {
     display: block; width: 100%; height: 340px;
     touch-action: none; cursor: ew-resize; border-radius: 12px;
   }
-  #stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  #stage:focus-visible { outline: 3px solid var(--pf-accent); outline-offset: 2px; }
   /* The one piece of feedback that has to arrive without being read. */
   #stage.refuse { animation: refuse 360ms var(--ease); }
   @keyframes refuse {
@@ -2178,7 +2247,7 @@ const SHEET_ICONS: Record<string, string> = {
     width: 34px; height: 34px; margin: -17px 0 0 -6px;
     display: grid; place-items: center; pointer-events: none;
     border-radius: 50%; opacity: 0;
-    background: radial-gradient(circle, var(--glow) 0%, transparent 68%);
+    background: radial-gradient(circle, var(--pf-glow) 0%, transparent 68%);
     transition: opacity 320ms var(--ease);
   }
   .grab svg {
@@ -2196,31 +2265,31 @@ const SHEET_ICONS: Record<string, string> = {
   .inset-hold {
     position: absolute; right: 2px; top: 2px; width: 132px;
     padding: 3px 3px 4px; border-radius: 12px;
-    background: var(--sink);
-    box-shadow: inset 0 0 0 1px var(--line-a), 0 6px 18px -6px rgb(0 0 0 / 0.8);
+    background: var(--pf-sink);
+    box-shadow: inset 0 0 0 1px var(--pf-line-a), 0 6px 18px -6px rgb(0 0 0 / 0.8);
     opacity: 0.94;
   }
   .inset { display: block; width: 126px; height: 74px; margin: 0 auto; }
   .inset-cap {
     margin: 0; text-align: center;
-    font: 500 8.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--ink-soft); opacity: 0.7;
+    font: 500 8.5px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--pf-ink-soft); opacity: 0.7;
   }
-  .inset .in-block { fill: var(--paper-lit); }
+  .inset .in-block { fill: var(--pf-paper-lit); }
   .inset .in-ghost {
     fill: none; stroke: #ff8a5c; stroke-width: 1.1; stroke-dasharray: 3.5 3;
   }
-  .inset .in-rule { stroke: var(--ink-soft); stroke-width: 0.8; opacity: 0.55; }
-  .inset .in-t { fill: var(--ink-soft); font-size: 8px; }
+  .inset .in-rule { stroke: var(--pf-ink-soft); stroke-width: 0.8; opacity: 0.55; }
+  .inset .in-t { fill: var(--pf-ink-soft); font-size: 8px; }
 
   .grip {
-    margin: 11px 0 0; font-size: 13px; color: var(--ink-soft);
+    margin: 11px 0 0; font-size: 13px; color: var(--pf-ink-soft);
     min-height: 34px; text-wrap: pretty;
   }
   /* The strip of paper, and what is being taken out of it. */
   .budget-bar {
     position: relative; height: 9px; border-radius: 5px;
-    background: var(--sink);
+    background: var(--pf-sink);
     box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(0 0 0 / 0.5);
   }
   .budget-bar i {
@@ -2247,7 +2316,7 @@ const SHEET_ICONS: Record<string, string> = {
   /* The end of the paper. Nothing may cross it. */
   .b-have {
     position: absolute; top: -3px; width: 2px; height: 15px; border-radius: 1px;
-    background: var(--ink); transform: translateX(-1px);
+    background: var(--pf-ink); transform: translateX(-1px);
     box-shadow: 0 0 0 1px rgb(0 0 0 / 0.6);
     transition: left 300ms var(--ease), background 260ms var(--ease);
   }
@@ -2255,12 +2324,12 @@ const SHEET_ICONS: Record<string, string> = {
      keeps the ink colour and gains a dark ring, rather than turning the same
      orange as the stripe it is standing in and disappearing into it. */
   .b-have.passed {
-    background: var(--ink);
+    background: var(--pf-ink);
     box-shadow: 0 0 0 1.5px rgb(120 44 20), 0 0 12px rgb(244 132 82 / 0.9);
   }
   .budget.spent { opacity: 0.42; filter: saturate(0.4); }
   .budget-text {
-    margin: 7px 0 0; font-size: 12px; color: var(--ink-soft);
+    margin: 7px 0 0; font-size: 12px; color: var(--pf-ink-soft);
     font-variant-numeric: tabular-nums; min-height: 17px;
   }
 
@@ -2274,22 +2343,22 @@ const SHEET_ICONS: Record<string, string> = {
   .scale-bay { padding: 11px 12px 10px; }
   .scale-top {
     display: flex; align-items: baseline; gap: 9px;
-    padding-bottom: 9px; border-bottom: 1px solid var(--line-a);
+    padding-bottom: 9px; border-bottom: 1px solid var(--pf-line-a);
   }
   .scale-lead {
     margin: 0; flex: none;
-    font: 600 9.5px/1.6 var(--mono); letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--ink-soft);
+    font: 600 9.5px/1.6 var(--sans); letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--pf-ink-soft);
   }
   .scale-name {
     margin: 0; flex: 1; min-width: 0;
     font-family: var(--display); font-weight: 800; font-size: 19px;
-    letter-spacing: -0.025em; color: var(--ink);
+    letter-spacing: -0.025em; color: var(--pf-ink);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .scale-rel {
     margin: 0; flex: none;
-    font: 700 12px/1.6 var(--mono); color: var(--accent);
+    font: 700 12px/1.6 var(--sans); color: var(--pf-accent);
     font-variant-numeric: tabular-nums;
   }
   .scale-hold { position: relative; margin-top: 4px; }
@@ -2299,9 +2368,9 @@ const SHEET_ICONS: Record<string, string> = {
     position: absolute; left: 50%; top: 10px; margin: 0;
     transform: translate(-50%, -8px);
     padding: 6px 14px; border-radius: 999px; white-space: nowrap;
-    font: 700 11px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--on-accent); background: var(--accent);
-    box-shadow: 0 6px 22px -6px var(--glow);
+    font: 700 11px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--pf-on-accent); background: var(--pf-accent);
+    box-shadow: 0 6px 22px -6px var(--pf-glow);
     opacity: 0; pointer-events: none;
   }
   .passed.show { animation: passed-by 2600ms var(--ease) both; }
@@ -2314,13 +2383,13 @@ const SHEET_ICONS: Record<string, string> = {
 
   .climb {
     display: flex; align-items: center; gap: 10px;
-    margin-top: 2px; padding-top: 9px; border-top: 1px solid var(--line-a);
+    margin-top: 2px; padding-top: 9px; border-top: 1px solid var(--pf-line-a);
   }
   #rail { display: block; flex: 1; min-width: 0; height: 14px; }
   .climb-text {
     margin: 0; flex: none;
-    font: 600 9.5px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--ink-soft); font-variant-numeric: tabular-nums;
+    font: 600 9.5px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--pf-ink-soft); font-variant-numeric: tabular-nums;
   }
 
   /* --- the readout ------------------------------------------------------- */
@@ -2330,37 +2399,38 @@ const SHEET_ICONS: Record<string, string> = {
     column-gap: 14px; row-gap: 4px;
     align-items: end; text-align: left;
     margin: 0 14px; padding: 16px 16px 18px;
-    border-top: 1px solid var(--line-a);
+    border-top: 1px solid var(--pf-line-a);
   }
   /* Past the sheet's limit nothing is being measured, and the readout should
      stop looking like a measurement. Marked with a ring rather than with
      transparency: a see-through panel over a sky that travels from daylight to
      deep space has a different contrast at every fold. */
-  .read.imaginary { box-shadow: inset 0 0 0 1px var(--line-a); border-radius: 14px; }
+  .read.imaginary { box-shadow: inset 0 0 0 1px var(--pf-line-a); border-radius: 14px; }
   .read.imaginary .mark { border-top-style: dashed; }
   /* The layer count reaches forty-one digits and the thickness reaches
      "107 billion light years". Both wrap, and the sizes here are what stops
      them wrapping into each other. */
   .fig b {
-    display: block; font-family: var(--display); font-weight: 800;
-    letter-spacing: -0.035em; color: var(--ink);
-    font-variant-numeric: tabular-nums; line-height: 1.1;
+    /* Numbers are the sans, proportional: Zalando's tabular zero is slashed. */
+    display: block; font-family: var(--sans); font-weight: 700;
+    letter-spacing: -0.035em; color: var(--pf-ink);
+    font-variant-numeric: proportional-nums; line-height: 1.1;
     font-size: clamp(14px, 2vw, 17px); overflow-wrap: anywhere;
   }
   /* Hairlines between the readouts. An instrument panel divides its dials;
      three numbers in a row with nothing between them is a table. */
-  .fig + .fig { border-left: 1px solid var(--line-a); padding-left: 14px; }
+  .fig + .fig { border-left: 1px solid var(--pf-line-a); padding-left: 14px; }
   /* A direct child, not any descendant. The rolling digits are spans too,
      and this rule was quietly setting them to ten-pixel uppercase mono inside
      a thirty-eight-pixel number. */
   .fig > span {
     display: block; margin-top: 4px;
-    font: 600 10px/1.2 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--ink-soft);
+    font: 600 10px/1.2 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--pf-ink-soft);
   }
   .fig-lead b {
     font-size: clamp(25px, 4.4vw, 38px); line-height: 1.04;
-    filter: drop-shadow(0 0 22px var(--glow-soft));
+    filter: drop-shadow(0 0 22px var(--pf-glow-soft));
   }
   .fig b .d { display: inline-block; }
   .fig b .d.roll { animation: digit 400ms var(--ease) both; }
@@ -2373,22 +2443,22 @@ const SHEET_ICONS: Record<string, string> = {
     position: relative; overflow: hidden;
     grid-column: 1 / -1;
     display: flex; align-items: center; gap: 12px;
-    font-size: 16px; color: var(--ink); min-height: 44px;
-    margin: 8px 0 0; padding-top: 15px; border-top: 1px solid var(--line-a);
+    font-size: 16px; color: var(--pf-ink); min-height: 44px;
+    margin: 8px 0 0; padding-top: 15px; border-top: 1px solid var(--pf-line-a);
     text-wrap: pretty;
   }
   .mark-glyph {
     width: 34px; height: 34px; flex: none; padding: 5px; box-sizing: border-box;
-    border-radius: 10px; color: var(--accent);
-    background: var(--well); box-shadow: inset 0 0 0 1px var(--line-a);
+    border-radius: 10px; color: var(--pf-accent);
+    background: var(--pf-well); box-shadow: inset 0 0 0 1px var(--pf-line-a);
   }
-  .mark-glyph.jump { animation: jump-glyph 420ms var(--ease-bounce); }
+  .mark-glyph.jump { animation: jump-glyph 420ms var(--spring); }
   @keyframes jump-glyph { 40% { transform: translateY(-6px) scale(1.14) rotate(-8deg); } }
   /* A light passes over the line when it changes, so a new one is noticed
      even when the words are as short as "a person". */
   .mark.lit::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(100deg, transparent 34%, var(--glow-soft) 50%, transparent 66%);
+    background: linear-gradient(100deg, transparent 34%, var(--pf-glow-soft) 50%, transparent 66%);
     animation: mark-sweep 760ms var(--ease);
   }
   @keyframes mark-sweep {
@@ -2404,42 +2474,41 @@ const SHEET_ICONS: Record<string, string> = {
   .act button {
     border-radius: 999px; padding: 14px 30px; font-weight: 700; font-size: 16px;
     cursor: pointer; border: 0; min-height: 48px;
-    transition: transform 200ms var(--ease-bounce), filter 160ms var(--ease),
+    transition: transform 200ms var(--spring), filter 160ms var(--ease),
                 box-shadow 200ms var(--ease);
   }
   .act button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
   .act button:active:not(:disabled) { transform: scale(0.97); }
   .act button:disabled { cursor: default; opacity: 0.45; }
-  .primary {
-    background: var(--accent); color: var(--on-accent);
-    box-shadow: 0 6px 26px -6px var(--glow), 0 0 0 1px var(--accent),
+  .pf-fold {
+    background: var(--pf-accent); color: var(--pf-on-accent);
+    box-shadow: 0 6px 26px -6px var(--pf-glow), 0 0 0 1px var(--pf-accent),
                 inset 0 1px 0 rgb(255 255 255 / 0.35);
     animation: breathe 4.5s var(--ease) infinite;
   }
   @keyframes breathe {
-    0%, 100% { box-shadow: 0 6px 26px -6px var(--glow), 0 0 0 1px var(--accent),
+    0%, 100% { box-shadow: 0 6px 26px -6px var(--pf-glow), 0 0 0 1px var(--pf-accent),
       inset 0 1px 0 rgb(255 255 255 / 0.35); }
-    50% { box-shadow: 0 8px 34px -4px var(--glow), 0 0 0 5px var(--glow-soft),
+    50% { box-shadow: 0 8px 34px -4px var(--pf-glow), 0 0 0 5px var(--pf-glow-soft),
       inset 0 1px 0 rgb(255 255 255 / 0.35); }
   }
-  .primary:disabled { animation: none; }
-  .ghost {
-    background: var(--well); color: var(--ink-soft);
-    box-shadow: inset 0 0 0 1px var(--line-a), 0 2px 8px rgb(0 0 0 / 0.4);
+  .pf-fold:disabled { animation: none; }
+  .pf-unfold {
+    background: var(--pf-well); color: var(--pf-ink-soft);
+    box-shadow: inset 0 0 0 1px var(--pf-line-a), 0 2px 8px rgb(0 0 0 / 0.4);
   }
-  .ghost:hover:not(:disabled) { color: var(--ink); }
+  .pf-unfold:hover:not(:disabled) { color: var(--pf-ink); }
 
   .hint {
-    display: inline-block; color: var(--ink-soft); font-size: 13px;
+    display: inline-block; color: var(--pf-ink-soft); font-size: 13px;
     margin: 18px auto 0; padding: 9px 18px; border-radius: 999px;
-    background: var(--surface);
-    box-shadow: inset 0 1px 0 var(--rim-a), 0 0 0 1px rgb(0 0 0 / 0.5),
+    background: var(--pf-surface);
+    box-shadow: inset 0 1px 0 var(--pf-rim-a), 0 0 0 1px rgb(0 0 0 / 0.5),
                 0 10px 30px -12px rgb(0 0 0 / 0.8);
     text-wrap: pretty;
   }
 
   @media (max-width: 660px) {
-    .wrap { padding: 16px 12px 72px; }
     .console { border-radius: 20px; }
     .con-head { padding: 24px 20px 18px; }
     .rail { padding: 0 14px 16px; }
@@ -2464,14 +2533,14 @@ const SHEET_ICONS: Record<string, string> = {
     /* Two per row now, so the divider belongs between them rather than after
        every one — otherwise the first of each row is ruled off from nothing. */
     .fig + .fig { border-left: 0; padding-left: 0; }
-    .read .fig:nth-of-type(3) { border-left: 1px solid var(--line-a); padding-left: 14px; }
+    .read .fig:nth-of-type(3) { border-left: 1px solid var(--pf-line-a); padding-left: 14px; }
     .act { padding: 2px 10px 16px; }
     .act button { padding: 13px 22px; font-size: 15px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .console, .budget-bar i, .b-have { transition: none; }
-    .console.pulse, .primary, .where i, #stage.refuse { animation: none; }
+    .console.pulse, .pf-fold, .where i, #stage.refuse { animation: none; }
     .show-grab .grab { animation: none; }
     .passed.show { animation: none; opacity: 1; transform: translate(-50%, -8px); }
     .budget-bar.deny, .mark.lit::after, .mark-glyph.jump { animation: none; }

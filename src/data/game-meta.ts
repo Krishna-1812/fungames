@@ -51,7 +51,7 @@ export const META: Record<string, GameMeta> = {
 }
 
 /** Games already running inside the shared shell. Grows two per phase. */
-export const SHELL_GAMES = new Set(['rule-cascade', 'auction', 'dark-patterns', 'trolley', 'not-a-robot', 'from-memory'])
+export const SHELL_GAMES = new Set(['rule-cascade', 'auction', 'dark-patterns', 'trolley', 'not-a-robot', 'from-memory', 'steady-hand', 'paper-folds'])
 
 /** localStorage key the shell keeps a game's personal best under. */
 export const bestKey = (slug: string) => `paper:best:${slug}`
@@ -65,7 +65,8 @@ export type Daily = { slug: string; title: string; goal: string }
 
 export function dailyFor(date: Date): Daily {
   const day = dayOf(date)
-  const pick = day % 6
+  // Paper Folds has no daily: it is something to see, not a score to beat.
+  const pick = day % 7
   const c = cycleOf(day)
   if (pick === 0) {
     return {
@@ -102,28 +103,37 @@ export function dailyFor(date: Date): Daily {
       goal: `Get through all twelve checks looking at least ${dailyHumanity(c)}% human.`,
     }
   }
+  if (pick === 5) {
+    return {
+      slug: 'from-memory',
+      title: 'From Memory',
+      goal: `Draw ten everyday things from memory with an average likeness of ${dailyLikeness(c)}% or better.`,
+    }
+  }
   return {
-    slug: 'from-memory',
-    title: 'From Memory',
-    goal: `Draw ten everyday things from memory with an average likeness of ${dailyLikeness(c)}% or better.`,
+    slug: 'steady-hand',
+    title: 'Steady Hand',
+    goal: `Draw a line, a circle, a square and a spiral freehand, and finish the round rated ${dailySteadiness(c)}% or better.`,
   }
 }
 
 /* The daily targets, exposed so each game can grade itself against the same
    number the homepage printed.
 
-   The nudge comes from which six-day cycle it is, not from the day itself:
-   each game only ever comes up on days with the same remainder mod 6, so a
-   `day % 3` on Trolley's day is the same number every single time. */
+   The nudge comes from which seven-day cycle it is, not from the day itself:
+   each game only ever comes up on days with the same remainder mod 7, so a
+   `day % 3` on Trolley's day would be the same number every single time. */
 function dayOf(date: Date) { return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86_400_000) }
-function cycleOf(day: number) { return Math.floor(day / 6) }
+function cycleOf(day: number) { return Math.floor(day / 7) }
 function dailyDodges(c: number) { return 8 + (c % 3) }
 function dailyConsistency(c: number) { return 80 + (c % 3) * 5 }
 function dailyHumanity(c: number) { return c % 2 ? 100 : 80 }
 function dailyLikeness(c: number) { return 40 + (c % 3) * 5 }
+function dailySteadiness(c: number) { return 70 + (c % 3) * 5 }
 export const dailyTarget = {
   dodges: (date: Date) => dailyDodges(cycleOf(dayOf(date))),
   consistency: (date: Date) => dailyConsistency(cycleOf(dayOf(date))),
   humanity: (date: Date) => dailyHumanity(cycleOf(dayOf(date))),
   likeness: (date: Date) => dailyLikeness(cycleOf(dayOf(date))),
+  steadiness: (date: Date) => dailySteadiness(cycleOf(dayOf(date))),
 }

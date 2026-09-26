@@ -9,7 +9,7 @@
  * whether it bends, so anything textured enough to be interesting is also
  * textured enough to hide the thing being judged. Everything here is therefore
  * very low frequency — a broad overhead light, a soft weave, and a vignette —
- * with one exception: a pool of warm light under each target, which is doing a
+ * with one exception: a pool of light under each target, which is doing a
  * job rather than decorating. The dots stop being flat circles printed on a
  * flat page and become two lit points on a surface, which is what makes the
  * distance between them read as a distance.
@@ -39,11 +39,12 @@ void main() {
   float t = u_time * u_motion;
 
   /* ---- the table --------------------------------------------------------
-     A deep maroon, lit from above and slightly left. The gradient is the only
-     thing giving the surface a sense of being a surface. */
-  vec3 col = mix(vec3(0.0290, 0.0060, 0.0110), vec3(0.0640, 0.0140, 0.0235), pow(uv.y, 0.85));
+     A deep navy, lit from above and slightly left — the site's palette is
+     cool, and so is the felt. The gradient is the only thing giving the
+     surface a sense of being a surface. */
+  vec3 col = mix(vec3(0.0045, 0.0070, 0.0210), vec3(0.0110, 0.0180, 0.0520), pow(uv.y, 0.85));
   vec2 lp = p - vec2(-0.25, 0.95);
-  col += vec3(0.075, 0.022, 0.032) * exp(-dot(lp, lp) * 0.42);
+  col += vec3(0.020, 0.036, 0.085) * exp(-dot(lp, lp) * 0.42);
 
   /* ---- weave ------------------------------------------------------------
      Two stretched noises crossing, which reads as cloth rather than as static.
@@ -56,17 +57,17 @@ void main() {
   col *= 1.0 + (fbm(p * 0.7 + vec2(t * 0.014, 0.0), 3) - 0.5) * 0.055;
 
   /* ---- the targets ------------------------------------------------------
-     Warm pools under A and B. These are the reason the two dots read as lit
+     Cobalt pools under A and B. These are the reason the two dots read as lit
      points on a table rather than as circles printed on a flat colour. */
   float da = length(p - u_a), db = length(p - u_b);
   // Breathes while you have not started, holds still once you have.
   float pulse = mix(0.86 + 0.14 * sin(t * 1.7), 1.0, u_locked);
-  col += vec3(0.55, 0.28, 0.10) * exp(-da * da * 34.0) * 0.085 * pulse;
-  col += vec3(0.55, 0.28, 0.10) * exp(-db * db * 34.0) * 0.085;
+  col += vec3(0.16, 0.30, 0.70) * exp(-da * da * 34.0) * 0.085 * pulse;
+  col += vec3(0.16, 0.30, 0.70) * exp(-db * db * 34.0) * 0.085;
 
   /* ---- the pen ---------------------------------------------------------- */
   float dp = length(p - u_pen);
-  col += vec3(0.42, 0.20, 0.10) * exp(-dp * dp * 26.0) * u_penOn * 0.075;
+  col += vec3(0.20, 0.42, 0.40) * exp(-dp * dp * 26.0) * u_penOn * 0.075;
 
   /* ---- closing in ------------------------------------------------------- */
   col *= 1.0 - dot(p, p) * 0.115;

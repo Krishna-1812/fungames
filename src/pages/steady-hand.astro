@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { SHAPES } from '../lib/steady-shapes'
 
 /**
@@ -15,110 +15,132 @@ import { SHAPES } from '../lib/steady-shapes'
  * Nothing is traced. Dots anchor each shape — two for a line, four corners for
  * a square — and the circle fixes only its centre, taking its radius from
  * whatever you drew, so it measures roundness rather than obedience.
+ *
+ * In the shell it is a round: the four shapes in order, one scored stroke
+ * each (redo as often as you like), and the round's rating at the end is the
+ * mean of the four — the same `rating()` the per-shape bests always had.
+ * Score is the round so far, Shape is progress, Moves are strokes, and Best
+ * is your best round.
  */
 ---
 
-<GameLayout slug="steady-hand" bar="#5b2333" fixed bodyClass="hand-body">
-  <div class="stage">
-    <h1 class="visually-hidden">Steady Hand</h1>
-    {/* Behind the canvas, which clears to transparent. */}
-    <div class="felt" id="felt" aria-hidden="true"></div>
-    <canvas id="c"></canvas>
-
-    <div class="shapes" id="shapes" role="tablist" aria-label="Shape">
+<GameShell
+  slug="steady-hand"
+  labels={{ score: 'This round', best: 'Best round', level: 'Shape', moves: 'Strokes' }}
+  initial={{ score: '—', level: `1 / ${SHAPES.length}`, moves: '0' }}
+>
+  <div class="sh">
+    <ol class="sh-round" id="round" aria-label="The round">
       {SHAPES.map((sh, i) => (
-        <button type="button" class="shape" role="tab" data-shape={sh.id}
-                aria-selected={i === 0 ? 'true' : 'false'}>
+        <li data-shape={sh.id} class={i === 0 ? 'is-now' : ''}>
+          <span class="label">{i + 1}</span>
           <b>{sh.name}</b>
-          <span class="sbest">—</span>
-        </button>
+          <span class="num sh-got" data-got>—</span>
+          <span class="sh-best">best <span data-best>—</span></span>
+        </li>
       ))}
-    </div>
+    </ol>
 
-    <div class="hud">
-      <div class="hint" id="hint">Press on the first dot and drag to the second. One stroke.</div>
-      <div class="scores">
-        <div><span class="k">Last</span><b id="last">—</b></div>
-        <div><span class="k">Best</span><b id="best">—</b></div>
-        <div><span class="k">Rating</span><b id="rating">—</b></div>
+    <div class="sh-board" id="board">
+      {/* Behind the canvas, which clears to transparent. */}
+      <div class="felt" id="felt" aria-hidden="true"></div>
+      <canvas id="c" aria-label="The drawing board. Press on the first dot and drag, in one stroke."></canvas>
+
+      <p class="sh-hint" id="hint" aria-live="polite">Press on the first dot and drag to the second. One stroke.</p>
+
+      <div class="sh-card" id="result" hidden tabindex="-1">
+        <p class="label meta" id="cardShape">Line</p>
+        <p class="sh-big num" id="bigScore">0.0%</p>
+        <p class="sh-verdict" id="verdict"></p>
+        <ul class="sh-factors" id="factors"></ul>
+        <div class="sh-acts">
+          <button type="button" class="pill pill--ink" id="next"><span id="nextLbl">Next shape</span><span aria-hidden="true">→</span></button>
+          <button type="button" class="pill pill--line pill--sm" id="redo"><span>Redo</span></button>
+        </div>
+        <p class="sh-keys"><kbd>N</kbd> next · <kbd>R</kbd> redo</p>
       </div>
     </div>
-
-    <div class="result" id="result" hidden>
-      <div class="big" id="bigScore">0.0%</div>
-      <div class="verdict" id="verdict"></div>
-      <p class="ready" id="ready" hidden>Share makes a card of this.</p>
-      <ul class="factors" id="factors"></ul>
-      <button type="button" id="again">Again</button>
-    </div>
   </div>
-</GameLayout>
+
+  <Fragment slot="howto">
+    <p>
+      Four shapes, freehand, one unbroken stroke each: a <b>line</b>, a
+      <b>circle</b>, a <b>square</b> and a <b>spiral</b>. Dots mark where to
+      start and finish; nothing is traced for you.
+    </p>
+    <ul>
+      <li>Press on the first dot, drag without lifting, and finish on the last one. Closed shapes finish where they started.</li>
+      <li>Your score is how close the stroke stayed to the ideal shape, how much of it you drew, and how directly you travelled. The ideal appears afterwards.</li>
+      <li>Redo any shape as often as you like before moving on. The shape turns to a new angle every time.</li>
+    </ul>
+    <p>The round's rating is the mean of the four. Your best is your best round.</p>
+  </Fragment>
+</GameShell>
 
 <script>
-  import { burst, ring, floatText, prefersReducedMotion } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
+  import { roll, PLAY } from '../lib/motion'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
   import { FELT_FRAG } from '../lib/steady-felt'
   import {
-    SHAPES, shapeById, scoreStroke, rating, verdictFor, ratingName,
+    SHAPES, scoreStroke, rating, verdictFor, ratingName,
     TOLERANCE, distToPath, dist, sizeOf,
   } from '../lib/steady-shapes'
+  import type { Score } from '../lib/steady-shapes'
   import { recordPlay } from '../lib/stats'
-  import { onShare } from '../lib/share-card'
-  import { SITE } from '../site.config'
+  import { dailyFor, dailyTarget } from '../data/game-meta'
 
-  const canvas = document.getElementById('c')
-  const ctx = canvas.getContext('2d')
-  const hint = document.getElementById('hint')
-  const elLast = document.getElementById('last')
-  const elBest = document.getElementById('best')
-  const elRating = document.getElementById('rating')
-  const result = document.getElementById('result')
-  const bigScore = document.getElementById('bigScore')
-  const verdict = document.getElementById('verdict')
-  const factors = document.getElementById('factors')
-  const again = document.getElementById('again')
-  const ready = document.getElementById('ready')
-  const tabs = document.getElementById('shapes')
+  type P = { x: number; y: number; t?: number }
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+  const canvas = $<HTMLCanvasElement>('c')
+  const ctx = canvas.getContext('2d')!
+  const hint = $('hint')
+  const result = $('result')
+  const roundEls = [...$('round').children] as HTMLLIElement[]
+  const prefersReducedMotion = !PLAY
 
   const STORE = 'steady-hand:bests.v1'
   const DOT_R = 13        // visual radius of a target dot
   const SNAP = 52         // how close the stroke must start and finish
 
   let W = 0, H = 0, dpr = 1
+  let idx = 0
   let shape = SHAPES[0]
   let rot = 0
-  let dots = []
-  let stroke = []         // each point carries the deviation it was drawn at
-  let liveTarget = []     // the ideal, for colouring the stroke as it is drawn
+  let dots: { x: number; y: number; label?: string }[] = []
+  let stroke: P[] = []    // each point carries the deviation it was drawn at
+  let liveTarget: P[] = [] // the ideal, for colouring the stroke as it is drawn
   let drawing = false
   let locked = false
-  let lastScore = null
-  let strokesDrawn = 0     // lifetime, from the shared store
+  let lastScore: Score | null = null
+  let strokes = 0
+  let round: Record<string, number> = {}
 
-  /* Bests are per shape now, and the old single number was the line. Reading
-     it back rather than dropping it means nobody loses a score they earned. */
-  const bests = {}
+  const shell = createShell({ slug: 'steady-hand', onRestart: restart })
+
+  /* Bests are per shape, and the old single number was the line. Reading it
+     back rather than dropping it means nobody loses a score they earned. */
+  const bests: Record<string, number> = {}
   try {
     const raw = localStorage.getItem(STORE)
     if (raw) Object.assign(bests, JSON.parse(raw))
     const old = Number(localStorage.getItem('steady-hand:best'))
     if (old > 0 && !(bests.line > old)) bests.line = old
   } catch { /* private mode. Start fresh. */ }
-
   function save() {
     try { localStorage.setItem(STORE, JSON.stringify(bests)) } catch { /* fine */ }
   }
 
   /* Canvas CSS pixels to the space centred() builds: origin at the middle,
      units of half the short axis, y upward. */
-  function toField(q) {
+  function toField(q: P) {
     const m = Math.min(W, H) || 1
     return [(2 * q.x - W) / m, (H - 2 * q.y) / m]
   }
 
-  let pen = { x: 0, y: 0 }
-  const felt = new ShaderSurface(document.getElementById('felt'), FELT_FRAG, {
+  let pen: P = { x: 0, y: 0 }
+  const felt = new ShaderSurface($('felt'), FELT_FRAG, {
     // Every layer is low frequency by design; see the note in steady-felt.ts.
     scale: 0.7,
     uniforms: () => ({
@@ -145,6 +167,8 @@ import { SHAPES } from '../lib/steady-shapes'
     canvas.width = Math.round(W * dpr)
     canvas.height = Math.round(H * dpr)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    // A resize moves the dots, so a stroke in progress or a scored one no
+    // longer lines up with them: start this shape again at the new size.
     place()
   }
 
@@ -156,17 +180,18 @@ import { SHAPES } from '../lib/steady-shapes'
     stroke = []
     locked = false
     lastScore = null
-    paintHud()
+    result.hidden = true
+    hint.textContent = shape.brief
     render()
   }
 
   /* ---- the board -------------------------------------------------------- */
 
-  /** On the line to badly off it. */
-  const strokeColour = (t) => [
-    Math.round(255 - t * 15),
-    Math.round(214 - t * 136),
-    Math.round(150 - t * 90),
+  /** On the line (mint) to badly off it (raspberry). */
+  const strokeColour = (t: number) => [
+    Math.round(79 + t * 176),
+    Math.round(227 - t * 148),
+    Math.round(193 - t * 83),
   ].join(',')
 
   /**
@@ -174,9 +199,7 @@ import { SHAPES } from '../lib/steady-shapes'
    *
    * Drawing the band is what turns a percentage into something you can learn
    * from: you can see how far off you were relative to what the scoring
-   * actually cares about, instead of being told a number. It is a wide
-   * translucent stroke along the same polyline, which gets the corners of the
-   * square and the turns of the spiral right for free.
+   * actually cares about, instead of being told a number.
    */
   function drawReveal() {
     const path = lastScore ? lastScore.target : shape.target(box(), rot, [])
@@ -190,13 +213,13 @@ import { SHAPES } from '../lib/steady-shapes'
     ctx.beginPath()
     ctx.moveTo(path[0].x, path[0].y)
     for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y)
-    ctx.strokeStyle = 'rgba(255, 232, 205, 0.055)'
+    ctx.strokeStyle = 'rgba(205, 225, 255, 0.07)'
     ctx.lineWidth = band
     ctx.stroke()
 
     // The ideal itself, dashed so it never reads as your stroke.
     ctx.setLineDash([7, 9])
-    ctx.strokeStyle = 'rgba(255, 242, 228, 0.5)'
+    ctx.strokeStyle = 'rgba(228, 238, 255, 0.55)'
     ctx.lineWidth = 2
     ctx.stroke()
     ctx.restore()
@@ -211,8 +234,8 @@ import { SHAPES } from '../lib/steady-shapes'
        segment separately at low alpha makes overlapping round caps accumulate,
        and the line comes out beaded rather than glowing. */
     ctx.save()
-    ctx.globalAlpha = 0.18
-    ctx.strokeStyle = '#ff9d55'
+    ctx.globalAlpha = 0.2
+    ctx.strokeStyle = '#8ccbff'
     ctx.lineWidth = 14
     ctx.beginPath()
     ctx.moveTo(stroke[0].x, stroke[0].y)
@@ -241,18 +264,18 @@ import { SHAPES } from '../lib/steady-shapes'
     for (const q of dots) {
       // A ring standing off the body, so the target has a footprint.
       ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R + 7, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(255, 196, 128, 0.28)'; ctx.lineWidth = 1.5; ctx.stroke()
+      ctx.strokeStyle = 'rgba(140, 203, 255, 0.32)'; ctx.lineWidth = 1.5; ctx.stroke()
       // Lit from the same direction as the surface behind it, which is what
       // stops it reading as a circle printed on a flat colour.
       const g = ctx.createRadialGradient(q.x - 4, q.y - 5, 1, q.x, q.y, DOT_R)
-      g.addColorStop(0, '#ffdcaa')
-      g.addColorStop(1, '#d08f42')
+      g.addColorStop(0, '#eef6ff')
+      g.addColorStop(1, '#7fa6ff')
       ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R, 0, Math.PI * 2)
       ctx.fillStyle = g; ctx.fill()
-      ctx.strokeStyle = 'rgba(70, 30, 14, 0.42)'; ctx.lineWidth = 1; ctx.stroke()
+      ctx.strokeStyle = 'rgba(10, 20, 50, 0.45)'; ctx.lineWidth = 1; ctx.stroke()
       if (q.label) {
-        ctx.fillStyle = '#3a121d'
-        ctx.font = '600 12px Inter, system-ui, sans-serif'
+        ctx.fillStyle = '#111318'
+        ctx.font = '700 12px "Zalando Sans", system-ui, sans-serif'
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
         ctx.fillText(q.label, q.x, q.y + 1)
       }
@@ -267,46 +290,55 @@ import { SHAPES } from '../lib/steady-shapes'
     drawDots()
   }
 
-  /* ---- the readouts ----------------------------------------------------- */
+  /* ---- the round -------------------------------------------------------- */
 
-  function paintHud() {
-    const b = bests[shape.id]
-    elBest.textContent = typeof b === 'number' ? b.toFixed(1) + '%' : '—'
-    elLast.textContent = lastScore ? lastScore.score.toFixed(1) + '%' : '—'
-    const r = rating(bests)
-    elRating.textContent = r === null ? '—' : r.toFixed(0) + '%'
-    elRating.title = r === null
-      ? 'Set a best on all four shapes'
-      : ratingName(r)
-    for (const el of tabs.querySelectorAll('.shape')) {
-      const id = el.dataset.shape
-      el.setAttribute('aria-selected', String(id === shape.id))
-      const v = bests[id]
-      el.querySelector('.sbest').textContent = typeof v === 'number' ? v.toFixed(0) : '—'
-    }
+  const roundMean = () => {
+    const v = Object.values(round)
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null
+  }
+
+  function paintRound() {
+    roundEls.forEach((li, k) => {
+      const id = li.dataset.shape!
+      const got = round[id]
+      li.className = k === idx ? 'is-now' : got !== undefined ? 'is-done' : ''
+      ;(li.querySelector('[data-got]') as HTMLElement).textContent = got !== undefined ? got.toFixed(0) + '%' : '—'
+      const b = bests[id]
+      ;(li.querySelector('[data-best]') as HTMLElement).textContent = typeof b === 'number' ? b.toFixed(0) + '%' : '—'
+    })
+  }
+
+  function paintStrip() {
+    const m = roundMean()
+    shell.setScore(m === null ? '—' : m.toFixed(1) + '%')
+    shell.setLevel(`${Math.min(idx + 1, SHAPES.length)} / ${SHAPES.length}`)
+    shell.setMoves(String(strokes))
   }
 
   /**
    * Put the score card where it does not cover the shape it is scoring.
    *
-   * Of the four corners, the one furthest from the ideal wins. With four
-   * shapes rather than one segment this matters more, not less: a spiral
-   * fills the middle of the board completely.
+   * Of the four corners, the one furthest from the ideal wins. A spiral fills
+   * the middle of the board completely, so this matters. On a narrow board
+   * the card sits under it instead (see the CSS), and nothing is placed.
    */
   function placeResult() {
-    const pad = 18
-    const w = result.offsetWidth || 250
-    const h = result.offsetHeight || 200
-    const hud = 110                     // the score pills live along the bottom
+    // Under the board (a narrow container): the CSS places it, and the board
+    // makes room for it below.
+    if (getComputedStyle(result).transform === 'none') {
+      result.style.left = ''; result.style.top = ''
+      $('board').style.setProperty('--sh-card-h', result.offsetHeight + 14 + 'px')
+      return
+    }
+    const pad = 16
+    const w = result.offsetWidth || 260
+    const h = result.offsetHeight || 220
     const path = lastScore ? lastScore.target : shape.target(box(), rot, [])
     const cx = [pad + w / 2, W - pad - w / 2]
-    const cy = [pad + h / 2 + 56, H - pad - h / 2 - hud]
-    let best = null, bestD = -1
+    const cy = [pad + h / 2, H - pad - h / 2]
+    let best = { x: W / 2, y: H / 2 }, bestD = -1
     for (const x of cx) for (const y of cy) {
-      // A board too small for a corner falls back to the middle rather than
-      // pushing the card off the edge.
-      const q = { x: Math.max(w / 2, Math.min(W - w / 2, x)),
-                  y: Math.max(h / 2, Math.min(H - h / 2, y)) }
+      const q = { x: Math.max(w / 2, Math.min(W - w / 2, x)), y: Math.max(h / 2, Math.min(H - h / 2, y)) }
       const d = distToPath(q, path)
       if (d > bestD) { bestD = d; best = q }
     }
@@ -316,13 +348,13 @@ import { SHAPES } from '../lib/steady-shapes'
 
   /* ---- drawing ---------------------------------------------------------- */
 
-  function pos(e) {
+  function pos(e: PointerEvent): P {
     const r = canvas.getBoundingClientRect()
     return { x: e.clientX - r.left, y: e.clientY - r.top }
   }
 
   /** Where a stroke is allowed to begin. Closed shapes: anywhere. */
-  function startOk(p) {
+  function startOk(p: P) {
     if (shape.closed) return true
     return dist(p, dots[0]) <= SNAP
   }
@@ -338,13 +370,13 @@ import { SHAPES } from '../lib/steady-shapes'
    * colour of the line. The score at the end is computed properly from the
    * whole stroke — and for the circle, against a radius fitted to it.
    */
-  function push(p) {
+  function push(p: P) {
     const d = liveTarget.length ? distToPath(p, liveTarget) : 0
     stroke.push({ x: p.x, y: p.y, t: Math.min(1, d / (TOLERANCE * strokeScale)) })
   }
 
   canvas.addEventListener('pointerdown', (e) => {
-    if (locked) return
+    if (locked || shell.paused || idx >= SHAPES.length) return
     const p = pos(e)
     if (!startOk(p)) {
       hint.textContent = 'Start on the first dot.'
@@ -352,7 +384,7 @@ import { SHAPES } from '../lib/steady-shapes'
     }
     // Capture keeps the stroke alive if the pointer leaves the canvas; it is
     // not available for synthetic events, so failing here must not break play.
-    try { canvas.setPointerCapture(e.pointerId) } catch {}
+    try { canvas.setPointerCapture(e.pointerId) } catch { /* not fatal */ }
     unlock(); sfx.click()
     drawing = true
     liveTarget = shape.target(box(), rot, [p])
@@ -365,6 +397,7 @@ import { SHAPES } from '../lib/steady-shapes'
       : 'Keep going. Do not lift.'
     render()
     nudge()
+    e.preventDefault()
   })
 
   let tickAt = 0
@@ -379,9 +412,10 @@ import { SHAPES } from '../lib/steady-shapes'
     nudge()
   })
 
-  function finish() {
+  function finishStroke() {
     if (!drawing) return
     drawing = false
+    strokes++
     const end = stroke[stroke.length - 1]
     const home = shape.closed ? stroke[0] : dots[dots.length - 1]
     if (!end || stroke.length < 6 || dist(end, home) > SNAP) {
@@ -389,6 +423,8 @@ import { SHAPES } from '../lib/steady-shapes'
       hint.textContent = shape.closed
         ? 'You have to come back to where you started. Try again.'
         : 'You have to finish on the last dot. Try again.'
+      shell.shake($('board'))
+      paintStrip()
       render()
       nudge()
       return
@@ -397,224 +433,226 @@ import { SHAPES } from '../lib/steady-shapes'
 
     const s = scoreStroke(shape, box(), rot, stroke)
     lastScore = s
-    if (!(bests[shape.id] >= s.score)) { bests[shape.id] = s.score; save() }
-    paintHud()
+    round[shape.id] = s.score
+    const beatShape = !(bests[shape.id] >= s.score)
+    if (beatShape) { bests[shape.id] = s.score; save() }
 
-    bigScore.textContent = s.score.toFixed(1) + '%'
-    factors.innerHTML = [
+    $('cardShape').textContent = shape.name + (beatShape ? ' · ✓ your best' : '')
+    const big = $('bigScore')
+    const txt = s.score.toFixed(1) + '%'
+    if (PLAY) roll(big, txt, { from: txt.replace(/\d/g, '0'), ms: 900 })
+    else big.textContent = txt
+    $('verdict').textContent = verdictFor(s.score)
+    $('factors').innerHTML = [
       ['Accuracy', s.accuracy, 'how close you were'],
       ['Coverage', s.coverage, 'how much of it you drew'],
       ['Economy', s.economy, 'against how far you travelled'],
     ].map(([k, v, why]) =>
-      `<li><span>${k}</span><b>${Math.round(v * 100)}%</b><i>${why}</i></li>`).join('')
+      `<li><span>${k}</span><b class="num">${Math.round((v as number) * 100)}%</b><i>${why}</i></li>`).join('')
+    $('nextLbl').textContent = idx + 1 >= SHAPES.length ? 'See the round' : 'Next shape'
 
-    const r = canvas.getBoundingClientRect()
-    const bx = r.left + end.x, by = r.top + end.y
-    if (s.score >= 92) {
-      sfx.great()
-      burst(bx, by, { count: 30, colors: ['#e8a75c', '#fff', '#ffd166'], speed: 5, gravity: 0.12, life: 46, size: 4 })
-      ring(bx, by, '#ffd166', 22)
-    } else if (s.score >= 62) {
-      sfx.good()
-      burst(bx, by, { count: 14, colors: ['#e8a75c', '#fff'], speed: 3.4, gravity: 0.16, life: 34, size: 3 })
-    } else {
-      sfx.bad()
-    }
-    floatText(bx, by - 26, s.score.toFixed(1) + '%', s.score >= 62 ? '#ffd166' : '#ff8f7a')
+    if (s.score >= 92) sfx.great()
+    else if (s.score >= 62) sfx.good()
+    else sfx.bad()
 
-    /* A play here is a stroke, which is what the word means in this game:
-       there is no run to finish, only shapes you keep re-drawing. The per-shape
-       bests stay in their own key — `stats.ts` deliberately leaves that alone —
-       and what the shared store gets is the score, which is the number that
-       compares with anything else. */
-    const stat = recordPlay(
-      'steady-hand',
-      { shape: shape.id, score: Math.round(s.score * 10) / 10 },
-      { score: 'high' },
-    )
-    // Lifetime, to match the bests beside it. `plays` is strokes here.
-    strokesDrawn = stat.plays
+    /* A play here is a stroke, which is what the word means in this game.
+       The per-shape bests stay in their own key — `stats.ts` deliberately
+       leaves that alone — and what the shared store gets is the score. */
+    recordPlay('steady-hand', { shape: shape.id, score: Math.round(s.score * 10) / 10 }, { score: 'high' })
 
-    const r2 = rating(bests)
-    verdict.textContent = r2 !== null && Object.keys(bests).length === SHAPES.length
-      ? `${verdictFor(s.score)} Overall: ${ratingName(r2)}.`
-      : verdictFor(s.score)
-
-    /* Nothing is worth a card until all four shapes have a best: a rating
-       built from the two you happen to be good at is not a steadiness rating,
-       which is exactly why `rating()` returns null until then. */
-    shareCard = r2 === null ? null : cardFor(r2)
-    ready.hidden = r2 === null
     result.hidden = false
     // Measurable only once it is laid out, so this has to follow the unhide.
     placeResult()
-    hint.textContent = 'Press Again, or pick another shape.'
+    hint.textContent = ''
+    shell.announce(`${shape.name}: ${txt}. ${verdictFor(s.score)}`)
+    paintRound()
+    paintStrip()
     render()
     nudge()
+    ;($('next') as HTMLButtonElement).focus({ preventScroll: true })
   }
 
-  /* ---- the result, as a picture ----------------------------------------- */
+  canvas.addEventListener('pointerup', finishStroke)
+  canvas.addEventListener('pointercancel', finishStroke)
+  canvas.addEventListener('pointerleave', finishStroke)
 
-  let shareCard = null
-
-  function cardFor(r) {
-    const ranked = SHAPES.map((sh) => ({ name: sh.name, best: bests[sh.id] }))
-      .sort((a, b) => b.best - a.best)
-    /* The four numbers are the interesting part, so they go in the sentence.
-       The narrowest a chip gets is 150px and three of those is most of the
-       column, so the chips carry only the short facts. */
-    const line = ranked
-      .map((v, i) => `${i ? v.name.toLowerCase() : v.name} ${v.best.toFixed(0)}`)
-      .join(', ')
-    return {
-      slug: 'steady-hand',
-      siteName: SITE.name,
-      headline: ratingName(r),
-      /* The four numbers go last. A sub-line too long for the card is
-         ellipsised, and losing "freehand" off the end costs nothing while
-         losing "line 66" costs the result. */
-      sub: `Freehand, one stroke each: ${line}.`,
-      stats: [
-        { label: 'Steadiest', value: ranked[0].name },
-        { label: 'Rating', value: r.toFixed(0) + '%' },
-        { label: 'Strokes', value: String(strokesDrawn) },
-      ],
-    }
-  }
-
-  onShare(() => shareCard, (c) => ({
-    title: 'Steady Hand',
-    text: `I draw like a ${c.headline.toLowerCase()}.`,
-  }))
-
-  canvas.addEventListener('pointerup', finish)
-  canvas.addEventListener('pointercancel', finish)
-  canvas.addEventListener('pointerleave', finish)
-
-  again.addEventListener('click', () => {
+  function redo() {
+    if (!locked || idx >= SHAPES.length) return
     unlock(); sfx.whoosh()
-    result.hidden = true
-    hint.textContent = shape.brief
+    delete round[shape.id]
     place()
+    paintRound()
+    paintStrip()
     nudge()
-  })
+  }
 
-  tabs.addEventListener('click', (e) => {
-    const b = e.target.closest('.shape')
-    if (!b) return
-    const s = shapeById(b.dataset.shape)
-    if (!s || s === shape) return
-    shape = s
+  function next() {
+    if (!locked || idx >= SHAPES.length) return
     unlock(); sfx.click()
-    result.hidden = true
-    hint.textContent = shape.brief
+    idx++
+    if (idx >= SHAPES.length) return finishRound()
+    shape = SHAPES[idx]
     place()
+    paintRound()
+    paintStrip()
+    if (idx === SHAPES.length - 1) shell.levelUp('Last one.')
     nudge()
+  }
+
+  $('redo').addEventListener('click', redo)
+  $('next').addEventListener('click', next)
+
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || shell.paused) return
+    const t = e.target as HTMLElement
+    if (t.closest('input, textarea, select, dialog')) return
+    const k = e.key.toLowerCase()
+    if (k === 'n' || (k === 'enter' && !t.closest('button, a'))) { if (locked) { e.preventDefault(); next() } }
+    else if (k === 'r') { if (locked) { e.preventDefault(); redo() } }
   })
 
-  addEventListener('resize', resize)
-  hint.textContent = shape.brief
+  /* ---- the round's rating ---------------------------------------------- */
+
+  function finishRound() {
+    const r = rating(round)!
+    result.hidden = true
+    locked = false
+    hint.textContent = 'Round over. Restart for another.'
+    paintRound()
+    paintStrip()
+
+    const ranked = SHAPES.map((sh) => ({ name: sh.name, v: round[sh.id] })).sort((a, b) => b.v - a.v)
+    shell.resultExtra.innerHTML = `
+      <ul class="sh-summary">${SHAPES.map((sh) => `
+        <li><span class="label">${sh.name}</span><b class="num">${round[sh.id].toFixed(1)}%</b><i>${verdictFor(round[sh.id])}</i></li>`).join('')}
+      </ul>`
+    const beat = shell.considerBest(Math.round(r * 10), `${r.toFixed(1)}%`)
+    const lines = [`Steadiest on the ${ranked[0].name.toLowerCase()}, shakiest on the ${ranked[ranked.length - 1].name.toLowerCase()}.`]
+    if (beat === 'beaten') lines.push('✓ Your best round yet.')
+    else if (beat === 'first') lines.push('Your first full round — that rating is the one to beat now.')
+    else if (shell.best) lines.push(`Your best round is still ${shell.best.text}.`)
+    const now = new Date()
+    if (dailyFor(now).slug === 'steady-hand') {
+      const need = dailyTarget.steadiness(now)
+      lines.push(r >= need ? `✓ Daily challenge beaten: a round of ${need}% or more.` : `✗ Daily challenge: a round of ${need}% or more.`)
+    }
+    shell.win({
+      kicker: `${SHAPES.length} shapes · ${strokes} strokes`,
+      title: ratingName(r) + '.',
+      score: r.toFixed(1) + '%',
+      lines,
+      againLabel: 'Another round',
+    })
+  }
+
+  function restart() {
+    idx = 0
+    shape = SHAPES[0]
+    round = {}
+    strokes = 0
+    place()
+    paintRound()
+    paintStrip()
+    shell.stage.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
+  }
+
+  new ResizeObserver(() => {
+    if (canvas.clientWidth !== W || canvas.clientHeight !== H) resize()
+  }).observe(canvas)
   resize()
+  paintRound()
 </script>
 
-<style>
-  .stage { position: relative; height: 100%; background: #3a121d; touch-action: none; }
+<style is:global>
+  /* The card, the factors and the summary are built by the script, so these
+     rules are global on purpose. Everything is prefixed. */
+  .sh { display: grid; gap: 14px; container-type: inline-size; }
+
+  .sh-round { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .sh-round li {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 2px 10px;
+    padding: 12px 14px; border-radius: var(--r); background: var(--paper2);
+  }
+  .sh-round li b { font-size: 16px; }
+  .sh-round li .label { color: var(--ink3); }
+  .sh-round .sh-got { font-size: 20px; }
+  .sh-round .sh-best { grid-column: 1 / -1; font-size: 12px; color: var(--ink2); }
+  .sh-round li.is-now { background: var(--card); box-shadow: inset 0 0 0 2px var(--ink); }
+  .sh-round li.is-done { background: var(--mint); }
+  .sh-round li.is-done .label, .sh-round li.is-done .sh-best { color: var(--ink); }
+  @media (max-width: 640px) {
+    .sh-round { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* The board: a dark felt, framed, because the stroke is the one bright
+     thing and a precision game cannot put it on a busy surface. */
+  .sh-board {
+    position: relative; overflow: hidden; isolation: isolate;
+    height: clamp(420px, 66vh, 700px);
+    border: 2px solid var(--ink); border-radius: var(--r-lg);
+    background: #0b1020; touch-action: none;
+  }
   /* The still fallback, for anything without WebGL2. */
   .felt {
     position: absolute; inset: 0; pointer-events: none;
-    background:
-      radial-gradient(90% 70% at 34% 4%, #4a1826 0%, transparent 62%),
-      #3a121d;
+    background: radial-gradient(90% 70% at 34% 4%, #16213f 0%, transparent 62%), #0b1020;
   }
-  .felt :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .felt .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .sh-board canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  /* Rounded themselves, because the board stops clipping when the card hangs
+     below it on a narrow screen. */
+  .felt, .sh-board canvas { border-radius: calc(var(--r-lg) - 2px); overflow: hidden; }
 
-  .hud {
-    position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
-    color: #fff; text-align: center; pointer-events: none; width: min(92vw, 560px);
+  .sh-hint {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    width: min(92%, 560px); text-align: center; pointer-events: none;
+    color: rgba(243, 245, 248, 0.86); font-size: 15px; font-weight: 500;
   }
-  .hint { font-size: 15px; opacity: 0.8; }
-  .scores {
-    display: flex; gap: 26px;
-    background: rgba(0,0,0,0.3); padding: 10px 22px; border-radius: 999px;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  }
-  .scores div { display: flex; flex-direction: column; align-items: center; }
-  .k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
-  .scores b { font-size: 17px; font-variant-numeric: tabular-nums; }
 
-  .result {
-    /* left/top are set from placeResult(); these are only the pre-layout
-       defaults for the first frame before it runs. */
+  /* The score card: a paper card on the felt, in whichever corner is
+     furthest from the shape. */
+  .sh-card {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    transition: left 260ms var(--ease), top 260ms var(--ease);
-    background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    color: #fff; border-radius: 18px; padding: 26px 38px; text-align: center;
+    width: min(280px, calc(100% - 32px));
+    display: grid; gap: 8px; justify-items: start;
+    padding: 20px; border-radius: var(--r-lg);
+    background: var(--card); color: var(--ink); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    outline: none;
   }
-  .big { font-size: 56px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-  .verdict { opacity: 0.8; margin-bottom: 10px; }
-  .ready { opacity: 0.55; font-size: 0.82rem; margin: 0 0 14px; }
-  .result button {
-    background: #e0a458; color: #3a121d; border: 0; border-radius: 999px;
-    padding: 10px 26px; font-weight: 600; cursor: pointer;
-    transition: transform 180ms var(--ease-bounce);
-  }
-  .result button:hover { transform: translateY(-2px) scale(1.05); }
-  .result button:active { transform: scale(0.95); }
-
-  @media (prefers-reduced-motion: reduce) {
-    .result { transition: none; }
-  }
-
-  /* ---- the four shapes -------------------------------------------------- */
-  .shapes {
-    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 5px; z-index: 3; max-width: 94vw;
-    background: rgba(30, 10, 16, 0.6); border: 1px solid rgba(255, 196, 128, 0.18);
-    border-radius: 999px; padding: 4px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  }
-  .shape {
-    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
-    background: transparent; border: 0; border-radius: 999px;
-    padding: 7px 14px; color: #f3d9c2; font: inherit; white-space: nowrap;
-    transition: background 140ms var(--ease), color 140ms var(--ease);
-  }
-  .shape b { font-size: 13px; font-weight: 600; }
-  .shape .sbest {
-    font-size: 11px; color: #c49a7c; font-variant-numeric: tabular-nums;
-  }
-  .shape:hover { background: rgba(255, 196, 128, 0.1); }
-  .shape[aria-selected='true'] { background: #e8a75c; color: #3a121d; }
-  .shape[aria-selected='true'] .sbest { color: #6b2a1c; }
-
-  /* ---- what the score is made of ---------------------------------------- */
-  .factors {
-    list-style: none; margin: 10px 0 0; padding: 0;
-    display: grid; gap: 4px; text-align: left;
-  }
-  /* Every one of these children is built by JS, and Astro's scoped styles do
-     not reach nodes the markup never contained — so they have to be :global.
-     Without it the whole block silently renders unstyled, which is exactly
-     how it first shipped: "Accuracy74%how close you were", all one run.
-
-     The name and the number share a row; the explanation gets its own, because
-     at this card width three columns collapse into one line of words. */
-  .factors :global(li) {
-    display: grid; grid-template-columns: 1fr auto; column-gap: 10px;
-    align-items: baseline; font-size: 11.5px;
-  }
-  .factors :global(span) { color: #c9a68d; }
-  .factors :global(b) { color: #ffe0bb; font-variant-numeric: tabular-nums; }
-  .factors :global(i) {
-    grid-column: 1 / -1; color: #a8836c; font-style: normal; font-size: 10.5px;
-    line-height: 1.4; margin-bottom: 3px;
+  .sh-card[hidden] { display: none; }
+  html.play .sh-card { transition: left 260ms var(--ease), top 260ms var(--ease); }
+  .sh-big { font-size: 52px; }
+  .sh-verdict { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: 22px; line-height: 1.1; letter-spacing: -0.02em; }
+  .sh-factors { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; width: 100%; }
+  .sh-factors li { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: baseline; font-size: 13px; }
+  .sh-factors span { color: var(--ink2); font-weight: 600; }
+  .sh-factors b { font-size: 15px; }
+  .sh-factors i { grid-column: 1 / -1; font-style: normal; font-size: 12px; color: var(--ink3); }
+  .sh-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .sh-keys { font-size: 12px; color: var(--ink3); }
+  .sh-keys kbd {
+    display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 6px;
+    border: 1.5px solid currentColor; font: 700 11px/1.5 var(--sans); text-align: center;
   }
 
-  @media (max-width: 620px) {
-    .shape { padding: 6px 9px; }
-    .shape b { font-size: 12px; }
-    .shape .sbest { display: none; }
+  /* On a board too small to have a corner the card cannot reach the shape
+     from, the card sits under the board instead. Measured on the board's own
+     width, not the window's: the shell's stage has padding of its own. */
+  @media (max-width: 640px) { .sh-board { height: clamp(360px, 62vh, 520px); } }
+  @container (max-width: 760px) {
+    .sh-board:has(.sh-card:not([hidden])) { overflow: visible; }
+    .sh-card { top: calc(100% + 14px); left: 0; transform: none; width: 100%; box-shadow: var(--shadow-block); }
+    .sh-board:has(.sh-card:not([hidden])) { margin-bottom: var(--sh-card-h, 330px); }
   }
+
+  /* The round, inside the ink result card. */
+  .sh-summary { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 640px) { .sh-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .sh-summary li { display: grid; gap: 8px; padding: 16px; border-radius: var(--r); box-shadow: inset 0 0 0 1.5px rgba(243, 245, 248, 0.28); }
+  .sh-summary b { font-size: clamp(28px, 3.4vw, 40px); }
+  .sh-summary i { font-style: normal; font-size: 14px; opacity: 0.8; }
+
+  html.play .sh-card:not([hidden]) { animation: sh-settle 520ms var(--spring) both; }
+  @keyframes sh-settle { from { transform: translate(-50%, -50%) scale(0.92); } }
+  @container (max-width: 760px) { html.play .sh-card:not([hidden]) { animation: none; } }
 </style>

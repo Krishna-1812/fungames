@@ -2324,7 +2324,35 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     `day % 3` — constant on any one game's day — so they now vary by the
     six-day cycle instead.
 
-46. Then reassess again.
+46. ~~**Paper & Ink, phase 4: Steady Hand and Paper Folds.**~~ **done.**
+
+    **Steady Hand** was free play — pick any shape, draw forever — and the
+    shell wants a run, so it is a round now: line, circle, square, spiral,
+    one scored stroke each (redo as often as you like), rated by the mean
+    of the four, which is the same `rating()` the per-shape bests always
+    used. The per-shape bests stay in their own store and show on the
+    round's rail. The felt went from maroon to navy with cobalt-lit dots,
+    and the stroke runs mint on the line to raspberry off it. The score
+    card still takes the corner furthest from the shape; on a board too
+    narrow to have one it hangs under the board instead — decided by a
+    container query on the board, not the window, because the stage has
+    padding of its own and the first version measured the wrong thing.
+
+    **Paper Folds** keeps its instrument: the sky and the console are the
+    picture, so they sit in a framed scene on the stage and keep their own
+    palette. The one thing that could not stay was *where* that palette
+    lived — it was written to `<body>` every frame as `--ink`, `--line`
+    and `--accent`, and `--ink` is the design system's, so the shell's
+    text would have turned cream on paper. It is `--pf-*` on the scene
+    now. Score is the stack's thickness in a short form ("0.1 mm", "107B
+    ly"), Moves are the real folds the sheet allows, Best is the furthest
+    fold reached, and fold 103 — wider than the observable universe — is
+    the ending. It has no daily: it is something to see, not a score to
+    beat.
+
+    The daily rotation is seven games now, nudged by the seven-day cycle.
+
+47. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
