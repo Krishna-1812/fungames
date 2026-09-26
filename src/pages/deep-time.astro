@@ -1,9 +1,8 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { EVENTS } from '../lib/time-events'
 import type { Event } from '../lib/time-events'
 import { TIME_ART, MOOD, sceneSvg } from '../lib/time-art'
-import { withBase } from '../lib/base'
 
 /** "#rrggbb" -> "r, g, b", for building rgba() strings without color-mix() —
  *  color-mix() renders as a `color(srgb …)` function, which several of this
@@ -19,6 +18,12 @@ const rgb = (hex: string) =>
  * number of years. But a single linear scale makes all of human history one
  * unreadable pixel, so the page is split into three acts that each zoom in by
  * ~500x, with the seam made explicit rather than hidden.
+ *
+ * In the shell the scroll is the stage, the same way The Deep Sea's is: the
+ * sky is a sticky backdrop inside the frame and the gauge sticks to its top.
+ * Score is when you are looking at, Zoom is which of the five scales you are
+ * on, Moves is what one pixel is worth there, Best is the furthest you have
+ * come, and today is the ending.
  */
 
 type Act = { id: string; from: number; to: number; yearsPerPx: number; sky: [string, string] }
@@ -79,23 +84,32 @@ const fmt = (y: number) =>
   : `${y.toLocaleString('en-US')} years ago`
 ---
 
-<GameLayout slug="deep-time" bar="#171132" bodyClass="night-body">
-  <div class="sky" id="sky"></div>
+<GameShell
+  slug="deep-time"
+  labels={{ score: 'When', best: 'Furthest', level: 'Zoom', moves: 'One pixel' }}
+  initial={{ score: '4.54 bn yrs', level: `1 / ${ACTS.length}`, moves: '250K yrs' }}
+>
+  <div class="dt" id="dig">
   {/* The rendered sky sits over the CSS gradient, which stays as the fallback
-      for anything without WebGL2. */}
-  <div class="skygl" id="skygl" aria-hidden="true"></div>
+      for anything without WebGL2. Pinned while the scroll passes over it. */}
+  <div class="dt-back" aria-hidden="true">
+    <div class="sky" id="sky"></div>
+    <div class="skygl" id="skygl"></div>
+  </div>
 
-  <div class="hud">
+  <div class="dt-hud-pin">
+  <div class="hud" role="group" aria-label="Time gauge">
     <div class="hud-label">you are looking at</div>
     <div class="hud-year" id="hudYear">4.54 billion years ago</div>
     <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
     <div class="hud-scale" id="hudScale">1 pixel = 250,000 years</div>
   </div>
+  </div>
 
   <div class="intro">
-    <h1>Deep Time</h1>
+    <p class="intro-title">Deep Time</p>
     <p>Every pixel below is a fixed number of years. Keep scrolling.</p>
-    <div class="arrow">↓</div>
+    <div class="arrow" aria-hidden="true">↓</div>
   </div>
 
   <div class="reel" style={`height:${totalHeight}px`}>
@@ -137,11 +151,21 @@ const fmt = (y: number) =>
     }
   </div>
 
-  <footer class="outro">
-    <p>Scroll back up. It is a long way.</p>
-    <a href={withBase('/')}>← more things like this</a>
-  </footer>
-</GameLayout>
+  <p class="dt-today">Today. Scroll back up: it is a long way.</p>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Scroll down through the 4.54 billion years since the Earth formed, from
+      its molten beginning to today.
+    </p>
+    <ul>
+      <li>Every pixel is a fixed number of years. One scale all the way would leave the whole of human history as a single unreadable pixel, so the page zooms in five times, and each seam says by how much.</li>
+      <li>Every event is at its real date on the scale it falls in. The gauge says when you are looking at, and what one pixel is worth there.</li>
+    </ul>
+    <p>Today is the end. Your best is the furthest you have come.</p>
+  </Fragment>
+</GameShell>
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
@@ -152,6 +176,8 @@ const fmt = (y: number) =>
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
   import { TIME_FRAG } from '../lib/time-sky'
+  import { createShell } from '../lib/game-shell'
+  import { recordPlay } from '../lib/stats'
     const { acts, totalHeight } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   // --- lane layout -------------------------------------------------------
@@ -260,6 +286,62 @@ const fmt = (y: number) =>
   const hudFill = document.getElementById('hudFill')
   const hudScale = document.getElementById('hudScale')
   const reel = document.querySelector('.reel')
+  const dig = document.getElementById('dig')
+
+  /* ---- the shell ------------------------------------------------------ */
+
+  let ended = false
+  let deepestAct = 0
+  const shell = createShell({
+    slug: 'deep-time',
+    // Back to the beginning of the Earth, not a reload.
+    onRestart: () => {
+      ended = false
+      deepestAct = 0
+      scrollTo({ top: dig.getBoundingClientRect().top + scrollY - 16, behavior: 'instant' })
+    },
+  })
+
+  const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 })
+  /** Short enough for a score tile: "4.54 bn yrs", "66M yrs", "1,850 yrs", "Today". */
+  function shortYears(y) {
+    if (y < 0.5) return 'Today'
+    if (y >= 1e9) return `${(y / 1e9).toFixed(2)} bn yrs`
+    if (y >= 1e4) return `${compact.format(y)} yrs`
+    return `${Math.round(y).toLocaleString('en-US')} yrs`
+  }
+
+  /* The strip rolls its digits, so it is told once the scroll settles; the
+     gauge on the sky is the live one. */
+  let stripT = 0
+  let at = { years: 4.54e9, actIdx: 0, progress: 0 }
+  function paintStrip() {
+    const { years, actIdx, progress } = at
+    const act = acts[actIdx]
+    shell.setScore(shortYears(years))
+    shell.setLevel(`${actIdx + 1} / ${acts.length}`)
+    shell.setMoves(act.yearsPerPx >= 1e4 ? `${compact.format(act.yearsPerPx)} yrs` : `${act.yearsPerPx} yr${act.yearsPerPx === 1 ? '' : 's'}`)
+    if (progress > 0) shell.considerBest(Math.round(progress * 10000), shortYears(years))
+  }
+
+  function reachedToday() {
+    ended = true
+    clearTimeout(stripT)
+    paintStrip()
+    recordPlay('deep-time', { reachedToday: true }, {})
+    const first = acts[0].yearsPerPx
+    const last = acts[acts.length - 1].yearsPerPx
+    shell.win({
+      kicker: '4.54 billion years, scrolled',
+      title: 'Today.',
+      score: `${totalHeight.toLocaleString('en-US')} px`,
+      lines: [
+        `At the scale the page began on, all 5,000 years of written history would be a ${Math.round(first / 5000)}th of a single pixel.`,
+        `To fit the last 250 years in, it had to zoom in ${Math.round(first / last).toLocaleString('en-US')} times.`,
+      ],
+      againLabel: 'Back to the beginning',
+    })
+  }
 
   const fmt = (y) =>
     y <= 0 ? 'today'
@@ -289,7 +371,9 @@ const fmt = (y: number) =>
     ticking = false
     // Depth measured at the middle of the viewport, so the readout matches
     // whatever event you are actually looking at.
-    const depth = window.scrollY + window.innerHeight / 2 - reel.offsetTop
+    // Measured against the viewport, not offsetTop: the reel sits inside the
+    // shell's stage now, and offsetTop is only relative to that.
+    const depth = window.innerHeight / 2 - reel.getBoundingClientRect().top
     const clamped = Math.max(0, Math.min(totalHeight, depth))
 
     const act = acts.find((a) => clamped < a.offset + a.height) ?? acts[acts.length - 1]
@@ -314,6 +398,17 @@ const fmt = (y: number) =>
     // Driven by scroll, not by time: under reduced motion the shared ticker
     // never runs, so the frame has to be asked for explicitly.
     if (prefersReducedMotion) surface.redraw()
+
+    const actIdx = acts.indexOf(act)
+    at = { years, actIdx, progress: clamped / totalHeight }
+    // Each zoom announces itself the first time you reach it.
+    if (actIdx > deepestAct) {
+      deepestAct = actIdx
+      shell.levelUp(`Zooming in ${Math.round(acts[actIdx - 1].yearsPerPx / act.yearsPerPx)}×`)
+    }
+    clearTimeout(stripT)
+    stripT = window.setTimeout(paintStrip, 180)
+    if (!ended && clamped >= totalHeight - 1) reachedToday()
   }
 
   addEventListener(
@@ -331,39 +426,50 @@ const fmt = (y: number) =>
 </script>
 
 <style>
-  .skygl { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+  /* The scroll fills the stage edge to edge. overflow: clip rather than
+     hidden, which would make the stage a scroll container and stop the sky
+     and the gauge sticking. */
+  :global(.stage:has(> .dt)) { padding: 0; overflow: clip; background: #100a1e; }
+  .dt { position: relative; color: #f3f5f8; container-type: inline-size; }
+  /* Sticky, not fixed: pinned while the scroll passes, but inside the frame. */
+  .dt-back { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; }
+  .dt-hud-pin { position: sticky; top: 0; height: 0; z-index: 40; }
+  .skygl { position: absolute; inset: 0; pointer-events: none; }
   /* Created at runtime, so this cannot be a scoped rule. */
   .skygl :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   .sky {
-    position: fixed; inset: 0; z-index: -2;
+    position: absolute; inset: 0;
     background: linear-gradient(#100a1e, #3b1f47);
     transition: background 260ms linear;
   }
-  :global(.night-body) { background: #100a1e; color: #fff; }
 
   .hud {
-    position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
-    z-index: 40; width: min(92vw, 520px); text-align: center;
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: min(calc(100% - 24px), 520px); text-align: center;
     padding: 10px 16px; border-radius: 12px;
     background: rgba(0, 0, 0, 0.66);
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     pointer-events: none;
   }
   .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
-  .hud-year { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .hud-year { font-size: 19px; font-weight: 700; margin-top: 2px; }
   .hud-bar { height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 9px 0 6px; }
   /* Colour set from JS, per frame — the same mix(act.sky[0], act.sky[1], t)
      the backdrop itself is built from, so the bar reads as a sample of the
      sky you are actually under rather than a generic white progress meter. */
   .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; transition: background 300ms linear; }
-  .hud-scale { font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+  .hud-scale { font-size: 12px; opacity: 0.8; }
 
   /* Leave room for the fixed HUD so the title is never hidden behind it. */
-  .intro { min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
-  .intro h1 { font-size: clamp(38px, 9vw, 74px); margin: 0; letter-spacing: -0.03em; }
+  .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
+  .intro-title {
+    font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600;
+    font-size: clamp(40px, 9cqw, 84px); line-height: 1; letter-spacing: -0.03em;
+  }
   .intro p { opacity: 0.75; margin: 0; font-size: 18px; }
-  .arrow { font-size: 30px; opacity: 0.6; animation: bob 1.8s ease-in-out infinite; }
+  .arrow { font-size: 30px; opacity: 0.6; }
+  :global(html.play) .arrow { animation: bob 1.8s ease-in-out infinite; }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
 
   /* overflow-x: clip, not the default visible: a card's glow is a soft
@@ -376,7 +482,7 @@ const fmt = (y: number) =>
 
   .ev {
     position: absolute; left: 50%; transform: translateX(-50%);
-    width: min(90vw, 560px);
+    width: min(90cqw, 560px);
     /* A picture on the left and centred text beside it reads as two things
        that arrived separately, so the text is ranged left now. It also wraps
        far better in the 220px lane the dense clusters fall back to.
@@ -411,8 +517,8 @@ const fmt = (y: number) =>
       0 0 30px -8px rgba(var(--moodRgb), 0.4);
     transition: box-shadow 200ms var(--ease, ease), border-color 200ms var(--ease, ease);
   }
-  .ev.lane-left { left: 50%; transform: translateX(-102%); width: min(44vw, 330px); }
-  .ev.lane-right { left: 50%; transform: translateX(2%); width: min(44vw, 330px); }
+  .ev.lane-left { left: 50%; transform: translateX(-102%); width: min(44cqw, 330px); }
+  .ev.lane-right { left: 50%; transform: translateX(2%); width: min(44cqw, 330px); }
   .ev.lane-left, .ev.lane-right { padding: 12px 15px; }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 19px; }
   .ev.lane-left p, .ev.lane-right p { font-size: 14px; }
@@ -475,8 +581,8 @@ const fmt = (y: number) =>
   .ev.compact-hard .ev-when { display: none; }
   .ev.compact-hard .ev-art { display: none; }
   .ev.compact-hard { padding: 9px 12px; grid-template-columns: minmax(0, 1fr); }
-  @media (max-width: 620px) {
-    .ev.lane-left, .ev.lane-right { width: min(46vw, 220px); }
+  @container (max-width: 620px) {
+    .ev.lane-left, .ev.lane-right { width: min(46cqw, 220px); }
     .ev.lane-left { transform: translateX(-104%); }
 
     /* A square crop, not a smaller 3:2 one, and the padding comes in with it.
@@ -500,7 +606,7 @@ const fmt = (y: number) =>
   }
   .ev-when {
     font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
-    opacity: 0.75; font-variant-numeric: tabular-nums;
+    opacity: 0.75;
   }
   .ev h2 { font-size: 22px; margin: 4px 0 0; font-weight: 700; }
   .ev p { margin: 6px 0 0; opacity: 0.72; font-size: 15px; }
@@ -530,7 +636,7 @@ const fmt = (y: number) =>
     border: 1px solid rgb(255 255 255 / 0.12);
   }
 
-  .outro { padding: 22vh 20px 18vh; text-align: center; }
-  .outro p { font-size: 20px; opacity: 0.8; }
-  .outro a { display: inline-block; margin-top: 12px; opacity: 0.75; }
+  /* The bottom padding is what lets the last pixel of the reel — today —
+     reach the middle of the screen, where the gauge reads from. */
+  .dt-today { position: relative; padding: 14vh 20px 56vh; text-align: center; font-size: 20px; opacity: 0.85; color: #0d1014; }
 </style>

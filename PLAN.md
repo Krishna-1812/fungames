@@ -2407,7 +2407,29 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     cool. Fixed on the way: at phone width a big card in a side lane took
     the full-width size and hung off both edges of the screen.
 
-49. Then reassess again.
+49. ~~**Paper & Ink, phase 7: Deep Time and Scale.**~~ **done.**
+
+    Both on the scroll-piece pattern from phase 6, which held.
+
+    **Deep Time**: Score is when you are looking at, Zoom is which of the
+    five scales, Moves is what one pixel is worth there, each zoom announces
+    itself, and today is the ending. The ending could not fire at first:
+    nothing after the reel let its last pixel reach the middle of the
+    screen, where the gauge reads from, so the scroll stopped three years
+    short of today. The closing line carries that room now.
+
+    **Scale** needed more than a move. Its objects are sized against "the
+    screen", and the screen had been the window; inside the shell it is the
+    frame, so every measurement reads the pinned backdrop's own size, and
+    the label stack clears the gauge rather than the old chrome bar. Two of
+    its class names were the design system's (`.stage`, `.label`) and are
+    prefixed now, and its sky-dependent classes live on the zoom rather than
+    on `<body>`. Seen counts the things you pass — all 43, on a real scroll.
+
+    On all four scroll pages, figures are proportional now: the gauges and
+    dates were tabular, which in this sans draws a slashed zero.
+
+50. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

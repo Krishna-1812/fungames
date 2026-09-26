@@ -419,7 +419,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
   .hud-depth { font-size: 19px; font-weight: 700; margin-top: 2px; }
   .hud-bar { height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 9px 0 6px; }
   .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; transition: background 300ms linear; }
-  .hud-row { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; gap: 10px; }
+  .hud-row { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.8; gap: 10px; }
   .hud-row span:last-child { opacity: 0.85; text-align: right; }
 
   .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
@@ -520,7 +520,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
   }
   .ev-when {
     font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase;
-    opacity: 0.8; font-variant-numeric: tabular-nums;
+    opacity: 0.8;
     text-shadow: 0 1px 8px rgb(0 0 0 / 0.9);
   }
   /* No card behind the words any more, so they carry their own legibility
