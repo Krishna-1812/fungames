@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { COUNTRIES, REST, annualBirths, annualDeaths, perSecond, globalTotals, WORLD_POPULATION } from '../data/population-live'
 import { COUNTRY_SHAPES, MAP_W, MAP_H } from '../data/population-geo'
 import { project } from '../lib/population-map'
@@ -25,6 +25,13 @@ import { project } from '../lib/population-map'
  * approximation. The forty simulated countries get their own real outline
  * lit up on a birth or death, the same way the real thing this is modelled
  * after does it.
+ *
+ * In the shell the map is a framed night scene on the stage, with the live
+ * count above it and the speed below. A birth lights mint now rather than
+ * gold. Score is births since you opened the page, Net is births minus
+ * deaths, Speed is the playback speed, Best is the most births you have
+ * watched in one visit, and one whole simulated day is the ending (a minute,
+ * at the fastest speed). Pausing stops the clock.
  */
 
 const shapeByName = new Map(COUNTRY_SHAPES.map((s) => [s.name, s]))
@@ -60,10 +67,12 @@ const restBps = perSecond(annualBirths(REST))
 const restDps = perSecond(annualDeaths(REST))
 ---
 
-<GameLayout slug="every-second" bar="#0a1420" fixed bodyClass="pop-body">
-  <div class="stage" id="stage">
-    <h1 class="visually-hidden">Every Second, Somewhere</h1>
-
+<GameShell
+  slug="every-second"
+  labels={{ score: 'Born', best: 'Most seen', level: 'Speed', moves: 'Net' }}
+  initial={{ score: '0', level: 'Live', moves: '+0' }}
+>
+  <div class="es-scene" id="scene">
     <div class="mapwrap">
       <svg id="map" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet">
         <rect class="ocean" width={MAP_W} height={MAP_H} />
@@ -84,7 +93,7 @@ const restDps = perSecond(annualDeaths(REST))
         }
         {
           simData.map((d, i) => (
-            <circle class="marker" data-i={i} cx={d.cx} cy={d.cy} r="1.3" aria-hidden="true" />
+            <circle class="es-marker" data-i={i} cx={d.cx} cy={d.cy} r="1.3" aria-hidden="true" />
           ))
         }
       </svg>
@@ -123,14 +132,28 @@ const restDps = perSecond(annualDeaths(REST))
   </div>
 
   {/* Text alternative for anyone who cannot use the live map. */}
-  <ul class="visually-hidden">
+  <ul class="sr-only">
     <li>World population, estimated: {fmt(WORLD_POPULATION)}</li>
     <li>Real global rate: {totals.birthsPerSecond.toFixed(2)} births and {totals.deathsPerSecond.toFixed(2)} deaths per second</li>
     {simData.map((d) => (
       <li>{d.name}: population {fmt(d.population)}, {d.birthRate} births and {d.deathRate} deaths per 1,000 people a year</li>
     ))}
   </ul>
-</GameLayout>
+
+  <Fragment slot="howto">
+    <p>
+      A live simulation of the world's real birth and death rates: every birth
+      and every death in forty real countries lights up on its own border, at
+      the rate the real country has them.
+    </p>
+    <ul>
+      <li>Each event is drawn from the same random process real, independent events follow, so the gaps are as uneven as the real ones.</li>
+      <li>Speed it up to watch an hour, or a whole day, go by in a minute.</li>
+      <li>Click a country for its population and its own rates.</li>
+    </ul>
+    <p>A whole simulated day is the end. Your best is the most births you have watched in one visit.</p>
+  </Fragment>
+</GameShell>
 
   <script type="application/json" id="game-data" set:html={JSON.stringify({
     simData, restBps, restDps, worldPopulation: WORLD_POPULATION,
@@ -141,13 +164,15 @@ const restDps = perSecond(annualDeaths(REST))
   import { nextInterval } from '../lib/population-map'
   import { prefersReducedMotion } from '../lib/gl'
   import { unlock } from '../lib/audio'
+  import { createShell } from '../lib/game-shell'
+  import { recordPlay } from '../lib/stats'
 
   const { simData, restBps, restDps, worldPopulation } = JSON.parse(
     document.getElementById('game-data')!.textContent!,
   ) as any
 
   const countryEls = [...document.querySelectorAll<SVGPathElement>('.country.sim')]
-  const markerEls = [...document.querySelectorAll<SVGCircleElement>('.marker')]
+  const markerEls = [...document.querySelectorAll<SVGCircleElement>('.es-marker')]
   // Both are indexed by the same data-i as simData, so a country's shape and
   // its marker are always found together.
   const byIndex = new Map<number, { country: SVGPathElement; marker: SVGCircleElement }>()
@@ -161,7 +186,7 @@ const restDps = perSecond(annualDeaths(REST))
     nextDeathAt: d.dps > 0 ? nextInterval(d.dps, Math.random()) : Infinity,
   }))
 
-  const BIRTH_COLOR = '#f3c667'
+  const BIRTH_COLOR = '#4fe3c1'
   const DEATH_COLOR = '#8892e8'
 
   function pulse(els: { country: SVGPathElement; marker: SVGCircleElement }, kind: 'birth' | 'death') {
@@ -181,6 +206,55 @@ const restDps = perSecond(annualDeaths(REST))
   let speed = 1
   let simNow = 0
   let lastReal = performance.now()
+  let paused = false
+
+  /* ---- the shell ------------------------------------------------------ */
+
+  const DAY = 86_400
+  const SPEED_NAME: Record<string, string> = { '1': 'Live', '60': '1 hr/min', '1440': '1 day/min' }
+  // Restart is a reload, the default. Pause and How to play stop the clock.
+  const shell = createShell({
+    slug: 'every-second',
+    onPause: () => { paused = true },
+    onResume: () => { paused = false; lastReal = performance.now() },
+  })
+  const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 })
+  const short = (n: number) => (Math.abs(n) < 10_000 ? Math.round(n).toLocaleString('en-US') : compact.format(n))
+  let shown = { births: 0, deaths: 0 }
+  let ended = false
+
+  // The strip rolls its digits, so it is told once a second; the count over
+  // the map is the live one.
+  function paintStrip() {
+    const net = shown.births - shown.deaths
+    shell.setScore(short(shown.births))
+    shell.setMoves((net >= 0 ? '+' : '−') + short(Math.abs(net)))
+    shell.setLevel(SPEED_NAME[String(speed)] ?? 'Live')
+    if (shown.births > 0) shell.considerBest(shown.births, short(shown.births))
+  }
+  setInterval(paintStrip, 1000)
+
+  function oneDay() {
+    ended = true
+    paintStrip()
+    const net = shown.births - shown.deaths
+    recordPlay('every-second', { births: shown.births, deaths: shown.deaths }, {})
+    shell.levelUp('One day on Earth')
+    // The map carries on; the card waits under it rather than pulling the
+    // page away from what is still happening.
+    shell.win({
+      celebrate: false,
+      scroll: false,
+      kicker: 'One simulated day',
+      title: `${fmt(net)} more people than yesterday.`,
+      score: short(shown.births),
+      lines: [
+        `${fmt(shown.births)} born and ${fmt(shown.deaths)} died, in the forty countries on the map and the rest of the world together.`,
+        'Tomorrow, about the same again.',
+      ],
+      againLabel: 'Watch another day',
+    })
+  }
 
   const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
   const popValue = document.getElementById('popValue')!
@@ -192,7 +266,7 @@ const restDps = perSecond(annualDeaths(REST))
     requestAnimationFrame(frame)
     // Clamped so a backgrounded tab does not resume with an enormous dt and
     // spend the next frame processing a day of events at once.
-    const dtReal = Math.min((now - lastReal) / 1000, 0.25)
+    const dtReal = paused ? 0 : Math.min((now - lastReal) / 1000, 0.25)
     lastReal = now
     const dtSim = dtReal * speed
     simNow += dtSim
@@ -223,6 +297,8 @@ const restDps = perSecond(annualDeaths(REST))
     birthCount.textContent = fmt(shownBirths)
     deathCount.textContent = fmt(shownDeaths)
     netCount.textContent = (net >= 0 ? '+' : '') + fmt(net)
+    shown = { births: shownBirths, deaths: shownDeaths }
+    if (!ended && simNow >= DAY) oneDay()
   }
   requestAnimationFrame(frame)
 
@@ -232,6 +308,7 @@ const restDps = perSecond(annualDeaths(REST))
     b.addEventListener('click', () => {
       speed = Number(b.dataset.speed)
       for (const o of speedBtns) o.setAttribute('aria-checked', String(o === b))
+      paintStrip()
     })
   }
 
@@ -278,8 +355,14 @@ const restDps = perSecond(annualDeaths(REST))
 </script>
 
 <style>
-  :global(.pop-body) { background: #060c14; color: #fff; }
-  :global(.pop-body) .stage { position: relative; height: 100%; display: grid; place-items: center; padding: 54px 14px 14px; }
+  /* The map is a night scene framed on the stage: the live count above it,
+     the speed below, the map itself full width between them. */
+  .es-scene {
+    position: relative; overflow: hidden; color: #fff;
+    display: grid; justify-items: center; gap: 12px;
+    padding: 14px 10px 14px;
+    border: 2px solid var(--ink); border-radius: var(--r-lg); background: #060c14;
+  }
 
   .mapwrap { width: 100%; max-width: 1200px; }
   #map { width: 100%; height: auto; display: block; overflow: visible; }
@@ -294,51 +377,48 @@ const restDps = perSecond(annualDeaths(REST))
     fill: #1e3345;
     stroke: #2f4a60;
     cursor: pointer;
-    transition: fill 220ms ease-out;
   }
+  :global(html.play) .country.sim { transition: fill 220ms ease-out; }
   .country.sim:hover, .country.sim:focus-visible { fill: #2a4a63; outline: none; }
   .country.sim.flash-birth { animation: flashCountryBirth 900ms ease-out; }
   .country.sim.flash-death { animation: flashCountryDeath 1100ms ease-out; }
   @keyframes flashCountryBirth {
-    0% { fill: #6b5a34; } 100% { fill: #1e3345; }
+    0% { fill: #1d5a50; } 100% { fill: #1e3345; }
   }
   @keyframes flashCountryDeath {
     0% { fill: #3d4270; } 100% { fill: #1e3345; }
   }
 
-  .marker {
+  .es-marker {
     fill: #6e879c;
     stroke: rgba(255, 255, 255, 0.25);
     stroke-width: 0.2;
     pointer-events: none;
   }
-  .marker.flash-birth { animation: flashMarkerBirth 650ms ease-out; }
-  .marker.flash-death { animation: flashMarkerDeath 900ms ease-out; }
+  .es-marker.flash-birth { animation: flashMarkerBirth 650ms ease-out; }
+  .es-marker.flash-death { animation: flashMarkerDeath 900ms ease-out; }
   @keyframes flashMarkerBirth {
-    0% { fill: #fff6df; r: 3.4; } 100% { fill: #6e879c; r: 1.3; }
+    0% { fill: #e9fff9; r: 3.4; } 100% { fill: #6e879c; r: 1.3; }
   }
   @keyframes flashMarkerDeath {
     0% { fill: #dfe3ff; r: 3; } 100% { fill: #6e879c; r: 1.3; }
   }
 
   .hud {
-    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-    text-align: center; pointer-events: none; width: max-content; max-width: 92vw;
-    background: rgba(0, 0, 0, 0.5); border-radius: 14px; padding: 10px 20px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    order: -1; text-align: center; pointer-events: none; max-width: 100%;
+    background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 10px 20px;
   }
   .pop-label { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; }
-  .pop-value { font-size: clamp(22px, 4.4vw, 34px); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .rate-row { display: flex; gap: 14px; justify-content: center; margin-top: 6px; font-size: 13px; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+  .pop-value { font-size: clamp(22px, 4.4vw, 34px); font-weight: 700; }
+  .rate-row { display: flex; gap: 14px; justify-content: center; margin-top: 6px; font-size: 13px; flex-wrap: wrap; }
   .rate i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-  .rate.birth i { background: #f3c667; }
+  .rate.birth i { background: #4fe3c1; }
   .rate.death i { background: #8892e8; }
   .since { font-size: 10.5px; opacity: 0.6; margin-top: 3px; }
 
   .speed {
-    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 6px; background: rgba(0, 0, 0, 0.5); border-radius: 999px;
-    padding: 5px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: flex; gap: 6px; background: rgba(255, 255, 255, 0.06); border-radius: 999px;
+    padding: 5px; flex-wrap: wrap; justify-content: center;
   }
   .speed .opt {
     font: inherit; font-size: 12.5px; color: #fff; background: transparent;
@@ -346,21 +426,20 @@ const restDps = perSecond(annualDeaths(REST))
   }
   .speed .opt[aria-checked='true'] { background: rgba(255, 255, 255, 0.16); opacity: 1; }
 
-  .hint {
-    position: absolute; bottom: 62px; left: 50%; transform: translateX(-50%);
-    font-size: 12px; opacity: 0.55; margin: 0;
-  }
+  .hint { font-size: 13px; opacity: 0.6; margin: 0; text-align: center; }
+  .hint[hidden] { display: none; }
 
   .inspector {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: min(88vw, 320px); background: rgba(8, 14, 22, 0.94);
+    width: min(calc(100% - 28px), 320px); background: rgba(8, 14, 22, 0.94);
     border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px;
     padding: 20px 22px; box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.7);
   }
   .inspector h2 { margin: 0 0 12px; font-size: 22px; }
   .inspector dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
   .inspector dt { opacity: 0.65; }
-  .inspector dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .inspector dd { margin: 0; text-align: right; }
+  .inspector[hidden] { display: none; }
   .inspector .close {
     position: absolute; top: 10px; right: 12px; font: inherit; font-size: 20px;
     color: #fff; opacity: 0.6; background: none; border: none; cursor: pointer; line-height: 1;
@@ -370,6 +449,5 @@ const restDps = perSecond(annualDeaths(REST))
   @media (max-width: 620px) {
     .rate-row { gap: 9px; font-size: 11.5px; }
     .speed .opt { padding: 6px 9px; font-size: 11px; }
-    :global(.pop-body) .stage { padding-top: 64px; }
   }
 </style>

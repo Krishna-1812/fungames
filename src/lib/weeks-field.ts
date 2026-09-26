@@ -9,9 +9,9 @@
  * dropped onto an unrelated background.
  *
  * `still: true` — the vignette and the stars never move. One thing here does:
- * a warm horizon at the foot of the screen that grows with `u_pct`, the same
+ * a teal horizon at the foot of the screen that grows with `u_pct`, the same
  * fraction of ninety years the grid's own gradient runs on. It is the grid's
- * central claim — cool at birth, warm as the years go on — made ambient
+ * central claim — deep blue at birth, brighter as the years go on — made ambient
  * rather than confined to 4,680 small squares. Before a date is entered
  * `u_pct` is 0 and the term is exactly zero: the page presumes nothing about
  * a life it has not been told the start of.
@@ -36,7 +36,7 @@ void main() {
      fades upward, so it reads as a horizon rather than a light dropped in the
      middle of the sky. */
   float horizon = smoothstep(0.55, 1.0, 1.0 - uv.y) * u_pct;
-  col += vec3(0.62, 0.40, 0.16) * horizon * 0.20;
+  col += vec3(0.16, 0.45, 0.42) * horizon * 0.20;
 
   col = aces(col * 1.02);
   col = toSRGB(col);

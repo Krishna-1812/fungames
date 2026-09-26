@@ -2474,7 +2474,30 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     slate plate, the parchment is white, and the needle's light is sky blue;
     the category colours on the chart stay, since they are the data.
 
-52. Then reassess again.
+52. ~~**Paper & Ink, phase 10: Every Second and Life in Weeks.**~~ **done.**
+
+    **Every Second** was a fixed, full-window map. In the shell it is a
+    framed night scene: the live count above the map, the speed below it, and
+    a birth lights mint rather than gold. Score is births since you opened
+    the page, Net is births minus deaths, Speed is the playback speed, Best
+    the most births watched in one visit, and one whole simulated day is a
+    quiet ending — a minute at the fastest speed (370,484 born and 182,497
+    died on the test run, about the real world's day). Pausing now stops the
+    simulated clock. Its SVG markers were classed `.marker`, which the
+    shell's own level-up headline also is, so the lookup found one element
+    too many and the whole script died before a single birth; they are
+    `.es-marker` now.
+
+    **Life in Weeks** is a night scene on the stage, its field shader the
+    stage's backdrop instead of the page's. A lived week runs from birth-blue
+    to mint rather than amber, this week is lilac, and the horizon glow is
+    teal — in the shaders themselves, not just the CSS. Showing the grid is
+    the ending: the result card waits under it with what happened in that
+    time and a share button, and its button goes back to the date rather
+    than reloading into the same saved one. Best is the oldest you have been
+    on a visit here.
+
+53. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

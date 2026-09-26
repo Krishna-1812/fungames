@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 
 /**
  * Life in Weeks — 90 years as 4,680 small squares.
@@ -7,16 +7,27 @@ import GameLayout from '../layouts/GameLayout.astro'
  * Everything is derived from one date the visitor types, entirely in the
  * browser. The date is stored in localStorage and sent nowhere; the page has no
  * backend and no analytics on the value.
+ *
+ * In the shell the grid is a night scene on the stage (the field shader is
+ * its backdrop now, not the page's), and a lived week runs from birth-blue to
+ * mint rather than to amber, with this week in lilac. Score is weeks lived,
+ * Age and Weeks left are the other two readings, and Best is the oldest you
+ * have been on a visit here — which, gently, is always now. Showing the grid
+ * is the ending: the result card carries what happened in that time.
  */
 const YEARS = 90
 const WEEKS = 52
 ---
 
-<GameLayout slug="life-in-weeks" bar="#1b1f2e" bodyClass="weeks-body">
+<GameShell
+  slug="life-in-weeks"
+  labels={{ score: 'Weeks lived', best: 'Oldest yet', level: 'Age', moves: 'Weeks left' }}
+  initial={{ score: '—', level: '—', moves: '—' }}
+>
+  <div class="weeks-body">
   <div class="field" id="field" aria-hidden="true"></div>
-  <div class="wrap">
+  <div class="lw-wrap">
     <header class="head">
-      <h1>Life in Weeks</h1>
       <p class="lede">
         Ninety years, one square per week. It fits on a single screen, which is
         the entire point.
@@ -32,8 +43,8 @@ const WEEKS = 52
       <p class="privacy">Stays in your browser. Nothing is sent anywhere.</p>
     </form>
 
-    <section class="result" id="result" hidden>
-      <div class="stats" id="stats"></div>
+    <section class="lw-result" id="result" hidden>
+      <div class="lw-stats" id="stats"></div>
 
       <div class="chart">
         <div class="legend">
@@ -41,22 +52,33 @@ const WEEKS = 52
           <span><i class="k-now"></i> this week</span>
           <span><i class="k-left"></i> if you reach 90</span>
         </div>
-        <div class="grid-wrap">
+        <div class="lw-grid-wrap">
           <div class="decades" id="decades" aria-hidden="true"></div>
-          <div class="grid" id="grid" role="img" aria-label="Your life so far, as a grid of weeks"></div>
+          <div class="lw-grid" id="grid" role="img" aria-label="Your life so far, as a grid of weeks"></div>
         </div>
         <p class="caption" id="caption"></p>
       </div>
 
-      <div class="facts" id="facts"></div>
-
       <div class="actions">
-        <button type="button" data-share data-title="Life in Weeks">Share</button>
-        <button type="button" id="changeBtn" class="ghost">Use a different date</button>
+        <button type="button" id="changeBtn" class="pill pill--sm pill--line-paper pill--line"><span>Use a different date</span></button>
       </div>
     </section>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Ninety years, one square per week: 4,680 of them, which fit on a single
+      screen. Put in your date of birth and every week you have lived lights
+      up.
+    </p>
+    <ul>
+      <li>Each row is one year of your life; the lilac square is this week.</li>
+      <li>The date stays in your browser, so the grid is here next time. Nothing is sent anywhere.</li>
+    </ul>
+    <p>Your best is the oldest you have been on a visit here.</p>
+  </Fragment>
+</GameShell>
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
@@ -68,9 +90,15 @@ const WEEKS = 52
   import { ShaderSurface } from '../lib/gl'
   import { weeksGridFrag } from '../lib/weeks-grid'
   import { WEEKS_FIELD_FRAG } from '../lib/weeks-field'
+  import { createShell } from '../lib/game-shell'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
+  import { SITE } from '../site.config'
+  import { recordPlay } from '../lib/stats'
     const { YEARS, WEEKS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const el = (id) => document.getElementById(id)
+  // Restart is a reload, the default: the saved date brings the grid back.
+  const shell = createShell({ slug: 'life-in-weeks' })
   const KEY = 'life-in-weeks:dob'
   const TOTAL = YEARS * WEEKS
   const WEEK_MS = 604_800_000
@@ -126,7 +154,7 @@ const WEEKS = 52
    * second reading of the same fact.
    */
   function stat(value, label, bar) {
-    return `<div class="stat">` +
+    return `<div class="lw-stat">` +
       `<b>${value}</b><span>${label}</span>` +
       (bar ? `<i class="stat-bar ${bar.cls}" style="--p:${bar.pct}"></i>` : '') +
       `</div>`
@@ -178,23 +206,59 @@ const WEEKS = 52
     const breaths = days * 24 * 60 * 15
     const sleepYears = (days * 8) / 24 / 365.2425
     const moons = days / 29.530588853
-    el('facts').innerHTML =
-      `<h2>In that time</h2><ul>` +
+    shell.setScore(nf(weeks))
+    shell.setLevel(String(years))
+    shell.setMoves(nf(Math.max(0, TOTAL - weeks)))
+    shell.considerBest(weeks, nf(weeks))
+
+    el('ask').hidden = true
+    el('result').hidden = false
+
+    /* The grid is the answer; the result card under it is what happened in
+       that time. It waits there rather than pulling the page past the grid. */
+    shell.reset()
+    shell.win({
+      celebrate: false,
+      scroll: false,
+      kicker: weeks >= TOTAL ? 'Past the ninetieth row' : `Week ${nf(weeks + 1)} of ${nf(TOTAL)}`,
+      title: `${Math.min(100, pct).toFixed(1)}% of a ninety-year life.`,
+      score: nf(weeks),
+      lines: [
+        `${nf(days)} days, and the Earth has gone round the Sun ${years} times with you on it.`,
+      ],
+      againLabel: 'Use a different date',
+    })
+    shell.resultExtra.innerHTML =
+      `<ul class="lw-facts">` +
       `<li>Your heart has beaten about <b>${nf(heartbeats)}</b> times.</li>` +
       `<li>You have taken roughly <b>${nf(breaths)}</b> breaths.</li>` +
       `<li>You have slept for about <b>${sleepYears.toFixed(1)} years</b> of it.</li>` +
       `<li>There have been <b>${nf(moons)}</b> full moons.</li>` +
-      `<li>The Earth has gone round the Sun <b>${years}</b> times with you on it.</li>` +
-      `</ul><p class="src">Heart rate and breathing use adult population averages, so treat them as an order of magnitude, not a measurement.</p>`
-
-    el('ask').hidden = true
-    el('result').hidden = false
+      `</ul><p class="lw-src">Heart rate and breathing use adult population averages, so treat them as an order of magnitude, not a measurement.</p>` +
+      `<div class="lw-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share this</span></button></div>`
+    el('shareBtn').addEventListener('click', async (e) => {
+      const label = e.currentTarget.querySelector('span')
+      const card = {
+        slug: 'life-in-weeks', siteName: SITE.name,
+        headline: `${nf(weeks)} weeks lived`,
+        sub: `${Math.min(100, pct).toFixed(1)}% of a ninety-year life.`,
+        stats: [
+          { label: 'Weeks left', value: nf(Math.max(0, TOTAL - weeks)) },
+          { label: 'Days', value: nf(days) },
+          { label: 'Full moons', value: nf(moons) },
+        ],
+      }
+      const outcome = await shareResult(card, { title: 'Life in Weeks', text: card.headline + '.', url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share this'), 1600)
+    })
+    recordPlay('life-in-weeks', { weeks }, { weeks: 'high' })
     unlock(); sfx.good()
     // One rising note per decade lived, so the reveal has a shape.
     const decades = Math.min(9, Math.floor(years / 10))
     for (let k = 0; k <= decades; k++) setTimeout(() => sfx.blip(k), 90 + k * 85)
     setTimeout(() => burst(innerWidth / 2, innerHeight * 0.36, {
-      count: 24, colors: ['#8fa2c4', '#ffd166', '#fff'], speed: 4, gravity: 0.12, life: 46, size: 3,
+      count: 24, colors: ['#8fa2c4', '#4fe3c1', '#fff'], speed: 4, gravity: 0.12, life: 46, size: 3,
     }), 120)
     try { localStorage.setItem(KEY, dobStr) } catch {}
   }
@@ -204,11 +268,20 @@ const WEEKS = 52
     if (el('dob').value) show(el('dob').value)
   })
 
-  el('changeBtn').addEventListener('click', () => {
+  function askAgain() {
+    shell.reset()
     el('result').hidden = true
     el('ask').hidden = false
-    el('dob').focus()
-  })
+    el('ask').scrollIntoView({ block: 'center' })
+    el('dob').focus({ preventScroll: true })
+  }
+  el('changeBtn').addEventListener('click', askAgain)
+  // The result card's own button means the same thing here, and the shell
+  // would otherwise reload the page — which brings the same date straight back.
+  document.querySelector('[data-act="again"]').addEventListener('click', (e) => {
+    e.stopPropagation()
+    askAgain()
+  }, { capture: true })
 
   try {
     const saved = localStorage.getItem(KEY)
@@ -227,11 +300,14 @@ const WEEKS = 52
      backdrop. A card built from these five numbers cannot drift from the
      picture above it, because they are not a second description of that
      picture — they are the same one. */
+  /* The night scene fills the stage edge to edge. */
+  .stage:has(> .weeks-body) { padding: 0; overflow: clip; background: #101320; }
   .weeks-body {
-    background: #101320; color: #e8ecf5;
+    position: relative; isolation: isolate; color: #e8ecf5;
+    border-radius: inherit;
     --wk-young: #6687bd;
-    --wk-old: #e8a94f;
-    --wk-now: #ffd166;
+    --wk-old: #4fe3c1;
+    --wk-now: #b8a1ff;
     --wk-future: #21273d;
     /* A lifted reading of --wk-future for the "weeks left" bar's fill. The
        grid can afford the true, near-black future colour because a lived cell
@@ -246,17 +322,17 @@ const WEEKS = 52
   }
 
   .weeks-body .field {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; overflow: hidden;
     /* The still fallback, roughly what the shader settles to: without
        WebGL2 this is the page's own background and nothing looks missing. */
     background: radial-gradient(120% 70% at 50% 0%, #171b2b 0%, #0c0e18 70%);
   }
   .weeks-body .field .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-  .weeks-body .wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 46px 22px 80px; }
+  .weeks-body .lw-wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: clamp(28px, 5vw, 46px) clamp(14px, 3vw, 22px) clamp(36px, 6vw, 64px); }
   .weeks-body .head { text-align: center; margin-bottom: 28px; }
-  .weeks-body .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .weeks-body .lede { color: var(--wk-ink2); margin: 10px auto 0; max-width: 44ch; }
+  .weeks-body .lede { color: var(--wk-ink2); margin: 0 auto; max-width: 44ch; font-size: var(--fs-lead); }
+  .weeks-body [hidden] { display: none !important; }
 
   /* --------------------------------------------------------------- ask -- */
 
@@ -264,7 +340,7 @@ const WEEKS = 52
     position: relative;
     background: linear-gradient(180deg, #181c2d, #10131f);
     border: 1px solid rgb(102 135 189 / 0.16);
-    border-radius: var(--radius-lg);
+    border-radius: var(--r-lg);
     padding: 28px 24px; text-align: center; max-width: 460px; margin: 0 auto;
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.05),
@@ -288,19 +364,19 @@ const WEEKS = 52
   .weeks-body input[type='date']:focus-visible {
     outline: none;
     border-color: var(--wk-now);
-    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.55), 0 0 0 3px rgb(255 209 102 / 0.22);
+    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.55), 0 0 0 3px rgb(184 161 255 / 0.22);
   }
   .weeks-body .primary {
     /* The birth-to-now arc, baked into the one button that starts it. */
     background: var(--wk-arc);
-    color: #16130a; border: 0; border-radius: 10px;
+    color: #0b1b1c; border: 0; border-radius: 10px;
     padding: 10px 22px; font-weight: 700; cursor: pointer;
-    box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 8px 20px -10px rgb(232 169 79 / 0.55);
-    transition: transform 180ms var(--ease-bounce), box-shadow 180ms var(--ease);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 8px 20px -10px rgb(79 227 193 / 0.55);
+    transition: transform 180ms var(--spring), box-shadow 180ms var(--ease);
   }
   .weeks-body .primary:hover {
     transform: translateY(-2px) scale(1.03);
-    box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 12px 26px -10px rgb(232 169 79 / 0.7);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 12px 26px -10px rgb(79 227 193 / 0.7);
   }
   .weeks-body .primary:active { transform: scale(0.96); }
   .weeks-body .privacy { color: var(--wk-ink3); font-size: 12.5px; margin: 12px 0 0; }
@@ -311,27 +387,27 @@ const WEEKS = 52
      Progress makes: a shared background shows through the hairline gaps as a
      seam rather than a hole back to the page, so four numbers read as one
      instrument rather than four unrelated widgets. */
-  .weeks-body .stats {
+  .weeks-body .lw-stats {
     display: grid; gap: 1px; margin-bottom: 26px;
     grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
     background: linear-gradient(180deg, #171b2b, #10131f);
-    border-radius: var(--radius-lg);
+    border-radius: var(--r-lg);
     padding: 7px;
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.05),
       inset 0 -1px 0 rgb(0 0 0 / 0.4),
       0 24px 50px -30px rgb(0 0 0 / 0.85);
   }
-  .weeks-body .stat {
+  .weeks-body .lw-stat {
     position: relative;
     background: transparent; border-radius: 9px;
     padding: 16px 14px 20px; text-align: center;
   }
-  .weeks-body .stat b {
+  .weeks-body .lw-stat b {
     display: block; font-family: var(--display); font-size: clamp(22px, 3.4vw, 30px);
-    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+    letter-spacing: -0.02em;
   }
-  .weeks-body .stat span { font-size: 12px; color: var(--wk-ink3); }
+  .weeks-body .lw-stat span { font-size: 12px; color: var(--wk-ink3); }
 
   /* A hairline underline standing in for a second bar chart. Two tiles carry
      one each, always summing to a full width between them — see the note by
@@ -355,7 +431,7 @@ const WEEKS = 52
   .weeks-body .chart {
     background: linear-gradient(180deg, #171b2b, #10131f);
     border: 1px solid rgb(102 135 189 / 0.14);
-    border-radius: var(--radius-lg);
+    border-radius: var(--r-lg);
     padding: 20px 18px;
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.05),
@@ -374,20 +450,20 @@ const WEEKS = 52
   .weeks-body .k-lived { background: var(--wk-arc); }
   .weeks-body .k-now {
     background: var(--wk-now);
-    box-shadow: 0 0 5px 1px rgb(255 209 102 / 0.6);
-    animation: wk-pulse 2.6s ease-in-out infinite;
+    box-shadow: 0 0 5px 1px rgb(184 161 255 / 0.6);
   }
+  html.play .weeks-body .k-now { animation: wk-pulse 2.6s ease-in-out infinite; }
   .weeks-body .k-left {
     background:
       radial-gradient(circle at 68% 32%, rgb(255 255 255 / 0.55) 0 0.5px, transparent 0.5px),
       var(--wk-future);
   }
   @keyframes wk-pulse {
-    0%, 100% { box-shadow: 0 0 4px 0.5px rgb(255 209 102 / 0.45); }
-    50% { box-shadow: 0 0 7px 1.5px rgb(255 209 102 / 0.8); }
+    0%, 100% { box-shadow: 0 0 4px 0.5px rgb(184 161 255 / 0.45); }
+    50% { box-shadow: 0 0 7px 1.5px rgb(184 161 255 / 0.8); }
   }
 
-  .weeks-body .grid-wrap { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
+  .weeks-body .lw-grid-wrap { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
   .weeks-body .decades { position: relative; font-size: 10px; color: var(--wk-ink3); }
   .weeks-body .decades span {
     position: absolute; right: 0;
@@ -395,77 +471,43 @@ const WEEKS = 52
     top: calc(var(--y) * (100% / 90));
   }
 
-  .weeks-body .grid {
+  .weeks-body .lw-grid {
     position: relative;
     display: grid;
     grid-template-columns: repeat(52, minmax(0, 1fr));
     gap: 1.5px;
   }
-  .weeks-body .grid .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .weeks-body .grid i {
+  .weeks-body .lw-grid .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .weeks-body .lw-grid i {
     display: block; aspect-ratio: 1; border-radius: 1.5px;
     background: var(--wk-future);
     transition: background 260ms var(--ease);
   }
-  .weeks-body .grid i.lived { background: var(--wk-young); }
-  .weeks-body .grid i.now { background: var(--wk-now); box-shadow: 0 0 0 2px rgb(255 209 102 / 0.35); }
-  .weeks-body .grid i.decade { box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.14); }
+  .weeks-body .lw-grid i.lived { background: var(--wk-young); }
+  .weeks-body .lw-grid i.now { background: var(--wk-now); box-shadow: 0 0 0 2px rgb(184 161 255 / 0.35); }
+  .weeks-body .lw-grid i.decade { box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.14); }
   /* The DOM cells stay in the layout — their aspect-ratio squares are what
      give the canvas its size — but paint nothing once the shader is live. */
-  .weeks-body .grid.gl i { visibility: hidden; }
+  .weeks-body .lw-grid.gl i { visibility: hidden; }
 
   .weeks-body .caption { text-align: center; color: var(--wk-ink3); font-size: 13px; margin: 14px 0 0; }
-
-  /* -------------------------------------------------------------- facts -- */
-
-  .weeks-body .facts {
-    background: linear-gradient(180deg, #171b2b, #10131f);
-    border: 1px solid rgb(102 135 189 / 0.14);
-    border-radius: var(--radius-lg);
-    padding: 22px 20px; margin-top: 18px;
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.05),
-      inset 0 -1px 0 rgb(0 0 0 / 0.45),
-      0 24px 55px -32px rgb(0 0 0 / 0.85);
-  }
-  .weeks-body .facts h2 { font-size: 22px; margin-bottom: 12px; }
-  .weeks-body .facts ul {
-    margin: 0; padding: 0; list-style: none;
-    display: grid; gap: 9px; color: #c3cde0;
-  }
-  /* A small lit dot in place of a browser bullet — the same legend mark the
-     register uses for a channel, here standing for "since you were born"
-     rather than for a rate. */
-  .weeks-body .facts li { position: relative; padding-left: 18px; }
-  .weeks-body .facts li::before {
-    content: ''; position: absolute; left: 0; top: 0.55em;
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--wk-old);
-    box-shadow: 0 0 4px 0.5px rgb(232 169 79 / 0.5);
-  }
-  .weeks-body .facts b { color: var(--wk-old); font-variant-numeric: tabular-nums; }
-  .weeks-body .facts .src { color: var(--wk-ink3); font-size: 12.5px; margin: 14px 0 0; }
 
   /* ------------------------------------------------------------ actions -- */
 
   .weeks-body .actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
-  .weeks-body .actions button {
-    border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 700;
-    cursor: pointer; background: var(--wk-arc); color: #16130a;
-    box-shadow: 0 1px 0 rgb(255 255 255 / 0.3) inset;
-    transition: transform 180ms var(--ease-bounce), box-shadow 180ms var(--ease);
+
+  /* The facts, inside the ink result card. */
+  .lw-facts { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: var(--fs-lead); }
+  .lw-facts li { position: relative; padding-left: 20px; }
+  .lw-facts li::before {
+    content: ''; position: absolute; left: 0; top: 0.55em;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--mint);
   }
-  .weeks-body .actions button:hover {
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 10px 22px -12px rgb(232 169 79 / 0.6);
-  }
-  .weeks-body .actions button:active { transform: scale(0.95); }
-  .weeks-body .actions .ghost {
-    background: transparent; border: 1px solid rgb(102 135 189 / 0.3); color: #e8ecf5;
-    box-shadow: none;
-  }
+  .lw-facts b { color: var(--mint); }
+  .lw-src { margin-top: 14px; font-size: 14px; opacity: 0.72; }
+  .lw-report-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 
   @media (prefers-reduced-motion: reduce) {
-    .weeks-body .k-now { animation: none; box-shadow: 0 0 5px 1px rgb(255 209 102 / 0.6); }
+    .weeks-body .k-now { animation: none; box-shadow: 0 0 5px 1px rgb(184 161 255 / 0.6); }
   }
 </style>

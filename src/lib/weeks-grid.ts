@@ -16,7 +16,7 @@
  *
  * Three things this adds that a flat fill could not:
  *
- *  - Lived weeks warm gradually, from a cool blue at birth to an amber near
+ *  - Lived weeks brighten gradually, from a cool blue at birth to a bright mint near
  *    the current week, keyed to age rather than to the week itself — so
  *    ninety rows read as one gradient instead of ninety repaints of a colour.
  *  - The current week breathes: a slow pulse whose glow bleeds past its own
@@ -69,7 +69,7 @@ void main() {
 
   /* No ACES past this point — deliberately, for the same reason memo-paper.ts
      has none. The tonemapper exists to stop bright HDR cores clipping; fed
-     the flat 0.3-0.9 range a "blue at birth, amber near now" gradient
+     the flat 0.3-0.9 range a "blue at birth, mint near now" gradient
      actually lives in, it compresses the whole span toward the same pale
      grey and the gradient simply disappears. Authored in sRGB via toLinear,
      clamped once at the end instead. */
@@ -81,11 +81,11 @@ void main() {
   vec3 future = toLinear(vec3(0.129, 0.153, 0.239)) * (1.0 + grain);
   future += toLinear(vec3(0.55, 0.62, 0.85)) * star * 0.6;
 
-  // Lived: one gradient from a cool birth-blue to a lived-in amber, keyed to
+  // Lived: one gradient from a cool birth-blue to a lived-in mint, keyed to
   // age (the row) rather than the individual week.
   float age = cellId.y / (YEARS - 1.0);
   vec3 young = toLinear(vec3(0.40, 0.53, 0.74));
-  vec3 old   = toLinear(vec3(0.910, 0.663, 0.310));
+  vec3 old   = toLinear(vec3(0.310, 0.890, 0.757));
   vec3 lived = mix(young, old, pow(age, 0.85)) * (1.0 + grain * 0.6);
 
   vec3 cellCol = mix(future, lived, isLived);
@@ -104,9 +104,9 @@ void main() {
   vec2 deltaPx = (gridPos - (nowCell + 0.5)) * cellPx;
   float pulse = 0.7 + 0.3 * sin(u_time * 2.35);
   float glow = exp(-length(deltaPx) / (min(cellPx.x, cellPx.y) * 1.7)) * pulse;
-  bg += toLinear(vec3(1.0, 0.74, 0.35)) * glow * 0.6;
+  bg += toLinear(vec3(0.72, 0.63, 1.0)) * glow * 0.6;
 
-  vec3 nowCol = toLinear(vec3(1.0, 0.82, 0.40)) * (0.85 + 0.55 * pulse);
+  vec3 nowCol = toLinear(vec3(0.722, 0.631, 1.0)) * (0.85 + 0.55 * pulse);
   cellCol = mix(cellCol, nowCol, isNow);
 
   vec3 col = mix(bg, cellCol, cover);
