@@ -10,17 +10,39 @@ import { METHODS } from '../lib/share-methods'
  * so themselves: they are jokes, not encodings, and the blurb never claims
  * otherwise. Nothing here needs a backend: every "send" happens entirely in
  * this tab, against whatever you actually typed.
+ *
+ * Two materials, not one template with the colour swapped: real methods sit
+ * on a bolted brushed-metal panel (rivets, a scanline, a lit LED rather than
+ * a text pill), jokes are handwritten postcards — their own font, a stamp,
+ * a few degrees of rotation seeded from the tile's own id so it is stable
+ * rather than reshuffling on every reload. Four real tiles with the richest
+ * payoff in their modal (Morse, Braille, Touch-Tone, Interstellar) get a
+ * second column so the grid itself isn't perfectly uniform.
  */
+
+// Deterministic, so the same tile always tilts the same amount — a random()
+// per render would make the "postcard" read as a layout bug on refresh.
+const seedOf = (id: string) => id.split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 1000, 7)
+const tiltOf = (id: string) => ((seedOf(id) % 240) / 240 - 0.5) * 5 // -2.5..2.5deg
+
+const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
 ---
 
-<GameLayout slug="share-this-page" bar="#1b2740" bodyClass="stp-body">
+<GameLayout slug="share-this-page" bar="#1b2740" bodyClass="stp-body" fonts={['Caveat:wght@600;700']}>
   <div class="stp-bg" aria-hidden="true">
     <div class="stp-grid-tex"></div>
+    <div class="stp-radar"></div>
     <div class="stp-glow"></div>
+    <div class="stp-pings">
+      <i style="--x:12%; --y:22%; --d:0s"></i>
+      <i style="--x:82%; --y:16%; --d:1.6s"></i>
+      <i style="--x:68%; --y:70%; --d:3.1s"></i>
+      <i style="--x:24%; --y:64%; --d:4.4s"></i>
+    </div>
   </div>
 
   <header class="stp-head">
-    <p class="stp-eyebrow">One message · thirty ways out</p>
+    <p class="stp-eyebrow"><i class="stp-live-dot" aria-hidden="true"></i>One message · thirty ways out</p>
     <h1>Share This Page</h1>
     <p class="stp-sub">
       Type anything below. Every tile sends it a different way — most of them
@@ -29,14 +51,32 @@ import { METHODS } from '../lib/share-methods'
     </p>
     <div class="stp-composer">
       <label for="msg" class="stp-label">Your message</label>
-      <input id="msg" type="text" maxlength="90" autocomplete="off" value="You should see this." />
+      <div class="stp-input-wrap">
+        <input id="msg" type="text" maxlength="90" autocomplete="off" value="You should see this." />
+        <div class="stp-signal" id="signal" aria-hidden="true"></div>
+      </div>
     </div>
   </header>
 
   <div class="stp-grid" id="grid">
     {METHODS.map((m) => (
-      <button type="button" class="stp-tile" data-id={m.id} data-kind={m.kind} style={`--accent:${m.accent}`}>
-        <svg class="stp-tile-icon" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" set:html={m.icon} />
+      <button
+        type="button"
+        class:list={['stp-tile', `stp-mat-${m.kind}`, { 'stp-tile-big': BIG.has(m.id) }]}
+        data-id={m.id}
+        data-kind={m.kind}
+        style={`--accent:${m.accent}; --tilt:${tiltOf(m.id).toFixed(2)}deg`}
+      >
+        {m.kind === 'real' ? (
+          <>
+            <i class="stp-rivet stp-rivet-tl" aria-hidden="true"></i>
+            <i class="stp-rivet stp-rivet-br" aria-hidden="true"></i>
+            <span class="stp-led" aria-hidden="true"></span>
+          </>
+        ) : (
+          <i class="stp-stamp" aria-hidden="true"></i>
+        )}
+        <svg class="stp-tile-icon" viewBox="0 0 24 24" width={BIG.has(m.id) ? 34 : 26} height={BIG.has(m.id) ? 34 : 26} aria-hidden="true" set:html={m.icon} />
         <span class="stp-tile-title">{m.title}</span>
         {m.kind === 'real' && <span class="stp-real-badge">real</span>}
       </button>
@@ -45,7 +85,7 @@ import { METHODS } from '../lib/share-methods'
 
   <div class="stp-modal" id="modal" hidden>
     <div class="stp-modal-backdrop" id="backdrop"></div>
-    <div class="stp-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="stp-modal-card" id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <button type="button" class="stp-close" id="closeBtn" aria-label="Close">
         <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
@@ -98,8 +138,29 @@ import { METHODS } from '../lib/share-methods'
   const playBtn = $<HTMLButtonElement>('playBtn')
   const playLabel = $('playLabel')
   const copyBtn = $<HTMLButtonElement>('copyBtn')
+  const signal = $('signal')
+  const modalCard = $('modalCard')
 
   const message = () => msgInput.value.trim() || 'You should see this.'
+
+  // A live "signal strength" readout under the input — not decoration, the
+  // bar heights are the real character codes of whatever is actually typed,
+  // so retyping the message visibly redraws it rather than replaying a loop.
+  function updateSignal() {
+    const text = msgInput.value || ' '
+    signal.innerHTML = ''
+    text
+      .split('')
+      .slice(0, 48)
+      .forEach((c) => {
+        const bar = document.createElement('i')
+        const h = 3 + (c.charCodeAt(0) % 17)
+        bar.style.height = `${h}px`
+        signal.append(bar)
+      })
+  }
+  msgInput.addEventListener('input', updateSignal)
+  updateSignal()
 
   let currentId = ''
   let playing = false
@@ -391,6 +452,8 @@ import { METHODS } from '../lib/share-methods'
     modalBlurb.textContent = m.blurb
     modalIcon.innerHTML = m.icon
     modalIconWrap.style.setProperty('--accent', m.accent)
+    modalCard.classList.toggle('stp-mat-joke', m.kind === 'joke')
+    modalCard.classList.toggle('stp-mat-real', m.kind === 'real')
     if (m.kind === 'real') renderReal(id)
     else renderJoke()
     modal.hidden = false
@@ -433,21 +496,58 @@ import { METHODS } from '../lib/share-methods'
       linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
     background-size: 34px 34px;
   }
+  /* A slow radar sweep behind everything — the one continuous piece of
+     motion that says "this room is receiving something" without ever
+     drawing the eye the way a foreground animation would. */
+  .stp-radar {
+    position: absolute; top: 50%; left: 50%; width: 1400px; height: 1400px;
+    transform: translate(-50%, -50%);
+    background: conic-gradient(from 0deg, rgba(140, 170, 255, 0.16), transparent 8%, transparent 100%);
+    animation: stp-sweep 7s linear infinite;
+    mix-blend-mode: screen;
+  }
+  @keyframes stp-sweep { to { transform: translate(-50%, -50%) rotate(360deg); } }
   .stp-glow {
     position: absolute; top: -20%; left: 50%; width: 900px; height: 700px;
     transform: translateX(-50%);
     background: radial-gradient(ellipse at center, rgba(120, 160, 255, 0.16), transparent 70%);
   }
+  .stp-pings { position: absolute; inset: 0; }
+  .stp-pings i {
+    position: absolute; left: var(--x); top: var(--y); width: 6px; height: 6px; margin: -3px;
+    border-radius: 999px; border: 1px solid rgba(140, 190, 255, 0.55);
+    animation: stp-ping 5s ease-out infinite; animation-delay: var(--d);
+  }
+  @keyframes stp-ping {
+    0% { transform: scale(0.4); opacity: 0.9; }
+    70% { opacity: 0; }
+    100% { transform: scale(9); opacity: 0; }
+  }
 
   .stp-head { max-width: 720px; margin: 48px auto 8px; padding: 0 20px; text-align: center; color: #eaf0ff; }
-  .stp-eyebrow { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.6; margin: 0 0 8px; }
-  .stp-head h1 { font-size: clamp(32px, 6vw, 52px); margin: 0 0 12px; letter-spacing: -0.02em; }
+  .stp-eyebrow {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.68; margin: 0 0 10px;
+  }
+  .stp-live-dot {
+    width: 7px; height: 7px; border-radius: 999px; background: #7ce0a8;
+    box-shadow: 0 0 8px 1px rgba(124, 224, 168, 0.8);
+    animation: stp-live-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes stp-live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.75); } }
+  .stp-head h1 {
+    font-size: clamp(32px, 6vw, 52px); margin: 0 0 12px; letter-spacing: -0.02em;
+    text-shadow: 0 0 28px rgba(140, 170, 255, 0.35);
+  }
   .stp-sub { opacity: 0.78; line-height: 1.5; margin: 0 0 26px; }
 
   .stp-composer { display: flex; justify-content: center; }
   .stp-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .stp-input-wrap { display: flex; flex-direction: column; align-items: center; gap: 9px; width: min(100%, 480px); }
+  .stp-signal { display: flex; align-items: flex-end; gap: 2px; height: 17px; opacity: 0.7; }
+  :global(.stp-signal i) { display: block; width: 3px; flex: none; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #ffd76b, #8caaff); }
   #msg {
-    width: min(100%, 480px);
+    width: 100%;
     padding: 13px 18px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.16);
@@ -461,30 +561,77 @@ import { METHODS } from '../lib/share-methods'
 
   .stp-grid {
     max-width: 980px; margin: 34px auto 80px; padding: 0 20px;
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 13px;
+    grid-auto-flow: dense;
   }
   .stp-tile {
     position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 8px;
     padding: 18px 10px 14px;
     border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 55%, #10182a), color-mix(in srgb, var(--accent) 22%, #0c1220));
     color: #f2f5ff;
     cursor: pointer;
-    transition: transform 180ms var(--ease-bounce), border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+    transition: transform 200ms var(--ease-bounce), border-color 180ms var(--ease), box-shadow 220ms var(--ease);
   }
-  .stp-tile:hover { transform: translateY(-3px) scale(1.03); border-color: rgba(255, 255, 255, 0.22); box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.6); }
-  .stp-tile:active { transform: translateY(-1px) scale(0.99); }
+  .stp-tile-big { grid-column: span 2; padding-block: 24px 18px; }
+  .stp-tile-big .stp-tile-title { font-size: 14.5px; }
+
+  /* ---- real: a bolted instrument panel --------------------------------- */
+  .stp-tile.stp-mat-real {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 5px),
+      linear-gradient(160deg, color-mix(in srgb, var(--accent) 58%, #10182a), color-mix(in srgb, var(--accent) 24%, #0c1220));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -10px 18px -14px rgba(0, 0, 0, 0.6);
+  }
+  .stp-tile.stp-mat-real:hover {
+    transform: translateY(-3px) scale(1.03);
+    border-color: rgba(255, 255, 255, 0.26);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 28px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  .stp-tile.stp-mat-real:active { transform: translateY(-1px) scale(0.99); }
+  .stp-rivet {
+    position: absolute; width: 5px; height: 5px; border-radius: 999px;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.75), rgba(0, 0, 0, 0.5));
+    opacity: 0.7;
+  }
+  .stp-rivet-tl { top: 7px; left: 8px; }
+  .stp-rivet-br { bottom: 7px; right: 8px; }
+  .stp-led {
+    position: absolute; top: 9px; right: 9px; width: 6px; height: 6px; border-radius: 999px;
+    background: #7ce0a8; box-shadow: 0 0 6px 1.5px rgba(124, 224, 168, 0.85);
+    animation: stp-live-pulse 2.4s ease-in-out infinite;
+  }
   .stp-tile-icon { opacity: 0.95; }
   .stp-tile-title { font-size: 13px; font-weight: 600; text-align: center; line-height: 1.25; }
   .stp-real-badge {
-    position: absolute; top: 8px; right: 9px;
-    font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: 999px;
-    padding: 2px 6px;
+    font-family: var(--mono, ui-monospace, monospace);
+    font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: -2px;
+  }
+
+  /* ---- joke: a handwritten postcard, pinned on a slight tilt ----------- */
+  .stp-tile.stp-mat-joke {
+    transform: rotate(var(--tilt));
+    border: 1px dashed rgba(255, 255, 255, 0.28);
+    background:
+      radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.05), transparent 45%),
+      radial-gradient(circle at 82% 78%, rgba(255, 255, 255, 0.045), transparent 45%),
+      linear-gradient(155deg, color-mix(in srgb, var(--accent) 62%, #241a1a), color-mix(in srgb, var(--accent) 26%, #150e0e));
+    box-shadow: 0 6px 16px -10px rgba(0, 0, 0, 0.55);
+  }
+  .stp-tile.stp-mat-joke:hover {
+    transform: rotate(0deg) translateY(-3px) scale(1.04);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 14px 26px -12px rgba(0, 0, 0, 0.6);
+  }
+  .stp-tile.stp-mat-joke:active { transform: rotate(0deg) translateY(-1px) scale(0.99); }
+  .stp-tile.stp-mat-joke .stp-tile-title { font-family: 'Caveat', var(--hand, cursive); font-size: 19px; font-weight: 700; letter-spacing: 0.01em; }
+  .stp-stamp {
+    position: absolute; top: 7px; right: 8px; width: 14px; height: 14px;
+    border: 1.5px dotted rgba(255, 255, 255, 0.45); border-radius: 3px;
+    opacity: 0.7;
   }
 
   .stp-modal { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; }
@@ -500,6 +647,21 @@ import { METHODS } from '../lib/share-methods'
     box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.7);
     animation: stp-pop 220ms var(--ease-bounce);
   }
+  /* A lit strip along the top identifies the device the modal is standing in
+     for — the same accent every tile already carries, just given somewhere
+     to live once you're inside it. */
+  .stp-modal-card::before {
+    content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; border-radius: 20px 20px 0 0;
+    background: linear-gradient(90deg, transparent, var(--accent, #8caaff), transparent);
+    opacity: 0.85;
+  }
+  .stp-modal-card.stp-mat-joke {
+    background: #201a2c;
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.22);
+  }
+  .stp-modal-card.stp-mat-joke::before { display: none; }
+  .stp-modal-card.stp-mat-joke #modalTitle { font-family: 'Caveat', var(--hand, cursive); font-size: 30px; font-weight: 700; }
   @keyframes stp-pop { from { opacity: 0; transform: scale(0.92) translateY(10px); } to { opacity: 1; transform: none; } }
   .stp-close {
     position: absolute; top: 14px; right: 14px;
@@ -572,6 +734,10 @@ import { METHODS } from '../lib/share-methods'
   .stp-act:active { transform: scale(0.96); }
 
   @media (prefers-reduced-motion: reduce) {
-    .stp-tile, .stp-modal-card { animation: none !important; transition: none !important; }
+    .stp-tile, .stp-modal-card, .stp-radar, .stp-pings i, .stp-live-dot, .stp-led {
+      animation: none !important; transition: none !important;
+    }
+    .stp-radar { opacity: 0.5; }
+    .stp-pings i { display: none; }
   }
 </style>
