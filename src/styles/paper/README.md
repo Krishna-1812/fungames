@@ -6,12 +6,12 @@ enforces the ones that can be checked mechanically.
 
 ## Principles
 
-1. **Paper ground.** The page is warm off-white `--paper`; cards are white
+1. **Paper ground.** The page is cool off-white `--paper`; cards are white
    `--card` on it. Never a pure-white page, never dark mode by default.
-2. **Colour comes in whole blocks.** Orange, amber, sky, red, sun and ink are
+2. **Colour comes in whole blocks.** Cobalt, mint, sky, red, lilac and ink are
    full-card fills with ink text, `--r-lg` (24px) corners and
    `--shadow-block`. No tints, glows, neon or decorative gradients. The one
-   exception is the **marker** — the orange-to-coral highlighter — used
+   exception is the **marker** — the mint-to-ice highlighter — used
    behind one phrase, once per page. (Game cover art keeps its own colours;
    it is a picture, not chrome.)
 3. **Pills for action.** Every button and control is a pill. Primary is solid
@@ -41,11 +41,11 @@ enforces the ones that can be checked mechanically.
 | Card | `--card` |
 | Text | `--ink` · `--ink2` (secondary) · `--ink3` (metadata; the contrast floor — never on `--paper2`) |
 | Text on ink | `--ink-paper` |
-| Block fills **only** | `--orange` `--amber` `--sky` `--red` `--sun` |
-| Coloured text on paper/card | `--t-orange` `--t-red` `--t-blue` `--t-amber` `--t-green` |
+| Block fills **only** | `--cobalt` `--mint` `--sky` `--red` `--lilac` |
+| Coloured text on paper/card | `--t-cobalt` `--t-red` `--t-blue` `--t-teal` `--t-green` |
 
 Text on any block colour is ink — never `--ink2`, never paper. Never put
-orange, amber or sky text on paper. Colour is never the only signal: pair it
+cobalt, mint or sky text on paper. Colour is never the only signal: pair it
 with a sign (✓ ✗ ↑ ↓) or a label.
 
 ## Motion

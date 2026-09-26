@@ -347,11 +347,11 @@ const first = DILEMMAS[0]
   .tr-scene .switch.thrown { transform: rotate(38deg); }
   html.play .tr-scene .switch { transition: transform 300ms var(--spring); }
 
-  /* Twenty-six sleepers: the ones behind you are ink, this one is orange. */
+  /* Twenty-six sleepers: the ones behind you are ink, this one is cobalt. */
   .tr-rail { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: 3px; }
   .tr-rail li { height: 10px; border-radius: 3px; background: var(--paper3); }
   .tr-rail li.is-done { background: var(--ink); }
-  .tr-rail li.is-now { background: var(--orange); }
+  .tr-rail li.is-now { background: var(--cobalt); }
 
   .tr-side { display: grid; gap: 14px; align-content: start; }
   .tr-title { font-size: var(--fs-h2); line-height: 0.98; }
@@ -372,11 +372,11 @@ const first = DILEMMAS[0]
     background: var(--paper2); color: var(--ink); font: 700 15px/1 var(--sans);
   }
   .tr-choice.is-chosen, .tr-choice.is-chosen[disabled] { background: var(--ink); color: var(--ink-paper); opacity: 1; }
-  .tr-choice.is-chosen kbd { background: var(--orange); }
+  .tr-choice.is-chosen kbd { background: var(--cobalt); }
 
-  /* The toll, in whole blocks: nobody is sky, a few is amber, many is red.
+  /* The toll, in whole blocks: nobody is sky, a few is lilac, many is red.
      The words always say the number too. */
-  .tr-outcome { display: grid; gap: 10px; justify-items: start; margin-top: 4px; padding: 22px; border-radius: var(--r-lg); color: var(--ink); background: var(--amber); box-shadow: var(--shadow-block); }
+  .tr-outcome { display: grid; gap: 10px; justify-items: start; margin-top: 4px; padding: 22px; border-radius: var(--r-lg); color: var(--ink); background: var(--lilac); box-shadow: var(--shadow-block); }
   .tr-outcome.is-none { background: var(--sky); }
   .tr-outcome.is-many { background: var(--red); }
   .tr-toll { font-size: 13px; }
@@ -398,10 +398,10 @@ const first = DILEMMAS[0]
   .tr-pos-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .tr-pos-row b { font-size: 18px; }
   .tr-pos-row .num { font-size: 22px; }
-  .tr-positions li.is-top .tr-pos-row { color: var(--amber); }
+  .tr-positions li.is-top .tr-pos-row { color: var(--mint); }
   .tr-bar { display: block; height: 8px; border-radius: 4px; background: rgba(246, 244, 240, 0.18); overflow: hidden; }
   .tr-bar i { display: block; height: 100%; background: var(--ink-paper); transform-origin: left center; transform: scaleX(var(--w, 0)); }
-  .tr-positions li.is-top .tr-bar i { background: var(--amber); }
+  .tr-positions li.is-top .tr-bar i { background: var(--mint); }
   .tr-positions p:not(.tr-pos-row) { font-size: 15px; opacity: 0.86; }
   .tr-positions small { font-size: 13px; opacity: 0.7; }
 

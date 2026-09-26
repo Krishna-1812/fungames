@@ -347,7 +347,7 @@ function initDecode() {
 /* N. Confetti                                                               */
 /* ------------------------------------------------------------------------ */
 
-const CONFETTI = ['#ff6022', '#ffb500', '#8ccbff', '#ff3b30', '#121213']
+const CONFETTI = ['#5b82ff', '#4fe3c1', '#8ccbff', '#b8a1ff', '#111318']
 let layer: HTMLElement | null = null
 
 export function confetti(x = innerWidth / 2, y = innerHeight / 3, count = 42) {

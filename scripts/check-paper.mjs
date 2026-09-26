@@ -38,7 +38,7 @@ const shell = read('src/styles/paper/game-shell.css')
 
 console.log('tokens')
 const tok = Object.fromEntries([...tokens.matchAll(/--([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]))
-for (const t of ['paper', 'paper2', 'paper3', 'card', 'ink', 'ink2', 'ink3', 'ink-paper', 'orange', 'orange-hi', 'amber', 'sky', 'red', 'sun', 'marker', 'r', 'r-lg', 'r-pill', 'shadow-block', 'shadow-pill', 'ease', 'spring', 'glide', 'ease-io'])
+for (const t of ['paper', 'paper2', 'paper3', 'card', 'ink', 'ink2', 'ink3', 'ink-paper', 'cobalt', 'cobalt-hi', 'mint', 'sky', 'red', 'lilac', 'marker', 'r', 'r-lg', 'r-pill', 'shadow-block', 'shadow-pill', 'ease', 'spring', 'glide', 'ease-io'])
   check(t in tok, `--${t} is defined`)
 
 const hex = (h) => { const v = h.replace('#', ''); return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16)) }
@@ -49,17 +49,17 @@ const lum = (h) => {
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
 
 console.log('contrast (AA, 4.5:1 for text)')
-for (const block of ['orange', 'amber', 'sky', 'red', 'sun'])
+for (const block of ['cobalt', 'mint', 'sky', 'red', 'lilac'])
   check(ratio(tok.ink, tok[block]) >= 4.5, `ink on --${block}: ${ratio(tok.ink, tok[block]).toFixed(2)}:1`)
 check(ratio(tok['ink-paper'], tok.ink) >= 4.5, `ink-paper on ink: ${ratio(tok['ink-paper'], tok.ink).toFixed(2)}:1`)
-for (const t of ['t-orange', 't-red', 't-blue', 't-amber', 't-green']) {
+for (const t of ['t-cobalt', 't-red', 't-blue', 't-teal', 't-green']) {
   check(ratio(tok[t], tok.paper) >= 4.5, `--${t} on paper: ${ratio(tok[t], tok.paper).toFixed(2)}:1`)
   check(ratio(tok[t], tok.card) >= 4.5, `--${t} on card: ${ratio(tok[t], tok.card).toFixed(2)}:1`)
 }
 check(ratio(tok.ink3, tok.paper) >= 4.5, `ink3 on paper (the floor): ${ratio(tok.ink3, tok.paper).toFixed(2)}:1`)
 check(ratio(tok.ink2, tok.paper2) >= 4.5, `ink2 on paper2: ${ratio(tok.ink2, tok.paper2).toFixed(2)}:1`)
 // Block colours must never be text on paper — and they would fail if they were.
-for (const block of ['orange', 'amber', 'sky'])
+for (const block of ['cobalt', 'mint', 'sky'])
   check(ratio(tok[block], tok.paper) < 4.5, `--${block} is correctly unusable as text on paper (${ratio(tok[block], tok.paper).toFixed(2)}:1), so the rule matters`)
 
 /* ---- 2. colour discipline -------------------------------------------- */
@@ -69,7 +69,7 @@ for (const [name, css] of [['base.css', base], ['motion.css', motion], ['game-sh
   const body = css.replace(/\/\*[\s\S]*?\*\//g, '')
   // The view-transition backdrop is the one literal: custom properties are
   // not reliably resolved on that pseudo-element in every engine.
-  const literals = [...body.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]).filter((h) => h.toLowerCase() !== '#ff6022')
+  const literals = [...body.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]).filter((h) => h.toLowerCase() !== '#5b82ff')
   check(!literals.length, `${name}: no literal colours outside tokens${literals.length ? ' — found ' + literals.join(', ') : ''}`)
   const grads = [...body.matchAll(/[\w.#:\-\[\]='\s]*\{[^}]*gradient\([^}]*\}/g)].map((m) => m[0].trim().split('{')[0].trim())
   const allowed = grads.filter((sel) => !/progress-bar|marker/.test(sel))

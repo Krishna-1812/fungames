@@ -36,7 +36,7 @@ ul[role='list'], ol[role='list'] { list-style: none; padding: 0; }
   outline-offset: 3px;
   border-radius: 6px;
 }
-::selection { background: var(--amber); color: var(--ink); }
+::selection { background: var(--mint); color: var(--ink); }
 
 .sr-only {
   position: absolute !important;
@@ -49,7 +49,7 @@ ul[role='list'], ol[role='list'] { list-style: none; padding: 0; }
   background: var(--ink); color: var(--ink-paper); text-decoration: none; font-weight: 600;
   transform: translateY(-160%);
 }
-.skip:focus-visible { transform: none; --focus: var(--orange); }
+.skip:focus-visible { transform: none; --focus: var(--cobalt); }
 
 /* ---- type -------------------------------------------------------------- */
 .display, h1, h2, h3 {
@@ -73,7 +73,7 @@ h3, .t-h3 { font-size: var(--fs-h3); letter-spacing: -0.02em; line-height: 1.02;
   font-weight: 600;
 }
 
-/* The one highlighter stroke on a page. It is ink on orange, never the
+/* The one highlighter stroke on a page. It is ink on cobalt, never the
    reverse, so the phrase under it keeps its contrast. */
 .marker {
   color: var(--ink);
@@ -137,7 +137,7 @@ table .num { font-variant-numeric: tabular-nums; }
 
 /* ---- pills ------------------------------------------------------------- */
 .pill {
-  --pill-flood: var(--orange);
+  --pill-flood: var(--cobalt);
   --pill-flood-ink: var(--ink);
   position: relative;
   isolation: isolate;
@@ -168,7 +168,7 @@ table .num { font-variant-numeric: tabular-nums; }
 /* Primary: solid ink. Static hover (no-JS / reduced motion) is a plain
    colour change; html.play replaces it with the flood in motion.css. */
 .pill--ink { background: var(--ink); color: var(--ink-paper); }
-.pill--ink:not([disabled]):hover { background: var(--orange); color: var(--ink); }
+.pill--ink:not([disabled]):hover { background: var(--cobalt); color: var(--ink); }
 
 .pill--hero {
   background: var(--ink);
@@ -181,7 +181,7 @@ table .num { font-variant-numeric: tabular-nums; }
   text-transform: uppercase;
   box-shadow: var(--shadow-pill);
 }
-.pill--hero:not([disabled]):hover { background: var(--orange); color: var(--ink); }
+.pill--hero:not([disabled]):hover { background: var(--cobalt); color: var(--ink); }
 .pill--hero .arrow { font-size: 1.2em; line-height: 1; }
 
 /* Secondary: outlined. Floods with ink; its text turns paper. */
@@ -209,7 +209,7 @@ table .num { font-variant-numeric: tabular-nums; }
   background: var(--ink-paper);
   color: var(--ink);
 }
-.on-ink .pill--hero:not([disabled]):hover, .pill--paper:not([disabled]):hover { background: var(--orange); color: var(--ink); }
+.on-ink .pill--hero:not([disabled]):hover, .pill--paper:not([disabled]):hover { background: var(--cobalt); color: var(--ink); }
 
 .pill--sm { min-height: 40px; padding: 0 16px; font-size: 14px; gap: 8px; }
 .pill--icon { min-width: 44px; padding: 0 12px; }
@@ -288,18 +288,18 @@ table .num { font-variant-numeric: tabular-nums; }
   box-shadow: var(--shadow-block);
   color: var(--ink);
 }
-.b-orange { background: var(--orange); }
-.b-amber { background: var(--amber); }
+.b-cobalt { background: var(--cobalt); }
+.b-mint { background: var(--mint); }
 .b-sky { background: var(--sky); }
 .b-red { background: var(--red); }
-.b-sun { background: var(--sun); }
+.b-lilac { background: var(--lilac); }
 .b-card { background: var(--card); }
 .b-ink, .on-ink {
   --focus: var(--ink-paper);
   background: var(--ink);
   color: var(--ink-paper);
 }
-.b-ink ::selection { background: var(--orange); color: var(--ink); }
+.b-ink ::selection { background: var(--cobalt); color: var(--ink); }
 
 /* ---- masthead ---------------------------------------------------------- */
 .progress-bar {
@@ -307,7 +307,7 @@ table .num { font-variant-numeric: tabular-nums; }
   inset: 0 0 auto 0;
   z-index: 101;
   height: 3px;
-  background: linear-gradient(90deg, var(--orange), var(--amber));
+  background: linear-gradient(90deg, var(--cobalt), var(--mint));
   transform-origin: left center;
   transform: scaleX(0);
   pointer-events: none;
@@ -339,7 +339,7 @@ table .num { font-variant-numeric: tabular-nums; }
 }
 .lockup .dot {
   width: 14px; height: 14px; border-radius: 50%;
-  background: var(--orange);
+  background: var(--cobalt);
   flex: none;
 }
 .nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
@@ -355,7 +355,7 @@ table .num { font-variant-numeric: tabular-nums; }
   position: absolute;
   left: 12px; right: 12px; bottom: 5px;
   height: 2px;
-  background: var(--orange);
+  background: var(--cobalt);
   border-radius: 2px;
   opacity: 0;
 }
@@ -459,7 +459,7 @@ table .num { font-variant-numeric: tabular-nums; }
   width: 10px; height: 10px;
   margin-inline: 22px;
   border-radius: 50%;
-  background: var(--orange);
+  background: var(--cobalt);
   flex: none;
 }
 .ticker-dup { display: none; }

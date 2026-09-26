@@ -24,8 +24,8 @@ const featured = deck[0]
 
 // Four block colours rotate by card slot; each card floods with the one two
 // steps along, so the flood is always a real change of colour.
-const SLOTS = ['orange', 'amber', 'sky', 'red'] as const
-const DECK_BLOCKS = ['orange', 'sky', 'amber', 'red', 'orange'] as const
+const SLOTS = ['cobalt', 'mint', 'sky', 'red'] as const
+const DECK_BLOCKS = ['cobalt', 'sky', 'mint', 'red', 'cobalt'] as const
 
 // A real count, read at build time rather than typed: every model on the
 // site has a checker in scripts/, and check-all runs all of them.
@@ -189,7 +189,7 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
               <a class="pill pill--line" href="#games"><span>Another game</span></a>
             </div>
           </div>
-          <div class="band-card block b-amber">
+          <div class="band-card block b-mint">
             <p class="label">Today's game</p>
             <h3 id="dailyName">{dailyGame.title}</h3>
             <dl>

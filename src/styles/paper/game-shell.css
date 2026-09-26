@@ -57,7 +57,7 @@
 .shell-tile .label { color: var(--ink3); }
 .shell-tile .num { font-size: clamp(28px, 3vw, 38px); white-space: nowrap; }
 .shell-tile .num small { font-size: 0.5em; font-weight: 600; letter-spacing: 0; color: var(--ink3); margin-left: 4px; }
-.shell-tile.is-best { background: var(--orange); }
+.shell-tile.is-best { background: var(--cobalt); }
 .shell-tile.is-best .label, .shell-tile.is-best .num small { color: var(--ink); }
 .new-best {
   position: absolute !important;
@@ -189,7 +189,7 @@ html.play .shell-tile::before {
   width: 250%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: var(--orange);
+  background: var(--cobalt);
   transform: translate(-50%, -50%) scale(0);
   transition: transform var(--t-reveal) var(--glide);
 }

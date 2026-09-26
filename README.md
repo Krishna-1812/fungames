@@ -11,7 +11,7 @@ a measurement from the live site, not a guess.
 ## Design system: Paper & Ink
 
 The homepage and every game in the shared shell are built on one editorial
-system — warm paper, white cards, colour only as whole blocks with ink on
+system — cool paper, white cards, colour only as whole blocks with ink on
 them, Fraunces for statements and Zalando Sans for information, and a motion
 layer that is typographic rather than decorative. The rules are in
 [`src/styles/paper/README.md`](src/styles/paper/README.md); the pieces are:
@@ -656,7 +656,7 @@ documented pattern, not an invented vibe — Harry Brignull's original 2010
 taxonomy (he coined the term), the Princeton/CHI 2019 study that scraped
 eleven thousand shopping sites for them, or the FTC's 2022 report — cited by
 name against each one, in `src/lib/dark-patterns.ts`. The visual grammar is
-the same in all eleven on purpose: the trick is always the loud, warm button;
+the same in all eleven on purpose: the trick is always the site's loudest button;
 the honest way through is always the small, quiet one. *`scripts/check-dark-
 patterns.mjs` proves every pattern cites one of the three real taxonomies,
 that no two share a written sentence, and — the cross-file check that

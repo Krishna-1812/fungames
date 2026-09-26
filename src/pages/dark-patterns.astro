@@ -54,7 +54,7 @@ const total = PATTERNS.length
   </div>
 
   <div class="dp-play" id="play" hidden>
-    <div class="dp-window" id="window" data-brand="sun">
+    <div class="dp-window" id="window" data-brand="lilac">
       <div class="dp-chrome">
         <span class="dp-lights" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="dp-addr">
@@ -153,18 +153,18 @@ const total = PATTERNS.length
    * ink, so some repeat — the voice of the wordmark is what keeps two sky
    * sites apart), and the trap button always wears it.
    */
-  type Brand = { name: string; block: 'orange' | 'amber' | 'sky' | 'red' | 'sun' | 'ink'; voice: 'serif' | 'sans' | 'shout' | 'lower' }
+  type Brand = { name: string; block: 'cobalt' | 'mint' | 'sky' | 'red' | 'lilac' | 'ink'; voice: 'serif' | 'sans' | 'shout' | 'lower' }
   const BRANDS: Record<string, Brand> = {
-    basket: { name: 'Fenwick & Oates', block: 'sun', voice: 'serif' },
-    confirmshame: { name: 'The Daily Brew', block: 'amber', voice: 'serif' },
+    basket: { name: 'Fenwick & Oates', block: 'lilac', voice: 'serif' },
+    confirmshame: { name: 'The Daily Brew', block: 'mint', voice: 'serif' },
     roach: { name: 'Chorus+', block: 'red', voice: 'sans' },
-    urgency: { name: 'GET IT NOW', block: 'orange', voice: 'shout' },
+    urgency: { name: 'GET IT NOW', block: 'cobalt', voice: 'shout' },
     ads: { name: 'Freeware Depot', block: 'sky', voice: 'sans' },
-    drip: { name: 'ticketloop', block: 'amber', voice: 'lower' },
+    drip: { name: 'ticketloop', block: 'mint', voice: 'lower' },
     continuity: { name: 'Loomline', block: 'sky', voice: 'serif' },
     trick: { name: 'Account settings', block: 'ink', voice: 'sans' },
     zuckering: { name: 'frennet', block: 'sky', voice: 'lower' },
-    social: { name: 'NIMBUS', block: 'orange', voice: 'shout' },
+    social: { name: 'NIMBUS', block: 'cobalt', voice: 'shout' },
     nagging: { name: 'The Daily Briefing', block: 'red', voice: 'serif' },
   }
 
@@ -326,7 +326,7 @@ const total = PATTERNS.length
     },
 
     ads(host, api) {
-      const decoys = [['DirectDownload Pro', 'orange'], ['FastGet Installer', 'sun'], ['SafeFile Setup', 'sky']] as const
+      const decoys = [['DirectDownload Pro', 'cobalt'], ['FastGet Installer', 'lilac'], ['SafeFile Setup', 'sky']] as const
       host.innerHTML = `
         <p class="dp-kicker">PhotoTrim 4 · free · 2.1 MB</p>
         <h3 class="dp-h">Download PhotoTrim 4</h3>
@@ -686,7 +686,7 @@ const total = PATTERNS.length
 
   /* ---- the browser window -------------------------------------------- */
   .dp-window {
-    --brand: var(--sun);
+    --brand: var(--lilac);
     --brand-ink: var(--ink);
     position: relative;
     border: 2px solid var(--ink);
@@ -694,11 +694,11 @@ const total = PATTERNS.length
     overflow: hidden;
     background: var(--card);
   }
-  .dp-window[data-brand='orange'] { --brand: var(--orange); }
-  .dp-window[data-brand='amber'] { --brand: var(--amber); }
+  .dp-window[data-brand='cobalt'] { --brand: var(--cobalt); }
+  .dp-window[data-brand='mint'] { --brand: var(--mint); }
   .dp-window[data-brand='sky'] { --brand: var(--sky); }
   .dp-window[data-brand='red'] { --brand: var(--red); }
-  .dp-window[data-brand='sun'] { --brand: var(--sun); }
+  .dp-window[data-brand='lilac'] { --brand: var(--lilac); }
   .dp-window[data-brand='ink'] { --brand: var(--ink); --brand-ink: var(--ink-paper); }
 
   .dp-chrome { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--paper2); border-bottom: 2px solid var(--ink); }
@@ -805,8 +805,8 @@ const total = PATTERNS.length
   .dp-dlgrid { display: grid; gap: 10px; }
   .dp-decoy, .dp-real-dl { display: grid; justify-items: center; gap: 3px; width: 100%; padding: 12px 20px; }
   .dp-decoy { justify-self: stretch; }
-  .dp-decoy[data-c='orange'] { background: var(--orange); }
-  .dp-decoy[data-c='sun'] { background: var(--sun); }
+  .dp-decoy[data-c='cobalt'] { background: var(--cobalt); }
+  .dp-decoy[data-c='lilac'] { background: var(--lilac); }
   .dp-decoy[data-c='sky'] { background: var(--sky); }
   .dp-decoy small, .dp-real-dl small { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
   .dp-real-dl {

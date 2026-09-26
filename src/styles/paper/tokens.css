@@ -3,34 +3,38 @@
  *
  * Every page built on the Paper layout reads its colour, type, shape and
  * motion from here and nowhere else. The rules these values encode are in
- * ./README.md; the short version is: warm paper ground, white cards, colour
+ * ./README.md; the short version is: cool paper ground, white cards, colour
  * only ever as a whole block with ink on it, and a single highlighter.
+ *
+ * The palette is cool throughout: cobalt is the one accent (hovers, floods,
+ * the best tile), mint, sky and lilac are the other blocks, and red is kept
+ * — shifted to raspberry — only because "wrong" and "lost" need it.
  */
 :root {
   /* ---- ground and ink ------------------------------------------------ */
-  --paper: #f1efed;
-  --paper2: #ebe9e5;
-  --paper3: #dbd7d1;
+  --paper: #eef0f3;
+  --paper2: #e5e8ed;
+  --paper3: #d3d8e0;
   --card: #ffffff;
-  --ink: #121213;
-  --ink2: #444444;
-  --ink3: #6f6b66;
-  --ink-paper: #f6f4f0;
+  --ink: #111318;
+  --ink2: #3f4550;
+  --ink3: #5f6672;
+  --ink-paper: #f3f5f8;
 
   /* ---- block colours: FILLS ONLY, never text on paper ----------------- */
-  --orange: #ff6022;
-  --orange-hi: #ff7a45;
-  --amber: #ffb500;
+  --cobalt: #5b82ff;
+  --cobalt-hi: #7a9bff;
+  --mint: #4fe3c1;
   --sky: #8ccbff;
-  --red: #ff3b30;
-  --sun: #ff9100;
-  --marker: linear-gradient(90deg, #ff6022 0%, #ff8b5d 100%);
+  --red: #ff4f6e;
+  --lilac: #b8a1ff;
+  --marker: linear-gradient(90deg, #4fe3c1 0%, #8ccbff 100%);
 
   /* ---- text-safe shades for coloured text on paper or card ------------ */
-  --t-orange: #b83c0c;
-  --t-red: #c8261b;
+  --t-cobalt: #2e52d1;
+  --t-red: #c21d43;
   --t-blue: #1d65a6;
-  --t-amber: #8a5a00;
+  --t-teal: #0b7663;
   --t-green: #17753f;
 
   /* ---- type ------------------------------------------------------------ */

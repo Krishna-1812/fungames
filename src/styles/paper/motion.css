@@ -148,7 +148,7 @@ html.play .ticker:focus-within .ticker-track { animation-play-state: paused; }
 /* ---- L. page transitions --------------------------------------------- */
 @media (prefers-reduced-motion: no-preference) {
   @view-transition { navigation: auto; }
-  ::view-transition { background: #ff6022; }
+  ::view-transition { background: #5b82ff; }
   ::view-transition-old(root) { animation: vt-out 420ms var(--ease-io) both; }
   ::view-transition-new(root) { animation: vt-in 680ms var(--ease) both; }
   @keyframes vt-out { to { opacity: 0; transform: scale(0.97); } }

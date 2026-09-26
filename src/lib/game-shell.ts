@@ -96,7 +96,7 @@ export function createShell(opts: ShellOptions) {
    *
    * Returns 'first' when there was no best yet (recorded quietly — there was
    * nothing to beat), 'beaten' when a stored best was genuinely beaten (the
-   * tile floods orange and the badge pops in, once per run), or false.
+   * tile floods cobalt and the badge pops in, once per run), or false.
    */
   function considerBest(value: number, text: string): 'first' | 'beaten' | false {
     if (value <= 0) return false
