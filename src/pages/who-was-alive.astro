@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { withBase } from '../lib/base'
 import { iconSvg } from '../lib/icons'
 import {
@@ -30,6 +30,12 @@ import {
  * than rebuilt — which is why there is no `innerHTML` on this page and
  * therefore none of the scoped-style trap that has bitten every game here
  * that did use one. (The style block is `is:global` anyway, prefixed `wa-`.)
+ *
+ * In the shell the counter is steel on a slate plate and the sheet is white
+ * rather than parchment. The goal is to meet everyone: Moves counts the
+ * people you have seen alive in some year you set, and meeting all of them
+ * is the ending. Score is how many are alive in the year on the counter,
+ * Year is that year, and Best is the most you have found alive at once.
  */
 
 const TOTAL = PEOPLE.length
@@ -133,12 +139,14 @@ const startDigits = String(Math.abs(START_YEAR)).padStart(4, '0').split('')
 const DRUM_CELLS = 30
 ---
 
-<GameLayout slug="who-was-alive" bar="#3a2b18" bodyClass="wa-body">
-  <div class="wa-grain" aria-hidden="true"></div>
-
+<GameShell
+  slug="who-was-alive"
+  labels={{ score: 'Alive then', best: 'Most at once', level: 'Year', moves: 'Met' }}
+  initial={{ score: String(startAlive.length), level: formatYear(START_YEAR), moves: `${startAlive.length} / ${TOTAL}` }}
+>
+  <div class="wa">
   <header class="wa-head">
-    <p class="wa-eyebrow">Eighty-nine lives, one shared timeline</p>
-    <h1>Who Was Alive</h1>
+    <p class="label meta wa-eyebrow">Eighty-nine lives, one shared timeline</p>
     <p class="wa-lede">
       Set the counter to any year between 700 BC and this one. Every life in
       the record that reached that year lights up on the chart, and the roster
@@ -273,9 +281,9 @@ const DRUM_CELLS = 30
               selected year and moves with it, so "now" reads as illuminated
               rather than just marked by a line. */}
           <radialGradient id="wa-spot-grad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#f0d28f" stop-opacity="0.65" />
-            <stop offset="55%" stop-color="#e8cd8a" stop-opacity="0.22" />
-            <stop offset="100%" stop-color="#e8cd8a" stop-opacity="0" />
+            <stop offset="0%" stop-color="#8ccbff" stop-opacity="0.65" />
+            <stop offset="55%" stop-color="#8ccbff" stop-opacity="0.22" />
+            <stop offset="100%" stop-color="#8ccbff" stop-opacity="0" />
           </radialGradient>
         </defs>
 
@@ -407,10 +415,6 @@ const DRUM_CELLS = 30
   </section>
 
   <footer class="wa-outro">
-    <div class="wa-acts">
-      <button type="button" data-share data-title="Who Was Alive">Share this</button>
-      <a href={withBase('/')}>try something else &rarr;</a>
-    </div>
 
     <details class="wa-how">
       <summary>Which of this is real</summary>
@@ -447,7 +451,20 @@ const DRUM_CELLS = 30
       </p>
     </details>
   </footer>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Set the counter to any year from 700 BC to this one, and every one of the
+      {TOTAL} real lives in the record that reached that year lights up.
+    </p>
+    <ul>
+      <li>Drag the wheel, scroll over it, use the arrow keys or the step buttons, type a year, or jump to the year you were born.</li>
+      <li>Click any bar on the chart to go to the year that person was born. The legend filters the chart by what people were known for.</li>
+    </ul>
+    <p><b>Met</b> counts everyone you have seen alive so far. Meet all {TOTAL} to finish. Your best is the most you have found alive at once.</p>
+  </Fragment>
+</GameShell>
 
 {/* Data for the module below: modules cannot take define:vars, and modules
     are what let every game share one synthesiser. */}
@@ -467,10 +484,13 @@ const DRUM_CELLS = 30
     oldestAliveIn, youngestAliveIn, nearestPopulatedYear, parseYearInput, toAxis,
   } from '../data/historical-figures'
   import { sfx, unlock } from '../lib/audio'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
-  import { prefersReducedMotion } from '../lib/gl'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+
+  const prefersReducedMotion = !PLAY
 
   const D = JSON.parse(document.getElementById('wa-data')!.textContent!) as {
     minYear: number; maxYear: number; startYear: number; total: number
@@ -602,7 +622,9 @@ const DRUM_CELLS = 30
     // from a single fixed year.
     for (let i = 0; i < bars.length; i++) {
       const bar = bars[i]
-      bar.classList.toggle('is-alive', isAliveIn(byBirth[i], y))
+      const on = isAliveIn(byBirth[i], y)
+      bar.classList.toggle('is-alive', on)
+      if (on) met.add(i)
       if (!prefersReducedMotion) {
         bar.style.transitionDelay = `${Math.min(150, Math.abs(barCentres[i] - x) * 0.1).toFixed(0)}ms`
       }
@@ -645,6 +667,57 @@ const DRUM_CELLS = 30
       const now = performance.now()
       if (now - lastTick > 55) { lastTick = now; sfx.tick() }
     }
+
+    at = { y, alive }
+    clearTimeout(stripT)
+    stripT = window.setTimeout(paintStrip, 140)
+  }
+
+  /* ---- the shell ------------------------------------------------------------ */
+
+  const met = new Set<number>()
+  let at = { y: D.startYear, alive: 0 }
+  let crowd = { y: D.startYear, alive: 0 }
+  let stripT = 0
+  let ended = false
+  // Restart is a reload, the default: everyone you have met is forgotten.
+  const shell = createShell({ slug: 'who-was-alive' })
+
+  /* The strip rolls its digits, so it is told once the wheel settles rather
+     than on every year a drag passes through. */
+  function paintStrip() {
+    shell.setScore(String(at.alive))
+    shell.setLevel(formatYear(at.y))
+    shell.setMoves(`${met.size} / ${D.total}`)
+    if (at.alive > 0) shell.considerBest(at.alive, String(at.alive))
+    // The tile only has room for the number; the year it was is said at the end.
+    if (at.alive > crowd.alive) crowd = { ...at }
+    if (!ended && met.size === D.total) metEveryone()
+  }
+
+  function metEveryone() {
+    ended = true
+    recordPlay('who-was-alive', { met: D.total }, {})
+    shell.win({
+      kicker: `All ${D.total} lives`,
+      title: 'You have met everyone.',
+      score: `${D.total} / ${D.total}`,
+      from: `0 / ${D.total}`,
+      lines: [
+        `The most you found alive at once: ${crowd.alive}, in ${formatYear(crowd.y)}.`,
+        'Twenty-six centuries, and not one of them made up.',
+      ].filter(Boolean),
+      againLabel: 'Forget them all and start again',
+    })
+    shell.resultExtra.innerHTML =
+      '<div class="wa-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share this</span></button></div>'
+    $('shareBtn').addEventListener('click', async (e) => {
+      const label = (e.currentTarget as HTMLElement).querySelector('span')!
+      const c = shareCardNow()
+      const outcome = await shareResult(c, { title: 'Who Was Alive', text: c.headline, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share this'), 1600)
+    })
   }
 
   const setYear = (y: number, opts?: { quiet?: boolean }) => {
@@ -813,68 +886,49 @@ const DRUM_CELLS = 30
 
   /* ---- share ---------------------------------------------------------------- */
 
-  onShare(
-    () => {
-      const alive = peopleAliveIn(year)
-      const oldest = oldestAliveIn(year)
-      return {
-        slug: 'who-was-alive',
-        siteName: SITE.name,
-        headline: alive.length
-          ? `${alive.length} of ${D.total} were alive in ${formatYear(year)}`
-          : `Nobody in the record was alive in ${formatYear(year)}`,
-        sub: 'Eighty-nine real lives on one timeline.',
-        stats: [
-          { label: 'Year', value: formatYear(year) },
-          { label: 'Alive then', value: `${alive.length} of ${D.total}` },
-          { label: 'Oldest', value: oldest ? `${oldest.person.name}, ${oldest.age}` : 'nobody' },
-        ],
-      }
-    },
-    (c) => ({ title: 'Who Was Alive', text: c.headline }),
-  )
+  function shareCardNow() {
+    const alive = peopleAliveIn(year)
+    const oldest = oldestAliveIn(year)
+    return {
+      slug: 'who-was-alive',
+      siteName: SITE.name,
+      headline: alive.length
+        ? `${alive.length} of ${D.total} were alive in ${formatYear(year)}`
+        : `Nobody in the record was alive in ${formatYear(year)}`,
+      sub: 'Eighty-nine real lives on one timeline.',
+      stats: [
+        { label: 'Year', value: formatYear(year) },
+        { label: 'Alive then', value: `${alive.length} of ${D.total}` },
+        { label: 'Oldest', value: oldest ? `${oldest.person.name}, ${oldest.age}` : 'nobody' },
+      ],
+    }
+  }
 
   paint(D.startYear, { quiet: true })
   recordPlay('who-was-alive')
 </script>
 
 <style is:global>
-  /* ---- the page is a sheet of aged paper on a walnut desk ---------------- */
+  /* ---- paper, with the counter as a steel instrument on a slate plate ---- */
 
-  .wa-body {
-    background: #f7efe0;
-    color: #33281a;
-    --wa-walnut: #3a2b18;
-    --wa-walnut-dark: #241a0e;
-    --wa-brass: #b98f3c;
-    --wa-brass-lit: #e8cd8a;
-    --wa-rule: rgba(58, 43, 24, 0.16);
-    --wa-ink-soft: rgba(51, 40, 26, 0.68);
+  .wa {
+    --wa-walnut: #232833;
+    --wa-walnut-dark: #14171d;
+    --wa-brass: var(--cobalt-hi);
+    --wa-brass-lit: var(--sky);
+    --wa-rule: var(--paper3);
+    --wa-ink-soft: var(--ink2);
   }
-  .wa-grain {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background:
-      radial-gradient(90vmax 70vmax at 12% -12%, rgba(185, 143, 60, 0.13), transparent 68%),
-      radial-gradient(80vmax 60vmax at 96% 108%, rgba(58, 43, 24, 0.12), transparent 70%);
-  }
-  .wa-body .game { position: relative; }
-  .wa-body .game > * { position: relative; z-index: 1; }
+  .wa [hidden] { display: none !important; }
 
   .wa-sr {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
   }
 
-  .wa-head { max-width: 660px; margin: 6vh auto 0; padding: 0 22px; text-align: center; }
-  .wa-eyebrow {
-    margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.16em;
-    text-transform: uppercase; color: #7c5d22;
-  }
-  .wa-head h1 {
-    margin: 0 0 14px; font-size: clamp(34px, 6.6vw, 54px); letter-spacing: -0.03em;
-    font-family: Georgia, 'Times New Roman', serif; font-weight: 700;
-  }
-  .wa-lede { margin: 0 auto; max-width: 58ch; font-size: 16.5px; line-height: 1.7; color: var(--wa-ink-soft); }
+  .wa-head { max-width: 660px; margin: 2vh auto 0; text-align: center; }
+  .wa-eyebrow { display: block; margin: 0 0 12px; color: var(--ink2); }
+  .wa-lede { margin: 0 auto; max-width: 58ch; font-size: var(--fs-lead); line-height: 1.6; color: var(--wa-ink-soft); }
 
   /* ---- the instrument: a brass counter bolted to a walnut plate ---------- */
 
@@ -886,16 +940,16 @@ const DRUM_CELLS = 30
     border-radius: 16px;
     background:
       repeating-linear-gradient(97deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 7px),
-      linear-gradient(168deg, #4a3620, var(--wa-walnut) 52%, var(--wa-walnut-dark));
+      linear-gradient(168deg, #2f3542, var(--wa-walnut) 52%, var(--wa-walnut-dark));
     box-shadow:
-      0 24px 46px -26px rgba(36, 26, 14, 0.75),
-      inset 0 1px 0 rgba(255, 233, 190, 0.18),
+      0 24px 46px -26px rgba(10, 12, 18, 0.55),
+      inset 0 1px 0 rgba(220, 230, 245, 0.18),
       inset 0 -2px 6px rgba(0, 0, 0, 0.45);
-    color: #f2e3c4;
+    color: #e6ebf2;
   }
   .wa-bolt {
     position: absolute; width: 10px; height: 10px; border-radius: 50%;
-    background: radial-gradient(circle at 34% 30%, #e6c887, #8a6a2c 62%, #4a3717);
+    background: radial-gradient(circle at 34% 30%, #e3e8f0, #7c8698 62%, #3a404c);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
   }
   .wa-bolt::after {
@@ -910,7 +964,7 @@ const DRUM_CELLS = 30
   .wa-engraved {
     margin: 0 0 16px; text-align: center;
     font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: #c9a962;
+    color: #aab6c8;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
   }
 
@@ -920,20 +974,20 @@ const DRUM_CELLS = 30
     display: flex; align-items: stretch; justify-content: center; gap: 10px;
     padding: 12px 14px;
     border-radius: 10px;
-    background: linear-gradient(180deg, #1a1208, #2b1f10);
-    box-shadow: inset 0 3px 9px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 226, 170, 0.14);
+    background: linear-gradient(180deg, #0e1016, #1b1f28);
+    box-shadow: inset 0 3px 9px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(220, 230, 245, 0.14);
     overflow: hidden;
   }
   .wa-era {
     align-self: center;
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--display); font-variation-settings: var(--display-axes);
     font-size: clamp(15px, 3vw, 20px); font-weight: 700; letter-spacing: 0.1em;
-    color: #d9b25c;
+    color: #cfe0ff;
     padding: 6px 9px; border-radius: 5px;
-    border: 1px solid rgba(217, 178, 92, 0.45);
-    background: rgba(217, 178, 92, 0.1);
+    border: 1px solid rgba(207, 224, 255, 0.45);
+    background: rgba(207, 224, 255, 0.1);
   }
-  .wa-era.is-bc { color: #e0a060; border-color: rgba(224, 160, 96, 0.5); background: rgba(224, 160, 96, 0.12); }
+  .wa-era.is-bc { color: #c9b8ff; border-color: rgba(184, 161, 255, 0.5); background: rgba(184, 161, 255, 0.14); }
 
   .wa-drums { display: flex; gap: 5px; }
   .wa-drum {
@@ -946,18 +1000,18 @@ const DRUM_CELLS = 30
        the digit is 62% of the cell tall, so its top and bottom sit about a
        fifth of the way into the shading, and against the first draft's
        #7d6132/#6d5329 ends that part of the glyph came out at 4.1:1. */
-    background: linear-gradient(180deg, #8a6b36, #e3c489 46%, #d2b071 54%, #7a5f2e);
+    background: linear-gradient(180deg, #6f7a8c, #e6ebf2 46%, #d3dae4 54%, #5f6978);
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 6px 9px -6px rgba(0, 0, 0, 0.8);
   }
   .wa-strip { transition: transform 260ms cubic-bezier(0.32, 0.9, 0.36, 1); will-change: transform; }
   .wa-cell {
     display: grid; place-items: center;
     height: var(--wa-cell);
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--display); font-variation-settings: var(--display-axes);
     font-size: calc(var(--wa-cell) * 0.62);
     font-weight: 700;
-    color: #2a1d0b;
-    text-shadow: 0 1px 0 rgba(255, 246, 222, 0.5);
+    color: #111318;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
   }
   /* The curved glass over the whole window: one highlight across all four
      drums, which is what makes them read as one cylinder behind one pane
@@ -974,7 +1028,7 @@ const DRUM_CELLS = 30
   .wa-wheel {
     margin: 16px auto 0; max-width: 360px; height: 40px;
     border-radius: 8px; cursor: ew-resize; touch-action: none;
-    background: linear-gradient(180deg, #6b5228, #e0c286 44%, #c6a465 56%, #5c461f);
+    background: linear-gradient(180deg, #5f6978, #e1e6ee 44%, #c7cfdb 56%, #4f5868);
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4), 0 2px 5px rgba(0, 0, 0, 0.4);
     position: relative; overflow: hidden;
   }
@@ -982,8 +1036,8 @@ const DRUM_CELLS = 30
     position: absolute; inset: 0;
     background-image: repeating-linear-gradient(
       90deg,
-      rgba(58, 43, 24, 0.55) 0 1.5px,
-      rgba(255, 240, 206, 0.32) 1.5px 3px,
+      rgba(20, 24, 32, 0.55) 0 1.5px,
+      rgba(255, 255, 255, 0.32) 1.5px 3px,
       transparent 3px 7px
     );
     background-position-x: 0;
@@ -992,22 +1046,22 @@ const DRUM_CELLS = 30
     content: ''; position: absolute; inset: 0; pointer-events: none;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent 34%, transparent 66%, rgba(0, 0, 0, 0.45));
   }
-  .wa-wheel:focus-visible { outline: 3px solid #f7efe0; outline-offset: 3px; }
+  .wa-wheel:focus-visible { outline: 3px solid #f3f5f8; outline-offset: 3px; }
   .wa-wheel.is-dragging { filter: brightness(1.08); }
 
   .wa-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 14px; }
   .wa-step {
     min-width: 54px; min-height: 34px; padding: 6px 11px;
     border-radius: 7px; cursor: pointer;
-    border: 1px solid rgba(233, 205, 145, 0.35);
-    background: linear-gradient(180deg, rgba(233, 205, 145, 0.2), rgba(233, 205, 145, 0.07));
-    color: #f3e5c6; font-size: 13.5px; font-weight: 700;
-    font-variant-numeric: tabular-nums;
+    border: 1px solid rgba(210, 222, 240, 0.35);
+    background: linear-gradient(180deg, rgba(210, 222, 240, 0.2), rgba(210, 222, 240, 0.07));
+    color: #e6ebf2; font-size: 13.5px; font-weight: 700;
+   
   }
-  .wa-step:hover { background: rgba(233, 205, 145, 0.3); }
+  .wa-step:hover { background: rgba(210, 222, 240, 0.3); }
   .wa-step:active { transform: translateY(1px); }
 
-  .wa-hint { margin: 12px 0 0; text-align: center; font-size: 12px; color: #c9a962; }
+  .wa-hint { margin: 12px 0 0; text-align: center; font-size: 12px; color: #aab6c8; }
 
   /* the two ways in that are not the wheel */
   .wa-jumps {
@@ -1017,30 +1071,30 @@ const DRUM_CELLS = 30
   .wa-jump label {
     display: block; margin-bottom: 7px;
     font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
-    color: #7c5d22;
+    color: var(--ink2);
   }
   .wa-field {
     display: flex; gap: 8px; align-items: center;
-    border: 1px solid rgba(58, 43, 24, 0.3);
+    border: 2px solid var(--ink);
     border-radius: 9px; padding: 5px 6px 5px 12px;
-    background: rgba(255, 252, 243, 0.8);
+    background: var(--card);
   }
   .wa-field input {
     flex: 1; min-width: 0; border: 0; background: none; outline: none;
-    color: #33281a; font-size: 16px; font-family: inherit;
+    color: var(--ink); font-size: 16px; font-family: inherit;
     padding: 7px 0;
   }
   /* 0.45 was the obvious value and it reads 2.5:1 on paper. Placeholder text
      is still text somebody has to read to know what the box takes. */
-  .wa-field input::placeholder { color: rgba(51, 40, 26, 0.7); }
-  .wa-field:focus-within { border-color: #7c5d22; box-shadow: 0 0 0 3px rgba(185, 143, 60, 0.22); }
+  .wa-field input::placeholder { color: var(--ink3); }
+  .wa-field:focus-within { border-color: var(--ink2); box-shadow: 0 0 0 3px rgba(91, 130, 255, 0.25); }
   .wa-field button {
     border: 0; border-radius: 6px; cursor: pointer;
-    background: var(--wa-walnut); color: #f5e8cc;
+    background: var(--wa-walnut); color: #f3f5f8;
     padding: 9px 15px; font-size: 13.5px; font-weight: 700;
   }
-  .wa-field button:hover { background: #4d3a21; }
-  .wa-err { margin: 6px 0 0; min-height: 1.3em; font-size: 12.5px; color: #8f3524; }
+  .wa-field button:hover { background: var(--cobalt); color: var(--ink); }
+  .wa-err { margin: 6px 0 0; min-height: 1.3em; font-size: 12.5px; color: var(--t-red); }
   .wa-note { margin: 6px 0 0; font-size: 12.5px; color: var(--wa-ink-soft); }
 
   /* ---- the readout, engraved on its own plate ---------------------------- */
@@ -1054,21 +1108,21 @@ const DRUM_CELLS = 30
     font-size: 17px; color: var(--wa-ink-soft);
   }
   .wa-count b {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: clamp(38px, 8vw, 58px); line-height: 1; color: #33281a;
-    font-variant-numeric: tabular-nums;
+    font-family: var(--display); font-variation-settings: var(--display-axes);
+    font-size: clamp(38px, 8vw, 58px); line-height: 1; color: var(--ink);
+   
   }
-  .wa-count span b { font-size: inherit; font-family: inherit; color: #6b4d12; }
+  .wa-count span b { font-size: inherit; font-family: inherit; color: var(--t-cobalt); }
 
   .wa-ends { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 0; }
   .wa-ends dt {
     font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; font-weight: 700;
-    color: #7c5d22; margin-bottom: 4px;
+    color: var(--ink2); margin-bottom: 4px;
   }
   .wa-ends dd { margin: 0; display: flex; align-items: baseline; gap: 9px; }
-  .wa-ends dd b { font-size: 17px; font-family: Georgia, 'Times New Roman', serif; }
+  .wa-ends dd b { font-size: 17px; font-family: var(--display); font-variation-settings: var(--display-axes); }
   .wa-ends dd span {
-    font-variant-numeric: tabular-nums; font-size: 13px; color: #f5e8cc;
+    font-size: 13px; color: #f3f5f8;
     background: var(--wa-walnut); border-radius: 999px; padding: 2px 9px;
   }
   .wa-ends dd span::after { content: ' yrs'; opacity: 0.7; }
@@ -1078,7 +1132,7 @@ const DRUM_CELLS = 30
   .wa-nobody[hidden] { display: none; }
   .wa-nobody button {
     margin-left: 6px; border: 0; background: none; cursor: pointer; padding: 4px 2px;
-    color: #8a5e10; font: inherit; text-decoration: underline; text-underline-offset: 3px;
+    color: var(--t-cobalt); font: inherit; text-decoration: underline; text-underline-offset: 3px;
   }
 
   /* ---- the chart ---------------------------------------------------------- */
@@ -1086,15 +1140,15 @@ const DRUM_CELLS = 30
   .wa-chart, .wa-roster { max-width: 940px; margin: 8vh auto 0; padding: 0 22px; }
   .wa-chart h2, .wa-roster h2 {
     margin: 0 0 8px; font-size: clamp(22px, 3.6vw, 30px); letter-spacing: -0.02em;
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--display); font-variation-settings: var(--display-axes);
   }
   .wa-sub { margin: 0 0 18px; max-width: 62ch; font-size: 14.5px; line-height: 1.65; color: var(--wa-ink-soft); }
 
   .wa-chart-frame {
     position: relative;
     border-radius: 12px; padding: 10px 6px 4px;
-    background: linear-gradient(180deg, #fbf5e8, #efe3cb);
-    box-shadow: inset 0 0 0 1px rgba(58, 43, 24, 0.18), 0 14px 30px -22px rgba(36, 26, 14, 0.6);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px rgba(17, 19, 24, 0.14), 0 14px 30px -22px rgba(17, 19, 24, 0.22);
     /* Eighty-nine rows in a 1000-unit-wide drawing: on a phone the aspect
        ratio squeezes each bar under two device pixels and the chart stops
        being a chart. Below 560px it scrolls sideways instead, and the
@@ -1114,15 +1168,15 @@ const DRUM_CELLS = 30
     opacity: 1; transform: none; filter: none;
     transition: opacity 640ms var(--ease, ease), transform 640ms var(--ease, ease), filter 640ms var(--ease, ease);
   }
-  .wa-chart-frame.wa-pending { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(2px); }
+  html.play .wa-chart-frame.wa-pending { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(2px); }
   .wa-chart-frame.wa-in { opacity: 1; transform: none; filter: none; }
   .wa-svg { display: block; width: 100%; min-width: 560px; height: auto; }
 
-  .wa-rules path { stroke: rgba(58, 43, 24, 0.13); stroke-width: 1; }
-  .wa-axis .wa-axis-tick { stroke: rgba(58, 43, 24, 0.34); stroke-width: 1.4; }
+  .wa-rules path { stroke: rgba(17, 19, 24, 0.09); stroke-width: 1; }
+  .wa-axis .wa-axis-tick { stroke: rgba(17, 19, 24, 0.3); stroke-width: 1.4; }
   .wa-axis text {
-    fill: #6b5230; font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
-    font-family: Georgia, 'Times New Roman', serif;
+    fill: var(--ink2); font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+    font-family: var(--display); font-variation-settings: var(--display-axes);
   }
 
   /* The needle's own light: a soft gradient rect that tracks it (JS moves
@@ -1132,7 +1186,7 @@ const DRUM_CELLS = 30
   .wa-spot { pointer-events: none; mix-blend-mode: multiply; }
 
   .wa-bar {
-    opacity: 0.2;
+    opacity: 0.22;
     cursor: pointer;
     transition: opacity 260ms ease, filter 260ms ease;
   }
@@ -1143,8 +1197,8 @@ const DRUM_CELLS = 30
   .wa-bar.is-alive {
     opacity: 1;
     filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 7px var(--c));
-    animation: wa-pulse 2.8s ease-in-out infinite;
   }
+  html.play .wa-bar.is-alive { animation: wa-pulse 2.8s ease-in-out infinite; }
   .wa-bar:hover { opacity: 0.9; filter: drop-shadow(0 0 4px var(--c)); }
   .wa-bar.is-alive:hover {
     opacity: 1; animation-play-state: paused;
@@ -1155,18 +1209,18 @@ const DRUM_CELLS = 30
     50% { filter: drop-shadow(0 0 3px var(--c)) drop-shadow(0 0 11px var(--c)); }
   }
 
-  .wa-needle path { stroke: #8a5e10; stroke-width: 2; }
+  .wa-needle path { stroke: var(--t-cobalt); stroke-width: 2; }
   .wa-needle-glow {
     stroke: var(--wa-brass-lit); stroke-width: 7; opacity: 0.35;
     filter: blur(3px);
   }
   .wa-needle .wa-needle-head {
-    fill: #b98f3c; stroke: #6b4510; stroke-width: 1;
-    filter: drop-shadow(0 0 5px rgba(233, 189, 107, 0.85));
+    fill: var(--cobalt-hi); stroke: #2e52d1; stroke-width: 1;
+    filter: drop-shadow(0 0 5px rgba(122, 155, 255, 0.85));
   }
   .wa-needle-label {
-    fill: #4a3410; font-size: 17px; font-weight: 700;
-    font-family: Georgia, 'Times New Roman', serif;
+    fill: var(--ink); font-size: 17px; font-weight: 700;
+    font-family: var(--display); font-variation-settings: var(--display-axes);
   }
 
   /* The tooltip that actually gets looked at: a native <title> still carries
@@ -1178,14 +1232,14 @@ const DRUM_CELLS = 30
   .wa-tip {
     position: absolute; z-index: 5; pointer-events: none;
     max-width: 240px; padding: 8px 12px; border-radius: 8px;
-    background: linear-gradient(180deg, #4d3a21, var(--wa-walnut));
-    box-shadow: 0 10px 22px -10px rgba(20, 14, 6, 0.65), inset 0 0 0 1px rgba(233, 205, 138, 0.25);
+    background: linear-gradient(180deg, #2f3542, var(--wa-walnut));
+    box-shadow: 0 10px 22px -10px rgba(8, 10, 16, 0.6), inset 0 0 0 1px rgba(220, 230, 245, 0.2);
     transform: translate(-50%, calc(-100% - 14px));
     opacity: 0; transition: opacity 120ms ease;
   }
   .wa-tip.is-shown { opacity: 1; }
-  .wa-tip-name { margin: 0; font-size: 13.5px; font-weight: 700; color: #f6ead0; }
-  .wa-tip-meta { margin: 2px 0 0; font-size: 12px; color: rgba(246, 234, 208, 0.75); }
+  .wa-tip-name { margin: 0; font-size: 13.5px; font-weight: 700; color: #f3f5f8; }
+  .wa-tip-meta { margin: 2px 0 0; font-size: 12px; color: rgba(243, 245, 248, 0.75); }
 
   .wa-legend {
     list-style: none; margin: 14px 0 0; padding: 0;
@@ -1200,10 +1254,10 @@ const DRUM_CELLS = 30
     transition: background 160ms ease, border-color 160ms ease, opacity 160ms ease;
   }
   .wa-legend-btn i { width: 15px; height: 8px; border-radius: 4px; display: block; flex: none; }
-  .wa-legend-btn:hover { background: rgba(58, 43, 24, 0.06); }
+  .wa-legend-btn:hover { background: var(--paper2); }
   .wa-legend-btn[aria-pressed='true'] {
-    background: rgba(185, 143, 60, 0.16); border-color: rgba(185, 143, 60, 0.4);
-    color: #33281a; font-weight: 600;
+    background: var(--paper2); border-color: var(--ink);
+    color: var(--ink); font-weight: 600;
   }
   /* One category isolated: every other legend chip (and, via the matching
      class on .wa-bars below, every bar not in that category) steps back
@@ -1215,10 +1269,10 @@ const DRUM_CELLS = 30
 
   .wa-gap-note {
     margin: 16px 0 0; padding: 12px 14px; border-left: 3px solid var(--wa-brass);
-    background: rgba(185, 143, 60, 0.1); border-radius: 0 8px 8px 0;
+    background: var(--paper2); border-radius: 0 8px 8px 0;
     font-size: 14px; line-height: 1.65; color: var(--wa-ink-soft);
   }
-  .wa-gap-note b { color: #33281a; }
+  .wa-gap-note b { color: var(--ink); }
 
   /* ---- the roster: a ledger, not a stack of cards ------------------------- */
 
@@ -1232,12 +1286,12 @@ const DRUM_CELLS = 30
   }
   .wa-cat-mark { width: 34px; height: 34px; flex: none; display: block; }
   .wa-group-name {
-    font-family: Georgia, 'Times New Roman', serif; font-size: 20px; letter-spacing: -0.01em;
+    font-family: var(--display); font-variation-settings: var(--display-axes); font-size: 20px; letter-spacing: -0.01em;
   }
   .wa-group-note { font-weight: 400; font-size: 13px; color: var(--wa-ink-soft); }
   .wa-group-count {
-    margin-left: auto; font-variant-numeric: tabular-nums; font-size: 13px;
-    color: #f5e8cc; background: var(--wa-walnut); border-radius: 999px; padding: 2px 10px;
+    margin-left: auto; font-size: 13px;
+    color: #f3f5f8; background: var(--wa-walnut); border-radius: 999px; padding: 2px 10px;
   }
 
   .wa-rows { list-style: none; margin: 0; padding: 0; }
@@ -1256,12 +1310,12 @@ const DRUM_CELLS = 30
 
   .wa-row-name { grid-area: name; font-weight: 700; font-size: 16px; }
   .wa-row-years {
-    grid-area: years; font-variant-numeric: tabular-nums; font-size: 13.5px;
+    grid-area: years; font-size: 13.5px;
     color: var(--wa-ink-soft); white-space: nowrap;
   }
   .wa-row-age {
-    grid-area: age; justify-self: start; font-variant-numeric: tabular-nums;
-    font-size: 12px; font-weight: 700; color: #6b4d12;
+    grid-area: age; justify-self: start;
+    font-size: 12px; font-weight: 700; color: var(--t-cobalt);
   }
   .wa-row-age::after { content: ' yr'; font-weight: 400; opacity: 0.7; }
   .wa-row-place { grid-area: place; justify-self: end; font-size: 13px; color: var(--wa-ink-soft); text-align: right; }
@@ -1276,27 +1330,19 @@ const DRUM_CELLS = 30
   /* ---- outro --------------------------------------------------------------- */
 
   .wa-outro { max-width: 680px; margin: 8vh auto 0; padding: 0 22px 14vh; }
-  .wa-acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 22px; }
-  .wa-acts button {
-    appearance: none; border: 0; cursor: pointer;
-    background: linear-gradient(180deg, #4d3a21, var(--wa-walnut));
-    color: #f6ead0; padding: 11px 19px; border-radius: 999px;
-    font-size: 14px; font-weight: 700;
-  }
-  .wa-acts a { color: #6b4d12; font-size: 14px; text-decoration: none; }
-  .wa-acts a:hover { text-decoration: underline; }
+  .wa-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
   .wa-how { font-size: 14px; color: var(--wa-ink-soft); }
-  .wa-how summary { cursor: pointer; text-align: center; margin-bottom: 10px; color: #6b4d12; }
+  .wa-how summary { cursor: pointer; text-align: center; margin-bottom: 10px; color: var(--t-cobalt); }
   .wa-how p { line-height: 1.7; margin: 10px 0; }
-  .wa-how b { color: #33281a; }
-  .wa-how a { color: #6b4d12; }
+  .wa-how b { color: var(--ink); }
+  .wa-how a { color: var(--t-cobalt); }
   .wa-how code {
-    font-size: 12.5px; background: rgba(58, 43, 24, 0.09);
+    font-size: 12.5px; background: var(--paper2);
     /* Full-strength ink, not the paragraph's softened ink: the tint behind a
        code span takes the same text from 4.8:1 to 4.45:1, which is a fail on
        the only line of the page that names a filename. */
-    color: #33281a;
+    color: var(--ink);
     padding: 1px 5px; border-radius: 4px;
   }
 

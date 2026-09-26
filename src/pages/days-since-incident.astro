@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { iconSvg } from '../lib/icons'
 import { EARTHQUAKE_CATEGORIES, FLARE_CATEGORIES, STORM_CATEGORIES, SHOCK_CATEGORIES } from '../lib/incident-model'
 import { digitCellHTML } from '../lib/seven-segment'
@@ -23,6 +23,13 @@ import { digitCellHTML } from '../lib/seven-segment'
  * `lib/seven-segment.ts` draws a real seven-segment digit (`check-seven-
  * segment.mjs` proves the table is genuine, not just plausible), and every
  * card here is a mounted plate: rivets, a recessed screen, real depth.
+ *
+ * In the shell the sign sits on paper: the plates keep their dark screens,
+ * the LEDs are mint and the hazard tape cobalt. Score is the headline "safe
+ * for", Feeds counts the four sources that have answered, Moves the rows
+ * read, and Best is the calmest stretch you have seen. When every row has
+ * been read the report is the ending — quietly, since it is a list of
+ * earthquakes and solar storms.
  */
 
 const GROUPS = [
@@ -93,17 +100,15 @@ const INFO: Record<string, InfoContent> = {
 }
 ---
 
-<GameLayout
+<GameShell
   slug="days-since-incident"
-  bar="#171907"
-  bodyClass="incident-body"
-  fonts={['Oswald:wght@500;600;700', 'Space+Mono:wght@400;700']}
+  labels={{ score: 'Safe for', best: 'Calmest', level: 'Feeds', moves: 'Rows read' }}
+  initial={{ score: '—', level: `0 / ${GROUPS.length}`, moves: `0 / ${GROUPS.reduce((n, g) => n + g.categories.length, 0)}` }}
 >
-  <div class="wrap">
+  <div class="dsi">
     <div class="tape" aria-hidden="true"></div>
 
     <header class="head">
-      <h1>Days Since Incident</h1>
       <p class="lede">
         The sign from a warehouse wall, except the incidents are real. Every
         number below is read <em>right now</em> from a live feed — not a
@@ -165,7 +170,7 @@ const INFO: Record<string, InfoContent> = {
                   <span class="odometer" data-fig aria-hidden="true" set:html={Array.from({ length: ROW_DIGITS }, () => digitCellHTML()).join('')} />
                   <div class="screen-glass" aria-hidden="true"></div>
                 </div>
-                <p class="visually-hidden" data-sr>Reading the sensors.</p>
+                <p class="sr-only" data-sr>Reading the sensors.</p>
                 <p class="row-detail" data-detail>&nbsp;</p>
               </li>
             ))}
@@ -195,18 +200,37 @@ const INFO: Record<string, InfoContent> = {
     </footer>
   </div>
 
-  <dialog id="infoDialog" class="info-dialog" aria-labelledby="infoTitle">
-    <button class="info-close" type="button" data-close aria-label="Close">&times;</button>
-    <h2 id="infoTitle" data-info-title></h2>
-    <p class="info-intro" data-info-intro></p>
-    <table class="info-table" data-info-table>
-      <tbody data-info-rows></tbody>
-    </table>
-    <p class="info-source">Data from <a data-info-source-link target="_blank" rel="noopener"><span data-info-source></span></a>.</p>
+  <dialog id="infoDialog" class="panel" aria-labelledby="infoTitle">
+    <p class="label meta">The scale</p>
+    <h2 id="infoTitle" data-info-title style="margin-top:10px"></h2>
+    <div class="panel-body">
+      <p class="info-intro" data-info-intro></p>
+      <table class="info-table" data-info-table>
+        <tbody data-info-rows></tbody>
+      </table>
+      <p class="info-source">Data from <a data-info-source-link target="_blank" rel="noopener"><span data-info-source></span></a>.</p>
+    </div>
+    <div class="panel-actions">
+      <button type="button" class="pill pill--hero" data-close><span>Close</span></button>
+    </div>
   </dialog>
 
   <script type="application/json" id="info-data" set:html={JSON.stringify(INFO)} />
-</GameLayout>
+
+  <Fragment slot="howto">
+    <p>
+      The "days since last accident" sign from a warehouse wall, except the
+      incidents are real: earthquakes from USGS, and solar flares, geomagnetic
+      storms and interplanetary shocks from NASA, read live from your browser.
+    </p>
+    <ul>
+      <li>The big counter is time since the most recent incident of any kind. Each row below is days since the last one at that strength or worse.</li>
+      <li>The <b>i</b> beside each group explains its scale.</li>
+      <li>A rare tier can take a few seconds longer, while the page looks further back for one.</li>
+    </ul>
+    <p>When every row has been read, the report is the end. Your best is the calmest stretch you have seen.</p>
+  </Fragment>
+</GameShell>
 
 <script>
   import {
@@ -216,6 +240,9 @@ const INFO: Record<string, InfoContent> = {
   } from '../lib/incident-model'
   import { loadFast, loadDeep, readCache, writeCache, type SourceResult, type DonkiKind } from '../lib/incident-fetch'
   import { segmentsFor, fitWidth, SEGMENT_KEYS } from '../lib/seven-segment'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+  import { recordPlay } from '../lib/stats'
 
   const rowEls = new Map(
     Array.from(document.querySelectorAll<HTMLLIElement>('.row')).map((el) => [el.dataset.cat!, el]),
@@ -227,7 +254,7 @@ const INFO: Record<string, InfoContent> = {
    *  seven `.seg` children between on/off, so a changed digit flickers
    *  exactly the way a real display does rather than the text silently
    *  becoming a different string. */
-  const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const prefersReducedMotion = !PLAY
   function setSegDigit(cell: HTMLElement, ch: string) {
     if (cell.dataset.v === ch) return
     const changed = cell.dataset.v !== undefined
@@ -290,6 +317,67 @@ const INFO: Record<string, InfoContent> = {
   function applyResult(cat: IncidentCategory, event: IncidentEvent | null, ok: boolean, pending: boolean) {
     state.set(cat.id, { event, ok, pending })
     paintRow(cat)
+    paintStrip()
+  }
+
+  /* ---- the shell ---------------------------------------------------------- */
+
+  // Restart is a reload, the default: reading every feed again is exactly
+  // what starting again means here.
+  const shell = createShell({ slug: 'days-since-incident' })
+  const GROUP_OF: Record<string, IncidentCategory[]> = {
+    quake: EARTHQUAKE_CATEGORIES, flare: FLARE_CATEGORIES, storm: STORM_CATEGORIES, shock: SHOCK_CATEGORIES,
+  }
+  /** "3 d 4 h", "5 h 12 m", "40 s": short enough for a score tile. */
+  function safeFor(ms: number) {
+    const { days, hours, minutes } = elapsedParts(Date.now(), Date.now() - ms)
+    if (days > 0) return `${days} d ${hours} h`
+    if (hours > 0) return `${hours} h ${minutes} m`
+    return minutes > 0 ? `${minutes} m` : `${Math.max(0, Math.floor(ms / 1000))} s`
+  }
+  /** The same span in words, for a sentence: "3 days and 4 hours", "43 minutes". */
+  function inWords(ms: number) {
+    const { days, hours, minutes } = elapsedParts(Date.now(), Date.now() - ms)
+    const n = (v: number, u: string) => `${v} ${u}${v === 1 ? '' : 's'}`
+    if (days > 0) return hours ? `${n(days, 'day')} and ${n(hours, 'hour')}` : n(days, 'day')
+    if (hours > 0) return minutes ? `${n(hours, 'hour')} and ${n(minutes, 'minute')}` : n(hours, 'hour')
+    return minutes > 0 ? n(minutes, 'minute') : 'under a minute'
+  }
+  const read = () => ALL_CATEGORIES.filter((c) => { const st = state.get(c.id)!; return !st.pending || !!st.event || !st.ok }).length
+  function paintStrip() {
+    shell.setLevel(`${Object.values(GROUP_OF).filter((list) => list.every((c) => { const st = state.get(c.id)!; return !st.pending || !!st.event || !st.ok })).length} / ${Object.keys(GROUP_OF).length}`)
+    shell.setMoves(`${read()} / ${ALL_CATEGORIES.length}`)
+  }
+
+  let reported = false
+  function maybeReport() {
+    if (reported || heroPending) return
+    if (ALL_CATEGORIES.some((c) => state.get(c.id)!.pending && !state.get(c.id)!.event)) return
+    reported = true
+    const calm = heroEvent ? Date.now() - heroEvent.time : 0
+    if (heroEvent) shell.considerBest(Math.round(calm / 1000), safeFor(calm))
+    // The row that has been quiet longest, for the one line worth reading.
+    let quietest: { cat: IncidentCategory; days: number } | null = null
+    for (const c of ALL_CATEGORIES) {
+      const ev = state.get(c.id)!.event
+      if (!ev) continue
+      const d = daysSince(Date.now(), ev.time)
+      if (!quietest || d > quietest.days) quietest = { cat: c, days: d }
+    }
+    recordPlay('days-since-incident', {}, {})
+    shell.win({
+      celebrate: false,
+      // The card waits below the sign; nobody reading a row needs yanking.
+      scroll: false,
+      kicker: 'Every sensor read',
+      title: heroEvent ? `The planet has been safe for ${inWords(calm)}.` : 'Nothing to report, for once.',
+      score: heroEvent ? safeFor(calm) : '—',
+      lines: [
+        heroEvent ? `The last incident: ${heroEvent.detail}.` : 'No confirmed incident turned up in any feed.',
+        quietest ? `Quietest row: ${quietest.cat.title}, ${quietest.days.toLocaleString('en-US')} days and counting.` : '',
+      ].filter(Boolean),
+      againLabel: 'Read the sensors again',
+    })
   }
 
   /* ---- the hero: the single most recent incident of any kind -------------- */
@@ -317,6 +405,8 @@ const INFO: Record<string, InfoContent> = {
     setOdometer(document.querySelector('[data-hero="minutes"]')!, String(minutes).padStart(2, '0'))
     setOdometer(document.querySelector('[data-hero="seconds"]')!, String(Math.max(0, seconds)).padStart(2, '0'))
     capEl.textContent = `Last: ${heroEvent.detail}`
+    // The tile only changes once a minute, so it is fine to tell it every tick.
+    shell.setScore(safeFor(Date.now() - heroEvent.time))
   }
   setInterval(tickHero, 1000)
   tickHero()
@@ -371,7 +461,9 @@ const INFO: Record<string, InfoContent> = {
     paintKind('GST', !cached)
     paintKind('IPS', !cached)
     recomputeHero()
+    heroPending = false
     tickHero()
+    maybeReport()
 
     if (!cached) {
       writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, deep }, now)
@@ -391,6 +483,7 @@ const INFO: Record<string, InfoContent> = {
       recomputeHero()
       tickHero()
       writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, deep }, now)
+      maybeReport()
     }
   }
 
@@ -430,56 +523,36 @@ const INFO: Record<string, InfoContent> = {
     })
   })
   dialog.querySelector('[data-close]')!.addEventListener('click', () => dialog.close())
+  // Not the shell's own panel, so P for pause should not fire while it is open.
   // A click on the ::backdrop lands on the <dialog> element itself (its box
   // is exactly the panel), so this only fires for a genuine outside click.
   dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close() })
 </script>
 
 <style>
-  :global(.incident-body) {
-    background: #0b0c03 radial-gradient(ellipse 90% 60% at 50% -10%, #1b2008 0%, #0b0c03 60%);
-    color: #eaf2c8;
-  }
-
-  .wrap {
-    max-width: 780px;
-    margin: 0 auto;
-    padding: 8px 20px 64px;
-    font-family: 'Oswald', sans-serif;
-    /* A faint printed-hazard watermark on the page itself, not just the tape —
-       barely there, the way a real warehouse wall has grime patterns rather
-       than a flat coat of paint. */
-    background-image: repeating-linear-gradient(45deg, rgba(212, 255, 61, 0.025) 0 2px, transparent 2px 34px);
-  }
+  /* The sign sits on paper. The plates keep their dark screens — they are
+     the picture — and the page around them is the design system's. */
+  .dsi { max-width: 780px; margin: 0 auto; }
 
   .tape {
     height: 13px;
-    margin: 0 -20px 22px;
-    background: repeating-linear-gradient(45deg, #d4ff3d 0 10px, #14160c 10px 20px);
+    margin: 0 0 22px;
+    border-radius: 3px;
+    background: repeating-linear-gradient(45deg, var(--cobalt) 0 10px, var(--ink) 10px 20px);
     box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.7), inset 0 -2px 3px rgba(0, 0, 0, 0.25);
   }
   .head + .hero { margin-top: 0; }
   .hero + .tape { margin-top: 26px; }
 
   .head { text-align: center; padding: 4px 0 22px; }
-  h1 {
-    margin: 0 0 10px;
-    font-size: clamp(28px, 6vw, 42px);
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-    color: #f4ffe0;
-    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
-  }
   .lede {
     margin: 0 auto;
     max-width: 46em;
-    font-family: 'Bricolage Grotesque', sans-serif;
-    font-size: 15px;
+    font-size: var(--fs-lead);
     line-height: 1.55;
-    color: #c9d8a4;
+    color: var(--ink2);
   }
-  .lede em { color: #d4ff3d; font-style: normal; }
+  .lede em { color: var(--ink); font-style: normal; font-weight: 700; }
 
   /* ---- mounted-plate chrome, shared by the hero and every row ------------- */
 
@@ -489,7 +562,7 @@ const INFO: Record<string, InfoContent> = {
     height: 9px;
     border-radius: 50%;
     background:
-      linear-gradient(135deg, #4a4d3c, #1c1e14) padding-box,
+      linear-gradient(135deg, #4a505c, #1a1d24) padding-box,
       conic-gradient(from 200deg, rgba(255, 255, 255, 0.5), transparent 40%, transparent 60%, rgba(255, 255, 255, 0.5)) border-box;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
   }
@@ -525,9 +598,9 @@ const INFO: Record<string, InfoContent> = {
     position: relative;
     text-align: center;
     padding: 26px 18px 24px;
-    border-radius: 16px;
-    background: linear-gradient(180deg, #1b1f0f, #0e100a);
-    border: 1px solid rgba(212, 255, 61, 0.14);
+    border-radius: var(--r-lg);
+    background: linear-gradient(180deg, #1a1d24, #0e1015);
+    border: 2px solid var(--ink);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.04),
       0 22px 46px -24px rgba(0, 0, 0, 0.85),
@@ -543,28 +616,25 @@ const INFO: Record<string, InfoContent> = {
     font-weight: 600;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: #9db06a;
+    color: #aab6c8;
   }
   .live-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #6bd44e;
-    box-shadow: 0 0 6px #6bd44e;
-    animation: incident-live 1.8s ease-in-out infinite;
+    background: var(--mint);
+    box-shadow: 0 0 6px var(--mint);
   }
+  :global(html.play) .live-dot { animation: incident-live 1.8s ease-in-out infinite; }
   @keyframes incident-live {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .live-dot { animation: none; }
   }
   .hero-screen {
     display: inline-block;
     padding: 14px clamp(10px, 3vw, 22px);
     background: #05060a;
-    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(212, 255, 61, 0.08);
+    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(79, 227, 193, 0.08);
   }
   .hero-clock {
     position: relative;
@@ -579,22 +649,20 @@ const INFO: Record<string, InfoContent> = {
   .hero-sep {
     align-self: center;
     margin-bottom: 0.5em;
-    font-family: 'Space Mono', monospace;
     font-size: clamp(20px, 6vw, 34px);
-    color: rgba(212, 255, 61, 0.35);
+    color: rgba(79, 227, 193, 0.35);
   }
   .hero-u {
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: #7c8f4c;
+    color: #8a93a3;
   }
   .hero-caption {
     margin: 16px 0 0;
-    font-family: 'Bricolage Grotesque', sans-serif;
-    font-size: 13px;
-    color: #a9bb75;
+    font-size: 14px;
+    color: #b7c0cd;
     min-height: 1.4em;
   }
 
@@ -621,12 +689,12 @@ const INFO: Record<string, InfoContent> = {
   }
   :global(.seg) {
     position: absolute;
-    background: var(--seg-off, rgba(212, 255, 61, 0.07));
+    background: var(--seg-off, rgba(79, 227, 193, 0.08));
     transition: background 140ms linear, box-shadow 140ms linear;
   }
   :global(.seg.on) {
-    background: var(--seg-on, #d4ff3d);
-    box-shadow: 0 0 0.08em var(--seg-on, #d4ff3d), 0 0 0.24em rgba(212, 255, 61, 0.55);
+    background: var(--seg-on, #4fe3c1);
+    box-shadow: 0 0 0.08em var(--seg-on, #4fe3c1), 0 0 0.24em rgba(79, 227, 193, 0.55);
   }
   :global(.seg-a), :global(.seg-g), :global(.seg-d) {
     left: 0.065em;
@@ -650,7 +718,7 @@ const INFO: Record<string, InfoContent> = {
   /* Still searching a rare tier's deeper window: a slow sweep of brightness
      crosses the blank digits left to right, rather than the row just
      sitting there looking broken. */
-  .odometer.scanning :global(.digit) { animation: incident-scan 1.8s ease-in-out infinite; }
+  :global(html.play) .odometer.scanning :global(.digit) { animation: incident-scan 1.8s ease-in-out infinite; }
   .odometer.scanning :global(.digit:nth-child(1)) { animation-delay: 0ms; }
   .odometer.scanning :global(.digit:nth-child(2)) { animation-delay: 120ms; }
   .odometer.scanning :global(.digit:nth-child(3)) { animation-delay: 240ms; }
@@ -665,6 +733,7 @@ const INFO: Record<string, InfoContent> = {
 
   .groups { display: flex; flex-direction: column; gap: 32px; }
   .group-head {
+    font-family: var(--sans);
     display: flex;
     align-items: center;
     gap: 9px;
@@ -673,42 +742,40 @@ const INFO: Record<string, InfoContent> = {
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #eaf2c8;
+    color: var(--ink);
   }
   .group-icon {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     flex: none;
-    color: #d4ff3d;
-    filter: drop-shadow(0 0 5px rgba(212, 255, 61, 0.3));
+    color: var(--t-teal);
   }
   .info-btn {
     flex: none;
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border-radius: 50%;
-    border: 1px solid rgba(212, 255, 61, 0.4);
-    background: rgba(212, 255, 61, 0.08);
-    color: #d4ff3d;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
+    border: 1.5px solid var(--ink);
+    background: var(--card);
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 13px;
     font-style: italic;
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
     transition: background 140ms, transform 140ms;
   }
-  .info-btn:hover { background: rgba(212, 255, 61, 0.22); transform: scale(1.1); }
+  .info-btn:hover { background: var(--ink); color: var(--ink-paper); }
   .info-btn:active { transform: scale(0.95); }
   .group-source {
     margin-left: auto;
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    font-weight: 400;
-    letter-spacing: 0.05em;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     text-transform: none;
-    color: #5f7038;
+    color: var(--ink3);
   }
 
   .rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -721,12 +788,10 @@ const INFO: Record<string, InfoContent> = {
     row-gap: 2px;
     padding: 16px 18px 13px;
     border-radius: 11px;
-    background: linear-gradient(180deg, #1a1d10, #14160d);
-    border: 1px solid rgba(212, 255, 61, 0.1);
-    box-shadow: 0 10px 22px -16px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    transition: border-color 160ms, transform 160ms;
+    background: linear-gradient(180deg, #1a1d24, #13151b);
+    border: 1px solid rgba(79, 227, 193, 0.1);
+    box-shadow: 0 10px 22px -16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
-  .row:hover { border-color: rgba(212, 255, 61, 0.28); transform: translateY(-1px); }
   .row .bolt-tl { top: 7px; left: 8px; }
   .row .bolt-tr { top: 7px; right: 8px; }
   .row .bolt { width: 6px; height: 6px; }
@@ -736,28 +801,26 @@ const INFO: Record<string, InfoContent> = {
     font-size: 14px;
     font-weight: 600;
     letter-spacing: 0.01em;
-    color: #eaf2c8;
+    color: #e6ebf2;
   }
   .row-threshold {
-    font-family: 'Space Mono', monospace;
-    font-size: 10.5px;
-    color: #6c7d40;
+    font-size: 12px;
+    color: #8a93a3;
   }
   .row-screen {
     grid-column: 2;
     grid-row: 1 / 3;
     padding: 5px 8px;
     background: #05060a;
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(212, 255, 61, 0.07);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(79, 227, 193, 0.07);
   }
   .row-screen .odometer { font-size: clamp(19px, 4.6vw, 25px); }
   .row-detail {
     grid-column: 1;
     margin: 4px 0 0;
-    font-family: 'Bricolage Grotesque', sans-serif;
-    font-size: 11.5px;
+    font-size: 12.5px;
     line-height: 1.4;
-    color: #7c8f4c;
+    color: #9aa3b2;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -771,74 +834,34 @@ const INFO: Record<string, InfoContent> = {
 
   /* ---- the info dialog ------------------------------------------------------ */
 
-  .info-dialog {
-    position: fixed;
-    margin: auto;
-    width: min(480px, calc(100vw - 32px));
-    max-height: min(560px, calc(100vh - 48px));
-    padding: 26px 24px 22px;
-    border: 1px solid rgba(212, 255, 61, 0.22);
-    border-radius: 16px;
-    background: linear-gradient(180deg, #1a1d10, #0f110a);
-    color: #eaf2c8;
-    font-family: 'Bricolage Grotesque', sans-serif;
-    box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.9);
-  }
-  .info-dialog::backdrop { background: rgba(4, 5, 1, 0.72); backdrop-filter: blur(2px); }
-  .info-dialog h2 {
-    margin: 0 0 8px;
-    padding-right: 24px;
-    font-family: 'Oswald', sans-serif;
-    font-size: 20px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: #f4ffe0;
-  }
-  .info-intro { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: #b7c68f; }
-  .info-close {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 0;
-    background: rgba(255, 255, 255, 0.06);
-    color: #c9d8a4;
-    font-size: 17px;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .info-close:hover { background: rgba(255, 255, 255, 0.14); }
+  .info-intro { margin: 0 0 14px; }
   /* The rows/cells here are appended by the info-button script (dialog.rowsEl
      is built from `content.rows`, not written in this template), so every
      rule that must reach them is `:global` — the same set:html trap as the
      odometer digits above. */
-  .info-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .info-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .info-table.empty { display: none; }
   :global(.info-table td) {
     padding: 7px 4px 7px 10px;
-    border-top: 1px solid rgba(212, 255, 61, 0.08);
+    border-top: 1px solid var(--paper3);
     border-left: 3px solid color-mix(in oklab, #d4302e calc(var(--tier, 0) * 20%), #6fae2e);
     vertical-align: top;
   }
-  :global(.info-range) { white-space: nowrap; font-family: 'Space Mono', monospace; font-size: 11.5px; color: #eaf2c8; padding-right: 12px !important; }
-  :global(.info-effect) { color: #b7c68f; line-height: 1.4; }
-  .info-source { margin: 14px 0 0; font-size: 11.5px; color: #6c7d40; }
-  .info-source a { color: #9db06a; }
+  :global(.info-range) { white-space: nowrap; font-weight: 700; color: var(--ink); padding-right: 12px !important; }
+  :global(.info-effect) { color: var(--ink2); line-height: 1.4; }
+  .info-source { margin: 14px 0 0; font-size: 13px; color: var(--ink2); }
+  .info-source a { color: var(--t-cobalt); }
 
   /* ---- footer ---------------------------------------------------------------- */
 
   .foot {
     margin-top: 34px;
     padding-top: 20px;
-    border-top: 1px dashed rgba(212, 255, 61, 0.16);
-    font-family: 'Bricolage Grotesque', sans-serif;
-    font-size: 12.5px;
+    border-top: 1.5px dashed var(--paper3);
+    font-size: 14px;
     line-height: 1.6;
-    color: #7c8f4c;
+    color: var(--ink2);
   }
-  .foot a { color: #b7d16f; }
+  .foot a { color: var(--t-cobalt); }
   .foot-small { margin-top: 10px; opacity: 0.85; }
 </style>

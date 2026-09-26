@@ -2452,7 +2452,29 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     Fixed on the way: "the median us worker" — the wage line lowercased a
     whole label, acronym and all.
 
-51. Then reassess again.
+51. ~~**Paper & Ink, phase 9: Days Since Incident and Who Was Alive.**~~ **done.**
+
+    Two instruments on paper, both of them warm-themed until now.
+
+    **Days Since Incident** keeps its sign — the bolted plates, the recessed
+    screens, the real seven-segment digits — but the LEDs are mint instead
+    of lime and the hazard tape cobalt and ink. Score is the headline "safe
+    for", Feeds counts the sources that have answered, Moves the rows read,
+    Best the calmest stretch you have seen, and once every row is read the
+    report is a quiet ending that waits below the sign rather than pulling
+    the page to it. It names the quietest row (on the day of the port, the
+    last G5 storm, 868 days before). The info panels are the shell's own
+    paper dialogs.
+
+    **Who Was Alive** had no goal, so it has one: meet everyone. Moves counts
+    the people you have seen alive in some year you set; all 89 is the
+    ending, and clicking a bar goes to that person's birth year, so nobody
+    is out of reach. Score is how many are alive on the counter's year and
+    Best is the most you have found at once. The brass counter is steel on a
+    slate plate, the parchment is white, and the needle's light is sky blue;
+    the category colours on the chart stay, since they are the data.
+
+52. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
