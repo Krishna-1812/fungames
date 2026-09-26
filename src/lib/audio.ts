@@ -12,13 +12,16 @@
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
-let muted = false
+// Sound is off until someone turns it on, and the choice is remembered. A
+// page that starts making noise the moment you click anything is the fastest
+// way to get a tab closed.
+let muted = true
 const MUTE_KEY = 'sound:muted'
 
 try {
-  muted = localStorage.getItem(MUTE_KEY) === '1'
+  muted = localStorage.getItem(MUTE_KEY) !== '0'
 } catch {
-  /* private mode — default to sound on */
+  /* private mode — stays off */
 }
 
 function ac(): AudioContext | null {

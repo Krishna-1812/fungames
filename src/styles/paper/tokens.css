@@ -1,0 +1,77 @@
+/*
+ * Paper & Ink — design tokens.
+ *
+ * Every page built on the Paper layout reads its colour, type, shape and
+ * motion from here and nowhere else. The rules these values encode are in
+ * ./README.md; the short version is: warm paper ground, white cards, colour
+ * only ever as a whole block with ink on it, and a single highlighter.
+ */
+:root {
+  /* ---- ground and ink ------------------------------------------------ */
+  --paper: #f1efed;
+  --paper2: #ebe9e5;
+  --paper3: #dbd7d1;
+  --card: #ffffff;
+  --ink: #121213;
+  --ink2: #444444;
+  --ink3: #6f6b66;
+  --ink-paper: #f6f4f0;
+
+  /* ---- block colours: FILLS ONLY, never text on paper ----------------- */
+  --orange: #ff6022;
+  --orange-hi: #ff7a45;
+  --amber: #ffb500;
+  --sky: #8ccbff;
+  --red: #ff3b30;
+  --sun: #ff9100;
+  --marker: linear-gradient(90deg, #ff6022 0%, #ff8b5d 100%);
+
+  /* ---- text-safe shades for coloured text on paper or card ------------ */
+  --t-orange: #b83c0c;
+  --t-red: #c8261b;
+  --t-blue: #1d65a6;
+  --t-amber: #8a5a00;
+  --t-green: #17753f;
+
+  /* ---- type ------------------------------------------------------------ */
+  --display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --sans: 'Zalando Sans', 'Helvetica Neue', Arial, system-ui, sans-serif;
+  --display-axes: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+
+  --fs-hero: clamp(46px, 8.6vw, 128px);
+  --fs-h1: clamp(38px, 6vw, 88px);
+  --fs-h2: clamp(31px, 4.4vw, 62px);
+  --fs-h3: clamp(23px, 2.4vw, 34px);
+  --fs-lead: clamp(17px, 1.35vw, 21px);
+  --fs-body: 16px;
+  --fs-small: 14px;
+  --fs-label: 12px;
+  --prose: 64ch;
+
+  /* ---- shape and depth ------------------------------------------------ */
+  --r: 16px;
+  --r-lg: 24px;
+  --r-pill: 999px;
+  --shadow-block: 0 20px 40px rgba(0, 0, 0, 0.08);
+  --shadow-pill: 0 8px 20px rgba(0, 0, 0, 0.2);
+
+  /* ---- layout --------------------------------------------------------- */
+  --s1: 8px;
+  --s2: 16px;
+  --s3: 24px;
+  --s4: 32px;
+  --s5: 48px;
+  --s6: 64px;
+  --section: clamp(72px, 9vw, 148px);
+  --max: 1340px;
+  --gutter: clamp(20px, 5.2vw, 84px);
+
+  /* ---- motion --------------------------------------------------------- */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --glide: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --t-reveal: 620ms;
+  --t-mid: 380ms;
+  --t-fast: 200ms;
+}

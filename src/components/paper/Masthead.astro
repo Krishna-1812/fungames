@@ -1,0 +1,19 @@
+---
+import { SITE } from '../../site.config'
+import { withBase } from '../../lib/base'
+---
+
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <a class="lockup" href={withBase('/')}>
+      <span class="dot" aria-hidden="true"></span>
+      <span>{SITE.name}</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav-hide" href={withBase('/#games')}>Games</a>
+      <a class="nav-hide" href={withBase('/#daily')}>Daily</a>
+      <a class="nav-hide" href={withBase('/#how')}>How it works</a>
+      <a class="pill pill--ink pill--sm" href={withBase('/#games')}><span>Play</span></a>
+    </nav>
+  </div>
+</header>

@@ -1,550 +1,338 @@
 ---
-import Base from '../layouts/Base.astro'
-import Backdrop from '../components/Backdrop.astro'
-import GameTile from '../components/GameTile.astro'
+import fs from 'node:fs'
+import Paper from '../layouts/Paper.astro'
 import TileArt from '../components/TileArt.astro'
-import AdSlot from '../components/AdSlot.astro'
 import { SITE } from '../site.config'
-import { listedGames, gamesByCategory } from '../data/games'
-import { iconSvg } from '../lib/icons'
+import { listedGames, CATEGORIES } from '../data/games'
+import { META, SHELL_GAMES, dailyFor } from '../data/game-meta'
+import { inkIcon } from '../lib/ink-icon'
 import { withBase } from '../lib/base'
 
-// Newest first, the same ordering neal.fun uses.
+// Newest first. The two games already in the shared shell lead the deck,
+// because they are the ones that look like the page you are on.
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
-const sections = gamesByCategory()
+const count = games.length
+const CHIP: Record<string, string> = { science: 'Real science', you: 'Measures you', money: 'Money', fun: 'Just because' }
+const catLabel = CHIP
 
-// The hero spotlight used to be one hardcoded game (Orbit, named in the
-// markup itself). It rotates through the three newest instead now, so it
-// stays current the moment a new game is added rather than on the next
-// person who remembers to update a string.
-const hero = games.slice(0, 3)
-
-// A running index across every section combined, not reset per category —
-// GameTile uses it to seed each tile's toss angle and stagger delay, and
-// resetting per section would give the first card of every section the
-// same angle and the same animation timing.
-let tileIndex = 0
-
-// Four hand-drawn confetti shapes, cycled by index rather than authored once
-// per game — the point is variety in the scatter, not a meaningful mapping.
-const SHAPES = [
-  '<circle cx="8" cy="8" r="6.5"/>',
-  '<path d="M8 0 10 5.6 16 8 10 10.4 8 16 6 10.4 0 8 6 5.6Z"/>',
-  '<path d="M1.5 9 Q5 2 8 9 T14.5 9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
-  '<path d="M6.7 0h2.6v6.7H16v2.6H9.3V16H6.7V9.3H0V6.7h6.7Z"/>',
+const shellFirst = [
+  ...games.filter((g) => SHELL_GAMES.has(g.slug)),
+  ...games.filter((g) => !SHELL_GAMES.has(g.slug)),
 ]
-// Deterministic pseudo-random rotation per dot, so the scatter looks tossed
-// rather than laid out in a grid but never reflows between builds.
-const confetti = games.map((g, i) => ({
-  shape: SHAPES[i % SHAPES.length],
-  rot: ((i * 47) % 13) - 6,
-  color: g.accent2,
-}))
+const deck = shellFirst.slice(0, 5)
+const featured = deck[0]
+
+// Four block colours rotate by card slot; each card floods with the one two
+// steps along, so the flood is always a real change of colour.
+const SLOTS = ['orange', 'amber', 'sky', 'red'] as const
+const DECK_BLOCKS = ['orange', 'sky', 'amber', 'red', 'orange'] as const
+
+// A real count, read at build time rather than typed: every model on the
+// site has a checker in scripts/, and check-all runs all of them.
+const checks = fs.readdirSync('scripts').filter((f) => /^check-.+\.mjs$/.test(f) && f !== 'check-all.mjs').length
+
+const daily = dailyFor(new Date())
+const dailyGame = games.find((g) => g.slug === daily.slug)!
 ---
 
-<Base title={SITE.name} description={SITE.description} image={withBase('/og-home.png')}>
-  <Backdrop variant="paper" />
-  <div class="wrap">
-    <header class="masthead">
-      <h1 class="wordmark">{SITE.name}</h1>
-      <svg class="squiggle" viewBox="0 0 220 16" aria-hidden="true" focusable="false">
-        <path d="M4 10 Q 30 1, 56 10 T 108 10 T 160 10 T 212 10" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" />
-      </svg>
-      <p class="tagline">{SITE.tagline}</p>
-      {/* A colour and shape per game, borrowed straight from its own tile —
-          a preview of the variety below rather than decoration for its own
-          sake. Shapes are tossed at a small fixed angle, like stickers. */}
-      <div class="confetti" aria-hidden="true">
-        {confetti.map((c, i) => (
-          <span style={`--c:${c.color}; --i:${i}; --r:${c.rot}deg`}>
-            <svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" set:html={c.shape} />
-          </span>
-        ))}
-      </div>
-    </header>
-
-    <main id="main">
-      {/* The spotlight used to be one game, named in the markup. It cycles
-          through the three newest instead — real data, not a hardcoded
-          favourite — crossfading on a timer and pausable by hovering,
-          focusing, or just clicking a dot. */}
-      <section class="hero" aria-roledescription="carousel" aria-label="Featured games" id="hero">
-        {hero.map((game, i) => (
-          <article class="hero-slide" data-i={i} aria-hidden={i === 0 ? 'false' : 'true'}>
-            <div class="hero-copy">
-              <p class="hero-label">JUST ADDED <span>{i + 1} / {hero.length}</span></p>
-              <h2>{game.title}</h2>
-              <p class="hero-description">{game.description}</p>
-              <div class="hero-links">
-                <a class="hero-play" href={withBase(`/${game.slug}/`)}>Play {game.title} <span aria-hidden="true">↗</span></a>
-                <a href="#collection">Explore all {games.length} games <span aria-hidden="true">↓</span></a>
-              </div>
-            </div>
-            <div class="hero-art" aria-hidden="true"><TileArt slug={game.slug} seed={i + 1} /></div>
-          </article>
-        ))}
-        <div class="hero-dots" aria-label="Choose a featured game">
-          {hero.map((game, i) => (
-            <button type="button" data-i={i} aria-pressed={i === 0 ? 'true' : 'false'} aria-label={`Show ${game.title}`}></button>
-          ))}
-        </div>
-      </section>
-
-      <div class="collection-head" id="collection">
-        <h2>Follow your curiosity.</h2>
-        <p>{games.length} little worlds, sorted by what they actually do — no right place to start.</p>
-        <label class="filter">
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13.3 13.3 18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <input type="search" id="gameSearch" autocomplete="off" spellcheck="false" placeholder="Search by name or idea…" aria-label="Filter the games below" />
-          <span id="filterCount" aria-live="polite">{games.length} of {games.length}</span>
-        </label>
-      </div>
-
-      {sections.map((section) => (
-        <section class="category" data-category={section.key}>
-          <div class="category-head">
-            <span class="category-tab">{section.label}</span>
-            <p>{section.note}</p>
-          </div>
-          <div class="grid">
-            {section.games.map((game) => {
-              const i = tileIndex++
-              return (
-                <div
-                  class="tile-slot"
-                  data-search={`${game.title} ${game.blurb} ${game.description}`.toLowerCase()}
-                >
-                  <GameTile game={game} index={i} />
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      ))}
-    </main>
-
-    <script>
-      import { sfx, unlock } from '../lib/audio'
-      import { prefersReducedMotion } from '../lib/gl'
-
-      // A soft blip on hover, pitched by position in the grid, so running the
-      // cursor across the page plays a little scale.
-      document.querySelectorAll<HTMLAnchorElement>('.tile').forEach((t, i) => {
-        t.addEventListener('pointerenter', () => sfx.blip(i % 10))
-        t.addEventListener('click', () => sfx.pop(i % 8))
-      })
-      addEventListener('pointerdown', unlock, { once: true, capture: true })
-      addEventListener('keydown', unlock, { once: true, capture: true })
-
-      /* Lighting and tilt for the whole grid from one delegated listener.
-         Fifteen per-tile listeners would each fire on every pointer move; this
-         fires once and only touches the tile actually under the cursor.
-
-         Writes are batched into a rAF so a fast sweep across the grid cannot
-         force more than one style recalculation per frame. */
-      const grids = document.querySelectorAll<HTMLElement>('.grid')
-      for (const grid of grids) {
-        let pending: { el: HTMLElement; x: number; y: number } | null = null
-        let queued = false
-
-        const flush = () => {
-          queued = false
-          if (!pending) return
-          const { el, x, y } = pending
-          el.style.setProperty('--mx', `${x * 100}%`)
-          el.style.setProperty('--my', `${y * 100}%`)
-          // -1..1 from centre, used by the art parallax.
-          el.style.setProperty('--px', `${x * 2 - 1}`)
-          el.style.setProperty('--py', `${y * 2 - 1}`)
-          if (!prefersReducedMotion) {
-            // Small angles on purpose. Past about 6° the text edges alias and
-            // the card starts to read as a gimmick rather than as a surface.
-            const rx = (0.5 - y) * 7
-            const ry = (x - 0.5) * 7
-            el.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-5px) scale(1.01)`
-          }
-        }
-
-        grid.addEventListener(
-          'pointermove',
-          (e) => {
-            const el = (e.target as HTMLElement).closest<HTMLElement>('.tile')
-            if (!el) return
-            const r = el.getBoundingClientRect()
-            pending = { el, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }
-            if (!queued) { queued = true; requestAnimationFrame(flush) }
-          },
-          { passive: true },
-        )
-
-        grid.addEventListener(
-          'pointerleave',
-          () => {
-            pending = null
-            for (const el of grid.querySelectorAll<HTMLElement>('.tile')) el.style.transform = ''
-          },
-          { passive: true },
-        )
-
-        // A tile left tilted after the pointer jumps straight from one card to
-        // another would stay stuck, so reset on the way out of each.
-        grid.addEventListener(
-          'pointerout',
-          (e) => {
-            const el = (e.target as HTMLElement).closest<HTMLElement>('.tile')
-            const to = (e as PointerEvent).relatedTarget as HTMLElement | null
-            if (el && (!to || !el.contains(to))) el.style.transform = ''
-          },
-          { passive: true },
-        )
-      }
-
-      /* ------------------------------------------------------------- hero */
-
-      const heroEl = document.getElementById('hero')
-      if (heroEl) {
-        const slides = [...heroEl.querySelectorAll<HTMLElement>('.hero-slide')]
-        const dots = [...heroEl.querySelectorAll<HTMLButtonElement>('.hero-dots button')]
-        let active = 0
-        let timer = 0
-
-        function show(i: number) {
-          active = (i + slides.length) % slides.length
-          slides.forEach((s, j) => {
-            s.classList.toggle('active', j === active)
-            s.setAttribute('aria-hidden', j === active ? 'false' : 'true')
-          })
-          dots.forEach((d, j) => d.setAttribute('aria-pressed', j === active ? 'true' : 'false'))
-        }
-        slides[0]?.classList.add('active')
-
-        function restart() {
-          clearInterval(timer)
-          // A carousel that keeps moving on its own is exactly the motion
-          // prefers-reduced-motion asks for less of — it still responds to a
-          // deliberate click on a dot, it just never advances by itself.
-          if (prefersReducedMotion || slides.length < 2) return
-          timer = window.setInterval(() => show(active + 1), 5200)
-        }
-
-        dots.forEach((d, i) => d.addEventListener('click', () => { show(i); restart(); unlock(); sfx.click() }))
-        heroEl.addEventListener('pointerenter', () => clearInterval(timer))
-        heroEl.addEventListener('pointerleave', restart)
-        heroEl.addEventListener('focusin', () => clearInterval(timer))
-        heroEl.addEventListener('focusout', restart)
-        document.addEventListener('visibilitychange', () => {
-          if (document.hidden) clearInterval(timer)
-          else restart()
-        })
-        restart()
-      }
-
-      /* ----------------------------------------------------------- filter */
-
-      const search = document.getElementById('gameSearch') as HTMLInputElement | null
-      const countEl = document.getElementById('filterCount')
-      const slots = [...document.querySelectorAll<HTMLElement>('.tile-slot')]
-      const categorySections = [...document.querySelectorAll<HTMLElement>('.category')]
-      const TOTAL = slots.length
-
-      function applyFilter() {
-        const q = (search?.value ?? '').trim().toLowerCase()
-        let shown = 0
-        for (const slot of slots) {
-          const hit = !q || (slot.dataset.search ?? '').includes(q)
-          slot.hidden = !hit
-          if (hit) shown++
-        }
-        // A section with nothing left in it is a heading over an empty grid,
-        // which reads as broken rather than as "no matches here."
-        for (const section of categorySections) {
-          const anyVisible = section.querySelectorAll('.tile-slot:not([hidden])').length > 0
-          section.hidden = !anyVisible
-        }
-        if (countEl) countEl.textContent = q ? `${shown} of ${TOTAL}` : `${TOTAL} of ${TOTAL}`
-      }
-      search?.addEventListener('input', applyFilter)
-    </script>
-
-    <section class="about">
-      <span class="tape" aria-hidden="true"></span>
-      <p class="about-lead">Hi. This is where I make things for the web.</p>
-      <p class="about-sub">
-        Everything here is free, works without an account, and fits on one page.
-      </p>
-      <div class="links">
-        {SITE.buyMeACoffee && (
-          <a
-            class="btn coffee-btn"
-            href={`https://www.buymeacoffee.com/${SITE.buyMeACoffee}`}
-            target="_blank"
-            rel="noopener"
-          >
-            <span class="coffee-icon" set:html={iconSvg('coffee')} />
-            Buy me a coffee
+<Paper title={`${SITE.name} — small games, real maths`} description={SITE.description} image={withBase('/og-home.png')}>
+  <main id="main" class="page-top">
+    {/* ---- hero ------------------------------------------------------- */}
+    <section class="wrap hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="label meta" data-decode>{count} small games · no sign-up · all in your browser</p>
+        <h1 id="hero-title" class="t-hero has-marker" data-reveal="lines" data-springy>
+          <span class="mask-line" style="--line:0"><span>Tiny games,</span></span>
+          <span class="mask-line" style="--line:1"><span><em class="wonk">wildly</em></span></span>
+          <span class="mask-line" style="--line:2"><span><span class="marker" data-draw>overthought.</span></span></span>
+        </h1>
+        <p class="lead">
+          Rule puzzles, auctions, falling asteroids and the whole history of the
+          internet — {count} of them, each built on real maths and checked
+          against real answers. Nothing to install. Pick one and it starts.
+        </p>
+        <div class="hero-actions">
+          <a class="pill pill--hero" href={withBase(`/${featured.slug}/`)} data-confetti>
+            <span>Play now</span><span class="arrow" aria-hidden="true">→</span>
           </a>
-        )}
-        <button type="button" class="btn" id="lucky">Surprise me</button>
-        {SITE.social.twitter && <a class="btn" href={SITE.social.twitter}>Twitter</a>}
-        {SITE.social.instagram && <a class="btn" href={SITE.social.instagram}>Instagram</a>}
-        {SITE.social.newsletter && <a class="btn" href={SITE.social.newsletter}>Newsletter</a>}
-        <a class="btn" href={`mailto:${SITE.email}`}>Say hello</a>
+          <a class="pill pill--line" href="#games"><span>Browse all {count}</span></a>
+        </div>
+      </div>
+
+      <div class="deck" data-settle role="group" aria-label="Featured games">
+        {deck.map((g, k) => (
+          <a
+            class={`deck-card b-${DECK_BLOCKS[k]}`}
+            href={withBase(`/${g.slug}/`)}
+            style={`--k:${k}`}
+            tabindex={k === 0 ? 0 : -1}
+            aria-hidden={k === 0 ? 'false' : 'true'}
+            draggable="false"
+          >
+            <span class="label">
+              <span>{SHELL_GAMES.has(g.slug) ? 'New shell' : catLabel[g.category]}</span>
+              <span>{META[g.slug]?.difficulty}</span>
+            </span>
+            <span class="deck-art" aria-hidden="true" style={`background:linear-gradient(142deg, ${g.accent}, ${g.accent2})`}><TileArt slug={g.slug} seed={k + 2} /></span>
+            <span class="deck-head">
+              <span class="deck-icon" aria-hidden="true" set:html={inkIcon(META[g.slug]?.icon ?? 'die')} />
+            </span>
+            <h3>{g.title}</h3>
+            <p>{g.blurb}</p>
+          </a>
+        ))}
       </div>
     </section>
 
-    <AdSlot slot="" />
+    {/* ---- ticker ----------------------------------------------------- */}
+    <div class="ticker" role="group" aria-label="Every game on the site">
+      <div class="ticker-track">
+        <div class="ticker-run">
+          {games.map((g) => <span class="ticker-item">{g.title}</span>)}
+        </div>
+        <div class="ticker-run ticker-dup" aria-hidden="true">
+          {games.map((g) => <span class="ticker-item">{g.title}</span>)}
+        </div>
+      </div>
+    </div>
 
-    <script>
-      // "Surprise me" is the neal.fun move: no menus, just take me somewhere —
-      // but only somewhere the current search would actually show, so it
-      // never contradicts what you just typed.
-      document.getElementById('lucky')?.addEventListener('click', () => {
-        const visible = [...document.querySelectorAll<HTMLElement>('.tile-slot:not([hidden]) .tile')] as HTMLAnchorElement[]
-        const pool = visible.length ? visible : [...document.querySelectorAll<HTMLAnchorElement>('.tile')]
-        const t = pool[(Math.random() * pool.length) | 0]
-        if (t) location.href = t.getAttribute('href')!
-      })
-    </script>
+    {/* ---- directory -------------------------------------------------- */}
+    <section class="wrap section" id="games" aria-labelledby="games-title">
+      <div class="dir-head">
+        <div>
+          <p class="label meta" data-decode>The directory</p>
+          <h2 id="games-title" data-reveal="lines" style="margin-top:14px">
+            <span class="mask-line" style="--line:0"><span>Pick a game.</span></span>
+            <span class="mask-line" style="--line:1"><span>Any <em class="wonk">game</em>.</span></span>
+          </h2>
+        </div>
+        <p class="lead">
+          Sorted by what they actually do. Two of them already live in the new
+          shell — scores, bests and all — and the rest move over two at a time.
+        </p>
+      </div>
+      <hr class="rule-line" data-reveal style="margin-top:40px" />
 
-    <footer class="foot">
-      <span>{games.length} things to play</span>
-      <span aria-hidden="true">·</span>
-      <span>Built to be beautiful and fast</span>
-    </footer>
-  </div>
-</Base>
+      <div class="dir-controls">
+        <div class="chips" role="group" aria-label="Filter games">
+          <button type="button" class="pill chip" data-filter="all" aria-pressed="true"><span>All</span></button>
+          <button type="button" class="pill chip" data-filter="shell" aria-pressed="false"><span>New shell</span></button>
+          {CATEGORIES.map((c) => (
+            <button type="button" class="pill chip" data-filter={c.key} aria-pressed="false"><span>{CHIP[c.key]}</span></button>
+          ))}
+        </div>
+        <label class="search">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6.2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M13.2 13.2 18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          <span class="sr-only">Search games</span>
+          <input type="search" id="q" autocomplete="off" spellcheck="false" placeholder="Search by name or idea" />
+          <span class="count" id="count" aria-live="polite">{count} games</span>
+        </label>
+      </div>
 
-<style>
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 22px 72px; }
+      <ul class="grid" role="list" id="grid">
+        {games.map((g, i) => {
+          const slot = i % 4
+          const meta = META[g.slug]
+          const inShell = SHELL_GAMES.has(g.slug)
+          return (
+            <li
+              class="gcard-slot"
+              data-slug={g.slug}
+              data-cat={g.category}
+              data-shell={inShell ? '1' : '0'}
+              data-search={`${g.title} ${g.blurb} ${g.description}`.toLowerCase()}
+            >
+              <a
+                class={`gcard b-${SLOTS[slot]}`}
+                href={withBase(`/${g.slug}/`)}
+                style={`--flood:var(--${SLOTS[(slot + 2) % 4]}); --cover:linear-gradient(142deg, ${g.accent}, ${g.accent2})`}
+              >
+                <div class="gcard-art" data-reveal="wipe" aria-hidden="true">
+                  <div class="wipe gcard-art-inner"><TileArt slug={g.slug} seed={i + 1} /></div>
+                </div>
+                <div class="gcard-row">
+                  <span class="gcard-icon" aria-hidden="true" set:html={inkIcon(meta?.icon ?? 'die')} />
+                  <span class={`tag${inShell ? ' is-solid' : ''}`}>{inShell ? '✓ ' : ''}{meta?.difficulty ?? 'Explore'}</span>
+                </div>
+                <h3>{g.title}</h3>
+                <p>{g.blurb}</p>
+                <div class="gcard-foot">
+                  <span class="gcard-best">
+                    <span class="label">Best</span>
+                    <span class="num" data-best={g.slug}>—</span>
+                  </span>
+                  <span class="gcard-go" aria-hidden="true">→</span>
+                </div>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+      <p class="empty" id="empty" hidden>Nothing matches that. Try a shorter word.</p>
+    </section>
 
-  .masthead { text-align: center; margin-bottom: 46px; }
-  .wordmark {
-    font-size: clamp(38px, 7vw, 62px);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    margin: 0;
-    animation: rise-in 620ms var(--ease) backwards;
-  }
-  .tagline {
-    font-size: clamp(15px, 2vw, 18px);
-    color: var(--ink-soft);
-    margin: 10px 0 0;
-    animation: rise-in 620ms var(--ease) 70ms backwards;
-  }
+    {/* ---- daily challenge: the ink band, opening like a portal ------- */}
+    <section class="wrap section" id="daily" aria-labelledby="daily-title">
+      <div class="portal">
+        <div class="portal-inner block b-ink band on-ink">
+          <div>
+            <p class="label" data-decode>Daily challenge</p>
+            <h2 id="daily-title" data-reveal="lines">
+              <span class="mask-line" style="--line:0"><span>One game.</span></span>
+              <span class="mask-line" style="--line:1"><span>One <em class="wonk">day</em>.</span></span>
+            </h2>
+            <p class="lead" id="dailyGoal">{daily.goal}</p>
+            <div class="band-actions">
+              <a class="pill pill--hero" id="dailyGo" href={withBase(`/${daily.slug}/`)} data-confetti>
+                <span>Take it on</span><span class="arrow" aria-hidden="true">→</span>
+              </a>
+              <a class="pill pill--line" href="#games"><span>Another game</span></a>
+            </div>
+          </div>
+          <div class="band-card block b-amber">
+            <p class="label">Today's game</p>
+            <h3 id="dailyName">{dailyGame.title}</h3>
+            <dl>
+              <div><dt class="label">Your best</dt><dd><span class="num" id="dailyBest">—</span></dd></div>
+              <div><dt class="label">Finished</dt><dd><span class="num" id="dailyPlays">0</span></dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
 
-  /* A hand-drawn underline, drawn on rather than faded in — the same
-     stroke-dasharray technique From Memory's reveal uses, just simple enough
-     here to not need the JS that drives that one. */
-  .squiggle {
-    display: block;
-    width: 150px;
-    height: 12px;
-    margin: 8px auto 0;
-    overflow: visible;
-    color: #ff6a3d;
-  }
-  .squiggle path {
-    stroke-dasharray: 260;
-    stroke-dashoffset: 260;
-    animation: draw 640ms var(--ease) 540ms forwards;
-  }
-  @keyframes draw { to { stroke-dashoffset: 0; } }
+    {/* ---- how it works ---------------------------------------------- */}
+    <section class="wrap section" id="how" aria-labelledby="how-title">
+      <p class="label meta" data-decode>How it works</p>
+      <h2 id="how-title" data-reveal="lines" style="margin-top:14px">
+        <span class="mask-line" style="--line:0"><span>Everything runs</span></span>
+        <span class="mask-line" style="--line:1"><span><em class="wonk">here</em>, in this tab.</span></span>
+      </h2>
+      <div class="stats">
+        <div class="stat">
+          <span class="num" data-odo={String(count)}>{count}</span>
+          <span class="label">Games</span>
+          <p>Each one a single page, loading only the code it needs.</p>
+        </div>
+        <div class="stat">
+          <span class="num" data-odo={String(checks)}>{checks}</span>
+          <span class="label">Automated checks</span>
+          <p>Every model is tested against answers somebody else already knows.</p>
+        </div>
+        <div class="stat">
+          <span class="num" data-odo="0">0</span>
+          <span class="label">Accounts needed</span>
+          <p>Scores stay in this browser. Nothing is sent anywhere.</p>
+        </div>
+        <div class="stat">
+          <span class="num" id="myPlays">0</span>
+          <span class="label">Games you've finished</span>
+          <p>Counted on this device, from the games that have an ending.</p>
+        </div>
+      </div>
+    </section>
 
-  /* A shape and colour per game, tossed at a small fixed angle and given a
-     lazy independent float — the confetti is a preview of the grid, not
-     decoration for its own sake. */
-  .confetti {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 22px;
-    padding: 0 20px;
-  }
-  .confetti span {
-    display: block;
-    width: 15px;
-    height: 15px;
-    color: var(--c);
-    filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--c) 55%, transparent));
-    animation-name: wiggle-in, bob;
-    animation-duration: 420ms, 3.4s;
-    animation-timing-function: var(--ease-bounce), ease-in-out;
-    animation-fill-mode: backwards, none;
-    animation-iteration-count: 1, infinite;
-    animation-delay: calc(220ms + var(--i) * 26ms), calc(640ms + var(--i) * 90ms);
-  }
-  .confetti span svg { display: block; width: 100%; height: 100%; }
-  @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
+    {/* ---- closing call to action ------------------------------------ */}
+    <section class="wrap section">
+      <div class="block b-sky cta" data-settle>
+        <div>
+          <h2 data-reveal="lines">
+            <span class="mask-line" style="--line:0"><span>Can't <em class="wonk">choose</em>?</span></span>
+            <span class="mask-line" style="--line:1"><span>Let the page.</span></span>
+          </h2>
+          <p class="lead">One of {count}, picked at random. No take-backs.</p>
+        </div>
+        <a class="pill pill--hero" id="surprise" href={withBase(`/${games[0].slug}/`)} data-confetti>
+          <span>Surprise me</span><span class="arrow" aria-hidden="true">→</span>
+        </a>
+      </div>
+    </section>
+  </main>
 
-  /* ------------------------------------------------------------ hero ---- */
+  <script type="application/json" id="dir-data" set:html={JSON.stringify({ slugs: games.map((g) => g.slug), daily: daily.slug })} />
+</Paper>
 
-  .hero {
-    position: relative; isolation: isolate; overflow: hidden; min-height: 390px;
-    border-radius: 26px; margin: 0 0 58px;
-    background: #101d36; color: #f2f5ff;
-    box-shadow: 0 18px 40px #10203b22;
-  }
-  .hero-slide {
-    position: absolute; inset: 0; padding: clamp(28px, 4vw, 48px);
-    opacity: 0; visibility: hidden; pointer-events: none;
-    transition: opacity 480ms var(--ease);
-  }
-  .hero-slide.active { position: relative; opacity: 1; visibility: visible; pointer-events: auto; }
-  .hero-copy { position: relative; z-index: 1; width: 55%; }
-  .hero-label { display: flex; flex-wrap: wrap; gap: 12px; font-size: 10px; font-weight: 650; letter-spacing: .16em; color: #a7c8f5; margin: 0 0 28px; }
-  .hero-label span { color: #c5d1e4; }
-  .hero-slide h2 { margin: 0; font-size: clamp(30px, 4.2vw, 52px); letter-spacing: -.035em; line-height: 1.04; }
-  .hero-description { max-width: 400px; color: #bbcce5; font-size: 15px; line-height: 1.75; margin: 22px 0; }
-  .hero-links { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
-  .hero-links a { color: #e4edfb; font-size: 13px; text-underline-offset: 5px; }
-  .hero-links .hero-play { display: inline-flex; align-items: center; gap: 26px; background: #d7e8ff; color: #15243e; padding: 13px 18px; border-radius: 11px; text-decoration: none; font-weight: 700; }
-  .hero-play:hover { background: #fff; }
-  .hero-art { position: absolute; right: -4%; top: 6%; width: 64%; height: 90%; pointer-events: none; }
+<script>
+  import { flip, roll, whenSeen, PLAY } from '../lib/motion'
+  import { readAll } from '../lib/stats'
+  import { bestKey, dailyFor } from '../data/game-meta'
+  import { withBase } from '../lib/base'
 
-  .hero-dots {
-    position: absolute; z-index: 2; left: 50%; bottom: 18px; transform: translateX(-50%);
-    display: flex; gap: 9px;
-  }
-  .hero-dots button {
-    width: 9px; height: 9px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
-    background: rgba(255, 255, 255, 0.32);
-    transition: background 200ms var(--ease), transform 200ms var(--ease-bounce);
-  }
-  .hero-dots button[aria-pressed='true'] { background: #fff; transform: scale(1.3); }
-  .hero-dots button:hover { background: rgba(255, 255, 255, 0.6); }
+  const data = JSON.parse(document.getElementById('dir-data')!.textContent!) as { slugs: string[] }
 
-  .collection-head { margin: 0 0 30px; scroll-margin-top: 24px; }
-  .collection-head h2 { margin: 0; font-size: clamp(23px, 3vw, 30px); letter-spacing: -.025em; }
-  .collection-head p { margin: 8px 0 0; color: var(--ink-soft); font-size: 13px; }
+  /* ---- bests, read from this browser ------------------------------- */
+  const readBest = (slug: string): string | null => {
+    try {
+      const raw = localStorage.getItem(bestKey(slug))
+      if (!raw) return null
+      const v = JSON.parse(raw)
+      return typeof v?.text === 'string' ? v.text : null
+    } catch { return null }
+  }
+  document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => {
+    const b = readBest(el.dataset.best!)
+    if (b) el.textContent = b
+  })
 
-  /* A sticker-sheet search box, not a plain form input — thick "cut" border
-     and the same rounded pill language as the site's own buttons. */
-  .filter {
-    display: flex; align-items: center; gap: 10px; margin-top: 18px;
-    max-width: 420px; padding: 10px 16px; border-radius: 999px;
-    border: var(--sticker-border); background: var(--card); box-shadow: var(--sticker-shadow);
-  }
-  .filter svg { flex: none; width: 17px; height: 17px; color: var(--ink-faint); }
-  .filter input {
-    flex: 1; border: 0; background: none; font: inherit; font-size: 15px;
-    color: var(--ink); min-width: 0;
-  }
-  .filter input:focus { outline: none; }
-  .filter input::placeholder { color: var(--ink-faint); }
-  #filterCount { flex: none; font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* ---- directory filter, carried by FLIP --------------------------- */
+  const slots = Array.from(document.querySelectorAll<HTMLElement>('.gcard-slot'))
+  const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-filter]'))
+  const q = document.getElementById('q') as HTMLInputElement
+  const countEl = document.getElementById('count')!
+  const empty = document.getElementById('empty')!
+  let filter = new URLSearchParams(location.search).get('c') ?? 'all'
+  if (!chips.some((c) => c.dataset.filter === filter)) filter = 'all'
 
-  /* --------------------------------------------------------- categories - */
+  const apply = () => {
+    const term = q.value.trim().toLowerCase()
+    chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.filter === filter)))
+    flip(slots, () => {
+      let shown = 0
+      for (const s of slots) {
+        const byKind = filter === 'all' || (filter === 'shell' ? s.dataset.shell === '1' : s.dataset.cat === filter)
+        const ok = byKind && (!term || s.dataset.search!.includes(term))
+        s.hidden = !ok
+        if (ok) shown++
+      }
+      countEl.textContent = `${shown} game${shown === 1 ? '' : 's'}`
+      empty.hidden = shown > 0
+    })
+  }
+  chips.forEach((c) => c.addEventListener('click', () => { filter = c.dataset.filter!; apply() }))
+  let t = 0
+  q.addEventListener('input', () => { clearTimeout(t); t = window.setTimeout(apply, 90) })
+  if (filter !== 'all') apply()
 
-  .category { margin-bottom: 42px; }
-  .category-head { margin-bottom: 18px; }
-  /* A torn sticky-note tab rather than a plain heading — the same "someone
-     stuck this here" language as the about section's tape, so the grouping
-     reads as curated rather than templated. */
-  .category-tab {
-    display: inline-block; font-size: clamp(17px, 2.2vw, 22px); font-weight: 800;
-    letter-spacing: -0.015em; padding: 5px 16px 7px; border-radius: 8px 8px 8px 2px;
-    background: var(--card); border: var(--sticker-border); box-shadow: var(--sticker-shadow);
-    transform: rotate(-1deg);
-  }
-  .category-head p { margin: 10px 2px 0; color: var(--ink-soft); font-size: 13px; max-width: 62ch; }
+  /* ---- daily challenge, for today rather than for the build -------- */
+  const d = dailyFor(new Date())
+  document.getElementById('dailyGoal')!.textContent = d.goal
+  document.getElementById('dailyName')!.textContent = d.title
+  ;(document.getElementById('dailyGo') as HTMLAnchorElement).href = withBase(`/${d.slug}/`)
+  const stats = readAll()
+  const best = readBest(d.slug)
+  const dailyBest = document.getElementById('dailyBest')!
+  const dailyPlays = document.getElementById('dailyPlays')!
+  const plays = stats.games[d.slug]?.plays ?? 0
+  whenSeen(dailyBest, () => {
+    if (best) roll(dailyBest, best, { from: best.replace(/\d/g, '0') })
+    roll(dailyPlays, String(plays), { from: '0' })
+  })
 
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 18px;
-    /* Shared perspective on the container rather than per-tile, so neighbouring
-       cards tilt as if lit and viewed from one camera instead of fifteen. */
-    perspective: 1400px;
-  }
-  @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 660px) { .grid { grid-template-columns: 1fr; gap: 14px; } }
+  /* ---- your finished games ----------------------------------------- */
+  const total = Object.values(stats.games).reduce((n, g) => n + (g?.plays ?? 0), 0)
+  const mine = document.getElementById('myPlays')!
+  if (PLAY) whenSeen(mine, () => roll(mine, total.toLocaleString('en-GB'), { from: '0' }))
+  else mine.textContent = total.toLocaleString('en-GB')
 
-  @media (max-width: 660px) {
-    .hero { min-height: 0; }
-    .hero-slide { padding-bottom: 230px; }
-    .hero-copy { width: 100%; }
-    .hero-art { width: 100%; right: 0; height: 250px; top: auto; bottom: -12px; }
-    .hero-label { margin-bottom: 20px; }
-    .filter { max-width: none; }
-  }
-
-  .about {
-    position: relative;
-    /* Translucent rather than solid, so the backdrop's drifting light shows
-       through it. The blur is what keeps the text crisp over moving colour. */
-    background: color-mix(in srgb, var(--card) 72%, transparent);
-    backdrop-filter: blur(14px) saturate(1.15);
-    -webkit-backdrop-filter: blur(14px) saturate(1.15);
-    border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-    border-radius: var(--radius);
-    margin-top: 40px;
-    padding: 34px 24px 30px;
-    text-align: center;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.7),
-      var(--shadow);
-  }
-  /* A strip of washi tape holding the note card down — the kind of detail
-     that makes a panel read as a physical thing someone stuck up. */
-  .tape {
-    position: absolute;
-    top: -14px;
-    left: 50%;
-    width: 78px;
-    height: 26px;
-    margin-left: -39px;
-    transform: rotate(-3deg);
-    background: repeating-linear-gradient(
-      45deg,
-      color-mix(in oklab, #ff6a3d 55%, white) 0 6px,
-      color-mix(in oklab, #ffb03d 55%, white) 6px 12px
-    );
-    opacity: 0.82;
-    box-shadow: 0 2px 5px rgba(22, 21, 26, 0.14);
-    clip-path: polygon(4% 0, 96% 0, 100% 100%, 0 100%);
-  }
-  .about-lead { font-size: 21px; margin: 0; font-weight: 500; }
-  .about-sub { color: var(--ink-soft); margin: 8px 0 0; font-size: 15.5px; }
-
-  .links { display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-  .btn {
-    border: var(--sticker-border);
-    border-radius: 999px;
-    padding: 9px 20px;
-    font-size: 15px;
-    font-weight: 600;
-    text-decoration: none;
-    background: linear-gradient(180deg, #fff 0%, color-mix(in oklab, var(--card) 88%, var(--line)) 100%);
-    box-shadow: var(--sticker-shadow);
-    transition: transform 180ms var(--ease-bounce), box-shadow 180ms var(--ease-bounce);
-  }
-  .btn:hover {
-    transform: translateY(-3px) rotate(-1.5deg);
-    box-shadow: var(--sticker-shadow-hover);
-  }
-  .btn:active { transform: translateY(0) rotate(0deg); box-shadow: 1px 2px 0 rgba(22, 21, 26, 0.18); }
-
-  /* Buy Me a Coffee's own yellow rather than the site's neutral sticker
-     tone — the one button here that is a real, named external service
-     deserves to look like it, the same reasoning the "Twitter"/"Instagram"
-     links already act on by naming themselves plainly rather than as
-     "Socials". The drawn mug (lib/icons.ts, on the same 24-unit grid as
-     every other icon on the site) replaces the emoji every other coffee
-     button on the web uses. */
-  .coffee-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    color: #2a1a05; border-color: #caa100;
-    background: linear-gradient(180deg, #ffe066 0%, #ffc93c 100%);
-  }
-  .coffee-icon { width: 20px; height: 20px; display: inline-flex; flex: none; }
-
-  .foot {
-    display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
-    margin-top: 34px; color: var(--ink-faint); font-size: 13.5px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .hero-slide { transition: none; }
-  }
-</style>
+  /* ---- surprise me ------------------------------------------------- */
+  const surprise = document.getElementById('surprise') as HTMLAnchorElement
+  const pick = () => data.slugs[Math.floor(Math.random() * data.slugs.length)]
+  surprise.href = withBase(`/${pick()}/`)
+  surprise.addEventListener('pointerenter', () => { surprise.href = withBase(`/${pick()}/`) })
+  surprise.addEventListener('click', (e) => {
+    // Let the confetti land before the page goes.
+    if (!PLAY || e.metaKey || e.ctrlKey || e.shiftKey) return
+    e.preventDefault()
+    setTimeout(() => { location.href = surprise.href }, 380)
+  })
+</script>

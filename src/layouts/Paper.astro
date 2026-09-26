@@ -1,0 +1,124 @@
+---
+import { SITE } from '../site.config'
+import Masthead from '../components/paper/Masthead.astro'
+import Colophon from '../components/paper/Colophon.astro'
+import '../styles/paper/tokens.css'
+import '../styles/paper/base.css'
+import '../styles/paper/motion.css'
+
+/**
+ * The Paper & Ink page. Every page in the new design system sits in this:
+ * the homepage, and every game once it has moved into the shared shell.
+ *
+ * It deliberately does not import global.css. The games that have not moved
+ * yet keep the old layout and the old stylesheet, untouched, until their turn.
+ */
+interface Props {
+  title: string
+  description?: string
+  image?: string
+  /** Show the fixed site masthead (the homepage); games draw their own bar. */
+  masthead?: boolean
+  /** Show the sun-orange colophon at the bottom. */
+  colophon?: boolean
+  structuredData?: Record<string, unknown>[]
+  noindex?: boolean
+  bodyClass?: string
+}
+
+const {
+  title,
+  description = SITE.description,
+  image,
+  masthead = true,
+  colophon = true,
+  structuredData = [],
+  noindex = false,
+  bodyClass = '',
+} = Astro.props
+
+const fontHref =
+  'https://fonts.googleapis.com/css2' +
+  '?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1' +
+  '&family=Zalando+Sans:wght@300..900' +
+  '&display=swap'
+
+const websiteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE.name,
+  url: SITE.url,
+  description: SITE.description,
+}
+const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
+const ogImage = image ? new URL(image, Astro.site ?? SITE.url).href : undefined
+const favicon =
+  'data:image/svg+xml,' +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#FF6022"/></svg>')
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#F1EFED" />
+    <meta name="color-scheme" content="light" />
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={favicon} />
+
+    {/* Before first paint: `js` arms anything a script finishes, `play` arms
+        every animated starting state. Reduced motion never gets `play`, so it
+        never sees a hidden or offset element. If motion.ts has not loaded in
+        time, `play` is taken away again rather than leaving headlines stuck
+        behind their masks. */}
+    <script is:inline>
+      (function () {
+        var d = document.documentElement
+        d.classList.add('js')
+        if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matches) d.classList.add('play')
+        setTimeout(function () { if (!d.classList.contains('motion-ready')) d.classList.remove('play') }, 2500)
+      })()
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href={fontHref} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    {ogImage && (
+      <>
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+      </>
+    )}
+    <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    {ogImage && <meta name="twitter:image" content={ogImage} />}
+    <script type="application/ld+json" set:html={JSON.stringify(websiteLd)} />
+    {structuredData.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
+    {SITE.plausibleDomain && (
+      <script is:inline defer data-domain={SITE.plausibleDomain} src="https://plausible.io/js/script.js"></script>
+    )}
+  </head>
+  <body class={bodyClass}>
+    <a class="skip" href="#main">Skip to content</a>
+    <div class="progress-bar" aria-hidden="true"></div>
+    {masthead && <Masthead />}
+    <slot />
+    {colophon && <Colophon />}
+    <script>
+      import { initMotion } from '../lib/motion'
+      initMotion()
+    </script>
+  </body>
+</html>

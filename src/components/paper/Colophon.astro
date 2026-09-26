@@ -1,0 +1,46 @@
+---
+import { SITE } from '../../site.config'
+import { withBase } from '../../lib/base'
+import { CATEGORIES, listedGames } from '../../data/games'
+import { SHELL_GAMES } from '../../data/game-meta'
+
+const newest = listedGames().sort((a, b) => b.added.localeCompare(a.added)).slice(0, 4)
+const shell = listedGames().filter((g) => SHELL_GAMES.has(g.slug))
+
+// Shape tiles: four shapes in five inks, fixed rather than random so the
+// grid is the same object on every visit.
+const TILES: [string, string][] = [
+  ['circle', 'var(--ink)'], ['half', 'var(--card)'], ['leaf', 'var(--sky)'], ['square', 'var(--red)'],
+  ['leaf', 'var(--card)'], ['square', 'var(--ink)'], ['circle', 'var(--orange)'], ['half', 'var(--sky)'],
+]
+---
+
+<footer class="wrap colophon-wrap">
+  <div class="block b-sun colophon" data-settle>
+    <div class="colophon-top">
+      <p class="wordmark">{SITE.name}</p>
+      <div class="shapes" aria-hidden="true">
+        {TILES.map(([shape, c]) => <span class={`shape ${shape}`} style={`--c:${c}`}></span>)}
+      </div>
+    </div>
+    <div class="colophon-body">
+      <p class="tagline">Small games, real maths, nothing to sign up for.</p>
+      <div>
+        <p class="label">Newest</p>
+        <ul>{newest.map((g) => <li><a href={withBase(`/${g.slug}/`)}>{g.title}</a></li>)}</ul>
+      </div>
+      <div>
+        <p class="label">In the new shell</p>
+        <ul>{shell.map((g) => <li><a href={withBase(`/${g.slug}/`)}>{g.title}</a></li>)}</ul>
+      </div>
+      <div>
+        <p class="label">Browse</p>
+        <ul>{CATEGORIES.map((c) => <li><a href={withBase(`/?c=${c.key}#games`)}>{c.label}</a></li>)}</ul>
+      </div>
+    </div>
+    <div class="colophon-legal">
+      <span>{SITE.tagline}</span>
+      <span>Runs in your browser. Nothing leaves it.</span>
+    </div>
+  </div>
+</footer>

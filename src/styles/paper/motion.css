@@ -1,0 +1,212 @@
+/*
+ * Paper & Ink — motion.
+ *
+ * Every rule that hides, offsets or animates anything is scoped under
+ * `html.play`. The inline head script adds `play` only when JavaScript runs
+ * AND reduced motion is not requested, so without it the page is exactly
+ * base.css: finished, still, complete.
+ *
+ * Only transform, opacity, clip-path, background-size and
+ * font-variation-settings are ever animated.
+ */
+
+/* ---- A. mask reveal: headline lines rise from behind their own mask ---- */
+html.play [data-reveal='lines'] .mask-line > span {
+  transform: translateY(105%);
+  transition: transform var(--t-reveal) var(--ease);
+  transition-delay: calc((var(--line, 0) + 1) * 70ms);
+}
+html.play [data-reveal='lines'].is-in .mask-line > span { transform: none; }
+
+/* ---- B. rule draw ----------------------------------------------------- */
+html.play .rule-line[data-reveal] {
+  transform: scaleX(0);
+  transition: transform 900ms var(--ease);
+}
+html.play .rule-line[data-reveal].is-in { transform: scaleX(1); }
+
+/* ---- C. wipe: the clip lives on the CHILD of the observed element ---- */
+html.play [data-reveal='wipe'] > .wipe {
+  clip-path: inset(0 100% 0 0 round var(--r));
+  transition: clip-path 900ms var(--ease);
+}
+html.play [data-reveal='wipe'].is-in > .wipe { clip-path: inset(0 0 0 0 round var(--r)); }
+
+/* ---- D. marker draw (once per page) ---------------------------------- */
+html.play .marker[data-draw] {
+  background-size: 0% 100%;
+  transition: background-size 900ms var(--glide) 420ms;
+}
+html.play .is-in .marker[data-draw],
+html.play .marker[data-draw].is-in { background-size: 100% 100%; }
+
+/* ---- E. springy letters ---------------------------------------------- */
+html.play .springy .ch {
+  display: inline-block;
+  font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144, 'wght' 600;
+  transition: font-variation-settings 420ms var(--glide);
+}
+html.play .springy.is-live .ch { transition-duration: 160ms; }
+
+/* ---- F. pill flood ---------------------------------------------------- */
+html.play .pill::before {
+  content: '';
+  position: absolute;
+  left: var(--x, 50%);
+  top: var(--y, 50%);
+  z-index: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--pill-flood);
+  transform: scale(0);
+  transition: transform 520ms var(--glide);
+  pointer-events: none;
+}
+html.play .pill { transition: color var(--t-fast) var(--glide), transform var(--t-mid) var(--spring), background-color 0s; }
+html.play .pill:not([disabled]):hover::before { transform: scale(60); }
+html.play .pill:not([disabled]):hover { color: var(--pill-flood-ink); }
+/* The flood replaces the static colour change, so the base fill stays put. */
+html.play .pill--ink:not([disabled]):hover,
+html.play .pill--hero:not([disabled]):hover { background: var(--ink); }
+html.play .pill--line:not([disabled]):hover,
+html.play .pill--line-paper:not([disabled]):hover,
+html.play .on-ink .pill--line:not([disabled]):hover { background: transparent; }
+html.play .on-ink .pill--hero:not([disabled]):hover,
+html.play .pill--paper:not([disabled]):hover { background: var(--ink-paper); }
+html.play .chip:hover { background: var(--card); }
+html.play .chip[aria-pressed='true']:hover { background: var(--ink); }
+html.play .pill:not([disabled]):active { transform: scale(0.96); transition-duration: 120ms; }
+
+/* ---- G. card flood from the entry corner ----------------------------- */
+html.play .gcard::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  left: var(--fx, 0%);
+  top: var(--fy, 0%);
+  width: 300%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--flood);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform var(--t-reveal) var(--glide);
+  pointer-events: none;
+}
+html.play .gcard:hover::before,
+html.play .gcard:focus-visible::before { transform: translate(-50%, -50%) scale(1); }
+html.play .gcard .gcard-icon { transition: transform var(--t-mid) var(--spring); }
+html.play .gcard:hover .gcard-icon,
+html.play .gcard:focus-visible .gcard-icon { transform: rotate(-12deg) scale(1.15); }
+html.play .gcard .gcard-go { transition: transform var(--t-mid) var(--spring); }
+html.play .gcard:hover .gcard-go { transform: translateX(4px) rotate(-45deg); }
+html.play .gcard-art-inner { transition: transform 1400ms var(--glide); }
+html.play .gcard:hover .gcard-art-inner { transform: scale(1.06); }
+
+/* ---- H. odometer ------------------------------------------------------ */
+/* Columns are a fixed width with the figure centred, rather than tabular
+   figures: Zalando Sans draws its tabular zero with a slash, which reads as
+   a different face mid-roll. */
+.odo { display: inline-flex; }
+.odo-col {
+  display: inline-block;
+  width: 0.6em;
+  height: 1em;
+  overflow: hidden;
+  line-height: 1;
+  vertical-align: top;
+}
+.odo-strip { display: flex; flex-direction: column; will-change: transform; }
+.odo-strip > span { display: block; height: 1em; line-height: 1; text-align: center; }
+.odo-sym { display: inline-block; line-height: 1; }
+
+/* ---- I. blocks settle, as one object ---------------------------------- */
+html.play [data-settle] {
+  transform: scale(0.94);
+  border-radius: 64px;
+  transition: transform 1000ms var(--spring), border-radius 1000ms var(--glide);
+}
+html.play [data-settle].is-in { transform: none; border-radius: var(--r-lg); }
+
+/* ---- J. ticker -------------------------------------------------------- */
+html.play .ticker-track {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  width: max-content;
+  animation: ticker 48s linear infinite;
+  transform: skewX(var(--skew, 0deg));
+}
+html.play .ticker-dup { display: contents; }
+html.play .ticker:hover .ticker-track,
+html.play .ticker:focus-within .ticker-track { animation-play-state: paused; }
+@keyframes ticker {
+  from { translate: 0 0; }
+  to { translate: -50% 0; }
+}
+
+/* ---- L. page transitions --------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  ::view-transition { background: #ff6022; }
+  ::view-transition-old(root) { animation: vt-out 420ms var(--ease-io) both; }
+  ::view-transition-new(root) { animation: vt-in 680ms var(--ease) both; }
+  @keyframes vt-out { to { opacity: 0; transform: scale(0.97); } }
+  @keyframes vt-in {
+    from { clip-path: inset(100% 0 0 0 round 48px 48px 0 0); }
+    to { clip-path: inset(0 0 0 0 round 0); }
+  }
+}
+
+/* ---- M. footer wordmark, letter by letter (type, so the stagger is fine) */
+html.play .wordmark[data-reveal] .ch {
+  transform: translateY(105%);
+  transition: transform 800ms var(--ease);
+  transition-delay: calc(var(--i, 0) * 45ms);
+}
+html.play .wordmark[data-reveal].is-in .ch { transform: none; }
+html.play .wordmark.is-landed .ch { transition: transform 360ms var(--spring); transition-delay: 0ms; }
+html.play .wordmark.is-landed .ch.is-hop { transform: translateY(-0.12em); transition-duration: 140ms; }
+html.play .shape {
+  transition: transform 520ms var(--spring), border-radius 520ms var(--glide);
+}
+html.play .shape:hover { transform: rotate(90deg) scale(0.92); border-radius: 50%; }
+html.play .shape.circle:hover { border-radius: 10px; transform: rotate(45deg); }
+
+/* ---- masthead --------------------------------------------------------- */
+html.js .masthead { background: transparent; border-bottom-color: transparent; }
+html.js .masthead.is-solid { background: var(--paper); border-bottom-color: var(--paper3); }
+html.play .masthead { transition: background-color var(--t-mid) var(--glide), border-color var(--t-mid) var(--glide); }
+html.play .nav a:not(.pill)::after {
+  opacity: 1;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--t-mid) var(--ease);
+}
+html.play .nav a:not(.pill):hover::after { transform: scaleX(1); }
+
+/* ---- deck ------------------------------------------------------------- */
+html.play .deck-card {
+  transition: transform 760ms var(--spring);
+}
+html.play .deck-card.is-held { transition: none; cursor: grabbing; }
+html.play .deck-card.is-flying { transition: transform 520ms var(--ease-io); }
+
+/* ---- directory FLIP --------------------------------------------------- */
+html.play .gcard-slot.is-moving { transition: transform 620ms var(--glide); }
+html.play .gcard-slot.is-arriving { transform: scale(0.94); }
+html.play .gcard-slot.is-arriving.is-settling { transform: none; transition: transform 620ms var(--spring); }
+
+/* ---- portal ----------------------------------------------------------- */
+html.play .portal > .portal-inner {
+  clip-path: inset(var(--pi, 0%) var(--pj, 0%) round var(--pr, 24px));
+}
+
+/* ---- reduced motion: OFF, not down ----------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

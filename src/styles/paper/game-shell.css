@@ -1,0 +1,217 @@
+/*
+ * The game shell — one frame every game sits in, so thirty-odd games read as
+ * one product. Top bar, score strip, stage, result card, and two panels.
+ */
+
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+
+/* ---- top bar --------------------------------------------------------- */
+.shell-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 20px;
+  padding-block: 18px;
+}
+.shell-back { padding-left: 14px; }
+.shell-title {
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1;
+  min-width: 0;
+}
+.shell-controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.shell-controls .pill { min-height: 44px; }
+@media (max-width: 860px) {
+  .shell-bar { grid-template-columns: auto minmax(0, 1fr); }
+  .shell-controls { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 480px) {
+  .shell-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .shell-controls .pill { padding: 0 6px; font-size: 13px; }
+}
+
+/* ---- score strip ----------------------------------------------------- */
+.shell-main { flex: 1; padding-bottom: clamp(40px, 6vw, 96px); }
+.shell-strip {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.shell-tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 14px 18px 16px;
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--shadow-block);
+  min-height: 92px;
+}
+.shell-tile > * { position: relative; z-index: 1; }
+.shell-tile .label { color: var(--ink3); }
+.shell-tile .num { font-size: clamp(28px, 3vw, 38px); white-space: nowrap; }
+.shell-tile .num small { font-size: 0.5em; font-weight: 600; letter-spacing: 0; color: var(--ink3); margin-left: 4px; }
+.shell-tile.is-best { background: var(--orange); }
+.shell-tile.is-best .label, .shell-tile.is-best .num small { color: var(--ink); }
+.new-best {
+  position: absolute !important;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--ink-paper);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+@media (max-width: 640px) {
+  .shell-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shell-tile { min-height: 80px; padding: 12px 14px; }
+}
+
+/* ---- stage ----------------------------------------------------------- */
+.stage {
+  position: relative;
+  margin-top: 16px;
+  padding: clamp(16px, 3vw, 36px);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-block);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+.stage.is-lost { filter: saturate(0.55); }
+.stage-note { padding: 32px; text-align: center; }
+
+/* Level up: a headline the marker sweeps across, pinned to the middle of
+   the screen rather than the middle of a stage that may be taller than it.
+   It never covers the controls with a veil and never takes a click. */
+.level-up {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 42%;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.level-up p {
+  font-size: var(--fs-h1);
+  line-height: 1.18;
+  padding: 14px 30px 18px;
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-block);
+}
+
+/* ---- result card: an ink block --------------------------------------- */
+.result {
+  --focus: var(--ink-paper);
+  margin-top: 16px;
+  padding: clamp(24px, 5vw, 64px);
+  border-radius: var(--r-lg);
+  background: var(--ink);
+  color: var(--ink-paper);
+  box-shadow: var(--shadow-block);
+}
+.result .label { color: var(--ink-paper); }
+.result h2 { margin-top: 14px; font-size: var(--fs-h2); }
+.result-score { display: block; margin-top: 22px; font-size: clamp(64px, 10vw, 140px); }
+.result-lines { margin-top: 18px; display: grid; gap: 6px; font-size: var(--fs-lead); max-width: 52ch; }
+.result-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.result-extra { margin-top: 30px; }
+
+/* ---- panels (native <dialog>) --------------------------------------- */
+.panel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(84dvh, 720px);
+  padding: clamp(24px, 4vw, 40px);
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.22);
+  overflow: auto;
+}
+.panel::backdrop {
+  background: rgba(18, 18, 19, 0.38);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.panel h2 { font-size: var(--fs-h3); }
+.panel .panel-body { margin-top: 16px; display: grid; gap: 12px; color: var(--ink2); }
+.panel .panel-body b, .panel .panel-body strong { color: var(--ink); }
+.panel .panel-body ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+.panel .panel-body kbd {
+  display: inline-block;
+  min-width: 24px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--paper2);
+  border: 1px solid var(--paper3);
+  font: 600 13px/1.6 var(--sans);
+  color: var(--ink);
+  text-align: center;
+}
+.panel-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+
+/* ---- feedback --------------------------------------------------------- */
+.fx-wrong { outline: 2px solid var(--t-red) !important; outline-offset: 2px; }
+
+html.play .fx-pop { animation: fx-pop 260ms var(--spring); }
+@keyframes fx-pop { 50% { transform: scale(1.12); } }
+html.play .fx-shake { animation: fx-shake 300ms var(--ease-io); }
+@keyframes fx-shake {
+  0%, 100% { transform: translateX(0); }
+  16%, 50%, 84% { transform: translateX(-6px); }
+  33%, 67% { transform: translateX(6px); }
+}
+
+html.play .shell-tile::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: 250%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--orange);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform var(--t-reveal) var(--glide);
+}
+html.play .shell-tile.is-best { background: var(--card); }
+html.play .shell-tile.is-best::before { transform: translate(-50%, -50%) scale(1); }
+html.play .new-best { animation: badge-in 460ms var(--spring) both; }
+@keyframes badge-in { from { transform: scale(0); } }
+
+html.play .level-up { animation: lvl-veil 1400ms var(--ease-io) both; }
+html.play .level-up .marker { animation: lvl-mark 700ms var(--glide) 120ms both; }
+html.play .level-up p { animation: lvl-settle 1400ms var(--spring) both; }
+@keyframes lvl-veil { 0% { opacity: 0; } 12%, 78% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lvl-mark { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
+@keyframes lvl-settle { 0% { transform: scale(0.94); } 30%, 100% { transform: none; } }
+
+html.play .result.is-in { animation: result-in 1000ms var(--spring) both; }
+@keyframes result-in {
+  from { transform: scale(0.94); border-radius: 64px; }
+  to { transform: none; border-radius: var(--r-lg); }
+}
+
+html.play .panel[open] { animation: panel-in 420ms var(--spring) both; }
+html.play .panel[open]::backdrop { animation: veil-in 260ms var(--ease) both; }
+@keyframes panel-in { from { opacity: 0; transform: scale(0.9); } }
+@keyframes veil-in { from { opacity: 0; } }

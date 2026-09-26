@@ -2208,7 +2208,51 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     stay unique, so those captions rendered squeezed into a 30px circle
     regardless of which tile opened first.
 
-43. Then reassess again.
+43. **Paper & Ink: one design system for the whole site — phase 1 of the
+    migration.** Requested explicitly, with a full spec: an editorial "paper
+    and ink" language — warm paper ground, white cards, colour only as whole
+    blocks with ink on them, one highlighter stroke per page, pills for every
+    action, Fraunces (SOFT 0 / WONK 1 / opsz 144) for statements and Zalando
+    Sans for every number — and a motion layer that is typographic rather
+    than decorative. All games, two at a time.
+
+    Phase 1 built the system and the first two games in it: tokens, base and
+    motion stylesheets; `lib/motion.ts` (mask reveals, rule draws, wipes,
+    the marker, springy letters, pill and card floods, the odometer, a
+    velocity-skewed ticker, decoding labels, confetti, the throwable deck,
+    the ink-band portal, cross-document view transitions); a new homepage;
+    and `GameShell` — top bar, odometer score strip, white stage, ink result
+    card, and native-`<dialog>` pause and how-to panels. **Rule Cascade** and
+    **The Auction Game** went first because they already had a real score,
+    a real level and a real ending, and both are keyboard-native.
+
+    The rule that shaped the most code: nothing is hidden unless `html.play`
+    says so, and `play` is only added before first paint when reduced motion
+    is off — and taken away again if `motion.ts` has not arrived in 2.5s, so
+    a failed script can never leave a headline stuck behind its mask.
+    `scripts/check-paper.mjs` holds the system to that and to the rest: every
+    armed starting state is scoped under `html.play`, no transition touches
+    a layout property, the only per-index delay is the wordmark's letters,
+    no literal colours outside tokens.css, and every text pairing the system
+    relies on clears 4.5:1 — including proving that orange, amber and sky
+    genuinely fail as text on paper, so the rule against it is not decorative.
+
+    What the browser caught that reading did not. Zalando Sans draws its
+    tabular zero with a slash, so every live counter looked like a different
+    face mid-roll; the odometer now uses fixed-width columns with
+    proportional figures instead. The Best tile flooded orange on the very
+    first page load, because "no best yet" counted as beaten — and, one fix
+    later, a best set two minutes earlier in the same game still counted.
+    Beaten now means beaten *the best the run started with*. The level-up
+    whitened the whole stage right as each lot opened for bidding; it is a
+    band pinned to the viewport now and never veils a control. And the fanned
+    deck pushed the homepage 49px wider than a 390px phone.
+
+    Unported games keep `GameLayout` and `global.css`, untouched, until their
+    turn. Sound is now off by default site-wide, which is the spec and also
+    simply correct.
+
+44. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

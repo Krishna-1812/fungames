@@ -8,6 +8,27 @@ Built after taking neal.fun apart game by game. The teardown is in
 [`docs/neal-fun-research.md`](docs/neal-fun-research.md) — every figure in it is
 a measurement from the live site, not a guess.
 
+## Design system: Paper & Ink
+
+The homepage and every game in the shared shell are built on one editorial
+system — warm paper, white cards, colour only as whole blocks with ink on
+them, Fraunces for statements and Zalando Sans for information, and a motion
+layer that is typographic rather than decorative. The rules are in
+[`src/styles/paper/README.md`](src/styles/paper/README.md); the pieces are:
+
+| File | What it is |
+|---|---|
+| `src/styles/paper/tokens.css` | every colour, type, shape and motion token |
+| `src/styles/paper/base.css` | reset, type, layout, components — the finished, still page |
+| `src/styles/paper/motion.css` | every `html.play` rule, and the reduced-motion off switch |
+| `src/lib/motion.ts` | reveals, springy letters, floods, odometer, ticker, decode, confetti, deck, portal |
+| `src/layouts/Paper.astro` | the page, the fonts, the `js`/`play` head script, masthead, colophon |
+| `src/layouts/GameShell.astro` + `src/lib/game-shell.ts` + `game-shell.css` | the frame every game sits in |
+| `scripts/check-paper.mjs` | holds the system to its own rules |
+
+Games move into the shell two at a time. **Done:** Rule Cascade, The Auction
+Game. Everything else still runs on the previous `GameLayout` until its turn.
+
 ---
 
 ## What neal.fun actually is
@@ -1030,6 +1051,7 @@ node scripts/check-earth-reviews.mjs # Earth Reviews, do the stars actually add 
 node scripts/check-internet-artifacts.mjs # the timeline, dates honest about their own precision
 node scripts/check-internet-artifacts-art.mjs # its twenty-five scenes, over their own era-sky
 node scripts/check-share-page.mjs  # every encoding, self-inverse, round-tripped, or vs the real standard
+node scripts/check-paper.mjs       # the design system held to its own rules: contrast, colour, motion
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
