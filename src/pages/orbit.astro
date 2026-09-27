@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { GOALS } from '../lib/orbit-goals'
 
 /**
@@ -18,26 +18,32 @@ import { GOALS } from '../lib/orbit-goals'
  *
  * Trails come from fading the canvas rather than storing history, which costs
  * one fill per frame instead of thousands of stored points.
+ *
+ * In the shell the sky is the stage, framed rather than filling the window.
+ * Score is the bodies in it, Collisions the merges, Challenges the eight, and
+ * Most laps the longest orbit you have flown. Each challenge gets its headline as
+ * it lands; all eight is the ending. Restart is a fresh solar system. Freeze
+ * holds the sky without covering it (a loaded scene arrives frozen), and the
+ * shell's Pause holds it too. Scene links moved from the old share button to
+ * a Share scene button in the dock.
  */
 ---
 
-<GameLayout slug="orbit" bar="#05060f" fixed bodyClass="orbit-body">
-  <div class="stage" id="stage">
-    <h1 class="visually-hidden">Orbit</h1>
+<GameShell
+  slug="orbit"
+  labels={{ score: 'Bodies', best: 'Most laps', level: 'Challenges', moves: 'Collisions' }}
+  initial={{ score: '0', level: `0 / ${GOALS.length}`, moves: '0' }}
+>
+  <div class="orbit-body" id="stage">
     <canvas id="sky" tabindex="0" aria-label="Gravity simulation" aria-describedby="keyboardHelp"></canvas>
-    <p id="keyboardHelp" class="visually-hidden">Press K to aim a launch. Arrow keys move the starting point. Hold Shift and use arrow keys to change launch direction and speed. Enter launches. Escape cancels.</p>
-    <p id="keyboardStatus" class="visually-hidden" role="status" aria-live="polite"></p>
+    <p id="keyboardHelp" class="sr-only">Press K to aim a launch. Arrow keys move the starting point. Hold Shift and use arrow keys to change launch direction and speed. Enter launches. Escape cancels.</p>
+    <p id="keyboardStatus" class="sr-only" role="status" aria-live="polite"></p>
     {/* The aim indicator is interface, not scene. Keeping it on its own 2D
         layer means a crisp dashed line rather than one that picks up bloom and
         the trail fade along with everything else. */}
     <canvas id="aimLayer" aria-hidden="true"></canvas>
 
     <div class="hud">
-      <div class="readout">
-        <span><b id="nBodies">0</b> bodies</span>
-        <span><b id="nMerges">0</b> collisions</span>
-        <span><b id="nFps">0</b> fps</span>
-      </div>
       <p class="tip" id="tip">Drag anywhere to fling a new body. Longer drag, faster throw.</p>
     </div>
 
@@ -96,7 +102,7 @@ import { GOALS } from '../lib/orbit-goals'
                 <path d="M3 8.5 L6.5 12 L13 4" />
               </svg>
             </span>
-            <b>{g.name}<span class="visually-hidden">, not yet done</span></b>
+            <b>{g.name}<span class="sr-only">, not yet done</span></b>
             <span class="brief">{g.brief}</span>
             <span class="note">{g.note}</span>
           </li>
@@ -124,12 +130,13 @@ import { GOALS } from '../lib/orbit-goals'
       </div>
       <div class="group">
         <button type="button" class="opt" id="trailsBtn" aria-pressed="true">Trails</button>
-        <button type="button" class="opt" id="pauseBtn">Pause</button>
+        <button type="button" class="opt" id="pauseBtn" aria-pressed="false">Freeze</button>
         <button type="button" class="opt" id="clearBtn">Clear</button>
       </div>
       <div class="group" aria-label="Scene controls">
         <button type="button" class="opt" id="saveScene">Save scene</button>
         <button type="button" class="opt" id="loadScene">Load scene</button>
+        <button type="button" class="opt" id="shareScene">Share scene</button>
         <button type="button" class="opt" id="helpBtn">Learn</button>
         <button type="button" class="opt" id="keyboardBtn">Keyboard</button>
       </div>
@@ -140,7 +147,21 @@ import { GOALS } from '../lib/orbit-goals'
       </div>
     </aside>
   </div>
-</GameLayout>
+
+  <Fragment slot="howto">
+    <p>
+      A gravity sandbox: every body pulls on every other with real Newtonian
+      gravity, and bodies that touch merge, keeping their momentum.
+    </p>
+    <ul>
+      <li>Drag across the sky to launch a body. The drag is the throw: longer is faster, and the line shows where it goes.</li>
+      <li>Pick Moon, Planet or Star for what you launch. The presets set up a solar system, a binary pair, or ninety bodies of chaos.</li>
+      <li>Learn walks you through a first orbit. Keyboard (or K on the sky) aims a launch with the arrow keys.</li>
+      <li>Freeze holds the sky without hiding it. Share scene makes a link to exactly what is on screen.</li>
+    </ul>
+    <p>Eight challenges, from a first orbit to the last one standing. Only bodies you launch yourself count. Earn all eight to finish.</p>
+  </Fragment>
+</GameShell>
 
 <script>
   import { sfx, unlock, tone } from '../lib/audio'
@@ -155,6 +176,10 @@ import { GOALS } from '../lib/orbit-goals'
     makeBody, step, circularV, radiusFor, MAX_BODIES,
   } from '../lib/orbit-sim'
   import { GOALS, Tracker, type Progress } from '../lib/orbit-goals'
+  import { createShell } from '../lib/game-shell'
+
+  // Restart is a fresh solar system, running.
+  const shell = createShell({ slug: 'orbit', onRestart: () => { solar(); setPaused(false) } })
 
   const canvas = document.getElementById('sky') as HTMLCanvasElement
   const aimCanvas = document.getElementById('aimLayer') as HTMLCanvasElement
@@ -254,15 +279,19 @@ import { GOALS } from '../lib/orbit-goals'
       const done = tracker.done.has(g.id)
       li.classList.toggle('done', done)
       // The tick is decorative, so the state has to be in the text as well.
-      const hidden = li.querySelector('b .visually-hidden')
+      const hidden = li.querySelector('b .sr-only')
       if (hidden) hidden.textContent = done ? ', done' : ', not yet done'
     }
     goalCount.textContent = `${tracker.done.size}/${GOALS.length}`
+    shell.setLevel(`${tracker.done.size} / ${GOALS.length}`)
+    if (tracker.bestLaps > 0) shell.considerBest(tracker.bestLaps, lapsText(tracker.bestLaps))
     missionReadout()
     bestLaps.textContent = tracker.bestLaps
       ? ` Longest orbit so far: ${tracker.bestLaps} lap${tracker.bestLaps === 1 ? '' : 's'}.`
       : ''
   }
+
+  const lapsText = (n: number) => `${n} lap${n === 1 ? '' : 's'}`
 
   function save() {
     try { localStorage.setItem(SAVE, JSON.stringify(tracker.progress())) } catch { /* fine */ }
@@ -289,7 +318,24 @@ import { GOALS } from '../lib/orbit-goals'
     goalBtn.classList.remove('picked')
     void goalBtn.offsetWidth
     goalBtn.classList.add('picked')
-    unlock(); sfx.great()
+    unlock()
+    if (tracker.done.size === GOALS.length) {
+      // The card waits under the sky; the sky is still worth watching.
+      shell.win({
+        scroll: false,
+        kicker: `All ${GOALS.length} challenges`,
+        title: 'Every orbit, earned.',
+        score: `${GOALS.length} / ${GOALS.length}`,
+        lines: [
+          `Longest orbit: ${lapsText(tracker.bestLaps)}. The last one was ${names[names.length - 1]}.`,
+          'The sky is still running up there. Launch whatever you like.',
+        ],
+        againLabel: 'A fresh solar system',
+      })
+    } else {
+      sfx.great()
+      shell.levelUp(names.length > 1 ? `${names.length} at once` : names[0])
+    }
   }
 
   const showGoals = (open: boolean) => {
@@ -364,16 +410,13 @@ import { GOALS } from '../lib/orbit-goals'
   // ---- loop --------------------------------------------------------------
   let fpsFrames = 0, lastFps = performance.now()
   let savedBestLaps = tracker.bestLaps
-  const nBodies = document.getElementById('nBodies')!
-  const nMerges = document.getElementById('nMerges')!
-  const nFps = document.getElementById('nFps')!
 
   const clock = new FixedClock()
   document.addEventListener('visibilitychange', () => clock.reset())
 
   function frame(now = performance.now()) {
     mergeSoundBudget = 2
-    if (!paused && W && !document.hidden) {
+    if (!paused && !shell.paused && W && !document.hidden) {
       clock.advance(now, () => {
         // Two half-steps per 60 Hz simulation tick preserve the tuned physics.
         const ev: StepEvents = { merges: [], escaped: [] }
@@ -393,11 +436,13 @@ import { GOALS } from '../lib/orbit-goals'
 
     fpsFrames++
     if (now - lastFps > 500) {
-      nFps.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
-      nBodies.textContent = String(bodies.length)
-      nMerges.textContent = String(merges)
+      shell.setScore(String(bodies.length))
+      shell.setMoves(String(merges))
       missionReadout()
-      if (tracker.bestLaps !== savedBestLaps) { save(); savedBestLaps = tracker.bestLaps }
+      if (tracker.bestLaps !== savedBestLaps) {
+        save(); savedBestLaps = tracker.bestLaps
+        shell.considerBest(tracker.bestLaps, lapsText(tracker.bestLaps))
+      }
       lastFps = now; fpsFrames = 0
     }
     requestAnimationFrame(frame)
@@ -601,10 +646,8 @@ import { GOALS } from '../lib/orbit-goals'
   document.getElementById('presetBinary')!.addEventListener('click', () => { unlock(); binary() })
   document.getElementById('presetChaos')!.addEventListener('click', () => { unlock(); chaos() })
   document.getElementById('clearBtn')!.addEventListener('click', () => { unlock(); sfx.click(); clear() })
-  document.getElementById('pauseBtn')!.addEventListener('click', (e) => {
-    paused = !paused
-    clock.reset()
-    ;(e.currentTarget as HTMLButtonElement).textContent = paused ? 'Resume' : 'Pause'
+  document.getElementById('pauseBtn')!.addEventListener('click', () => {
+    setPaused(!paused)
     unlock(); sfx.click()
   })
   document.getElementById('trailsBtn')!.addEventListener('click', (e) => {
@@ -625,7 +668,9 @@ import { GOALS } from '../lib/orbit-goals'
   }
   function setPaused(value: boolean) {
     paused = value; clock.reset()
-    document.getElementById('pauseBtn')!.textContent = paused ? 'Resume' : 'Pause'
+    const b = document.getElementById('pauseBtn')!
+    b.textContent = paused ? 'Resume' : 'Freeze'
+    b.setAttribute('aria-pressed', String(paused))
   }
   const lessonRadius = () => Math.min(150, Math.min(W, H) * .24)
   function lesson(example: boolean) {
@@ -672,11 +717,11 @@ import { GOALS } from '../lib/orbit-goals'
       if (!raw) { message('No saved scene yet. Save one you would like to revisit.'); return }
       const scene = readScene(JSON.parse(raw))
       if (!scene) { message('That saved scene could not be read. Your current scene is unchanged.'); return }
-      applyScene(scene); message('Saved scene loaded, paused. Completed challenges are kept; partial laps start fresh.')
+      applyScene(scene); message('Saved scene loaded, frozen. Completed challenges are kept; partial laps start fresh.')
     } catch { message('The saved scene could not be opened. Your current scene is unchanged.') }
   })
-  document.addEventListener('game:share', (event) => {
-    event.preventDefault()
+  document.getElementById('shareScene')!.addEventListener('click', () => {
+    unlock(); sfx.click()
     if (!W) return
     const code = encodeScene(captureScene(bodies, W, H, trails, launchMass))
     if (!code) { message('This scene is too large for a link. Try sharing a smaller system.'); return }
@@ -694,7 +739,7 @@ import { GOALS } from '../lib/orbit-goals'
     const code = new URLSearchParams(location.hash.slice(1)).get('scene')
     if (code !== null) {
       const scene = decodeScene(code)
-      if (scene) { applyScene(scene, true); message('Shared scene loaded, paused. Launch your own bodies to earn challenges.'); return true }
+      if (scene) { applyScene(scene, true); message('Shared scene loaded, frozen. Launch your own bodies to earn challenges.'); return true }
       solar(); message('This scene link could not be opened. Here is a fresh solar system.'); return true
     }
     solar()
@@ -705,24 +750,34 @@ import { GOALS } from '../lib/orbit-goals'
     const ro = new ResizeObserver(() => { if (initialize()) ro.disconnect() })
     ro.observe(stage)
   }
+  const dock = document.querySelector('.dock') as HTMLElement
+  function dockEdges() {
+    dock.classList.toggle('more-left', dock.scrollLeft > 2)
+    dock.classList.toggle('more-right', dock.scrollLeft + dock.clientWidth < dock.scrollWidth - 2)
+  }
+  dock.addEventListener('scroll', dockEdges, { passive: true })
+  dockEdges()
+
   let rt = 0
-  addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(resize, 200) })
+  addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(() => { resize(); dockEdges() }, 200) })
   frame()
 </script>
 
 <style is:global>
-  .orbit-body .mission-readout { position: absolute; top: 70px; right: 18px; z-index: 4; display: grid; gap: 5px; max-width: calc(100% - 36px); text-align: left; padding: 12px 16px; background: #101b2ee8; color: #e1edff; border: 1px solid #435778; border-radius: 14px; cursor: pointer; }
+  .orbit-body .mission-readout { position: absolute; top: 48px; right: 18px; z-index: 4; display: grid; gap: 5px; max-width: calc(100% - 36px); text-align: left; padding: 12px 16px; background: #101b2ee8; color: #e1edff; border: 1px solid #435778; border-radius: 14px; cursor: pointer; }
   .orbit-body .mission-readout span { font-size: 13px; font-weight: 650; }
   .orbit-body .mission-readout small { font-size: 11px; color: #b6c5df; }
-  .orbit-body .stage:has(.flight-card:not([hidden])) .mission-readout { display: none; }
+  .orbit-body:has(.flight-card:not([hidden])) .mission-readout { display: none; }
   .orbit-body .log-entries { list-style: none; padding: 0; display: grid; gap: 12px; }
   .orbit-body .log-entries li { border-left: 2px solid #8fcdb5; padding: 4px 0 4px 14px; }
   .orbit-body .log-entries strong { color: #b9ebd6; }
   .orbit-body .log-entries p { margin: 5px 0; }
   .orbit-body #flightLog { max-height: 85dvh; overflow-y: auto; }
-  .orbit-body { background: #05060f; color: #e9edff; }
-
-  .orbit-body .stage { position: relative; height: 100%; }
+  /* The sky fills the stage edge to edge, framed at a fixed height rather
+     than the whole window. */
+  .stage:has(> .orbit-body) { padding: 0; overflow: hidden; background: #05060f; }
+  .orbit-body { position: relative; color: #e9edff; height: clamp(500px, 78vh, 860px); }
+  @media (max-width: 620px) { .orbit-body { height: clamp(560px, 84vh, 860px); } }
   .orbit-body canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
   /* The aim layer sits above the scene but must never swallow the pointer —
      every drag is captured by #sky underneath it. */
@@ -730,21 +785,14 @@ import { GOALS } from '../lib/orbit-goals'
 
   .orbit-body .hud {
     position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-    text-align: center; pointer-events: none; width: max-content; max-width: 92vw;
+    text-align: center; pointer-events: none; width: max-content; max-width: 92%;
   }
-  .orbit-body .readout {
-    display: inline-flex; gap: 16px; font-size: 12.5px;
-    background: rgba(0, 0, 0, 0.55); padding: 7px 16px; border-radius: 999px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    color: #a9b6dd;
-  }
-  .orbit-body .readout b { color: #fff; font-variant-numeric: tabular-nums; }
   .orbit-body .tip {
-    margin: 10px 0 0; font-size: 13px; color: #8b98c4;
+    margin: 0; font-size: 13px; color: #8b98c4;
     transition: opacity 600ms var(--ease);
   }
   .orbit-body .tip.faded { opacity: 0; }
-  .orbit-body .stage.reading .hud { opacity: 0; transition: opacity 160ms var(--ease); }
+  .orbit-body.reading .hud { opacity: 0; transition: opacity 160ms var(--ease); }
 
   .orbit-body .flight-card {
     position: absolute; z-index: 5; top: 100px; left: clamp(16px, 5vw, 72px);
@@ -754,7 +802,7 @@ import { GOALS } from '../lib/orbit-goals'
     color: #d9e5fa;
   }
   .orbit-body .flight-card[hidden] { display: none; }
-  .orbit-body .stage:has(.flight-card:not([hidden])) .tip { visibility: hidden; }
+  .orbit-body:has(.flight-card:not([hidden])) .tip { visibility: hidden; }
   .orbit-body .flight-kicker { margin: 0 0 16px; font-size: 10px; letter-spacing: .2em; color: #8cbbfa; }
   .orbit-body .flight-card h2 { margin: 0 0 14px; font-size: clamp(26px, 3vw, 38px); line-height: 1.08; letter-spacing: -.035em; color: #f1f6ff; }
   .orbit-body .flight-card p:not(.flight-kicker), .orbit-body .scene-dialog p { font-size: 14px; line-height: 1.65; color: #b6c5df; }
@@ -773,13 +821,23 @@ import { GOALS } from '../lib/orbit-goals'
     .orbit-body .flight-card h2 { font-size: 27px; }
   }
 
+  /* One row that scrolls sideways when it does not fit, rather than wrapping.
+     Wrapped, the dock was five rows and a quarter of a phone's sky, and it ran
+     under the lesson card. */
   .orbit-body .dock {
     position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
-    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-    width: max-content; max-width: 96vw; z-index: 6;
+    display: flex; gap: 8px; flex-wrap: nowrap;
+    width: max-content; max-width: 96%; z-index: 6;
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    border-radius: 999px;
   }
+  .orbit-body .dock::-webkit-scrollbar { display: none; }
+  /* A fade at whichever end has more, so a row that scrolls says so. */
+  .orbit-body .dock.more-right { mask-image: linear-gradient(90deg, #000 84%, transparent); }
+  .orbit-body .dock.more-left { mask-image: linear-gradient(270deg, #000 84%, transparent); }
+  .orbit-body .dock.more-left.more-right { mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); }
   .orbit-body .group {
-    display: flex; gap: 4px; padding: 4px;
+    display: flex; flex: none; gap: 4px; padding: 4px;
     background: rgba(12, 16, 34, 0.82); border: 1px solid #1e2647; border-radius: 999px;
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   }
@@ -793,11 +851,11 @@ import { GOALS } from '../lib/orbit-goals'
   .orbit-body .opt:active { transform: scale(0.94); }
   .orbit-body .opt[aria-checked='true'],
   .orbit-body .opt[aria-pressed='true'] { background: #2c65d8; color: #fff; }
-  .orbit-body .opt.wide b { color: #fff; font-variant-numeric: tabular-nums; margin-left: 3px; }
+  .orbit-body .opt.wide b { color: #fff; margin-left: 3px; }
   /* A one-shot bounce when a launch mass is actually picked — see Powder's
      identical .picked pattern for why this needs a toggled class rather
      than an attribute selector. */
-  .orbit-body .opt.picked { animation: pop-opt 360ms var(--ease-bounce); }
+  html.play .orbit-body .opt.picked { animation: pop-opt 360ms var(--ease-bounce); }
   @keyframes pop-opt { 40% { transform: scale(1.14); } }
 
   /* ---- the challenge panel ---------------------------------------------- */
@@ -861,9 +919,10 @@ import { GOALS } from '../lib/orbit-goals'
   .orbit-body .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   @media (max-width: 620px) {
-    .orbit-body .dock { width: calc(100% - 16px); gap: 6px; bottom: 10px; }
+    .orbit-body .dock { gap: 6px; bottom: 10px; }
+    /* The tip is two lines here; the readout goes under both. */
+    .orbit-body .mission-readout { top: 64px; }
     .orbit-body .group { padding: 3px; gap: 1px; }
     .orbit-body .opt { padding: 7px; min-height: 40px; font-size: 11px; }
-    .orbit-body .readout { gap: 10px; font-size: 11.5px; }
   }
 </style>

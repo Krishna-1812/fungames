@@ -2543,7 +2543,32 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     data plate's `92vw` min-width was pushing the dial's grid track wider
     than the frame; the track is `minmax(0, 1fr)` now.
 
-55. Then reassess again.
+55. ~~**Paper & Ink, phase 13: Powder and Orbit.**~~ **done.**
+
+    Both were full-window sandboxes, and both are framed in the stage now at
+    a fixed height (taller on a phone, where Powder's panel stacks under the
+    grid). Each had its own `.stage` class, which is the shell's; Powder's
+    `.panel` and `.stat` were too. The in-page Pause is **Freeze** in both,
+    because it does something the shell's Pause cannot: it holds the world
+    without covering it, so you can draw into a frozen grid or look at a
+    loaded scene. The shell's Pause holds the simulation as well.
+
+    **Powder**: Reactions found, scenarios Solved, Particles alive, and Best
+    the most there have ever been at once. Solving a scenario is a result
+    card with that scenario's explanation; finding the whole reaction table
+    is the other ending. Restart clears the sandbox, or starts the scenario
+    you are in again, instead of reloading the page. The panel's warm browns
+    and orange are cool greys with sky accents; the materials and the fire
+    keep their colours.
+
+    **Orbit**: Bodies, Collisions, Challenges, and Most laps for the longest
+    orbit flown. Each challenge gets the shell's headline as it lands, and
+    all eight is the ending; Restart is a fresh solar system. The old share
+    button's scene link is a Share scene button in the dock. The dock is one
+    row that scrolls sideways, with a fade at whichever end has more; wrapped,
+    it was five rows on a phone and ran under the lesson card.
+
+56. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

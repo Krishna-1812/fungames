@@ -1,5 +1,7 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
+import { REACTIONS } from '../lib/powder-rules'
+import { SCENARIOS } from '../lib/powder-goals'
 
 /**
  * Powder - a falling-sand sandbox.
@@ -9,12 +11,24 @@ import GameLayout from '../layouts/GameLayout.astro'
  * fire makes steam because it met water, and glass appears because sand met
  * lava. All of the interesting behaviour is emergent from about forty local
  * rules, which is why it stays interesting after the novelty wears off.
+ *
+ * In the shell the sandbox is the stage, framed rather than filling the
+ * window. Score is the reactions found, Solved the scenarios, Particles how
+ * much is alive in the grid, and Best the most there has ever been at once.
+ * Solving a scenario is a round's ending; finding every reaction is the other.
+ * Restart clears the sandbox, or starts the scenario you are in again. The
+ * in-page Freeze stops time without covering the grid, so you can draw into a
+ * held world; the shell's Pause holds it too. The panel is cool greys with sky
+ * accents now rather than warm browns and orange; the materials keep theirs.
  */
 ---
 
-<GameLayout slug="powder" bar="#12100f" fixed bodyClass="powder-body">
-  <div class="stage">
-    <h1 class="visually-hidden">Powder</h1>
+<GameShell
+  slug="powder"
+  labels={{ score: 'Reactions', best: 'Most at once', level: 'Solved', moves: 'Particles' }}
+  initial={{ score: `0 / ${REACTIONS.length}`, level: `0 / ${SCENARIOS.length}`, moves: '0' }}
+>
+  <div class="powder-body">
 
     <div class="canvas-wrap" id="wrap">
       <div id="worldSurface" class="world-surface"><canvas id="sim" aria-label="Falling sand simulation"></canvas></div>
@@ -33,7 +47,7 @@ import GameLayout from '../layouts/GameLayout.astro'
       </div>
     </div>
 
-    <aside class="panel">
+    <aside class="pw-panel">
       <div class="palette" id="palette" role="radiogroup" aria-label="Material"></div>
       <div class="controls">
         <label class="brush">
@@ -42,7 +56,7 @@ import GameLayout from '../layouts/GameLayout.astro'
           <b id="brushVal">5</b>
         </label>
         <div class="btns">
-          <button type="button" id="pauseBtn" class="ctl">Pause</button>
+          <button type="button" id="pauseBtn" class="ctl" aria-pressed="false">Freeze</button>
           <button type="button" id="clearBtn" class="ctl">Clear</button>
         </div>
         <div class="btns">
@@ -53,7 +67,6 @@ import GameLayout from '../layouts/GameLayout.astro'
           <button type="button" id="saveExperiment" class="ctl">Save experiment</button>
           <button type="button" id="loadExperiment" class="ctl">Load experiment</button>
         </div>
-        <p class="stat"><b id="count">0</b> particles &middot; <b id="fps">0</b> fps</p>
       </div>
 
       {/* The reason to keep going. A sandbox with nothing to find is a toy you
@@ -104,11 +117,26 @@ import GameLayout from '../layouts/GameLayout.astro'
     {/* Announcements land here so a discovery is not silent for screen readers. */}
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
-</GameLayout>
+
+  <Fragment slot="howto">
+    <p>
+      A falling-sand sandbox. Pick a material and draw into the grid; everything
+      after that is about forty local rules, and none of it is scripted.
+    </p>
+    <ul>
+      <li>Oil floats on water because it is lighter. Lava meeting sand makes glass. Fire meeting water makes steam.</li>
+      <li>Every pair of materials that reacts is a thing to find: the Reactions count keeps track, and the list shows what each one makes.</li>
+      <li>Scenarios hand you a set problem and only the materials it needs, on a budget of paint.</li>
+      <li>Freeze stops time without hiding the grid, so you can build into a held world.</li>
+    </ul>
+    <p>Solve a scenario, or find every reaction, to finish. Try dropping lava on ice.</p>
+  </Fragment>
+</GameShell>
 
 <script>
   import { sfx, unlock } from '../lib/audio'
-  import { burst, ring, shake } from '../lib/fx'
+  import { burst, ring } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
   import { createPowderRenderer } from '../lib/powder-render'
   import { POWDER_SAVE, captureExperiment, readExperiment, restoreExperiment } from '../lib/powder-scene'
   import {
@@ -128,6 +156,16 @@ import GameLayout from '../layouts/GameLayout.astro'
      itself in lib/powder-sim.ts. Both used to be inline here, which worked but
      meant nothing could be counted or run without a browser — the reaction log
      below needed the first move and the scenarios needed the second. */
+  /* Restart clears the sandbox, or starts the scenario over; reloading would
+     throw away a world someone had spent ten minutes on for no reason. */
+  const shell = createShell({
+    slug: 'powder',
+    onRestart: () => {
+      if (active) { loadScenario(active); return }
+      clearWorld(world); seed()
+    },
+  })
+
   const DRAWABLE = MATERIALS.filter((m) => m.draw)
   const RX = buildLookup()
 
@@ -181,6 +219,16 @@ import GameLayout from '../layouts/GameLayout.astro'
     found.add(id)
     try { localStorage.setItem(SAVE, JSON.stringify([...found])) } catch { /* not worth breaking the sim over */ }
     announce(r)
+    if (found.size === REACTIONS.length) {
+      shell.win({
+        scroll: false,
+        kicker: 'The whole table',
+        title: 'Every reaction, found.',
+        score: `${found.size} / ${REACTIONS.length}`,
+        lines: [`The last one was ${describe(r)}.`, 'Nothing in here was scripted; all of it fell out of the rules.'],
+        againLabel: 'Clear the sandbox',
+      })
+    }
   }
 
   /* --------------------------------------------------------------------
@@ -215,11 +263,12 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   function paintScenarioList() {
     scCount.textContent = `${beaten.size}/${SCENARIOS.length}`
+    shell.setLevel(`${beaten.size} / ${SCENARIOS.length}`)
     scList.innerHTML = SCENARIOS.map((s) => {
       const got = beaten.has(s.id)
       return `<li class="sc ${got ? 'got' : ''}" data-sc="${s.id}">
         <button type="button" data-sc="${s.id}">
-          <b>${s.name}<span class="visually-hidden">${got ? ', done' : ', not yet done'}</span></b>
+          <b>${s.name}<span class="sr-only">${got ? ', done' : ', not yet done'}</span></b>
           <span class="scbrief">${s.brief}</span>
           ${got ? `<span class="scnote">${s.note}</span>` : ''}
         </button>
@@ -242,6 +291,8 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   function loadScenario(sc: Scenario) {
     if (!W && !build()) return
+    // A new attempt puts the last result card away.
+    shell.reset()
     clearWorld(world)
     active = sc
     stats = begin(world, sc)
@@ -312,12 +363,16 @@ import GameLayout from '../layouts/GameLayout.astro'
     barProgress.textContent = 'Solved. ' + active.note
     bar.classList.add('won')
     setTimeout(() => bar.classList.remove('won'), 2400)
-    sfx.great()
-    const r = canvas.getBoundingClientRect()
-    burst(r.left + r.width / 2, r.top + r.height / 2, {
-      count: 30, colors: ['#7fd6a0', '#d6f2e0', '#fff'], speed: 5, gravity: 0.1, size: 3,
-    })
     if (wasNew) toastText('Solved — ' + active.name)
+    // The card waits under the grid; the grid is what you are looking at.
+    shell.win({
+      scroll: false,
+      kicker: beaten.size === SCENARIOS.length ? `All ${SCENARIOS.length} solved` : `Scenario solved · ${beaten.size} of ${SCENARIOS.length}`,
+      title: active.name,
+      score: `${beaten.size} / ${SCENARIOS.length}`,
+      lines: [active.note],
+      againLabel: 'Try it again',
+    })
   }
 
   scBtn.addEventListener('click', () => {
@@ -351,20 +406,17 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   let paused = false
   let raining = false
-  let lastFps = performance.now()
-  let fpsFrames = 0
-  const countEl = document.getElementById('count')!
-  const fpsEl = document.getElementById('fps')!
+  let lastCount = performance.now()
 
   function tick() {
-    if (!paused && W) {
+    if (!paused && !shell.paused && W) {
       if (raining) for (let n = 0; n < 3; n++) put(world, (Math.random() * W) | 0, 0, WATER)
       step(world, RX)
       for (const id of world.justFired) discover(id)
       if (world.bangs > 0) {
         // One sound per frame no matter how many cells detonated at once.
         sfx.boom()
-        shake(document.body, Math.min(14, 4 + world.bangs), 320)
+        shell.shake()
         const r = canvas.getBoundingClientRect()
         burst(r.left + r.width / 2, r.top + r.height / 2, {
           count: 18, colors: ['#ff9a3c', '#ffd166'], speed: 6, gravity: 0.25, shape: 'streak', size: 3,
@@ -385,13 +437,12 @@ import GameLayout from '../layouts/GameLayout.astro'
     }
     if (W) {
       renderer.draw(world.grid, world.life, world.shade, performance.now() / 1000)
-      fpsFrames++
       const now = performance.now()
-      if (now - lastFps > 500) {
-        fpsEl.textContent = String(Math.round((fpsFrames * 1000) / (now - lastFps)))
-        countEl.textContent = countAlive(world).toLocaleString('en-US')
-        lastFps = now
-        fpsFrames = 0
+      if (now - lastCount > 500) {
+        const alive = countAlive(world)
+        shell.setMoves(alive.toLocaleString('en-US'))
+        if (alive > 0) shell.considerBest(alive, alive.toLocaleString('en-US'))
+        lastCount = now
       }
     }
     requestAnimationFrame(tick)
@@ -453,6 +504,7 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   function paintCount() {
     document.getElementById('foundN')!.textContent = String(found.size)
+    shell.setScore(`${found.size} / ${REACTIONS.length}`)
     foundBtn.classList.toggle('complete', found.size === REACTIONS.length)
   }
 
@@ -567,7 +619,10 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   document.getElementById('pauseBtn')!.addEventListener('click', (e) => {
     paused = !paused
-    ;(e.currentTarget as HTMLButtonElement).textContent = paused ? 'Resume' : 'Pause'
+    const b = e.currentTarget as HTMLButtonElement
+    b.textContent = paused ? 'Resume' : 'Freeze'
+    b.setAttribute('aria-pressed', String(paused))
+    b.classList.toggle('on', paused)
     unlock(); sfx.click()
   })
   document.getElementById('clearBtn')!.addEventListener('click', () => {
@@ -584,7 +639,7 @@ import GameLayout from '../layouts/GameLayout.astro'
     if (raining) sfx.fizz(); else sfx.click()
   })
   document.getElementById('quakeBtn')!.addEventListener('click', () => {
-    unlock(); sfx.boom(); shake(document.body, 12, 420)
+    unlock(); sfx.boom(); shell.shake()
     const cx = ((0.25 + Math.random() * 0.5) * W) | 0
     for (let i = 0; i < 26; i++) {
       const x = cx + (((Math.random() - 0.5) * 20) | 0)
@@ -625,10 +680,11 @@ import GameLayout from '../layouts/GameLayout.astro'
       const restored = restoreExperiment(scene)
       stop(); world = restored; W = world.w; H = world.h
       paused = true; raining = false
-      document.getElementById('pauseBtn')!.textContent = 'Resume'
+      const pb = document.getElementById('pauseBtn')!
+      pb.textContent = 'Resume'; pb.setAttribute('aria-pressed', 'true'); pb.classList.add('on')
       document.getElementById('rainBtn')!.classList.remove('on')
       build()
-      toastText('Experiment loaded, paused. Future reactions may unfold differently.')
+      toastText('Experiment loaded, frozen. Future reactions may unfold differently.')
     } catch { toastText('The experiment could not be loaded.'); }
   })
 
@@ -654,10 +710,14 @@ import GameLayout from '../layouts/GameLayout.astro'
 </script>
 
 <style is:global>
-  .powder-body { background: #0d0e10; color: #eee9e3; }
-
+  /* The sandbox fills the stage edge to edge, framed at a fixed height
+     rather than the whole window. */
+  .stage:has(> .powder-body) { padding: 0; overflow: hidden; background: #0d0e10; }
   /* The log and the toast are absolutely positioned over the whole thing. */
-  .powder-body .stage { display: flex; height: 100%; position: relative; }
+  .powder-body {
+    display: flex; position: relative; color: #e9edf3;
+    height: clamp(460px, 76vh, 820px);
+  }
   .powder-body .canvas-wrap { position: relative; flex: 1; min-width: 0; background: #0d0e10; }
   .powder-body .world-surface { position: absolute; }
   .powder-body canvas {
@@ -675,25 +735,25 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
   .powder-body .hint.faded { opacity: 0; }
 
-  .powder-body .panel {
+  .powder-body .pw-panel {
     width: 218px; flex: none; display: flex; flex-direction: column;
-    background: #1a1715; border-left: 1px solid #2c2724; overflow-y: auto;
+    background: #161a20; border-left: 1px solid #262c35; overflow-y: auto;
   }
   .powder-body .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 10px; }
   .powder-body .mat {
     display: flex; align-items: center; gap: 7px;
-    background: #241f1c; border: 1px solid #322c28; color: #eee9e3;
+    background: #1f242c; border: 1px solid #2c323c; color: #e9edf3;
     border-radius: 9px; padding: 7px 8px; font-size: 12.5px; cursor: pointer;
     transition: border-color 140ms var(--ease), background 140ms var(--ease), transform 180ms var(--ease-bounce);
     text-align: left;
   }
-  .powder-body .mat:hover { background: #2e2723; transform: translateY(-1px) scale(1.03); }
+  .powder-body .mat:hover { background: #272d36; transform: translateY(-1px) scale(1.03); }
   .powder-body .mat:active { transform: scale(0.96); }
-  .powder-body .mat[aria-checked='true'] { border-color: #e8a75c; background: #33291f; }
+  .powder-body .mat[aria-checked='true'] { border-color: #8ccbff; background: #1d2a3a; }
   /* A one-shot bounce when a material is actually picked, not just hovered —
      toggled by a class the click handler adds and removes, since a CSS
      attribute selector alone can't tell "just changed" from "still true". */
-  .powder-body .mat.picked { animation: pop-mat 360ms var(--ease-bounce); }
+  html.play .powder-body .mat.picked { animation: pop-mat 360ms var(--ease-bounce); }
   @keyframes pop-mat { 40% { transform: scale(1.12); } }
   /* A round swatch reads as a paint dab; the square it replaces read as a
      form field. */
@@ -703,23 +763,21 @@ import GameLayout from '../layouts/GameLayout.astro'
   }
 
   .powder-body .controls { padding: 4px 10px 14px; display: grid; gap: 9px; }
-  .powder-body .brush { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #bdb3ab; }
+  .powder-body .brush { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b3bcc8; }
   .powder-body .brush input { flex: 1; min-width: 0; }
-  .powder-body .brush b { font-variant-numeric: tabular-nums; width: 18px; text-align: right; }
+  .powder-body .brush b { width: 18px; text-align: right; }
   .powder-body .btns { display: flex; gap: 6px; }
   .powder-body .ctl {
-    flex: 1; background: #241f1c; border: 1px solid #322c28; color: #eee9e3;
+    flex: 1; background: #1f242c; border: 1px solid #2c323c; color: #e9edf3;
     border-radius: 9px; padding: 8px 6px; font-size: 12.5px; cursor: pointer;
     transition: background 140ms var(--ease), transform 180ms var(--ease-bounce);
   }
-  .powder-body .ctl:hover { background: #322b26; transform: translateY(-1px) scale(1.03); }
+  .powder-body .ctl:hover { background: #2a313b; transform: translateY(-1px) scale(1.03); }
   .powder-body .ctl:active { transform: scale(0.95); }
-  .powder-body .ctl.on { background: #33291f; border-color: #e8a75c; }
-  .powder-body .stat { font-size: 11.5px; color: #a1968e; margin: 2px 0 0; font-variant-numeric: tabular-nums; }
-  .powder-body .stat b { color: #d3c8c0; }
+  .powder-body .ctl.on { background: #1d2a3a; border-color: #8ccbff; }
 
   .powder-body input[type='range'] {
-    --sl-a: #b3652f; --sl-b: #f0b768; --sl-track: #3a322d; --sl-thumb: 15px;
+    --sl-a: #3b6fd8; --sl-b: #8ccbff; --sl-track: #343b47; --sl-thumb: 15px;
   }
 
 
@@ -727,12 +785,12 @@ import GameLayout from '../layouts/GameLayout.astro'
 
   .powder-body .found {
     margin: 10px; padding: 9px 11px; display: flex; align-items: center; gap: 8px;
-    justify-content: space-between; background: #241f1c; border: 1px solid #3a322d;
-    border-radius: 9px; color: #d3c8c0; font-size: 12.5px; cursor: pointer;
+    justify-content: space-between; background: #1f242c; border: 1px solid #343b47;
+    border-radius: 9px; color: #c9d1dc; font-size: 12.5px; cursor: pointer;
     transition: border-color 140ms var(--ease), color 140ms var(--ease);
   }
-  .powder-body .found:hover { border-color: #e8a75c; color: #fff; }
-  .powder-body .found b { color: #e8a75c; font-variant-numeric: tabular-nums; }
+  .powder-body .found:hover { border-color: #8ccbff; color: #fff; }
+  .powder-body .found b { color: #8ccbff; }
   .powder-body .found.complete { border-color: #7fd6a0; }
   .powder-body .found.complete b { color: #7fd6a0; }
   .powder-body .found[aria-expanded='true'] svg { transform: rotate(180deg); }
@@ -742,31 +800,31 @@ import GameLayout from '../layouts/GameLayout.astro'
      panel is already the narrowest thing on the page. */
   .powder-body .logwrap {
     position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column;
-    background: rgba(16, 14, 13, 0.97); padding: 16px 18px 12px;
+    background: rgba(13, 15, 19, 0.97); padding: 16px 18px 12px;
   }
   .powder-body .logwrap[hidden] { display: none; }
   .powder-body .loghead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .powder-body .loghead h2 { font-size: 17px; color: #f2ece6; }
+  .powder-body .loghead h2 { font-size: 17px; color: #eef2f7; }
   .powder-body .loghead button {
-    background: none; border: 1px solid #3a322d; color: #d3c8c0; border-radius: 7px;
+    background: none; border: 1px solid #343b47; color: #c9d1dc; border-radius: 7px;
     padding: 5px 12px; font-size: 12px; cursor: pointer;
   }
-  .powder-body .loghead button:hover { border-color: #e8a75c; color: #fff; }
+  .powder-body .loghead button:hover { border-color: #8ccbff; color: #fff; }
   .powder-body .log {
     list-style: none; margin: 12px 0 0; padding: 0 4px 0 0; overflow-y: auto; flex: 1;
     display: grid; gap: 7px; align-content: start;
   }
-  .powder-body .log li { padding: 7px 10px; border-radius: 8px; background: #221d1a; }
-  .powder-body .log li b { display: block; font-size: 13px; color: #f2ece6; }
-  .powder-body .log li span { display: block; font-size: 12px; color: #a99e96; margin-top: 2px; }
-  .powder-body .log li.locked { background: #1c1917; }
-  .powder-body .log li.locked b { color: #968b83; letter-spacing: 0.18em; }
-  .powder-body .log li.locked span { color: #968b83; }
-  .powder-body .lognote { font-size: 11.5px; color: #8d827b; margin: 10px 0 0; line-height: 1.5; }
+  .powder-body .log li { padding: 7px 10px; border-radius: 8px; background: #1c2128; }
+  .powder-body .log li b { display: block; font-size: 13px; color: #eef2f7; }
+  .powder-body .log li span { display: block; font-size: 12px; color: #9fa9b6; margin-top: 2px; }
+  .powder-body .log li.locked { background: #181c22; }
+  .powder-body .log li.locked b { color: #8c96a3; letter-spacing: 0.18em; }
+  .powder-body .log li.locked span { color: #8c96a3; }
+  .powder-body .lognote { font-size: 11.5px; color: #86909c; margin: 10px 0 0; line-height: 1.5; }
 
   .powder-body .toast {
     position: absolute; left: 50%; top: 16px; transform: translate(-50%, -14px);
-    z-index: 6; background: #2b2019; border: 1px solid #e8a75c; color: #ffe7c9;
+    z-index: 6; background: #17222e; border: 1px solid #8ccbff; color: #e2f0ff;
     padding: 8px 16px; border-radius: 999px; font-size: 13px; pointer-events: none;
     opacity: 0; transition: opacity 240ms var(--ease), transform 240ms var(--ease);
     max-width: 90%; text-align: center;
@@ -774,8 +832,8 @@ import GameLayout from '../layouts/GameLayout.astro'
   .powder-body .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   @media (max-width: 760px) {
-    .powder-body .stage { flex-direction: column; }
-    .powder-body .panel { width: auto; height: 44%; border-left: 0; border-top: 1px solid #2c2724; }
+    .powder-body { flex-direction: column; height: clamp(600px, 88vh, 900px); }
+    .powder-body .pw-panel { width: auto; height: 44%; border-left: 0; border-top: 1px solid #262c35; }
     .powder-body .palette { grid-template-columns: repeat(3, 1fr); }
   }
 
@@ -786,11 +844,11 @@ import GameLayout from '../layouts/GameLayout.astro'
   .powder-body .mat[hidden] { display: none; }
 
   .powder-body .found.scenarios { margin-top: 6px; }
-  .powder-body .found.scenarios b { color: #9fd0ff; }
+  .powder-body .found.scenarios b { color: #b8a1ff; }
 
   .powder-body .scbar {
     position: absolute; left: 12px; right: 12px; top: 12px; z-index: 4;
-    background: rgba(16, 14, 13, 0.92); border: 1px solid #3a322d; border-radius: 12px;
+    background: rgba(13, 15, 19, 0.92); border: 1px solid #343b47; border-radius: 12px;
     padding: 10px 13px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     display: grid; gap: 5px;
   }
@@ -798,17 +856,17 @@ import GameLayout from '../layouts/GameLayout.astro'
   .powder-body .scbar[hidden] { display: none; }
   .powder-body .scbar.won { border-color: #7fd6a0; }
   .powder-body .scbar-main { display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap; }
-  .powder-body .scbar-main b { font-size: 14px; color: #f2ece6; }
-  .powder-body .scbar-main span { font-size: 12.5px; color: #a99e96; }
-  .powder-body .scbar-live { margin: 0; font-size: 12.5px; color: #d3c8c0; }
-  .powder-body .scbar-live b { color: #9fd0ff; font-variant-numeric: tabular-nums; margin-left: 8px; }
-  .powder-body .scbar-live b.out { color: #e8875c; }
+  .powder-body .scbar-main b { font-size: 14px; color: #eef2f7; }
+  .powder-body .scbar-main span { font-size: 12.5px; color: #9fa9b6; }
+  .powder-body .scbar-live { margin: 0; font-size: 12.5px; color: #c9d1dc; }
+  .powder-body .scbar-live b { color: #9fd0ff; margin-left: 8px; }
+  .powder-body .scbar-live b.out { color: #ff8f9e; }
   .powder-body .scbar-acts { display: flex; gap: 6px; }
   .powder-body .scbar-acts button {
-    background: none; border: 1px solid #3a322d; color: #d3c8c0; border-radius: 7px;
+    background: none; border: 1px solid #343b47; color: #c9d1dc; border-radius: 7px;
     padding: 4px 11px; font-size: 12px; cursor: pointer;
   }
-  .powder-body .scbar-acts button:hover { border-color: #e8a75c; color: #fff; }
+  .powder-body .scbar-acts button:hover { border-color: #8ccbff; color: #fff; }
 
   /* The region a masked scenario will not let you draw in. */
   .powder-body .world-surface.masked::after {
@@ -822,12 +880,12 @@ import GameLayout from '../layouts/GameLayout.astro'
   .powder-body .sclist li { padding: 0; background: none; }
   .powder-body .sclist button {
     display: block; width: 100%; text-align: left; cursor: pointer;
-    background: #221d1a; border: 1px solid transparent; border-radius: 8px;
+    background: #1c2128; border: 1px solid transparent; border-radius: 8px;
     padding: 9px 11px; color: inherit; font: inherit;
   }
-  .powder-body .sclist button:hover { border-color: #e8a75c; }
-  .powder-body .sclist b { display: block; font-size: 13.5px; color: #f2ece6; }
-  .powder-body .sclist .scbrief { display: block; font-size: 12.5px; color: #a99e96; margin-top: 3px; line-height: 1.5; }
+  .powder-body .sclist button:hover { border-color: #8ccbff; }
+  .powder-body .sclist b { display: block; font-size: 13.5px; color: #eef2f7; }
+  .powder-body .sclist .scbrief { display: block; font-size: 12.5px; color: #9fa9b6; margin-top: 3px; line-height: 1.5; }
   .powder-body .sclist .scnote { display: block; font-size: 12.5px; color: #8fc9a6; margin-top: 6px; line-height: 1.55; }
   .powder-body .sclist li.got button { background: #182420; }
   .powder-body .sclist li.got b { color: #7fd6a0; }
