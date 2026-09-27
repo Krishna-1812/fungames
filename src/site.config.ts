@@ -6,18 +6,20 @@
  * `name`, `domain` and `email` below are placeholders, not a decided brand —
  * swap them for the real thing once a name and domain are picked.
  *
- * `url` is the full deployed URL *including* any base path — currently
- * GitHub Pages' own `/fungames` subpath, since this repo isn't the special
- * `<user>.github.io` one that would serve at the domain root. It therefore
- * will not always equal `astro.config.mjs`'s `site`, which Astro requires to
- * be the origin alone; `base` there carries the same subpath separately.
- * Move to a custom domain (or a `<user>.github.io` repo) and both collapse
- * back to matching exactly, with `base` returned to `'/'`.
+ * `url` is the full deployed URL *including* any base path, built from
+ * `astro.config.mjs`'s `site` and `base` — which work out the host at build
+ * time (Vercel's production domain, or the GitHub Pages subpath) — so it is
+ * never typed in and never goes stale when a custom domain is attached. The
+ * optional chaining is for the checkers, which import this under plain Node
+ * where there is no `import.meta.env`.
  */
+const ORIGIN = (import.meta.env?.SITE ?? 'http://localhost:4321').replace(/\/+$/, '')
+const BASE_PATH = (import.meta.env?.BASE_URL ?? '/').replace(/\/+$/, '')
+
 export const SITE = {
   name: 'Your Site Name',
   domain: 'yoursite.com',
-  url: 'https://krishna-1812.github.io/fungames',
+  url: ORIGIN + BASE_PATH,
   tagline: 'games, toys and other weird stuff',
   description:
     'Games, visualisations, interactives and other weird stuff. Made to be played, not scrolled past.',

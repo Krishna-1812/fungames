@@ -1279,23 +1279,32 @@ Exact-origin checks are browser hotlink protection, not authentication or a
 spending limit. Configure rate limits and a model budget before enabling the
 optional API for a public audience.
 
-Static output — any host. `netlify.toml` and `public/_headers` are included;
-Cloudflare Pages reads both.
+Static output — any host. `vercel.json` is included for Vercel (the intended
+host); `netlify.toml` and `public/_headers` are there for Netlify and
+Cloudflare Pages, which read both.
 
-**Currently deployed to GitHub Pages** via `.github/workflows/deploy.yml`,
+**On Vercel** nothing needs configuring: `vercel.json` names the framework,
+the build and `dist`, keeps the `/game-name/` trailing slash, and sets the
+same cache and security headers as `public/_headers`. `astro.config.mjs`
+reads `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel sets on every build, so
+canonical links, the sitemap and share URLs follow the production domain —
+`<project>.vercel.app` at first, the custom domain as soon as one is attached
+and the site is redeployed. `SITE_URL` overrides it on any host.
+
+**Also deployed to GitHub Pages** via `.github/workflows/deploy.yml`,
 which builds and publishes straight from Actions on every push to `main` —
 no `gh-pages` branch to keep in sync. That is also the one host here that
 needed real code to work at all: a repo called `fungames` is not the special
 `<user>.github.io` repo GitHub serves at a domain root, so it publishes to
 `https://<user>.github.io/fungames/`, a subpath. `astro.config.mjs`'s `base`
-carries that; `src/lib/base.ts`'s `withBase()` is what every hand-written
+carries that (the workflow sets `BASE_PATH=/fungames`, and every other host
+builds at `/`); `src/lib/base.ts`'s `withBase()` is what every hand-written
 root-relative link in the codebase (a tile's own href, the chrome bar's home
 link, a cross-game "related" link, an OG image path, the sitemap) is prefixed
 with, because none of that is rewritten automatically — only Astro's own
-generated asset tags and `Astro.url` are. Moving to a custom domain, or to a
-literal `<user>.github.io` repo, means setting `base` back to `'/'`; nothing
-else needs to change, since every one of those links already goes through the
-one function.
+generated asset tags and `Astro.url` are. Once the site lives on Vercel this
+workflow can be switched off (delete the file, or disable it under the repo's
+Actions tab); nothing else depends on it.
 
 The Fusion backend is optional (the game works without it):
 
