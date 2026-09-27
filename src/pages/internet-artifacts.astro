@@ -1,9 +1,8 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { ZONES, MARKERS } from '../data/internet-artifacts'
 import type { Marker } from '../data/internet-artifacts'
 import { INTERNET_ARTIFACTS_ART, MOOD, sceneSvg } from '../lib/internet-artifacts-art'
-import { withBase } from '../lib/base'
 import { digitCellHTML } from '../lib/seven-segment'
 
 /**
@@ -19,6 +18,14 @@ import { digitCellHTML } from '../lib/seven-segment'
  * height, once art fills the card instead of sitting in a corner of it, can
  * be taller than the gap between it and the next section, and needs a real
  * buffer rather than however much space happens to be left over.
+ *
+ * In the shell it follows Space Elevator: the sky and the scanlines are a
+ * sticky backdrop inside the stage, the year gauge rides on a zero-height
+ * sticky pin, and widths are measured against the stage (cqw) rather than the
+ * window. Score is the year you have scrolled to, Era which of the five, and
+ * Moments how many of the twenty-five you have passed; each era announces
+ * itself as you enter it, and scrolling past Nyan Cat is the ending. Restart
+ * scrolls back to 1969.
  */
 
 let cursor = 0
@@ -129,11 +136,20 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
 }))
 ---
 
-<GameLayout slug="internet-artifacts" bar="#0b2b12" bodyClass="ia-body">
-  <div class="sky" id="sky"></div>
-  <div class="scanlines" aria-hidden="true"></div>
-  <div class="hud-scrim" aria-hidden="true"></div>
+<GameShell
+  slug="internet-artifacts"
+  labels={{ score: 'Year', best: 'Furthest', level: 'Era', moves: 'Moments' }}
+  initial={{ score: String(ZONES[0].from), level: `1 / ${ZONES.length}`, moves: `0 / ${MARKERS.length}` }}
+>
+  <div class="ia" id="iaRoot">
+  {/* The sky, pinned while the timeline scrolls past it. */}
+  <div class="ia-back" aria-hidden="true">
+    <div class="sky" id="sky"></div>
+    <div class="scanlines"></div>
+  </div>
 
+  <div class="ia-hud-pin">
+  <div class="hud-scrim" aria-hidden="true"></div>
   <div class="hud" id="hud">
     <button type="button" class="hud-dial" id="dialToggle" aria-pressed="false" aria-label="Play dial-up modem sound">
       <svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true"><path d="M4 8a6 6 0 0 1 12 0v6a1.5 1.5 0 0 1-3 0v-5a3 3 0 0 0-6 0v5a1.5 1.5 0 0 1-3 0Z" fill="currentColor"/></svg>
@@ -143,6 +159,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
       <span class="odometer" id="hudYear" set:html={Array.from({ length: HUD_DIGITS }, () => digitCellHTML()).join('')} />
     </div>
     <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
+  </div>
   </div>
 
   <div class="climb">
@@ -159,7 +176,8 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
       </div>
       <div class="intro-title">
         <p class="boot-line">&gt; RUN INTERNET_ARTIFACTS.EXE_</p>
-        <h1>Internet Artifacts<span class="cursor">_</span></h1>
+        {/* The shell already names the page; this is the boot screen's art. */}
+        <p class="intro-name" aria-hidden="true">Internet Artifacts<span class="cursor">_</span></p>
       </div>
       <p>Twenty-five real, dated moments from the internet's own history — from the first message ever sent between two computers to a cat made of Pop-Tart.</p>
       <div class="arrow">&#8595;</div>
@@ -237,15 +255,25 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     </section>
 
     <footer class="outro">
-      <div class="acts">
-        <button type="button" data-share data-title="Internet Artifacts">Share this</button>
-        <button type="button" id="again">Start over</button>
-        <a href={withBase('/')}>try something else &rarr;</a>
-      </div>
       <p class="outro-line">Twenty-five real dates, fifty years, one cat made of Pop-Tart.</p>
     </footer>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Twenty-five real, dated moments from the internet's own history, in the
+      order they happened: from the first message ever sent between two
+      computers, in 1969, to Nyan Cat.
+    </p>
+    <ul>
+      <li>Scroll down to move forward in time. The gauge at the top reads the year.</li>
+      <li>Time is not to scale across the whole page: each era has its own pace, and the bubbles mark where one ends and the next begins.</li>
+      <li>The handset button on the gauge plays a dial-up modem, if you have the sound on.</li>
+    </ul>
+    <p>Scroll past Nyan Cat, in 2011, to finish.</p>
+  </Fragment>
+</GameShell>
 
 <script type="application/json" id="game-data" set:html={JSON.stringify({ zones, totalHeight, reelHeight, TOP_PAD, BOTTOM_PAD })} />
 
@@ -253,9 +281,11 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   import { ring } from '../lib/fx'
   import { sfx, unlock, tone } from '../lib/audio'
   import { segmentsFor, fitWidth } from '../lib/seven-segment'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
 
   const { zones, totalHeight, reelHeight, TOP_PAD, BOTTOM_PAD } = JSON.parse(
     document.getElementById('game-data')!.textContent!,
@@ -350,7 +380,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   const reel = document.querySelector('.reel') as HTMLElement
 
   const yearDigits = [...$('hudYear').children] as HTMLElement[]
-  const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const prefersReducedMotion = !PLAY
   function setYear(year: number) {
     const raw = fitWidth(String(Math.max(0, Math.round(year))), yearDigits.length)
     for (let i = 0; i < yearDigits.length; i++) {
@@ -418,9 +448,66 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   }
 
   let shareCard: import('../lib/result-card').ResultCard | null = null
-  onShare(() => shareCard, (c) => ({ title: 'Internet Artifacts', text: `${c.headline}.` }))
 
+  /* ---- the shell ------------------------------------------------------------ */
   let recorded = false
+  /* Set by Restart. The ending re-arms only once the page is back in the first
+     half: the ride up starts at the far end, and re-arming at once let the
+     first frame of it end the piece again. */
+  let rearm = false
+  let highestZone = 0
+  let seenMost = 0
+  const root = $('iaRoot')
+  const shell = createShell({
+    slug: 'internet-artifacts',
+    // Back to 1969 rather than a reload.
+    onRestart: () => {
+      rearm = true
+      highestZone = 0
+      scrollTo({ top: root.getBoundingClientRect().top + scrollY - 12, behavior: PLAY ? 'smooth' : 'auto' })
+    },
+  })
+
+  /* The strip rolls its digits, so it is told once the scroll settles; the
+     gauge on the sky is the live one. */
+  let stripT = 0
+  let at = { year: zones[0].from, zoneIdx: 0 }
+  function paintStrip() {
+    const y = Math.round(at.year)
+    shell.setScore(String(y))
+    shell.setLevel(`${at.zoneIdx + 1} / ${zones.length}`)
+    shell.setMoves(`${seenMost} / ${cards.length}`)
+    if (y > zones[0].from) shell.considerBest(y, String(y))
+  }
+
+  /** Nyan Cat is the ending. The card waits under the finale, which is still
+      to be read on the way down to it. */
+  function finish(year: number) {
+    const y = Math.round(year)
+    shell.win({
+      celebrate: false,
+      scroll: false,
+      // The timeline runs on past the last entry, to the end of its last era.
+      kicker: 'Past Nyan Cat',
+      title: `${y - zones[0].from} years of the internet.`,
+      score: String(y),
+      from: String(zones[0].from),
+      lines: [
+        `${cards.length} real, dated moments, from the first message between two computers to a cat made of Pop-Tart.`,
+        'The gaps between them kept getting shorter.',
+      ],
+      againLabel: `Back to ${zones[0].from}`,
+    })
+    shell.resultExtra.innerHTML =
+      '<div class="ia-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share this</span></button></div>'
+    $('shareBtn').addEventListener('click', async (e) => {
+      if (!shareCard) return
+      const label = (e.currentTarget as HTMLElement).querySelector('span')!
+      const outcome = await shareResult(shareCard, { title: 'Internet Artifacts', text: `${shareCard.headline}.`, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share this'), 1600)
+    })
+  }
   function updateShareCard(year: number) {
     shareCard = {
       slug: 'internet-artifacts',
@@ -433,6 +520,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
       ],
     }
     recordPlay('internet-artifacts', { yearReached: Math.round(year) }, { yearReached: 'high' })
+    finish(year)
   }
 
   let ticking = false
@@ -459,6 +547,20 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     hud.style.setProperty('--glow', `rgba(${zoneColor.slice(4, -1)}, 0.4)`)
     sky.style.background = `linear-gradient(${zoneColor}, ${mix(zone.sky[0], zone.sky[1], Math.min(1, zt + 0.25))})`
 
+    const zoneIdx = zones.indexOf(zone)
+    // Each era announces itself the first time you scroll into it.
+    if (zoneIdx > highestZone) {
+      highestZone = zoneIdx
+      shell.levelUp(zone.label)
+    }
+    let seen = 0
+    for (const c of cards) if (c.offsetTop <= topInReel) seen++
+    if (seen > seenMost) seenMost = seen
+    at = { year, zoneIdx }
+    clearTimeout(stripT)
+    stripT = window.setTimeout(paintStrip, 180)
+
+    if (rearm && d < totalHeight / 2) { rearm = false; recorded = false }
     if (!recorded && d >= totalHeight - 40) {
       recorded = true
       updateShareCard(year)
@@ -471,14 +573,22 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   addEventListener('resize', () => { relayout(); sizeTrack(); update() }, { passive: true })
   update()
 
-  document.getElementById('again')?.addEventListener('click', () => location.reload())
 </script>
 
 <style>
-  :global(.ia-body) { background: #03110a; color: #fff; }
+  /* The timeline fills the stage edge to edge. overflow: clip rather than
+     hidden, which would make the stage a scroll container and stop the sky
+     and the gauge sticking. */
+  :global(.stage:has(> .ia)) { padding: 0; overflow: clip; background: #03110a; }
+  .ia { position: relative; color: #fff; container-type: inline-size; }
+  /* Sticky, not fixed: pinned while the timeline is on screen, but inside the
+     frame. The negative margin takes it back out of the flow. */
+  .ia-back { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; }
+  .ia-hud-pin { position: sticky; top: 0; height: 0; z-index: 40; }
+  .ia-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
   .sky {
-    position: fixed; inset: 0; z-index: -2;
+    position: absolute; inset: 0;
     background: linear-gradient(#0b2b12, #03110a);
     transition: background 260ms linear;
   }
@@ -487,7 +597,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
      place this page borrows its look directly from the hardware it is
      describing, rather than just naming it in the copy. */
   .scanlines {
-    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    position: absolute; inset: 0; pointer-events: none;
     background-image:
       repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0 1px, transparent 1px 4px),
       radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
@@ -498,19 +608,17 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     97% { opacity: 0.62; }
     98% { opacity: 0.48; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .scanlines { animation: none; }
-  }
+  :global(html:not(.play)) .scanlines { animation: none; }
 
   .hud-scrim {
-    position: fixed; inset: 0 0 auto 0; height: 150px; z-index: 39;
+    position: absolute; inset: 0 0 auto 0; height: 150px;
     pointer-events: none;
     background: linear-gradient(rgba(1, 4, 2, 0.5), rgba(1, 4, 2, 0));
   }
 
   .hud {
-    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-    z-index: 40; width: min(92vw, 420px); text-align: center;
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: min(calc(100% - 24px), 420px); text-align: center;
     padding: 8px 16px; border-radius: 20px;
     background: rgba(4, 12, 6, 0.55);
     border: 1.5px solid var(--glow, rgba(124, 252, 138, 0.18));
@@ -559,15 +667,15 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     font-size: 12.5px; letter-spacing: 0.06em; color: #7cfc8a; opacity: 0.8;
     text-shadow: 0 0 8px rgba(124, 252, 138, 0.6);
   }
-  .intro h1 {
-    font-size: clamp(40px, 10vw, 84px); margin: 0; letter-spacing: -0.03em;
+  .intro .intro-name {
+    font-size: clamp(36px, 10cqw, 84px); margin: 0; letter-spacing: -0.03em;
     color: #eaf3ff; -webkit-text-stroke: 3px #03110a; paint-order: stroke fill;
     text-shadow:
       0 4px 0 #7cfc8a, 0 9px 0 #03110a, 0 18px 34px rgba(0, 0, 0, 0.5),
       2px 0 0 rgba(255, 110, 199, 0.35), -2px 0 0 rgba(110, 231, 255, 0.35);
     animation: title-pop 700ms var(--ease-bounce, ease) both, title-glitch 9s ease-in-out 1s infinite;
   }
-  .intro h1 .cursor { color: #7cfc8a; -webkit-text-stroke: 0; animation: cursor-blink 1s steps(1, end) infinite; }
+  .intro .intro-name .cursor { color: #7cfc8a; -webkit-text-stroke: 0; animation: cursor-blink 1s steps(1, end) infinite; }
   @keyframes cursor-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
   @keyframes title-pop { from { opacity: 0; transform: scale(0.7) rotate(-3deg); } }
   /* A brief CRT-glitch pulse every few seconds — a couple of frames of
@@ -579,10 +687,8 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     98.2% { transform: translate(2px, -1px); filter: hue-rotate(-25deg); }
     98.8% { transform: translate(-1px, 0); filter: none; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .intro h1 { animation: none; }
-    .intro h1 .cursor { animation: none; opacity: 1; }
-  }
+  :global(html:not(.play)) .intro .intro-name { animation: none; }
+  :global(html:not(.play)) .intro .intro-name .cursor { animation: none; opacity: 1; }
   .intro p { opacity: 0.85; margin: 0; font-size: 18px; max-width: 34ch; margin-inline: auto; position: relative; z-index: 2; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4); }
   .scroll-hint { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
   .arrow { font-size: 30px; opacity: 0.7; animation: bob 1.8s ease-in-out infinite; position: relative; z-index: 2; }
@@ -608,9 +714,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     50% { transform: translateY(-14px); }
     100% { transform: translateY(0); }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .intro-glyphs span, .glyphfield span { animation: none; }
-  }
+  :global(html:not(.play)) .intro-glyphs span, :global(html:not(.play)) .glyphfield span { animation: none; }
 
   .rail-track { position: absolute; top: 0; left: 26px; width: 12px; height: 0; z-index: 1; pointer-events: none; }
   .rail-line {
@@ -628,10 +732,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   @media (max-width: 460px) {
     .rail-track { display: none; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .rail-dot { animation: none; }
-    .rail-dot, .cable-car { transition: none; }
-  }
+  :global(html:not(.play)) .rail-dot { animation: none; transition: none; }
 
   /* Cut-outs, same contract as Deep Sea and Space Elevator: the drawing is
      the element, not an icon pinned above a text column — it fills the
@@ -639,13 +740,13 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
      shipping. */
   .ev {
     position: absolute; left: 50%; transform: translateX(-50%); z-index: 2;
-    width: min(88vw, 480px);
+    width: min(88cqw, 480px);
     display: grid; justify-items: center;
     gap: 12px; text-align: center;
     --moodRgb: 234, 243, 255;
   }
-  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44vw, 320px); }
-  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44vw, 320px); }
+  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44cqw, 320px); }
+  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44cqw, 320px); }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 18px; }
   .ev.lane-left p, .ev.lane-right p { font-size: 13.5px; }
 
@@ -663,7 +764,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   }
   .ev-art svg { display: block; width: 100%; height: 100%; }
 
-  .ev.big { width: min(92vw, 560px); }
+  .ev.big { width: min(92cqw, 560px); }
   .ev.big h2 { font-size: 27px; }
   .ev.big .ev-art { width: min(100%, 340px); filter: drop-shadow(0 0 26px rgba(var(--moodRgb), 0.7)) drop-shadow(0 0 74px rgba(var(--moodRgb), 0.42)); }
   .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 19px; }
@@ -676,24 +777,27 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   .ev.big.focused .ev-art { animation: seen-pulse 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
   .ev.compact p { display: none; }
-  .ev.compact { width: min(46vw, 220px); }
+  .ev.compact { width: min(46cqw, 220px); }
   .ev.compact .ev-art { width: 64px; }
   /* A turning point stays visually a little heavier than the trivia next to
      it even when the cluster forces it to compact — the same reasoning as
      `.ev.big`'s own larger glow, just surviving the squeeze. */
-  .ev.big.compact { width: min(52vw, 260px); }
+  .ev.big.compact { width: min(52cqw, 260px); }
   .ev.big.compact .ev-art { width: 96px; }
   .ev.compact-hard .ev-when { display: none; }
   .ev.compact-hard .ev-art { display: none; }
-  @media (max-width: 620px) {
-    .ev { width: min(92vw, 360px); }
-    .ev.lane-left, .ev.lane-right { width: min(48vw, 240px); }
-    .ev.big { width: min(94vw, 400px); }
+  @container (max-width: 620px) {
+    .ev { width: min(92cqw, 360px); }
+    .ev.lane-left, .ev.lane-right { width: min(48cqw, 240px); }
+    .ev.big { width: min(94cqw, 400px); }
+    /* A big card in a side lane keeps the lane's width: .ev.big comes later
+       and would otherwise stretch it past the edge of the frame. */
+    .ev.lane-left.big, .ev.lane-right.big { width: min(48cqw, 240px); }
   }
   .ev-when {
     font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
     font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
-    opacity: 0.85; font-variant-numeric: tabular-nums;
+    opacity: 0.85;
     text-shadow: 0 1px 8px rgb(0 0 0 / 0.85);
   }
   .ev-when::before { content: '// '; opacity: 0.6; }
@@ -706,12 +810,9 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     text-shadow: 0 1px 10px rgb(0 0 0 / 0.9), 0 0 22px rgb(0 0 0 / 0.7);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .ev.big.focused .ev-art { animation: none; }
-    .ev-art { animation: none; }
-    .ev { transition: none; }
-    .arrow { animation: none; }
-  }
+  :global(html:not(.play)) .ev.big.focused .ev-art,
+  :global(html:not(.play)) .ev-art,
+  :global(html:not(.play)) .arrow { animation: none; }
 
   .seam { position: absolute; left: 0; right: 0; z-index: 1; text-align: center; padding-top: 8px; }
   .seam::before {
@@ -722,7 +823,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     position: relative; display: inline-block; margin-top: 16px;
     background: #fff; color: #1a2233;
     border: 2px solid #1a2233; border-radius: 18px;
-    padding: 10px 18px 11px; max-width: min(84vw, 420px);
+    padding: 10px 18px 11px; max-width: min(84cqw, 420px);
     box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
   }
   .seam-bubble::after {
@@ -736,21 +837,13 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
 
   .finale { max-width: 640px; margin: 10vh auto 0; padding: 0 22px 8vh; text-align: left; }
   .fin-kicker { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #7cfc8a; opacity: 0.9; margin: 0 0 12px; font-weight: 600; }
-  .finale h2 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 18px; letter-spacing: -0.02em; }
+  .finale h2 { font-size: clamp(24px, 4cqw, 32px); margin: 0 0 18px; letter-spacing: -0.02em; }
   .finale p { font-size: 16px; line-height: 1.7; opacity: 0.85; margin: 0 0 16px; }
   .finale em { color: #7cfc8a; font-style: normal; }
-  .finale strong { color: #ffd27a; }
+  .finale strong { color: #7cfc8a; }
   .fin-closer { opacity: 0.95; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 
-  .outro { padding: 6vh 20px 16vh; text-align: center; }
-  .acts { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-bottom: 20px; }
-  .acts button {
-    appearance: none; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
-    color: inherit; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
-  }
-  .acts button:first-child { background: linear-gradient(165deg, #a8ffb4, #7cfc8a); color: #03110a; border: 0; }
-  .acts a { color: inherit; opacity: 0.7; font-size: 14px; text-decoration: none; }
-  .acts a:hover { opacity: 1; }
+  .outro { padding: 2vh 20px 10vh; text-align: center; }
   .outro-line { font-size: 15px; opacity: 0.6; margin: 0; }
 </style>
 
@@ -774,7 +867,5 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   }
   .seg-f, .seg-e { left: 0; } .seg-b, .seg-c { right: 0; }
   .seg-f, .seg-b { top: 0.09em; } .seg-e, .seg-c { top: 0.5em; }
-  @media (prefers-reduced-motion: reduce) {
-    .digit.flicker { animation: none; }
-  }
+  html:not(.play) .digit.flicker { animation: none; }
 </style>

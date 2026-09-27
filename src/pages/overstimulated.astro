@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { iconSvg } from '../lib/icons'
 
 /**
@@ -12,10 +12,24 @@ import { iconSvg } from '../lib/icons'
  *
  * Two rules keep it from being hostile: the sound is off until you press a
  * button, and "Make it stop" is always reachable.
+ *
+ * In the shell the room is the stage, framed rather than filling the window.
+ * Score is attention, Upgrades how many layers of noise you have bought,
+ * Clicks the clicks, and Best the most clicks anybody has put in before
+ * stopping. "Make it stop" is the ending, and the quiet is the shell's result
+ * card now rather than an overlay. The shell's Pause really pauses: every
+ * layer runs on one interval helper that skips its turn while paused, so the
+ * bassline, the popups and the income all hold. The page's own gold is mint
+ * and sky; the confetti is still confetti.
  */
 ---
 
-<GameLayout slug="overstimulated" bar="#12021f" fixed bodyClass="over-body">
+<GameShell
+  slug="overstimulated"
+  labels={{ score: 'Attention', best: 'Most clicks', level: 'Upgrades', moves: 'Clicks' }}
+  initial={{ score: '0', level: '0 / 15', moves: '0' }}
+>
+  <div class="over-body" id="overRoot">
   {/* Deliberately a sibling of .world rather than a child. The world tilts and
       shakes; a full-bleed element inside it would swing its own corners into
       view. Keeping the room still while the furniture lurches is also the more
@@ -32,7 +46,6 @@ import { iconSvg } from '../lib/icons'
   />
 
   <div class="world" id="world">
-    <h1 class="visually-hidden">Overstimulated</h1>
 
     <div class="core">
       <div class="score">
@@ -51,20 +64,23 @@ import { iconSvg } from '../lib/icons'
     <aside class="shop" id="shop" aria-label="Upgrades"></aside>
 
     <button type="button" class="stop" id="stopBtn" hidden>Make it stop</button>
-
-    <div class="ending" id="ending" hidden>
-      <div class="ending-card">
-        <h2>Quiet.</h2>
-        <p id="endingStats"></p>
-        <p class="ending-note">That took a surprising amount of clicking.</p>
-        <div class="ending-actions">
-          <button type="button" data-share data-title="Overstimulated">Share</button>
-          <button type="button" id="againBtn" class="ghost">Do it again</button>
-        </div>
-      </div>
-    </div>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      A clicker. Click the button to earn attention, and spend it in the shop.
+      Every upgrade makes the page a little worse, and they all keep running.
+    </p>
+    <ul>
+      <li>Click fast and the button runs hotter: a quick run of clicks is worth more per click.</li>
+      <li>Some upgrades earn attention on their own. All of them add noise.</li>
+      <li>The sound stays off until you turn it on with the Sound button.</li>
+      <li>"Make it stop" appears once there is something to stop, and it always works.</li>
+    </ul>
+    <p>Stopping is the end. Best is the most clicks it took you.</p>
+  </Fragment>
+</GameShell>
 
 <script>
     const { trophy: TROPHY, runners: RUNNERS } = JSON.parse(
@@ -72,15 +88,25 @@ import { iconSvg } from '../lib/icons'
     ) as { trophy: string; runners: string[] }
 
   import { sfx, unlock, tone, hit, scaleFreq } from '../lib/audio'
-  import { burst, floatText, prefersReducedMotion } from '../lib/fx'
+  import { burst, floatText } from '../lib/fx'
   import { ShaderSurface } from '../lib/gl'
   import { OVER_FRAG } from '../lib/over-sky'
-  import { onShare } from '../lib/share-card'
+  import { shareResult, outcomeLabel } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+
+  const prefersReducedMotion = !PLAY
+  // Restart is the default reload: nothing about the noise is worth keeping.
+  const shell = createShell({ slug: 'overstimulated' })
+  /** Every layer's timer. It skips its turn while the shell is paused, so a
+      pause holds the whole room rather than only the income. */
+  const every = (fn: () => void, ms: number) => window.setInterval(() => { if (!shell.paused) fn() }, ms)
 
   const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
   const world = el('world')
+  const root = el('overRoot')
   const shop = el('shop')
 
   let attention = 0
@@ -107,10 +133,12 @@ import { iconSvg } from '../lib/icons'
   let focus: [number, number] = [0, 0]
   function measureFocus() {
     const r = document.querySelector('.core')!.getBoundingClientRect()
-    const w = innerWidth, h = innerHeight, m = Math.min(w, h)
-    // Mirrors centredAt(): origin at the viewport centre, units of half the
+    // Against the room, not the window: the sky fills the stage now.
+    const b = root.getBoundingClientRect()
+    const w = b.width || 1, h = b.height || 1, m = Math.min(w, h)
+    // Mirrors centredAt(): origin at the room's centre, units of half the
     // short axis, y upward.
-    focus = [(2 * (r.left + r.width / 2) - w) / m, (h - 2 * (r.top + r.height / 2)) / m]
+    focus = [(2 * (r.left - b.left + r.width / 2) - w) / m, (h - 2 * (r.top - b.top + r.height / 2)) / m]
   }
   measureFocus()
   addEventListener('resize', measureFocus)
@@ -222,7 +250,7 @@ import { iconSvg } from '../lib/icons'
   function startMusic() {
     const PATTERN = [0, 0, 3, 0, 5, 3, 0, -2]
     let beat = 0
-    musicTimer = window.setInterval(() => {
+    musicTimer = every(() => {
       beatAt = performance.now()
       const step = PATTERN[beat % PATTERN.length]
       tone({ freq: scaleFreq(step, 55), dur: 0.26, type: 'sawtooth', gain: 0.1, filter: 420 })
@@ -239,13 +267,13 @@ import { iconSvg } from '../lib/icons'
     { id: 'auto', name: 'An autoclicker', note: '+2 attention every second', cost: 25, rate: 2,
       apply: () => {} },
     { id: 'notif', name: 'Notifications', note: 'From apps you do not have', cost: 45,
-      apply: () => timers.push(window.setInterval(spawnNotification, 2600)) },
+      apply: () => timers.push(every(spawnNotification, 2600)) },
     { id: 'music', name: 'A backing track', note: 'It has one idea', cost: 80,
       apply: startMusic },
     { id: 'confetti', name: 'Confetti', note: 'For no particular reason', cost: 120,
-      apply: () => timers.push(window.setInterval(() => {
+      apply: () => timers.push(every(() => {
         burst(Math.random() * innerWidth, -10, {
-          count: 10, colors: ['#ff5f9e', '#ffd166', '#63c9f0', '#8affc4'],
+          count: 10, colors: ['#ff5f9e', '#8affc4', '#63c9f0', '#8affc4'],
           speed: 3, gravity: 0.22, spread: Math.PI, angle: Math.PI / 2, shape: 'square', size: 7, life: 90,
         })
       }, 900)) },
@@ -254,13 +282,13 @@ import { iconSvg } from '../lib/icons'
     { id: 'cursor', name: 'A second cursor', note: 'It is slightly behind yours', cost: 260,
       apply: () => { addCursors(1); world.classList.add('has-cursors') } },
     { id: 'popup', name: 'A newsletter popup', note: 'Recurring, obviously', cost: 380,
-      apply: () => { spawnPopup(); timers.push(window.setInterval(spawnPopup, 9000)) } },
+      apply: () => { spawnPopup(); timers.push(every(spawnPopup, 9000)) } },
     { id: 'achv', name: 'Achievements', note: 'For clicking', cost: 520, rate: 10,
-      apply: () => { spawnAchievement(); timers.push(window.setInterval(spawnAchievement, 6000)) } },
+      apply: () => { spawnAchievement(); timers.push(every(spawnAchievement, 6000)) } },
     { id: 'shake', name: 'Screen shake', note: 'Constantly', cost: 700,
       apply: () => world.classList.add('has-shake') },
     { id: 'runner', name: 'Animals', note: 'Running across the screen', cost: 900,
-      apply: () => { spawnRunner(); timers.push(window.setInterval(spawnRunner, 2200)) } },
+      apply: () => { spawnRunner(); timers.push(every(spawnRunner, 2200)) } },
     { id: 'rainbow', name: 'Colour', note: 'All of it', cost: 1200, rate: 25,
       apply: () => { world.classList.add('has-rainbow'); rainbow = true } },
     { id: 'swarm', name: 'Nineteen more cursors', note: 'They are all slightly behind yours', cost: 1700,
@@ -270,10 +298,10 @@ import { iconSvg } from '../lib/icons'
     { id: 'everything', name: 'Everything, faster', note: 'You know what you are doing', cost: 3600, rate: 100,
       apply: () => {
         world.classList.add('has-everything')
-        timers.push(window.setInterval(spawnNotification, 900))
-        timers.push(window.setInterval(spawnRunner, 700))
-        timers.push(window.setInterval(() => burst(Math.random() * innerWidth, -10, {
-          count: 14, colors: ['#ff5f9e', '#ffd166', '#63c9f0'], speed: 4, gravity: 0.26,
+        timers.push(every(spawnNotification, 900))
+        timers.push(every(spawnRunner, 700))
+        timers.push(every(() => burst(Math.random() * innerWidth, -10, {
+          count: 14, colors: ['#ff5f9e', '#8affc4', '#63c9f0'], speed: 4, gravity: 0.26,
           spread: Math.PI, angle: Math.PI / 2, shape: 'square', size: 8, life: 90,
         }), 400))
       } },
@@ -309,11 +337,12 @@ import { iconSvg } from '../lib/icons'
 
     const r = b.getBoundingClientRect()
     burst(r.left + r.width / 2, r.top + r.height / 2, {
-      count: 18, colors: ['#ff5f9e', '#ffd166', '#8affc4'], speed: 4, gravity: 0.1, life: 40, size: 4,
+      count: 18, colors: ['#ff5f9e', '#8affc4', '#8affc4'], speed: 4, gravity: 0.1, life: 40, size: 4,
     })
 
     if (owned.size >= 4) el('rate').hidden = false
     if (owned.size >= 3) el('stopBtn').hidden = false
+    shell.setLevel(`${owned.size} / ${UPGRADES.length}`)
     if (owned.size === UPGRADES.length) {
       el('sub').textContent = 'There is nothing left to buy. There is only this.'
       el('stopBtn').classList.add('urgent')
@@ -341,9 +370,9 @@ import { iconSvg } from '../lib/icons'
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const px = r.left + r.width / 2 + (Math.random() - 0.5) * r.width * 0.5
     const py = r.top + r.height / 2
-    floatText(px, py, '+' + gain, '#ffd166')
+    floatText(px, py, '+' + gain, '#8affc4')
     burst(px, py, {
-      count: 6 + combo, colors: ['#ff5f9e', '#ffd166', '#fff'],
+      count: 6 + combo, colors: ['#ff5f9e', '#8affc4', '#fff'],
       speed: 3, gravity: 0.18, life: 30, size: 3,
     })
 
@@ -364,12 +393,19 @@ import { iconSvg } from '../lib/icons'
   }
 
   let last = performance.now()
+  let lastStrip = -1e9
   let lastDrawn = -1
   let shakeSeed = 0
   function loop(now: number) {
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
-    if (perSec) { attention += perSec * dt; paint() }
+    if (perSec && !shell.paused) { attention += perSec * dt; paint() }
+    // The strip rolls its digits; four times a second is plenty.
+    if (now - lastStrip > 250) {
+      lastStrip = now
+      shell.setScore(Math.floor(attention).toLocaleString('en-US'))
+      shell.setMoves(clicks.toLocaleString('en-US'))
+    }
 
     // Ease toward the target rather than stepping to it. Buying a layer should
     // feel like a fader being pushed up, not like a switch.
@@ -400,7 +436,9 @@ import { iconSvg } from '../lib/icons'
       world.style.setProperty('--sy', (Math.cos(shakeSeed * 2.3) * k).toFixed(2) + 'px')
     }
 
-    // Ghost cursors chase the real one, each one lagging a little more.
+    // Ghost cursors chase the real one, each one lagging a little more. They
+    // live in the room, so the pointer is taken into the room's own space.
+    const wr = cursorEls.length ? world.getBoundingClientRect() : null
     cursorEls.forEach((c, i) => {
       const lag = 0.16 - Math.min(0.14, i * 0.006)
       const cx = Number(c.dataset.x || cursorPos.x)
@@ -408,7 +446,7 @@ import { iconSvg } from '../lib/icons'
       const nx = cx + (cursorPos.x - cx) * lag
       const ny = cy + (cursorPos.y - cy) * lag
       c.dataset.x = String(nx); c.dataset.y = String(ny)
-      c.style.transform = 'translate(' + nx + 'px,' + ny + 'px)'
+      c.style.transform = 'translate(' + (nx - wr!.left) + 'px,' + (ny - wr!.top) + 'px)'
     })
 
     requestAnimationFrame(loop)
@@ -416,11 +454,7 @@ import { iconSvg } from '../lib/icons'
 
   // ---- the off switch ----------------------------------------------------
   let stopping = false
-  let shareCard = null
-  onShare(() => shareCard, (c) => ({
-    title: 'Overstimulated',
-    text: `${c.headline}, and then I stopped.`,
-  }))
+  let shareCard: import('../lib/result-card').ResultCard | null = null
 
   el('stopBtn').addEventListener('click', () => {
     // The loop fades 'calm' in from here; the shader multiplies every layer out
@@ -437,11 +471,6 @@ import { iconSvg } from '../lib/icons'
     world.style.removeProperty('--sy')
 
     const secs = Math.round((performance.now() - started) / 1000)
-    el('endingStats').textContent =
-      clicks.toLocaleString('en-US') + ' clicks, ' + owned.size + ' of ' + UPGRADES.length +
-      ' upgrades, ' + Math.floor(secs / 60) + 'm ' + (secs % 60) + 's.'
-    el('ending').hidden = false
-    sfx.good()
 
     const stat = recordPlay(
       'overstimulated',
@@ -464,18 +493,45 @@ import { iconSvg } from '../lib/icons'
         { label: 'Per second', value: (clicks / Math.max(1, secs)).toFixed(1) },
       ],
     }
+
+    if (clicks > 0) shell.considerBest(clicks, clicks.toLocaleString('en-US'))
+    shell.win({
+      celebrate: false,
+      kicker: 'You made it stop',
+      title: 'Quiet.',
+      score: clicks.toLocaleString('en-US'),
+      lines: [
+        `${clicks.toLocaleString('en-US')} click${clicks === 1 ? '' : 's'}, ${owned.size} of ${UPGRADES.length} upgrades, ${Math.floor(secs / 60)}m ${secs % 60}s.`,
+        'That took a surprising amount of clicking.',
+      ],
+      againLabel: 'Do it again',
+    })
+    shell.resultExtra.innerHTML =
+      '<div class="os-report-acts"><button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share this</span></button></div>'
+    el('shareBtn').addEventListener('click', async (e) => {
+      if (!shareCard) return
+      const label = (e.currentTarget as HTMLElement).querySelector('span')!
+      const outcome = await shareResult(shareCard, { title: 'Overstimulated', text: `${shareCard.headline}, and then I stopped.`, url: location.href })
+      label.textContent = outcomeLabel[outcome]
+      setTimeout(() => (label.textContent = 'Share this'), 1600)
+    })
+    el('stopBtn').hidden = true
   })
 
-  el('againBtn').addEventListener('click', () => location.reload())
+  shell.setLevel(`0 / ${UPGRADES.length}`)
 
   paint()
   requestAnimationFrame(loop)
 </script>
 
 <style is:global>
-  .over-body { background: #0b0114; color: #f3e9ff; overflow: hidden; }
+  /* The room fills the stage edge to edge, framed at a fixed height rather
+     than the whole window. */
+  .stage:has(> .over-body) { padding: 0; overflow: hidden; background: #0b0114; }
+  .over-body { position: relative; color: #f3e9ff; overflow: hidden; height: clamp(540px, 80vh, 860px); }
+  .os-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
-  .oversky { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .oversky { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
   .oversky .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   .over-body .world {
@@ -499,10 +555,9 @@ import { iconSvg } from '../lib/icons'
   .over-body .score b {
     font-family: var(--display); font-size: clamp(44px, 10vw, 84px);
     font-weight: 800; letter-spacing: -0.04em; line-height: 1;
-    font-variant-numeric: tabular-nums;
   }
   .over-body .score span { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: #b58fd6; }
-  .over-body .score em { font-style: normal; font-size: 13px; color: #7ce0b0; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .over-body .score em { font-style: normal; font-size: 13px; color: #7ce0b0; margin-top: 4px; }
 
   .over-body .big {
     position: relative; overflow: hidden;
@@ -559,7 +614,7 @@ import { iconSvg } from '../lib/icons'
   .over-body .buy-note { grid-area: 2 / 1; font-size: 11.5px; color: #a487c4; }
   .over-body .buy-cost {
     grid-area: 1 / 2 / span 2 / 3; align-self: center; font-size: 13px; font-weight: 700;
-    color: #ffd166; font-variant-numeric: tabular-nums; white-space: nowrap;
+    color: #8ccbff; white-space: nowrap;
   }
   .over-body .buy.owned .buy-cost { color: #3ec98d; }
 
@@ -581,7 +636,7 @@ import { iconSvg } from '../lib/icons'
   /* --- the noise --- */
   .over-body .world.has-bar::before {
     content: ''; position: absolute; top: 0; left: 0; height: 4px; z-index: 30;
-    background: linear-gradient(90deg, #ff4d94, #ffd166);
+    background: linear-gradient(90deg, #ff4d94, #63c9f0);
     animation: fakeLoad 5.5s ease-in-out infinite;
   }
   @keyframes fakeLoad { 0% { width: 0; } 70% { width: 92%; } 100% { width: 96%; } }
@@ -621,19 +676,19 @@ import { iconSvg } from '../lib/icons'
   .over-body .achv {
     position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
     z-index: 33; display: flex; align-items: center; gap: 10px;
-    background: #1c0a2b; border: 1px solid #ffd16655; border-radius: 12px;
+    background: #1c0a2b; border: 1px solid #8affc455; border-radius: 12px;
     padding: 9px 16px; animation: popUp 320ms var(--ease);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
   .over-body .achv span { width: 22px; height: 22px; flex: none; display: inline-block; }
-  .over-body .achv b { display: block; font-size: 11px; color: #ffd166; letter-spacing: 0.08em; text-transform: uppercase; }
+  .over-body .achv b { display: block; font-size: 11px; color: #8affc4; letter-spacing: 0.08em; text-transform: uppercase; }
   .over-body .achv i { font-style: normal; font-size: 14px; }
   .over-body .achv.out { animation: slideOut 380ms var(--ease) forwards; }
   @keyframes popUp { from { opacity: 0; transform: translate(-50%, 16px); } }
 
   .over-body .popup {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    z-index: 45; width: min(320px, 84vw); text-align: center;
+    z-index: 45; width: min(320px, 84%); text-align: center;
     background: #1c0a2b; border: 1px solid #43215e; border-radius: 16px;
     padding: 22px 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
     animation: popIn 260ms var(--ease);
@@ -651,7 +706,7 @@ import { iconSvg } from '../lib/icons'
   @keyframes popIn { from { opacity: 0; transform: translate(-50%, -46%) scale(0.94); } }
 
   .over-body .ghost-cursor {
-    position: fixed; left: 0; top: 0; z-index: 8500;
+    position: absolute; left: 0; top: 0; z-index: 50;
     font-size: 17px; color: #fff; pointer-events: none;
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
     rotate: -35deg;
@@ -663,31 +718,11 @@ import { iconSvg } from '../lib/icons'
   }
   @keyframes runAcross { to { transform: translateX(calc(100vw + 120px)); } }
 
-  .over-body .world.calm > *:not(.core):not(.ending) { display: none; }
+  .over-body .world.calm > *:not(.core) { display: none; }
   .over-body .world.calm .core { opacity: 0.25; }
 
-  .over-body .ending {
-    position: absolute; inset: 0; z-index: 60; display: grid; place-content: center;
-    background: rgba(6, 0, 12, 0.86); padding: 20px;
-    animation: fadeUp 700ms var(--ease);
-  }
-  .over-body .ending[hidden] { display: none; }
-  @keyframes fadeUp { from { opacity: 0; } }
-  .over-body .ending-card { text-align: center; max-width: 420px; }
-  .over-body .ending-card h2 { font-size: clamp(38px, 8vw, 62px); }
-  .over-body .ending-card p { color: #b6a0cc; margin: 12px 0 0; font-variant-numeric: tabular-nums; }
-  .over-body .ending-note { font-size: 14px; color: #7a6790; }
-  .over-body .ending-actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; }
-  .over-body .ending-actions button {
-    border: 0; border-radius: 999px; padding: 11px 24px; font-weight: 600; cursor: pointer;
-    background: #ff4d94; color: #fff;
-    transition: transform 180ms var(--ease-bounce);
-  }
-  .over-body .ending-actions button:hover { transform: translateY(-2px) scale(1.04); }
-  .over-body .ending-actions button:active { transform: scale(0.95); }
-  .over-body .ending-actions .ghost { background: transparent; border: 1px solid #43215e; color: #f3e9ff; }
-
   @media (max-width: 760px) {
+    .over-body { height: clamp(640px, 90vh, 920px); }
     .over-body .shop { position: absolute; right: 0; left: 0; top: auto; bottom: 0; width: auto; height: 42%;
       grid-template-columns: 1fr 1fr; border-left: 0; border-top: 1px solid #2a1140; }
     .over-body .core { bottom: 42%; inset-block-end: 42%; }
@@ -696,16 +731,15 @@ import { iconSvg } from '../lib/icons'
     .over-body .world.has-ad::after { display: none; }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    /* The combined .has-tilt.has-rainbow rule above is four classes and beat
-       these two three-class overrides, so once you owned both the tilt and the
-       colour the page carried on rotating and hue-cycling regardless of the
-       setting. Same for .has-everything, which only sets a duration. */
-    .over-body .world.has-tilt,
-    .over-body .world.has-rainbow,
-    .over-body .world.has-tilt.has-rainbow,
-    .over-body .world.has-everything { animation: none; }
-    .over-body .runner { display: none; }
-    .over-body .big::after { animation: none; opacity: 0; }
-  }
+  /* The site's motion setting, not only the system one. The combined
+     .has-tilt.has-rainbow rule above is four classes and beat three-class
+     overrides, so once you owned both the tilt and the colour the page carried
+     on rotating and hue-cycling regardless of the setting. Same for
+     .has-everything, which only sets a duration. */
+  html:not(.play) .over-body .world.has-tilt,
+  html:not(.play) .over-body .world.has-rainbow,
+  html:not(.play) .over-body .world.has-tilt.has-rainbow,
+  html:not(.play) .over-body .world.has-everything { animation: none; }
+  html:not(.play) .over-body .runner { display: none; }
+  html:not(.play) .over-body .big::after { animation: none; opacity: 0; }
 </style>

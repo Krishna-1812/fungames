@@ -2588,7 +2588,27 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     has its own switch. `.wrap`, `.grid` and `.meta` were the system's and
     are prefixed.
 
-57. Then reassess again.
+57. ~~**Paper & Ink, phase 15: Overstimulated and Internet Artifacts.**~~ **done.**
+
+    **Overstimulated** is framed in the stage. Attention, Upgrades (of
+    fifteen), Clicks, and Best the most clicks it took before stopping.
+    "Make it stop" is the ending, and "Quiet." is the shell's result card
+    with a share rather than an overlay. The shell's Pause really pauses:
+    every layer of noise runs through one interval helper that skips its turn
+    while paused, so the bassline, the popups and the income all hold. The
+    sky's focus well and the ghost cursors are measured against the room
+    instead of the window, and the page's gold is mint and sky.
+
+    **Internet Artifacts** follows Space Elevator: a sticky sky and
+    scanlines inside the stage, the year gauge on a zero-height sticky pin,
+    widths in `cqw` (with the side-lane big-card fix Space Elevator needed).
+    Year, Era, Moments passed (of twenty-five); each era announces itself,
+    and scrolling past Nyan Cat is the ending. Restart scrolls back to 1969,
+    and re-arms the ending only once the page is back in the first half —
+    re-arming at once let the first frame of the smooth scroll up end the
+    piece again.
+
+58. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
