@@ -1291,20 +1291,18 @@ canonical links, the sitemap and share URLs follow the production domain —
 `<project>.vercel.app` at first, the custom domain as soon as one is attached
 and the site is redeployed. `SITE_URL` overrides it on any host.
 
-**Also deployed to GitHub Pages** via `.github/workflows/deploy.yml`,
-which builds and publishes straight from Actions on every push to `main` —
-no `gh-pages` branch to keep in sync. That is also the one host here that
-needed real code to work at all: a repo called `fungames` is not the special
-`<user>.github.io` repo GitHub serves at a domain root, so it publishes to
-`https://<user>.github.io/fungames/`, a subpath. `astro.config.mjs`'s `base`
-carries that (the workflow sets `BASE_PATH=/fungames`, and every other host
-builds at `/`); `src/lib/base.ts`'s `withBase()` is what every hand-written
-root-relative link in the codebase (a tile's own href, the chrome bar's home
-link, a cross-game "related" link, an OG image path, the sitemap) is prefixed
-with, because none of that is rewritten automatically — only Astro's own
-generated asset tags and `Astro.url` are. Once the site lives on Vercel this
-workflow can be switched off (delete the file, or disable it under the repo's
-Actions tab); nothing else depends on it.
+**GitHub Pages is retired.** The site used to publish there too, at
+`https://<user>.github.io/fungames/` — a subpath, because a repo called
+`fungames` is not the special `<user>.github.io` one GitHub serves at a domain
+root. Its workflow is gone, but the subpath support stays, because it costs
+nothing and any host that serves from a folder needs it: set `BASE_PATH`
+(for example `/fungames`) and `astro.config.mjs`'s `base` follows.
+`src/lib/base.ts`'s `withBase()` is what every hand-written root-relative link
+in the codebase (a tile's own href, the chrome bar's home link, a cross-game
+"related" link, an OG image path, the sitemap) is prefixed with, because none
+of that is rewritten automatically — only Astro's own generated asset tags and
+`Astro.url` are. `.github/workflows/check.yml` still runs every checker and
+the build on each push.
 
 The Fusion backend is optional (the game works without it):
 

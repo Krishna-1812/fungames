@@ -1,9 +1,9 @@
 /**
  * The site's deploy base path.
  *
- * Empty at a domain root; `/fungames` on GitHub Pages, where this repo is
- * served from `https://<user>.github.io/fungames/` rather than the domain
- * root. Astro injects the real value from `base` in `astro.config.mjs` at
+ * Empty at a domain root, which is where Vercel serves it; `/fungames` when
+ * built with BASE_PATH for a host that serves from a folder (GitHub Pages
+ * did, before it was retired). Astro injects the real value from `base` in `astro.config.mjs` at
  * build time, so every hand-written root-relative link in the codebase runs
  * through `withBase` instead of being typed as a literal `/slug/` — the one
  * thing that would otherwise silently 404 the moment this deploys anywhere

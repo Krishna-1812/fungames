@@ -8,7 +8,8 @@
  *
  * `url` is the full deployed URL *including* any base path, built from
  * `astro.config.mjs`'s `site` and `base` — which work out the host at build
- * time (Vercel's production domain, or the GitHub Pages subpath) — so it is
+ * time (Vercel's production domain, plus BASE_PATH if a host ever needs one)
+ * — so it is
  * never typed in and never goes stale when a custom domain is attached. The
  * optional chaining is for the checkers, which import this under plain Node
  * where there is no `import.meta.env`.

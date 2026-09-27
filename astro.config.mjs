@@ -9,9 +9,9 @@ import { defineConfig } from 'astro/config'
  *   until then. Vercel sets it on every build, previews included, so a
  *   preview's canonical links still point at the real site.
  * - SITE_URL overrides that anywhere (an origin, no path).
- * - BASE_PATH is only for a host that serves from a subpath. The GitHub Pages
- *   workflow sets it to '/fungames', because a repo called `fungames` is
- *   published at <user>.github.io/fungames/, not at a domain root.
+ * - BASE_PATH is only for a host that serves from a subpath, e.g. '/fungames'.
+ *   GitHub Pages needed it (a repo called `fungames` publishes at
+ *   <user>.github.io/fungames/); nothing sets it now that Pages is retired.
  */
 const vercelDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL
 const site = (process.env.SITE_URL || (vercelDomain ? `https://${vercelDomain}` : 'http://localhost:4321')).replace(/\/+$/, '')
