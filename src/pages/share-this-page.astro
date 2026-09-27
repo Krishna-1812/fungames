@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { METHODS } from '../lib/share-methods'
 
 /**
@@ -18,6 +18,13 @@ import { METHODS } from '../lib/share-methods'
  * rather than reshuffling on every reload. Four real tiles with the richest
  * payoff in their modal (Morse, Braille, Touch-Tone, Interstellar) get a
  * second column so the grid itself isn't perfectly uniform.
+ *
+ * In the shell the receiving room is a dark stage, its radar a sticky
+ * backdrop inside the frame. Score is how many of the ways you have sent it,
+ * Real how many of those were genuine encodings, Characters how long the
+ * message is, and Best the most ways in one visit. Sending it every way there
+ * is — jokes included — is the ending. The page's gold is mint and sky; the
+ * postcards keep their own warm card.
  */
 
 // Deterministic, so the same tile always tilts the same amount — a random()
@@ -28,7 +35,13 @@ const tiltOf = (id: string) => ((seedOf(id) % 240) / 240 - 0.5) * 5 // -2.5..2.5
 const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
 ---
 
-<GameLayout slug="share-this-page" bar="#1b2740" bodyClass="stp-body" fonts={['Caveat:wght@600;700']}>
+<GameShell
+  slug="share-this-page"
+  labels={{ score: 'Sent', best: 'Most ways', level: 'Real', moves: 'Characters' }}
+  initial={{ score: `0 / ${METHODS.length}`, level: `0 / ${METHODS.filter((m) => m.kind === 'real').length}`, moves: '20' }}
+  fonts={['Caveat:wght@600;700']}
+>
+  <div class="stp-body">
   <div class="stp-bg" aria-hidden="true">
     <div class="stp-grid-tex"></div>
     <div class="stp-radar"></div>
@@ -43,7 +56,6 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
 
   <header class="stp-head">
     <p class="stp-eyebrow"><i class="stp-live-dot" aria-hidden="true"></i>One message · thirty ways out</p>
-    <h1>Share This Page</h1>
     <p class="stp-sub">
       Type anything below. Every tile sends it a different way — most of them
       for real: the actual Morse timing, the actual Braille cell, the actual
@@ -106,11 +118,26 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
       </div>
     </div>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      Type a message, then send it. Every tile is a different way out, and
+      opening one shows your message sent that way.
+    </p>
+    <ul>
+      <li>The metal panels are real: the actual Morse timing, the actual Braille cell, the actual dial tones. Several can be played or copied.</li>
+      <li>The handwritten postcards are jokes, and they say so.</li>
+      <li>Change the message whenever you like; every tile uses whatever is typed.</li>
+    </ul>
+    <p>Send it every way there is to finish. The sounds need the Sound button on.</p>
+  </Fragment>
+</GameShell>
 
 <script>
   import { unlock, tone, hit, sfx } from '../lib/audio'
-  import { shake, prefersReducedMotion } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
+  import { recordPlay } from '../lib/stats'
   import {
     METHODS, methodById,
     morseText, morseBeats, MORSE_UNIT,
@@ -142,6 +169,45 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   const modalCard = $('modalCard')
 
   const message = () => msgInput.value.trim() || 'You should see this.'
+
+  /* ---- the shell ----------------------------------------------------------- */
+  // Restart is the default reload: a fresh message and nothing sent.
+  const shell = createShell({ slug: 'share-this-page' })
+  const REAL = METHODS.filter((m) => m.kind === 'real').length
+  const sent = new Set<string>()
+  let realSent = 0
+  let ended = false
+  function paintStrip() {
+    shell.setScore(`${sent.size} / ${METHODS.length}`)
+    shell.setLevel(`${realSent} / ${REAL}`)
+    if (sent.size) shell.considerBest(sent.size, String(sent.size))
+  }
+  function noteSent(id: string) {
+    const m = methodById(id)
+    if (!m || sent.has(id)) return
+    sent.add(id)
+    if (m.kind === 'real') realSent++
+    paintStrip()
+    if (ended || sent.size < METHODS.length) return
+    ended = true
+    recordPlay('share-this-page', { ways: sent.size }, { ways: 'high' })
+    shell.win({
+      celebrate: false,
+      // The card waits under the tiles; the one just opened is still open.
+      scroll: false,
+      kicker: `All ${METHODS.length} ways`,
+      title: 'Sent every way there is.',
+      score: `${METHODS.length} / ${METHODS.length}`,
+      lines: [
+        `${REAL} of them for real and ${METHODS.length - REAL} of them not. Every one of them said “${message()}”`,
+        'Nobody has replied yet.',
+      ],
+      againLabel: 'Send another',
+    })
+  }
+  const paintLength = () => shell.setMoves(String(message().length))
+  msgInput.addEventListener('input', paintLength)
+  paintLength()
 
   // A live "signal strength" readout under the input — not decoration, the
   // bar heights are the real character codes of whatever is actually typed,
@@ -459,6 +525,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     modal.hidden = false
     document.body.style.overflow = 'hidden'
     sfx.click()
+    noteSent(id)
   }
 
   function close() {
@@ -488,7 +555,14 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
 </script>
 
 <style>
-  .stp-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: #131c30; }
+  /* The receiving room fills the stage edge to edge. overflow: clip rather
+     than hidden, which would make the stage a scroll container and stop the
+     radar sticking. */
+  :global(.stage:has(> .stp-body)) { padding: 0; overflow: clip; background: #131c30; }
+  .stp-body { position: relative; }
+  /* Sticky, not fixed: pinned behind the tiles, but inside the frame. */
+  .stp-bg { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; pointer-events: none; background: #131c30; }
+  .stp-head, .stp-grid { position: relative; z-index: 1; }
   .stp-grid-tex {
     position: absolute; inset: 0;
     background-image:
@@ -524,7 +598,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     100% { transform: scale(9); opacity: 0; }
   }
 
-  .stp-head { max-width: 720px; margin: 48px auto 8px; padding: 0 20px; text-align: center; color: #eaf0ff; }
+  .stp-head { max-width: 720px; margin: 0 auto 8px; padding-top: 30px; padding: 0 20px; text-align: center; color: #eaf0ff; }
   .stp-eyebrow {
     display: inline-flex; align-items: center; gap: 7px;
     font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.68; margin: 0 0 10px;
@@ -535,17 +609,13 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     animation: stp-live-pulse 1.8s ease-in-out infinite;
   }
   @keyframes stp-live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.75); } }
-  .stp-head h1 {
-    font-size: clamp(32px, 6vw, 52px); margin: 0 0 12px; letter-spacing: -0.02em;
-    text-shadow: 0 0 28px rgba(140, 170, 255, 0.35);
-  }
-  .stp-sub { opacity: 0.78; line-height: 1.5; margin: 0 0 26px; }
+  .stp-sub { opacity: 0.78; line-height: 1.5; margin: 0 0 26px; font-size: 17px; }
 
   .stp-composer { display: flex; justify-content: center; }
   .stp-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .stp-input-wrap { display: flex; flex-direction: column; align-items: center; gap: 9px; width: min(100%, 480px); }
   .stp-signal { display: flex; align-items: flex-end; gap: 2px; height: 17px; opacity: 0.7; }
-  :global(.stp-signal i) { display: block; width: 3px; flex: none; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #ffd76b, #8caaff); }
+  :global(.stp-signal i) { display: block; width: 3px; flex: none; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #4fe3c1, #8caaff); }
   #msg {
     width: 100%;
     padding: 13px 18px;
@@ -560,7 +630,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   #msg:focus { outline: none; border-color: rgba(140, 170, 255, 0.6); background: rgba(255, 255, 255, 0.09); }
 
   .stp-grid {
-    max-width: 980px; margin: 34px auto 80px; padding: 0 20px;
+    max-width: 980px; margin: 34px auto 0; padding: 0 20px 48px;
     display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 13px;
     grid-auto-flow: dense;
   }
@@ -694,7 +764,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   :global(.stp-morse-row) { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
   :global(.stp-morse-mark) { width: 9px; height: 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); transition: background 120ms, box-shadow 120ms; }
   :global(.stp-morse-mark.stp-morse-dash) { width: 18px; border-radius: 5px; }
-  :global(.stp-morse-mark.is-lit) { background: #ffd76b; box-shadow: 0 0 10px 2px rgba(255, 215, 107, 0.7); }
+  :global(.stp-morse-mark.is-lit) { background: #4fe3c1; box-shadow: 0 0 10px 2px rgba(79, 227, 193, 0.7); }
 
   :global(.stp-braille-cells) { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   :global(.stp-braille-cell) { display: grid; grid-template-columns: repeat(2, 8px); grid-template-rows: repeat(3, 8px); gap: 2px; padding: 4px; background: rgba(0, 0, 0, 0.22); border-radius: 6px; }
@@ -703,7 +773,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
 
   :global(.stp-tapgrid) { display: grid; grid-template-columns: repeat(5, 30px); grid-template-rows: repeat(5, 30px); gap: 4px; margin-top: 12px; }
   :global(.stp-tapcell) { border-radius: 6px; background: rgba(255, 255, 255, 0.08); transition: background 90ms, transform 90ms; }
-  :global(.stp-tapcell.is-hit) { background: #ffd76b; transform: scale(0.88); }
+  :global(.stp-tapcell.is-hit) { background: #4fe3c1; transform: scale(0.88); }
 
   :global(.stp-nato) { display: flex; flex-wrap: wrap; gap: 6px; }
   :global(.stp-nato-word) { font-size: 12.5px; padding: 5px 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); }
@@ -721,7 +791,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
 
   :global(.stp-stars) { display: grid; grid-template-columns: repeat(var(--cols), 6px); gap: 2px; margin-top: 12px; }
   :global(.stp-star) { width: 6px; height: 6px; border-radius: 1px; background: rgba(255, 255, 255, 0.08); }
-  :global(.stp-star.is-on) { background: #ffe27a; box-shadow: 0 0 4px rgba(255, 226, 122, 0.7); }
+  :global(.stp-star.is-on) { background: #cfe3ff; box-shadow: 0 0 4px rgba(207, 227, 255, 0.7); }
 
   .stp-modal-actions { display: flex; gap: 8px; margin-top: 18px; }
   .stp-act {
@@ -733,11 +803,15 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   .stp-act:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.04); }
   .stp-act:active { transform: scale(0.96); }
 
-  @media (prefers-reduced-motion: reduce) {
-    .stp-tile, .stp-modal-card, .stp-radar, .stp-pings i, .stp-live-dot, .stp-led {
-      animation: none !important; transition: none !important;
-    }
-    .stp-radar { opacity: 0.5; }
-    .stp-pings i { display: none; }
+  /* The site's motion setting, not only the system one. */
+  :global(html:not(.play)) .stp-tile,
+  :global(html:not(.play)) .stp-modal-card,
+  :global(html:not(.play)) .stp-radar,
+  :global(html:not(.play)) .stp-pings i,
+  :global(html:not(.play)) .stp-live-dot,
+  :global(html:not(.play)) .stp-led {
+    animation: none !important; transition: none !important;
   }
+  :global(html:not(.play)) .stp-radar { opacity: 0.5; }
+  :global(html:not(.play)) .stp-pings i { display: none; }
 </style>

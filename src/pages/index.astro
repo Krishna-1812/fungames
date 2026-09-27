@@ -4,22 +4,18 @@ import Paper from '../layouts/Paper.astro'
 import TileArt from '../components/TileArt.astro'
 import { SITE } from '../site.config'
 import { listedGames, CATEGORIES } from '../data/games'
-import { META, SHELL_GAMES, dailyFor } from '../data/game-meta'
+import { META, dailyFor } from '../data/game-meta'
 import { inkIcon } from '../lib/ink-icon'
 import { withBase } from '../lib/base'
 
-// Newest first. The two games already in the shared shell lead the deck,
-// because they are the ones that look like the page you are on.
+// Newest first. Every game is in the shared shell now, so the deck is simply
+// the five newest.
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
 const count = games.length
 const CHIP: Record<string, string> = { science: 'Real science', you: 'Measures you', money: 'Money', fun: 'Just because' }
 const catLabel = CHIP
 
-const shellFirst = [
-  ...games.filter((g) => SHELL_GAMES.has(g.slug)),
-  ...games.filter((g) => !SHELL_GAMES.has(g.slug)),
-]
-const deck = shellFirst.slice(0, 5)
+const deck = games.slice(0, 5)
 const featured = deck[0]
 
 // Four block colours rotate by card slot; each card floods with the one two
@@ -70,7 +66,7 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
             draggable="false"
           >
             <span class="label">
-              <span>{SHELL_GAMES.has(g.slug) ? 'New shell' : catLabel[g.category]}</span>
+              <span>{catLabel[g.category]}</span>
               <span>{META[g.slug]?.difficulty}</span>
             </span>
             <span class="deck-art" aria-hidden="true" style={`background:linear-gradient(142deg, ${g.accent}, ${g.accent2})`}><TileArt slug={g.slug} seed={k + 2} /></span>
@@ -107,8 +103,8 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
           </h2>
         </div>
         <p class="lead">
-          Sorted by what they actually do. Two of them already live in the new
-          shell — scores, bests and all — and the rest move over two at a time.
+          Sorted by what they actually do. Every one of them keeps score, and
+          remembers your best on this device.
         </p>
       </div>
       <hr class="rule-line" data-reveal style="margin-top:40px" />
@@ -116,7 +112,6 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
       <div class="dir-controls">
         <div class="chips" role="group" aria-label="Filter games">
           <button type="button" class="pill chip" data-filter="all" aria-pressed="true"><span>All</span></button>
-          <button type="button" class="pill chip" data-filter="shell" aria-pressed="false"><span>New shell</span></button>
           {CATEGORIES.map((c) => (
             <button type="button" class="pill chip" data-filter={c.key} aria-pressed="false"><span>{CHIP[c.key]}</span></button>
           ))}
@@ -133,13 +128,11 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
         {games.map((g, i) => {
           const slot = i % 4
           const meta = META[g.slug]
-          const inShell = SHELL_GAMES.has(g.slug)
           return (
             <li
               class="gcard-slot"
               data-slug={g.slug}
               data-cat={g.category}
-              data-shell={inShell ? '1' : '0'}
               data-search={`${g.title} ${g.blurb} ${g.description}`.toLowerCase()}
             >
               <a
@@ -152,7 +145,7 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
                 </div>
                 <div class="gcard-row">
                   <span class="gcard-icon" aria-hidden="true" set:html={inkIcon(meta?.icon ?? 'die')} />
-                  <span class={`tag${inShell ? ' is-solid' : ''}`}>{inShell ? '✓ ' : ''}{meta?.difficulty ?? 'Explore'}</span>
+                  <span class="tag">{meta?.difficulty ?? 'Explore'}</span>
                 </div>
                 <h3>{g.title}</h3>
                 <p>{g.blurb}</p>
@@ -289,7 +282,7 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
     flip(slots, () => {
       let shown = 0
       for (const s of slots) {
-        const byKind = filter === 'all' || (filter === 'shell' ? s.dataset.shell === '1' : s.dataset.cat === filter)
+        const byKind = filter === 'all' || s.dataset.cat === filter
         const ok = byKind && (!term || s.dataset.search!.includes(term))
         s.hidden = !ok
         if (ok) shown++

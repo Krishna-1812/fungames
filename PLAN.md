@@ -2608,7 +2608,31 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     re-arming at once let the first frame of the smooth scroll up end the
     piece again.
 
-58. Then reassess again.
+58. ~~**Paper & Ink, phase 16: Share This Page and Earth Reviews.**~~ **done.** Every game is in the shell.
+
+    **Share This Page** is a dark stage with its radar as a sticky backdrop.
+    Sent (of twenty-seven), Real (of seventeen), Characters, and Best the
+    most ways in one visit; sending it every way there is, jokes included, is
+    the ending. The Morse lamp, the tap-code grid and the signal bars are
+    mint rather than gold; the postcards keep their warm card.
+
+    **Earth Reviews** keeps its fake shop exactly as it was — the shop's own
+    brand is content, the way Dark Patterns' fake sites are — and the room
+    around the browser window goes from warm to cool. Seen (of thirty-two),
+    Worst seen, Helpful, Best the most seen in one visit; looking at every
+    product on Earth is the ending, and Restart goes back to the storefront
+    rather than reloading onto whichever product the address still names.
+    Its checker forbids `:global()` in its `is:global` sheet, so the stage
+    rule is written plainly.
+
+    With nothing left on the old layout, the homepage's migration scaffolding
+    went: the "New shell" filter chip (it would have matched everything), the
+    "New shell" label in the deck, the tick on every card's tag, the "two of
+    them already live in the new shell" copy, and the colophon's "In the new
+    shell" column, which is "Oldest" now. `GameLayout.astro` is no longer
+    imported by any page.
+
+59. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

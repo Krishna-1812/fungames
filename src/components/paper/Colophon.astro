@@ -2,10 +2,11 @@
 import { SITE } from '../../site.config'
 import { withBase } from '../../lib/base'
 import { CATEGORIES, listedGames } from '../../data/games'
-import { SHELL_GAMES } from '../../data/game-meta'
 
 const newest = listedGames().sort((a, b) => b.added.localeCompare(a.added)).slice(0, 4)
-const shell = listedGames().filter((g) => SHELL_GAMES.has(g.slug))
+// The other end of the shelf from "Newest", now that every game is in the
+// shell and a list of the shell ones would be a list of everything.
+const oldest = listedGames().sort((a, b) => a.added.localeCompare(b.added)).slice(0, 4)
 
 // Shape tiles: four shapes in five inks, fixed rather than random so the
 // grid is the same object on every visit.
@@ -30,8 +31,8 @@ const TILES: [string, string][] = [
         <ul>{newest.map((g) => <li><a href={withBase(`/${g.slug}/`)}>{g.title}</a></li>)}</ul>
       </div>
       <div>
-        <p class="label">In the new shell</p>
-        <ul>{shell.map((g) => <li><a href={withBase(`/${g.slug}/`)}>{g.title}</a></li>)}</ul>
+        <p class="label">Oldest</p>
+        <ul>{oldest.map((g) => <li><a href={withBase(`/${g.slug}/`)}>{g.title}</a></li>)}</ul>
       </div>
       <div>
         <p class="label">Browse</p>

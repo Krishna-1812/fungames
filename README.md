@@ -26,10 +26,11 @@ layer that is typographic rather than decorative. The rules are in
 | `src/layouts/GameShell.astro` + `src/lib/game-shell.ts` + `game-shell.css` | the frame every game sits in |
 | `scripts/check-paper.mjs` | holds the system to its own rules |
 
-Games move into the shell two at a time. **Done:** Rule Cascade, The Auction
-Game, Dark Patterns, Trolley, I'm Not a Robot, From Memory, Steady Hand, Paper Folds, Constellation Draw, Asteroid Launcher, The Deep Sea, Space Elevator, Deep Time, Scale, Spend It, Printing Money, Days Since Incident, Who Was Alive, Every Second, Life in Weeks, Day Go, Universe Forecast, How Fast Are You Moving?, Progress, Powder, Orbit, Fusion, Ambient Mix, Overstimulated, Internet Artifacts. Everything else still runs on the previous
-`GameLayout` until its turn. The daily challenge rotates through the shell
-games only; `dailyTarget` in `game-meta.ts` gives each game the same number
+Every game is in the shell. They moved over two at a time, sixteen phases in
+all, and no page imports the previous `GameLayout` any more. `SHELL_GAMES` in
+`game-meta.ts` still lists them, because `check-paper.mjs` uses it to prove
+each one really is built on the shell. The daily challenge rotates through the
+shell games only; `dailyTarget` in `game-meta.ts` gives each game the same number
 the homepage printed.
 
 ---

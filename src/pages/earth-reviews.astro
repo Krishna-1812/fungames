@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import {
   PHENOMENA,
   averageRating,
@@ -41,6 +41,15 @@ import { withBase } from '../lib/base'
  * `is:global` and every selector carries an `er-` prefix to keep it out of the
  * rest of the site's way — the same call `dark-patterns.astro` made, for the
  * same reason.
+ *
+ * In the shell the room around the browser window is a dark stage, cool
+ * rather than warm; the shop inside the window keeps its own brand, the way
+ * Dark Patterns' fake sites keep theirs. Score is how many products you have
+ * looked at, Worst seen the lowest average among them, Helpful the votes you
+ * have cast, and Best the most products in one visit. Looking at every
+ * product on Earth is the ending. Restart goes back to the storefront and
+ * forgets what you have seen, rather than reloading onto whichever product
+ * the address still names.
  */
 
 const stats = catalogueStats()
@@ -74,13 +83,17 @@ const PAYLOAD = PHENOMENA.map((p) => ({
 const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
 ---
 
-<GameLayout slug="earth-reviews" bar="#42281c" bodyClass="er-body">
+<GameShell
+  slug="earth-reviews"
+  labels={{ score: 'Seen', best: 'Most seen', level: 'Worst seen', moves: 'Helpful' }}
+  initial={{ score: `0 / ${PHENOMENA.length}`, level: '—', moves: '0' }}
+>
+  <div class="er-body">
   <div class="er-bg" aria-hidden="true"><i class="er-spot er-spot-a"></i><i class="er-spot er-spot-b"></i></div>
 
   <div class="er-shell">
     <header class="er-intro">
       <p class="er-eyebrow">{stats.reviews} reviews · {stats.phenomena} products · none of them optional</p>
-      <h1>Earth Reviews</h1>
       <p class="er-lede">
         Every product on this shop is a real natural phenomenon, a real physical
         law, or a real and unavoidable feature of being alive. None of them can
@@ -220,7 +233,22 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
       </p>
     </details>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      A shop where every product is a real natural phenomenon, a real law of
+      physics, or a real and unavoidable part of being alive, and none of them
+      can be returned.
+    </p>
+    <ul>
+      <li>Open a product to read its reviews, its rating breakdown, and what customers also regretted.</li>
+      <li>Search and sort the storefront; sort the reviews by most helpful or most recent.</li>
+      <li>The reviewers are invented. The star averages are honest arithmetic over what they wrote.</li>
+    </ul>
+    <p>Look at every product on Earth to finish.</p>
+  </Fragment>
+</GameShell>
 
 <script type="application/json" id="game-data" set:html={JSON.stringify(PAYLOAD)} />
 
@@ -228,8 +256,13 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   import { averageRating, ratingDistribution, sortReviews, STARS } from '../data/earth-reviews'
   import type { Review, ReviewSort } from '../data/earth-reviews'
   import { starsSvg, symbolId } from '../lib/earth-reviews-art'
-  import { burst, prefersReducedMotion } from '../lib/fx'
+  import { burst } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+  import { recordPlay } from '../lib/stats'
+
+  const prefersReducedMotion = !PLAY
 
   type Item = {
     id: string
@@ -272,6 +305,59 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
 
   const pressed = new Set<string>()
   const voteKey = (id: string, i: number) => `${id}:${i}`
+
+  /* ---- the shell ----------------------------------------------------------- */
+
+  const seen = new Set<string>()
+  let ended = false
+  /* Back to the storefront rather than a reload, which would land on whichever
+     product the address still names. The votes go with it: they were only
+     ever in memory. */
+  const shell = createShell({
+    slug: 'earth-reviews',
+    onRestart: () => {
+      seen.clear()
+      pressed.clear()
+      ended = false
+      history.pushState(null, '', location.pathname + location.search)
+      showStore()
+      paintStrip()
+    },
+  })
+  function paintStrip() {
+    shell.setScore(`${seen.size} / ${ITEMS.length}`)
+    let worst: Item | null = null
+    for (const id of seen) {
+      const it = BY_ID.get(id)!
+      if (!worst || averageRating(it) < averageRating(worst)) worst = it
+    }
+    shell.setLevel(worst ? `${averageRating(worst).toFixed(1)} / 5` : '—')
+    shell.setMoves(String(pressed.size))
+    if (seen.size) shell.considerBest(seen.size, String(seen.size))
+  }
+  function noteSeen(item: Item) {
+    if (seen.has(item.id)) return
+    seen.add(item.id)
+    paintStrip()
+    if (ended || seen.size < ITEMS.length) return
+    ended = true
+    const all = ITEMS.reduce((n, i) => n + i.reviews.length, 0)
+    const lowest = [...ITEMS].sort((a, b) => averageRating(a) - averageRating(b))[0]
+    recordPlay('earth-reviews', { seen: seen.size }, { seen: 'high' })
+    shell.win({
+      celebrate: false,
+      // The card waits under the shop; the product just opened stays put.
+      scroll: false,
+      kicker: 'The whole catalogue',
+      title: 'Every product on Earth, reviewed.',
+      score: `${ITEMS.length} / ${ITEMS.length}`,
+      lines: [
+        `${all} reviews read, or at least scrolled past. The worst-rated thing on Earth is ${lowest.name}, at ${averageRating(lowest).toFixed(1)}.`,
+        'None of it can be returned.',
+      ],
+      againLabel: 'Back to the storefront',
+    })
+  }
 
   /* ---- the storefront ---------------------------------------------------- */
 
@@ -438,9 +524,9 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     store.hidden = true
     product.hidden = false
     urlBar.textContent = `earthreviews.example/p/${item.id}`
+    noteSeen(item)
     sweep()
-    if (focus) {
-      ;(product.querySelector('#er-pname') as HTMLElement).focus({ preventScroll: true })
+    if (focus) { (product.querySelector('#er-pname') as HTMLElement).focus({ preventScroll: true })
       product.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
     }
     if (!prefersReducedMotion) {
@@ -521,6 +607,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
       if (on) pressed.add(key)
       else pressed.delete(key)
       vote.setAttribute('aria-pressed', String(on))
+      paintStrip()
       vote.querySelector('.er-votes')!.textContent = nf.format(item.reviews[i].helpful + (on ? 1 : 0))
       if (on) {
         sfx.pop(i % 5)
@@ -538,6 +625,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   })
 
   fromHash(false)
+  paintStrip()
 </script>
 
 <style is:global>
@@ -545,30 +633,26 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
      because the whole product view is built with .innerHTML and would never
      receive Astro's scoped-style attribute. */
 
-  .er-body {
-    background: #17130f;
-    color: #f3ece1;
-  }
-  .er-body .game { padding-bottom: 12vh; position: relative; }
+  /* The room around the window fills the stage edge to edge. overflow: clip
+     rather than hidden, which would make the stage a scroll container and
+     stop the backdrop sticking. */
+  .stage:has(> .er-body) { padding: 0; overflow: clip; background: #11151c; }
+  .er-body { position: relative; color: #eef2f7; padding-bottom: 6vh; }
 
-  .er-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  /* Sticky, not fixed: pinned behind the shop, but inside the frame. */
+  .er-bg { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; z-index: 0; overflow: hidden; pointer-events: none; }
   .er-spot { position: absolute; width: 74vmax; height: 74vmax; border-radius: 50%; filter: blur(70px); }
-  .er-spot-a { top: -26vmax; left: -14vmax; background: radial-gradient(circle, #ffd96b, transparent 70%); opacity: 0.11; }
-  .er-spot-b { bottom: -30vmax; right: -18vmax; background: radial-gradient(circle, #c0392b, transparent 70%); opacity: 0.1; }
+  .er-spot-a { top: -26vmax; left: -14vmax; background: radial-gradient(circle, #8ccbff, transparent 70%); opacity: 0.11; }
+  .er-spot-b { bottom: -30vmax; right: -18vmax; background: radial-gradient(circle, #b8a1ff, transparent 70%); opacity: 0.1; }
 
   .er-shell { position: relative; z-index: 1; max-width: 1040px; margin: 0 auto; padding: 0 20px; }
   .er-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
   /* ---- above the browser window ------------------------------------------ */
-  .er-intro { max-width: 640px; margin: 9vh auto 34px; text-align: center; }
+  .er-intro { max-width: 640px; margin: 0 auto 30px; padding-top: 32px; text-align: center; }
   .er-eyebrow {
     font-size: 12.5px; letter-spacing: 0.13em; text-transform: uppercase;
-    color: #ffd96b; opacity: 0.85; margin: 0 0 12px; font-weight: 600;
-  }
-  .er-intro h1 {
-    font-size: clamp(34px, 7vw, 56px); margin: 0 0 14px; letter-spacing: -0.03em;
-    background: linear-gradient(165deg, #fff6e6, #ffd96b 130%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+    color: #8ccbff; opacity: 0.9; margin: 0 0 12px; font-weight: 600;
   }
   .er-lede { font-size: 16.5px; line-height: 1.62; opacity: 0.8; margin: 0 auto; max-width: 54ch; }
 
@@ -580,7 +664,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   }
   .er-load {
     position: absolute; top: 0; left: 0; height: 2.5px; width: 38%; z-index: 4;
-    background: linear-gradient(90deg, transparent, #ffd96b, transparent); opacity: 0;
+    background: linear-gradient(90deg, transparent, #8ccbff, transparent); opacity: 0;
   }
   .er-load.er-go { animation: er-sweep 620ms ease-out; }
   @keyframes er-sweep {
@@ -590,7 +674,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   }
   .er-framebar {
     display: flex; align-items: center; gap: 10px; padding: 9px 13px;
-    background: #23180f; border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    background: #1b2029; border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   }
   .er-dots { display: flex; gap: 6px; }
   .er-dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.17); }
@@ -723,7 +807,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-buy h2 { margin: 0 0 4px; font-size: clamp(24px, 3.4vw, 32px); }
   .er-ptag { margin: 0 0 14px; color: var(--er-mute); font-size: 14.5px; max-width: 48ch; }
   .er-summary { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--er-line); }
-  .er-big { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .er-big { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
   .er-summeta { display: flex; flex-direction: column; gap: 3px; color: var(--er-mute); font-size: 13px; }
 
   .er-bars { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
@@ -731,7 +815,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-barlabel { white-space: nowrap; }
   .er-bartrack { height: 12px; border-radius: 3px; background: #e6e1d8; overflow: hidden; border: 1px solid #d8d2c6; }
   .er-bartrack i { display: block; height: 100%; background: linear-gradient(180deg, #ffc95c, #e59512); transition: width 420ms cubic-bezier(0.2, 0.9, 0.3, 1); }
-  .er-barn { text-align: right; font-variant-numeric: tabular-nums; color: var(--er-ink); }
+  .er-barn { text-align: right; color: var(--er-ink); }
   .er-stock { margin: 14px 0 0; font-size: 13px; color: #1f6b4a; font-weight: 600; }
 
   /* ---- reviews ------------------------------------------------------------ */
@@ -769,7 +853,6 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-helpful:active { transform: scale(0.96); }
   .er-helpful:focus-visible { outline: 3px solid #b8892f; outline-offset: 2px; }
   .er-helpful[aria-pressed='true'] { background: #2b1a12; border-color: #2b1a12; color: #ffe9b8; }
-  .er-votes { font-variant-numeric: tabular-nums; }
 
   /* ---- cross-sell ---------------------------------------------------------- */
   .er-cross { margin-top: 26px; }
@@ -796,7 +879,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-how { margin: 34px auto 0; max-width: 680px; font-size: 14px; }
   .er-how summary { cursor: pointer; opacity: 0.66; margin-bottom: 8px; }
   .er-how p { line-height: 1.64; margin: 10px 0; opacity: 0.82; }
-  .er-how a { color: #ffd96b; }
+  .er-how a { color: #8ccbff; }
   .er-how code { font-size: 12.5px; background: rgba(255, 255, 255, 0.07); padding: 1px 5px; border-radius: 4px; }
 
   @media (max-width: 760px) {
@@ -805,7 +888,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   }
   @media (max-width: 560px) {
     .er-shell { padding: 0 12px; }
-    .er-intro { margin-top: 6vh; }
+    .er-intro { padding-top: 22px; }
     .er-sitehead { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
     .er-searchwrap { order: 3; flex-basis: 100%; }
     .er-acct { margin-left: auto; }
@@ -815,10 +898,10 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     .er-bar { grid-template-columns: 46px 1fr 20px; gap: 8px; }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .er-load.er-go { animation: none; }
-    .er-view.er-in { animation: none; }
-    .er-tilelink:hover, .er-crosslink:hover { transform: none; }
-    .er-bartrack i { transition: none; }
-  }
+  /* The site's motion setting, not only the system one. */
+  html:not(.play) .er-load.er-go,
+  html:not(.play) .er-view.er-in { animation: none; }
+  html:not(.play) .er-tilelink:hover,
+  html:not(.play) .er-crosslink:hover { transform: none; }
+  html:not(.play) .er-bartrack i { transition: none; }
 </style>
