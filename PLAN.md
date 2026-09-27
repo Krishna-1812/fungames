@@ -2568,7 +2568,27 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     row that scrolls sideways, with a fade at whichever end has more; wrapped,
     it was five rows on a phone and ran under the lesson card.
 
-56. Then reassess again.
+56. ~~**Paper & Ink, phase 14: Fusion and Ambient Mix.**~~ **done.**
+
+    **Fusion** is framed in the stage like the other sandboxes. Its styles
+    were global and unprefixed — `.stage` and `.chip` among them, both the
+    system's — so every rule is scoped under the page root now, the tray's
+    chips are `.fu-chip`, and its `pop` keyframes are `fu-pop`. Score is how
+    much of the built-in tree is discovered (44 things, starters included),
+    This visit the new ones since opening, Merges the successful combinations,
+    and Best the most ever held, which survives the tray's reset. The whole
+    tree is the ending; Restart tidies the board back to the four starters
+    and keeps every discovery. A new discovery glows mint instead of gold.
+
+    **Ambient Mix** is a dark stage. Playing, Heard (of twelve), Listened,
+    and Best the most layers going at once; bringing in all twelve is a quiet
+    ending that leaves the mix running. The shell's Pause suspends the audio
+    and Resume brings it back only if it was playing; the Sound button stays
+    the site's clicks and chimes, and says so in the how-to, because the mix
+    has its own switch. `.wrap`, `.grid` and `.meta` were the system's and
+    are prefixed.
+
+57. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

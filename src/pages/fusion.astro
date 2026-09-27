@@ -1,11 +1,25 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 import { SITE } from '../site.config'
 import { FUSION_ART, elementSvg } from '../lib/fusion-art'
+import { LOCAL } from '../lib/fusion-recipes.js'
+import { SEED } from '../lib/fusion-state.js'
 
 /** Fusion resolves pairs from saved recipes, then the built-in table, then
- * the optional API. Personal discoveries stay on this device. */
+ * the optional API. Personal discoveries stay on this device.
+ *
+ * In the shell the board is the stage, framed rather than filling the window.
+ * Score is how much of the built-in tree you have discovered, This visit the
+ * new ones since the page opened, Merges every successful combination, and
+ * Best the most you have ever had at once (it survives the tray's reset).
+ * Discovering the whole built-in tree is the ending. Restart tidies the board
+ * back to the four starters and keeps every discovery; throwing discoveries
+ * away is still the tray's own reset. A new discovery glows mint rather than
+ * gold. */
 const API = SITE.fusionApi
+
+/** Everything the built-in table can make, plus the four you start with. */
+const TREE = [...new Set([...SEED.map((s) => s.text), ...Object.values(LOCAL).map((r) => r.text)])]
 
 /* Every element in the tree, drawn. Serialised into the page once rather
    than imported by the client module, because the board builds its pieces
@@ -15,9 +29,12 @@ const ART_BY_NAME = Object.fromEntries(
 )
 ---
 
-<GameLayout slug="fusion" bar="#241e4e" fixed bodyClass="fusion-body">
-  <div class="stage">
-    <h1 class="visually-hidden">Fusion</h1>
+<GameShell
+  slug="fusion"
+  labels={{ score: 'Discovered', best: 'Most found', level: 'This visit', moves: 'Merges' }}
+  initial={{ score: `${SEED.length} / ${TREE.length}`, level: '0', moves: '0' }}
+>
+  <div class="fusion-body">
     <div class="board" id="board">
       {/* First child, so every piece appended later paints over it. */}
       <div class="field" id="field" aria-hidden="true"></div>
@@ -46,15 +63,31 @@ const ART_BY_NAME = Object.fromEntries(
 
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   </div>
-</GameLayout>
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
   <script type="application/json" id="art-data" set:html={JSON.stringify(ART_BY_NAME)} />
-  <script type="application/json" id="game-data" set:html={JSON.stringify({ API })} />
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ API, TREE })} />
+
+  <Fragment slot="howto">
+    <p>
+      Start with water, fire, earth and wind. Drag one thing onto another and
+      see what the two of them make.
+    </p>
+    <ul>
+      <li>Everything you discover goes in the tray. Tap it there to put another one on the board.</li>
+      <li>Two of the same thing can combine too.</li>
+      <li>Rather not drag? "Combine without dragging" in the tray takes any two discoveries from a list.</li>
+      <li>Restart clears the board back to the four starters. Your discoveries stay; the tray's reset is what throws them away.</li>
+    </ul>
+    <p>Discover everything in the tree to finish.</p>
+  </Fragment>
+</GameShell>
 
   <script>
-  import { burst, ring, floatText, prefersReducedMotion } from '../lib/fx'
+  import { burst, ring, floatText } from '../lib/fx'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
   import { pairKey as norm } from '../lib/fusion-pair.js'
@@ -62,7 +95,20 @@ const ART_BY_NAME = Object.fromEntries(
   import { KEY, SEED, loadState, saveState, restoreState } from '../lib/fusion-state.js'
   import { FIELD_FRAG } from '../lib/fusion-field'
   import { UNKNOWN_MARK } from '../lib/fusion-art'
-    const { API } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+  const prefersReducedMotion = !PLAY
+  const { API, TREE } = JSON.parse(document.getElementById('game-data')!.textContent!) as { API: string; TREE: string[] }
+  // Restart tidies the board; discoveries are kept.
+  const shell = createShell({
+    slug: 'fusion',
+    onRestart: () => {
+      for (const p of board.querySelectorAll('.piece')) p.remove()
+      seedBoard()
+      tip.hidden = false
+    },
+  })
+  let newThisVisit = 0
+  let merges = 0
+  let ended = false
   const ART = JSON.parse(document.getElementById('art-data')!.textContent!) as Record<string, string>
   const UNKNOWN = UNKNOWN_MARK
 
@@ -304,6 +350,8 @@ const ART_BY_NAME = Object.fromEntries(
     made.classList.add('pop')
 
     const isNew = !state.items.some((i) => i.text.toLowerCase() === res.text.toLowerCase())
+    merges++
+    if (isNew) newThisVisit++
     const br = made.getBoundingClientRect()
     const cx = br.left + br.width / 2, cy = br.top + br.height / 2
 
@@ -314,9 +362,9 @@ const ART_BY_NAME = Object.fromEntries(
     nudgeField()
     if (isNew) {
       sfx.great()
-      ring(cx, cy, '#ffd166', 22)
-      burst(cx, cy, { count: 26, colors: ['#ffd166', '#c04cfd', '#fff'], speed: 4.5, gravity: 0.1, life: 48, size: 4 })
-      floatText(cx, cy - 26, 'new!', '#ffd166')
+      ring(cx, cy, '#4fe3c1', 22)
+      burst(cx, cy, { count: 26, colors: ['#4fe3c1', '#c04cfd', '#fff'], speed: 4.5, gravity: 0.1, life: 48, size: 4 })
+      floatText(cx, cy - 26, 'new!', '#4fe3c1')
     } else {
       sfx.pop(state.items.length % 10)
       burst(cx, cy, { count: 10, colors: ['#c04cfd', '#fff'], speed: 3, gravity: 0.12, life: 28, size: 3 })
@@ -328,7 +376,36 @@ const ART_BY_NAME = Object.fromEntries(
     }
     save()
     renderTray()
+    if (isNew) maybeFinish(res.text)
     return made
+  }
+
+  /** How much of the built-in tree is in the tray. Things a pair API invents
+      are discoveries too, but they are not in the tree, so they cannot be
+      what stands between anybody and the end. */
+  function treeFound() {
+    const have = new Set(state.items.map((i) => i.text.toLowerCase()))
+    return TREE.filter((t) => have.has(t.toLowerCase())).length
+  }
+  function paintStrip() {
+    shell.setScore(`${treeFound()} / ${TREE.length}`)
+    shell.setLevel(String(newThisVisit))
+    shell.setMoves(String(merges))
+    shell.considerBest(state.items.length, String(state.items.length))
+  }
+  function maybeFinish(last) {
+    if (ended || treeFound() < TREE.length) return
+    ended = true
+    shell.win({
+      kicker: 'The whole tree',
+      title: 'Everything, discovered.',
+      score: `${TREE.length} / ${TREE.length}`,
+      lines: [
+        `The last one was ${last}. It took ${merges} merge${merges === 1 ? '' : 's'} this visit.`,
+        'Your discoveries stay in the tray. The tray\'s reset starts the tree again.',
+      ],
+      againLabel: 'Clear the board',
+    })
   }
   board.addEventListener('pointerup', drop)
   board.addEventListener('pointercancel', () => {
@@ -387,7 +464,7 @@ const ART_BY_NAME = Object.fromEntries(
       ...items.map((item) => {
         const b = document.createElement('button')
         b.type = 'button'
-        b.className = 'chip'
+        b.className = 'fu-chip'
         b.innerHTML =
           `<span class="pic" aria-hidden="true">${ART[item.text] ?? UNKNOWN}</span>` +
           `<span class="lbl"></span>`
@@ -402,6 +479,7 @@ const ART_BY_NAME = Object.fromEntries(
     )
     foundEl.textContent = String(state.items.length)
     refreshIngredients()
+    paintStrip()
   }
   filter.addEventListener('input', renderTray)
 
@@ -437,31 +515,34 @@ const ART_BY_NAME = Object.fromEntries(
 <!-- .piece / .chip are created in JS, and JS-created nodes do not get Astro's
      scoped-style attribute, so these rules must be global. -->
 <style is:global>
-  .recipe-controls { margin: 0 12px 10px; border: 1px solid #51457e; border-radius: 10px; background: #211b43; overflow-y: auto; flex-shrink: 0; max-height: 50%; }
-  .recipe-controls summary { padding: 10px; cursor: pointer; font-size: 12px; color: #e7dbff; }
-  #recipeForm { display: grid; gap: 7px; padding: 0 10px 10px; }
-  #recipeForm label { font-size: 12px; color: #c9bde5; }
-  #recipeForm select, #recipeForm button { width: 100%; min-width: 0; padding: 9px; border-radius: 7px; border: 1px solid #685b94; color: #fff; background: #302751; font: inherit; font-size: 13px; }
-  #recipeForm button { cursor: pointer; background: #ded0ff; color: #241d3b; font-weight: 600; }
-  #recipeForm button:disabled { opacity: .65; cursor: wait; }
-  #recipeStatus { font-size: 12px; line-height: 1.5; color: #dacdea; margin: 2px 0; }
-  .stage { position: relative; height: 100%; display: flex; background: #16122e; color: #fff; }
+  .fusion-body .recipe-controls { margin: 0 12px 10px; border: 1px solid #51457e; border-radius: 10px; background: #211b43; overflow-y: auto; flex-shrink: 0; max-height: 50%; }
+  .fusion-body .recipe-controls summary { padding: 10px; cursor: pointer; font-size: 12px; color: #e7dbff; }
+  .fusion-body #recipeForm { display: grid; gap: 7px; padding: 0 10px 10px; }
+  .fusion-body #recipeForm label { font-size: 12px; color: #c9bde5; }
+  .fusion-body #recipeForm select, .fusion-body #recipeForm button { width: 100%; min-width: 0; padding: 9px; border-radius: 7px; border: 1px solid #685b94; color: #fff; background: #302751; font: inherit; font-size: 13px; }
+  .fusion-body #recipeForm button { cursor: pointer; background: #ded0ff; color: #241d3b; font-weight: 600; }
+  .fusion-body #recipeForm button:disabled { opacity: .65; cursor: wait; }
+  .fusion-body #recipeStatus { font-size: 12px; line-height: 1.5; color: #dacdea; margin: 2px 0; }
+  /* The board fills the stage edge to edge, framed at a fixed height rather
+     than the whole window. */
+  .stage:has(> .fusion-body) { padding: 0; overflow: hidden; background: #16122e; }
+  .fusion-body { position: relative; display: flex; color: #fff; height: clamp(480px, 76vh, 820px); }
 
-  .board { position: relative; flex: 1; overflow: hidden; touch-action: none; }
+  .fusion-body .board { position: relative; flex: 1; overflow: hidden; touch-action: none; }
   /* The still fallback, for anything without WebGL2. */
-  .field {
+  .fusion-body .field {
     position: absolute; inset: 0; pointer-events: none;
     background:
       radial-gradient(120% 80% at 50% 100%, #241a4c 0%, transparent 62%),
       #16122e;
   }
-  .field .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .tip {
+  .fusion-body .field .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .fusion-body .tip {
     position: absolute; inset: auto 0 24px 0; text-align: center;
     opacity: 0.62; font-size: 15px; margin: 0;
   }
 
-  .piece {
+  .fusion-body .piece {
     position: absolute;
     /* A tile with a top face, rather than a rectangle with a border. */
     background: linear-gradient(180deg, #fcfaff 0%, #e4ddf8 100%);
@@ -477,7 +558,7 @@ const ART_BY_NAME = Object.fromEntries(
       0 7px 16px rgba(5, 2, 20, 0.34);
     transition: transform 140ms var(--ease), box-shadow 180ms var(--ease);
   }
-  .piece.held {
+  .fusion-body .piece.held {
     cursor: grabbing; z-index: 5;
     transform: scale(1.06) rotate(-0.7deg);
     box-shadow:
@@ -487,7 +568,7 @@ const ART_BY_NAME = Object.fromEntries(
   }
   /* A ring and a glow rather than a 2px outline: it has to read at a glance,
      mid-drag, while the filament in the field is already pointing at it. */
-  .piece.target {
+  .fusion-body .piece.target {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.95),
       0 2px 6px rgba(5, 2, 20, 0.5),
@@ -497,7 +578,7 @@ const ART_BY_NAME = Object.fromEntries(
   /* A sweep, not opacity. Fading a light tile toward a dark board takes its
      text down with it, and this state is on screen while a request is in
      flight -- exactly when it should still be readable. */
-  .piece.working {
+  .fusion-body .piece.working {
     background:
       linear-gradient(100deg, transparent 36%, rgba(192, 76, 253, 0.35) 50%, transparent 64%),
       linear-gradient(180deg, #fcfaff 0%, #e4ddf8 100%);
@@ -505,39 +586,39 @@ const ART_BY_NAME = Object.fromEntries(
     animation: workSweep 900ms linear infinite;
   }
   @keyframes workSweep { from { background-position: 150% 0, 0 0; } to { background-position: -150% 0, 0 0; } }
-  .piece.fresh {
-    background: linear-gradient(180deg, #fff8db 0%, #f7e6a4 100%);
-    border-color: rgba(255, 240, 190, 0.8);
+  .fusion-body .piece.fresh {
+    background: linear-gradient(180deg, #effff9 0%, #bff3e2 100%);
+    border-color: rgba(200, 255, 236, 0.85);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.95),
       0 1px 2px rgba(5, 2, 20, 0.55),
       0 7px 16px rgba(5, 2, 20, 0.34),
-      0 0 26px rgba(255, 209, 102, 0.45);
+      0 0 26px rgba(79, 227, 193, 0.5);
   }
-  .piece.pop { animation: pop 380ms var(--ease-bounce); }
-  @keyframes pop { from { transform: scale(0.6); opacity: 0; } }
+  .fusion-body .piece.pop { animation: fu-pop 380ms var(--ease-bounce); }
+  @keyframes fu-pop { from { transform: scale(0.6); opacity: 0; } }
 
-  .tray {
+  .fusion-body .tray {
     width: 260px; flex: none; display: flex; flex-direction: column;
     background: #1e1940; border-left: 1px solid #322a5e;
   }
-  .tray-head {
+  .fusion-body .tray-head {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 14px; font-size: 13px; opacity: 0.85; border-bottom: 1px solid #322a5e;
   }
-  .tray-head button {
+  .fusion-body .tray-head button {
     background: none; border: 1px solid #4a3f80; color: inherit;
     border-radius: 8px; padding: 3px 10px; font-size: 12px; cursor: pointer;
     transition: transform 180ms var(--ease-bounce), background 140ms var(--ease);
   }
-  .tray-head button:hover { transform: scale(1.06); background: #322a5e; }
-  .tray-head button:active { transform: scale(0.94); }
-  #filter {
+  .fusion-body .tray-head button:hover { transform: scale(1.06); background: #322a5e; }
+  .fusion-body .tray-head button:active { transform: scale(0.94); }
+  .fusion-body #filter {
     margin: 10px 12px; padding: 8px 10px; border-radius: 8px;
     border: 1px solid #3b3270; background: #16122e; color: #fff; font: inherit; font-size: 14px;
   }
-  .tray-list { flex: 1; overflow-y: auto; padding: 0 12px 16px; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
-  .chip {
+  .fusion-body .tray-list { flex: 1; overflow-y: auto; padding: 0 12px 16px; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+  .fusion-body .fu-chip {
     background: #2b2456; border: 1px solid #3d3470; color: #fff;
     border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer;
     display: inline-flex; align-items: center; gap: 6px;
@@ -545,26 +626,25 @@ const ART_BY_NAME = Object.fromEntries(
   }
   /* The drawing fills whatever box it is given — see elementSvg — so the
      wrapper is the only thing that can size it. */
-  .pic { width: 20px; height: 20px; flex: none; display: inline-block; }
-  .chip .pic { width: 17px; height: 17px; }
-  .lbl { display: inline-block; }
-  .chip:hover { background: #3a3170; transform: translateY(-1px) scale(1.05); }
-  .chip:active { transform: scale(0.95); }
+  .fusion-body .pic { width: 20px; height: 20px; flex: none; display: inline-block; }
+  .fusion-body .fu-chip .pic { width: 17px; height: 17px; }
+  .fusion-body .lbl { display: inline-block; }
+  .fusion-body .fu-chip:hover { background: #3a3170; transform: translateY(-1px) scale(1.05); }
+  .fusion-body .fu-chip:active { transform: scale(0.95); }
 
-  .toast {
+  .fusion-body .toast {
     position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.75); padding: 10px 18px; border-radius: 999px;
-    font-size: 14px; max-width: 80vw; text-align: center;
+    font-size: 14px; max-width: 80%; text-align: center; z-index: 6;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .piece { transition: none; }
-    .piece.working { animation: none; }
-    .piece.pop { animation: none; }
-  }
+  /* The site's motion setting, not only the system one. */
+  html:not(.play) .fusion-body .piece { transition: none; }
+  html:not(.play) .fusion-body .piece.working,
+  html:not(.play) .fusion-body .piece.pop { animation: none; }
 
   @media (max-width: 760px) {
-    .stage { flex-direction: column; }
-    .tray { width: auto; height: 42%; border-left: 0; border-top: 1px solid #322a5e; }
+    .fusion-body { flex-direction: column; height: clamp(600px, 88vh, 900px); }
+    .fusion-body .tray { width: auto; height: 42%; border-left: 0; border-top: 1px solid #322a5e; }
   }
 </style>

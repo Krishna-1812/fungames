@@ -1,5 +1,5 @@
 ---
-import GameLayout from '../layouts/GameLayout.astro'
+import GameShell from '../layouts/GameShell.astro'
 
 /**
  * Ambient Mix — a soundscape mixer with no audio files at all.
@@ -8,6 +8,15 @@ import GameLayout from '../layouts/GameLayout.astro'
  * the textures, scheduled bursts for the events. That means the page weighs a
  * few kilobytes instead of a few megabytes, nothing has to be licensed, and
  * the loops never repeat audibly because there is no loop.
+ *
+ * In the shell the mixer is a dark stage. Score is how many layers are playing,
+ * Heard how many of the twelve you have brought in at least once, Listened how
+ * long the sound has been on, and Best the most layers you have ever had going
+ * at once. Hearing all twelve is the ending. The shell's Pause suspends the
+ * whole mix and its Resume brings it back; its Sound button is for the site's
+ * own clicks and chimes, and the mix keeps its own switch, because the mix is
+ * the thing you came for. Three class names were the design system's
+ * (`.wrap`, `.grid`, `.meta`) and are prefixed.
  */
 
 import { LAYERS, PRESETS } from '../lib/mix-code'
@@ -52,10 +61,14 @@ const KNOB_DEFAULT_P1 = knobPoint(KNOB.ptrIn, KNOB_DEFAULT_ANGLE)
 const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 ---
 
-<GameLayout slug="ambient-mix" bar="#132a3f" bodyClass="mix-body">
-  <div class="wrap">
+<GameShell
+  slug="ambient-mix"
+  labels={{ score: 'Playing', best: 'Most at once', level: 'Heard', moves: 'Listened' }}
+  initial={{ score: '0', level: `0 / ${LAYERS.length}`, moves: '0:00' }}
+>
+  <div class="mix-body">
+  <div class="am-wrap">
     <header class="head">
-      <h1>Ambient Mix</h1>
       <p class="lede">
         Twelve layers, all generated live in your browser. Nothing here is a
         recording. Start with rain and see how long you last.
@@ -85,13 +98,13 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 
     <div class="field" id="field" aria-hidden="true"></div>
 
-    <ul class="grid" id="grid">
+    <ul class="am-grid" id="grid">
       {
         LAYERS.map((l) => (
           <li class="layer" data-id={l.id} style={`--mood:${MOOD[l.id]};--moodRgb:${rgb(MOOD[l.id])}`}>
             <button type="button" class="toggle" aria-pressed="false">
               <span class="scene" aria-hidden="true" set:html={sceneSvg(l.id)} />
-              <span class="meta">
+              <span class="am-meta">
                 <span class="name">{l.name}</span>
                 <span class="hint">{l.hint}</span>
               </span>
@@ -125,12 +138,42 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
       }
     </ul>
 
-    <p class="note" id="note">Click a card to bring that layer in. Drag its slider to set how much.</p>
+    <p class="note" id="note">Click a card to bring that layer in. Turn its knob to set how much.</p>
   </div>
-</GameLayout>
+  </div>
+
+  <Fragment slot="howto">
+    <p>
+      A soundscape mixer with no recordings in it. Every layer — rain, waves,
+      a fire, a café, a thunderstorm, a dial-up modem — is synthesised live in
+      this tab.
+    </p>
+    <ul>
+      <li>Press the sound button, then click a card to bring that layer in. Click it again to take it out.</li>
+      <li>Each card's knob sets how loud it is: drag it up or down, scroll on it, or use the arrow keys. Double-click puts it back.</li>
+      <li>The presets are mixes worth arriving at. Copy link puts the whole mix in the address.</li>
+      <li>Pause suspends the mix. The Sound button up top is for the site's clicks, not for this.</li>
+    </ul>
+    <p>Bring in all twelve layers, at least once each, to finish.</p>
+  </Fragment>
+</GameShell>
 
 <script>
-  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { ShaderSurface } from '../lib/gl'
+  import { createShell } from '../lib/game-shell'
+  import { PLAY } from '../lib/motion'
+  import { recordPlay } from '../lib/stats'
+
+  const prefersReducedMotion = !PLAY
+  /* The shell's Pause holds the whole mix: the context is suspended, and only
+     brought back if it was playing when Pause was pressed. Restart is the
+     default reload, and the address still carries the mix. */
+  let heldByPause = false
+  const shell = createShell({
+    slug: 'ambient-mix',
+    onPause: () => { if (running && ctx) { heldByPause = true; ctx.suspend() } },
+    onResume: () => { if (heldByPause && ctx) { heldByPause = false; ctx.resume() } },
+  })
   import { MIX_FRAG } from '../lib/mix-field'
   import { LAYERS, PRESETS, encode, decode, presetById } from '../lib/mix-code'
 
@@ -484,13 +527,52 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   }
   bindKnobs()
 
+  /* ---- the strip ----------------------------------------------------------- */
+  const heard = new Set()
+  let listened = 0
+  let ended = false
+  const clockText = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+  function paintStrip() {
+    let on = 0
+    for (const L of layers.values()) if (L.on) on++
+    shell.setScore(String(on))
+    if (on > 0) shell.considerBest(on, String(on))
+    shell.setLevel(`${heard.size} / ${LAYERS.length}`)
+  }
+  setInterval(() => {
+    if (!running || shell.paused || document.hidden) return
+    listened++
+    shell.setMoves(clockText(listened))
+  }, 1000)
+  function noteHeard(id) {
+    heard.add(id)
+    if (ended || heard.size < LAYERS.length) return
+    ended = true
+    recordPlay('ambient-mix', { heard: heard.size }, { heard: 'high' })
+    shell.win({
+      celebrate: false,
+      // The card waits under the mixer; nobody wants the page yanked mid-mix.
+      scroll: false,
+      kicker: 'Every layer, heard',
+      title: `All ${LAYERS.length} of them.`,
+      score: `${LAYERS.length} / ${LAYERS.length}`,
+      lines: [
+        'Not one of them was a recording. Every sound here was worked out in this tab as you heard it.',
+        `${clockText(listened)} of listening so far. The mix is still going.`,
+      ],
+      againLabel: 'Listen again',
+    })
+  }
+
   function setLayer(L, on) {
     L.on = on
+    if (on && running) noteHeard(L.id)
     const target = on ? L.vol : 0
     L.out.gain.cancelScheduledValues(ctx.currentTime)
     L.out.gain.setTargetAtTime(target, ctx.currentTime, 0.12)
     L.li.classList.toggle('on', on)
     L.li.querySelector('.toggle').setAttribute('aria-pressed', String(on))
+    paintStrip()
     if (on) {
       const scene = L.li.querySelector('.scene')
       scene.classList.remove('jump')
@@ -542,13 +624,16 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     meters()
     masterBtn.textContent = 'Sound is on'
     masterBtn.classList.add('live')
-    note.textContent = 'Click a card to bring that layer in. Drag its slider to set how much.'
+    note.textContent = 'Click a card to bring that layer in. Turn its knob to set how much.'
+    // A shared mix arrives with its layers on but silent; they count once heard.
+    for (const L of layers.values()) if (L.on) noteHeard(L.id)
   }
 
   masterBtn.addEventListener('click', async () => {
     if (!running) return start()
     await ctx.suspend()
     running = false
+    heldByPause = false
     cancelAnimationFrame(meterRaf)
     // Settle everything to rest rather than freezing mid-reading.
     spec.fill(0)
@@ -707,12 +792,13 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 </script>
 
 <style>
-  :global(.mix-body) { background: #0e1b28; color: #eaf1f7; }
+  /* A dark stage, edge to edge. */
+  :global(.stage:has(> .mix-body)) { padding: 0; overflow: clip; background: #0e1b28; }
+  .mix-body { color: #eaf1f7; }
 
-  .wrap { max-width: 900px; margin: 0 auto; padding: 44px 22px 90px; }
-  .head { text-align: center; margin-bottom: 26px; }
-  .head h1 { font-size: clamp(34px, 6vw, 52px); }
-  .lede { color: #a8bccd; margin: 10px auto 0; max-width: 46ch; }
+  .am-wrap { max-width: 900px; margin: 0 auto; padding: 30px 22px 48px; }
+  .head { text-align: center; margin-bottom: 22px; }
+  .lede { color: #a8bccd; margin: 0 auto; max-width: 46ch; font-size: 17px; }
 
   .bar {
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
@@ -775,7 +861,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   }
   .field :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-  .grid {
+  .am-grid {
     list-style: none; margin: 0; padding: 0;
     display: grid; gap: 12px;
     grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
@@ -806,9 +892,9 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   /* A little jump the moment a layer actually switches on — see Spend It's
      identical .jump for why this needs a toggled class rather than tying
      straight to .on, which stays applied and would only fire once. */
-  .scene.jump { animation: jump-glyph 380ms var(--ease-bounce); }
+  :global(html.play) .scene.jump { animation: jump-glyph 380ms var(--ease-bounce); }
   @keyframes jump-glyph { 40% { transform: translateY(-9px) scale(1.15); } }
-  .meta { display: grid; flex: 1; min-width: 0; }
+  .am-meta { display: grid; flex: 1; min-width: 0; }
   .name { font-weight: 600; font-size: 15.5px; }
   .hint { font-size: 12px; color: #7f99b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -850,7 +936,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   .knob.grabbed .knob-pointer { transition: none; }
   .layer.on .knob-pointer { stroke: var(--mood); }
   .knob-val {
-    font-size: 12px; font-variant-numeric: tabular-nums; color: #7f99b0;
+    font-size: 12px; color: #7f99b0;
     min-width: 3ch;
   }
 
