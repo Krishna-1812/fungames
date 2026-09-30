@@ -10,11 +10,12 @@ a measurement from the live site, not a guess.
 
 ## Design system: Paper & Ink
 
-The homepage and every game in the shared shell are built on one editorial
+Every game in the shared shell is built on one editorial
 system — cool paper, white cards, colour only as whole blocks with ink on
 them, Fraunces for statements and Zalando Sans for information, and a motion
 layer that is typographic rather than decorative. The rules are in
-[`src/styles/paper/README.md`](src/styles/paper/README.md); the pieces are:
+[`src/styles/paper/README.md`](src/styles/paper/README.md); the pieces are below. The homepage is the
+one exception: it is a night sky instead of paper (see "The homepage").
 
 | File | What it is |
 |---|---|
@@ -217,44 +218,40 @@ real map geometry baked in at author time.
 
 ## The homepage
 
-The grid used to be one flat list, newest first, under one static hero
-naming a single game in the markup itself. Three real changes, none of them
-decoration:
+The one page that is not paper. It is a night sky, cool throughout — cobalt,
+mint, sky and lilac on near-black — and it is meant to be the most animated
+page on the site. The markup is `src/pages/index.astro`; every moving part
+is `src/lib/home-fx.ts`.
 
-**A hero that rotates through real data, not a hardcoded favourite.**
-`hero = games.slice(0, 3)` — the three most recently added, the same
-"newest first" ordering the grid already used. Crossfades on a 5.2s timer,
-pauses on hover, focus, or an unfocused tab, and never autoplays at all
-under `prefers-reduced-motion` — a carousel that keeps moving on its own is
-exactly the motion that preference asks for less of, so it only advances on
-a deliberate dot click there.
+- **The hero** is a canvas of stars in three depths that drift with the
+  pointer, draw a constellation between the ones nearest it, and throw the
+  odd shooting star, over three slow aurora glows and a film grain.
+- **The title** is split into letters at build time. Fraunces is a variable
+  font, so each letter thickens as the pointer nears it, and a swell of
+  weight runs through the whole title on load and on every click.
+- **The ring** stands the eight newest games round a circle in 3D. It turns
+  on its own, slows under the pointer, can be dragged and thrown, and brings
+  whichever card you tab onto round to the front; the caption under it names
+  the card facing you.
+- **Two marquees** of every title run in opposite directions and speed up
+  and lean with the scroll.
+- **The directory** keeps its filter, search and FLIP; the chips share one
+  sliding highlight, cards arrive a column at a time, tilt towards the
+  pointer with a glare that follows it, and a comet of light runs round the
+  border of the one you are on.
+- **The daily challenge** is a portal of counter-rotating rings round a
+  floating screen of today's game, with a live countdown to the next one at
+  midnight UTC. Every game the week's rotation can land on is drawn into the
+  page, because the page is built once and visited on other days.
+- **Surprise Me** is a slot-machine reel of titles that idles, then spins
+  three turns and lands on the game it is about to open.
 
-**Games grouped into four sections that describe a real mechanism, not a
-vibe** (`CATEGORIES` and `gamesByCategory()` in `data/games.ts`): *Real
-science, worked out live* (five games that compute their answer from the
-same equations the real thing runs on — Orbit's gravity, Asteroid
-Launcher's impact model, Scale, Deep Time, Universe Forecast), *Measures
-the actual you* (five games that score real input rather than a
-pre-written outcome), *Money, spent unwisely* (exactly two — nobody was
-moved in to round the number up), and *Just because*. `check-art.mjs` now
-has a `categories` section proving every game's category is real, the four
-sections account for all seventeen listed games between them with none
-counted twice, and prints the real split so a category that quietly
-absorbed everything (or emptied out) is a diff away from being caught.
-
-**A live filter**, typed into a search box styled like the rest of the
-site's sticker chrome: matches against each game's title, blurb *and*
-description (searching "money" finds Spend It even though only its
-description, not its blurb, uses the word), collapses a section to nothing
-rather than leaving an empty heading over a blank grid, and the existing
-"Surprise me" button now picks only from whatever the current search
-actually shows.
-
-Every tile keeps the sticker treatment underneath all of this exactly as
-it was — the gloss, the film-grain, the rim light, the pointer-driven tilt
-and art parallax — because none of the three changes above touch a tile's
-shape or dimensions, which is what lets `check-art.mjs`'s three measured
-card shapes stay valid without needing their own rewrite.
+Without motion — `prefers-reduced-motion`, or no script — every one of those
+paints its finished state once: a still sky, the ring facing its first game,
+still marquees, nothing tilting. Anything that runs every frame also sleeps
+while it is off screen or the tab is hidden. The masthead and the colophon
+are the shared components, turned dark by re-inking Paper's tokens inside
+them rather than by a second copy.
 
 ---
 

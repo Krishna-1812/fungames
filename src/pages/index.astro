@@ -8,250 +8,333 @@ import { META, dailyFor } from '../data/game-meta'
 import { inkIcon } from '../lib/ink-icon'
 import { withBase } from '../lib/base'
 
-// Newest first. Every game is in the shared shell now, so the deck is simply
-// the five newest.
+/*
+ * The homepage is the one page that is not paper. It is a night sky: the
+ * games stand in a ring you can spin, the title thickens under the pointer,
+ * and everything below it glows rather than sits in a coloured block. The
+ * motion is all in lib/home-fx.ts; without it (reduced motion, or no script)
+ * every section below is simply its finished state.
+ */
+
+// Newest first.
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
 const count = games.length
 const CHIP: Record<string, string> = { science: 'Real science', you: 'Measures you', money: 'Money', fun: 'Just because' }
-const catLabel = CHIP
 
-const deck = games.slice(0, 5)
-const featured = deck[0]
+const featured = games[0]
+const ring = games.slice(0, 8)
+const cover = (g: (typeof games)[number]) => `--cover:linear-gradient(142deg, ${g.accent}, ${g.accent2})`
 
-// Four block colours rotate by card slot; each card floods with the one two
-// steps along, so the flood is always a real change of colour.
-const SLOTS = ['cobalt', 'mint', 'sky', 'red'] as const
-const DECK_BLOCKS = ['cobalt', 'sky', 'mint', 'red', 'cobalt'] as const
+// The title, split into letters here rather than in the browser, so the
+// markup is final before any script runs. `i` counts through the whole
+// title for the rise; `j` counts within a line for the gradient's offset.
+let n = 0
+const TITLE = [
+  { cls: '', words: ['Tiny', 'games,'] },
+  { cls: 'h-wonk', words: ['wildly'] },
+  { cls: 'h-grad', words: ['overthought.'] },
+].map((line) => {
+  let j = 0
+  return { cls: line.cls, words: line.words.map((w) => [...w].map((c) => ({ c, i: n++, j: j++ }))) }
+})
 
 // A real count, read at build time rather than typed: every model on the
 // site has a checker in scripts/, and check-all runs all of them.
 const checks = fs.readdirSync('scripts').filter((f) => /^check-.+\.mjs$/.test(f) && f !== 'check-all.mjs').length
 
+// The daily game changes at midnight UTC, long after this page was built, so
+// every game the week's rotation can land on is drawn here and the script
+// shows today's.
 const daily = dailyFor(new Date())
 const dailyGame = games.find((g) => g.slug === daily.slug)!
+const dailySlugs = [...new Set(Array.from({ length: 7 }, (_, i) => dailyFor(new Date(Date.now() + i * 86_400_000)).slug))]
+const dailyGames = dailySlugs.map((s) => games.find((g) => g.slug === s)!).filter(Boolean)
 ---
 
-<Paper title={`${SITE.name} — small games, real maths`} description={SITE.description} image={withBase('/og-home.png')}>
-  <main id="main" class="page-top">
-    {/* ---- hero ------------------------------------------------------- */}
-    <section class="wrap hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="label meta" data-decode>{count} small games · no sign-up · all in your browser</p>
-        <h1 id="hero-title" class="t-hero has-marker" data-reveal="lines" data-springy>
-          <span class="mask-line" style="--line:0"><span>Tiny games,</span></span>
-          <span class="mask-line" style="--line:1"><span><em class="wonk">wildly</em></span></span>
-          <span class="mask-line" style="--line:2"><span><span class="marker" data-draw>overthought.</span></span></span>
-        </h1>
-        <p class="lead">
-          Rule puzzles, auctions, falling asteroids and the whole history of the
-          internet — {count} of them, each built on real maths and checked
-          against real answers. Nothing to install. Pick one and it starts.
-        </p>
-        <div class="hero-actions">
-          <a class="pill pill--hero" href={withBase(`/${featured.slug}/`)} data-confetti>
-            <span>Play now</span><span class="arrow" aria-hidden="true">→</span>
-          </a>
-          <a class="pill pill--line" href="#games"><span>Browse all {count}</span></a>
+<Paper
+  title={`${SITE.name} — small games, real maths`}
+  description={SITE.description}
+  image={withBase('/og-home.png')}
+  bodyClass="home-night"
+  themeColor="#05070f"
+  colorScheme="dark"
+>
+  <div class="h-glow" id="glow" aria-hidden="true"></div>
+  <main id="main" class="h">
+    {/* ---- hero: the night sky and the ring ---------------------------- */}
+    <section class="h-hero" aria-labelledby="hero-title">
+      <div class="h-aurora" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+      <canvas class="h-sky" id="sky" aria-hidden="true"></canvas>
+      <div class="h-grain" aria-hidden="true"></div>
+
+      <div class="wrap h-hero-in">
+        <div class="h-copy">
+          <p class="h-pill h-in" style="--d:0ms"><span class="h-pulse" aria-hidden="true"></span>{count} small games · no sign-up · all in your browser</p>
+          <h1 class="h-title" id="hero-title" aria-label="Tiny games, wildly overthought.">
+            {TITLE.map((line) => (
+              <span class={`h-line ${line.cls}`} aria-hidden="true">
+                {line.words.map((w, wi) => (
+                  <>{wi > 0 && ' '}<span class="h-word">{w.map((ch) => <span class="ch" style={`--i:${ch.i};--j:${ch.j}`}>{ch.c}</span>)}</span></>
+                ))}
+              </span>
+            ))}
+          </h1>
+          <p class="h-lead h-in" style="--d:900ms">
+            Rule puzzles, auctions, falling asteroids and the whole history of
+            the internet: {count} of them, each built on real maths and checked
+            against real answers. Nothing to install. Pick one and it starts.
+          </p>
+          <div class="h-actions h-in" style="--d:1050ms">
+            <a class="h-btn h-btn--main h-magnet" href={withBase(`/${featured.slug}/`)}>
+              <span>Play now</span><span class="h-arrow" aria-hidden="true">→</span>
+            </a>
+            <a class="h-btn h-btn--ghost h-magnet" href="#games"><span>Browse all {count}</span></a>
+          </div>
+        </div>
+
+        <div class="h-stage-wrap h-in" style="--d:500ms">
+          <div class="h-stage" id="stage" role="group" aria-label="The newest games">
+            <div class="h-ring" style={`--n:${ring.length}`}>
+              {ring.map((g, k) => (
+                <a class="h-rc" href={withBase(`/${g.slug}/`)} style={`--k:${k}`} draggable="false" data-title={g.title} data-blurb={g.blurb}>
+                  <span class="h-rc-art" style={cover(g)} aria-hidden="true"><TileArt slug={g.slug} seed={k + 2} /></span>
+                  <span class="h-rc-c">{CHIP[g.category]}</span>
+                  <span class="h-rc-t">{g.title}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+          <p class="h-cap" aria-hidden="true">
+            <span class="h-cap-k">Facing you</span>
+            <span class="h-cap-t" id="capTitle">{ring[0].title}</span>
+            <span class="h-cap-b" id="capBlurb">{ring[0].blurb}</span>
+            <span class="h-cap-hint">Drag to spin</span>
+          </p>
         </div>
       </div>
 
-      <div class="deck" data-settle role="group" aria-label="Featured games">
-        {deck.map((g, k) => (
-          <a
-            class={`deck-card b-${DECK_BLOCKS[k]}`}
-            href={withBase(`/${g.slug}/`)}
-            style={`--k:${k}`}
-            tabindex={k === 0 ? 0 : -1}
-            aria-hidden={k === 0 ? 'false' : 'true'}
-            draggable="false"
-          >
-            <span class="label">
-              <span>{catLabel[g.category]}</span>
-              <span>{META[g.slug]?.difficulty}</span>
-            </span>
-            <span class="deck-art" aria-hidden="true" style={`background:linear-gradient(142deg, ${g.accent}, ${g.accent2})`}><TileArt slug={g.slug} seed={k + 2} /></span>
-            <span class="deck-head">
-              <span class="deck-icon" aria-hidden="true" set:html={inkIcon(META[g.slug]?.icon ?? 'die')} />
-            </span>
-            <h3>{g.title}</h3>
-            <p>{g.blurb}</p>
-          </a>
-        ))}
-      </div>
+      <a class="h-cue" href="#games" aria-label="Scroll to the games"><span class="h-cue-dot"></span></a>
     </section>
 
-    {/* ---- ticker ----------------------------------------------------- */}
-    <div class="ticker" role="group" aria-label="Every game on the site">
-      <div class="ticker-track">
-        <div class="ticker-run">
-          {games.map((g) => <span class="ticker-item">{g.title}</span>)}
+    {/* ---- two marquees, the second one running the other way --------- */}
+    <div class="h-mq" id="marquee" aria-hidden="true">
+      <div class="h-mq-row" data-dir="-1">
+        <div class="h-mq-track">
+          {[0, 1].map(() => games.map((g) => <span class="h-mq-item">{g.title}</span>))}
         </div>
-        <div class="ticker-run ticker-dup" aria-hidden="true">
-          {games.map((g) => <span class="ticker-item">{g.title}</span>)}
+      </div>
+      <div class="h-mq-row h-mq-row--line" data-dir="1">
+        <div class="h-mq-track">
+          {[0, 1].map(() => [...games].reverse().map((g) => <span class="h-mq-item">{g.title}</span>))}
         </div>
       </div>
     </div>
 
     {/* ---- directory -------------------------------------------------- */}
-    <section class="wrap section" id="games" aria-labelledby="games-title">
-      <div class="dir-head">
+    <section class="wrap h-sec" id="games" aria-labelledby="games-title">
+      <div class="h-head">
         <div>
-          <p class="label meta" data-decode>The directory</p>
-          <h2 id="games-title" data-reveal="lines" style="margin-top:14px">
-            <span class="mask-line" style="--line:0"><span>Pick a game.</span></span>
-            <span class="mask-line" style="--line:1"><span>Any <em class="wonk">game</em>.</span></span>
-          </h2>
+          <p class="h-kicker h-rv">The directory</p>
+          <h2 class="h-h2 h-rv" id="games-title">Pick a game.<br />Any <em>game</em>.</h2>
         </div>
-        <p class="lead">
+        <p class="h-sub h-rv">
           Sorted by what they actually do. Every one of them keeps score, and
           remembers your best on this device.
         </p>
       </div>
-      <hr class="rule-line" data-reveal style="margin-top:40px" />
 
-      <div class="dir-controls">
-        <div class="chips" role="group" aria-label="Filter games">
-          <button type="button" class="pill chip" data-filter="all" aria-pressed="true"><span>All</span></button>
+      <div class="h-controls h-rv">
+        <div class="h-chips" role="group" aria-label="Filter games">
+          <span class="h-chip-ind" aria-hidden="true"></span>
+          <button type="button" class="h-chip" data-filter="all" aria-pressed="true">All</button>
           {CATEGORIES.map((c) => (
-            <button type="button" class="pill chip" data-filter={c.key} aria-pressed="false"><span>{CHIP[c.key]}</span></button>
+            <button type="button" class="h-chip" data-filter={c.key} aria-pressed="false">{CHIP[c.key]}</button>
           ))}
         </div>
-        <label class="search">
+        <label class="h-search">
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6.2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M13.2 13.2 18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
           <span class="sr-only">Search games</span>
           <input type="search" id="q" autocomplete="off" spellcheck="false" placeholder="Search by name or idea" />
-          <span class="count" id="count" aria-live="polite">{count} games</span>
+          <span class="h-count" id="count" aria-live="polite">{count} games</span>
         </label>
       </div>
 
-      <ul class="grid" role="list" id="grid">
+      <ul class="h-grid" role="list" id="grid">
         {games.map((g, i) => {
-          const slot = i % 4
           const meta = META[g.slug]
           return (
             <li
-              class="gcard-slot"
+              class="gcard-slot h-slot"
               data-slug={g.slug}
               data-cat={g.category}
               data-search={`${g.title} ${g.blurb} ${g.description}`.toLowerCase()}
             >
-              <a
-                class={`gcard b-${SLOTS[slot]}`}
-                href={withBase(`/${g.slug}/`)}
-                style={`--flood:var(--${SLOTS[(slot + 2) % 4]}); --cover:linear-gradient(142deg, ${g.accent}, ${g.accent2})`}
-              >
-                <div class="gcard-art" data-reveal="wipe" aria-hidden="true">
-                  <div class="wipe gcard-art-inner"><TileArt slug={g.slug} seed={i + 1} /></div>
-                </div>
-                <div class="gcard-row">
-                  <span class="gcard-icon" aria-hidden="true" set:html={inkIcon(meta?.icon ?? 'die')} />
-                  <span class="tag">{meta?.difficulty ?? 'Explore'}</span>
-                </div>
+              <a class="h-card" href={withBase(`/${g.slug}/`)}>
+                <span class="h-card-art" aria-hidden="true">
+                  <span class="h-card-cover" style={cover(g)}><TileArt slug={g.slug} seed={i + 1} /></span>
+                </span>
+                <span class="h-card-top">
+                  <span class="h-card-icon" aria-hidden="true" set:html={inkIcon(meta?.icon ?? 'die')} />
+                  <span class="h-tag">{meta?.difficulty ?? 'Explore'}</span>
+                </span>
                 <h3>{g.title}</h3>
                 <p>{g.blurb}</p>
-                <div class="gcard-foot">
-                  <span class="gcard-best">
-                    <span class="label">Best</span>
-                    <span class="num" data-best={g.slug}>—</span>
+                <span class="h-card-foot">
+                  <span class="h-best">
+                    <span class="h-best-l">Best</span>
+                    <span class="h-best-v" data-best={g.slug}>—</span>
                   </span>
-                  <span class="gcard-go" aria-hidden="true">→</span>
-                </div>
+                  <span class="h-go" aria-hidden="true">→</span>
+                </span>
               </a>
             </li>
           )
         })}
       </ul>
-      <p class="empty" id="empty" hidden>Nothing matches that. Try a shorter word.</p>
+      <p class="h-empty" id="empty" hidden>Nothing matches that. Try a shorter word.</p>
     </section>
 
-    {/* ---- daily challenge: the ink band, opening like a portal ------- */}
-    <section class="wrap section" id="daily" aria-labelledby="daily-title">
-      <div class="portal">
-        <div class="portal-inner block b-ink band on-ink">
-          <div>
-            <p class="label" data-decode>Daily challenge</p>
-            <h2 id="daily-title" data-reveal="lines">
-              <span class="mask-line" style="--line:0"><span>One game.</span></span>
-              <span class="mask-line" style="--line:1"><span>One <em class="wonk">day</em>.</span></span>
-            </h2>
-            <p class="lead" id="dailyGoal">{daily.goal}</p>
-            <div class="band-actions">
-              <a class="pill pill--hero" id="dailyGo" href={withBase(`/${daily.slug}/`)} data-confetti>
-                <span>Take it on</span><span class="arrow" aria-hidden="true">→</span>
-              </a>
-              <a class="pill pill--line" href="#games"><span>Another game</span></a>
-            </div>
+    {/* ---- daily challenge: a portal ---------------------------------- */}
+    <section class="wrap h-sec" id="daily" aria-labelledby="daily-title">
+      <div class="h-daily">
+        <div class="h-daily-copy">
+          <p class="h-kicker h-rv">Daily challenge</p>
+          <h2 class="h-h2 h-rv" id="daily-title">One game.<br />One <em>day</em>.</h2>
+          <p class="h-sub h-rv" id="dailyGoal">{daily.goal}</p>
+          <p class="h-clock h-rv">
+            <span class="h-clock-l">A new one in</span>
+            <span class="h-clock-v" id="dailyClock">--:--:--</span>
+          </p>
+          <div class="h-actions h-rv">
+            <a class="h-btn h-btn--main h-magnet" id="dailyGo" href={withBase(`/${daily.slug}/`)}>
+              <span>Take it on</span><span class="h-arrow" aria-hidden="true">→</span>
+            </a>
+            <a class="h-btn h-btn--ghost h-magnet" href="#games"><span>Another game</span></a>
           </div>
-          <div class="band-card block b-mint">
-            <p class="label">Today's game</p>
-            <h3 id="dailyName">{dailyGame.title}</h3>
-            <dl>
-              <div><dt class="label">Your best</dt><dd><span class="num" id="dailyBest">—</span></dd></div>
-              <div><dt class="label">Finished</dt><dd><span class="num" id="dailyPlays">0</span></dd></div>
-            </dl>
+        </div>
+
+        <div class="h-portal h-rv">
+          <div class="h-portal-glow" aria-hidden="true"></div>
+          <svg class="h-rings" viewBox="0 0 400 400" aria-hidden="true">
+            <defs>
+              <linearGradient id="h-ring-grad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#4fe3c1" />
+                <stop offset="0.5" stop-color="#8ccbff" />
+                <stop offset="1" stop-color="#b8a1ff" />
+              </linearGradient>
+            </defs>
+            <g class="h-r h-r1"><circle cx="200" cy="200" r="192" /></g>
+            <g class="h-r h-r2"><circle cx="200" cy="200" r="170" /></g>
+            <g class="h-r h-r3"><circle cx="200" cy="200" r="148" /><circle class="h-moon" cx="200" cy="52" r="6" /></g>
+            <g class="h-r h-r4"><circle class="h-moon h-moon--b" cx="200" cy="8" r="4.5" /><circle class="h-moon h-moon--c" cx="30" cy="290" r="3.5" /></g>
+          </svg>
+          <div class="h-screen">
+            {dailyGames.map((g) => (
+              <span class="h-screen-art" data-daily-art={g.slug} hidden={g.slug !== daily.slug} style={cover(g)} aria-hidden="true">
+                <TileArt slug={g.slug} seed={3} />
+              </span>
+            ))}
+            <span class="h-screen-shade" aria-hidden="true"></span>
+            <span class="h-screen-k">Today's game</span>
+            <h3 class="h-screen-t" id="dailyName">{dailyGame.title}</h3>
           </div>
+          <dl class="h-daily-stats">
+            <div><dt>Your best</dt><dd id="dailyBest">—</dd></div>
+            <div><dt>Finished</dt><dd id="dailyPlays">0</dd></div>
+          </dl>
         </div>
       </div>
     </section>
 
     {/* ---- how it works ---------------------------------------------- */}
-    <section class="wrap section" id="how" aria-labelledby="how-title">
-      <p class="label meta" data-decode>How it works</p>
-      <h2 id="how-title" data-reveal="lines" style="margin-top:14px">
-        <span class="mask-line" style="--line:0"><span>Everything runs</span></span>
-        <span class="mask-line" style="--line:1"><span><em class="wonk">here</em>, in this tab.</span></span>
-      </h2>
-      <div class="stats">
-        <div class="stat">
-          <span class="num" data-odo={String(count)}>{count}</span>
-          <span class="label">Games</span>
+    <section class="wrap h-sec" id="how" aria-labelledby="how-title">
+      <p class="h-kicker h-rv">How it works</p>
+      <h2 class="h-h2 h-rv" id="how-title">Everything runs<br /><em>here</em>, in this tab.</h2>
+      <div class="h-stats">
+        <div class="h-stat h-rv">
+          <span class="h-stat-n" data-odo={String(count)}>{count}</span>
+          <span class="h-stat-l">Games</span>
           <p>Each one a single page, loading only the code it needs.</p>
         </div>
-        <div class="stat">
-          <span class="num" data-odo={String(checks)}>{checks}</span>
-          <span class="label">Automated checks</span>
+        <div class="h-stat h-rv">
+          <span class="h-stat-n" data-odo={String(checks)}>{checks}</span>
+          <span class="h-stat-l">Automated checks</span>
           <p>Every model is tested against answers somebody else already knows.</p>
         </div>
-        <div class="stat">
-          <span class="num" data-odo="0">0</span>
-          <span class="label">Accounts needed</span>
+        <div class="h-stat h-rv">
+          <span class="h-stat-n" data-odo="0">0</span>
+          <span class="h-stat-l">Accounts needed</span>
           <p>Scores stay in this browser. Nothing is sent anywhere.</p>
         </div>
-        <div class="stat">
-          <span class="num" id="myPlays">0</span>
-          <span class="label">Games you've finished</span>
+        <div class="h-stat h-rv">
+          <span class="h-stat-n" id="myPlays">0</span>
+          <span class="h-stat-l">Games you've finished</span>
           <p>Counted on this device, from the games that have an ending.</p>
         </div>
       </div>
     </section>
 
-    {/* ---- closing call to action ------------------------------------ */}
-    <section class="wrap section">
-      <div class="block b-sky cta" data-settle>
-        <div>
-          <h2 data-reveal="lines">
-            <span class="mask-line" style="--line:0"><span>Can't <em class="wonk">choose</em>?</span></span>
-            <span class="mask-line" style="--line:1"><span>Let the page.</span></span>
-          </h2>
-          <p class="lead">One of {count}, picked at random. No take-backs.</p>
+    {/* ---- closing call to action: a slot machine --------------------- */}
+    <section class="wrap h-sec h-last">
+      <div class="h-luck h-rv">
+        <div class="h-luck-copy">
+          <h2 class="h-h2">Can't <em>choose</em>?<br />Let the page.</h2>
+          <p class="h-sub">One of {count}, picked at random. No take-backs.</p>
         </div>
-        <a class="pill pill--hero" id="surprise" href={withBase(`/${games[0].slug}/`)} data-confetti>
-          <span>Surprise me</span><span class="arrow" aria-hidden="true">→</span>
+        <div class="h-reel" id="reel" aria-hidden="true">
+          <div class="h-reel-track">
+            {[0, 1, 2].map(() => games.map((g) => <span class="h-reel-row">{g.title}</span>))}
+          </div>
+        </div>
+        <a class="h-btn h-btn--main h-magnet" id="surprise" href={withBase(`/${games[0].slug}/`)}>
+          <span>Surprise me</span><span class="h-arrow" aria-hidden="true">→</span>
         </a>
       </div>
     </section>
   </main>
 
-  <script type="application/json" id="dir-data" set:html={JSON.stringify({ slugs: games.map((g) => g.slug), daily: daily.slug })} />
+  <script type="application/json" id="dir-data" set:html={JSON.stringify({ slugs: games.map((g) => g.slug) })} />
 </Paper>
 
 <script>
-  import { flip, roll, whenSeen, PLAY } from '../lib/motion'
+  import { flip, roll, whenSeen, confetti, PLAY } from '../lib/motion'
+  import { initSky, initRing, initTitle, initMarquee, initTilt, initMagnets, initGlow, initReel } from '../lib/home-fx'
   import { readAll } from '../lib/stats'
   import { bestKey, dailyFor } from '../data/game-meta'
   import { withBase } from '../lib/base'
 
   const data = JSON.parse(document.getElementById('dir-data')!.textContent!) as { slugs: string[] }
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+
+  /* ---- the hero ----------------------------------------------------- */
+  initSky($<HTMLCanvasElement>('sky'))
+  initTitle(document.querySelector<HTMLElement>('.h-title')!)
+  initGlow($('glow'))
+  initMagnets(Array.from(document.querySelectorAll<HTMLElement>('.h-magnet')))
+  const ringCards = Array.from(document.querySelectorAll<HTMLAnchorElement>('.h-rc'))
+  const capTitle = $('capTitle')
+  const capBlurb = $('capBlurb')
+  initRing($('stage'), (i) => {
+    capTitle.textContent = ringCards[i].dataset.title!
+    capBlurb.textContent = ringCards[i].dataset.blurb!
+    if (PLAY) {
+      capTitle.parentElement!.classList.remove('is-new')
+      void capTitle.offsetWidth
+      capTitle.parentElement!.classList.add('is-new')
+    }
+  })
+  initMarquee($('marquee'))
+
+  /* ---- reveals: headings, and the cards a column at a time --------- */
+  document.querySelectorAll('.h-rv').forEach((el) => (PLAY ? whenSeen(el) : el.classList.add('is-in')))
+  const slots = Array.from(document.querySelectorAll<HTMLElement>('.gcard-slot'))
+  for (const s of slots) {
+    s.style.setProperty('--d', `${Math.round(s.offsetLeft / Math.max(1, s.offsetWidth)) * 90}ms`)
+    if (!PLAY) { s.classList.add('is-in'); continue }
+    whenSeen(s)
+    s.addEventListener('animationend', () => s.classList.add('is-done'), { once: true })
+  }
+  initTilt(Array.from(document.querySelectorAll<HTMLElement>('.h-card')))
 
   /* ---- bests, read from this browser ------------------------------- */
   const readBest = (slug: string): string | null => {
@@ -264,28 +347,41 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
   }
   document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => {
     const b = readBest(el.dataset.best!)
-    if (b) el.textContent = b
+    if (b) { el.textContent = b; el.classList.add('has-best') }
   })
 
   /* ---- directory filter, carried by FLIP --------------------------- */
-  const slots = Array.from(document.querySelectorAll<HTMLElement>('.gcard-slot'))
   const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-filter]'))
-  const q = document.getElementById('q') as HTMLInputElement
-  const countEl = document.getElementById('count')!
-  const empty = document.getElementById('empty')!
+  const chipBox = document.querySelector<HTMLElement>('.h-chips')!
+  const ind = chipBox.querySelector<HTMLElement>('.h-chip-ind')!
+  const q = $<HTMLInputElement>('q')
+  const countEl = $('count')
+  const empty = $('empty')
   let filter = new URLSearchParams(location.search).get('c') ?? 'all'
   if (!chips.some((c) => c.dataset.filter === filter)) filter = 'all'
+
+  // One highlight slides between the chips instead of each chip filling.
+  const moveInd = () => {
+    const on = chips.find((c) => c.dataset.filter === filter)!
+    ind.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`
+    ind.style.width = `${on.offsetWidth}px`
+    ind.style.height = `${on.offsetHeight}px`
+  }
+  chipBox.classList.add('has-ind')
+  addEventListener('resize', moveInd, { passive: true })
+  document.fonts?.ready.then(moveInd)
 
   const apply = () => {
     const term = q.value.trim().toLowerCase()
     chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.filter === filter)))
+    moveInd()
     flip(slots, () => {
       let shown = 0
       for (const s of slots) {
         const byKind = filter === 'all' || s.dataset.cat === filter
         const ok = byKind && (!term || s.dataset.search!.includes(term))
         s.hidden = !ok
-        if (ok) shown++
+        if (ok) { shown++; s.classList.add('is-in', 'is-done') }
       }
       countEl.textContent = `${shown} game${shown === 1 ? '' : 's'}`
       empty.hidden = shown > 0
@@ -295,37 +391,936 @@ const dailyGame = games.find((g) => g.slug === daily.slug)!
   let t = 0
   q.addEventListener('input', () => { clearTimeout(t); t = window.setTimeout(apply, 90) })
   if (filter !== 'all') apply()
+  else moveInd()
 
   /* ---- daily challenge, for today rather than for the build -------- */
   const d = dailyFor(new Date())
-  document.getElementById('dailyGoal')!.textContent = d.goal
-  document.getElementById('dailyName')!.textContent = d.title
-  ;(document.getElementById('dailyGo') as HTMLAnchorElement).href = withBase(`/${d.slug}/`)
+  $('dailyGoal').textContent = d.goal
+  $('dailyName').textContent = d.title
+  $<HTMLAnchorElement>('dailyGo').href = withBase(`/${d.slug}/`)
+  document.querySelectorAll<HTMLElement>('[data-daily-art]').forEach((el) => { el.hidden = el.dataset.dailyArt !== d.slug })
   const stats = readAll()
   const best = readBest(d.slug)
-  const dailyBest = document.getElementById('dailyBest')!
-  const dailyPlays = document.getElementById('dailyPlays')!
+  const dailyBest = $('dailyBest')
+  const dailyPlays = $('dailyPlays')
   const plays = stats.games[d.slug]?.plays ?? 0
   whenSeen(dailyBest, () => {
     if (best) roll(dailyBest, best, { from: best.replace(/\d/g, '0') })
     roll(dailyPlays, String(plays), { from: '0' })
   })
+  // The rotation turns over at midnight UTC.
+  const clock = $('dailyClock')
+  const pad = (v: number) => String(v).padStart(2, '0')
+  const tickClock = () => {
+    const now = new Date()
+    const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+    const s = Math.max(0, Math.floor((next - now.getTime()) / 1000))
+    clock.textContent = `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`
+  }
+  tickClock()
+  setInterval(tickClock, 1000)
 
   /* ---- your finished games ----------------------------------------- */
   const total = Object.values(stats.games).reduce((n, g) => n + (g?.plays ?? 0), 0)
-  const mine = document.getElementById('myPlays')!
+  const mine = $('myPlays')
   if (PLAY) whenSeen(mine, () => roll(mine, total.toLocaleString('en-GB'), { from: '0' }))
   else mine.textContent = total.toLocaleString('en-GB')
 
-  /* ---- surprise me ------------------------------------------------- */
-  const surprise = document.getElementById('surprise') as HTMLAnchorElement
-  const pick = () => data.slugs[Math.floor(Math.random() * data.slugs.length)]
-  surprise.href = withBase(`/${pick()}/`)
-  surprise.addEventListener('pointerenter', () => { surprise.href = withBase(`/${pick()}/`) })
+  /* ---- surprise me: spin the reel, then go ------------------------- */
+  const surprise = $<HTMLAnchorElement>('surprise')
+  const reel = initReel($('reel'), data.slugs.length)
+  let pick = 0
+  const choose = () => {
+    pick = Math.floor(Math.random() * data.slugs.length)
+    surprise.href = withBase(`/${data.slugs[pick]}/`)
+  }
+  choose()
+  surprise.addEventListener('pointerenter', choose)
+  let going = false
   surprise.addEventListener('click', (e) => {
-    // Let the confetti land before the page goes.
     if (!PLAY || e.metaKey || e.ctrlKey || e.shiftKey) return
     e.preventDefault()
-    setTimeout(() => { location.href = surprise.href }, 380)
+    if (going) return
+    going = true
+    surprise.classList.add('is-spinning')
+    reel.spinTo(pick).then(() => {
+      const r = surprise.getBoundingClientRect()
+      confetti(r.left + r.width / 2, r.top + r.height / 2, 60)
+      setTimeout(() => { location.href = surprise.href }, 520)
+    })
   })
 </script>
+
+<style is:global>
+  /* The night, for the whole page: the masthead and the colophon read their
+     colours from Paper's tokens, so re-inking the tokens inside them is all
+     it takes to turn them dark. */
+  body.home-night {
+    --h-bg: #05070f;
+    --h-bg2: #0a0f22;
+    --h-text: #eef2ff;
+    --h-dim: #a4aecb;
+    --h-line: rgba(160, 180, 255, 0.13);
+    background: var(--h-bg);
+    color: var(--h-text);
+  }
+  .home-night ::selection { background: var(--mint); color: #05070f; }
+  .home-night .masthead {
+    --paper: rgba(5, 7, 15, 0.72);
+    --paper3: rgba(160, 180, 255, 0.12);
+    --ink: #eef2ff;
+    --ink-paper: #05070f;
+    --focus: #eef2ff;
+    color: var(--ink);
+  }
+  .home-night .masthead.is-solid { backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
+  .home-night .masthead .pill--ink:hover { background: var(--mint); color: #05070f; }
+  .home-night .skip { background: #eef2ff; color: #05070f; }
+  .home-night .colophon-wrap {
+    --ink: #eef2ff;
+    --card: #26306a;
+    --focus: #eef2ff;
+    margin-top: clamp(80px, 10vw, 150px);
+  }
+  .home-night .colophon.b-lilac {
+    background:
+      radial-gradient(90% 120% at 0% 0%, rgba(91, 130, 255, 0.28), transparent 55%),
+      radial-gradient(70% 100% at 100% 100%, rgba(184, 161, 255, 0.24), transparent 60%),
+      linear-gradient(180deg, #0d1330, #090d1f);
+    border: 1px solid rgba(160, 180, 255, 0.16);
+    box-shadow: 0 40px 80px -40px rgba(91, 130, 255, 0.4);
+  }
+  .home-night .colophon .label { color: var(--h-dim); }
+  .home-night .colophon .wordmark {
+    background: linear-gradient(100deg, #eef2ff 20%, #8ccbff 55%, #b8a1ff 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .home-night .colophon .wordmark .ch { -webkit-text-fill-color: transparent; background: inherit; -webkit-background-clip: text; background-clip: text; }
+  .home-night .colophon-legal { color: var(--h-dim); }
+
+  @property --h-ang {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+</style>
+
+<style>
+  /* ================================================================ */
+  /* hero                                                              */
+  /* ================================================================ */
+  .h { position: relative; z-index: 1; }
+
+  .h-glow {
+    position: fixed;
+    left: 0; top: 0;
+    z-index: 2;
+    width: 620px; height: 620px;
+    margin: -310px 0 0 -310px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(91, 130, 255, 0.13), rgba(79, 227, 193, 0.05) 40%, transparent 68%);
+    mix-blend-mode: screen;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s;
+  }
+  .h-glow.is-on { opacity: 1; }
+
+  .h-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+    min-height: max(100svh, 700px);
+    display: grid;
+    align-items: center;
+    padding: 104px 0 88px;
+  }
+  .h-hero::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 30%;
+    background: linear-gradient(180deg, transparent, var(--h-bg));
+    z-index: -1;
+    pointer-events: none;
+  }
+  .h-sky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -2; max-width: none; }
+  .h-aurora { position: absolute; inset: 0; z-index: -3; pointer-events: none; }
+  .h-aurora i { position: absolute; display: block; border-radius: 50%; width: 62vmax; height: 62vmax; }
+  .h-aurora .a1 { left: -22vmax; top: -18vmax; background: radial-gradient(circle, rgba(91, 130, 255, 0.36), transparent 62%); }
+  .h-aurora .a2 { right: -26vmax; top: -8vmax; background: radial-gradient(circle, rgba(79, 227, 193, 0.2), transparent 62%); }
+  .h-aurora .a3 { left: 22vw; bottom: -40vmax; background: radial-gradient(circle, rgba(184, 161, 255, 0.28), transparent 62%); }
+  :global(html.play) .h-aurora .a1 { animation: h-drift-a 24s ease-in-out infinite alternate; }
+  :global(html.play) .h-aurora .a2 { animation: h-drift-b 30s ease-in-out infinite alternate; }
+  :global(html.play) .h-aurora .a3 { animation: h-drift-c 27s ease-in-out infinite alternate; }
+  @keyframes h-drift-a { to { transform: translate(14vw, 12vh) scale(1.15); } }
+  @keyframes h-drift-b { to { transform: translate(-16vw, 18vh) scale(0.9); } }
+  @keyframes h-drift-c { to { transform: translate(-10vw, -14vh) scale(1.2); } }
+  .h-grain {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    opacity: 0.07;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  .h-hero-in {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(24px, 4vw, 64px);
+  }
+
+  .h-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--h-line);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--h-dim);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .h-pulse { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--mint); flex: none; }
+  .h-pulse::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--mint); opacity: 0; }
+  :global(html.play) .h-pulse::after { animation: h-ping 2.2s ease-out infinite; }
+  @keyframes h-ping { 0% { transform: scale(0.4); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
+
+  .h-title {
+    margin-top: 26px;
+    font-family: var(--display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-weight: 600;
+    font-size: clamp(50px, 7.3vw, 118px);
+    line-height: 0.96;
+    letter-spacing: -0.035em;
+    color: #f6f7ff;
+    text-wrap: nowrap;
+    cursor: default;
+  }
+  .h-line { display: block; white-space: nowrap; }
+  .h-word { display: inline-block; white-space: nowrap; }
+  .h-title .ch { display: inline-block; }
+  .h-wonk .ch { font-style: italic; }
+  .h-grad .ch {
+    background-image: linear-gradient(90deg, #4fe3c1, #8ccbff 25%, #b8a1ff 50%, #8ccbff 75%, #4fe3c1);
+    background-size: 12em 100%;
+    background-position: calc(var(--j) * -0.56em) 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 0.06em;
+  }
+  :global(html.play) .h-title .ch {
+    animation: h-rise 1.05s var(--ease) both;
+    animation-delay: calc(140ms + var(--i) * 34ms);
+  }
+  :global(html.play) .h-grad .ch {
+    animation: h-rise 1.05s var(--ease) both, h-flow 9s linear infinite;
+    animation-delay: calc(140ms + var(--i) * 34ms), 0s;
+  }
+  @keyframes h-rise {
+    from { opacity: 0; transform: translateY(0.55em) rotate(9deg) scale(0.8); filter: blur(12px); }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+  @keyframes h-flow {
+    from { background-position: calc(var(--j) * -0.56em) 0; }
+    to { background-position: calc(var(--j) * -0.56em - 12em) 0; }
+  }
+
+  .h-lead {
+    margin-top: 26px;
+    max-width: 44ch;
+    color: var(--h-dim);
+    font-size: var(--fs-lead);
+    line-height: 1.55;
+  }
+  .h-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+
+  /* Everything else in the hero arrives after the title. */
+  :global(html.play) .h-in { animation: h-fade 1s var(--ease) both; animation-delay: var(--d, 0ms); }
+  @keyframes h-fade { from { opacity: 0; transform: translateY(22px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+
+  /* ---- buttons ---------------------------------------------------- */
+  .h-btn {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 58px;
+    padding: 0 28px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: translate 0.35s var(--ease), box-shadow 0.4s, border-color 0.3s, background-color 0.3s;
+  }
+  .h-btn--main {
+    color: #05070f;
+    background: linear-gradient(110deg, #4fe3c1, #8ccbff 45%, #b8a1ff 90%);
+    background-size: 200% 100%;
+    box-shadow: 0 10px 34px -10px rgba(79, 227, 193, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+  .h-btn--main:hover { box-shadow: 0 16px 48px -10px rgba(140, 203, 255, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+  :global(html.play) .h-btn--main { animation: h-sheen 6s ease-in-out infinite alternate; }
+  @keyframes h-sheen { to { background-position: 100% 0; } }
+  .h-btn--main::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 70%);
+    background-size: 250% 100%;
+    background-position: 120% 0;
+    mix-blend-mode: overlay;
+  }
+  :global(html.play) .h-btn--main:hover::after { animation: h-shine 0.9s var(--ease); }
+  @keyframes h-shine { from { background-position: 120% 0; } to { background-position: -40% 0; } }
+  .h-btn--ghost {
+    color: var(--h-text);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(160, 180, 255, 0.28);
+  }
+  .h-btn--ghost:hover { border-color: rgba(200, 215, 255, 0.7); background: rgba(255, 255, 255, 0.08); }
+  .h-arrow { font-size: 1.25em; line-height: 1; transition: transform 0.4s var(--spring); }
+  .h-btn:hover .h-arrow { transform: translateX(4px); }
+  .h-btn:focus-visible { outline: 2px solid #eef2ff; outline-offset: 4px; }
+
+  /* ---- the ring ---------------------------------------------------- */
+  .h-stage-wrap { position: relative; }
+  .h-stage {
+    position: relative;
+    height: clamp(420px, 42vw, 560px);
+    perspective: 1300px;
+    perspective-origin: 50% 40%;
+    touch-action: pan-y;
+    cursor: grab;
+    user-select: none;
+  }
+  .h-stage.is-dragging { cursor: grabbing; }
+  /* A floor of light under the ring. */
+  .h-stage::after {
+    content: '';
+    position: absolute;
+    left: 6%; right: 6%; bottom: 4%;
+    height: 90px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(91, 130, 255, 0.4), rgba(79, 227, 193, 0.08) 60%, transparent);
+    filter: blur(6px);
+    pointer-events: none;
+  }
+  .h-ring {
+    --cw: 196px;
+    --R: calc(var(--cw) * 1.36);
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    transform: translateZ(calc(var(--R) * -1)) rotateX(-8deg) rotateY(var(--spin, 0deg));
+  }
+  .h-rc {
+    --lit: 1;
+    position: absolute;
+    left: calc(var(--cw) / -2);
+    top: calc(var(--cw) * -0.52);
+    width: var(--cw);
+    display: block;
+    padding: 8px 8px 14px;
+    border-radius: 18px;
+    color: var(--h-text);
+    text-decoration: none;
+    background: linear-gradient(180deg, #121a3c, #0a0f24);
+    border: 1px solid rgba(160, 180, 255, 0.2);
+    box-shadow:
+      0 30px 50px -24px rgba(0, 0, 0, 0.9),
+      0 0 50px -10px rgba(91, 130, 255, calc(var(--lit) * 0.55));
+    transform: rotateY(calc(var(--k) * 360deg / var(--n))) translateZ(var(--R));
+    -webkit-user-drag: none;
+  }
+  .h-rc.is-back { pointer-events: none; }
+  .h-rc.is-front { border-color: rgba(140, 203, 255, 0.6); }
+  .h-rc:focus-visible { outline: 2px solid #eef2ff; outline-offset: 4px; }
+  .h-rc-art {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 10;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--cover);
+  }
+  .h-rc-c {
+    display: block;
+    margin: 12px 4px 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sky);
+  }
+  .h-rc-t {
+    display: block;
+    margin: 4px 4px 0;
+    font-family: var(--display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-weight: 600;
+    font-size: calc(var(--cw) * 0.1);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+  }
+
+  .h-cap {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    margin-top: -12px;
+    text-align: center;
+    min-height: 92px;
+  }
+  .h-cap-k { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mint); }
+  .h-cap-t { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; line-height: 1.1; }
+  .h-cap-b { color: var(--h-dim); font-size: 14.5px; max-width: 36ch; }
+  .h-cap-hint { margin-top: 6px; font-size: 12px; color: var(--h-dim); opacity: 0.7; }
+  :global(html.play) .h-cap.is-new .h-cap-t,
+  :global(html.play) .h-cap.is-new .h-cap-b { animation: h-cap-in 0.6s var(--ease) both; }
+  :global(html.play) .h-cap.is-new .h-cap-b { animation-delay: 60ms; }
+  @keyframes h-cap-in { from { opacity: 0; transform: translateY(8px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+
+  .h-cue {
+    position: absolute;
+    left: 50%;
+    bottom: 26px;
+    width: 26px;
+    height: 42px;
+    margin-left: -13px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(200, 215, 255, 0.4);
+  }
+  .h-cue-dot {
+    position: absolute;
+    left: 50%;
+    top: 8px;
+    width: 4px;
+    height: 8px;
+    margin-left: -2px;
+    border-radius: 4px;
+    background: #eef2ff;
+  }
+  :global(html.play) .h-cue-dot { animation: h-cue 1.8s var(--ease) infinite; }
+  @keyframes h-cue { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(14px); opacity: 0; } 100% { transform: translateY(0); opacity: 0; } }
+  .h-cue:focus-visible { outline: 2px solid #eef2ff; outline-offset: 4px; }
+
+  @media (max-width: 1100px) {
+    .h-ring { --cw: 168px; }
+  }
+  @media (max-width: 900px) {
+    .h-hero { min-height: 0; padding: 100px 0 90px; }
+    .h-hero-in { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .h-stage { height: 380px; }
+    .h-ring { --cw: 156px; }
+    .h-cue { display: none; }
+  }
+  @media (max-width: 520px) {
+    .h-title { font-size: clamp(44px, 13.4vw, 64px); }
+    .h-stage { height: 320px; perspective: 900px; }
+    .h-ring { --cw: 132px; }
+    .h-cap-t { font-size: 21px; }
+    .h-btn { min-height: 54px; padding: 0 22px; font-size: 14px; }
+    .h-pill { font-size: 12px; }
+  }
+
+  /* ================================================================ */
+  /* marquee                                                           */
+  /* ================================================================ */
+  .h-mq {
+    position: relative;
+    display: grid;
+    gap: 10px;
+    padding-block: 30px;
+    border-block: 1px solid var(--h-line);
+    background: linear-gradient(180deg, rgba(91, 130, 255, 0.06), transparent 70%);
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  }
+  .h-mq-row { overflow: hidden; white-space: nowrap; }
+  .h-mq-track { display: inline-flex; will-change: transform; }
+  .h-mq-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6em;
+    padding-right: 0.6em;
+    font-family: var(--display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-weight: 650;
+    font-size: clamp(34px, 5.2vw, 78px);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #eef2ff;
+  }
+  .h-mq-item::after { content: '✦'; font-size: 0.42em; color: var(--mint); }
+  .h-mq-row--line .h-mq-item {
+    font-style: italic;
+    color: transparent;
+    -webkit-text-stroke: 1.2px rgba(180, 200, 255, 0.5);
+  }
+  .h-mq-row--line .h-mq-item::after { color: var(--lilac); -webkit-text-stroke: 0; }
+
+  /* ================================================================ */
+  /* shared section type                                               */
+  /* ================================================================ */
+  .h-sec { padding-top: clamp(90px, 11vw, 170px); }
+  .h-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mint);
+  }
+  .h-kicker::before { content: ''; width: 34px; height: 1.5px; background: linear-gradient(90deg, var(--mint), var(--sky)); }
+  .h-h2 {
+    margin-top: 18px;
+    font-family: var(--display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-weight: 600;
+    font-size: clamp(42px, 5.8vw, 88px);
+    line-height: 0.96;
+    letter-spacing: -0.035em;
+    color: #f6f7ff;
+  }
+  .h-h2 em {
+    font-style: italic;
+    background: linear-gradient(100deg, #4fe3c1, #8ccbff 50%, #b8a1ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    padding-right: 0.06em;
+  }
+  .h-sub { margin-top: 20px; max-width: 46ch; color: var(--h-dim); font-size: var(--fs-lead); line-height: 1.55; }
+
+  :global(html.play) .h-rv { transition: opacity 1s var(--ease), transform 1s var(--ease), filter 1s var(--ease); }
+  :global(html.play) .h-rv:not(.is-in) { opacity: 0; transform: translateY(34px); filter: blur(8px); }
+
+  /* ================================================================ */
+  /* directory                                                         */
+  /* ================================================================ */
+  .h-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  .h-head .h-sub { margin-top: 0; }
+
+  .h-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 48px; }
+  .h-chips {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 5px;
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--h-line);
+  }
+  .h-chip-ind {
+    position: absolute;
+    left: 0; top: 0;
+    width: 0; height: 0;
+    border-radius: 999px;
+    background: linear-gradient(110deg, #4fe3c1, #8ccbff);
+    box-shadow: 0 8px 26px -8px rgba(79, 227, 193, 0.8);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .h-chips.has-ind .h-chip-ind { opacity: 1; }
+  :global(html.play) .h-chip-ind { transition: transform 0.55s var(--spring), width 0.55s var(--spring), height 0.3s var(--ease); }
+  .h-chip {
+    position: relative;
+    z-index: 1;
+    min-height: 40px;
+    padding: 0 17px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--h-dim);
+    font-size: 14px;
+    font-weight: 700;
+    transition: color 0.3s;
+  }
+  .h-chip:hover { color: var(--h-text); }
+  .h-chip[aria-pressed='true'] { color: #05070f; }
+  .h-chips:not(.has-ind) .h-chip[aria-pressed='true'] { background: linear-gradient(110deg, #4fe3c1, #8ccbff); }
+  .h-chip:focus-visible { outline: 2px solid #eef2ff; outline-offset: 2px; }
+
+  .h-search {
+    flex: 1 1 260px;
+    max-width: 380px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 10px 0 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--h-line);
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .h-search:focus-within { border-color: rgba(140, 203, 255, 0.7); box-shadow: 0 0 0 4px rgba(140, 203, 255, 0.12); }
+  .h-search svg { width: 18px; height: 18px; flex: none; color: var(--h-dim); }
+  .h-search input { flex: 1; min-width: 0; height: 48px; border: 0; background: transparent; outline: none; color: var(--h-text); font-size: 15px; }
+  .h-search input::placeholder { color: var(--h-dim); opacity: 0.8; }
+  .h-count { flex: none; font-size: 12px; font-weight: 700; color: var(--h-dim); padding: 6px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.05); }
+
+  .h-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
+    gap: clamp(16px, 1.6vw, 24px);
+    margin-top: 32px;
+  }
+  .h-slot { display: flex; }
+  :global(html.play) .h-slot:not(.is-in) { opacity: 0; }
+  :global(html.play) .h-slot.is-in:not(.is-done) { animation: h-card-in 0.95s var(--ease) backwards; animation-delay: var(--d, 0ms); }
+  @keyframes h-card-in {
+    from { opacity: 0; transform: perspective(900px) translateY(60px) rotateX(14deg) scale(0.94); filter: blur(6px); }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+
+  .h-card {
+    --rx: 0deg;
+    --ry: 0deg;
+    --mx: 50%;
+    --my: 50%;
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 10px 10px 18px;
+    border-radius: 22px;
+    color: var(--h-text);
+    text-decoration: none;
+    background: linear-gradient(180deg, #0f1633, #0a0e21);
+    border: 1px solid var(--h-line);
+    transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
+    transition: transform 0.7s var(--ease), box-shadow 0.45s, border-color 0.35s;
+  }
+  .h-card.is-tilting { transition: transform 0.12s linear, box-shadow 0.45s, border-color 0.35s; }
+  .h-card:hover, .h-card:focus-visible {
+    border-color: transparent;
+    box-shadow: 0 34px 60px -30px rgba(91, 130, 255, 0.7), 0 0 0 1px rgba(140, 203, 255, 0.08);
+  }
+  .h-card:focus-visible { outline: 2px solid #eef2ff; outline-offset: 4px; }
+  /* A comet of light running round the border on hover. */
+  .h-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(from var(--h-ang), transparent 0 35%, #4fe3c1 52%, #8ccbff 64%, #b8a1ff 76%, transparent 92%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+  }
+  .h-card:hover::before, .h-card:focus-visible::before { opacity: 1; }
+  :global(html.play) .h-card:hover::before { animation: h-orbit 2.8s linear infinite; }
+  @keyframes h-orbit { to { --h-ang: 360deg; } }
+  /* The glare, following the pointer. */
+  .h-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.13), transparent 42%);
+    opacity: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+  }
+  .h-card.is-tilting::after { opacity: 1; }
+
+  .h-card-art {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 9;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #03050c;
+  }
+  .h-card-cover { position: absolute; inset: 0; background: var(--cover); transition: transform 0.9s var(--ease); }
+  .h-card:hover .h-card-cover { transform: scale(1.07); }
+  .h-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 6px 0; }
+  .h-card-icon { display: block; width: 30px; height: 30px; flex: none; color: #dfe6ff; }
+  .h-card-icon :global(svg) { width: 100%; height: 100%; }
+  .h-tag {
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(160, 180, 255, 0.24);
+    color: var(--h-dim);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .h-card h3 {
+    margin: 12px 6px 0;
+    font-family: var(--display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-weight: 600;
+    font-size: clamp(24px, 1.9vw, 28px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+  }
+  .h-card p { margin: 8px 6px 0; color: var(--h-dim); font-size: 15px; line-height: 1.45; }
+  .h-card-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: auto 6px 0; padding-top: 20px; }
+  .h-best { display: grid; gap: 3px; }
+  .h-best-l { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--h-dim); }
+  .h-best-v { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: rgba(238, 242, 255, 0.45); }
+  .h-best-v.has-best { color: var(--mint); text-shadow: 0 0 18px rgba(79, 227, 193, 0.45); }
+  .h-go {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 19px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(160, 180, 255, 0.22);
+    transition: transform 0.5s var(--spring), background-color 0.3s, color 0.3s, border-color 0.3s;
+  }
+  .h-card:hover .h-go { background-color: #8ccbff; border-color: #8ccbff; color: #05070f; transform: rotate(-45deg); }
+  .h-empty { margin-top: 32px; padding: 32px; border-radius: 22px; text-align: center; color: var(--h-dim); border: 1px dashed var(--h-line); }
+
+  /* ================================================================ */
+  /* daily                                                             */
+  /* ================================================================ */
+  .h-daily {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(32px, 5vw, 90px);
+  }
+  .h-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 26px;
+    padding: 10px 18px;
+    border-radius: 16px;
+    border: 1px solid var(--h-line);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .h-clock-l { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--h-dim); }
+  .h-clock-v { font-size: 26px; font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; color: var(--sky); text-shadow: 0 0 20px rgba(140, 203, 255, 0.5); }
+
+  .h-portal { position: relative; width: min(100%, 520px); aspect-ratio: 1; margin-inline: auto; display: grid; place-items: center; }
+  .h-portal-glow {
+    position: absolute;
+    inset: 12%;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(79, 227, 193, 0.55), rgba(140, 203, 255, 0.2), rgba(184, 161, 255, 0.55), rgba(91, 130, 255, 0.25), rgba(79, 227, 193, 0.55));
+    filter: blur(46px);
+    opacity: 0.55;
+  }
+  :global(html.play) .h-portal-glow { animation: h-turn 16s linear infinite; }
+  .h-rings { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .h-rings circle { fill: none; stroke: url(#h-ring-grad); }
+  .h-r { transform-origin: 200px 200px; }
+  .h-r1 circle { stroke-width: 1.5; stroke-dasharray: 2 10; stroke-linecap: round; opacity: 0.8; }
+  .h-r2 circle { stroke-width: 1; stroke-dasharray: 90 28 14 28; opacity: 0.6; }
+  .h-r3 circle:first-child { stroke-width: 1; opacity: 0.35; }
+  .h-moon { fill: #4fe3c1 !important; stroke: none !important; filter: drop-shadow(0 0 6px #4fe3c1); }
+  .h-moon--b { fill: #b8a1ff !important; filter: drop-shadow(0 0 6px #b8a1ff); }
+  .h-moon--c { fill: #8ccbff !important; filter: drop-shadow(0 0 5px #8ccbff); }
+  :global(html.play) .h-r1 { animation: h-turn 60s linear infinite; }
+  :global(html.play) .h-r2 { animation: h-turn 38s linear infinite reverse; }
+  :global(html.play) .h-r3 { animation: h-turn 14s linear infinite; }
+  :global(html.play) .h-r4 { animation: h-turn 22s linear infinite reverse; }
+  @keyframes h-turn { to { transform: rotate(360deg); } }
+
+  .h-screen {
+    position: relative;
+    z-index: 1;
+    width: 64%;
+    aspect-ratio: 16 / 11;
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 18px;
+    background: #03050c;
+    border: 1px solid rgba(160, 180, 255, 0.3);
+    box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.9), 0 0 60px -10px rgba(91, 130, 255, 0.55);
+  }
+  :global(html.play) .h-screen { animation: h-bob 6s ease-in-out infinite; }
+  @keyframes h-bob { 50% { transform: translateY(-10px); } }
+  .h-screen-art { position: absolute; inset: 0; background: var(--cover); }
+  .h-screen-shade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, rgba(3, 5, 12, 0.92)); }
+  .h-screen-k, .h-screen-t { position: relative; }
+  .h-screen-k { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mint); }
+  .h-screen-t {
+    margin-top: 6px;
+    font-family: var(--display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-weight: 600;
+    font-size: clamp(22px, 2.4vw, 32px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+  }
+  .h-daily-stats {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    bottom: 3%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 6px;
+    border-radius: 18px;
+    background: rgba(10, 14, 33, 0.82);
+    border: 1px solid var(--h-line);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .h-daily-stats div { padding: 8px 16px; border-radius: 13px; background: rgba(255, 255, 255, 0.04); min-width: 108px; }
+  .h-daily-stats dt { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--h-dim); }
+  .h-daily-stats dd { margin: 4px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+
+  @media (max-width: 900px) {
+    .h-daily { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* ================================================================ */
+  /* stats                                                             */
+  /* ================================================================ */
+  .h-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(14px, 1.6vw, 22px);
+    margin-top: 56px;
+  }
+  .h-stat {
+    position: relative;
+    overflow: hidden;
+    padding: 28px 24px 26px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #0f1633, #0a0e21);
+    border: 1px solid var(--h-line);
+    transition: border-color 0.4s, box-shadow 0.4s, transform 0.6s var(--ease);
+  }
+  .h-stat::before {
+    content: '';
+    position: absolute;
+    right: -30%;
+    top: -40%;
+    width: 80%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(91, 130, 255, 0.26), transparent);
+    transition: transform 0.8s var(--ease);
+  }
+  .h-stat:nth-child(2)::before { background: radial-gradient(closest-side, rgba(79, 227, 193, 0.22), transparent); }
+  .h-stat:nth-child(3)::before { background: radial-gradient(closest-side, rgba(140, 203, 255, 0.24), transparent); }
+  .h-stat:nth-child(4)::before { background: radial-gradient(closest-side, rgba(184, 161, 255, 0.26), transparent); }
+  .h-stat:hover { border-color: rgba(140, 203, 255, 0.4); box-shadow: 0 30px 60px -34px rgba(91, 130, 255, 0.7); transform: translateY(-4px); }
+  .h-stat:hover::before { transform: scale(1.5) translate(-10%, 10%); }
+  .h-stat > * { position: relative; }
+  .h-stat-n {
+    display: block;
+    font-size: clamp(54px, 6.4vw, 96px);
+    font-weight: 800;
+    letter-spacing: -0.05em;
+    line-height: 1;
+    color: #f6f7ff;
+    text-shadow: 0 0 34px rgba(140, 203, 255, 0.35);
+  }
+  .h-stat-l { display: block; margin-top: 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mint); }
+  .h-stat p { margin-top: 8px; color: var(--h-dim); font-size: 14.5px; line-height: 1.5; max-width: 28ch; }
+  @media (max-width: 900px) { .h-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 480px) { .h-stat { padding: 22px 18px; } }
+
+  /* ================================================================ */
+  /* surprise me                                                       */
+  /* ================================================================ */
+  .h-luck {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(24px, 4vw, 56px);
+    padding: clamp(32px, 5.5vw, 80px);
+    border-radius: 32px;
+    border: 1px solid rgba(160, 180, 255, 0.2);
+    background:
+      radial-gradient(80% 140% at 100% 0%, rgba(79, 227, 193, 0.2), transparent 55%),
+      radial-gradient(70% 120% at 0% 100%, rgba(91, 130, 255, 0.3), transparent 60%),
+      linear-gradient(180deg, #0f1636, #0a0e22);
+  }
+  .h-luck .h-h2 { margin-top: 0; font-size: clamp(38px, 4.6vw, 72px); }
+  .h-reel {
+    --row: 62px;
+    position: relative;
+    height: calc(var(--row) * 3);
+    overflow: hidden;
+    border-radius: 20px;
+    border: 1px solid var(--h-line);
+    background: rgba(3, 5, 12, 0.6);
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+  }
+  .h-reel::before {
+    content: '';
+    position: absolute;
+    left: 10px; right: 10px;
+    top: var(--row);
+    height: var(--row);
+    border-radius: 14px;
+    border: 1px solid rgba(140, 203, 255, 0.35);
+    background: rgba(140, 203, 255, 0.07);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .h-reel-track { display: flex; flex-direction: column; padding-top: var(--row); will-change: transform; }
+  .h-reel-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--row);
+    flex: none;
+    padding: 0 20px;
+    font-family: var(--display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-weight: 600;
+    font-size: clamp(20px, 2vw, 28px);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #surprise.is-spinning { pointer-events: none; }
+  @media (max-width: 1024px) {
+    .h-luck { grid-template-columns: minmax(0, 1fr); }
+    .h-luck #surprise { justify-self: start; }
+  }
+</style>

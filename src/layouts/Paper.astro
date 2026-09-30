@@ -27,6 +27,10 @@ interface Props {
   /** Extra Google Fonts families a page needs for its own content, e.g.
    *  'Roboto:wght@400;500;700' for a widget that imitates a real one. */
   fonts?: string[]
+  /** The browser chrome colour, and whether form controls and scrollbars
+   *  draw light or dark. The homepage is a night sky; everything else is paper. */
+  themeColor?: string
+  colorScheme?: 'light' | 'dark'
 }
 
 const {
@@ -39,6 +43,8 @@ const {
   noindex = false,
   bodyClass = '',
   fonts = [],
+  themeColor = '#EEF0F3',
+  colorScheme = 'light',
 } = Astro.props
 
 const fontHref =
@@ -69,8 +75,8 @@ const favicon =
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#EEF0F3" />
-    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content={themeColor} />
+    <meta name="color-scheme" content={colorScheme} />
     {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" href={favicon} />

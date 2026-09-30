@@ -2632,7 +2632,15 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     shell" column, which is "Oldest" now. `GameLayout.astro` is no longer
     imported by any page.
 
-59. Then reassess again.
+59. ~~**A new homepage.**~~ **done.** The homepage leaves paper for a night
+    sky: a starfield hero that answers the pointer, a title whose letters
+    thicken under it, a 3D ring of the newest games you can spin, two
+    scroll-driven marquees, tilting glow cards in the directory, a portal for
+    the daily challenge with a live countdown, and a slot-machine Surprise Me.
+    All of it lives in `lib/home-fx.ts` and all of it stands still under
+    reduced motion. The games themselves stay on paper.
+
+60. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
