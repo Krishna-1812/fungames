@@ -15,7 +15,7 @@ system — cool paper, white cards, colour only as whole blocks with ink on
 them, Fraunces for statements and Zalando Sans for information, and a motion
 layer that is typographic rather than decorative. The rules are in
 [`src/styles/paper/README.md`](src/styles/paper/README.md); the pieces are below. The homepage is the
-one exception: it is a night sky instead of paper (see "The homepage").
+one exception: it is Tiny Island, an illustrated map (see "The homepage").
 
 | File | What it is |
 |---|---|
@@ -218,40 +218,45 @@ real map geometry baked in at author time.
 
 ## The homepage
 
-The one page that is not paper. It is a night sky, cool throughout — cobalt,
-mint, sky and lilac on near-black — and it is meant to be the most animated
-page on the site. The markup is `src/pages/index.astro`; every moving part
-is `src/lib/home-fx.ts`.
+Tiny Island: every game is a building on one illustrated isometric map,
+standing in the district its subject belongs to — space on the high peaks,
+the sea things on the coast, money on the marina, people and time in Old Town
+in the middle. Each building is drawn to be the game (Deep Time is a cliff of
+rock layers with a fossil in it; Trolley is a track that forks; the lighthouse
+flashes real Morse), and each is a real link. Under the map, every game again
+as a card, with the four filters and search.
 
-- **The hero** is a canvas of stars in three depths that drift with the
-  pointer, draw a constellation between the ones nearest it, and throw the
-  odd shooting star, over three slow aurora glows and a film grain.
-- **The title** is split into letters at build time. Fraunces is a variable
-  font, so each letter thickens as the pointer nears it, and a swell of
-  weight runs through the whole title on load and on every click.
-- **The ring** stands the eight newest games round a circle in 3D. It turns
-  on its own, slows under the pointer, can be dragged and thrown, and brings
-  whichever card you tab onto round to the front; the caption under it names
-  the card facing you.
-- **Two marquees** of every title run in opposite directions and speed up
-  and lean with the scroll.
-- **The directory** keeps its filter, search and FLIP; the chips share one
-  sliding highlight, cards arrive a column at a time, tilt towards the
-  pointer with a glare that follows it, and a comet of light runs round the
-  border of the one you are on.
-- **The daily challenge** is a portal of counter-rotating rings round a
-  floating screen of today's game, with a live countdown to the next one at
-  midnight UTC. Every game the week's rotation can land on is drawn into the
-  page, because the page is built once and visited on other days.
-- **Surprise Me** is a slot-machine reel of titles that idles, then spins
-  three turns and lands on the game it is about to open.
+| File | What it is |
+|---|---|
+| `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), bounds that every shape grows, CSS keyframe paths |
+| `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
+| `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
+| `src/lib/island/landmarks.ts` | the districts and where every building stands |
+| `src/lib/island/world.ts` | the map: land, heights, a path search for the roads, sea and surf, trees, walkers, and the layers it is painted in |
+| `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard, the hover card, names at close zoom, the mini-map, the dive into a game |
+| `src/styles/island.css` | every loop on the map |
+| `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG) |
 
-Without motion — `prefers-reduced-motion`, or no script — every one of those
-paints its finished state once: a still sky, the ring facing its first game,
-still marquees, nothing tilting. Anything that runs every frame also sleeps
-while it is off screen or the tab is hidden. The masthead and the colophon
-are the shared components, turned dark by re-inking Paper's tokens inside
-them rather than by a second copy.
+Three things about performance, all found by measuring rather than guessing:
+
+- **The island is painted in layers**, each its own `<svg>`: sea, boats,
+  ground, walkers, then every building in its own layer in depth order with
+  the trees between buildings sharing still layers, then banners and sky. An
+  animation inside one huge SVG makes Chrome rework the whole tree every
+  frame; in a small layer it only reworks that layer. Ten frames a second
+  became sixty.
+- **Only what is on screen and near the middle moves**: the camera picks up
+  to eight buildings and ten walkers at a time from far away and more up
+  close, and pauses the rest where they are. Nothing moves that crosses the
+  whole map (the surf and the wave marks stand still), and nothing uses SMIL:
+  every mover is a CSS keyframe path generated at build time.
+- **The cards are copies, not `<use>`s.** A `<use>` of a building replays every
+  animation on the island into its copy each frame even when the cards are
+  off screen. The page clones each building into its card once instead.
+
+While a zoom is in motion the island is one GPU layer and its loops pause,
+then it is redrawn sharp; with reduced motion the camera jumps instead of
+flying and nothing on the map moves.
 
 ---
 

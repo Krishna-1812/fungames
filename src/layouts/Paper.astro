@@ -30,6 +30,8 @@ interface Props {
   /** The browser chrome colour, and whether form controls and scrollbars
    *  draw light or dark. The homepage is a night sky; everything else is paper. */
   themeColor?: string
+  /** Load Fraunces and Zalando Sans. The homepage draws in Fredoka instead. */
+  paperFonts?: boolean
   colorScheme?: 'light' | 'dark'
 }
 
@@ -45,13 +47,16 @@ const {
   fonts = [],
   themeColor = '#EEF0F3',
   colorScheme = 'light',
+  paperFonts = true,
 } = Astro.props
 
 const fontHref =
   'https://fonts.googleapis.com/css2' +
-  '?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1' +
-  '&family=Zalando+Sans:wght@300..900' +
-  fonts.map((f) => '&family=' + f.replace(/ /g, '+')).join('') +
+  '?' +
+  [
+    ...(paperFonts ? ['Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1', 'Zalando+Sans:wght@300..900'] : []),
+    ...fonts.map((f) => f.replace(/ /g, '+')),
+  ].map((f) => 'family=' + f).join('&') +
   '&display=swap'
 
 const websiteLd = {
