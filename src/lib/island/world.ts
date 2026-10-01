@@ -12,11 +12,14 @@
 import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath } from './kit'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
+import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle } from './town'
 import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
 
 export const GRID = 30
 const SEA = -12
 const BEACH = -6
+/** Piers: a run of ground points from a beach out over the water. */
+const PIERS: [number, number][][] = [[[5.5, 17.2], [5.5, 14.3]], [[14.5, 29.4], [14.5, 31.7]]]
 const f = (v: number) => Math.round(v * 10) / 10
 const f2 = (v: number) => Math.round(v * 100) / 100
 /** Sand: two tones for the tops, the wet edge, and the two faces of a step. */
@@ -264,6 +267,9 @@ export function buildIsland(games: GameLink[]): Island {
     root.add(dolphin(x, y, d as number, flip as boolean))
   })
   { const [x, y] = P(3, 29.5, SEA); root.add(whale(x, y)) }
+  // Rowing boats tied up at the piers, and buoys off the harbour.
+  for (const [n, pts] of PIERS.entries()) { const [ei, ej] = pts[pts.length - 1], [si, sj] = pts[0]; const di = Math.sign(ei - si), dj = Math.sign(ej - sj); const [x, y] = P(ei - di * 0.6 + (dj ? 0.42 : 0), ej - dj * 0.6 + (di ? 0.42 : 0), SEA); root.add(rowboat(x, y, n ? C.cobalt : C.mint)) }
+  ;[[30, 21], [26.5, 29.2], [31, 16.5]].forEach(([i, j], n) => { const [x, y] = P(i, j, SEA); root.add(buoy(x, y, n * 1.4)) })
 
   // The ground, a diagonal row at a time: tops merged by colour, then cliffs.
   root = open('ground')
@@ -404,6 +410,20 @@ export function buildIsland(games: GameLink[]): Island {
     po.add(new N('circle', { cx: f2(fx2 + 0.03), cy: f2(fy2), r: 0.045, fill: '#ffc4d4', stroke: INK, 'stroke-width': 0.02 }))
   }
 
+  // Zebra crossings on the roads into the busiest junctions.
+  {
+    let n = 0
+    for (let i = 0; i < GRID && n < 9; i++) for (let j = 0; j < GRID && n < 9; j++) {
+      if (!road.has(key(i, j)) || !['oldtown', 'market', 'funfair', 'harbour'].includes(dist[i][j].key)) continue
+      const out = [[1, 0], [0, 1], [-1, 0], [0, -1]].filter(([a, b]) => road.has(key(i + a, j + b)))
+      if (out.length < 3) continue
+      const [a, b] = out[(i + j) % out.length]
+      // The crossing sits on the arm, its stripes along the road.
+      crossing(new Pen(root), i + a * 0.95 + 0.5, j + b * 0.95 + 0.5, a !== 0 ? 'y' : 'x')
+      n++
+    }
+  }
+
   // Grass tufts and flower dots, merged into a handful of paths.
   const tufts = new Map<string, string>()
   const filled = (c: string) => c.startsWith('#ff') || c === '#c6b6ff' || c === '#b3acd8'
@@ -467,6 +487,30 @@ export function buildIsland(games: GameLink[]): Island {
     }
   })
 
+  // Traffic: cars, a bus and bikes up and down the longest straight roads.
+  {
+    const runs: [number, number][][] = []
+    for (const r of routes) {
+      let cur: [number, number][] = [r[0]]
+      for (let n = 1; n < r.length; n++) {
+        const d0 = cur.length > 1 ? [cur[1][0] - cur[0][0], cur[1][1] - cur[0][1]] : null
+        const d1 = [r[n][0] - r[n - 1][0], r[n][1] - r[n - 1][1]]
+        if (d0 && (d0[0] !== d1[0] || d0[1] !== d1[1])) { runs.push(cur); cur = [r[n - 1]] }
+        cur.push(r[n])
+      }
+      runs.push(cur)
+    }
+    const seen = new Set<string>()
+    const long = runs.filter((r) => r.length >= 5).sort((a, b) => b.length - a.length).filter((r) => { const k = r.map((c) => key(...c)); if (k.some((x) => seen.has(x))) return false; k.forEach((x) => seen.add(x)); return true }).slice(0, 6)
+    const kinds: ['car' | 'bus' | 'bike', string][] = [['car', C.rasp], ['bus', C.cobalt], ['car', C.mint], ['bike', C.rasp], ['car', '#ffffff'], ['bike', C.cobalt]]
+    long.forEach((r, n) => {
+      const [kind, body] = kinds[n % kinds.length]
+      const a0 = r[0], b0 = r[r.length - 1]
+      const axis: 'x' | 'y' = a0[0] !== b0[0] ? 'x' : 'y'
+      walkers.add(shuttle(kind, body, P(a0[0] + 0.5, a0[1] + 0.5), P(b0[0] + 0.5, b0[1] + 0.5), axis, `drive${n}`, r.length * (kind === 'bike' ? 3.2 : 2) + 4, n * 3.3))
+    })
+  }
+
   // Two ducks going round the pond.
   if (pond.size) {
     const loop = (ri: number, rj: number): [number, number][] => Array.from({ length: 20 }, (_, k) => { const a = (k / 20) * Math.PI * 2; return P(15 + Math.cos(a) * ri, 10.5 + Math.sin(a) * rj) })
@@ -497,7 +541,7 @@ export function buildIsland(games: GameLink[]): Island {
     } })
   }
   /* ---- the wild things and the farm ---------------------------------------- */
-  const at = (i: number, j: number, depth: number, fn: (p: Pen) => void, z = height[Math.floor(i)]?.[Math.floor(j)] ?? 0) => things.push({ depth, draw: (layer) => fn(new Pen(layer, 0, 0, z)) })
+  const at = (i: number, j: number, depth: number, fn: (p: Pen) => void, z = height[Math.floor(i)]?.[Math.floor(j)] ?? 0) => things.push({ depth, draw: (layer) => fn(new Pen(layer, 0, 0, z, new Bounds(), lights)) })
   if (mill) at(mill[0] + 0.5, mill[1] + 0.5, mill[0] + mill[1] + 1, (p) => windmill(p, mill[0] + 0.5, mill[1] + 0.5))
   for (const [i, j] of bales) for (const [u, v] of [[0.35, 0.4], [0.65, 0.62]]) at(i + u, j + v, i + j + u + v, (p) => bale(p, i + u, j + v))
   if (archAt) at(archAt[0] + 0.5, archAt[1] + 0.5, archAt[0] + archAt[1] + 1, (p) => arch(p, archAt[0] + 0.5, archAt[1] + 0.5))
@@ -545,6 +589,90 @@ export function buildIsland(games: GameLink[]): Island {
     }
   }
   for (const [i, j] of [[12.3, 12.4], [12.7, 12.6], [17.3, 13.3], [10.4, 13.6]]) if (free(Math.floor(i), Math.floor(j)) && height[Math.floor(i)][Math.floor(j)] === 0) at(i, j, i + j, (p) => topiary(p, i, j, 0.9))
+
+  /* ---- town life ------------------------------------------------------------ */
+  const ROOFS = [C.rasp, C.cobalt, C.lilac, '#35c9a6', '#6fa8ff', '#ff8fb0']
+  const WALLS = ['#ffffff', '#f4f6fc', '#eef4ff', '#f3eefe']
+  // Little houses between the big ones, each with its door to a road we can
+  // see (the +x or +y side), kept a tile clear of every building.
+  {
+    let made = 0
+    const nearLm = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => taken.has(key(i + a, j + b)))
+    const homes = new Set<string>()
+    const nearHome = (i: number, j: number) => { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (homes.has(key(i + a, j + b))) return true; return false }
+    for (let s = 0; s < GRID * 2 && made < 16; s++) for (let i = 0; i < GRID && made < 16; i++) {
+      const j = s - i
+      if (j < 0 || j >= GRID || !free(i, j) || height[i][j] !== 0 || coast(i, j) || nearLm(i, j) || nearHome(i, j)) continue
+      if (!['oldtown', 'market', 'harbour', 'funfair', 'proving'].includes(dist[i][j].key)) continue
+      const door: 'x' | 'y' | null = road.has(key(i + 1, j)) ? 'x' : road.has(key(i, j + 1)) ? 'y' : null
+      if (!door) continue
+      reserved.add(key(i, j)); homes.add(key(i, j))
+      const n = made++
+      const roof = ROOFS[n % ROOFS.length], wall = WALLS[n % WALLS.length]
+      at(i + 0.5, j + 0.5, i + j + 1, (p) => cottage(p, i + 0.45, j + 0.45, { wall, roof, door, smoke: n % 3 === 0 }))
+      if (n % 2 === 0) at(i + 0.9, j + 0.88, i + j + 1.8, (p) => (door === 'x' ? postbox(p, i + 0.9, j + 0.85) : postbox(p, i + 0.85, j + 0.9)))
+      else at(i + 0.82, j + 0.14, i + j + 0.96, (p) => flowers(p, i + 0.82, j + 0.16))
+    }
+  }
+  // Signposts at the busiest crossroads, a bus stop, and a fountain.
+  {
+    const tint = (k: DistrictKey) => shade(D(k).tint, 0.85)
+    let posts = 0
+    for (let i = 0; i < GRID && posts < 4; i++) for (let j = 0; j < GRID && posts < 4; j++) {
+      if (!road.has(key(i, j))) continue
+      const out = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => road.has(key(i + a, j + b)))
+      if (out.length < 3) continue
+      // The free corner beside the junction.
+      const corner = [[1, 1], [-1, 1], [1, -1], [-1, -1]].find(([a, b]) => free(i + a, j + b) && height[i + a][j + b] === 0 && !coast(i + a, j + b))
+      if (!corner) continue
+      const [ci, cj] = [i + corner[0], j + corner[1]]
+      const arms = out.slice(0, 3).map(([a, b]) => ({ dx: a, dy: b, c: tint(dist[i + a * 3]?.[j + b * 3]?.key ?? dist[i][j].key) }))
+      posts++
+      at(ci + 0.5 - corner[0] * 0.3, cj + 0.5 - corner[1] * 0.3, ci + cj + 1 - (corner[0] + corner[1]) * 0.3, (p) => signpost(p, ci + 0.5 - corner[0] * 0.3, cj + 0.5 - corner[1] * 0.3, arms))
+      reserved.add(key(ci, cj))
+    }
+  }
+  const spot = (cands: [number, number][], fn: (i: number, j: number) => void, ok = (i: number, j: number) => height[i][j] === 0 && !coast(i, j)) => {
+    for (const [i, j] of cands) if (free(i, j) && ok(i, j)) { reserved.add(key(i, j)); fn(i, j); return true }
+    return false
+  }
+  spot([[13, 16], [16, 13], [12, 13], [11, 17], [13, 11]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => fountain(p, i + 0.5, j + 0.5)))
+  spot([[16, 16], [16, 15], [16, 17], [12, 14], [9, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => busStop(p, i + 0.5, j + 0.45)), (i, j) => height[i][j] === 0 && [[1, 0], [0, 1], [-1, 0], [0, -1]].some(([a, b]) => road.has(key(i + a, j + b))))
+  // The park: a picnic, someone flying a kite, a playground.
+  spot([[16, 18], [16, 14], [12, 15], [11, 13]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => picnic(p, i + 0.5, j + 0.5, [C.cobalt, C.rasp])))
+  spot([[16, 17], [17, 17], [13, 19], [12, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(p, i + 0.5, j + 0.5, C.lilac, C.rasp, 1)))
+  spot([[11, 18], [12, 19], [13, 15], [17, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => playground(p, i + 0.5, j + 0.5)))
+  spot([[13, 22], [12, 21], [10, 23], [16, 23]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(p, i + 0.5, j + 0.5, C.mint, C.cobalt, 4)))
+  // A campsite high on the peaks: two tents round a fire.
+  {
+    const cells: [number, number][] = [[3, 4], [3, 5], [2, 5]]
+    const ok = cells.filter(([i, j]) => free(i, j))
+    if (ok.length === cells.length) {
+      ok.forEach(([i, j]) => reserved.add(key(i, j)))
+      at(3.35, 4.4, 7.75, (p) => tent(p, 3.35, 4.4, C.rasp))
+      at(2.6, 5.5, 8.1, (p) => tent(p, 2.6, 5.5, '#35c9a6'))
+      at(3.5, 5.5, 9.0, (p) => campfire(p, 3.5, 5.45))
+      at(3.75, 5.85, 9.6, (p) => sitter(p, 3.75, 5.85, C.cobalt, '#e0b899'))
+    }
+  }
+  // The beaches: umbrellas and towels, a sandcastle, surfboards, the lifeguard.
+  {
+    const sandy = [...beach].map((k) => k.split(',').map(Number) as [number, number]).filter(([i, j]) => dist[i][j].key !== 'badlands' && dist[i][j].key !== 'peaks')
+    sandy.sort((a, b) => (a[0] * 31 + a[1] * 17) % 11 - (b[0] * 31 + b[1] * 17) % 11)
+    let n = 0
+    const towels = ['#ff9fb2', C.cobalt, C.mint, C.lilac, C.sky]
+    for (const [i, j] of sandy) {
+      if (n >= 11 || reserved.has(key(i, j))) continue
+      const z = height[i][j], kind = n % 4
+      reserved.add(key(i, j))
+      const m = n++
+      if (kind === 0 || kind === 2) { at(i + 0.4, j + 0.45, i + j + 0.85, (p) => umbrella(p, i + 0.4, j + 0.45, ROOFS[m % ROOFS.length]), z); at(i + 0.62, j + 0.6, i + j + 1.0, (p) => towel(p, i + 0.62, j + 0.6, towels[m % towels.length], m % 2 ? 'x' : 'y'), z) }
+      else if (kind === 1) at(i + 0.5, j + 0.5, i + j + 1, (p) => (m === 1 ? lifeguard(p, i + 0.5, j + 0.5) : sandcastle(p, i + 0.5, j + 0.5)), z)
+      else { at(i + 0.4, j + 0.4, i + j + 0.8, (p) => surfboard(p, i + 0.4, j + 0.4, ROOFS[(m + 2) % ROOFS.length]), z); at(i + 0.6, j + 0.55, i + j + 1.15, (p) => towel(p, i + 0.6, j + 0.55, towels[(m + 1) % towels.length]), z); at(i + 0.62, j + 0.58, i + j + 1.2, (p) => sitter(p, i + 0.62, j + 0.58, '#ffffff', '#c99a78'), z) }
+    }
+  }
+  // Piers out from the beaches, each with someone fishing off the end.
+  for (const pts of PIERS) things.push({ depth: pts[0][0] + pts[0][1] + 0.4, draw: (layer) => pier(new Pen(layer), pts, BEACH + 1, C.rasp) })
 
   // Trees, rocks and the odd lamp or bench, on the land left over.
   const treeKind = (d: District, coastal: boolean): TreeKind => {

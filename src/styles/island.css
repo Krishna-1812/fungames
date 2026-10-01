@@ -116,6 +116,23 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 @keyframes nat-roll { 0%, 100% { transform: translate(-36px, 10px); } 50% { transform: translate(36px, -8px); } }
 .isle .tumble-ball { animation: isl-spin 3s linear infinite; transform-box: fill-box; transform-origin: center; }
 
+/* ---- town life (lib/island/town.ts) ------------------------------------- */
+.isle .fount { animation: isl-fall 0.7s linear infinite; }
+.isle .fount-up { animation: nat-spurt 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes nat-spurt { 50% { transform: scaleY(1.4); } }
+.isle .kite { animation: town-kite 5s ease-in-out infinite; transform-box: fill-box; transform-origin: 0% 100%; }
+@keyframes town-kite { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-4deg) translateY(-3px); } }
+.isle .swing { animation: town-swing 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 0%; }
+@keyframes town-swing { 0%, 100% { transform: rotate(28deg); } 50% { transform: rotate(-28deg); } }
+.isle .moored { animation: town-moor 3.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes town-moor { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(1.6px) rotate(2deg); } }
+.isle .bobber { animation: town-bob 2.6s ease-in-out infinite; }
+@keyframes town-bob { 0%, 70%, 100% { transform: translateY(0); } 76% { transform: translateY(3px); } 82% { transform: translateY(-1px); } }
+.isle .flame { animation: town-flame 0.5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes town-flame { to { transform: scale(0.85, 1.15) skewX(4deg); } }
+.isle .spark { animation: town-spark 2.6s ease-out infinite; opacity: 0; }
+@keyframes town-spark { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(4px, -26px); opacity: 0; } }
+
 /* ---- each building's own motion -------------------------------------- */
 .isle .se-pod { animation: se-climb 8s ease-in-out infinite; }
 @keyframes se-climb { 0%, 8% { transform: translateY(110px); } 50%, 58% { transform: translateY(-420px); } 100% { transform: translateY(110px); } }

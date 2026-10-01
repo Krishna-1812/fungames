@@ -231,6 +231,7 @@ as a card, with the four filters and search.
 | `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), bounds that every shape grows, CSS keyframe paths |
 | `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
 | `src/lib/island/nature.ts` | the wild things and the farm: snowy pines, cacti, reeds, hedges, topiary, toadstools, a rock arch and buttes, crop fields, hay bales, the windmill, and the animals (sheep, deer, ducks, crabs, dolphins, a whale, gulls, butterflies, a tumbleweed) |
+| `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, fingerposts, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends) |
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
 | `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, trees, walkers, and the layers it is painted in |

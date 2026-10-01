@@ -22,6 +22,10 @@ type Attr = string | number | undefined | null
 export type Attrs = Record<string, Attr>
 
 const f = (v: number) => Math.round(v * 10) / 10
+// Attributes keep three places below one: a stroke drawn in tile units (a
+// road's centre line, a field's rows) is a few hundredths wide, and one
+// decimal place would round it away to nothing.
+const fa = (v: number) => (Math.abs(v) < 1 ? Math.round(v * 1000) / 1000 : Math.round(v * 10) / 10)
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 export class N {
@@ -39,7 +43,7 @@ export function render(n: N | string): string {
   for (const k in n.attrs) {
     const v = n.attrs[k]
     if (v === undefined || v === null || v === '') continue
-    a += ` ${k}="${typeof v === 'number' ? f(v) : esc(v)}"`
+    a += ` ${k}="${typeof v === 'number' ? fa(v) : esc(v)}"`
   }
   return n.kids.length ? `<${n.tag}${a}>${n.kids.map(render).join('')}</${n.tag}>` : `<${n.tag}${a}/>`
 }
