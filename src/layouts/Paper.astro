@@ -1,5 +1,7 @@
 ---
 import { SITE } from '../site.config'
+import { faviconHref } from '../lib/favicon'
+import { withBase } from '../lib/base'
 import Masthead from '../components/paper/Masthead.astro'
 import Colophon from '../components/paper/Colophon.astro'
 import '../styles/paper/tokens.css'
@@ -68,9 +70,7 @@ const websiteLd = {
 }
 const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
 const ogImage = image ? new URL(image, Astro.site ?? SITE.url).href : undefined
-const favicon =
-  'data:image/svg+xml,' +
-  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#FF6022"/></svg>')
+const favicon = faviconHref(true)
 ---
 
 <!doctype html>
@@ -84,7 +84,9 @@ const favicon =
     <meta name="color-scheme" content={colorScheme} />
     {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
-    <link rel="icon" href={favicon} />
+    <link rel="icon" href={withBase('/favicon-96.png')} sizes="96x96" type="image/png" />
+    <link rel="icon" href={favicon} type="image/svg+xml" id="favicon" />
+    <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
 
     {/* Before first paint: `js` arms anything a script finishes, `play` arms
         every animated starting state. Reduced motion never gets `play`, so it

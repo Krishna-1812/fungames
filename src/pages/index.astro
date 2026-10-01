@@ -4,6 +4,7 @@ import { SITE } from '../site.config'
 import { listedGames, CATEGORIES } from '../data/games'
 import { META, dailyFor } from '../data/game-meta'
 import { withBase } from '../lib/base'
+import { faviconSvg } from '../lib/favicon'
 import { buildIsland } from '../lib/island/world'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import '../styles/island.css'
@@ -79,7 +80,7 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
         <div class="isl-iris" aria-hidden="true"></div>
 
         <header class="isl-top">
-          <a class="isl-logo" href={withBase('/')}><span class="isl-logo-dot" aria-hidden="true"></span>{SITE.name}</a>
+          <a class="isl-logo" href={withBase('/')}><span class="isl-logo-dot" aria-hidden="true" set:html={faviconSvg(true)} />{SITE.name}</a>
           <nav class="isl-nav" aria-label="Island">
             <button type="button" class="isl-btn" id="btnToday"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="6.5" fill="currentColor" opacity=".25" /><path d="M5.5 10a6.5 6.5 0 0 1 13 0c0 3-2.4 5-4 6.5h-5C7.9 15 5.5 13 5.5 10zM9.5 16.5 10.5 20h3l1-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Today</span></button>
             <button type="button" class="isl-btn isl-btn--hot" id="btnSurprise"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="9" r="1.6" fill="currentColor" /><circle cx="15" cy="15" r="1.6" fill="currentColor" /><circle cx="15" cy="9" r="1.6" fill="currentColor" /><circle cx="9" cy="15" r="1.6" fill="currentColor" /></svg><span>Surprise me</span></button>
@@ -163,6 +164,34 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
   import { initIsland, type GameInfo } from '../lib/island/camera'
   import { flip, PLAY } from '../lib/motion'
   import { bestKey, dailyFor } from '../data/game-meta'
+  import { faviconHref } from '../lib/favicon'
+
+  // The lighthouse in the tab says hello: once when the page opens, and again
+  // each time you switch away to another tab, it flashes the island's Morse
+  // "HI" and then stays lit. One unit is a whole second, because a tab in the
+  // background only gets its timers about once a second.
+  if (PLAY) {
+    const icon = document.getElementById('favicon') as HTMLLinkElement | null
+    const on = faviconHref(true), off = faviconHref(false)
+    // .... (gap) .. then a pause before it settles lit, as alternating
+    // on/off lengths in units
+    const HI = [1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 2]
+    let timer = 0
+    const flash = () => {
+      if (!icon) return
+      clearTimeout(timer)
+      let i = 0
+      const step = () => {
+        if (i >= HI.length) { icon.href = on; return }
+        icon.href = i % 2 ? off : on
+        timer = window.setTimeout(step, HI[i++] * 1000)
+      }
+      icon.href = off
+      timer = window.setTimeout(step, 1000)
+    }
+    flash()
+    document.addEventListener('visibilitychange', () => { if (document.hidden) flash() })
+  }
 
   const data = JSON.parse(document.getElementById('isl-data')!.textContent!) as {
     bounds: [number, number, number, number]
@@ -337,7 +366,8 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
     background: #fff; border: 3px solid #1b2340; border-radius: 16px; box-shadow: 0 4px 0 #1b2340;
     font-weight: 700; font-size: 19px; text-decoration: none; color: #1b2340;
   }
-  .isl-logo-dot { width: 20px; height: 20px; border-radius: 50%; background: #4fe3c1; border: 3px solid #1b2340; }
+  .isl-logo-dot { width: 30px; height: 30px; flex: none; margin: -4px 0; }
+  .isl-logo-dot :global(svg) { display: block; width: 100%; height: 100%; }
   .isl-nav { display: flex; gap: 10px; }
   .isl-btn, .isl-zoom button, .isl-down {
     display: inline-flex; align-items: center; gap: 8px;
