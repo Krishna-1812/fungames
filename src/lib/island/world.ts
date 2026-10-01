@@ -29,10 +29,17 @@ const key = (i: number, j: number) => `${i},${j}`
 
 export type Anchor = { slug: string; district: DistrictKey; x0: number; y0: number; x1: number; y1: number; bx: number; by: number; foot: string }
 export type Layer = { kind: 'sea' | 'boats' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
-export type Island = { svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
+export type Island = { hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
-export function buildIsland(games: GameLink[]): Island {
+/**
+ * Draws an SVG document into RGBA pixels at a given width: resvg at build
+ * time. Given one, the island works out which of its lights something in
+ * front hides, so no window glows through a sign at night.
+ */
+export type Raster = (svg: string, width: number) => { width: number; height: number; pixels: Uint8Array }
+
+export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): Island {
   const R = rng(20260930)
   motionCss.length = 0
   const D = (k: DistrictKey) => DISTRICTS.find((d) => d.key === k)!
@@ -743,7 +750,39 @@ export function buildIsland(games: GameLink[]): Island {
     else { bundle ??= open('things'); t.draw(bundle) }
   }
 
+  const [vx0] = P(0, GRID), [vx1] = P(GRID, 0), [, vy0] = P(0, 0, 220), [, vy1] = P(GRID, GRID, SEA)
+  const viewBox: [number, number, number, number] = [f(vx0 - 120), f(vy0 - 60), f(vx1 - vx0 + 240), f(vy1 - vy0 + 180)]
+
+  let hiddenLights = 0
   /* ---- night ------------------------------------------------------------- */
+  // Which lights can be seen: everything that stands up is drawn once more,
+  // with each light's pane or bulb painted a colour of its own, and the
+  // pixels of each colour counted. Then the same again with every light also
+  // drawn on top of everything, which is how much of it there would be with
+  // nothing in front. A light that keeps less than a fifth of itself glows
+  // no more. (Things that move, such as clouds, are not in these pictures;
+  // they pass over a glow, which is how light behaves anyway.)
+  function occlusion(raster: Raster): boolean[] {
+    const code = (n: number) => [(n + 1) & 255, (((n + 1) >> 8) & 15) * 16 + 3, 251]
+    const hex = (c: number[]) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('')
+    const body = made.filter((m) => m.kind === 'landmark' || m.kind === 'things').map((m) => render(m.node)).join('')
+      .replace(/<(\w+)([^>]*?) data-l="(\d+)"/g, (_, tag: string, attrs: string, n: string) => `<${tag}${attrs.replace(/ (fill|opacity|class)="[^"]*"/g, '')} fill="${hex(code(Number(n)))}" data-l="${n}"`)
+    const onTop = (body.match(/<(?:polygon|circle|rect|path)[^>]*data-l="\d+"[^>]*\/>/g) ?? []).join('')
+    const [vx, vy, vw, vh] = viewBox, W = 3200, k = W / vw
+    const doc = (inner: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${W}" height="${Math.round(vh * k)}">${inner}</svg>`
+    const tally = (inner: string) => {
+      const px = raster(doc(inner), W).pixels, count = new Uint32Array(lights.length)
+      for (let o = 0; o < px.length; o += 4) {
+        if (px[o + 2] < 249 || px[o + 3] < 250 || (px[o + 1] & 15) !== 3) continue
+        const n = ((px[o + 1] >> 4) << 8) + px[o] - 1
+        if (n >= 0 && n < lights.length) count[n]++
+      }
+      return count
+    }
+    const shown = tally(body), whole = tally(body + onTop)
+    return lights.map((_, n) => whole[n] === 0 || shown[n] >= whole[n] * 0.2)
+  }
+
   // Hidden by day. At dusk and at night the page fades in a veil over the
   // whole map and, above it, a glow at every lit window and lamp, and
   // fireflies over the parks.
@@ -760,7 +799,9 @@ export function buildIsland(games: GameLink[]): Island {
     glow.add(new N('stop', { offset: 1, 'stop-color': '#ffe7a8', 'stop-opacity': 0 }))
     let cores = ''
     const halos = night.add(new N('g', { class: 'night-halos' }))
-    for (const [x, y] of lights) { halos.add(new N('circle', { cx: f(x), cy: f(y), r: 13, fill: 'url(#isl-glow)' })); cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0` }
+    const seen = opts.raster ? occlusion(opts.raster) : lights.map(() => true)
+    hiddenLights = seen.filter((v) => !v).length
+    for (const [x, y] of lights.filter((_, n) => seen[n])) { halos.add(new N('circle', { cx: f(x), cy: f(y), r: 13, fill: 'url(#isl-glow)' })); cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0` }
     night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8 }))
     // Fireflies over the meadows.
     let made = 0
@@ -804,11 +845,9 @@ export function buildIsland(games: GameLink[]): Island {
     g.add(birds())
   }
 
-  const [vx0] = P(0, GRID), [vx1] = P(GRID, 0), [, vy0] = P(0, 0, 220), [, vy1] = P(GRID, GRID, SEA)
-  const viewBox: [number, number, number, number] = [f(vx0 - 120), f(vy0 - 60), f(vx1 - vx0 + 240), f(vy1 - vy0 + 180)]
   const layers: Layer[] = made.map((m) => ({ kind: m.kind, slug: m.slug, body: render(m.node) }))
   const css = motionCss.join('')
-  return { svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini }
+  return { hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini }
 }
 
 export { OUT, bench }

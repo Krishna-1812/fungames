@@ -30,11 +30,11 @@ export function cottage(p: Pen, x: number, y: number, o: { wall?: string; roof?:
   p.band(b, 0, 2.5, shade(wall, 0.8))
   p.door(b, o.door, 0.5, { w: 0.13, h: 9, fill: o.door === 'x' ? C.cobalt : C.mint })
   const other = o.door === 'x' ? 'y' : 'x'
-  p.windows(b, other, { rows: 1, cols: 2, z0: 5, h: 5, wide: 0.42 })
+  p.windows(b, other, { rows: 1, cols: 2, z0: 7, h: 5, wide: 0.42 })
   p.windows(b, o.door, { rows: 1, cols: 2, z0: 6, h: 4.5, wide: 0.22, lit: true })
   // Window boxes of flowers on the side without the door.
-  const [fx1, fy1] = o.door === 'x' ? p.at(x0 + w * 0.25, y0 + d + 0.01, 4.5) : p.at(x0 + w + 0.01, y0 + d * 0.25, 4.5)
-  const [fx2, fy2] = o.door === 'x' ? p.at(x0 + w * 0.75, y0 + d + 0.01, 4.5) : p.at(x0 + w + 0.01, y0 + d * 0.75, 4.5)
+  const [fx1, fy1] = o.door === 'x' ? p.at(x0 + w * 0.25, y0 + d + 0.01, 3.6) : p.at(x0 + w + 0.01, y0 + d * 0.25, 3.6)
+  const [fx2, fy2] = o.door === 'x' ? p.at(x0 + w * 0.75, y0 + d + 0.01, 3.6) : p.at(x0 + w + 0.01, y0 + d * 0.75, 3.6)
   for (const [fx, fy] of [[fx1, fy1], [fx2, fy2]]) {
     p.el('rect', { x: fx - 4, y: fy - 1.5, width: 8, height: 3, rx: 1, fill: C.wood, stroke: INK, 'stroke-width': 0.8 })
     p.path(blob(fx - 2, fy - 2, 1.4, 1.2) + blob(fx + 1.5, fy - 2.2, 1.4, 1.2), '#ff9fb2', { sw: 0.6 })

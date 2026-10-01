@@ -83,6 +83,26 @@ export class Pen {
     this.b.add(p[0], p[1])
     return p
   }
+  /**
+   * A light for the night layer, at a screen point, given off by `el` (a
+   * window pane, a lamp's bulb). The element is tagged with the light's
+   * number, so the island can find out at build time whether anything drawn
+   * in front of it hides it (see occlusion in world.ts).
+   */
+  light(pt: [number, number], el: N) {
+    el.attrs['data-l'] = this.lights.length
+    // Its area on screen, so the test can tell how much of it is hidden.
+    const at = el.attrs
+    let area = 0
+    if (typeof at.points === 'string') {
+      const p = at.points.split(' ').map((s) => s.split(',').map(Number))
+      for (let i = 0; i < p.length; i++) { const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % p.length]; area += x1 * y2 - x2 * y1 }
+      area = Math.abs(area) / 2
+    } else if (typeof at.r === 'number') area = Math.PI * at.r * at.r
+    else if (typeof at.width === 'number' && typeof at.height === 'number') area = at.width * at.height
+    el.attrs['data-la'] = Math.round(area * 10) / 10
+    this.lights.push(pt)
+  }
   /** Grow the bounds round a screen-space shape drawn relative to a point. */
   grow(x0: number, y0: number, x1: number, y1: number) { this.b.add(x0, y0); this.b.add(x1, y1) }
 
@@ -151,12 +171,12 @@ export class Pen {
       const u = slot * (c + 0.5), z = (o.z0 ?? 8) + r * (h + gap)
       const fu = 1.6 / (S * len)
       this.quad(b, face, u - ww / 2 - fu, u + ww / 2 + fu, z - 1.5, z + h + 1.5, shade(frame, dark), { sw: 1 })
-      this.quad(b, face, u - ww / 2, u + ww / 2, z, z + h, shade(pane, dark), { sw: 0.8, cls: o.cls ?? 'win' })
+      const glass = this.quad(b, face, u - ww / 2, u + ww / 2, z, z + h, shade(pane, dark), { sw: 0.8, cls: o.cls ?? 'win' })
       this.quad(b, face, u - ww / 2, u - ww / 2 + ww * 0.35, z + h * 0.45, z + h, shade(C.glassHi, dark), { sw: 0, op: 0.7 })
       this.quad(b, face, u - ww / 2 - fu * 2, u + ww / 2 + fu * 2, z - 2.5, z - 1, shade(frame, dark * 0.9), { sw: 0.8 })
       if (o.lit !== false) {
         const Z = b.z0 + z + h / 2
-        this.lights.push(face === 'x' ? P(b.x + b.w + this.ox, b.y + u * b.d + this.oy, Z + this.oz) : P(b.x + u * b.w + this.ox, b.y + b.d + this.oy, Z + this.oz))
+        this.light(face === 'x' ? P(b.x + b.w + this.ox, b.y + u * b.d + this.oy, Z + this.oz) : P(b.x + u * b.w + this.ox, b.y + b.d + this.oy, Z + this.oz), glass)
       }
     }
   }

@@ -21,6 +21,7 @@ const { listedGames } = await import('../src/data/games.ts')
 const { LANDMARKS, PLACES, DISTRICTS } = await import('../src/lib/island/landmarks.ts')
 const { buildIsland, GRID } = await import('../src/lib/island/world.ts')
 const { Resvg } = await import('@resvg/resvg-js')
+const { resvgRaster } = await import('../src/lib/island/raster.ts')
 
 let failures = 0
 const fail = (m) => { failures++; console.log(`  FAIL  ${m}`) }
@@ -62,7 +63,7 @@ for (const [slug, , i, j] of PLACES) {
 }
 
 console.log('the drawing')
-const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: `/${g.slug}/` })))
+const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: `/${g.slug}/` })), { raster: resvgRaster })
 for (const g of games) {
   const a = island.anchors[g.slug]
   if (!a) { fail(`${g.slug} was never drawn`); continue }
@@ -76,6 +77,9 @@ check(!/NaN|undefined|Infinity/.test(island.svg), 'no NaN, undefined or Infinity
 const roadPaths = (island.svg.match(/class="walker[ "]/g) ?? []).length
 check(roadPaths >= 16, `people are walking the roads (${roadPaths})`)
 console.log(`  size  ${(island.svg.length / 1024).toFixed(0)} KB of markup, ${island.lights.length} lights`)
+// At night no window may glow through whatever stands in front of it; the
+// island hides those, and most lights should still be seen.
+check(island.hiddenLights > 0 && island.hiddenLights < island.lights.length * 0.4, `lights hidden behind something are left dark at night (${island.hiddenLights} of ${island.lights.length})`)
 check(island.svg.length < 900 * 1024, 'the island is under 900 KB of markup')
 
 console.log('rasterise')

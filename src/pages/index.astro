@@ -6,6 +6,7 @@ import { META, dailyFor } from '../data/game-meta'
 import { withBase } from '../lib/base'
 import { faviconSvg } from '../lib/favicon'
 import { buildIsland } from '../lib/island/world'
+import { resvgRaster } from '../lib/island/raster'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import '../styles/island.css'
 
@@ -19,7 +20,7 @@ import '../styles/island.css'
  */
 const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
 const count = games.length
-const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`) })))
+const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`) })), { raster: resvgRaster })
 const [vx, vy, vw, vh] = island.viewBox
 
 const districtOf = Object.fromEntries(PLACES.map(([s, d]) => [s, d]))

@@ -82,8 +82,7 @@ export function lamp(p: Pen, x: number, y: number, h = 26) {
   const [bx, by] = p.at(x, y)
   p.path(`M${f(bx)} ${f(by)}L${f(bx)} ${f(by - h)}`, 'none', { sw: 2.2 })
   p.path(`M${f(bx)} ${f(by - h)}q0 -4 5 -4`, 'none', { sw: 2 })
-  p.el('circle', { cx: bx + 5.5, cy: by - h - 2, r: 3.2, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2, class: 'lamp-bulb' })
-  p.lights.push([bx + 5.5, by - h - 2])
+  p.light([bx + 5.5, by - h - 2], p.el('circle', { cx: bx + 5.5, cy: by - h - 2, r: 3.2, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2, class: 'lamp-bulb' }))
   p.grow(bx - 3, by - h - 7, bx + 9, by)
 }
 
