@@ -14,8 +14,14 @@ export const badlands: Record<string, Landmark> = {
     for (const [x, y] of [[0.3, 0.4], [1.9, 0.5], [1.8, 1.8], [0.5, 1.85]] as const) tree(p, x, y, 'rock', C.rock, 0.7)
     const [cx, cy] = p.at(1.1, 1.05)
     const m = p.group('ast-meteor')
-    m.path(`M${f(cx - 6)} ${f(cy - 5)}L${f(cx - 80)} ${f(cy - 100)}L${f(cx - 64)} ${f(cy - 108)}Z`, C.rasp, { sw: 0, op: 0.5 })
-    m.path(`M${f(cx - 4)} ${f(cy - 4)}L${f(cx - 50)} ${f(cy - 66)}L${f(cx - 42)} ${f(cy - 70)}Z`, '#ffffff', { sw: 0, op: 0.6 })
+    const trail = m.el('defs')
+    for (const [id, c] of [['ast-tail', C.rasp], ['ast-core', '#ffffff']] as const) {
+      const lg = trail.add(new N('linearGradient', { id, gradientUnits: 'userSpaceOnUse', x1: f(cx - 6), y1: f(cy - 5), x2: f(cx - 76), y2: f(cy - 104) }))
+      lg.add(new N('stop', { offset: 0, 'stop-color': c, 'stop-opacity': 0.75 }))
+      lg.add(new N('stop', { offset: 1, 'stop-color': c, 'stop-opacity': 0 }))
+    }
+    m.path(`M${f(cx - 6)} ${f(cy - 5)}L${f(cx - 80)} ${f(cy - 100)}L${f(cx - 64)} ${f(cy - 108)}Z`, 'url(#ast-tail)', { sw: 0 })
+    m.path(`M${f(cx - 4)} ${f(cy - 4)}L${f(cx - 50)} ${f(cy - 66)}L${f(cx - 42)} ${f(cy - 70)}Z`, 'url(#ast-core)', { sw: 0 })
     m.path(`M${f(cx - 10)} ${f(cy - 2)}l3 -9l9 -3l8 5l1 9l-7 6l-10 -1z`, C.rockDark, { sw: 2 })
     // The launch rail and its control hut.
     const hut = p.box(0.05, 1.4, 0.45, 0.45, 16, { fill: C.white, trim: C.rasp })

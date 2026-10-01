@@ -29,7 +29,7 @@ const key = (i: number, j: number) => `${i},${j}`
 
 export type Anchor = { slug: string; district: DistrictKey; x0: number; y0: number; x1: number; y1: number; bx: number; by: number; foot: string }
 export type Layer = { kind: 'sea' | 'boats' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
-export type Island = { hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
+export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
 /**
@@ -615,8 +615,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   for (const [i, j] of [[12.3, 12.4], [12.7, 12.6], [17.3, 13.3], [10.4, 13.6]]) if (free(Math.floor(i), Math.floor(j)) && height[Math.floor(i)][Math.floor(j)] === 0) at(i, j, i + j, (p) => topiary(p, i, j, 0.9))
 
   /* ---- town life ------------------------------------------------------------ */
-  const ROOFS = [C.rasp, C.cobalt, C.lilac, '#35c9a6', '#6fa8ff', '#ff8fb0']
-  const WALLS = ['#ffffff', '#f4f6fc', '#eef4ff', '#f3eefe']
+  // Filler is quieter than the games: paler roofs, no raspberry, so the
+  // buildings you can play stand out from the houses between them.
+  const ROOFS = ['#9fb5f2', '#c3b3f3', '#8fd9c4', '#a9cdf5', '#d6b9e6', '#b3c4e8']
+  const WALLS = ['#ffffff', '#f6f8fd', '#f2f6fd', '#f6f3fd']
   // Little houses between the big ones, each with its door to a road we can
   // see (the +x or +y side), kept a tile clear of every building.
   {
@@ -829,7 +831,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   ;[[-0.2, 0.1, 1.2], [0.25, 0.45, 1], [0.6, 0.2, 1.3], [0.05, 0.7, 0.9], [0.8, 0.6, 1.1]].forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
     const g = sky.add(new N('g', { class: 'cloud', style: `animation-delay:${-n * 23}s;animation-duration:${150 + n * 20}s` }))
-    g.add(new N('ellipse', { cx: f(x + 20), cy: f(y + 190), rx: f(70 * k), ry: f(24 * k), fill: INK, opacity: 0.08 }))
+    g.add(new N('ellipse', { cx: f(x + 14), cy: f(y + 120), rx: f(56 * k), ry: f(17 * k), fill: INK, opacity: 0.06, class: 'cloud-shadow' }))
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudShape(k))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
@@ -847,7 +849,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
 
   const layers: Layer[] = made.map((m) => ({ kind: m.kind, slug: m.slug, body: render(m.node) }))
   const css = motionCss.join('')
-  return { hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini }
+  // The island's own extent, without the sea round it: the camera keeps this in view.
+  const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini }
 }
 
 export { OUT, bench }

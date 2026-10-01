@@ -22,6 +22,10 @@ export function initIsland(o: {
   /** The layers, all moved together by one transform. */
   world: HTMLElement
   bounds: [number, number, number, number]
+  /** The island itself, without the sea: the camera never lets it all go off screen. */
+  land?: [number, number, number, number]
+  /** The district names, where their banners stand on the map. */
+  districts?: { key: string; name: string; x: number; y: number }[]
   anchors: Record<string, Anchor>
   games: Record<string, GameInfo>
   onEnter?: (slug: string) => void
@@ -50,6 +54,12 @@ export function initIsland(o: {
     const padX = Math.max(0, bw / 2 - hw * 0.4), padY = Math.max(0, bh / 2 - hh * 0.4)
     goal.x = Math.min(bx + bw / 2 + padX, Math.max(bx + bw / 2 - padX, goal.x))
     goal.y = Math.min(by + bh / 2 + padY, Math.max(by + bh / 2 - padY, goal.y))
+    // However hard it is thrown, the middle of the view stays over the island.
+    if (o.land) {
+      const [lx0, ly0, lx1, ly1] = o.land, ix = (lx1 - lx0) * 0.12, iy = (ly1 - ly0) * 0.12
+      goal.x = Math.min(lx1 - ix, Math.max(lx0 + ix, goal.x))
+      goal.y = Math.min(ly1 - iy, Math.max(ly0 + iy, goal.y))
+    }
   }
   const apply = () => {
     const w = W / cam.z, h = H / cam.z
@@ -138,7 +148,8 @@ export function initIsland(o: {
     goal.x -= dx / cam.z; goal.y -= dy / cam.z
     cam.x = goal.x; cam.y = goal.y
     const now = performance.now(), dt = Math.max(8, now - last.t)
-    vel = { x: (dx / dt) * 16, y: (dy / dt) * 16 }
+    const cap = (v: number) => Math.max(-38, Math.min(38, v))
+    vel = { x: cap((dx / dt) * 16), y: cap((dy / dt) * 16) }
     last = { x: e.clientX, y: e.clientY, t: now }
     clampGoal()
     if (moved > 6) hideCard()
@@ -200,6 +211,7 @@ export function initIsland(o: {
 
   /* ---- names, when close enough to read them ----------------------------- */
   const tags = new Map<string, HTMLElement>()
+  const tagW = new Map<string, number>()
   for (const s of Object.keys(anchors)) {
     const g = games[s]; if (!g) continue
     const t = document.createElement('span')
@@ -207,6 +219,16 @@ export function initIsland(o: {
     t.style.setProperty('--tint', g.tint)
     labels.append(t); tags.set(s, t)
   }
+
+  // District names, drawn in the page rather than the picture, so they are
+  // the same readable size at every zoom. They give way to the building
+  // names once you are close.
+  const dtags = (o.districts ?? []).map((d) => {
+    const t = document.createElement('span')
+    t.className = 'isl-dtag'; t.textContent = d.name; t.dataset.d = d.key
+    labels.append(t)
+    return { t, d }
+  })
 
   /* ---- the card --------------------------------------------------------- */
   let hot: string | null = null, hideT = 0
@@ -240,6 +262,7 @@ export function initIsland(o: {
     if (now) go(); else hideT = window.setTimeout(go, 260)
   }
   card.addEventListener('pointerenter', () => clearTimeout(hideT))
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && hot) { hideCard(); box.focus({ preventScroll: true }) } })
   card.addEventListener('pointerleave', () => hideCard(false))
   cardPlay.addEventListener('click', (e) => { if (hot) { e.preventDefault(); enter(hot) } })
 
@@ -256,13 +279,26 @@ export function initIsland(o: {
       card.style.transform = `translate(${(x - cw / 2).toFixed(0)}px, ${(below ? sb + 14 : sy - 14).toFixed(0)}px) translateY(${below ? '0' : '-100%'})`
       card.style.setProperty('--arrow', `${(sx - x + cw / 2).toFixed(0)}px`)
     }
-    if (box.classList.contains('z-near')) {
-      for (const [s, t] of tags) {
-        const a = anchors[s]
-        const [sx, sy] = toScreen(a.bx, a.y1)
-        const on = sx > -80 && sx < W + 80 && sy > -40 && sy < H + 40 && s !== hot
+    const near = box.classList.contains('z-near')
+    for (const { t, d } of dtags) {
+      const [sx, sy] = toScreen(d.x, d.y)
+      const on = !near && sx > -120 && sx < W + 120 && sy > -40 && sy < H + 40
+      t.classList.toggle('is-on', on)
+      if (on) t.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translate(-50%, -50%)`
+    }
+    if (near) {
+      // Nearest the middle first; a name that would sit on one already placed waits.
+      const placed: [number, number, number, number][] = []
+      const order = [...tags].map(([s, t]) => { const a = anchors[s]; const [sx, sy] = toScreen(a.bx, a.y1); return { s, t, sx, sy: sy + 6, d: Math.hypot(sx - W / 2, sy - H / 2) } }).sort((p, q) => p.d - q.d)
+      for (const { s, t, sx, sy } of order) {
+        let w = tagW.get(s)
+        if (w === undefined) { w = t.offsetWidth || 120; tagW.set(s, w) }
+        const r: [number, number, number, number] = [sx - w / 2 - 4, sy - 2, sx + w / 2 + 4, sy + 28]
+        const inView = sx > -80 && sx < W + 80 && sy > -40 && sy < H + 40 && s !== hot
+        const clear = !placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])
+        const on = inView && clear
         t.classList.toggle('is-on', on)
-        if (on) t.style.transform = `translate(${sx.toFixed(0)}px, ${(sy + 6).toFixed(0)}px) translateX(-50%)`
+        if (on) { placed.push(r); t.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translateX(-50%)` }
       }
     }
   }

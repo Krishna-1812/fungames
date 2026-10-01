@@ -149,12 +149,18 @@ export function birds(): string {
   return [[0, 0], [16, 8], [-14, 10]].map(([x, y]) => `<path class="flap" d="M${x - 7} ${y}q3.5 -5 7 0q3.5 -5 7 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`).join('')
 }
 
-/** A cloud, drawn at the origin; its shadow is drawn separately on the ground. */
+/**
+ * A cloud, drawn at the origin: soft and a little see-through, with no ink
+ * outline, so it floats over the map rather than sitting on it. A shaded
+ * base, then the lit puffs on top. Its shadow is drawn separately below it.
+ */
 export function cloudShape(k = 1): string {
   const parts: [number, number, number][] = [[0, 0, 26], [30, 8, 20], [-28, 9, 18], [10, -16, 20], [-12, -12, 17]]
-  return `<g>` + parts.map(([x, y, r]) => `<circle cx="${f(x * k)}" cy="${f(y * k)}" r="${f(r * k)}" fill="#ffffff" stroke="${INK}" stroke-width="${OUT}"/>`).join('') +
-    parts.map(([x, y, r]) => `<circle cx="${f(x * k)}" cy="${f(y * k)}" r="${f(r * k - 1.2)}" fill="#ffffff"/>`).join('') +
-    `<path d="M${f(-44 * k)} ${f(16 * k)}q${f(44 * k)} ${f(14 * k)} ${f(92 * k)} ${f(-2 * k)}" fill="none" stroke="${C.cloud}" stroke-width="${f(8 * k)}" stroke-linecap="round"/></g>`
+  return '<g class="cloud-body" opacity="0.9">' +
+    `<ellipse cx="${f(2 * k)}" cy="${f(17 * k)}" rx="${f(46 * k)}" ry="${f(11 * k)}" fill="#d9e2f6" class="cloud-base"/>` +
+    parts.map(([x, y, r]) => `<circle cx="${f(x * k)}" cy="${f(y * k)}" r="${f(r * k)}" fill="#ffffff" class="cloud-puff"/>`).join('') +
+    `<path d="M${f(-40 * k)} ${f(14 * k)}q${f(42 * k)} ${f(10 * k)} ${f(86 * k)} 0" fill="none" stroke="#e6ecfa" stroke-width="${f(6 * k)}" stroke-linecap="round" class="cloud-base"/>` +
+    `<ellipse cx="${f(-6 * k)}" cy="${f(-18 * k)}" rx="${f(12 * k)}" ry="${f(6 * k)}" fill="#ffffff" opacity="0.9"/></g>`
 }
 
 export { N }

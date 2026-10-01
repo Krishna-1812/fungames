@@ -98,9 +98,17 @@ export const harbour: Record<string, Landmark> = {
     p.el('ellipse', { cx: x, cy: y - 88, rx: 19, ry: 6, fill: C.slate, stroke: INK, 'stroke-width': OUT })
     for (let k = -3; k <= 3; k++) p.path(`M${f(x + k * 5.5)} ${f(y - 86 + Math.abs(k))}v-8`, 'none', { sw: 1.2 })
     p.path(`M${f(x - 18)} ${f(y - 94)}a19 5 0 0 0 36 0`, 'none', { sw: 1.4 })
+    // Each beam fades to nothing along its length rather than stopping dead.
+    const fade = p.el('defs')
+    for (const [id, x1, x2] of [['stp-fade-r', 0, 1], ['stp-fade-l', 1, 0]] as const) {
+      const lg = fade.add(new N('linearGradient', { id, x1, x2, y1: 0, y2: 0 }))
+      lg.add(new N('stop', { offset: 0, 'stop-color': '#ffffff', 'stop-opacity': 0.8 }))
+      lg.add(new N('stop', { offset: 0.55, 'stop-color': '#ffffff', 'stop-opacity': 0.35 }))
+      lg.add(new N('stop', { offset: 1, 'stop-color': '#ffffff', 'stop-opacity': 0 }))
+    }
     const beam = p.group('stp-beam')
-    beam.path(`M${f(x)} ${f(y - 102)}L${f(x + 190)} ${f(y - 140)}L${f(x + 190)} ${f(y - 72)}Z`, '#ffffff', { sw: 0, op: 0.65 })
-    beam.path(`M${f(x)} ${f(y - 102)}L${f(x - 190)} ${f(y - 140)}L${f(x - 190)} ${f(y - 72)}Z`, '#ffffff', { sw: 0, op: 0.65 })
+    beam.path(`M${f(x)} ${f(y - 102)}L${f(x + 190)} ${f(y - 140)}L${f(x + 190)} ${f(y - 72)}Z`, 'url(#stp-fade-r)', { sw: 0 })
+    beam.path(`M${f(x)} ${f(y - 102)}L${f(x - 190)} ${f(y - 140)}L${f(x - 190)} ${f(y - 72)}Z`, 'url(#stp-fade-l)', { sw: 0 })
     p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp' }))
     p.path(`M${f(x - 4)} ${f(y - 108)}h8v12h-8z`, '#ffffff', { sw: 1, cls: 'stp-lamp' })
     p.path(`M${f(x - 14)} ${f(y - 112)}Q${f(x)} ${f(y - 132)} ${f(x + 14)} ${f(y - 112)}Z`, C.slate)

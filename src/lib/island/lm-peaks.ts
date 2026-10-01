@@ -68,9 +68,13 @@ export const peaks: Record<string, Landmark> = {
     p.box(1.66, 0.8, 0.12, 0.42, 5, { z0: 23, fill: '#d5d9ea' })
     const [mx, my] = p.at(1, 1, 130)
     p.el('circle', { cx: mx, cy: my, r: 26, fill: '#ffffff', opacity: 0.35, class: 'pulse' })
+    // Rays round the sun, so the dark disc reads as an eclipse, not a hole.
+    let rays = ''
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2, r0 = 21, r1 = k % 2 ? 27 : 31; rays += `M${f(mx + Math.cos(a) * r0)} ${f(my + Math.sin(a) * r0)}L${f(mx + Math.cos(a) * r1)} ${f(my + Math.sin(a) * r1)}` }
+    p.path(rays, 'none', { stroke: '#ffffff', sw: 2.4 })
     p.circle(1, 1, 130, 17, '#ffffff')
     const cp = p.el('clipPath', { id: 'uf-clip' }); cp.add(new N('circle', { cx: mx, cy: my, r: 17 }))
-    p.el('g', { 'clip-path': 'url(#uf-clip)' }).add(new N('circle', { cx: mx, cy: my, r: 16, fill: '#243066', class: 'uf-shadow' }))
+    p.el('g', { 'clip-path': 'url(#uf-clip)' }).add(new N('circle', { cx: mx, cy: my, r: 16, fill: '#4b5ba6', class: 'uf-shadow' }))
     p.el('circle', { cx: mx, cy: my, r: 17, fill: 'none', stroke: INK, 'stroke-width': OUT })
     p.el('path', { d: `M${f(mx - 60)} ${f(my + 30)}A70 40 0 0 1 ${f(mx + 60)} ${f(my + 30)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-dasharray': '3 6' })
     person(p, 1.85, 1.35, C.lilac, { pose: 'look' })

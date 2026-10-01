@@ -45,7 +45,8 @@ const frame = (slug: string) => {
 
 const daily = dailyFor(new Date())
 const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug) }]))
-const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug) }
+const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
+const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug) }
 ---
 
 <Paper
@@ -89,6 +90,7 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
           </nav>
         </header>
 
+        <h1 class="isl-title">{count} small games on one tiny island</h1>
         <p class="isl-hint"><span class="isl-hint-long">Drag to explore · click any building to play</span><span class="isl-hint-short">Drag · pinch · tap a building</span></p>
 
         <div class="isl-zoom" role="group" aria-label="Zoom">
@@ -197,6 +199,8 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
 
   const data = JSON.parse(document.getElementById('isl-data')!.textContent!) as {
     bounds: [number, number, number, number]
+    land: [number, number, number, number]
+    districts: { key: string; name: string; x: number; y: number }[]
     anchors: Record<string, { x0: number; y0: number; x1: number; y1: number; bx: number; by: number; district: string; slug: string }>
     games: Record<string, GameInfo>
     slugs: string[]
@@ -212,7 +216,10 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
   for (const s of data.slugs) data.games[s].best = readBest(s)
   document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => { const b = data.games[el.dataset.best!]?.best; if (b) { el.textContent = `Best ${b}`; el.classList.add('has-best') } })
 
-  const isle = initIsland({ box, stage: document.getElementById('islStage')!, world: svg, bounds: data.bounds, anchors: data.anchors, games: data.games })
+  const isle = initIsland({ box, stage: document.getElementById('islStage')!, world: svg, bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games })
+  // The map is a window, not a scroller: focusing a building near the edge
+  // must never scroll the box itself and push the top bar out of view.
+  box.addEventListener('scroll', () => { box.scrollLeft = 0; box.scrollTop = 0 })
   document.getElementById('zIn')!.addEventListener('click', isle.zoomIn)
   document.getElementById('zOut')!.addEventListener('click', isle.zoomOut)
   document.getElementById('zHome')!.addEventListener('click', isle.home)
@@ -356,6 +363,7 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
     position: relative;
     height: max(560px, min(100svh, 1100px));
     overflow: hidden;
+    overflow: clip;
     background: #8ccbff;
     outline: none;
     touch-action: none;
@@ -424,6 +432,20 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
     transition: opacity 0.5s, transform 0.5s;
   }
   .isl-hint-short { display: none; }
+  /* Touch or mouse decides the words, not the width of the window. */
+  @media (pointer: coarse) { .isl-hint-long { display: none; } .isl-hint-short { display: inline; } }
+  .isl-title {
+    position: absolute; left: 50%; top: 22px; z-index: 4; transform: translateX(-50%);
+    margin: 0; padding: 8px 18px;
+    font: 700 18px 'Fredoka', system-ui, sans-serif; color: #1b2340; white-space: nowrap;
+    background: rgba(255, 255, 255, 0.82); border: 2.5px solid #1b2340; border-radius: 999px;
+    pointer-events: none;
+  }
+  [data-time='night'] .isl-title { background: rgba(223, 230, 250, 0.9); }
+  /* It steps aside with the hint once you start exploring. */
+  .isl-title { transition: opacity 0.5s; }
+  .isl-title:has(+ .isl-hint.is-gone) { opacity: 0; }
+  @media (max-width: 1080px) { .isl-title { top: 84px; font-size: 16px; } }
   .isl-hint.is-gone { opacity: 0; transform: translateX(-50%) translateY(12px); }
   :global(html.play) .isl-hint { animation: isl-hint-in 0.8s 1.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
   @keyframes isl-hint-in { from { opacity: 0; transform: translateX(-50%) translateY(20px); } }
@@ -489,6 +511,18 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
     opacity: 0; transition: opacity 0.25s;
   }
   :global(.isl-box.z-near .isl-tag.is-on) { opacity: 1; }
+  /* The district names, the same size at every zoom; the drawn banners are
+     only for a page without script. */
+  :global(html.js .layer-banners) { display: none; }
+  :global(.isl-dtag) {
+    position: absolute; left: 0; top: 0;
+    padding: 4px 13px;
+    font: 700 15px 'Fredoka', system-ui, sans-serif; color: #1b2340; white-space: nowrap;
+    background: #fff; border: 2.5px solid #1b2340; border-radius: 10px; box-shadow: 0 3px 0 #1b2340;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  :global(.isl-dtag.is-on) { opacity: 1; }
+  :global([data-time='night'] .isl-dtag), :global([data-time='night'] .isl-tag) { background: #dfe6fa; }
 
   /* The circle that closes round a building as you go in. */
   .isl-iris {
@@ -506,9 +540,8 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
     .isl-btn { padding: 9px 11px; }
     .isl-logo { font-size: 17px; }
     .isl-mini { display: none; }
-    .isl-hint { top: 78px; bottom: auto; font-size: 14px; }
-    .isl-hint-long { display: none; }
-    .isl-hint-short { display: inline; }
+    .isl-hint { top: 122px; bottom: auto; font-size: 14px; }
+    .isl-title { top: 78px; font-size: 14px; padding: 6px 14px; }
     .isl-zoom { bottom: 20px; }
     .isl-zoom button { width: 44px; height: 44px; }
     .isl-down { display: inline-flex; bottom: 20px; }

@@ -142,7 +142,8 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 /* ---- the sky (lib/island/sky.ts) ----------------------------------------- */
 /* The plane crosses now and then, climbing gently, then is gone a while. */
 .isle .isl-plane { animation: sky-plane 70s linear infinite; animation-delay: -20s; }
-@keyframes sky-plane { 0% { transform: translate(-1500px, 560px) rotate(-14deg); } 42% { transform: translate(1500px, -180px) rotate(-14deg); } 42.01%, 100% { transform: translate(1500px, -2400px) rotate(-14deg); } }
+/* Low over the sea along the front of the island, clear of Sky Peaks. */
+@keyframes sky-plane { 0% { transform: translate(-1500px, 1130px) rotate(-7deg); } 42% { transform: translate(1500px, 760px) rotate(-7deg); } 42.01%, 100% { transform: translate(1500px, -2400px) rotate(-7deg); } }
 .isle .isl-plane .prop { animation: sky-prop 0.12s linear infinite alternate; transform-box: fill-box; transform-origin: center; }
 @keyframes sky-prop { to { transform: scaleY(0.2); } }
 .isle .isl-plane .tow { animation: isl-flutter 0.9s ease-in-out infinite; transform-box: fill-box; transform-origin: 100% 50%; }
@@ -166,8 +167,14 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 [data-time='night'] .isle .firefly { animation: sky-firefly 4.5s ease-in-out infinite; }
 @keyframes sky-firefly { 0%, 100% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 50% { opacity: 0.3; transform: translate(9px, -7px); } 70% { opacity: 1; } 85% { transform: translate(-4px, 4px); } }
 [data-time='night'] .isle .glint { visibility: hidden; }
-[data-time='night'] .isle .cloud { opacity: 0.45; }
-[data-time='night'] .isle .isl-layer--sky .mover, [data-time='night'] .isle .isl-plane { opacity: 0.75; }
+/* At night the clouds go dusky blue and thin, and the balloons and the plane
+   are lit only by the town below. */
+[data-time='night'] .isle .cloud { opacity: 0.55; }
+[data-time='night'] .isle .cloud-puff { fill: #7f8fc4; }
+[data-time='night'] .isle .cloud-base { fill: #6a79b0; stroke: #6a79b0; }
+[data-time='dusk'] .isle .cloud-puff { fill: #e9defa; }
+[data-time='dusk'] .isle .cloud-base { fill: #cdbdf0; stroke: #cdbdf0; }
+[data-time='night'] .isle .hab, [data-time='night'] .isle .isl-plane { filter: brightness(0.6) saturate(0.85); }
 .isl-box[data-time='night'] { background-color: #3a5aa6; }
 
 /* ---- each building's own motion -------------------------------------- */
