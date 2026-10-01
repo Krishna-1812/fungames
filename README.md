@@ -232,7 +232,7 @@ as a card, with the four filters and search.
 | `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
-| `src/lib/island/world.ts` | the map: land, heights, a path search for the roads, sea and surf, trees, walkers, and the layers it is painted in |
+| `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, trees, walkers, and the layers it is painted in |
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard, the hover card, names at close zoom, the mini-map, the dive into a game |
 | `src/styles/island.css` | every loop on the map |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG) |
@@ -247,12 +247,17 @@ Three things about performance, all found by measuring rather than guessing:
   became sixty.
 - **Only what is on screen and near the middle moves**: the camera picks up
   to eight buildings and ten walkers at a time from far away and more up
-  close, and pauses the rest where they are. Nothing moves that crosses the
+  close, and pauses the rest where they are. Anything else that moves on its
+  own (a glint on the sea, the white water on a fall) is marked `.amb` with
+  its box in `data-b`, and gets the same treatment from its own budget. Nothing moves that crosses the
   whole map (the surf and the wave marks stand still), and nothing uses SMIL:
   every mover is a CSS keyframe path generated at build time.
 - **The cards are copies, not `<use>`s.** A `<use>` of a building replays every
   animation on the island into its copy each frame even when the cards are
   off screen. The page clones each building into its card once instead.
+  (The one `<use>` left is the coastline the shallows are drawn from: one
+  still outline, stroked eight times at different widths with round joins,
+  which grows it outwards into soft bands that follow the coast.)
 
 While a zoom is in motion the island is one GPU layer and its loops pause,
 then it is redrawn sharp; with reduced motion the camera jumps instead of

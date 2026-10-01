@@ -11,7 +11,7 @@
    and walkers at once. Every animated SVG element costs the browser style work
    every frame, and a hundred and fifty of them at once is ten frames a second.
    The camera chooses (lib/island/camera.ts). */
-.isle.is-culling .lm:not(.is-live) .lm-art *, .isle.is-culling .walker:not(.is-live), .isle.is-culling .walker:not(.is-live) * { animation-play-state: paused !important; }
+.isle.is-culling .lm:not(.is-live) .lm-art *, .isle.is-culling .walker:not(.is-live), .isle.is-culling .walker:not(.is-live) *, .isle.is-culling .amb:not(.is-live), .isle.is-culling .amb:not(.is-live) * { animation-play-state: paused !important; }
 .isle.is-paused *, .isle.is-zooming *, html:not(.play) .isle * { animation-play-state: paused !important; }
 html:not(.play) .isle * { animation: none !important; transition: none !important; }
 
@@ -70,6 +70,12 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 /* The sea's marks stand still: a mark that moves across the whole map makes
    the browser repaint the whole map, every frame. */
 .isle .wave { opacity: 0.5; }
+/* Sun on the water: a glint swells and goes, here and there. */
+.isle .glint { opacity: 0; animation: isl-glint 5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes isl-glint { 0%, 55%, 100% { opacity: 0; transform: scale(0.3); } 72% { opacity: 0.95; transform: scale(1); } }
+/* White water running down each fall of the river. */
+.isle .fall { animation: isl-fall 0.55s linear infinite; }
+@keyframes isl-fall { to { stroke-dashoffset: -9; } }
 .isle .w1, .isle .w3 { opacity: 0.32; }
 .isle .fish { opacity: 0; animation: isl-fish 7s ease-in-out infinite; }
 @keyframes isl-fish { 0%, 70% { transform: translate(0, 0) rotate(0); opacity: 0; } 74% { opacity: 1; } 80% { transform: translate(14px, -22px) rotate(-30deg); } 86% { transform: translate(28px, 0) rotate(30deg); opacity: 1; } 88%, 100% { opacity: 0; transform: translate(28px, 0); } }

@@ -171,7 +171,10 @@ export function initIsland(o: {
 
   /* ---- motion only where you are looking --------------------------------- */
   svg.classList.add('is-culling')
-  const walkerEls = Array.from(svg.querySelectorAll<SVGGElement>('.walker')).map((el) => ({ el, b: (el.dataset.b ?? '0 0 0 0').split(' ').map(Number) }))
+  const boxed = (sel: string) => Array.from(svg.querySelectorAll<SVGElement>(sel)).map((el) => ({ el, b: (el.dataset.b ?? '0 0 0 0').split(' ').map(Number) }))
+  const walkerEls = boxed('.walker')
+  // The small ambient things: glints, falls, and whatever else moves on its own.
+  const ambEls = boxed('.amb')
   let lastCull = 0
   function cull(force = false) {
     const now = performance.now()
@@ -182,13 +185,15 @@ export function initIsland(o: {
     // Fewer at once from far away, where the whole island is on screen and
     // every moving thing makes the browser repaint more of it.
     const near = cam.z / fitZ()
-    const LIVE_LM = near < 1.3 ? 8 : near < 2 ? 11 : 14, LIVE_WALK = near < 1.3 ? 10 : near < 2 ? 12 : 16
+    const LIVE_LM = near < 1.3 ? 8 : near < 2 ? 11 : 14, LIVE_WALK = near < 1.3 ? 10 : near < 2 ? 12 : 16, LIVE_AMB = near < 1.3 ? 10 : near < 2 ? 14 : 18
     const d = (b: number[]) => Math.hypot((b[0] + b[2]) / 2 - cam.x, (b[1] + b[3]) / 2 - cam.y)
     const lm = Object.values(anchors).map((a) => ({ s: a.slug, b: [a.x0, a.y0, a.x1, a.y1] })).filter((a) => seen(a.b)).sort((p, q) => d(p.b) - d(q.b)).slice(0, LIVE_LM).map((a) => a.s)
     const live = new Set(lm); if (hot) live.add(hot)
     for (const [s, a] of links) a.classList.toggle('is-live', live.has(s))
     const wl = new Set(walkerEls.filter((x) => seen(x.b)).sort((p, q) => d(p.b) - d(q.b)).slice(0, LIVE_WALK).map((x) => x.el))
     for (const x of walkerEls) x.el.classList.toggle('is-live', wl.has(x.el))
+    const al = new Set(ambEls.filter((x) => seen(x.b)).sort((p, q) => d(p.b) - d(q.b)).slice(0, LIVE_AMB).map((x) => x.el))
+    for (const x of ambEls) x.el.classList.toggle('is-live', al.has(x.el))
   }
 
   /* ---- names, when close enough to read them ----------------------------- */

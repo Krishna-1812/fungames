@@ -9,13 +9,17 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { C, INK, N, OUT, P, Pen, render, rng, shade, S, Bounds, motionCss, motionPath } from './kit'
+import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath } from './kit'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 
 export const GRID = 30
 const SEA = -12
+const BEACH = -6
 const f = (v: number) => Math.round(v * 10) / 10
+const f2 = (v: number) => Math.round(v * 100) / 100
+/** Sand: two tones for the tops, the wet edge, and the two faces of a step. */
+const SAND = ['#f6f0e1', '#efe7d3', '#d9ccad', '#e3d7ba', '#cbbb98']
 const key = (i: number, j: number) => `${i},${j}`
 
 export type Anchor = { slug: string; district: DistrictKey; x0: number; y0: number; x1: number; y1: number; bx: number; by: number; foot: string }
@@ -60,9 +64,22 @@ export function buildIsland(games: GameLink[]): Island {
   const coast = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => !isLand(i + a, j + b))
   const H = (i: number, j: number) => (isLand(i, j) ? height[i][j] : SEA)
 
+  // The low coast steps down to a beach, half-way to the sea.
+  const beach = new Set<string>()
+  for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (isLand(i, j) && height[i][j] === 0 && !taken.has(key(i, j)) && coast(i, j)) beach.add(key(i, j))
+  for (const k of beach) { const [i, j] = k.split(',').map(Number); height[i][j] = BEACH }
+
+  // A river: a spring high on Sky Peaks, falling down the terraces to the sea.
+  const river: [number, number][] = []
+  for (let j = 4; j < GRID && isLand(7, j); j++) river.push([7, j])
+  const wet = new Set(river.map((c) => key(...c)))
+  // A pond in the park in Old Town.
+  const pond = new Set<string>()
+  for (const [i, j] of [[14, 9], [14, 10], [14, 11], [15, 9], [15, 10], [15, 11]]) if (isLand(i, j) && !taken.has(key(i, j))) pond.add(key(i, j))
+
   /* ---- roads: found by searching round the buildings -------------------- */
   const road = new Set<string>()
-  const walkable = (i: number, j: number) => isLand(i, j) && height[i][j] === 0 && !taken.has(key(i, j)) && !coast(i, j)
+  const walkable = (i: number, j: number) => isLand(i, j) && height[i][j] === 0 && !taken.has(key(i, j)) && !coast(i, j) && !wet.has(key(i, j)) && !pond.has(key(i, j))
   const nearestFree = (x: number, y: number) => {
     let best: [number, number] = [Math.floor(x), Math.floor(y)], bd = Infinity
     for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (walkable(i, j)) { const d = Math.hypot(i + 0.5 - x, j + 0.5 - y); if (d < bd) { bd = d; best = [i, j] } }
@@ -109,26 +126,86 @@ export function buildIsland(games: GameLink[]): Island {
 
   // The sea, its shallows, and the surf round the coast.
   const [sx0, sy0] = P(-8, GRID + 8), [sx1] = P(GRID + 8, -8), [, sy1] = P(-8, -8), [, sy2] = P(GRID + 8, GRID + 8)
-  root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: C.water }))
-  const shallows = new Map<string, string>()
-  for (let i = -4; i < GRID + 4; i++) for (let j = -4; j < GRID + 4; j++) {
+  // The open sea is a touch deeper the further it is from the island.
+  const [mx, my] = P(GRID / 2, GRID / 2, SEA)
+  const defs = root.add(new N('defs'))
+  const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: 1500, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
+  grad.add(new N('stop', { offset: 0.3, 'stop-color': '#a3dbff' }))
+  grad.add(new N('stop', { offset: 1, 'stop-color': C.water }))
+  root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: 'url(#isl-sea)' }))
+
+  // The shallows: the whole coast's outline, stroked wider and wider with
+  // round joins, which is the same as growing it outwards by that much. Drawn
+  // flat on the sea in tile units, so the bands curve round the coast the way
+  // shallow water does, rather than stepping tile by tile. A thin lighter
+  // ring marks each band's edge, like the line a wave leaves.
+  const [sox, soy] = P(0, 0, SEA)
+  const flat = (cls?: string) => root.add(new N('g', { class: cls, transform: `translate(${f(sox)} ${f(soy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
+  let landSq = ''
+  for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (isLand(i, j)) landSq += `M${i} ${j}h1v1h-1z`
+  const sh = flat('shallows')
+  // One outline, drawn eight times: each band and its lighter edge.
+  sh.add(new N('defs')).add(new N('path', { id: 'isl-coast', d: landSq }))
+  ;([[7.2, '#98d4fc'], [4.6, '#a7ddf9'], [2.6, '#b8e7f6'], [1.2, '#cdf1f4']] as [number, string][]).forEach(([w, c]) => {
+    sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: mix(c, '#ffffff', 0.45), 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
+    sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: c, 'stroke-width': f2(w - 0.09), 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
+  })
+  // Sand and pebbles seen through the clearest water, right by the shore.
+  let seabed = ''
+  for (let i = -2; i < GRID + 2; i++) for (let j = -2; j < GRID + 2; j++) {
     if (isLand(i, j)) continue
-    let near = 9
-    for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) if (isLand(i + a, j + b)) near = Math.min(near, Math.max(Math.abs(a), Math.abs(b)))
-    if (near > 3) continue
-    const col = near === 1 ? '#b8e2ff' : near === 2 ? '#a6d9ff' : '#98d2ff'
-    const pts = [P(i, j, SEA), P(i + 1, j, SEA), P(i + 1, j + 1, SEA), P(i, j + 1, SEA)]
-    shallows.set(col, (shallows.get(col) ?? '') + `M${pts.map((p) => p.map(f).join(' ')).join('L')}Z`)
+    if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => isLand(i + a, j + b))) continue
+    for (let k = 0; k < 2; k++) { const u = i + 0.2 + R() * 0.6, v = j + 0.2 + R() * 0.6, r = 0.035 + R() * 0.05; seabed += `M${f2(u - r)} ${f2(v)}a${f2(r)} ${f2(r)} 0 1 0 ${f2(r * 2)} 0a${f2(r)} ${f2(r)} 0 1 0 ${f2(-r * 2)} 0` }
   }
-  for (const [col, d] of shallows) root.add(new N('path', { d, fill: col }))
+  sh.add(new N('path', { d: seabed, fill: '#ffffff', opacity: 0.45 }))
+
   const waves = root.add(new N('g', { class: 'waves' }))
+  // Wave marks out in open water only, where they will not sit on the shallows.
+  const nearLand = (u: number, v: number, r: number) => { for (let a = Math.floor(u - r); a <= u + r; a++) for (let b = Math.floor(v - r); b <= v + r; b++) if (isLand(a, b)) return true; return false }
   for (let g = 0; g < 4; g++) {
     let d = ''
     for (let k = 0; k < 45; k++) {
-      const [x, y] = P(R() * (GRID + 16) - 8, R() * (GRID + 16) - 8, SEA)
+      const u = R() * (GRID + 16) - 8, v = R() * (GRID + 16) - 8
+      if (nearLand(u, v, 3.5)) continue
+      const [x, y] = P(u, v, SEA)
       d += `M${f(x)} ${f(y)}q7 -5 14 0q7 -5 14 0`
     }
     waves.add(new N('path', { d, fill: 'none', stroke: '#ffffff', 'stroke-width': 2.2, 'stroke-linecap': 'round', class: `wave w${g}` }))
+  }
+  // Rocks standing in the shallows, each with a ring of foam, and a little
+  // sandbar off the harbour with one palm on it.
+  const waterSlug = new Set(placed.filter((p) => p.lm.water).flatMap((p) => p.cells.map((c) => key(...c))))
+  const clearOf = (i: number, j: number, r: number) => { for (let a = i - r; a <= i + r; a++) for (let b = j - r; b <= j + r; b++) if (isLand(a, b) || waterSlug.has(key(a, b))) return false; return true }
+  const seaRocks: [number, number, number][] = []
+  for (const [i, j, k] of [[-2, 12, 1], [12, 31, 1.2], [31, 6, 0.9], [29, 28, 1.1], [-2, 8, 0.8], [13, -2, 0.9], [18, -2, 1], [9, 30, 0.9]] as [number, number, number][]) {
+    if (!clearOf(Math.floor(i), Math.floor(j), 1)) continue
+    seaRocks.push([i, j, k])
+  }
+  for (const [i, j, k] of seaRocks) {
+    const [x, y] = P(i + 0.5, j + 0.5, SEA)
+    root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(26 * k), ry: f(11 * k), fill: '#ffffff', opacity: 0.55 }))
+    root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(19 * k), ry: f(8 * k), fill: '#cdf1f4' }))
+    root.add(new N('path', { d: `M${f(x - 14 * k)} ${f(y + 4)}L${f(x - 10 * k)} ${f(y - 8 * k)}L${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}Z`, fill: C.rock, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
+    root.add(new N('path', { d: `M${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}L${f(x + 1 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.55 }))
+    root.add(new N('path', { d: `M${f(x - 9 * k)} ${f(y - 8 * k)}l5 -3`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.7 }))
+    root.add(new N('path', { d: `M${f(x - 18 * k)} ${f(y + 5)}q${f(18 * k)} ${f(7 * k)} ${f(36 * k)} 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-linecap': 'round' }))
+  }
+  const sandbar = [30.2, 24.4]
+  if (clearOf(30, 24, 1)) {
+    const [x, y] = P(sandbar[0], sandbar[1], SEA)
+    root.add(new N('ellipse', { cx: f(x), cy: f(y + 4), rx: 54, ry: 21, fill: '#ffffff', opacity: 0.6 }))
+    root.add(new N('ellipse', { cx: f(x), cy: f(y + 4), rx: 46, ry: 17, fill: '#cdf1f4' }))
+    root.add(new N('path', { d: `M${f(x - 34)} ${f(y + 3)}q34 -16 68 0q-34 14 -68 0z`, fill: SAND[0], stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
+    root.add(new N('path', { d: `M${f(x - 34)} ${f(y + 3)}q34 14 68 0`, fill: 'none', stroke: SAND[2], 'stroke-width': 2.4, 'stroke-linecap': 'round' }))
+    for (const [dx, dy] of [[-14, 1], [10, 4], [20, 0]]) root.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r: 1.3, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6 }))
+  }
+  // Glints of sun on the water, here and there.
+  const glints = root.add(new N('g', { class: 'glints' }))
+  for (let k = 0; k < 26; k++) {
+    const u = R() * (GRID + 14) - 7, v = R() * (GRID + 14) - 7
+    if (nearLand(u, v, 1.5)) continue
+    const [x, y] = P(u, v, SEA), r = 3 + R() * 3
+    glints.add(new N('path', { d: `M${f(x)} ${f(y - r)}Q${f(x)} ${f(y)} ${f(x + r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y + r)}Q${f(x)} ${f(y)} ${f(x - r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y - r)}Z`, fill: '#ffffff', class: 'glint amb', 'data-b': `${f(x - r)} ${f(y - r)} ${f(x + r)} ${f(y + r)}`, style: `animation-delay:${f(-R() * 4)}s` }))
   }
   let foam = ''
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
@@ -164,27 +241,100 @@ export function buildIsland(games: GameLink[]): Island {
   const ground = root.add(new N('g', { class: 'ground' }))
   let mini = ''
   const quad = (pts: [number, number][]) => `M${pts.map((p) => p.map(f).join(' ')).join('L')}Z`
+  const seg = (a: [number, number], b: [number, number]) => `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}`
+  const ring = (x: number, y: number, rx: number, ry: number) => `M${f(x - rx)} ${f(y)}a${f(rx)} ${f(ry)} 0 1 0 ${f(rx * 2)} 0a${f(rx)} ${f(ry)} 0 1 0 ${f(-rx * 2)} 0`
+  // A smooth, low-frequency field, so the grass falls into soft patches of
+  // lighter and darker green rather than a chessboard.
+  const field = (i: number, j: number) => 0.5 + 0.22 * Math.sin(i * 0.55 + j * 0.31 + 1.7) + 0.2 * Math.cos(j * 0.62 - i * 0.23) + 0.08 * Math.sin(i * 2.1 + j * 1.7)
+  const grassTones = (d: District) => [shade(d.ground[0], 0.95), d.ground[0], mix(d.ground[0], d.ground[1], 0.5), d.ground[1], mix(d.ground[1], '#ffffff', 0.14)]
+  const FACE = { soil: ['#c9cfe6', '#a3add6'], rock: ['#a9a1d6', '#8a80c2'], sand: [SAND[3], SAND[4]], slate: ['#c2bde3', '#a59ed2'] }
+  const drip = (along: (u: number, z: number) => [number, number], h: number, seed: number) => {
+    const pts: [number, number][] = [along(0, h + 0.5), along(1, h + 0.5)]
+    for (let k = 8; k >= 0; k--) { const u = k / 8, deep = 2.5 + 3.2 * Math.abs(Math.sin(seed * 1.7 + k * 1.9)) * (k % 2 ? 1 : 0.45); pts.push(along(u, h - deep)) }
+    return quad(pts)
+  }
+  // Wet sand along every edge of a beach that meets the sea.
+  let wetSand = ''
+  const fallStreaks: { d: string; b: string }[] = []
+  let splash = ''
   for (let s = 0; s < GRID * 2; s++) {
-    const tops = new Map<string, string>(), cliffs = new Map<string, string>()
+    const tops = new Map<string, string>(), cliffs = new Map<string, string>(), lips = new Map<string, string>()
+    let strata = '', wetTop = '', wetFall = '', wetHi = ''
+    const add = (m: Map<string, string>, c: string, d: string) => m.set(c, (m.get(c) ?? '') + d)
     for (let i = 0; i < GRID; i++) {
       const j = s - i
       if (!isLand(i, j)) continue
-      const h = height[i][j], d = dist[i][j]
-      let top = (i + j) % 2 ? d.ground[0] : d.ground[1]
-      if (coast(i, j) && h === 0 && d.key !== 'badlands') top = (i + j) % 2 ? '#eef1f8' : '#e7ebf5'
-      if (taken.has(key(i, j))) top = (i + j) % 2 ? '#eef0f8' : '#e6e9f4'
-      if (d.key === 'peaks' && h >= 48) top = (i + j) % 2 ? '#f4f7ff' : '#eaf0fd'
-      tops.set(top, (tops.get(top) ?? '') + quad([P(i, j, h), P(i + 1, j, h), P(i + 1, j + 1, h), P(i, j + 1, h)]))
-      mini += quad([P(i, j, h), P(i + 1, j, h), P(i + 1, j + 1, h), P(i, j + 1, h)])
-      const rock = d.key === 'badlands' || d.key === 'peaks'
-      const cr = rock ? ['#a9a1d6', '#8a80c2'] : ['#c9cfe6', '#a3add6']
+      const h = height[i][j], d = dist[i][j], k = key(i, j), n = field(i, j)
+      const isBeach = beach.has(k), snowy = d.key === 'peaks' && (h >= 48 || (h === 36 && n > 0.62))
+      let top: string, lip: string | null = null, face: string[]
+      if (taken.has(k)) { top = (i + j) % 2 ? '#eef0f8' : '#e6e9f4'; face = FACE.soil }
+      else if (isBeach && d.key === 'badlands') { top = n > 0.5 ? '#ddd8ef' : '#d5cfe9'; face = FACE.slate }
+      else if (isBeach) { top = n > 0.5 ? SAND[0] : SAND[1]; face = FACE.sand }
+      else if (snowy) { top = n > 0.55 ? '#f7faff' : '#e9f0ff'; lip = '#ffffff'; face = FACE.rock }
+      else {
+        const t = grassTones(d)
+        top = t[Math.max(0, Math.min(t.length - 1, Math.floor(n * t.length)))]
+        lip = shade(d.ground[0], d.key === 'badlands' ? 0.86 : 0.8)
+        face = d.key === 'badlands' || d.key === 'peaks' ? FACE.rock : FACE.soil
+      }
+      const tq = quad([P(i, j, h), P(i + 1, j, h), P(i + 1, j + 1, h), P(i, j + 1, h)])
+      add(tops, top, tq); mini += tq
+      if (isBeach) {
+        const w = 0.2
+        if (!isLand(i + 1, j)) wetSand += quad([P(i + 1 - w, j, h), P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1 - w, j + 1, h)])
+        if (!isLand(i, j + 1)) wetSand += quad([P(i, j + 1 - w, h), P(i + 1, j + 1 - w, h), P(i + 1, j + 1, h), P(i, j + 1, h)])
+        if (!isLand(i - 1, j)) wetSand += quad([P(i, j, h), P(i + w, j, h), P(i + w, j + 1, h), P(i, j + 1, h)])
+        if (!isLand(i, j - 1)) wetSand += quad([P(i, j, h), P(i + 1, j, h), P(i + 1, j + w, h), P(i, j + w, h)])
+      }
       const hr = H(i + 1, j), hd = H(i, j + 1)
-      if (hr < h) cliffs.set(cr[0], (cliffs.get(cr[0]) ?? '') + quad([P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hr), P(i + 1, j, hr)]))
-      if (hd < h) cliffs.set(cr[1], (cliffs.get(cr[1]) ?? '') + quad([P(i, j + 1, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hd), P(i, j + 1, hd)]))
+      const rocky = face === FACE.rock
+      // The two faces we can see, with a lip of grass (or snow) along the top,
+      // a line of strata across the taller ones, and the odd crack in rock.
+      const detail = (hi: number, lo: number, along: (u: number, z: number) => [number, number]) => {
+        const tall = hi - lo
+        if (tall >= 12) { const z = lo + tall * (0.42 + 0.12 * Math.sin(i * 3.1 + j)); strata += seg(along(0.02, z), along(0.98, z)) }
+        if (rocky && tall >= 10 && R() < 0.7) { const p = along(0.2 + R() * 0.6, lo + tall * (0.25 + R() * 0.4)); strata += `M${f(p[0])} ${f(p[1])}l1.5 -4l-1 -3` }
+      }
+      if (hr < h) {
+        add(cliffs, face[0], quad([P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hr), P(i + 1, j, hr)]))
+        if (lip) add(lips, lip, snowy ? drip((u, z) => P(i + 1, j + u, z), h, i * 7 + j) : quad([P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1, j + 1, h - 2.6), P(i + 1, j, h - 2.6)]))
+        detail(h, hr, (u, z) => P(i + 1, j + u, z))
+      }
+      if (hd < h) {
+        add(cliffs, face[1], quad([P(i, j + 1, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hd), P(i, j + 1, hd)]))
+        if (lip) add(lips, lip, snowy ? drip((u, z) => P(i + u, j + 1, z), h, i + j * 5) : quad([P(i, j + 1, h), P(i + 1, j + 1, h), P(i + 1, j + 1, h - 2.6), P(i, j + 1, h - 2.6)]))
+        detail(h, hd, (u, z) => P(i + u, j + 1, z))
+      }
+      // The river: a channel across the top, and a fall down every step.
+      if (wet.has(k)) {
+        const first = river[0][0] === i && river[0][1] === j, j0 = first ? 0.3 : 0
+        wetTop += quad([P(i + 0.32, j + j0, h), P(i + 0.68, j + j0, h), P(i + 0.68, j + 1, h), P(i + 0.32, j + 1, h)])
+        wetHi += seg(P(i + 0.42, j + j0 + 0.08, h), P(i + 0.42, j + 0.95, h))
+        if (first) { const [px, py] = P(i + 0.5, j + 0.32, h); wetTop += ring(px, py, 14, 7) }
+        if (hd < h) {
+          wetFall += quad([P(i + 0.32, j + 1, h), P(i + 0.68, j + 1, h), P(i + 0.68, j + 1, hd), P(i + 0.32, j + 1, hd)])
+          let st = ''
+          for (const u of [0.41, 0.5, 0.59]) st += seg(P(i + u, j + 1, h - 1), P(i + u, j + 1, hd + 1))
+          const [ax, ay] = P(i + 0.32, j + 1, h), [bx2, by2] = P(i + 0.68, j + 1, hd)
+          fallStreaks.push({ d: st, b: `${f(Math.min(ax, bx2))} ${f(Math.min(ay, by2))} ${f(Math.max(ax, bx2))} ${f(Math.max(ay, by2))}` })
+          const [sx, sy] = P(i + 0.5, j + 1.1, hd)
+          splash += ring(sx, sy, 9, 3.8) + ring(sx - 9, sy - 2, 3, 2) + ring(sx + 9, sy + 1, 2.6, 1.7)
+        }
+      }
     }
-    for (const [c, d] of tops) ground.add(new N('path', { d, fill: c, stroke: shade(c, 0.93), 'stroke-width': 0.8 }))
+    for (const [c, d] of tops) ground.add(new N('path', { d, fill: c, stroke: shade(c, 0.94), 'stroke-width': 0.7 }))
+    if (wetSand) { ground.add(new N('path', { d: wetSand, fill: '#e4d8bb' })); wetSand = '' }
     for (const [c, d] of cliffs) ground.add(new N('path', { d, fill: c, stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
+    for (const [c, d] of lips) ground.add(new N('path', { d, fill: c }))
+    if (strata) ground.add(new N('path', { d: strata, fill: 'none', stroke: INK, 'stroke-width': 1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.2 }))
+    if (wetTop) ground.add(new N('path', { d: wetTop, fill: '#8fd3ff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
+    if (wetHi) ground.add(new N('path', { d: wetHi, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.75 }))
+    if (wetFall) ground.add(new N('path', { d: wetFall, fill: '#b9e6ff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
   }
+  // Where each fall lands, after the step below it is down.
+  ground.add(new N('path', { d: splash, fill: '#ffffff', stroke: INK, 'stroke-width': 1 }))
+  // The falls' white water, running down: only these few strokes move.
+  for (const st of fallStreaks) ground.add(new N('path', { d: st.d, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-dasharray': '4 5', class: 'fall amb', 'data-b': st.b }))
   // The outline of the whole island's edge, drawn once, so the coast reads.
   let edge = ''
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
@@ -206,20 +356,66 @@ export function buildIsland(games: GameLink[]): Island {
   plane.add(new N('path', { d: rd, fill: 'none', stroke: '#f3f5fb', 'stroke-width': 0.56, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
   plane.add(new N('path', { d: rd, fill: 'none', stroke: '#c9cfe6', 'stroke-width': 0.035, 'stroke-dasharray': '0.14 0.16' }))
 
+  // The pond, laid flat in the park: a sandy rim, deep middle, lily pads.
+  if (pond.size) {
+    const cells = [...pond].map((k) => k.split(',').map(Number))
+    const i0 = Math.min(...cells.map((c) => c[0])), i1 = Math.max(...cells.map((c) => c[0])) + 1
+    const j0 = Math.min(...cells.map((c) => c[1])), j1 = Math.max(...cells.map((c) => c[1])) + 1
+    const po = plane.add(new N('g', { class: 'pond' }))
+    const rr = (x0: number, y0: number, x1: number, y1: number, r: number, a: Record<string, string | number>) => po.add(new N('rect', { x: f2(x0), y: f2(y0), width: f2(x1 - x0), height: f2(y1 - y0), rx: r, ...a }))
+    rr(i0 + 0.08, j0 + 0.1, i1 - 0.08, j1 - 0.1, 0.62, { fill: SAND[1], stroke: INK, 'stroke-width': 0.035 })
+    rr(i0 + 0.2, j0 + 0.22, i1 - 0.2, j1 - 0.22, 0.52, { fill: '#9fdcff', stroke: INK, 'stroke-width': 0.03 })
+    rr(i0 + 0.42, j0 + 0.5, i1 - 0.4, j1 - 0.55, 0.36, { fill: '#7cc8fb' })
+    po.add(new N('path', { d: `M${f2(i0 + 0.3)} ${f2(j0 + 0.9)}q0 -0.5 0.5 -0.58`, fill: 'none', stroke: '#ffffff', 'stroke-width': 0.06, 'stroke-linecap': 'round', opacity: 0.8 }))
+    for (const [u, v, r] of [[0.3, 0.55, 0.13], [0.62, 0.32, 0.1], [0.75, 0.7, 0.12], [0.38, 0.82, 0.09]]) {
+      const x = i0 + 0.2 + (i1 - i0 - 0.4) * u, y = j0 + 0.22 + (j1 - j0 - 0.44) * v
+      po.add(new N('path', { d: `M${f2(x)} ${f2(y)}L${f2(x + r)} ${f2(y - r * 0.3)}A${f2(r)} ${f2(r)} 0 1 1 ${f2(x + r)} ${f2(y + r * 0.3)}Z`, fill: '#3fcf9f', stroke: INK, 'stroke-width': 0.025 }))
+    }
+    const [fx2, fy2] = [i0 + 0.2 + (i1 - i0 - 0.4) * 0.62, j0 + 0.22 + (j1 - j0 - 0.44) * 0.32]
+    po.add(new N('circle', { cx: f2(fx2 + 0.03), cy: f2(fy2), r: 0.045, fill: '#ffc4d4', stroke: INK, 'stroke-width': 0.02 }))
+  }
+
   // Grass tufts and flower dots, merged into a handful of paths.
   const tufts = new Map<string, string>()
+  const filled = (c: string) => c.startsWith('#ff') || c === '#c6b6ff' || c === '#b3acd8'
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
-    if (!isLand(i, j) || taken.has(key(i, j)) || road.has(key(i, j)) || height[i][j] !== 0 || coast(i, j)) continue
-    const d = dist[i][j]
-    if (d.key === 'badlands') continue
-    for (let k = 0; k < 2; k++) {
-      const [x, y] = P(i + 0.15 + R() * 0.7, j + 0.15 + R() * 0.7)
-      const col = R() < 0.18 ? (R() < 0.5 ? '#ffffff' : '#ffb3c2') : shade(d.ground[0], 0.8)
-      tufts.set(col, (tufts.get(col) ?? '') + (col.startsWith('#ff') ? `M${f(x)} ${f(y)}m-1.6 0a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0` : `M${f(x - 3)} ${f(y)}l1.5 -3.5l1.5 3.5l1.5 -4l1.5 4`))
+    const k0 = key(i, j)
+    if (!isLand(i, j) || taken.has(k0) || road.has(k0) || wet.has(k0) || pond.has(k0)) continue
+    const d = dist[i][j], h = height[i][j]
+    // Shells and pebbles on the beaches.
+    if (beach.has(k0)) {
+      for (let k = 0; k < 2; k++) {
+        const [x, y] = P(i + 0.15 + R() * 0.7, j + 0.15 + R() * 0.7, h)
+        const col = R() < 0.5 ? '#ffffff' : d.key === 'badlands' ? '#b3acd8' : '#ffc9d6'
+        tufts.set(col, (tufts.get(col) ?? '') + (R() < 0.5 ? `M${f(x - 1.8)} ${f(y)}a1.8 1.2 0 1 0 3.6 0a1.8 1.2 0 1 0 -3.6 0` : `M${f(x - 2)} ${f(y)}q2 -3.5 4 0z`))
+      }
+      continue
+    }
+    // The Badlands are dry: the ground is cracked into plates.
+    if (d.key === 'badlands') {
+      if (h === 0 && R() < 0.75) {
+        const u = i + 0.2 + R() * 0.5, v = j + 0.2 + R() * 0.5
+        const pts = [[u, v], [u + 0.12, v + 0.1], [u + 0.1, v + 0.24], [u + 0.26, v + 0.3]].map(([a, b]) => P(a, b, h))
+        const [bx2, by2] = P(u + 0.12, v + 0.1, h), [cx2, cy2] = P(u + 0.22, v + 0.02, h)
+        const crack = `M${pts.map((p) => p.map(f).join(' ')).join('L')}M${f(bx2)} ${f(by2)}L${f(cx2)} ${f(cy2)}`
+        tufts.set('crack', (tufts.get('crack') ?? '') + crack)
+      }
+      continue
+    }
+    if (h < 0) continue
+    // Tufts of three kinds, and flowers where the meadow is lightest.
+    const bright = field(i, j) > 0.62
+    for (let k = 0; k < (bright ? 3 : 2); k++) {
+      const [x, y] = P(i + 0.15 + R() * 0.7, j + 0.15 + R() * 0.7, h)
+      const r = R()
+      const col = bright && r < 0.45 ? (R() < 0.35 ? '#ffffff' : R() < 0.6 ? '#ffb3c2' : '#c6b6ff') : r < 0.12 ? '#ffffff' : shade(d.ground[0], 0.78)
+      const isFlower = filled(col)
+      const kind = R()
+      tufts.set(col, (tufts.get(col) ?? '') + (isFlower ? `M${f(x - 1.6)} ${f(y)}a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0` : kind < 0.45 ? `M${f(x - 3)} ${f(y)}l1.5 -3.5l1.5 3.5l1.5 -4l1.5 4` : kind < 0.8 ? `M${f(x - 2)} ${f(y)}q-0.5 -4 -2 -6M${f(x)} ${f(y)}v-7M${f(x + 2)} ${f(y)}q0.5 -4 2 -6` : `M${f(x - 2.5)} ${f(y)}q2.5 -4 5 0`))
     }
   }
   const tuftG = root.add(new N('g', { class: 'tufts' }))
-  for (const [c, d] of tufts) tuftG.add(new N('path', c.startsWith('#ff') ? { d, fill: c, stroke: INK, 'stroke-width': 0.5 } : { d, fill: 'none', stroke: c, 'stroke-width': 1.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+  for (const [c, d] of tufts) tuftG.add(new N('path', c === 'crack' ? { d, fill: 'none', stroke: '#9d95c9', 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } : filled(c) ? { d, fill: c, stroke: INK, 'stroke-width': 0.5 } : { d, fill: 'none', stroke: c, 'stroke-width': 1.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
 
   // People walking the roads, there and back.
   root = open('walkers')
@@ -262,6 +458,7 @@ export function buildIsland(games: GameLink[]): Island {
   }
   // Trees, rocks and the odd lamp or bench, on the land left over.
   const treeKind = (d: District, coastal: boolean): TreeKind => {
+    if (coastal && d.key === 'peaks') return R() < 0.7 ? 'pine' : 'rock'
     if (coastal) return d.key === 'badlands' ? 'rock' : 'palm'
     const r = R()
     if (d.key === 'peaks') return r < 0.8 ? 'pine' : 'rock'
@@ -271,8 +468,10 @@ export function buildIsland(games: GameLink[]): Island {
     return r < 0.55 ? 'round' : r < 0.8 ? 'bush' : 'blossom'
   }
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
-    if (!isLand(i, j) || taken.has(key(i, j))) continue
+    if (!isLand(i, j) || taken.has(key(i, j)) || pond.has(key(i, j))) continue
     const d = dist[i][j], z = height[i][j], coastal = coast(i, j)
+    // Nothing grows in the river; the odd rock stands beside it.
+    if (wet.has(key(i, j))) continue
     if (road.has(key(i, j))) {
       if ((i * 7 + j * 3) % 5 === 0) things.push({ depth: i + j + 0.9, draw: (layer) => lamp(new Pen(layer, 0, 0, z, new Bounds(), lights), i + 0.12, j + 0.12, 24) })
       continue

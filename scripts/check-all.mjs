@@ -7,8 +7,10 @@ const checks = readdirSync(new URL('.', import.meta.url))
   .filter((name) => /^check-.+\.mjs$/.test(name) && name !== 'check-all.mjs').sort()
 const failed = []
 for (const name of checks) {
+  // Five minutes each: the card-art check rasterises every drawing at three
+  // sizes, and on a busy laptop (a dev server running) it passes two minutes.
   const result = spawnSync(process.execPath, [`scripts/${name}`], {
-    cwd: root, encoding: 'utf8', timeout: 120_000, maxBuffer: 16 * 1024 * 1024,
+    cwd: root, encoding: 'utf8', timeout: 300_000, maxBuffer: 16 * 1024 * 1024,
   })
   const ok = result.status === 0 && !result.error
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`)
