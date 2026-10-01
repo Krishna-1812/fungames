@@ -13,7 +13,13 @@
    The camera chooses (lib/island/camera.ts). */
 .isle.is-culling .lm:not(.is-live) .lm-art *, .isle.is-culling .walker:not(.is-live), .isle.is-culling .walker:not(.is-live) *, .isle.is-culling .amb:not(.is-live), .isle.is-culling .amb:not(.is-live) * { animation-play-state: paused !important; }
 .isle.is-paused *, .isle.is-zooming *, html:not(.play) .isle * { animation-play-state: paused !important; }
-html:not(.play) .isle * { animation: none !important; transition: none !important; }
+html:not(.play) .isle *:not(.mover) { animation: none !important; transition: none !important; }
+/* Without motion, everything that travels a path (boats, walkers, ducks,
+   traffic, balloons) is held still where its delay puts it along the way,
+   rather than losing its keyframes and piling up at the map's corner. The
+   plane only makes sense crossing, so it is not there at all. */
+html:not(.play) .isle .mover { animation-play-state: paused !important; }
+html:not(.play) .isle .isl-plane { display: none; }
 
 /* ---- the buildings --------------------------------------------------- */
 .isle .lm { cursor: pointer; outline: none; }
@@ -132,6 +138,37 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 @keyframes town-flame { to { transform: scale(0.85, 1.15) skewX(4deg); } }
 .isle .spark { animation: town-spark 2.6s ease-out infinite; opacity: 0; }
 @keyframes town-spark { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(4px, -26px); opacity: 0; } }
+
+/* ---- the sky (lib/island/sky.ts) ----------------------------------------- */
+/* The plane crosses now and then, climbing gently, then is gone a while. */
+.isle .isl-plane { animation: sky-plane 70s linear infinite; animation-delay: -20s; }
+@keyframes sky-plane { 0% { transform: translate(-1500px, 560px) rotate(-14deg); } 42% { transform: translate(1500px, -180px) rotate(-14deg); } 42.01%, 100% { transform: translate(1500px, -2400px) rotate(-14deg); } }
+.isle .isl-plane .prop { animation: sky-prop 0.12s linear infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes sky-prop { to { transform: scaleY(0.2); } }
+.isle .isl-plane .tow { animation: isl-flutter 0.9s ease-in-out infinite; transform-box: fill-box; transform-origin: 100% 50%; }
+
+/* ---- day and night ----------------------------------------------------------
+   The page sets data-time on the map from the visitor's own clock (or the
+   sun/moon button): dawn, day, dusk or night. By day the night layer is not
+   there at all; otherwise it fades in a veil and the glow of every window and
+   lamp above it. */
+.isl-layer--night { opacity: 0; visibility: hidden; transition: opacity 1.6s ease, visibility 0s 1.6s; }
+.isle .night-veil { fill: #0d1a4d; opacity: 0.56; }
+.isle .night-halos { opacity: 1; }
+.isle .night-halos + path { opacity: 0.8; }
+[data-time='night'] .isl-layer--night, [data-time='dusk'] .isl-layer--night, [data-time='dawn'] .isl-layer--night { opacity: 1; visibility: visible; transition: opacity 1.6s ease; }
+[data-time='night'] .isle .layer-night, [data-time='dusk'] .isle .layer-night, [data-time='dawn'] .isle .layer-night { visibility: visible; }
+[data-time='dusk'] .isle .night-veil { fill: #5a3f9e; opacity: 0.3; }
+[data-time='dusk'] .isle .night-halos, [data-time='dusk'] .isle .night-halos + path { opacity: 0.55; }
+[data-time='dawn'] .isle .night-veil { fill: #c98fd8; opacity: 0.16; }
+[data-time='dawn'] .isle .night-halos, [data-time='dawn'] .isle .night-halos + path { opacity: 0.25; }
+.isle .firefly { opacity: 0; }
+[data-time='night'] .isle .firefly { animation: sky-firefly 4.5s ease-in-out infinite; }
+@keyframes sky-firefly { 0%, 100% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 50% { opacity: 0.3; transform: translate(9px, -7px); } 70% { opacity: 1; } 85% { transform: translate(-4px, 4px); } }
+[data-time='night'] .isle .glint { visibility: hidden; }
+[data-time='night'] .isle .cloud { opacity: 0.45; }
+[data-time='night'] .isle .isl-layer--sky .mover, [data-time='night'] .isle .isl-plane { opacity: 0.75; }
+.isl-box[data-time='night'] { background-color: #3a5aa6; }
 
 /* ---- each building's own motion -------------------------------------- */
 .isle .se-pod { animation: se-climb 8s ease-in-out infinite; }

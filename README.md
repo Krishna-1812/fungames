@@ -232,6 +232,7 @@ as a card, with the four filters and search.
 | `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
 | `src/lib/island/nature.ts` | the wild things and the farm: snowy pines, cacti, reeds, hedges, topiary, toadstools, a rock arch and buttes, crop fields, hay bales, the windmill, and the animals (sheep, deer, ducks, crabs, dolphins, a whale, gulls, butterflies, a tumbleweed) |
 | `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, fingerposts, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends) |
+| `src/lib/island/sky.ts` | hot-air balloons and a plane towing a banner |
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
 | `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, trees, walkers, and the layers it is painted in |
@@ -261,9 +262,17 @@ Three things about performance, all found by measuring rather than guessing:
   still outline, stroked eight times at different widths with round joins,
   which grows it outwards into soft bands that follow the coast.)
 
+**Day and night follow the visitor's clock**: dawn from six, day from eight,
+dusk from six in the evening, night from eight. The map's `data-time` turns
+on a night layer (hidden in the markup itself, so a still render is day): a
+veil over everything and, above it, a glow at every lit window and lamp that
+the drawing kit collected, plus fireflies. The sun/moon button picks day or
+night by hand and remembers it in this browser.
+
 While a zoom is in motion the island is one GPU layer and its loops pause,
 then it is redrawn sharp; with reduced motion the camera jumps instead of
-flying and nothing on the map moves.
+flying and nothing on the map moves (anything that travels a path is held
+where its delay puts it along the way).
 
 ---
 

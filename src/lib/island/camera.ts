@@ -185,7 +185,9 @@ export function initIsland(o: {
     // Fewer at once from far away, where the whole island is on screen and
     // every moving thing makes the browser repaint more of it.
     const near = cam.z / fitZ()
-    const LIVE_LM = near < 1.3 ? 8 : near < 2 ? 11 : 14, LIVE_WALK = near < 1.3 ? 10 : near < 2 ? 12 : 16, LIVE_AMB = near < 1.3 ? 10 : near < 2 ? 14 : 18
+    // A phone shows less of the island and has less to spare: two thirds as many.
+    const k = W < 700 ? 0.67 : 1
+    const LIVE_LM = Math.round((near < 1.3 ? 8 : near < 2 ? 11 : 14) * k), LIVE_WALK = Math.round((near < 1.3 ? 10 : near < 2 ? 12 : 16) * k), LIVE_AMB = Math.round((near < 1.3 ? 10 : near < 2 ? 14 : 18) * k)
     const d = (b: number[]) => Math.hypot((b[0] + b[2]) / 2 - cam.x, (b[1] + b[3]) / 2 - cam.y)
     const lm = Object.values(anchors).map((a) => ({ s: a.slug, b: [a.x0, a.y0, a.x1, a.y1] })).filter((a) => seen(a.b)).sort((p, q) => d(p.b) - d(q.b)).slice(0, LIVE_LM).map((a) => a.s)
     const live = new Set(lm); if (hot) live.add(hot)

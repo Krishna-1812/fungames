@@ -2644,7 +2644,20 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     three fixes (layers, culling, no `<use>`) are written up under "The
     homepage" in the README.
 
-60. Then reassess again.
+60. ~~**The island, filled in.**~~ **done.** Four phases, each pushed as it
+    landed. The land and the water (smooth shallows grown from the coast, a
+    deepening sea, beaches, textured cliffs, snow, a river with four falls, a
+    pond); nature and the animals (plants by district, a farm and a windmill,
+    rock formations, sheep, deer, ducks, crabs, dolphins, a whale, gulls,
+    butterflies); town life (cottages, street furniture, a park, the beaches'
+    umbrellas and lifeguard, piers, a campsite, traffic); and the sky and the
+    light (building shadows, balloons, a plane with a banner, and day, dusk,
+    night and dawn from the visitor's own clock with every window and lamp
+    lit after dark). Two old bugs turned up on the way: strokes drawn in tile
+    units were rounded to nothing (the roads' centre lines had never shown),
+    and under reduced motion every boat and walker sat in one corner.
+
+61. Then reassess again.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

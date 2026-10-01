@@ -82,6 +82,7 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
         <header class="isl-top">
           <a class="isl-logo" href={withBase('/')}><span class="isl-logo-dot" aria-hidden="true" set:html={faviconSvg(true)} />{SITE.name}</a>
           <nav class="isl-nav" aria-label="Island">
+            <button type="button" class="isl-btn isl-btn--round" id="btnTime" aria-label="Switch to night" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-sun"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></g><path class="ic-moon" d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg></button>
             <button type="button" class="isl-btn" id="btnToday"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="6.5" fill="currentColor" opacity=".25" /><path d="M5.5 10a6.5 6.5 0 0 1 13 0c0 3-2.4 5-4 6.5h-5C7.9 15 5.5 13 5.5 10zM9.5 16.5 10.5 20h3l1-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Today</span></button>
             <button type="button" class="isl-btn isl-btn--hot" id="btnSurprise"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="9" r="1.6" fill="currentColor" /><circle cx="15" cy="15" r="1.6" fill="currentColor" /><circle cx="15" cy="9" r="1.6" fill="currentColor" /><circle cx="9" cy="15" r="1.6" fill="currentColor" /></svg><span>Surprise me</span></button>
           </nav>
@@ -214,6 +215,29 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
   document.getElementById('zIn')!.addEventListener('click', isle.zoomIn)
   document.getElementById('zOut')!.addEventListener('click', isle.zoomOut)
   document.getElementById('zHome')!.addEventListener('click', isle.home)
+
+  /* ---- day and night, by the visitor's own clock ---------------------------- */
+  // Dawn from six, day from eight, dusk from six in the evening, night from
+  // eight. The sun/moon button picks day or night by hand, remembered in this
+  // browser; picking what the clock would have chosen goes back to the clock.
+  const btnTime = document.getElementById('btnTime')!
+  const byClock = (h = new Date().getHours()) => (h >= 6 && h < 8 ? 'dawn' : h >= 8 && h < 18 ? 'day' : h >= 18 && h < 20 ? 'dusk' : 'night')
+  const readTime = () => { try { return localStorage.getItem('isl-time') } catch { return null } }
+  const showTime = () => {
+    const chosen = readTime(), t = chosen === 'day' || chosen === 'night' ? chosen : byClock()
+    box.dataset.time = t
+    const dark = t === 'night' || t === 'dusk'
+    btnTime.setAttribute('aria-pressed', String(dark))
+    btnTime.setAttribute('aria-label', dark ? 'Switch to day' : 'Switch to night')
+  }
+  btnTime.addEventListener('click', () => {
+    const next = box.dataset.time === 'night' || box.dataset.time === 'dusk' ? 'day' : 'night'
+    const clock = byClock(), clockDark = clock === 'night' || clock === 'dusk'
+    try { if ((next === 'night') === clockDark) localStorage.removeItem('isl-time'); else localStorage.setItem('isl-time', next) } catch {}
+    showTime()
+  })
+  showTime()
+  setInterval(showTime, 5 * 60 * 1000)
 
   // A layer of our own on top, for the balloon and the flags.
   const extras = document.createElementNS(NS, 'svg')
@@ -380,6 +404,12 @@ const data = { bounds: island.viewBox, anchors: island.anchors, games: info, slu
   .isl-btn:hover, .isl-zoom button:hover, .isl-down:hover { background: #eef4ff; }
   .isl-btn:active, .isl-zoom button:active, .isl-down:active { transform: translateY(4px); box-shadow: 0 0 0 #1b2340; }
   .isl-btn--hot { background: #4fe3c1; }
+  .isl-btn--round { padding: 9px 11px; }
+  .isl-btn .ic-moon { display: none; }
+  .isl-btn[aria-pressed='true'] .ic-sun { display: none; }
+  .isl-btn[aria-pressed='true'] .ic-moon { display: inline; }
+  .isl-btn[aria-pressed='true'] { background: #1b2340; color: #fff; }
+  .isl-btn[aria-pressed='true']:hover { background: #2c355e; }
   .isl-btn--hot:hover { background: #6debcd; }
   .isl-btn:focus-visible, .isl-zoom button:focus-visible, .isl-down:focus-visible, .isl-logo:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 

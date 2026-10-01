@@ -12,6 +12,7 @@
 import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath } from './kit'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
+import { hotAirBalloon, plane as skyPlane } from './sky'
 import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle } from './town'
 import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
 
@@ -27,7 +28,7 @@ const SAND = ['#f6f0e1', '#efe7d3', '#d9ccad', '#e3d7ba', '#cbbb98']
 const key = (i: number, j: number) => `${i},${j}`
 
 export type Anchor = { slug: string; district: DistrictKey; x0: number; y0: number; x1: number; y1: number; bx: number; by: number; foot: string }
-export type Layer = { kind: 'sea' | 'boats' | 'ground' | 'walkers' | 'things' | 'landmark' | 'banners' | 'sky'; slug?: string; body: string }
+export type Layer = { kind: 'sea' | 'boats' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
 export type Island = { svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
@@ -424,6 +425,22 @@ export function buildIsland(games: GameLink[]): Island {
     }
   }
 
+  // Every building throws a soft shadow down and to the right, longer the
+  // taller it is. Measured by drawing it once into nothing.
+  {
+    const keep = motionCss.length
+    const sg = root.add(new N('g', { class: 'shadows', transform: `translate(${f(ox)} ${f(oy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
+    for (const pl of placed) {
+      if (pl.lm.water) continue
+      const b = new Bounds()
+      pl.lm.draw(new Pen(new N('g'), pl.i, pl.j, pl.z, b, []))
+      const [, footY] = P(pl.i + pl.w / 2, pl.j + pl.d / 2, pl.z)
+      const L = Math.min(2.4, Math.max(0.3, (footY - b.y0) / 80))
+      for (const [k, op] of [[1, 0.06], [0.6, 0.06]]) sg.add(new N('rect', { x: f2(pl.i), y: f2(pl.j + 0.06), width: f2(pl.w + L * k), height: f2(pl.d - 0.12), rx: 0.3, fill: INK, opacity: op }))
+    }
+    motionCss.length = keep
+  }
+
   // Grass tufts and flower dots, merged into a handful of paths.
   const tufts = new Map<string, string>()
   const filled = (c: string) => c.startsWith('#ff') || c === '#c6b6ff' || c === '#b3acd8'
@@ -726,6 +743,35 @@ export function buildIsland(games: GameLink[]): Island {
     else { bundle ??= open('things'); t.draw(bundle) }
   }
 
+  /* ---- night ------------------------------------------------------------- */
+  // Hidden by day. At dusk and at night the page fades in a veil over the
+  // whole map and, above it, a glow at every lit window and lamp, and
+  // fireflies over the parks.
+  const night = open('night')
+  // Hidden in the markup itself, so a still render (or a page whose styles
+  // have not loaded) shows day; island.css shows it when data-time asks.
+  night.attrs.visibility = 'hidden'
+  night.add(new N('rect', { class: 'night-veil', x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: '#0d1a4d', opacity: 0.56 }))
+  {
+    const nd = night.add(new N('defs'))
+    const glow = nd.add(new N('radialGradient', { id: 'isl-glow' }))
+    glow.add(new N('stop', { offset: 0, 'stop-color': '#fff4cf', 'stop-opacity': 0.95 }))
+    glow.add(new N('stop', { offset: 0.35, 'stop-color': '#ffe7a8', 'stop-opacity': 0.45 }))
+    glow.add(new N('stop', { offset: 1, 'stop-color': '#ffe7a8', 'stop-opacity': 0 }))
+    let cores = ''
+    const halos = night.add(new N('g', { class: 'night-halos' }))
+    for (const [x, y] of lights) { halos.add(new N('circle', { cx: f(x), cy: f(y), r: 13, fill: 'url(#isl-glow)' })); cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0` }
+    night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8 }))
+    // Fireflies over the meadows.
+    let made = 0
+    for (let i = 0; i < GRID && made < 10; i++) for (let j = 0; j < GRID && made < 10; j++) {
+      if (!isLand(i, j) || taken.has(key(i, j)) || road.has(key(i, j)) || height[i][j] !== 0 || (i * 11 + j * 7) % 7 || !['oldtown', 'funfair', 'harbour', 'market', 'proving'].includes(dist[i][j].key)) continue
+      const [x, y] = P(i + 0.5, j + 0.5, 10 + (made % 3) * 6)
+      night.add(new N('circle', { cx: f(x), cy: f(y), r: 2.2, fill: '#d9ffb0', class: 'firefly amb', 'data-b': `${f(x - 14)} ${f(y - 14)} ${f(x + 14)} ${f(y + 14)}`, style: `animation-delay:${f(-made * 0.9)}s` }))
+      made++
+    }
+  }
+
   /* ---- labels and sky ---------------------------------------------------- */
   const banners: Record<string, [number, number]> = {}
   const bannerG = open('banners')
@@ -745,6 +791,12 @@ export function buildIsland(games: GameLink[]): Island {
     g.add(new N('ellipse', { cx: f(x + 20), cy: f(y + 190), rx: f(70 * k), ry: f(24 * k), fill: INK, opacity: 0.08 }))
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudShape(k))
   })
+  // Hot-air balloons drifting slowly over, and a little plane towing a banner.
+  ;([[9, 26, 230, C.rasp, '#ffffff', 0], [26, 10, 260, C.cobalt, C.mint, 40]] as [number, number, number, string, string, number][]).forEach(([i, j, z, a, b, d], n) => {
+    const [x, y] = P(i, j, z)
+    sky.add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d))
+  })
+  sky.add(skyPlane('isl-plane'))
   { const [x, y] = P(24, 23, 150); sky.add(gullsCircling(x, y, 70, 26, 'gulls0', 14)) }
   { const [x, y] = P(5, 20, 130); sky.add(gullsCircling(x, y, 50, 20, 'gulls1', 11)) }
   for (const [n, d] of [[0, 0], [1, 18]]) {
