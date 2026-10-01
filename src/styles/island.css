@@ -91,6 +91,31 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 .isle .flap { animation: isl-flap 0.5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
 @keyframes isl-flap { to { transform: scaleY(0.45); } }
 
+/* ---- the wild things (lib/island/nature.ts) ---------------------------- */
+.isle .mill-sails { animation: isl-spin 9s linear infinite; transform-box: fill-box; transform-origin: center; }
+/* A sheep's head goes down to the grass, and comes up to look about. */
+.isle .sheep-head { animation: nat-graze 6s ease-in-out infinite; transform-box: fill-box; transform-origin: 0% 30%; }
+@keyframes nat-graze { 0%, 45%, 100% { transform: rotate(0); } 55%, 85% { transform: rotate(-28deg) translateY(-1px); } }
+.isle .deer-head { animation: nat-look 8s ease-in-out infinite; transform-box: fill-box; transform-origin: 0% 100%; }
+@keyframes nat-look { 0%, 100% { transform: rotate(48deg); } 30%, 70% { transform: rotate(0); } }
+.isle .crab { animation: nat-scuttle 7s ease-in-out infinite; }
+@keyframes nat-scuttle { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-12px, -6px); } 25%, 55% { transform: translate(-12px, -6px); } 75% { transform: translate(10px, 5px); } 80% { transform: translate(10px, 5px); } }
+/* A dolphin breaks the surface, arcs over and goes back in, then waits. */
+.isle .dolphin { opacity: 0; animation: nat-leap 9s ease-in-out infinite; }
+@keyframes nat-leap { 0%, 62% { opacity: 0; transform: translate(-24px, 10px) rotate(-35deg); } 64% { opacity: 1; } 72% { transform: translate(0, -26px) rotate(0); } 80% { opacity: 1; transform: translate(24px, 8px) rotate(40deg); } 82%, 100% { opacity: 0; transform: translate(24px, 10px) rotate(40deg); } }
+.isle .dol-ring { animation: nat-ring 9s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes nat-ring { 0%, 62% { opacity: 0; transform: scale(0.4); } 64% { opacity: 0.8; } 76% { opacity: 0; transform: scale(1.4); } 80% { opacity: 0.8; transform: scale(0.5) translateX(30px); } 92%, 100% { opacity: 0; transform: scale(1.4) translateX(20px); } }
+.isle .whale-spout { animation: nat-blow 7s ease-out infinite; transform-box: fill-box; transform-origin: 50% 100%; opacity: 0; }
+@keyframes nat-blow { 0%, 70% { opacity: 0; transform: scaleY(0.2); } 74% { opacity: 1; } 90% { opacity: 0.9; transform: scaleY(1); } 100% { opacity: 0; transform: scaleY(1.1); } }
+/* A butterfly wanders a little loop and beats its wings. */
+.isle .bfly { animation: nat-flit 7s ease-in-out infinite; }
+@keyframes nat-flit { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(10px, -6px); } 50% { transform: translate(4px, -12px); } 75% { transform: translate(-9px, -4px); } }
+.isle .bfly-wings { animation: nat-wing 0.28s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes nat-wing { to { transform: scaleX(0.3); } }
+.isle .tumble { animation: nat-roll 12s ease-in-out infinite; }
+@keyframes nat-roll { 0%, 100% { transform: translate(-36px, 10px); } 50% { transform: translate(36px, -8px); } }
+.isle .tumble-ball { animation: isl-spin 3s linear infinite; transform-box: fill-box; transform-origin: center; }
+
 /* ---- each building's own motion -------------------------------------- */
 .isle .se-pod { animation: se-climb 8s ease-in-out infinite; }
 @keyframes se-climb { 0%, 8% { transform: translateY(110px); } 50%, 58% { transform: translateY(-420px); } 100% { transform: translateY(110px); } }

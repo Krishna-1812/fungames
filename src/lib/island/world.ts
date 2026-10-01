@@ -12,6 +12,7 @@
 import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath } from './kit'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
+import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
 
 export const GRID = 30
 const SEA = -12
@@ -76,6 +77,11 @@ export function buildIsland(games: GameLink[]): Island {
   // A pond in the park in Old Town.
   const pond = new Set<string>()
   for (const [i, j] of [[14, 9], [14, 10], [14, 11], [15, 9], [15, 10], [15, 11]]) if (isLand(i, j) && !taken.has(key(i, j))) pond.add(key(i, j))
+  // Ground kept for fields, the windmill and the rock formations, so no tree
+  // or tuft lands on them. Each is only used if its ground really is free.
+  const reserved = new Set<string>()
+  const FIELDS: [number, number, number, number, 'lavender' | 'wheat' | 'greens'][] = [[9, 13, 1, 3, 'lavender'], [19, 15, 2, 3, 'wheat'], [22, 19, 2, 3, 'greens']]
+  const SPOTS: { mill: [number, number]; bale: [number, number][]; arch: [number, number]; buttes: [number, number, number][] } = { mill: [8, 15], bale: [[8, 16], [9, 12], [21, 15], [21, 16]], arch: [20, 7], buttes: [[22, 3, 34], [25, 6, 26], [18, 5, 20]] }
 
   /* ---- roads: found by searching round the buildings -------------------- */
   const road = new Set<string>()
@@ -116,6 +122,20 @@ export function buildIsland(games: GameLink[]): Island {
   for (const d of DISTRICTS) if (d.key !== 'oldtown') { const r = search(gates[d.key], hub); if (r.length > 1) { routes.push(r); r.forEach((c) => road.add(key(...c))) } }
   for (const [a, b] of [['market', 'funfair'], ['funfair', 'harbour'], ['harbour', 'proving'], ['proving', 'badlands']] as [DistrictKey, DistrictKey][]) { const r = search(gates[a], gates[b]); if (r.length > 1) { routes.push(r); r.forEach((c) => road.add(key(...c))) } }
 
+  const free = (i: number, j: number) => { const k = key(i, j); return isLand(i, j) && !taken.has(k) && !road.has(k) && !wet.has(k) && !pond.has(k) && !beach.has(k) && !reserved.has(k) }
+  const claim = (cells: [number, number][]) => { if (!cells.every(([i, j]) => free(i, j))) return false; cells.forEach(([i, j]) => reserved.add(key(i, j))); return true }
+  const fields = FIELDS.filter(([i, j, w, d]) => { const c: [number, number][] = []; for (let a = i; a < i + w; a++) for (let b = j; b < j + d; b++) c.push([a, b]); return claim(c) })
+  const mill = claim([SPOTS.mill]) ? SPOTS.mill : null
+  const bales = SPOTS.bale.filter((c) => claim([c]))
+  const archAt = claim([SPOTS.arch]) ? SPOTS.arch : null
+  const buttes = SPOTS.buttes.filter(([i, j]) => claim([[i, j]]))
+
+  if (process.env.ISLAND_ASCII) {
+    const rows = ['    ' + [...Array(GRID).keys()].map((j) => j % 10).join('')]
+    for (let i = 0; i < GRID; i++) { let out = String(i).padStart(3) + ' '; for (let j = 0; j < GRID; j++) { const k = key(i, j); out += !isLand(i, j) ? '.' : taken.has(k) ? '#' : road.has(k) ? '=' : wet.has(k) ? '~' : pond.has(k) ? 'o' : beach.has(k) ? ',' : height[i][j] > 0 ? String(height[i][j] / 12) : dist[i][j].key[0] } rows.push(out) }
+    const out = rows.join(String.fromCharCode(10))
+    console.log(out)
+  }
   /* ---- the painting ------------------------------------------------------ */
   // The island is painted in layers, each its own SVG, so an animation only
   // makes the browser rework the small layer it is in rather than the lot.
@@ -181,7 +201,8 @@ export function buildIsland(games: GameLink[]): Island {
     if (!clearOf(Math.floor(i), Math.floor(j), 1)) continue
     seaRocks.push([i, j, k])
   }
-  for (const [i, j, k] of seaRocks) {
+  for (const rk of seaRocks) {
+    const [i, j, k] = rk
     const [x, y] = P(i + 0.5, j + 0.5, SEA)
     root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(26 * k), ry: f(11 * k), fill: '#ffffff', opacity: 0.55 }))
     root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(19 * k), ry: f(8 * k), fill: '#cdf1f4' }))
@@ -189,6 +210,8 @@ export function buildIsland(games: GameLink[]): Island {
     root.add(new N('path', { d: `M${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}L${f(x + 1 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.55 }))
     root.add(new N('path', { d: `M${f(x - 9 * k)} ${f(y - 8 * k)}l5 -3`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.7 }))
     root.add(new N('path', { d: `M${f(x - 18 * k)} ${f(y + 5)}q${f(18 * k)} ${f(7 * k)} ${f(36 * k)} 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-linecap': 'round' }))
+    // A gull on every other rock.
+    if (seaRocks.indexOf(rk) % 2 === 0) root.add(gullStanding(x - 1 * k, y - 13.5 * k, seaRocks.indexOf(rk) % 4 === 0))
   }
   const sandbar = [30.2, 24.4]
   if (clearOf(30, 24, 1)) {
@@ -235,6 +258,12 @@ export function buildIsland(games: GameLink[]): Island {
     const [x, y] = P(i, j, SEA)
     root.add(new N('path', { d: `M${f(x - 7)} ${f(y)}q7 -5 14 0q-7 5 -14 0zM${f(x + 7)} ${f(y)}l5 -3v6z`, fill: C.sky, stroke: INK, 'stroke-width': 1.2, class: 'fish', style: `animation-delay:${d}s` }))
   }
+  // Dolphins leaping, and a whale further out, now and then blowing.
+  ;[[33, 13, 0, false], [16, 34, 2.6, true], [-3, 16, 5.1, false]].forEach(([i, j, d, flip]) => {
+    const [x, y] = P(i as number, j as number, SEA)
+    root.add(dolphin(x, y, d as number, flip as boolean))
+  })
+  { const [x, y] = P(3, 29.5, SEA); root.add(whale(x, y)) }
 
   // The ground, a diagonal row at a time: tops merged by colour, then cliffs.
   root = open('ground')
@@ -380,7 +409,7 @@ export function buildIsland(games: GameLink[]): Island {
   const filled = (c: string) => c.startsWith('#ff') || c === '#c6b6ff' || c === '#b3acd8'
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
     const k0 = key(i, j)
-    if (!isLand(i, j) || taken.has(k0) || road.has(k0) || wet.has(k0) || pond.has(k0)) continue
+    if (!isLand(i, j) || taken.has(k0) || road.has(k0) || wet.has(k0) || pond.has(k0) || reserved.has(k0)) continue
     const d = dist[i][j], h = height[i][j]
     // Shells and pebbles on the beaches.
     if (beach.has(k0)) {
@@ -417,6 +446,10 @@ export function buildIsland(games: GameLink[]): Island {
   const tuftG = root.add(new N('g', { class: 'tufts' }))
   for (const [c, d] of tufts) tuftG.add(new N('path', c === 'crack' ? { d, fill: 'none', stroke: '#9d95c9', 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } : filled(c) ? { d, fill: c, stroke: INK, 'stroke-width': 0.5 } : { d, fill: 'none', stroke: c, 'stroke-width': 1.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
 
+  // Fields, laid flat: lavender under Sky Peaks, wheat on the Proving
+  // Grounds, an allotment by the harbour.
+  for (const [i, j, w, d, kind] of fields) cropField(new Pen(root), i, j, w, d, kind)
+
   // People walking the roads, there and back.
   root = open('walkers')
   const walkers = root.add(new N('g', { class: 'walkers' }))
@@ -433,6 +466,13 @@ export function buildIsland(games: GameLink[]): Island {
       g.add(walkerFigure(shirts[(n * 2 + k) % shirts.length]))
     }
   })
+
+  // Two ducks going round the pond.
+  if (pond.size) {
+    const loop = (ri: number, rj: number): [number, number][] => Array.from({ length: 20 }, (_, k) => { const a = (k / 20) * Math.PI * 2; return P(15 + Math.cos(a) * ri, 10.5 + Math.sin(a) * rj) })
+    walkers.add(duck(loop(0.42, 0.85), 'duck0', 26, 0))
+    walkers.add(duck(loop(0.3, 0.6).reverse(), 'duck1', 19, 7, '#b9a6ff'))
+  }
 
   /* ---- everything standing up, back to front ---------------------------- */
   type Thing = { depth: number; slug?: string; draw: (g: N) => void }
@@ -456,6 +496,56 @@ export function buildIsland(games: GameLink[]): Island {
       anchors[pl.slug] = { slug: pl.slug, district: pl.district, x0: f(b.x0), y0: f(b.y0), x1: f(b.x1), y1: f(b.y1), bx: f(bx), by: f(by), foot: [P(pl.i, pl.j, pl.z), P(pl.i + pl.w, pl.j, pl.z), P(pl.i + pl.w, pl.j + pl.d, pl.z), P(pl.i, pl.j + pl.d, pl.z)].map((q) => q.map(f).join(',')).join(' ') }
     } })
   }
+  /* ---- the wild things and the farm ---------------------------------------- */
+  const at = (i: number, j: number, depth: number, fn: (p: Pen) => void, z = height[Math.floor(i)]?.[Math.floor(j)] ?? 0) => things.push({ depth, draw: (layer) => fn(new Pen(layer, 0, 0, z)) })
+  if (mill) at(mill[0] + 0.5, mill[1] + 0.5, mill[0] + mill[1] + 1, (p) => windmill(p, mill[0] + 0.5, mill[1] + 0.5))
+  for (const [i, j] of bales) for (const [u, v] of [[0.35, 0.4], [0.65, 0.62]]) at(i + u, j + v, i + j + u + v, (p) => bale(p, i + u, j + v))
+  if (archAt) at(archAt[0] + 0.5, archAt[1] + 0.5, archAt[0] + archAt[1] + 1, (p) => arch(p, archAt[0] + 0.5, archAt[1] + 0.5))
+  for (const [i, j, h] of buttes) at(i + 0.5, j + 0.5, i + j + 1, (p) => butte(p, i + 0.5, j + 0.5, h))
+  // Sheep graze the low slopes of Sky Peaks; deer stand at the forest edge.
+  ;[[10.5, 3.4, false], [10.35, 5.3, true], [11.45, 6.6, false], [9.55, 9.55, true], [10.6, 7.7, false]].forEach(([i, j, flip], n) => {
+    if (!free(Math.floor(i as number), Math.floor(j as number))) return
+    at(i as number, j as number, (i as number) + (j as number), (p) => sheep(p, i as number, j as number, flip as boolean, n * 1.7))
+  })
+  ;[[8.5, 9.45, false], [6.45, 1.5, true]].forEach(([i, j, flip], n) => {
+    if (!free(Math.floor(i as number), Math.floor(j as number))) return
+    at(i as number, j as number, (i as number) + (j as number), (p) => deer(p, i as number, j as number, flip as boolean, n * 3))
+  })
+  for (const [i, j] of [[10.5, 2.5], [12.5, 7.5], [4.6, 1.5]]) if (free(Math.floor(i), Math.floor(j))) at(i, j, i + j, (p) => toadstools(p, i, j))
+  // Reeds round the pond and along the river's banks.
+  for (const [i, j] of [[14.22, 9.25], [15.8, 11.72], [14.2, 11.75], [15.82, 9.3], [7.12, 6.5], [7.86, 9.4], [7.85, 5.3], [7.14, 10.6]]) at(i, j, i + j, (p) => reeds(p, i, j, 0.85))
+  // Crabs on the beaches, a tumbleweed in the Badlands.
+  ;[[8.5, 13.5], [24.5, 24.6], [13.5, 27.5], [3.5, 17.4]].forEach(([i, j], n) => { if (beach.has(key(Math.floor(i), Math.floor(j)))) at(i, j, i + j, (p) => crab(p, i, j, n * 2.3)) })
+  if (free(23, 7) || isLand(23, 7)) at(23.5, 6.5, 30, (p) => tumbleweed(p, 23.5, 6.5, 2))
+  // Butterflies over the brightest meadows.
+  {
+    let made = 0
+    const cols = ['#ff9fb2', C.lilac, '#ffffff', C.sky, '#ffd1da']
+    for (let i = 0; i < GRID && made < 9; i++) for (let j = 0; j < GRID && made < 9; j++) {
+      const d = dist[i][j]
+      if (!free(i, j) || height[i][j] !== 0 || coast(i, j) || field(i, j) < 0.66 || !['oldtown', 'funfair', 'market', 'proving'].includes(d.key)) continue
+      if ((i * 13 + j * 7) % 5) continue
+      const c = cols[made % cols.length], n = made++
+      at(i + 0.5, j + 0.5, i + j + 1.5, (p) => butterfly(p, i + 0.5, j + 0.5, 18, c, n * 1.3))
+    }
+  }
+  // Hedges along Old Town's roads, and a topiary or two.
+  for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
+    if (!road.has(key(i, j)) || dist[i][j].key !== 'oldtown') continue
+    for (const [a, b] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      const ni = i + a, nj = j + b
+      if (!free(ni, nj) || height[ni][nj] !== 0 || coast(ni, nj) || (i * 5 + j * 3 + a * 7 + b * 11) % 3) continue
+      // A hedge on the free side of the shared edge, a little in from it.
+      const e = 0.12
+      if (a === 1) at(ni + e, nj + 0.5, ni + nj + 0.6, (p) => hedge(p, ni + e, nj + 0.12, ni + e, nj + 0.88))
+      else if (a === -1) at(ni + 1 - e, nj + 0.5, ni + nj + 1.4, (p) => hedge(p, ni + 1 - e, nj + 0.12, ni + 1 - e, nj + 0.88))
+      else if (b === 1) at(ni + 0.5, nj + e, ni + nj + 0.6, (p) => hedge(p, ni + 0.12, nj + e, ni + 0.88, nj + e))
+      else at(ni + 0.5, nj + 1 - e, ni + nj + 1.4, (p) => hedge(p, ni + 0.12, nj + 1 - e, ni + 0.88, nj + 1 - e))
+      reserved.add(key(ni, nj))
+    }
+  }
+  for (const [i, j] of [[12.3, 12.4], [12.7, 12.6], [17.3, 13.3], [10.4, 13.6]]) if (free(Math.floor(i), Math.floor(j)) && height[Math.floor(i)][Math.floor(j)] === 0) at(i, j, i + j, (p) => topiary(p, i, j, 0.9))
+
   // Trees, rocks and the odd lamp or bench, on the land left over.
   const treeKind = (d: District, coastal: boolean): TreeKind => {
     if (coastal && d.key === 'peaks') return R() < 0.7 ? 'pine' : 'rock'
@@ -468,7 +558,7 @@ export function buildIsland(games: GameLink[]): Island {
     return r < 0.55 ? 'round' : r < 0.8 ? 'bush' : 'blossom'
   }
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
-    if (!isLand(i, j) || taken.has(key(i, j)) || pond.has(key(i, j))) continue
+    if (!isLand(i, j) || taken.has(key(i, j)) || pond.has(key(i, j)) || reserved.has(key(i, j))) continue
     const d = dist[i][j], z = height[i][j], coastal = coast(i, j)
     // Nothing grows in the river; the odd rock stands beside it.
     if (wet.has(key(i, j))) continue
@@ -483,13 +573,20 @@ export function buildIsland(games: GameLink[]): Island {
       else if (R() < 0.03 && !coastal && z === 0) things.push({ depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : 'stand' }) })
       continue
     }
+    // The Badlands grow cacti as often as anything.
+    if (d.key === 'badlands' && !coastal && R() < 0.45) {
+      const x = i + 0.3 + R() * 0.4, y = j + 0.3 + R() * 0.4, big = R() < 0.6, flower = R() < 0.3, k = 0.85 + R() * 0.3
+      things.push({ depth: x + y, draw: (layer) => (big ? cactus(new Pen(layer, 0, 0, z), x, y, k, flower) : barrelCactus(new Pen(layer, 0, 0, z), x, y, k)) })
+      continue
+    }
     const kind = treeKind(d, coastal)
+    const snowy = d.key === 'peaks' && (z >= 48 || (z === 36 && field(i, j) > 0.62))
     const n = kind === 'pine' && R() < 0.6 ? 2 : 1
     for (let k = 0; k < n; k++) {
       const x = i + 0.3 + R() * 0.4, y = j + 0.3 + R() * 0.4
       const c = kind === 'blossom' ? C.leaf : R() < 0.22 ? C.bloom : R() < 0.5 ? C.leaf : '#35c9a6'
       const sz = 0.85 + R() * 0.35
-      things.push({ depth: x + y, draw: (layer) => tree(new Pen(layer, 0, 0, z), x, y, kind, c, sz) })
+      things.push({ depth: x + y, draw: (layer) => (snowy && kind === 'pine' ? snowPine(new Pen(layer, 0, 0, z), x, y, c === C.bloom ? C.leaf : c, sz) : tree(new Pen(layer, 0, 0, z), x, y, kind, c, sz)) })
     }
   }
   things.sort((a, b) => a.depth - b.depth)
@@ -520,6 +617,8 @@ export function buildIsland(games: GameLink[]): Island {
     g.add(new N('ellipse', { cx: f(x + 20), cy: f(y + 190), rx: f(70 * k), ry: f(24 * k), fill: INK, opacity: 0.08 }))
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudShape(k))
   })
+  { const [x, y] = P(24, 23, 150); sky.add(gullsCircling(x, y, 70, 26, 'gulls0', 14)) }
+  { const [x, y] = P(5, 20, 130); sky.add(gullsCircling(x, y, 50, 20, 'gulls1', 11)) }
   for (const [n, d] of [[0, 0], [1, 18]]) {
     const g = sky.add(new N('g', { class: `flock flock${n}`, style: `animation-delay:${-d}s` }))
     g.add(birds())
