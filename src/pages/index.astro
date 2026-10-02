@@ -1145,7 +1145,9 @@ const book = BOOK.map((key) => {
   .pp-reset:hover { color: #c4306f; }
 
   /* ---- the tabs down the edge of the pages ---- */
-  .pp-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+  /* Never shrinks: on a phone it scrolls sideways, and a scroller in a
+     flex column is otherwise squashed to nothing by a tall page below it. */
+  .pp-tabs { flex: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
   .pp-tab {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 5px 11px; font: 600 13.5px 'Fredoka', system-ui, sans-serif; color: #1b2340; cursor: pointer;
