@@ -409,7 +409,8 @@ export function stringLights(p: Pen, a: [number, number], b: [number, number], z
   p.path(`M${f(ax)} ${f(ay)}Q${f(mx)} ${f(my)} ${f(bx)} ${f(by)}`, 'none', { sw: 0.8 })
   for (let k = 1; k < 8; k++) {
     const t = k / 8, x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * mx + t * t * bx, y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * my + t * t * by
-    p.light([x, y + 2], p.el('circle', { cx: x, cy: y + 2, r: 1.5, fill: ['#ffffff', '#ffd1da', '#d6ecff', '#d8f7ec'][k % 4], stroke: INK, 'stroke-width': 0.5, class: 'bulb' }))
+    const c = ['#ffffff', '#ffd1da', '#d6ecff', '#d8f7ec'][k % 4]
+    p.light([x, y + 2], p.el('circle', { cx: x, cy: y + 2, r: 1.5, fill: c, stroke: INK, 'stroke-width': 0.5, class: 'bulb' }), c)
   }
 }
 

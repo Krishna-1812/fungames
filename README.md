@@ -283,10 +283,26 @@ Three things about performance, all found by measuring rather than guessing:
 
 **Day and night follow the visitor's clock**: dawn from six, day from eight,
 dusk from six in the evening, night from eight. The map's `data-time` turns
-on a night layer (hidden in the markup itself, so a still render is day): a
-veil over everything and, above it, a glow at every lit window and lamp that
-the drawing kit collected, plus fireflies. The sun/moon button picks day or
-night by hand and remembers it in this browser.
+on a night layer (hidden in the markup itself, so a still render is day; by
+day not in the page at all, `display: none`, so its loops cost nothing): a
+deep blue veil over everything and, above it, the light. Every lit window's
+pane and every bulb is drawn again in its glow colour with a halo (about one
+window in five stays dark, as in a real town), and everything that shines by
+itself (neon, screens, the Ferris wheel's bulbs) is drawn again as it is by
+day, so it stays bright. A moon with its path on the sea, stars, fireflies,
+and the lighthouse's beam sweeping round, which is a layer of its own that
+the page turns whole: turning so big a shape inside a layer repainted half
+the map every frame. (A multiply blend graded the colours more prettily and
+cost two frames in three; the plain veil stayed.) The sun/moon button picks
+day or night by hand and remembers it in this browser.
+
+**The seasons follow the visitor's date**: snow from December to Twelfth
+Night, fireworks on New Year's Eve and Day, blossom falling in April, and
+all year a little rain cloud over the Universe Forecast. Snow and petals are
+one layer each holding the fall twice; the page slides the whole layer down
+one copy's height and round, which the browser does without redrawing.
+`?season=winter`, `spring` or `newyear` and `?time=dawn`, `day`, `dusk` or
+`night` show any of them out of season.
 
 While a zoom is in motion the island is one GPU layer and its loops pause,
 then it is redrawn sharp; with reduced motion the camera jumps instead of

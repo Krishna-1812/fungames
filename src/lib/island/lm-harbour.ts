@@ -13,6 +13,9 @@ const planks = (p: Pen, x: number, y: number, w: number, d: number, z: number, a
   return b
 }
 
+/** Where the lighthouse's lamp is on screen, for the beam that sweeps at night. */
+export const beacon: [number, number] = [0, 0]
+
 export const harbour: Record<string, Landmark> = {
   'deep-sea': { size: [2, 2], water: true, draw(p) {
     // The trench: the one dark patch of sea on the map.
@@ -109,7 +112,8 @@ export const harbour: Record<string, Landmark> = {
     const beam = p.group('stp-beam')
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x + 190)} ${f(y - 140)}L${f(x + 190)} ${f(y - 72)}Z`, 'url(#stp-fade-r)', { sw: 0 })
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x - 190)} ${f(y - 140)}L${f(x - 190)} ${f(y - 72)}Z`, 'url(#stp-fade-l)', { sw: 0 })
-    p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp' }))
+    p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp' }), '#fff8e0')
+    beacon[0] = x; beacon[1] = y - 102
     p.path(`M${f(x - 4)} ${f(y - 108)}h8v12h-8z`, '#ffffff', { sw: 1, cls: 'stp-lamp' })
     p.path(`M${f(x - 14)} ${f(y - 112)}Q${f(x)} ${f(y - 132)} ${f(x + 14)} ${f(y - 112)}Z`, C.slate)
     p.path(`M${f(x)} ${f(y - 124)}v-10M${f(x - 6)} ${f(y - 130)}h12`, 'none', { sw: 1.4 })

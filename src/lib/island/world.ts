@@ -9,9 +9,10 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot } from './kit'
+import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light } from './kit'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
+import { beacon } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane } from './sky'
 import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet } from './town'
 import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, hoodoo, boulders, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
@@ -31,7 +32,7 @@ const SAND = ['#f6f0e1', '#efe7d3', '#d9ccad', '#e3d7ba', '#cbbb98']
 const key = (i: number, j: number) => `${i},${j}`
 
 export type Anchor = { slug: string; district: DistrictKey; x0: number; y0: number; x1: number; y1: number; bx: number; by: number; foot: string }
-export type Layer = { kind: 'sea' | 'surf' | 'boats' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
+export type Layer = { kind: 'sea' | 'surf' | 'boats' | 'beam' | 'weather' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
 export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
@@ -45,6 +46,7 @@ export type Raster = (svg: string, width: number) => { width: number; height: nu
 export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): Island {
   const R = rng(20260930)
   motionCss.length = 0
+  glows.length = 0
   const D = (k: DistrictKey) => DISTRICTS.find((d) => d.key === k)!
 
   /* ---- land, height, district ------------------------------------------ */
@@ -167,7 +169,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // inherit (render() then leaves the attribute off each shape).
   const open = (kind: Layer['kind'], slug?: string) => { const node = joinRoot(new N('g', { class: `layer-${kind}`, 'stroke-linejoin': 'round' })); made.push({ kind, slug, node }); return node }
   let root = open('sea')
-  const lights: [number, number][] = []
+  const lights: Light[] = []
 
   // The sea, its shallows, and the surf round the coast.
   const [sx0, sy0] = P(-8, GRID + 8), [sx1] = P(GRID + 8, -8), [, sy1] = P(-8, -8), [, sy2] = P(GRID + 8, GRID + 8)
@@ -572,7 +574,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // front left, on the side of each building that is in shade. Longer the
   // taller it is, measured by drawing the building once into nothing.
   {
-    const keep = motionCss.length
+    const keep = motionCss.length, keepGlow = glows.length
     const sg = root.add(new N('g', { class: 'shadows', transform: `translate(${f(ox)} ${f(oy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
     for (const pl of placed) {
       if (pl.lm.water) continue
@@ -588,6 +590,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       }
     }
     motionCss.length = keep
+    glows.length = keepGlow
   }
 
   // Grass tufts and flower dots, merged into a handful of paths.
@@ -1009,14 +1012,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     return lights.map((_, n) => whole[n] === 0 || shown[n] >= whole[n] * 0.2)
   }
 
-  // Hidden by day. At dusk and at night the page fades in a veil over the
-  // whole map and, above it, a glow at every lit window and lamp, and
-  // fireflies over the parks.
+  // Hidden by day. At dusk and at night the page lays a deep blue veil over
+  // the whole map, and then, on top of that, the light:
+  // every lit window and lamp drawn again in its own glow with a halo, and
+  // everything that shines by itself (neon, screens, bulbs) drawn again
+  // as it is by day, so it stays bright. And the sky: a moon and its path on
+  // the sea, stars, the lighthouse's beam going round, fireflies.
   const night = open('night')
   // Hidden in the markup itself, so a still render (or a page whose styles
   // have not loaded) shows day; island.css shows it when data-time asks.
   night.attrs.visibility = 'hidden'
-  night.add(new N('rect', { class: 'night-veil', x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: '#0d1a4d', opacity: 0.56 }))
+  night.add(new N('rect', { class: 'night-veil', x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: '#14205c', opacity: 0.5 }))
   {
     const nd = night.add(new N('defs'))
     const glow = nd.add(new N('radialGradient', { id: 'isl-glow' }))
@@ -1027,8 +1033,77 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     const halos = night.add(new N('g', { class: 'night-halos' }))
     const seen = opts.raster ? occlusion(opts.raster) : lights.map(() => true)
     hiddenLights = seen.filter((v) => !v).length
-    for (const [x, y] of lights.filter((_, n) => seen[n])) { halos.add(new N('circle', { cx: f(x), cy: f(y), r: 13, fill: 'url(#isl-glow)' })); cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0` }
-    night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8 }))
+    // A town at night is not every window lit: about one in five stays dark.
+    const lit = lights.map((l, n) => seen[n] && (l.glow !== '#ffe6a1' || hz(n, 3, 9) > 0.2))
+    const panes = night.add(new N('g', { class: 'night-panes' }))
+    lights.forEach((l, n) => {
+      if (!lit[n]) return
+      const [x, y] = l
+      halos.add(new N('circle', { cx: f(x), cy: f(y), r: 13, fill: 'url(#isl-glow)' }))
+      cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
+      // The pane or bulb itself, in its glow colour, above the veil.
+      if (l.el && l.glow) {
+        const a: Record<string, string | number | undefined> = {}
+        for (const k of ['points', 'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'transform'] as const) { const v = l.el.attrs[k]; if (v !== undefined && v !== null && v !== '') a[k] = v as string | number }
+        panes.add(new N(l.el.tag, { ...a, fill: l.glow, opacity: 0.92 }))
+      }
+    })
+    night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8, class: 'night-cores' }))
+    // Everything that shines by itself, as bright as by day.
+    const shine = night.add(new N('g', { class: 'night-shine' }))
+    for (const g of glows) shine.add(g)
+    // The lighthouse's beam, going round: a long soft wedge turning about the
+    // lamp, squashed flat so it sweeps across the sea and the land. It is a
+    // layer of its own, and the page turns the whole layer, which costs
+    // nothing; turning a shape this big inside a layer would repaint half
+    // the map every frame.
+    if (beacon[0] || beacon[1]) {
+      const beam = open('beam')
+      const bd = beam.add(new N('defs')).add(new N('linearGradient', { id: 'isl-beam' }))
+      for (const [o, op] of [[0, 0.75], [0.5, 0.22], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': '#fff8e0', 'stop-opacity': op }))
+      const sweep = beam.add(new N('g', { transform: `translate(${f(beacon[0])} ${f(beacon[1])})` }))
+      for (const rot of [0, 180]) sweep.add(new N('path', { d: 'M0 -4L640 -60L640 60L0 4Z', fill: 'url(#isl-beam)', transform: rot ? 'rotate(180)' : undefined }))
+      motionCss.push(`.isl-layer--beam{transform-origin:${f(beacon[0] - viewBox[0])}px ${f(beacon[1] - viewBox[1])}px}`)
+      night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 18, fill: 'url(#isl-glow)', class: 'night-shine' }))
+    }
+    // The moon, low over the sea to the north-east, and its path on the water.
+    {
+      const [vx, vy, vw] = viewBox, mx = vx + vw * 0.72, my = vy + 290
+      const sky = night.add(new N('g', { class: 'night-sky' }))
+      sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 70, fill: 'url(#isl-glow)', opacity: 0.6 }))
+      sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 30, fill: '#f6f4ff', stroke: INK, 'stroke-width': OUT }))
+      sky.add(new N('path', { d: `M${f(mx + 6)} ${f(my - 29)}a30 30 0 0 1 0 58a24 30 0 0 0 0 -58z`, fill: '#d9dcf5' }))
+      for (const [dx, dy, r] of [[-10, -8, 5], [4, 10, 3.5], [-4, 16, 2.4], [10, -14, 2.6]]) sky.add(new N('circle', { cx: f(mx + dx), cy: f(my + dy), r, fill: '#e2e4f6' }))
+      let path = ''
+      for (let k = 0; k < 16; k++) { const y = my + 70 + k * 22, w = 10 + k * 3.5 + hz(k, 5, 1) * 10, x = mx + (hz(k, 6, 2) - 0.5) * 16; path += `M${f(x - w)} ${f(y)}h${f(w * 2)}` }
+      sky.add(new N('path', { d: path, stroke: '#f6f4ff', 'stroke-width': 2.4, 'stroke-linecap': 'round', class: 'moon-path', opacity: 0.7 }))
+      // Stars across the dark water, like the sky reflected in it.
+      let st = '', st2 = ''
+      for (let k = 0; k < 90; k++) {
+        const x = vx + hz(k, 1, 31) * vw, y = vy + hz(k, 2, 32) * (viewBox[3] * 0.98)
+        const u = (x / 32 + y / 16) / 2, v = (y / 16 - x / 32) / 2
+        if (nearLand(u, v, 1.5)) continue
+        const r = 1 + hz(k, 3, 33) * 1.6
+        if (k % 3) st += `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(r * 2)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-r * 2)} 0`
+        else st2 += `M${f(x)} ${f(y - r * 2.6)}l${f(r * 0.5)} ${f(r * 2.1)}l${f(r * 2.1)} ${f(r * 0.5)}l${f(-r * 2.1)} ${f(r * 0.5)}l${f(-r * 0.5)} ${f(r * 2.1)}l${f(-r * 0.5)} ${f(-r * 2.1)}l${f(-r * 2.1)} ${f(-r * 0.5)}l${f(r * 2.1)} ${f(-r * 0.5)}z`
+      }
+      sky.add(new N('path', { d: st, fill: '#eef0ff', opacity: 0.85 }))
+      sky.add(new N('path', { d: st2, fill: '#ffffff', class: 'star-twinkle' }))
+    }
+    // New Year: fireworks over the island (shown only on those two nights).
+    {
+      const fw = night.add(new N('g', { class: 'fireworks' }))
+      const at: [number, number, number, string][] = [[8, 20, 330, C.rasp], [15, 13, 380, C.mint], [21, 9, 340, C.sky], [13, 24, 300, C.lilac], [24, 19, 360, '#ffffff'], [6, 9, 400, '#ffd1da']]
+      at.forEach(([i, j, z, c], n) => {
+        const [x, y] = P(i, j, z)
+        const g = fw.add(new N('g', { class: 'fw', style: `animation-delay:${f(n * 0.7)}s` }))
+        let d = '', dots = ''
+        for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2, r0 = 10, r1 = 38 + (k % 2) * 8; d += `M${f(x + Math.cos(a) * r0)} ${f(y + Math.sin(a) * r0)}L${f(x + Math.cos(a) * r1)} ${f(y + Math.sin(a) * r1)}`; dots += `M${f(x + Math.cos(a + 0.2) * (r1 + 8))} ${f(y + Math.sin(a + 0.2) * (r1 + 8))}h0.1` }
+        g.add(new N('path', { d, stroke: c, 'stroke-width': 2.4, 'stroke-linecap': 'round' }))
+        g.add(new N('path', { d: dots, stroke: '#ffffff', 'stroke-width': 3, 'stroke-linecap': 'round' }))
+        g.add(new N('circle', { cx: f(x), cy: f(y), r: 7, fill: '#ffffff' }))
+      })
+    }
     // Fireflies over the meadows.
     let made = 0
     for (let i = 0; i < GRID && made < 10; i++) for (let j = 0; j < GRID && made < 10; j++) {
@@ -1036,6 +1111,26 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       const [x, y] = P(i + 0.5, j + 0.5, 10 + (made % 3) * 6)
       night.add(new N('circle', { cx: f(x), cy: f(y), r: 2.2, fill: '#d9ffb0', class: 'firefly amb', 'data-b': `${f(x - 14)} ${f(y - 14)} ${f(x + 14)} ${f(y + 14)}`, style: `animation-delay:${f(-made * 0.9)}s` }))
       made++
+    }
+  }
+
+  /* ---- weather ----------------------------------------------------------- */
+  // Snow in December, petals in April. Each is a layer of its own holding
+  // the same fall twice, one copy above the other; the page slides the whole
+  // layer down by one copy's height and round again, which is a transform
+  // of one element, so the browser does it without redrawing a thing.
+  {
+    const [vx, vy, vw, vh] = viewBox
+    for (const kind of ['snow', 'petals'] as const) {
+      const w = open('weather', kind)
+      let d = ''
+      for (let k = 0; k < (kind === 'snow' ? 170 : 60); k++) {
+        const x = vx + hz(k, kind === 'snow' ? 7 : 8, 41) * vw, y0 = vy + hz(k, 9, 42) * vh, r = kind === 'snow' ? 3.2 + hz(k, 4, 43) * 4.4 : 4 + hz(k, 4, 43) * 2.4
+        for (const y of [y0]) d += kind === 'snow' ? `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(r * 2)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-r * 2)} 0` : `M${f(x)} ${f(y)}q${f(r)} ${f(-r)} ${f(r * 2)} 0q${f(-r)} ${f(r)} ${f(-r * 2)} 0z`
+      }
+      // One fall, and the same again a whole height above it (a <use>: it never moves on its own).
+      w.add(new N('path', { id: `isl-${kind}`, d, fill: kind === 'snow' ? '#ffffff' : '#ffc9d6', stroke: kind === 'snow' ? '#a9bde6' : INK, 'stroke-width': kind === 'snow' ? 0.8 : 0.5, opacity: kind === 'snow' ? 0.95 : 1 }))
+      w.add(new N('use', { href: `#isl-${kind}`, y: f(-vh) }))
     }
   }
 

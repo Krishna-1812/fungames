@@ -142,9 +142,25 @@ export type Box = { x: number; y: number; w: number; d: number; z0: number; h: n
 
 export type Draw = { fill?: string; stroke?: string; sw?: number; op?: number; cls?: string; id?: string; style?: string }
 
+/**
+ * A light for the night: where it shines, the shape that gives it off, and
+ * the colour that shape glows when it is lit (null: a halo only, the shape
+ * keeps its own colour, as a dark LED panel does).
+ */
+export type Light = [number, number] & { el?: N; glow?: string | null }
+
+/**
+ * Things that give off light of their own (neon, a screen, a ring of bulbs),
+ * drawn again above the night's veil so they stay bright after dark. Each is
+ * a group placed in screen space by itself (a painted face carries its own
+ * transform), so a copy of it lands in the same place.
+ */
+export const glows: N[] = []
+export function glow<T extends N>(n: T): T { glows.push(n); return n }
+
 export class Pen {
-  g: N; ox: number; oy: number; oz: number; b: Bounds; lights: [number, number][]
-  constructor(g: N, ox = 0, oy = 0, oz = 0, b: Bounds = new Bounds(), lights: [number, number][] = []) { this.g = g; this.ox = ox; this.oy = oy; this.oz = oz; this.b = b; this.lights = lights }
+  g: N; ox: number; oy: number; oz: number; b: Bounds; lights: Light[]
+  constructor(g: N, ox = 0, oy = 0, oz = 0, b: Bounds = new Bounds(), lights: Light[] = []) { this.g = g; this.ox = ox; this.oy = oy; this.oz = oz; this.b = b; this.lights = lights }
 
   at(x: number, y: number, z = 0): [number, number] {
     const p = P(x + this.ox, y + this.oy, z + this.oz)
@@ -157,7 +173,7 @@ export class Pen {
    * number, so the island can find out at build time whether anything drawn
    * in front of it hides it (see occlusion in world.ts).
    */
-  light(pt: [number, number], el: N) {
+  light(pt: [number, number], el: N, glowWith: string | null = '#ffe6a1') {
     el.attrs['data-l'] = this.lights.length
     // Its area on screen, so the test can tell how much of it is hidden.
     const at = el.attrs
@@ -169,7 +185,7 @@ export class Pen {
     } else if (typeof at.r === 'number') area = Math.PI * at.r * at.r
     else if (typeof at.width === 'number' && typeof at.height === 'number') area = at.width * at.height
     el.attrs['data-la'] = Math.round(area * 10) / 10
-    this.lights.push(pt)
+    this.lights.push(Object.assign([pt[0], pt[1]] as [number, number], { el, glow: glowWith }))
   }
   /** Grow the bounds round a screen-space shape drawn relative to a point. */
   grow(x0: number, y0: number, x1: number, y1: number) { this.b.add(x0, y0); this.b.add(x1, y1) }

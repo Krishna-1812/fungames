@@ -159,16 +159,43 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
    sun/moon button): dawn, day, dusk or night. By day the night layer is not
    there at all; otherwise it fades in a veil and the glow of every window and
    lamp above it. */
-.isl-layer--night { opacity: 0; visibility: hidden; transition: opacity 1.6s ease, visibility 0s 1.6s; }
-.isle .night-veil { fill: #0d1a4d; opacity: 0.56; }
+/* By day the night layer is not in the page at all (display: none): merely
+   hidden, its loops would still run and the browser would composite it over
+   the whole map every frame. It fades in when it comes. Its veil is a deep
+   blue-violet wash; a multiply blend grades the colours more prettily but
+   costs two frames in three, so this is the cheap kind. */
+.isl-layer--night { display: none; animation: isl-fade-in 1.6s ease; }
+@keyframes isl-fade-in { from { opacity: 0; } }
+.isle .night-veil { fill: #111a58; opacity: 0.58; }
+[data-time='dusk'] .isle .night-veil { fill: #6a3f9e; opacity: 0.26; }
+[data-time='dawn'] .isle .night-veil { fill: #d48fd8; opacity: 0.14; }
+/* What only belongs to the dark: the sky, the beam, and only at night. */
+.isle .night-sky, .isle .night-shine, .isle .night-panes { opacity: 0; transition: opacity 1.6s ease; }
+[data-time='night'] .isle .night-sky, [data-time='night'] .isle .night-shine, [data-time='night'] .isle .night-panes { opacity: 1; }
+[data-time='dusk'] .isle .night-shine, [data-time='dusk'] .isle .night-panes { opacity: 0.7; }
+/* The beam: the whole layer turns, squashed flat, about the lamp. */
+.isl-layer--beam { display: none; will-change: transform; }
+[data-time='night'] .isl-layer--beam, [data-time='dusk'] .isl-layer--beam { display: block; animation: isl-beam 10s linear infinite; }
+[data-time='dusk'] .isl-layer--beam { opacity: 0.5; }
+@keyframes isl-beam { from { transform: scaleY(0.5) rotate(0deg); } to { transform: scaleY(0.5) rotate(360deg); } }
+.isle .star-twinkle { animation: isl-blink 2.6s steps(2, jump-none) infinite; }
+.isle .moon-path { animation: isl-moonpath 4s ease-in-out infinite; }
+@keyframes isl-moonpath { 50% { opacity: 0.35; } }
+.isle .fireworks { display: none; }
+[data-season='newyear'][data-time='night'] .isle .fireworks, [data-season='newyear'][data-time='dusk'] .isle .fireworks { display: inline; }
+.isle .fw { opacity: 0; animation: isl-fw 4.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes isl-fw { 0% { transform: scale(0.15); opacity: 0; } 8% { opacity: 1; } 55% { transform: scale(1); opacity: 0.9; } 80%, 100% { transform: scale(1.12) translateY(6px); opacity: 0; } }
+/* Snow and petals: the whole layer slides down one copy's height, and round. */
+.isl-layer--weather { display: none; will-change: transform; }
+[data-season='winter'] .isl-weather-snow, [data-season='newyear'] .isl-weather-snow { display: block; animation: isl-fall 40s linear infinite; }
+[data-season='spring'] .isl-weather-petals { display: block; animation: isl-fall 70s linear infinite; }
+@keyframes isl-fall { from { transform: translateY(0); } to { transform: translateY(100%); } }
 .isle .night-halos { opacity: 1; }
-.isle .night-halos + path { opacity: 0.8; }
-[data-time='night'] .isl-layer--night, [data-time='dusk'] .isl-layer--night, [data-time='dawn'] .isl-layer--night { opacity: 1; visibility: visible; transition: opacity 1.6s ease; }
+.isle .night-cores { opacity: 0.8; }
+[data-time='night'] .isl-layer--night, [data-time='dusk'] .isl-layer--night, [data-time='dawn'] .isl-layer--night { display: block; }
 [data-time='night'] .isle .layer-night, [data-time='dusk'] .isle .layer-night, [data-time='dawn'] .isle .layer-night { visibility: visible; }
-[data-time='dusk'] .isle .night-veil { fill: #5a3f9e; opacity: 0.3; }
-[data-time='dusk'] .isle .night-halos, [data-time='dusk'] .isle .night-halos + path { opacity: 0.55; }
-[data-time='dawn'] .isle .night-veil { fill: #c98fd8; opacity: 0.16; }
-[data-time='dawn'] .isle .night-halos, [data-time='dawn'] .isle .night-halos + path { opacity: 0.25; }
+[data-time='dusk'] .isle .night-halos, [data-time='dusk'] .isle .night-cores { opacity: 0.55; }
+[data-time='dawn'] .isle .night-halos, [data-time='dawn'] .isle .night-cores { opacity: 0.25; }
 .isle .firefly { opacity: 0; }
 [data-time='night'] .isle .firefly { animation: sky-firefly 4.5s ease-in-out infinite; }
 @keyframes sky-firefly { 0%, 100% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 50% { opacity: 0.3; transform: translate(9px, -7px); } 70% { opacity: 1; } 85% { transform: translate(-4px, 4px); } }

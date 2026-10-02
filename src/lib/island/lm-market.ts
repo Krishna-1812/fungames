@@ -1,5 +1,5 @@
 /** Market Street: where the money goes. */
-import { C, INK, N, OUT, shade, r1 as f, letter, neon, type Landmark } from './kit'
+import { C, INK, N, OUT, shade, r1 as f, letter, neon, glow, type Landmark } from './kit'
 import { person, crate, tree, flag, lamp, fence } from './props'
 
 export const market: Record<string, Landmark> = {
@@ -93,20 +93,20 @@ export const market: Record<string, Landmark> = {
     for (let k = 1; k < 4; k++) p.quad(mall, 'y', 0.3 + k * 0.12 - 0.003, 0.3 + k * 0.12 + 0.003, 0, 20, INK, { sw: 0 })
     p.light(p.at(1, 1.65, 12), p.quad(mall, 'y', 0.31, 0.77, 10, 19, '#8592cc', { sw: 0 }))
     // An LED ticker over the doors that never quite runs out.
-    p.light(p.at(1, 1.65, 27), p.quad(mall, 'y', 0.06, 0.94, 23, 31, '#11162e', { sw: 1.2 }))
-    const tk = p.face(mall, 'y', 0.5, 24.8, { w: 54, h: 7 })
+    p.light(p.at(1, 1.65, 27), p.quad(mall, 'y', 0.06, 0.94, 23, 31, '#11162e', { sw: 1.2 }), null)
+    const tk = glow(p.face(mall, 'y', 0.5, 24.8, { w: 54, h: 7 }))
     letter(tk, 0, 0, 'SALE ENDS 0:59', { size: 4.8, fill: C.rasp, font: 'Silkscreen, monospace', weight: 400, cls: 'blink' })
     // The rooftop sign: neon tubes on a dark board, on legs.
     for (const x of [0.5, 1.5]) { p.line([x, 0.88, 44], [x, 0.92, 52], { sw: 1.6 }); p.line([x, 0.8, 44], [x, 0.92, 52], { sw: 1 }) }
     const bd = p.box(0.28, 0.9, 1.44, 0.05, 11, { z0: 51, fill: '#3b4675', sw: 1.3 })
-    p.light(p.at(1, 0.95, 56), p.quad(bd, 'y', 0.03, 0.97, 1, 10, '#1b2140', { sw: 0.8 }))
-    const ns = p.face(bd, 'y', 0.5, 3.2, { w: 46, h: 11 })
+    p.light(p.at(1, 0.95, 56), p.quad(bd, 'y', 0.03, 0.97, 1, 10, '#1b2140', { sw: 0.8 }), null)
+    const ns = glow(p.face(bd, 'y', 0.5, 3.2, { w: 46, h: 11 }))
     neon(ns, 0, 0, 'ONLY 1 LEFT!', C.mint, { size: 6.6, cls: 'blink-slow' })
     // Round the side: an exit sign that points both ways, over a door that is painted on.
     p.quad(mall, 'x', 0.6, 0.8, 0, 17, '#3b4675', { sw: 1.1 })
     p.quad(mall, 'x', 0.62, 0.78, 0, 15.5, '#2c355e', { sw: 0.8 })
     p.quad(mall, 'x', 0.75, 0.765, 7, 9, '#9aa3c0', { sw: 0 })
-    const ex = p.face(mall, 'x', 0.7, 19.6, { w: 26, h: 6 })
+    const ex = glow(p.face(mall, 'x', 0.7, 19.6, { w: 26, h: 6 }))
     neon(ex, 0, 0, 'EXIT', '#7dffc9', { size: 5 })
     ex.add(new N('path', { d: 'M-9 -1.8h-4m1.6 -1.6l-1.6 1.6l1.6 1.6M9 -1.8h4m-1.6 -1.6l1.6 1.6l-1.6 1.6', fill: 'none', stroke: '#7dffc9', 'stroke-width': 1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
     person(p, 0.45, 1.85, C.sky); person(p, 0.62, 1.85, C.lilac, { pose: 'look' })

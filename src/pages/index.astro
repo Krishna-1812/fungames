@@ -65,7 +65,7 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
       <div class="isl-box" id="islBox" tabindex="0">
         <div class="isl-stage" id="islStage">
           <div class="isle isl-world" id="isle" style={`--vx:${vx}px;--vy:${vy}px;--vw:${vw}px;--vh:${vh}px`}>
-            {island.layers.map((l) => <svg class={`isl-layer isl-layer--${l.kind}${l.kind === 'surf' ? ` isl-surf-${l.slug}` : ''}`} viewBox={`${vx} ${vy} ${vw} ${vh}`} xmlns="http://www.w3.org/2000/svg" aria-hidden={l.kind === 'landmark' ? undefined : 'true'} set:html={l.body} />)}
+            {island.layers.map((l) => <svg class={`isl-layer isl-layer--${l.kind}${l.kind === 'surf' || l.kind === 'weather' ? ` isl-${l.kind}-${l.slug}` : ''}`} viewBox={`${vx} ${vy} ${vw} ${vh}`} xmlns="http://www.w3.org/2000/svg" aria-hidden={l.kind === 'landmark' ? undefined : 'true'} set:html={l.body} />)}
           </div>
         </div>
         <style is:inline set:html={island.css}></style>
@@ -229,10 +229,19 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
   // eight. The sun/moon button picks day or night by hand, remembered in this
   // browser; picking what the clock would have chosen goes back to the clock.
   const btnTime = document.getElementById('btnTime')!
+  // The season, from the visitor's own date: snow from December to Twelfth
+  // Night, fireworks on New Year's Eve and Day, blossom in April. A page can
+  // ask for one (?season=winter, spring or newyear) and for a time of day
+  // (?time=night), to see it out of season.
+  const ask = new URLSearchParams(location.search)
+  const bySeason = (d = new Date()) => { const m = d.getMonth(), day = d.getDate(); if ((m === 11 && day === 31) || (m === 0 && day === 1)) return 'newyear'; if (m === 11 || (m === 0 && day <= 6)) return 'winter'; if (m === 3) return 'spring'; return '' }
+  const season = ask.get('season') ?? bySeason()
+  if (season) box.dataset.season = season
   const byClock = (h = new Date().getHours()) => (h >= 6 && h < 8 ? 'dawn' : h >= 8 && h < 18 ? 'day' : h >= 18 && h < 20 ? 'dusk' : 'night')
   const readTime = () => { try { return localStorage.getItem('isl-time') } catch { return null } }
   const showTime = () => {
-    const chosen = readTime(), t = chosen === 'day' || chosen === 'night' ? chosen : byClock()
+    const forced = ask.get('time'), chosen = readTime()
+    const t = forced && ['dawn', 'day', 'dusk', 'night'].includes(forced) ? forced : chosen === 'day' || chosen === 'night' ? chosen : byClock()
     box.dataset.time = t
     const dark = t === 'night' || t === 'dusk'
     btnTime.setAttribute('aria-pressed', String(dark))

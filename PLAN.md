@@ -2702,9 +2702,24 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     The markup stayed under budget by setting round joins once per layer
     for every shape to inherit: 894 KB became 826.
 
-64. Next, in order, unless the order changes: a real night with weather
-    and seasons; things to poke and easter eggs; a passport of visited
-    games and optional sound; then polish, phones and speed.
+64. ~~**The island, made real: night, weather and seasons.**~~ **done.**
+    Night is a real night now: a deep blue veil, and above it the light,
+    every lit window's pane in warm glow with a halo (one in five dark),
+    neon, screens and the Ferris wheel's bulbs drawn bright, a moon and its
+    path on the sea, stars, and the lighthouse's beam sweeping round. The
+    seasons come from the visitor's date: snow from December to Twelfth
+    Night, fireworks at New Year, petals in April, and a rain cloud over
+    the Universe Forecast all year; `?season=` and `?time=` show them out
+    of season. Measuring caught two expensive ideas before they shipped:
+    a multiply blend for the night's colour grade (it took the map from
+    sixty frames a second to twenty, by day as well, since a blend on a
+    layer costs even while it is hidden), and a beam turning inside the
+    night layer. The night layer is now out of the page by day, the beam is
+    a layer the page turns whole, and the veil is a plain wash.
+
+65. Next, in order, unless the order changes: things to poke and easter
+    eggs; a passport of visited games and optional sound; then polish,
+    phones and speed.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

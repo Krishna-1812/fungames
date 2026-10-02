@@ -77,6 +77,13 @@ export const peaks: Record<string, Landmark> = {
     p.el('g', { 'clip-path': 'url(#uf-clip)' }).add(new N('circle', { cx: mx, cy: my, r: 16, fill: '#4b5ba6', class: 'uf-shadow' }))
     p.el('circle', { cx: mx, cy: my, r: 17, fill: 'none', stroke: INK, 'stroke-width': OUT })
     p.el('path', { d: `M${f(mx - 60)} ${f(my + 30)}A70 40 0 0 1 ${f(mx + 60)} ${f(my + 30)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-dasharray': '3 6' })
+    // The forecast for the stone circle itself: showers.
+    const [rx, ry] = p.at(0.3, 0.6, 74)
+    const rc = p.group('drift')
+    for (const [dx, dy, r] of [[-12, 0, 10], [2, -6, 12], [15, 1, 9], [0, 4, 9]]) rc.el('circle', { cx: rx + dx, cy: ry + dy, r, fill: '#e3e8f5', stroke: INK, 'stroke-width': 1.3 })
+    rc.el('ellipse', { cx: rx + 1, cy: ry + 5, rx: 19, ry: 6, fill: '#e3e8f5' })
+    for (let k = 0; k < 7; k++) p.el('path', { d: `M${f(rx - 15 + k * 5)} ${f(ry + 14)}l-2.4 6`, stroke: C.cobalt, 'stroke-width': 1.5, 'stroke-linecap': 'round', class: 'rain', style: `animation-delay:${(k % 3) * 0.27}s` })
+    p.grow(rx - 26, ry - 20, rx + 26, ry + 24)
     person(p, 1.85, 1.35, C.lilac, { pose: 'look' })
     person(p, 1.35, 1.9, C.rasp)
     const [sx, sy] = p.at(0.2, 1.7)
