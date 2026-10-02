@@ -21,6 +21,11 @@ export type Page = {
   ink: string
   /** The rendered size in CSS pixels, from the rule that sizes it. */
   size: number
+  /**
+   * Drawn through inkIcon: every fill is the ink, so the palette never
+   * lands on this background and only the ink has to read on it.
+   */
+  inkOnly?: boolean
 }
 
 export const PAGES: Record<string, Page> = {
@@ -37,12 +42,9 @@ export const PAGES: Record<string, Page> = {
   // The 404 page and the browser tab. The favicon is the smallest thing on the
   // site, so it is checked at roughly the size a tab draws it.
   chrome: { bg: '#faf6ea', ink: '#241d12', size: 32 },
-  // The homepage's "Buy me a coffee" button, in the .about card. That card is
-  // a translucent blur over the paper backdrop shader, not a flat colour —
-  // bg here is the shader's own near-white floor (Backdrop.astro keeps its
-  // luminance swing within a few percent of --paper), which is what the card
-  // actually composites close to in practice.
-  home: { bg: '#f6f5f1', ink: '#16151a', size: 20 },
+  // The homepage's "Buy me a coffee" button, in the island page's footer:
+  // the mug drawn in ink on the button's flat mint (.ft-coffee).
+  home: { bg: '#4fe3c1', ink: '#1b2340', size: 22, inkOnly: true },
   // :global(.incident-body) { background: #0e1004; color: #d4ff3d }, .row-icon { 22px }
   'days-since-incident': { bg: '#0e1004', ink: '#d4ff3d', size: 22 },
   // .toolbar's own near-opaque backdrop over the sky canvas, .tbtn { color: #e5dbfa }, svg { 15px }

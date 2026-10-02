@@ -12,6 +12,15 @@
    every frame, and a hundred and fifty of them at once is ten frames a second.
    The camera chooses (lib/island/camera.ts). */
 .isle.is-culling .lm:not(.is-live) .lm-art *, .isle.is-culling .walker:not(.is-live), .isle.is-culling .walker:not(.is-live) *, .isle.is-culling .amb:not(.is-live), .isle.is-culling .amb:not(.is-live) * { animation-play-state: paused !important; }
+/* And paused is not enough. Chrome runs these animations on the GPU, each
+   in a layer of its own, and a paused one keeps its layer; every layer then
+   lifts whatever is painted over it into layers of its own, so with the
+   whole map in view there were eight hundred, nearly two hundred megapixels
+   to composite every frame. So anything culled that does not carry
+   something along a path loses its animation outright and rests in its
+   still pose; a mover (a walker, a boat) is only paused, where it is, and
+   whatever was just poked still plays its reaction. */
+.isle.is-culling .lm:not(.is-live) .lm-art *:not(.mover, .poked, .poked *), .isle.is-culling .walker:not(.is-live) *:not(.mover, .poked, .poked *), .isle.is-culling .amb:not(.is-live) *:not(.mover, .poked, .poked *) { animation: none !important; }
 .isle.is-paused *, .isle.is-zooming *, html:not(.play) .isle * { animation-play-state: paused !important; }
 html:not(.play) .isle *:not(.mover) { animation: none !important; transition: none !important; }
 /* Without motion, everything that travels a path (boats, walkers, ducks,
@@ -28,7 +37,7 @@ html:not(.play) .isle .isl-plane { display: none; }
 .isle .lm:hover .lm-art, .isle .lm.is-hot .lm-art, .isle .lm:focus-visible .lm-art { transform: translateY(-9px); }
 .isle .lm:hover .lm-ring, .isle .lm.is-hot .lm-ring, .isle .lm:focus-visible .lm-ring { opacity: 1; animation: isl-march 1s linear infinite; }
 @keyframes isl-march { to { stroke-dashoffset: -12; } }
-.isle.is-dimming .lm:not(.is-match) { opacity: 0.28; filter: saturate(0.2); }
+.isle.is-dimming .lm:not(.is-match) { opacity: 0.25; }
 .isle .lm { transition: opacity 0.35s; }
 html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; animation-delay: calc(250ms + var(--d, 0ms)); }
 @keyframes isl-pop { from { transform: translateY(-60px) scaleY(0.6); opacity: 0; } 60% { opacity: 1; } }
@@ -183,7 +192,10 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 @keyframes isl-moonpath { 50% { opacity: 0.35; } }
 .isle .fireworks { display: none; }
 [data-season='newyear'][data-time='night'] .isle .fireworks, [data-season='newyear'][data-time='dusk'] .isle .fireworks { display: inline; }
-.isle .fw { opacity: 0; animation: isl-fw 4.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+/* The animation is only attached when they can be seen: one left running
+   inside the hidden group repaints the night layer every frame all year. */
+.isle .fw { opacity: 0; transform-box: fill-box; transform-origin: center; }
+[data-season='newyear'][data-time='night'] .isle .fw, [data-season='newyear'][data-time='dusk'] .isle .fw { animation: isl-fw 4.2s ease-out infinite; }
 @keyframes isl-fw { 0% { transform: scale(0.15); opacity: 0; } 8% { opacity: 1; } 55% { transform: scale(1); opacity: 0.9; } 80%, 100% { transform: scale(1.12) translateY(6px); opacity: 0; } }
 /* Snow and petals: the whole layer slides down one copy's height, and round. */
 .isl-layer--weather { display: none; will-change: transform; }
@@ -207,7 +219,8 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 [data-time='night'] .isle .cloud-base { fill: #6a79b0; stroke: #6a79b0; }
 [data-time='dusk'] .isle .cloud-puff { fill: #e9defa; }
 [data-time='dusk'] .isle .cloud-base { fill: #cdbdf0; stroke: #cdbdf0; }
-[data-time='night'] .isle .hab, [data-time='night'] .isle .isl-plane { filter: brightness(0.6) saturate(0.85); }
+.isle .night-dim { display: none; }
+[data-time='night'] .isle .night-dim { display: inline; }
 .isl-box[data-time='night'] { background-color: #3a5aa6; }
 
 /* ---- each building's own motion -------------------------------------- */
@@ -305,5 +318,11 @@ html:not(.play) .isle .poked > .pk-say { opacity: 1; }
 [data-hour='3'] .isle .ufo { display: inline; }
 .isle .dawn-whale { display: none; }
 [data-time='dawn'] .isle .dawn-whale { display: inline; }
+/* And they are still while they are away. An animation inside a hidden
+   group goes on running, and Chrome repaints the whole of its layer for it
+   every frame: the UFO's seven lights, out of sight in the sky layer that
+   spans the map, cost more than half the frame rate (26 fps became 11). */
+:where(.isl-box:not([data-hour='3'])) .isle .ufo, :where(.isl-box:not([data-hour='3'])) .isle .ufo *,
+:where(.isl-box:not([data-time='dawn'])) .isle .dawn-whale, :where(.isl-box:not([data-time='dawn'])) .isle .dawn-whale * { animation-play-state: paused !important; }
 .isle .breach { animation: pk-breach 6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
 @keyframes pk-breach { 0%, 100% { transform: translateY(18px) scaleY(0.4); opacity: 0; } 20%, 60% { transform: none; opacity: 1; } 80% { transform: translateY(18px) scaleY(0.4); opacity: 0; } }

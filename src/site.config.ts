@@ -48,11 +48,9 @@ export const SITE = {
    * Buy Me a Coffee is the merchant of record and runs its own hosted
    * checkout, so nothing here ever touches a card number.
    *
-   * 'yourhandle' is a placeholder — swap it for a real account before this
-   * goes live, the same way `name`/`domain`/`email` above are placeholders
-   * until a real brand is picked.
+   * The button sits in the homepage's footer.
    */
-  buyMeACoffee: 'yourhandle',
+  buyMeACoffee: 'krishna18',
 
   /**
    * NASA's open API key, used by /days-since-incident/ to read NASA DONKI's

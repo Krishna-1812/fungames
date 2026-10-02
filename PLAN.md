@@ -2747,8 +2747,23 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     with no outline, so in one ink the Earth was a disc; each colour now
     prints at its own strength, like a one-colour tint.
 
-67. Next: polish, phones and speed; then the site's name and the support
-    link.
+67. ~~**The island, made real: speed, phones and polish.**~~ **done.** The
+    map had fallen to eleven frames a second, measured headlessly at a
+    desktop's size with the whole island in view, and building each
+    phase's commit found where: Phase 5's UFO animating unseen inside a
+    hidden group, which repainted the sky layer every frame; the cards'
+    thirty-one buildings animating just below the fold; paused animations
+    that kept their GPU layers (848 of them, two hundred megapixels a
+    frame); and a brightness filter dimming the balloons at night. Each
+    was fixed, and `check-island` now fails if any comes back. Eleven
+    frames a second became about fifty, by day and by night and on a phone. On a phone the cards are two to a row (one per screen made the
+    list thirty-one screens long) and the hint no longer covers a label;
+    on a laptop the title no longer runs into the top bar, which Phase 6
+    had made wider. The footer has a Buy Me a Coffee button, in the
+    island's mint.
+
+68. Still waiting on a decision: the site's name, its contact email and
+    its domain (`site.config.ts`; everything reads from there).
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

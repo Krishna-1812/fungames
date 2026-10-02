@@ -144,7 +144,7 @@ console.log('\nthe palette still works on every page it lands on')
   for (const [pageName, page] of Object.entries(PAGES)) {
     if (!USES[pageName]?.length) continue
     const bgL = lumOf(page.bg)
-    for (const [n, c] of names) {
+    if (!page.inkOnly) for (const [n, c] of names) {
       const r = contrast(lumOf(c), bgL)
       if (r < 3)
         fail(

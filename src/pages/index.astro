@@ -260,6 +260,12 @@ const book = BOOK.map((key) => {
       <div class="gs-wrap ft-in">
         <p class="ft-name">{SITE.name}</p>
         <p class="ft-line">{count} small games, real maths, nothing to sign up for. Everything runs in your browser.</p>
+        {SITE.buyMeACoffee && (
+          <a class="ft-coffee" href={`https://www.buymeacoffee.com/${SITE.buyMeACoffee}`} target="_blank" rel="noopener">
+            <span class="ft-coffee-icon" aria-hidden="true" set:html={inkIcon('coffee')} />
+            <span>Buy me a coffee</span>
+          </a>
+        )}
       </div>
     </footer>
   </main>
@@ -706,9 +712,12 @@ const book = BOOK.map((key) => {
     copy.removeAttribute('id'); copy.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'))
     sv.append(copy)
   })
-  // The cards' buildings run only while the cards are on screen.
-  const grid = document.getElementById('grid')!
-  new IntersectionObserver(([e]) => grid.classList.toggle('is-paused', !e.isIntersecting), { rootMargin: '200px' }).observe(grid)
+  // Each card's building moves only while that card is on screen. Every
+  // animation on the page costs the whole page a frame, seen or not: with the
+  // grid watched as one block, and woken 200px early, all thirty-one ran
+  // just below the fold and took the island from 47 frames a second to 29.
+  const cardIo = new IntersectionObserver((es) => { for (const e of es) e.target.classList.toggle('is-live', e.isIntersecting) })
+  document.querySelectorAll('.gc-svg').forEach((sv) => cardIo.observe(sv))
 
   /* ---- a few motions that need a clock rather than a keyframe ------------- */
   if (PLAY) {
@@ -814,7 +823,9 @@ const book = BOOK.map((key) => {
   /* It steps aside with the hint once you start exploring. */
   .isl-title { transition: opacity 0.5s; }
   .isl-title:has(+ .isl-hint.is-gone) { opacity: 0; }
-  @media (max-width: 1080px) { .isl-title { top: 84px; font-size: 16px; } }
+  /* Below the top bar once the bar is wide enough to reach it: five buttons
+     and a passport count meet a centred title at about 1560px. */
+  @media (max-width: 1560px) { .isl-title { top: 84px; font-size: 16px; } }
   .isl-hint.is-gone { opacity: 0; transform: translateX(-50%) translateY(12px); }
   :global(html.play) .isl-hint { animation: isl-hint-in 0.8s 1.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
   @keyframes isl-hint-in { from { opacity: 0; transform: translateX(-50%) translateY(20px); } }
@@ -924,7 +935,7 @@ const book = BOOK.map((key) => {
     .isl-btn { padding: 9px 11px; }
     .isl-logo { font-size: 17px; }
     .isl-mini { display: none; }
-    .isl-hint { top: 122px; bottom: auto; font-size: 14px; }
+    .isl-hint { bottom: 86px; font-size: 14px; }
     .isl-title { top: 78px; font-size: 14px; padding: 6px 14px; }
     .isl-zoom { bottom: 20px; }
     .isl-zoom button { width: 44px; height: 44px; }
@@ -999,15 +1010,45 @@ const book = BOOK.map((key) => {
     transition: opacity 0.2s, transform 0.2s;
   }
   .gc-pin svg { width: 20px; height: 20px; }
+  /* A phone: two to a row. One card the height of the screen made the list
+     thirty-one screens long; at two a row it is a list you can scan. */
+  @media (max-width: 600px) {
+    .gs-grid { grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+    .gs-search { width: 100%; }
+    .gc { border-radius: 18px; border-width: 2.5px; box-shadow: 0 4px 0 #1b2340; }
+    .gc-art { border-bottom-width: 2.5px; }
+    .gc-body { padding: 10px 11px 12px; }
+    .gc-title { font-size: 16.5px; }
+    .gc-blurb { margin-top: 4px; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .gc-foot { padding-top: 9px; gap: 6px; flex-wrap: wrap; }
+    .gc-tag { font-size: 11px; padding: 2px 8px; }
+    .gc-best { font-size: 12px; }
+    .gc-pin { right: 7px; top: 7px; width: 34px; height: 34px; border-radius: 10px; }
+    .gc-pin svg { width: 18px; height: 18px; }
+  }
   .gs-slot:hover .gc-pin, .gc-pin:focus-visible { opacity: 1; transform: none; }
   @media (hover: none) { .gc-pin { opacity: 1; transform: none; } }
   .gs-empty { margin: 28px 0 0; padding: 28px; text-align: center; font-weight: 600; background: #fff; border: 2.5px dashed #1b2340; border-radius: 18px; }
-  :global(.gs-grid.is-paused .isle *) { animation-play-state: paused !important; }
+  :global(.gs-grid .gc-svg:not(.is-live) *) { animation-play-state: paused !important; }
+  /* Not just paused: gone, so they hold no GPU layers (see island.css). */
+  :global(.gs-grid .gc-svg:not(.is-live) *:not(.mover)) { animation: none !important; }
 
   .ft { background: #1b2340; color: #fff; padding: 36px 0 44px; }
   .ft-in { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px 24px; }
   .ft-name { margin: 0; font-weight: 700; font-size: 24px; }
   .ft-line { margin: 0; color: #c9d2f0; font-size: 15px; }
+  /* Buy Me a Coffee runs its own checkout; this is only a link to it. In the
+     island's mint rather than that service's yellow: the site stays cool. */
+  .ft-coffee {
+    display: inline-flex; align-items: center; gap: 9px; align-self: center;
+    padding: 9px 16px 9px 13px; font-weight: 700; font-size: 16px; color: #1b2340; text-decoration: none;
+    background: #4fe3c1; border: 3px solid #1b2340; border-radius: 14px; box-shadow: 0 4px 0 #0c1230;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
+  }
+  .ft-coffee:hover { background: #6debcd; }
+  .ft-coffee:active { transform: translateY(4px); box-shadow: 0 0 0 #0c1230; }
+  .ft-coffee:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .ft-coffee-icon { display: inline-flex; width: 22px; height: 22px; flex: none; }
 
   /* ================= the sound and passport buttons ================= */
   #btnSound .ic-waves { display: none; }

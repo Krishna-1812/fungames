@@ -7,6 +7,15 @@ import { C, INK, OUT, N, shade, motionPath } from './kit'
 
 const f = (v: number) => Math.round(v * 10) / 10
 
+/**
+ * The things in the sky are above the night's veil, so they would stay in
+ * daylight. They are dimmed by a shade of the veil's own blue over their
+ * silhouette, shown only after dark. (A CSS brightness filter did the same
+ * and took the map from 36 frames a second to 13: a filter on something
+ * moving is drawn again, filter and all, every frame.)
+ */
+const nightDim = (d: string) => new N('path', { d, class: 'night-dim', fill: '#111a58', opacity: 0.42 })
+
 /** A striped balloon with a basket and two people in it, drifting round a slow loop. */
 export function hotAirBalloon(x: number, y: number, a: string, b: string, name: string, dur: number, delay: number): N {
   const pts: [number, number][] = []
@@ -28,6 +37,7 @@ export function hotAirBalloon(x: number, y: number, a: string, b: string, name: 
     bob.add(new N('rect', { x: px - 2.6, y: -16, width: 5.2, height: 6, rx: 2, fill: c, stroke: INK, 'stroke-width': 1 }))
     bob.add(new N('circle', { cx: px, cy: -18.5, r: 2.6, fill: '#f1d9c6', stroke: INK, 'stroke-width': 1 }))
   }
+  bob.add(nightDim(`${env}M-13 -23h26v25h-26z`))
   return g
 }
 
@@ -48,6 +58,7 @@ export function plane(name: string): N {
   body.add(new N('path', { d: 'M-8 -2l-10 14h7l13 -14z', fill: C.rasp, stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
   body.add(new N('path', { d: 'M8 -8h8q4 0 6 3h-14z', fill: C.glassHi, stroke: INK, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }))
   body.add(new N('path', { d: 'M23 -11v14', stroke: INK, 'stroke-width': 1.6, 'stroke-linecap': 'round', class: 'prop' }))
+  body.add(nightDim('M-62 -11h-87q6 9 0 18h87zM-35 -4q0 -7 11 -7h32q11 0 15 7q-4 7 -15 7h-32q-11 0 -11 -7zM-31 -9l-6 -11h7l9 10zM-8 -2l-11 15h8l14 -15z'))
   return g
 }
 

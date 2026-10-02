@@ -82,6 +82,27 @@ console.log(`  size  ${(island.svg.length / 1024).toFixed(0)} KB of markup, ${is
 check(island.hiddenLights > 0 && island.hiddenLights < island.lights.length * 0.4, `lights hidden behind something are left dark at night (${island.hiddenLights} of ${island.lights.length})`)
 check(island.svg.length < 900 * 1024, 'the island is under 900 KB of markup')
 
+// What it costs to keep the map moving. Each of these was a measured loss
+// (a headless Chrome on an Intel laptop, the whole island in view) and none
+// of them shows in a screenshot, so they are checked here rather than hoped
+// about.
+console.log('what it costs to keep moving')
+{
+  const css = fs.readFileSync('src/styles/island.css', 'utf8') + island.css
+  // A filter on something that moves is drawn again, filter and all, every
+  // frame: the balloons' night dimming took the map from 36 fps to 13.
+  const filters = [...css.matchAll(/(?<![-\w])filter\s*:\s*(?!none)([^;}]+)/g)].map((m) => m[1].trim())
+  check(!filters.length, `no CSS filter on anything on the map${filters.length ? ` (found: ${filters.join(', ')})` : ''}`)
+  check(!/ filter="/.test(island.svg), 'and none in the drawing')
+  // A paused animation keeps its GPU layer, and every layer lifts whatever is
+  // painted over it into one of its own: culled things must lose theirs.
+  check(/\.isle\.is-culling \.lm:not\(\.is-live\) \.lm-art \*:not\([^)]*\)[^{]*\{ animation: none !important; \}/.test(css), 'culled buildings drop their animations, not just pause them')
+  // An animation inside a hidden group still runs, and repaints its layer:
+  // the secrets that keep their own hours are still while they are away.
+  for (const cls of ['ufo', 'dawn-whale']) check(new RegExp(`\\.isle \\.${cls} \\*[^{]*\\{ animation-play-state: paused !important; \\}`).test(css), `the ${cls} is still while it is hidden`)
+  check(!/^\.isle \.fw \{[^}]*animation/m.test(css), 'the fireworks only animate at New Year')
+}
+
 console.log('rasterise')
 const [vx, vy, vw, vh] = island.viewBox
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${Math.round(vw)}" height="${Math.round(vh)}">${island.svg}</svg>`

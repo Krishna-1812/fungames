@@ -284,6 +284,40 @@ Three things about performance, all found by measuring rather than guessing:
   still outline, stroked eight times at different widths with round joins,
   which grows it outwards into soft bands that follow the coast.)
 
+Six phases later the map was down to **eleven frames a second** (headless
+Chrome, an Intel laptop, 1280×800, the whole island in view), and the
+reasons were all of one kind: Chrome runs these CSS animations on the GPU,
+each in a layer of its own, and every such layer lifts whatever is painted
+over it into a layer too. There were 848 layers, nearly two hundred
+megapixels to composite every frame. Building each phase's commit and
+measuring it found where it went, and Chrome's own layer list said why:
+
+- **Hidden things were still animating.** The UFO (out of sight except at
+  three in the morning) kept its seven lights chasing inside a
+  `display: none` group, and Chrome repainted the sky layer, which spans the
+  map, for them every frame: 26 fps became 11. The secrets that keep their
+  own hours are paused while they are away; the fireworks only get their
+  animation at New Year.
+- **The cards were animating below the fold.** The grid was watched as one
+  block and woken 200px early, and at a desktop's height it starts just
+  under the island, so all thirty-one buildings in it ran all the time.
+  Each card now moves only while it is itself on screen.
+- **A paused animation keeps its layer.** Culling paused the buildings and
+  walkers far from the middle, which stopped their frames but kept every
+  layer. Culled things now lose their animations outright and rest in
+  their still pose; only movers (a walker, a boat) are paused, so they hold
+  their place on the path.
+- **A filter on something moving is drawn again every frame.** The
+  balloons' and the plane's night dimming was `filter: brightness()`, and
+  took night from 36 fps to 13. They are dimmed now by a shade of the
+  veil's blue over their own silhouette.
+
+Eleven frames a second became about fifty by day and by night (45 to 59
+from run to run on a busy laptop), and the same on a phone. `check-island` holds the line: no filter anywhere on the map,
+culled things drop their animations, the hidden secrets are still. (Two
+ideas measured worse and were dropped: running the animations on the main
+thread instead, at 10 fps, and flattening every `opacity` onto fills.)
+
 **Day and night follow the visitor's clock**: dawn from six, day from eight,
 dusk from six in the evening, night from eight. The map's `data-time` turns
 on a night layer (hidden in the markup itself, so a still render is day; by
