@@ -267,3 +267,43 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 @keyframes tr-lever { 0%, 30% { transform: rotate(0); } 31%, 100% { transform: rotate(-40deg); } }
 .isle .robot { animation: isl-bob 1.8s ease-in-out infinite; }
 .isle .lm:hover .dt-fossil { animation: isl-blink 0.6s steps(2, jump-none) 3; }
+
+/* ---- things to poke -----------------------------------------------------------
+   A poke plays once on the wrapper (.poked, for a few seconds), so whatever
+   moves inside it carries on. Under reduced motion the words still show. */
+.isle .pk { pointer-events: visiblePainted; cursor: pointer; }
+.isle .pk-say { opacity: 0; pointer-events: none; }
+.isle .poked > .pk-say { animation: pk-say 2.4s ease-out; }
+@keyframes pk-say { 0% { opacity: 0; transform: translateY(4px); } 12%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+html:not(.play) .isle .poked > .pk-say { opacity: 1; }
+.isle .pk.poked { transform-box: fill-box; transform-origin: 50% 100%; }
+.isle .pk-whale.poked, .isle .pk-dawnwhale.poked { animation: pk-dive 2.6s ease-in-out; }
+@keyframes pk-dive { 30% { transform: translateY(10px); opacity: 0.25; } 55% { transform: translateY(14px); opacity: 0; } 80% { transform: translateY(-5px); opacity: 1; } }
+.isle .pk-sheep.poked, .isle .pk-duck.poked, .isle .pk-castaway.poked, .isle .pk-bottle.poked, .isle .pk-ferry.poked { animation: pk-hop 0.9s ease-out; }
+@keyframes pk-hop { 25% { transform: translateY(-9px); } 50% { transform: none; } 70% { transform: translateY(-4px); } }
+.isle .pk-windmill.poked .mill-sails { animation-duration: 0.45s; }
+.isle .pk-balloon.poked { animation: pk-rise 5s ease-in-out; }
+@keyframes pk-rise { 30% { transform: translateY(-110px); } }
+.isle .pk-crab.poked { animation: pk-scurry 1.6s ease-in-out; }
+@keyframes pk-scurry { 30%, 60% { transform: translateX(26px); } }
+.isle .pk-fountain.poked .fount-up { animation: pk-jet 1.6s ease-out; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes pk-jet { 30% { transform: scaleY(3.4); } }
+.isle .pk-kite.poked .kite { animation: pk-loop 1.4s ease-in-out; transform-box: fill-box; transform-origin: 50% 50%; }
+@keyframes pk-loop { to { transform: rotate(360deg); } }
+.isle .pk-dolphin.poked { animation: pk-leap 1.4s ease-out; }
+@keyframes pk-leap { 40% { transform: translate(8px, -26px) rotate(-10deg); } }
+.isle .pk-gull.poked > :not(.pk-say) { animation: pk-flyoff 3s ease-in-out; }
+@keyframes pk-flyoff { 30%, 70% { transform: translate(30px, -40px); opacity: 0; } }
+.isle .pk-deer.poked { animation: pk-run 2.4s ease-in-out; }
+@keyframes pk-run { 35%, 65% { transform: translateX(-34px); } }
+.isle .pk-treasure.poked, .isle .pk-house32.poked { animation: pk-jiggle 0.8s ease-in-out; }
+@keyframes pk-jiggle { 25% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } 75% { transform: rotate(-3deg); } }
+.isle .pk-ufo.poked { animation: pk-zip 3.4s ease-in-out; }
+@keyframes pk-zip { 25%, 70% { transform: translate(260px, -220px) scale(0.4); opacity: 0; } }
+/* Secrets that keep their own hours. */
+.isle .ufo { display: none; }
+[data-hour='3'] .isle .ufo { display: inline; }
+.isle .dawn-whale { display: none; }
+[data-time='dawn'] .isle .dawn-whale { display: inline; }
+.isle .breach { animation: pk-breach 6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes pk-breach { 0%, 100% { transform: translateY(18px) scaleY(0.4); opacity: 0; } 20%, 60% { transform: none; opacity: 1; } 80% { transform: translateY(18px) scaleY(0.4); opacity: 0; } }

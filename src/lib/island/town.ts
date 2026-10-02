@@ -15,6 +15,15 @@ const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0
 const blob = (x: number, y: number, rx: number, ry: number) => `M${f(x - rx)} ${f(y)}a${f(rx)} ${f(ry)} 0 1 0 ${f(rx * 2)} 0a${f(rx)} ${f(ry)} 0 1 0 ${f(-rx * 2)} 0`
 const SKIN = ['#f1d9c6', '#e0b899', '#c99a78', '#8f6650']
 
+/** A speech bubble over something you can poke, shown when you do (see .pk-say). */
+export function sayBubble(w: N, x: number, y: number, text: string) {
+  const b = w.add(new N('g', { class: 'pk-say' }))
+  const wd = text.length * 4.4 + 12
+  b.add(new N('path', { d: `M${f(x - wd / 2)} ${f(y - 12)}h${f(wd)}v11h${f(-wd / 2 + 3)}l-3 4l-3 -4h${f(-wd / 2 + 3)}z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }))
+  b.add(new N('text', { x: f(x), y: f(y - 4.2), 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 7, fill: INK }).text(text))
+  return b
+}
+
 /* ---- houses ---------------------------------------------------------------- */
 
 /**
@@ -478,26 +487,62 @@ export function secretIslet(p: Pen, x: number, y: number) {
   const xm = p.plane(x + 0.62, y + 0.32, -7)
   xm.add(new N('path', { d: 'M-0.1 -0.1L0.1 0.1M0.1 -0.1L-0.1 0.1', stroke: C.rasp, 'stroke-width': 0.05, 'stroke-linecap': 'round' }))
   const z = -7
-  const ch = p.box(x + 0.66, y + 0.05, 0.16, 0.11, 5, { z0: z, fill: C.wood, sw: 1 })
-  p.band(ch, 1.5, 2.6, '#ffd98a')
-  p.poly([[x + 0.66, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 10], [x + 0.66, y + 0.05, z + 10]], shade(C.wood, 1.1), { sw: 1 })
+  const tr = p.el('g', { 'data-poke': 'treasure', class: 'pk pk-treasure' })
+  const [hx, hy] = p.at(x + 0.74, y + 0.11, z)
+  tr.add(new N('circle', { cx: f(hx), cy: f(hy - 4), r: 13, fill: 'transparent' }))
+  const tp = new Pen(tr, p.ox, p.oy, p.oz, p.b, p.lights)
+  const ch = tp.box(x + 0.66, y + 0.05, 0.16, 0.11, 5, { z0: z, fill: C.wood, sw: 1 })
+  tp.band(ch, 1.5, 2.6, '#ffd98a')
+  tp.poly([[x + 0.66, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 10], [x + 0.66, y + 0.05, z + 10]], shade(C.wood, 1.1), { sw: 1 })
   const [gx, gy] = p.at(x + 0.74, y + 0.11, z + 6)
-  p.el('path', { d: `M${f(gx)} ${f(gy - 5)}l1.2 3.8l3.8 1.2l-3.8 1.2l-1.2 3.8l-1.2 -3.8l-3.8 -1.2l3.8 -1.2z`, fill: '#ffffff', stroke: '#ffd98a', 'stroke-width': 0.6, class: 'twinkle' })
+  tp.el('path', { d: `M${f(gx)} ${f(gy - 5)}l1.2 3.8l3.8 1.2l-3.8 1.2l-1.2 3.8l-1.2 -3.8l-3.8 -1.2l3.8 -1.2z`, fill: '#ffffff', stroke: '#ffd98a', 'stroke-width': 0.6, class: 'twinkle' })
+  sayBubble(tr, gx, gy - 12, 'treasure!')
   // The castaway's hut: driftwood and a leaf roof.
   const h = p.box(x - 0.15, y - 0.45, 0.34, 0.26, 13, { z0: z, fill: '#c9b8e8', sw: 1.2 })
   p.door(h, 'y', 0.5, { w: 0.1, h: 8, fill: shade(C.wood, 0.7) })
   p.gable(x - 0.15, y - 0.45, 0.34, 0.26, z + 13, 9, C.leaf2, 'y', { lines: 2, over: 0.08 })
   tree(p.move(0, 0, z), x - 0.55, y - 0.3, 'palm', C.leaf, 1)
   tree(p.move(0, 0, z), x + 0.62, y - 0.42, 'palm', C.leaf, 0.75)
-  person(p.move(0, 0, z), x - 0.42, y + 0.18, '#ffffff', { pose: 'wave', skin: '#e0b899' })
+  const cw = p.el('g', { 'data-poke': 'castaway', class: 'pk pk-castaway' })
+  const [qx, qy] = p.at(x - 0.42, y + 0.18, z)
+  cw.add(new N('circle', { cx: f(qx), cy: f(qy - 9), r: 13, fill: 'transparent' }))
+  person(new Pen(cw, p.ox, p.oy, p.oz + z, p.b, p.lights), x - 0.42, y + 0.18, '#ffffff', { pose: 'wave', skin: '#e0b899' })
+  sayBubble(cw, qx, qy - 26, 'help!')
   // A message in a bottle, bobbing in towards the island.
   const [bx, by] = p.at(x - 1.6, y + 1.2, -12)
-  const b = p.el('g', { class: 'bob' })
+  const bw = p.el('g', { 'data-poke': 'bottle', class: 'pk pk-bottle' })
+  bw.add(new N('circle', { cx: f(bx), cy: f(by - 2), r: 12, fill: 'transparent' }))
+  const b = bw.add(new N('g', { class: 'bob' }))
   b.add(new N('ellipse', { cx: f(bx), cy: f(by + 1), rx: 7, ry: 2, fill: '#ffffff', opacity: 0.6 }))
   b.add(new N('path', { d: `M${f(bx - 6)} ${f(by - 1)}q0 -4 4 -4h5l2 -1.6v4.2l-2 -1h-5q-4 0 -4 -4z`, fill: '#bdf0da', stroke: INK, 'stroke-width': 0.9, opacity: 0.95 }))
   b.add(new N('path', { d: `M${f(bx - 3)} ${f(by - 3)}h4`, stroke: '#ffffff', 'stroke-width': 1.4 }))
   p.grow(sx - 100, sy - 60, sx + 100, sy + 46)
 }
 
+
+
+/**
+ * The 32nd building: a hobbit-hole of a house dug into the back of Sky
+ * Peaks, a round blue door, a lamp, a chimney, and a sign that says only 32.
+ * It is not a game. Not yet.
+ */
+export function house32(p: Pen, x: number, y: number) {
+  const [sx, sy] = p.at(x, y)
+  p.el('ellipse', { cx: sx - 6, cy: sy + 2, rx: 24, ry: 7, fill: INK, opacity: 0.12 })
+  p.dome(x, y, 0.36, 0, '#3fcf9f')
+  const [dx, dy] = p.at(x + 0.1, y + 0.28, 0)
+  p.el('path', { d: `M${f(dx - 6)} ${f(dy)}v-6a6 6 0 0 1 12 0v6z`, fill: C.cobalt, stroke: INK, 'stroke-width': 1.2 })
+  p.el('circle', { cx: dx, cy: dy - 6, r: 1.2, fill: '#ffd98a', stroke: INK, 'stroke-width': 0.5 })
+  const [wx, wy] = p.at(x + 0.32, y + 0.05, 7)
+  p.el('circle', { cx: wx, cy: wy, r: 3.2, fill: C.glass, stroke: INK, 'stroke-width': 1 })
+  p.light([wx, wy], p.el('circle', { cx: wx, cy: wy, r: 2, fill: C.glassHi }), '#ffe6a1')
+  p.box(x - 0.12, y - 0.16, 0.08, 0.08, 9, { z0: 15, fill: C.stone2, sw: 1 })
+  // The sign, on its post.
+  const [px, py] = p.at(x + 0.42, y + 0.42)
+  p.el('path', { d: `M${f(px)} ${f(py)}v-13`, stroke: C.wood, 'stroke-width': 1.6 })
+  p.el('rect', { x: px - 6, y: py - 19, width: 12, height: 7, rx: 1.5, fill: '#ffffff', stroke: INK, 'stroke-width': 1 })
+  p.el('text', { x: px, y: py - 13.6, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 5.4, fill: INK }).text('32')
+  p.grow(sx - 26, sy - 30, sx + 26, sy + 6)
+}
 
 export { S }

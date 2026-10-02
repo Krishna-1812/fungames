@@ -363,3 +363,23 @@ export function tumbleweed(p: Pen, x: number, y: number, delay = 0) {
   ball.add(new N('path', { d: `M${f(bx - 5)} ${f(by - 8)}q5 -3 10 3M${f(bx - 4)} ${f(by - 3)}q4 -7 8 -6M${f(bx - 2)} ${f(by - 11)}q3 6 -1 10`, fill: 'none', stroke: '#9d8fd0', 'stroke-width': 1, 'stroke-linecap': 'round' }))
   p.grow(bx - 50, by - 16, bx + 50, by + 4)
 }
+
+/** A big whale breaching, arched out of the sea in a burst of spray. Only at dawn. */
+export function dawnWhale(x: number, y: number): N {
+  const g = new N('g', { class: 'dawn-whale' })
+  g.add(new N('ellipse', { cx: f(x), cy: f(y + 4), rx: 60, ry: 13, fill: '#ffffff', opacity: 0.55 }))
+  const b = g.add(new N('g', { class: 'breach' }))
+  // The body, rising out of the water and arching back, snout to the sky.
+  const front = `C${f(x + 14)} ${f(y - 62)} ${f(x + 22)} ${f(y - 50)} ${f(x + 18)} ${f(y - 36)}C${f(x + 14)} ${f(y - 20)} ${f(x + 12)} ${f(y - 8)} ${f(x + 14)} ${f(y + 4)}`
+  b.add(new N('path', { d: `M${f(x - 30)} ${f(y + 4)}C${f(x - 32)} ${f(y - 26)} ${f(x - 16)} ${f(y - 50)} ${f(x + 2)} ${f(y - 58)}${front}Z`, fill: '#5a74c9', stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
+  // The pale, grooved throat and belly down its front.
+  b.add(new N('path', { d: `M${f(x + 2)} ${f(y - 58)}${front}H${f(x + 2)}C${f(x)} ${f(y - 14)} ${f(x + 4)} ${f(y - 34)} ${f(x + 2)} ${f(y - 58)}Z`, fill: '#dfe7ff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
+  for (const t of [0.25, 0.45, 0.65, 0.85]) b.add(new N('path', { d: `M${f(x + 4 + t * 4)} ${f(y - 56 + t * 58)}q6 -2 ${f(10 - t * 2)} -4`, fill: 'none', stroke: '#9aaee6', 'stroke-width': 1.1, 'stroke-linecap': 'round' }))
+  // A long white flipper, flung out, and an eye.
+  b.add(new N('path', { d: `M${f(x - 8)} ${f(y - 30)}q-24 -6 -34 6q14 2 34 2z`, fill: '#eef2ff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
+  b.add(new N('circle', { cx: f(x + 6), cy: f(y - 44), r: 1.8, fill: INK }))
+  b.add(new N('path', { d: `M${f(x - 24)} ${f(y - 18)}C${f(x - 20)} ${f(y - 38)} ${f(x - 10)} ${f(y - 50)} ${f(x - 2)} ${f(y - 54)}`, fill: 'none', stroke: '#8fa3e6', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.7 }))
+  for (const [dx, dy, r] of [[-44, -6, 3], [-38, -16, 2.4], [24, -2, 3.4], [34, -10, 2.2], [-20, 0, 2.6], [10, 2, 2.4], [44, -2, 2]]) g.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r, fill: '#ffffff', stroke: INK, 'stroke-width': 0.8 }))
+  g.add(new N('path', { d: `M${f(x - 56)} ${f(y + 6)}q56 14 112 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2.4, 'stroke-linecap': 'round' }))
+  return g
+}

@@ -296,6 +296,18 @@ the map every frame. (A multiply blend graded the colours more prettily and
 cost two frames in three; the plain veil stayed.) The sun/moon button picks
 day or night by hand and remembers it in this browser.
 
+**Poke anything that moves.** The whale dives, the sheep say baa, the
+windmill races, a balloon shoots up and drifts back, a crab scurries, the
+fountain leaps, a kite loops the loop, a gull flies off and comes back.
+Each is wrapped in a group with `data-poke` naming it; the camera hands a
+click that was not a drag to the page, which plays the wrapper's reaction
+once (so whatever moves inside keeps moving) and remembers, in this
+browser, which of the eighteen kinds you have found. A chip keeps the
+count. Some are secrets: a castaway on the islet, buried treasure, a
+message in a bottle with a different note each time, a 32nd building
+tucked behind the stone circle, a whale that only breaches at dawn, and a
+UFO that only comes at three in the morning (`?hour=3` to see it).
+
 **The seasons follow the visitor's date**: snow from December to Twelfth
 Night, fireworks on New Year's Eve and Day, blossom falling in April, and
 all year a little rain cloud over the Universe Forecast. Snow and petals are

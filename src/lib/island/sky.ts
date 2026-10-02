@@ -50,3 +50,29 @@ export function plane(name: string): N {
   body.add(new N('path', { d: 'M23 -11v14', stroke: INK, 'stroke-width': 1.6, 'stroke-linecap': 'round', class: 'prop' }))
   return g
 }
+
+/**
+ * A flying saucer, hovering, its beam lifting a very surprised sheep. It
+ * only comes at three in the morning.
+ */
+export function ufo(x: number, y: number, ground: number): N {
+  const g = new N('g', { class: 'ufo' })
+  const defs = g.add(new N('defs')).add(new N('linearGradient', { id: 'isl-ufo-beam', x1: 0, y1: 0, x2: 0, y2: 1 }))
+  defs.add(new N('stop', { offset: 0, 'stop-color': '#d8f7ec', 'stop-opacity': 0.7 }))
+  defs.add(new N('stop', { offset: 1, 'stop-color': '#d8f7ec', 'stop-opacity': 0.08 }))
+  g.add(new N('ellipse', { cx: f(x), cy: f(ground), rx: 34, ry: 11, fill: '#d8f7ec', opacity: 0.35 }))
+  g.add(new N('path', { d: `M${f(x - 12)} ${f(y + 4)}L${f(x - 34)} ${f(ground)}h68L${f(x + 12)} ${f(y + 4)}Z`, fill: 'url(#isl-ufo-beam)', class: 'ufo-beam' }))
+  // The sheep, on its way up.
+  const s = g.add(new N('g', { class: 'ufo-sheep' }))
+  const sy = (y + ground) / 2 + 10
+  s.add(new N('path', { d: `M${f(x - 7)} ${f(sy)}a4 4 0 0 1 3 -6a4 4 0 0 1 7 0a4 4 0 0 1 4 6z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1 }))
+  s.add(new N('ellipse', { cx: f(x + 8), cy: f(sy - 3), rx: 2.6, ry: 2.2, fill: INK }))
+  s.add(new N('path', { d: `M${f(x - 4)} ${f(sy)}v3M${f(x + 3)} ${f(sy)}v3`, stroke: INK, 'stroke-width': 1.2, 'stroke-linecap': 'round' }))
+  const bob = g.add(new N('g', { class: 'bob' }))
+  bob.add(new N('path', { d: `M${f(x - 11)} ${f(y - 4)}a11 10 0 0 1 22 0z`, fill: C.glassHi, stroke: INK, 'stroke-width': OUT }))
+  bob.add(new N('path', { d: `M${f(x - 6)} ${f(y - 8)}q2 -4 6 -5`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round' }))
+  bob.add(new N('ellipse', { cx: f(x), cy: f(y - 2), rx: 28, ry: 8, fill: '#c9d2ee', stroke: INK, 'stroke-width': OUT }))
+  bob.add(new N('ellipse', { cx: f(x), cy: f(y + 1), rx: 14, ry: 3.6, fill: '#9aa8d8', stroke: INK, 'stroke-width': 1 }))
+  for (let k = 0; k < 6; k++) bob.add(new N('circle', { cx: f(x - 20 + k * 8), cy: f(y - 2 + (k === 0 || k === 5 ? -1 : 0.6)), r: 1.8, fill: [C.mint, C.rasp, '#ffffff'][k % 3], class: 'chase', style: `animation-delay:${k * 0.15}s` }))
+  return g
+}

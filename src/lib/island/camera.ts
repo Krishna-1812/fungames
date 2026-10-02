@@ -29,6 +29,8 @@ export function initIsland(o: {
   anchors: Record<string, Anchor>
   games: Record<string, GameInfo>
   onEnter?: (slug: string) => void
+  /** Something that is not a building was clicked (it carries data-poke). */
+  onPoke?: (el: Element) => void
 }) {
   const { box, stage, world, anchors, games } = o
   const svg = world
@@ -115,13 +117,16 @@ export function initIsland(o: {
 
   /* ---- pointers: drag, pinch, wheel, double-click ------------------------ */
   const ptrs = new Map<number, { x: number; y: number }>()
-  let moved = 0, last = { x: 0, y: 0, t: 0 }, pinch0 = 0, pinchZ = 1
+  let moved = 0, last = { x: 0, y: 0, t: 0 }, pinch0 = 0, pinchZ = 1, pressed: Element | null = null
   let interacted = false
   setTimeout(() => hint?.classList.add('is-gone'), 9000)
   function firstTouch() { if (interacted) return; interacted = true; hint?.classList.add('is-gone'); svg.classList.remove('is-intro') }
   stage.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    // The stage takes the pointer for the drag, which makes the click that
+    // follows land on the stage: remember what was really pressed.
+    pressed = e.target as Element
     stage.setPointerCapture(e.pointerId)
     dragging = true; moved = 0; vel = { x: 0, y: 0 }
     last = { x: e.clientX, y: e.clientY, t: performance.now() }
@@ -310,15 +315,27 @@ export function initIsland(o: {
     a.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && !dragging) showCard(slug) })
     a.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hideCard(false) })
     a.addEventListener('focus', () => { flyToSlug(slug, 2.2); showCard(slug) })
-    a.addEventListener('click', (e) => {
-      e.preventDefault()
-      if (moved > 6) return
-      // On a touch screen the first tap shows the card; the second goes in.
-      if (touchish && hot !== slug) { showCard(slug); flyToSlug(slug, 2); return }
-      enter(slug)
-    })
+    // A click that reaches the link itself (the keyboard's Enter does).
+    a.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); pick(slug) })
   }
-  stage.addEventListener('click', (e) => { if (!(e.target as Element).closest('a.lm') && moved <= 6) hideCard() })
+  // On a touch screen the first tap shows the card; the second goes in.
+  function pick(slug: string) {
+    if (moved > 6) return
+    if (touchish && hot !== slug) { showCard(slug); flyToSlug(slug, 2); return }
+    enter(slug)
+  }
+  // A click with the mouse or a finger lands here, not on what was pressed:
+  // the stage took the pointer for dragging (see pointerdown). So this is
+  // where a building, or something to poke, is found and acted on.
+  stage.addEventListener('click', (e) => {
+    const t = (pressed ?? e.target) as Element
+    if (moved > 6) return
+    const lm = t.closest<SVGAElement>('a.lm')
+    if (lm?.dataset.slug) { e.preventDefault(); pick(lm.dataset.slug); return }
+    const pk = t.closest('[data-poke]')
+    if (pk) { o.onPoke?.(pk); return }
+    hideCard()
+  })
 
   /* ---- going in: the camera dives, a circle closes, the game opens ------- */
   const iris = box.querySelector<HTMLElement>('.isl-iris')!

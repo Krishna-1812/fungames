@@ -13,9 +13,9 @@ import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, 
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { beacon } from './lm-harbour'
-import { hotAirBalloon, plane as skyPlane } from './sky'
-import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet } from './town'
-import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, hoodoo, boulders, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
+import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
+import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble } from './town'
+import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, hoodoo, boulders, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed, dawnWhale } from './nature'
 
 export const GRID = 30
 const SEA = -12
@@ -160,6 +160,23 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     console.log(out)
   }
   /* ---- the painting ------------------------------------------------------ */
+  // Things to poke. Each is wrapped in a group the page listens on
+  // (data-poke names what it is); the reaction plays on the wrapper, so
+  // whatever moves inside it keeps moving. A small thing gets a ring of
+  // nothing round it to tap, and some have something to say.
+  const pokeN = (kind: string, hit?: [number, number, number]) => {
+    const w = new N('g', { 'data-poke': kind, class: `pk pk-${kind}` })
+    if (hit) w.add(new N('circle', { cx: f(hit[0]), cy: f(hit[1]), r: hit[2], fill: 'transparent' }))
+    return w
+  }
+  const poke = (p: Pen, kind: string, x: number, y: number, words?: string, z = 26): Pen => {
+    const [sx, sy] = p.at(x, y)
+    const w = p.el('g', { 'data-poke': kind, class: `pk pk-${kind}` })
+    w.add(new N('circle', { cx: f(sx), cy: f(sy - 8), r: 15, fill: 'transparent' }))
+    const inner = w.add(new N('g'))
+    if (words) { const [bx, by] = p.at(x, y, z); sayBubble(w, bx, by, words) }
+    return new Pen(inner, p.ox, p.oy, p.oz, p.b, p.lights)
+  }
   // A fixed hash, for choices that must line up from one tile to the next.
   const hz = (a: number, b: number, c: number) => { const v = Math.sin(a * 12.9898 + b * 78.233 + c * 3.71) * 43758.5453; return v - Math.floor(v) }
   // The island is painted in layers, each its own SVG, so an animation only
@@ -239,7 +256,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     root.add(new N('path', { d: `M${f(x - 9 * k)} ${f(y - 8 * k)}l5 -3`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.7 }))
     root.add(new N('path', { d: `M${f(x - 18 * k)} ${f(y + 5)}q${f(18 * k)} ${f(7 * k)} ${f(36 * k)} 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-linecap': 'round' }))
     // A gull on every other rock.
-    if (seaRocks.indexOf(rk) % 2 === 0) root.add(gullStanding(x - 1 * k, y - 13.5 * k, seaRocks.indexOf(rk) % 4 === 0))
+    if (seaRocks.indexOf(rk) % 2 === 0) { const w = root.add(pokeN('gull', [x, y - 16 * k, 14])); w.add(gullStanding(x - 1 * k, y - 13.5 * k, seaRocks.indexOf(rk) % 4 === 0)); sayBubble(w, x, y - 26 * k, 'squawk!') }
   }
   const sandbar = [30.2, 24.4]
   if (clearOf(30, 24, 1)) {
@@ -329,9 +346,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // Dolphins leaping, and a whale further out, now and then blowing.
   ;[[33, 13, 0, false], [16, 34, 2.6, true], [-3, 16, 5.1, false]].forEach(([i, j, d, flip]) => {
     const [x, y] = P(i as number, j as number, SEA)
-    root.add(dolphin(x, y, d as number, flip as boolean))
+    root.add(pokeN('dolphin', [x, y - 14, 22])).add(dolphin(x, y, d as number, flip as boolean))
   })
-  { const [x, y] = P(3, 29.5, SEA); root.add(whale(x, y)) }
+  { const [x, y] = P(3, 29.5, SEA); const w = root.add(pokeN('whale', [x, y - 10, 34])); w.add(whale(x, y)); sayBubble(w, x, y - 44, 'pfffsh!') }
+  // A second whale, much bigger, that only comes up at dawn.
+  { const [x, y] = P(36, 21, SEA); root.add(pokeN('dawnwhale')).add(dawnWhale(x, y)) }
   // Rowing boats tied up at the piers, and buoys off the harbour.
   for (const [n, pts] of PIERS.slice(0, 2).entries()) { const [ei, ej] = pts[pts.length - 1], [si, sj] = pts[0]; const di = Math.sign(ei - si), dj = Math.sign(ej - sj); const [x, y] = P(ei - di * 0.6 + (dj ? 0.42 : 0), ej - dj * 0.6 + (di ? 0.42 : 0), SEA); root.add(rowboat(x, y, n ? C.cobalt : C.mint)) }
   ;[[30, 21], [26.5, 29.2], [31, 16.5]].forEach(([i, j], n) => { const [x, y] = P(i, j, SEA); root.add(buoy(x, y, n * 1.4)) })
@@ -350,7 +369,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     const a = P(FERRY.from[0], FERRY.from[1], SEA), b = P(FERRY.dock[0], FERRY.dock[1], SEA)
     const pose = (q: [number, number], dir: number) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px) scaleX(${dir})`
     motionCss.push(`@keyframes isl-ferry{0%{${pose(a, -1)};opacity:0}4%{opacity:1}32%,62%{${pose(b, -1)}}62.4%{${pose(b, 1)}}95%{opacity:1}100%{${pose(a, 1)};opacity:0}}`)
-    const g = root.add(new N('g', { class: 'mover amb', 'data-b': `${f(a[0] - 40)} ${f(b[1] - 40)} ${f(b[0] + 40)} ${f(a[1] + 20)}`, style: `animation:isl-ferry ${FERRY_DUR}s linear infinite` }))
+    const g = root.add(pokeN('ferry')).add(new N('g', { class: 'mover amb', 'data-b': `${f(a[0] - 40)} ${f(b[1] - 40)} ${f(b[0] + 40)} ${f(a[1] + 20)}`, style: `animation:isl-ferry ${FERRY_DUR}s linear infinite` }))
     g.add(ferry())
   }
   // The islet with the secret, far out to the west.
@@ -708,8 +727,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // Two ducks going round the pond.
   if (pond.size) {
     const loop = (ri: number, rj: number): [number, number][] => Array.from({ length: 20 }, (_, k) => { const a = (k / 20) * Math.PI * 2; return P(15 + Math.cos(a) * ri, 10.5 + Math.sin(a) * rj) })
-    walkers.add(duck(loop(0.42, 0.85), 'duck0', 26, 0))
-    walkers.add(duck(loop(0.3, 0.6).reverse(), 'duck1', 19, 7, '#b9a6ff'))
+    walkers.add(pokeN('duck')).add(duck(loop(0.42, 0.85), 'duck0', 26, 0))
+    walkers.add(pokeN('duck')).add(duck(loop(0.3, 0.6).reverse(), 'duck1', 19, 7, '#b9a6ff'))
   }
 
   /* ---- everything standing up, back to front ---------------------------- */
@@ -736,7 +755,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   }
   /* ---- the wild things and the farm ---------------------------------------- */
   const at = (i: number, j: number, depth: number, fn: (p: Pen) => void, z = height[Math.floor(i)]?.[Math.floor(j)] ?? 0) => things.push({ depth, draw: (layer) => fn(new Pen(layer, 0, 0, z, new Bounds(), lights)) })
-  if (mill) at(mill[0] + 0.5, mill[1] + 0.5, mill[0] + mill[1] + 1, (p) => windmill(p, mill[0] + 0.5, mill[1] + 0.5))
+  if (mill) at(mill[0] + 0.5, mill[1] + 0.5, mill[0] + mill[1] + 1, (p) => windmill(poke(p, 'windmill', mill[0] + 0.5, mill[1] + 0.5, 'whoosh!', 62), mill[0] + 0.5, mill[1] + 0.5))
   for (const [i, j] of bales) for (const [u, v] of [[0.35, 0.4], [0.65, 0.62]]) at(i + u, j + v, i + j + u + v, (p) => bale(p, i + u, j + v))
   if (archAt) at(archAt[0] + 0.5, archAt[1] + 0.5, archAt[0] + archAt[1] + 1, (p) => arch(p, archAt[0] + 0.5, archAt[1] + 0.5))
   for (const [i, j, h] of buttes) at(i + 0.5, j + 0.5, i + j + 1, (p) => butte(p, i + 0.5, j + 0.5, h))
@@ -745,17 +764,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // Sheep graze the low slopes of Sky Peaks; deer stand at the forest edge.
   ;[[10.5, 3.4, false], [10.35, 5.3, true], [11.45, 6.6, false], [9.55, 9.55, true], [10.6, 7.7, false]].forEach(([i, j, flip], n) => {
     if (!free(Math.floor(i as number), Math.floor(j as number))) return
-    at(i as number, j as number, (i as number) + (j as number), (p) => sheep(p, i as number, j as number, flip as boolean, n * 1.7))
+    at(i as number, j as number, (i as number) + (j as number), (p) => sheep(poke(p, 'sheep', i as number, j as number, 'baa!', 16), i as number, j as number, flip as boolean, n * 1.7))
   })
   ;[[8.5, 9.45, false], [6.45, 1.5, true]].forEach(([i, j, flip], n) => {
     if (!free(Math.floor(i as number), Math.floor(j as number))) return
-    at(i as number, j as number, (i as number) + (j as number), (p) => deer(p, i as number, j as number, flip as boolean, n * 3))
+    at(i as number, j as number, (i as number) + (j as number), (p) => deer(poke(p, 'deer', i as number, j as number), i as number, j as number, flip as boolean, n * 3))
   })
   for (const [i, j] of [[10.5, 2.5], [12.5, 7.5], [4.6, 1.5]]) if (free(Math.floor(i), Math.floor(j))) at(i, j, i + j, (p) => toadstools(p, i, j))
   // Reeds round the pond and along the river's banks.
   for (const [i, j] of [[14.22, 9.25], [15.8, 11.72], [14.2, 11.75], [15.82, 9.3], [7.12, 6.5], [7.86, 9.4], [7.85, 5.3], [7.14, 10.6]]) at(i, j, i + j, (p) => reeds(p, i, j, 0.85))
   // Crabs on the beaches, a tumbleweed in the Badlands.
-  ;[[8.5, 13.5], [24.5, 24.6], [13.5, 27.5], [3.5, 17.4]].forEach(([i, j], n) => { if (beach.has(key(Math.floor(i), Math.floor(j)))) at(i, j, i + j, (p) => crab(p, i, j, n * 2.3)) })
+  ;[[8.5, 13.5], [24.5, 24.6], [13.5, 27.5], [3.5, 17.4]].forEach(([i, j], n) => { if (beach.has(key(Math.floor(i), Math.floor(j)))) at(i, j, i + j, (p) => crab(poke(p, 'crab', i, j, 'snip!', 12), i, j, n * 2.3)) })
   if (free(23, 7) || isLand(23, 7)) at(23.5, 6.5, 30, (p) => tumbleweed(p, 23.5, 6.5, 2))
   // Butterflies over the brightest meadows.
   {
@@ -834,13 +853,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     for (const [i, j] of cands) if (free(i, j) && ok(i, j)) { reserved.add(key(i, j)); fn(i, j); return true }
     return false
   }
-  spot([[13, 16], [16, 13], [12, 13], [11, 17], [13, 11]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => fountain(p, i + 0.5, j + 0.5)))
+  spot([[13, 16], [16, 13], [12, 13], [11, 17], [13, 11]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => fountain(poke(p, 'fountain', i + 0.5, j + 0.5, 'splash!', 34), i + 0.5, j + 0.5)))
   spot([[16, 16], [16, 15], [16, 17], [12, 14], [9, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => busStop(p, i + 0.5, j + 0.45)), (i, j) => height[i][j] === 0 && [[1, 0], [0, 1], [-1, 0], [0, -1]].some(([a, b]) => road.has(key(i + a, j + b))))
   // The park: a picnic, someone flying a kite, a playground.
   spot([[16, 18], [16, 14], [12, 15], [11, 13]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => picnic(p, i + 0.5, j + 0.5, [C.cobalt, C.rasp])))
-  spot([[16, 17], [17, 17], [13, 19], [12, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(p, i + 0.5, j + 0.5, C.lilac, C.rasp, 1)))
+  spot([[16, 17], [17, 17], [13, 19], [12, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(poke(p, 'kite', i + 0.5, j + 0.5, 'wheee!', 30), i + 0.5, j + 0.5, C.lilac, C.rasp, 1)))
   spot([[11, 18], [12, 19], [13, 15], [17, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => playground(p, i + 0.5, j + 0.5)))
-  spot([[13, 22], [12, 21], [10, 23], [16, 23]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(p, i + 0.5, j + 0.5, C.mint, C.cobalt, 4)))
+  spot([[13, 22], [12, 21], [10, 23], [16, 23]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(poke(p, 'kite', i + 0.5, j + 0.5, 'wheee!', 30), i + 0.5, j + 0.5, C.mint, C.cobalt, 4)))
+  // The 32nd building: tucked away at the very back of Sky Peaks, among
+  // the pines, where hardly anyone looks.
+  spot([[1, 7], [2, 7], [2, 6], [1, 8], [3, 3]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => house32(poke(p, 'house32', i + 0.5, j + 0.5, 'shh!', 34), i + 0.5, j + 0.5)), (i, j) => height[i][j] >= 12)
   // A campsite high on the peaks: two tents round a fire.
   {
     const cells: [number, number][] = [[3, 4], [3, 5], [2, 5]]
@@ -1156,9 +1178,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
   ;([[9, 26, 230, C.rasp, '#ffffff', 0], [26, 10, 260, C.cobalt, C.mint, 40]] as [number, number, number, string, string, number][]).forEach(([i, j, z, a, b, d], n) => {
     const [x, y] = P(i, j, z)
-    sky.add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d))
+    sky.add(pokeN('balloon')).add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d))
   })
   sky.add(skyPlane('isl-plane'))
+  { const [x, y] = P(23.4, 6.4, 170), [, gy] = P(23.4, 6.4, 0); sky.add(pokeN('ufo')).add(ufo(x, y, gy)) }
   { const [x, y] = P(24, 23, 150); sky.add(gullsCircling(x, y, 70, 26, 'gulls0', 14)) }
   { const [x, y] = P(5, 20, 130); sky.add(gullsCircling(x, y, 50, 20, 'gulls1', 11)) }
   for (const [n, d] of [[0, 0], [1, 18]]) {

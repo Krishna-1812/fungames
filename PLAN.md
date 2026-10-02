@@ -2717,9 +2717,22 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     night layer. The night layer is now out of the page by day, the beam is
     a layer the page turns whole, and the veil is a plain wash.
 
-65. Next, in order, unless the order changes: things to poke and easter
-    eggs; a passport of visited games and optional sound; then polish,
-    phones and speed.
+65. ~~**The island, made real: things to poke, and secrets.**~~ **done.**
+    Eighteen kinds of thing react when you poke them (the whale dives,
+    sheep say baa, the windmill races, balloons shoot up, crabs scurry,
+    the fountain leaps, kites loop, gulls fly off, the ferry toots), and a
+    chip counts how many you have found. Six are secrets: a castaway, a
+    treasure chest, a message in a bottle with four different notes, a
+    32nd building behind the stone circle, a whale that breaches only at
+    dawn, a UFO only at three in the morning. And a bug that had been
+    live for a while: the camera takes the pointer for dragging, which
+    makes the browser send the click to the map rather than to the thing
+    pressed, so clicking a building showed its card but never went in
+    (only the card's Play button did). The camera now remembers what was
+    pressed and acts on that, for buildings and pokes alike.
+
+66. Next, in order, unless the order changes: a passport of visited
+    games and optional sound; then polish, phones and speed.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

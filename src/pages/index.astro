@@ -93,6 +93,9 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
         <h1 class="isl-title">{count} small games on one tiny island</h1>
         <p class="isl-hint"><span class="isl-hint-long">Drag to explore · click any building to play</span><span class="isl-hint-short">Drag · pinch · tap a building</span></p>
 
+        <button type="button" class="isl-found" id="islFound" hidden></button>
+        <p class="isl-toast" id="islToast" role="status" aria-live="polite"></p>
+
         <div class="isl-zoom" role="group" aria-label="Zoom">
           <button type="button" id="zIn" aria-label="Zoom in">+</button>
           <button type="button" id="zOut" aria-label="Zoom out">−</button>
@@ -216,7 +219,41 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
   for (const s of data.slugs) data.games[s].best = readBest(s)
   document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => { const b = data.games[el.dataset.best!]?.best; if (b) { el.textContent = `Best ${b}`; el.classList.add('has-best') } })
 
-  const isle = initIsland({ box, stage: document.getElementById('islStage')!, world: svg, bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games })
+  /* ---- things to poke, and secrets to find ---------------------------------- */
+  const NAMES: Record<string, string> = { whale: 'the whale', dawnwhale: 'the dawn whale', sheep: 'a sheep', windmill: 'the windmill', balloon: 'a balloon', crab: 'a crab', fountain: 'the fountain', kite: 'a kite', dolphin: 'a dolphin', duck: 'a duck', gull: 'a gull', deer: 'the deer', ferry: 'the ferry', castaway: 'the castaway', treasure: 'the buried treasure', bottle: 'a message in a bottle', house32: 'the 32nd building', ufo: 'a UFO' }
+  const NOTES = [
+    'Day 212. The crabs have started to trust me. Send biscuits. (The castaway, the islet out west)',
+    'Whoever finds this: there are eighteen secrets on this island. You have found one of them.',
+    'If you are reading this, try the windmill. Try everything. Something comes at three in the morning.',
+    'The whale only shows off at dawn. Do not tell anyone I told you.',
+  ]
+  const foundEl = document.getElementById('islFound') as HTMLButtonElement, toastEl = document.getElementById('islToast')!
+  const kinds = [...new Set([...document.querySelectorAll<SVGElement>('#isle [data-poke]')].map((e) => e.dataset.poke!))]
+  const readFound = () => { try { return new Set<string>(JSON.parse(localStorage.getItem('isl-found') ?? '[]')) } catch { return new Set<string>() } }
+  const found = readFound()
+  let toastT = 0, note = 0
+  const toast = (msg: string, ms = 3400) => { toastEl.textContent = msg; toastEl.classList.add('is-on'); clearTimeout(toastT); toastT = window.setTimeout(() => toastEl.classList.remove('is-on'), ms) }
+  const showFound = () => {
+    const n = kinds.filter((k) => found.has(k)).length
+    foundEl.hidden = n === 0
+    foundEl.textContent = n === kinds.length ? `All ${n} found` : `${n} of ${kinds.length} found`
+  }
+  foundEl.addEventListener('click', () => toast(found.size >= kinds.length ? 'Every secret on the island. You know it better than we do.' : 'Poke anything that moves. Some things only come at certain hours.'))
+  showFound()
+  const onPoke = (el: Element) => {
+    const kind = (el as SVGElement).dataset.poke!
+    el.classList.remove('poked'); void (el as SVGGraphicsElement).getBBox(); el.classList.add('poked')
+    clearTimeout(Number((el as SVGElement).dataset.pokeT)); (el as SVGElement).dataset.pokeT = String(window.setTimeout(() => el.classList.remove('poked'), 5200))
+    const first = !found.has(kind)
+    if (first) { found.add(kind); try { localStorage.setItem('isl-found', JSON.stringify([...found])) } catch {} showFound() }
+    const tally = `${kinds.filter((k) => found.has(k)).length} of ${kinds.length}`
+    if (kind === 'bottle') { toast(`A note in the bottle: “${NOTES[note++ % NOTES.length]}”`, 7000); return }
+    if (kind === 'house32') { toast(`You found the 32nd building. It is not a game. Not yet. (${tally})`, 5000); return }
+    if (kind === 'treasure') { toast(`Buried treasure! It is full of maps of other islands. (${tally})`, 5000); return }
+    if (first) toast(found.size === kinds.length ? `You found ${NAMES[kind] ?? kind}, and that is all ${kinds.length}. Well done.` : `You found ${NAMES[kind] ?? kind}. ${tally}`)
+  }
+
+  const isle = initIsland({ box, stage: document.getElementById('islStage')!, world: svg, bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games, onPoke })
   // The map is a window, not a scroller: focusing a building near the edge
   // must never scroll the box itself and push the top bar out of view.
   box.addEventListener('scroll', () => { box.scrollLeft = 0; box.scrollTop = 0 })
@@ -237,6 +274,9 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
   const bySeason = (d = new Date()) => { const m = d.getMonth(), day = d.getDate(); if ((m === 11 && day === 31) || (m === 0 && day === 1)) return 'newyear'; if (m === 11 || (m === 0 && day <= 6)) return 'winter'; if (m === 3) return 'spring'; return '' }
   const season = ask.get('season') ?? bySeason()
   if (season) box.dataset.season = season
+  // The hour, for the secrets that keep their own (?hour=3 asks for one).
+  const showHour = () => { box.dataset.hour = ask.get('hour') ?? String(new Date().getHours()) }
+  showHour(); setInterval(showHour, 60 * 1000)
   const byClock = (h = new Date().getHours()) => (h >= 6 && h < 8 ? 'dawn' : h >= 8 && h < 18 ? 'day' : h >= 18 && h < 20 ? 'dusk' : 'night')
   const readTime = () => { try { return localStorage.getItem('isl-time') } catch { return null } }
   const showTime = () => {
@@ -481,6 +521,21 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
   .isl-mini svg { width: 100%; height: 100%; display: block; }
   .isl-mini-view { fill: rgba(255, 255, 255, 0.35); stroke: #1b2340; stroke-width: 22; }
   .isl-down { position: absolute; left: 50%; bottom: 24px; z-index: 4; transform: translateX(-50%); display: none; }
+  /* How many of the island's secrets you have found, once you have found one. */
+  .isl-found {
+    position: absolute; left: clamp(14px, 3vw, 32px); bottom: 150px; z-index: 5;
+    padding: 7px 14px; font: 700 14px 'Fredoka', system-ui, sans-serif; color: #1b2340;
+    background: #fff; border: 2.5px solid #1b2340; border-radius: 999px; box-shadow: 0 3px 0 #1b2340; cursor: pointer;
+  }
+  .isl-found[hidden] { display: none; }
+  .isl-found::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: #4fe3c1; border: 2px solid #1b2340; vertical-align: -1px; }
+  .isl-toast {
+    position: absolute; left: 50%; bottom: 90px; z-index: 6; max-width: min(520px, calc(100% - 32px)); margin: 0;
+    padding: 10px 18px; font: 600 15px/1.35 'Fredoka', system-ui, sans-serif; color: #1b2340; text-align: center;
+    background: #fff; border: 2.5px solid #1b2340; border-radius: 16px; box-shadow: 0 4px 0 #1b2340;
+    transform: translate(-50%, 12px); opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s;
+  }
+  .isl-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
   .isl-down:active { transform: translateX(-50%) translateY(4px); }
 
   /* The card that pops up over a building. */
