@@ -12,29 +12,29 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import type { Scene } from '../scene'
 import { RULES, KEYFRAMES, LAYERS, POKES, LANDMARK } from '../moves'
 
 /** Bump when the baked format or the way it is painted changes. */
 export const BAKE_VERSION = 1
-/** Layers the canvas does not draw: the page writes the district names itself. */
+/** Layers the canvas does not draw (the page writes the district names itself); the still picture for a page without script has them. */
 export const SKIP_LAYERS = new Set(['banners'])
 
 type IslandLike = { layers: { kind: string; slug?: string; body: string }[]; css: string; viewBox: [number, number, number, number] }
 
-const root = fileURLToPath(new URL('../../../../', import.meta.url))
+// The project: builds (and the bake script) run from it. Not import.meta.url, which a bundled build moves.
+const root = process.cwd()
 const cacheDir = path.join(root, 'node_modules', '.cache', 'island')
 
 /** A hash of everything the bake depends on. */
 export function bakeHash(island: IslandLike): string {
   const h = createHash('sha256')
   h.update(String(BAKE_VERSION))
-  for (const l of island.layers) if (!SKIP_LAYERS.has(l.kind)) h.update(`${l.kind}:${l.slug ?? ''}:${l.body}`)
+  for (const l of island.layers) h.update(`${l.kind}:${l.slug ?? ''}:${l.body}`)
   h.update(island.css)
   h.update(JSON.stringify(island.viewBox))
   h.update(JSON.stringify({ RULES, KEYFRAMES, LAYERS, POKES, LANDMARK }))
-  for (const f of ['build.ts', 'draw.ts', 'xml.ts', '../anim.ts', '../keyframes.ts']) h.update(fs.readFileSync(path.join(root, 'src/lib/island/bake', f)))
+  for (const f of ['build.ts', 'draw.ts', 'xml.ts', '../anim.ts', '../keyframes.ts', '../scene.ts', '../../../../scripts/bake-island.mjs']) h.update(fs.readFileSync(path.join(root, 'src/lib/island/bake', f)))
   return h.digest('hex').slice(0, 12)
 }
 
@@ -54,7 +54,7 @@ export function bakedIsland(island: IslandLike): Baked {
     // The island exactly as the page built it, for the bake to read.
     fs.mkdirSync(cacheDir, { recursive: true })
     const input = path.join(cacheDir, `${hash}.input.json`)
-    fs.writeFileSync(input, JSON.stringify({ layers: island.layers.filter((l) => !SKIP_LAYERS.has(l.kind)), css: island.css, viewBox: island.viewBox }))
+    fs.writeFileSync(input, JSON.stringify({ layers: island.layers, css: island.css, viewBox: island.viewBox }))
     const r = spawnSync(process.execPath, ['--expose-gc', '--max-old-space-size=4096', path.join(root, 'scripts/bake-island.mjs'), input, dir, hash], { cwd: root, stdio: 'inherit', timeout: 20 * 60_000 })
     fs.rmSync(input, { force: true })
     if (r.status !== 0 || !fs.existsSync(done)) throw new Error(`[island] the bake failed (exit ${r.status}${r.error ? `, ${r.error.message}` : ''})`)

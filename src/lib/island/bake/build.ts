@@ -27,7 +27,8 @@ export type Built = {
   runs: Run[]
   keyframes: Record<string, Keyframes>
   /** Sprites: their run, and for each the top node whose group it is sorted into. */
-  sprites: { run: Run; top: Node & { k: 'g' } }[]
+  /** Each sprite's run, the topmost moving group it is in, and how many world units one of its own units spans (its groups' scale, at rest). */
+  sprites: { run: Run; top: Node & { k: 'g' }; scale: number }[]
   masks: { key: string; el: El; inherit: Record<string, string> }[]
   defs: Map<string, El>
   pokes: string[]
@@ -43,6 +44,20 @@ const SHAPES = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polygon', 
 const INHERITED = ['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'letter-spacing', 'dominant-baseline', 'visibility']
 /** Classes the engine finds and drives by itself. */
 const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg-year', 'pg-bar', 'dt-fossil', 'cloud-puff', 'cloud-base', 'night-veil', 'lm-ring', 'lm-art', 'pk-say', 'mill-sails', 'fount-up', 'kite', 'cloud', 'isl-plane', 'walker', 'dsi-count'])
+/**
+ * Of those, the ones whose own paint the engine changes (a fill, a dash, a
+ * width): drawn from their outlines. Everything else that moves is a
+ * picture (a sprite) moved whole, which costs the canvas a fraction of
+ * drawing the shape again: fifteen hundred shapes drawn from their outlines
+ * every frame held the map to twelve frames a second.
+ */
+const OUTLINED = new Set(['es-win', 'liw-cell', 'pg-bar', 'cloud-puff', 'cloud-base', 'night-veil', 'lm-ring'])
+/**
+ * Classes whose opacity the time of day sets (moves.ts LAYERS): the page's
+ * CSS set it over the element's own opacity attribute, so the engine's value
+ * replaces that attribute rather than multiplying it.
+ */
+const TIMED_OPACITY = new Set(['night-veil', 'night-halos', 'night-cores', 'night-panes', 'night-shine', 'night-sky', 'cloud'])
 /** Groups whose only change is how strongly they show (by the time of day): painted into cells like still painting. */
 const ALPHA = new Set(['night-halos', 'night-panes', 'night-shine', 'night-sky', 'night-cores', 'fireworks'])
 /** Groups that are only there at some times. */
@@ -214,6 +229,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     return el.attrs[k]
   }
   const solid = (v: string | undefined) => v === undefined || v === 'none' || v === 'transparent' || /^#[0-9a-f]{3,8}$/i.test(v) || /^(white|black|currentColor)$/.test(v)
+  /** An element's own opacity, unless the time of day sets it (TIMED_OPACITY). */
+  const ownOpacity = (el: El) => (classes(el).some((c) => TIMED_OPACITY.has(c)) ? undefined : baseAttr(el, 'opacity'))
   /** Whether the engine can draw this element by itself, from its outline. */
   const vectorable = (el: El, inh: Record<string, string>) => {
     if (!SHAPES.has(el.tag) || el.kids.length) return false
@@ -237,7 +254,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
       const so = n('stroke-opacity'); if (so !== undefined && so !== 1) st.so = so
     }
     const fo = n('fill-opacity'); if (fo !== undefined && fo !== 1) st.fo = fo
-    const op = baseAttr(el, 'opacity'); if (op !== undefined && Number(op) !== 1) st.op = Number(op)
+    const op = ownOpacity(el); if (op !== undefined && Number(op) !== 1) st.op = Number(op)
     if (g('fill-rule') === 'evenodd') st.rule = 'evenodd'
     return st
   }
@@ -248,7 +265,6 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
   const masks: Built['masks'] = []
   type Ctx = { cell: boolean; night: boolean; m: M; chain: El[]; out: Node[]; run: Run | null; ctx: number; inherit: Record<string, string>; top: (Node & { k: 'g' }) | null }
   let ctxSeq = 0
-  const VMAX = 14
 
   const openRun = (c: Ctx): Run => {
     if (c.run) return c.run
@@ -262,16 +278,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     const run = c.run
     c.run = null
     if (!run || run.cell) return
-    // A handful of plain shapes: drawn from their outlines, crisp at any size.
-    const at = c.out.findIndex((n) => n.k === 'spr' && n.id === run.id)
-    const inh = (it: RunItem) => inheritFrom(it.chain, run.inherit)
-    if (run.items.length <= VMAX && run.items.every((it) => vectorable(it.el, inh(it)) && it.chain.every((w) => !w.attrs['clip-path'] && !w.attrs.mask && !w.attrs.filter && (w.attrs.opacity === undefined || Number(w.attrs.opacity) === 1)))) {
-      const vs = run.items.map((it) => vectorNode(it.el, it.chain, inh(it)))
-      c.out.splice(at, 1, ...vs)
-      run.items = []
-      return
-    }
-    sprites.push({ run, top: c.top! })
+    sprites.push({ run, top: c.top!, scale: 1 })
   }
 
   const matOf = (chain: El[]) => chain.reduce((m, e) => (e.attrs.transform ? mul(m, parseSvgTransform(e.attrs.transform)) : m), [...ID] as M)
@@ -304,7 +311,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     const anchor = ({ middle: 'center', end: 'right', start: 'left' } as Record<string, CanvasTextAlign>)[g('text-anchor') ?? 'start'] ?? 'left'
     const node: Node & { k: 'txt' } = {
       k: 'txt', s, x: Number(el.attrs.x ?? 0), y: Number(el.attrs.y ?? 0), font: `${weight} ${size}px ${fam}`,
-      fill: fill === 'none' ? null : fill === undefined ? '#000000' : fill, anchor, base: g('dominant-baseline') === 'middle' ? 'middle' : 'alphabetic', bb: [0, 0, 0, 0],
+      fill: fill === 'none' ? null : fill === undefined ? '#000000' : fill, anchor, bl: g('dominant-baseline') === 'middle' ? 'middle' : 'alphabetic', bb: [0, 0, 0, 0],
     }
     if (stroke && stroke !== 'none') { node.stroke = stroke; node.sw = Number(g('stroke-width') ?? 1) }
     const op = baseAttr(el, 'opacity'); if (op !== undefined && Number(op) !== 1) node.op = Number(op)
@@ -316,7 +323,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     const tags = classes(el).filter((x) => DRIVEN.has(x)); if (tags.length) node.tags = tags
     // A rough box, for culling: the browser's own text box is not known here.
     const w = s.length * size * 0.75 + (node.ls ?? 0) * s.length, x0 = anchor === 'center' ? node.x - w / 2 : anchor === 'right' ? node.x - w : node.x
-    const y0 = node.base === 'middle' ? node.y - size * 0.6 : node.y - size, y1 = node.base === 'middle' ? node.y + size * 0.6 : node.y + size * 0.3
+    const y0 = node.bl === 'middle' ? node.y - size * 0.6 : node.y - size, y1 = node.bl === 'middle' ? node.y + size * 0.6 : node.y + size * 0.3
     node.bb = grow([x0, y0, x0 + w, y1], (node.sw ?? 0) + 1)
     return node
   }
@@ -364,7 +371,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     closeRun(c)
     if (el.tag === 'text') { c.out.push(textNode(el, c)); return }
     const inh = inheritFrom(c.chain, c.inherit)
-    if (vectorable(el, inh) && !el.attrs['data-poke'] && !classes(el).includes('lm')) {
+    if (vectorable(el, inh) && !el.attrs['data-poke'] && !classes(el).includes('lm') && outlined(el)) {
       c.out.push(vectorNode(el, c.chain, inh))
       return
     }
@@ -382,9 +389,19 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     if (node.poke) node.data = { ...(node.data ?? {}), mask: masks[masks.length - 1].key }
   }
 
-  /** An element with what the engine now does for it taken off: its transform, opacity and visibility. */
+  /** Whether the engine must draw a moving shape from its outline: it changes the shape's paint (see OUTLINED). */
+  function outlined(el: El): boolean {
+    if (classes(el).some((x) => OUTLINED.has(x))) return true
+    const r = rulesOf(el)
+    return !!r.loop && (keyframes[r.loop.kf] ?? []).some((st) => st.fill !== undefined || st.doff !== undefined)
+  }
+
+  /** An element with what the engine now does for it taken off: its transform, opacity and visibility (its class's own paint kept). */
   function stripped(el: El): El {
     const a = { ...el.attrs }
+    const rb = rulesOf(el).base
+    if (rb.fill) a.fill = rb.fill
+    if (rb.dash) a['stroke-dasharray'] = rb.dash
     delete a.transform; delete a.opacity; delete a.visibility; delete a.class
     const st = styleOf(el)
     const keep = Object.entries(st).filter(([k]) => !k.startsWith('animation') && k !== 'transform-origin' && !k.startsWith('--'))
@@ -400,7 +417,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     if (!alpha && m.some((v, i) => v !== ID[i])) node.m = m
     if (!alpha && el.attrs.transform) node.base = parseSvgTransform(el.attrs.transform)
     if (alpha && el.attrs.transform) warn(`an alpha group with a transform: ${el.attrs.class}`)
-    const op = baseAttr(el, 'opacity')
+    const op = ownOpacity(el)
     if (op !== undefined && Number(op) !== 1) node.op = Number(op)
     if (el.attrs['clip-path']) node.clip = clipPathData(el.attrs['clip-path'])
     const tags = cs.filter((x) => DRIVEN.has(x) || ALPHA.has(x))
@@ -433,7 +450,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
   function seaNode(el: El): Node {
     const g = defs.get('isl-sea')!
     const tf = g.attrs.gradientTransform ?? ''
-    const sy = Number(tf.match(/scale(1 ([d.]+))/)?.[1] ?? 1)
+    const sy = Number(tf.match(/scale\(1 ([\d.]+)\)/)?.[1] ?? 1)
     const stops = g.kids.filter((k): k is El => typeof k !== 'string').map((k) => [Number(k.attrs.offset), k.attrs['stop-color']] as [number, string])
     const x = Number(el.attrs.x), y = Number(el.attrs.y)
     return { k: 'sea', cx: Number(g.attrs.cx), cy: Number(g.attrs.cy), r: Number(g.attrs.r), sy, stops, rect: [x, y, x + Number(el.attrs.width), y + Number(el.attrs.height)] }
@@ -469,6 +486,20 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
   }
 
   const pokes = [...new Set(masks.filter((m) => m.key.startsWith('pk:')).map((m) => m.key.split(':')[2]))]
+  // A sprite is painted in its own group's units, which its groups may scale
+  // far up or down (the trolley's cart is drawn a thirty-second the size and
+  // scaled back up): it must be painted at the size it is seen.
+  const scaleOf = new Map<number, number>()
+  const measure = (n: Node, m: M) => {
+    if (n.k === 'spr') { scaleOf.set(n.id, Math.max(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3]))); return }
+    if (n.k !== 'g') return
+    let mm = n.m ? mul(m, n.m) : m
+    if (n.base) mm = mul(mm, n.base)
+    for (const k of n.kids) measure(k, mm)
+  }
+  for (const n of root) measure(n, ID)
+  for (const sp of sprites) sp.scale = scaleOf.get(sp.run.id) ?? 1
+
   return { root, runs, keyframes, sprites, masks, defs, pokes, cards, warnings }
 
   /* ---- helpers needing the closure ---- */

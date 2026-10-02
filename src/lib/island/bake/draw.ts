@@ -13,7 +13,7 @@
 import { Resvg } from '@resvg/resvg-js'
 import sharp from 'sharp'
 import { write, classes, styleOf, type El } from './xml'
-import { RULES, LAYERS } from '../moves'
+import { RULES } from '../moves'
 import type { Built, Run } from './build'
 import { computeReach, grow, union } from './build'
 import type { Box, M, Node, Page, Scene, Sprite } from '../scene'
@@ -21,15 +21,34 @@ import { Bounds, pathBounds } from '../kit'
 import { mul, ID, parseSvgTransform } from '../anim'
 import { xform } from './build'
 
-export const LEVELS = process.env.ISLAND_LEVELS ? process.env.ISLAND_LEVELS.split(',').map(Number) : [0.5, 1, 2, 4, 8]
+/** Pixels per map unit at each size the island is painted at: from the whole island on a phone to closer than the camera goes. */
+export const LEVELS = [0.5, 1, 2, 4, 8]
 export const CELL = 512
 /** Native memory (resvg's pictures) is only given back when JavaScript collects: collect often, when allowed. */
 const gc = () => (globalThis as { gc?: () => void }).gc?.()
 const MAX_SPRITE = 2048
 const PAGE = 2048
-const WEBP = { quality: 84, alphaQuality: 90, effort: 4, smartSubsample: true }
+/**
+ * Near-lossless WebP: lossless coding, after nudging each value by no more
+ * than the eye can see. Lossy WebP halves the colour resolution, which blurs
+ * every coloured edge (a red band on a white lighthouse) even at 1:1; this
+ * keeps the art as sharp as the SVG was, for under twice the bytes.
+ */
+const WEBP = { nearLossless: true, quality: 60, effort: 4 }
+/** Pictures encoded at once (sharp works on threads of its own). */
+const ENCODE_AHEAD = 6
 
 type Frag = { run: number; x: number; y: number; w: number; h: number; px: Buffer }
+
+/** A colour as the island writes them (#rgb, #rrggbb, rgb()), as 0..255 channels. */
+function rgb(c: string): [number, number, number] {
+  const h = c.trim()
+  if (/^#[0-9a-f]{3}$/i.test(h)) return [1, 2, 3].map((i) => parseInt(h[i] + h[i], 16)) as [number, number, number]
+  if (/^#[0-9a-f]{6}/i.test(h)) return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number]
+  const m = h.match(/^rgba?\(([^)]+)\)/)
+  if (m) return m[1].split(/[\s,/]+/).slice(0, 3).map(Number) as [number, number, number]
+  throw new Error(`[island] a sea colour the poster cannot read: ${c}`)
+}
 
 export type Painted = { scene: Scene; files: Map<string, Buffer>; levels: unknown[]; stats: Record<string, number> }
 
@@ -82,16 +101,23 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     return `<g${a}>`
   }
   const idsIn = (els: El[]) => { const s = new Set<string>(); const go = (e: El) => { if (e.attrs.id) s.add(e.attrs.id); for (const k of e.kids) if (typeof k !== 'string') go(k) }; els.forEach(go); return s }
-  /** Definitions that some elements refer to, not already among them. */
-  const refs = (els: El[]): string => {
-    const have = idsIn(els), need = new Set<string>()
-    const look = (e: El) => {
+  /**
+   * Definitions that some elements refer to, not already among them: the
+   * elements written whole (items), and the groups they are written inside
+   * (wrappers), of which only the group itself is written. A gradient
+   * defined somewhere else inside a wrapper (the night's glow, in the night
+   * layer) is not in the document, so it is fetched like any other.
+   */
+  const refs = (items: El[], wrappers: El[] = []): string => {
+    const have = idsIn(items), need = new Set<string>()
+    const own = (e: El) => {
       for (const v of Object.values(e.attrs)) for (const m of v.matchAll(/url\(#([^)]+)\)/g)) need.add(m[1])
       const h = e.attrs.href ?? e.attrs['xlink:href']
       if (h?.startsWith('#')) need.add(h.slice(1))
-      for (const k of e.kids) if (typeof k !== 'string') look(k)
     }
-    els.forEach(look)
+    const look = (e: El) => { own(e); for (const k of e.kids) if (typeof k !== 'string') look(k) }
+    items.forEach(look)
+    wrappers.forEach(own)
     let out = ''
     const done = new Set<string>()
     const queue = [...need]
@@ -101,10 +127,8 @@ export async function paint(b: Built, view: [number, number, number, number], ha
       done.add(id)
       const d = b.defs.get(id)
       if (!d) continue
-      const before = need.size
       look(d)
       for (const n of need) if (!done.has(n)) queue.push(n)
-      void before
       out += write(d, (e) => { const a = edit()(e); if (a && e !== d) delete a.id; if (a && e === d) a.id = id; return a })
     }
     return out
@@ -128,8 +152,8 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   }
   const doc = (body: string, defs: string, box: Box = [vx, vy, vx + vw, vy + vh]) => `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${box[0]} ${box[1]} ${box[2] - box[0]} ${box[3] - box[1]}" width="${box[2] - box[0]}" height="${box[3] - box[1]}">${defs ? `<defs>${defs}</defs>` : ''}${body}</svg>`
   const refCache = new Map<number, string>()
-  const refsOf = (run: Run) => refCache.get(run.id) ?? refCache.set(run.id, refs(run.items.map((i) => i.el).concat(run.items.flatMap((i) => i.chain)))).get(run.id)!
-  const runDoc = (run: Run, box?: Box) => doc(runBody(run), refs(run.items.map((i) => i.el).concat(run.items.flatMap((i) => i.chain))), box)
+  const refsOf = (run: Run) => refCache.get(run.id) ?? refCache.set(run.id, refs(run.items.map((i) => i.el), run.items.flatMap((i) => i.chain))).get(run.id)!
+  const runDoc = (run: Run, box?: Box) => doc(runBody(run), refs(run.items.map((i) => i.el), run.items.flatMap((i) => i.chain)), box)
   const resvg = (svg: string, zoom: number) => new Resvg(svg, { fitTo: { mode: 'zoom', value: zoom }, font: { loadSystemFonts: false }, shapeRendering: 2, imageRendering: 0 })
   const crop = (r: Resvg, box: Box) => { const bb = r.getBBox() ?? (r.innerBBox() as never); if (!bb) return false; bb.x = box[0]; bb.y = box[1]; bb.width = box[2] - box[0]; bb.height = box[3] - box[1]; r.cropByBBox(bb); return true }
   /** The alpha box of some pixels (exclusive end), or null if all clear. */
@@ -163,12 +187,33 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     for (let c = 0; c < n; c++) out.push(x1[c] > x0[c] ? [x0[c], y0[c], x1[c], y1[c]] : null)
     return out
   }
+  /** Lay premultiplied pixels over others, at (dx, dy). */
+  const over = (dst: Buffer, dw: number, src: Buffer, sw: number, sh: number, dx: number, dy: number) => {
+    for (let y = 0; y < sh; y++) {
+      let si = y * sw * 4, di = ((dy + y) * dw + dx) * 4
+      for (let x = 0; x < sw; x++, si += 4, di += 4) {
+        const a = src[si + 3]
+        if (!a) continue
+        if (a === 255) { dst[di] = src[si]; dst[di + 1] = src[si + 1]; dst[di + 2] = src[si + 2]; dst[di + 3] = 255; continue }
+        const k = (255 - a) / 255
+        dst[di] = src[si] + dst[di] * k; dst[di + 1] = src[si + 1] + dst[di + 1] * k; dst[di + 2] = src[si + 2] + dst[di + 2] * k; dst[di + 3] = a + dst[di + 3] * k
+      }
+    }
+  }
   const cut = (px: Buffer, w: number, x0: number, y0: number, cw: number, ch: number): Buffer => {
     const out = Buffer.alloc(cw * ch * 4)
     for (let y = 0; y < ch; y++) px.copy(out, y * cw * 4, ((y0 + y) * w + x0) * 4, ((y0 + y) * w + x0 + cw) * 4)
     return out
   }
-  const webp = (px: Buffer, w: number, h: number) => (process.env.BAKE_NOENC ? Promise.resolve(Buffer.alloc(0)) : sharp(px, { raw: { width: w, height: h, channels: 4, premultiplied: true } }).webp(WEBP).toBuffer())
+  // Encoding runs alongside painting, a few pictures ahead.
+  const pending = new Set<Promise<void>>()
+  const encodeLater = async (file: string, px: Buffer, w: number, h: number, done: (bytes: number) => void) => {
+    while (pending.size >= ENCODE_AHEAD) await Promise.race(pending)
+    const p: Promise<void> = webp(px, w, h).then((buf) => { files.set(file, buf); done(buf.length) }).finally(() => pending.delete(p))
+    pending.add(p)
+  }
+  const encoded = () => Promise.all(pending)
+  const webp = (px: Buffer, w: number, h: number) => sharp(px, { raw: { width: w, height: h, channels: 4, premultiplied: true } }).webp(WEBP).toBuffer()
 
   /* ---- every still element's box in the world ----
    * resvg cannot paint a document in which something with an opacity of its
@@ -220,10 +265,10 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   const cellRuns = b.runs.filter((r) => r.cell && r.items.length)
   const PROBE = 0.5, wide: Box = [vx - vw * 0.6, vy - vh * 0.6, vx + vw * 1.6, vy + vh * 1.6]
   const runBox = new Map<number, Box>()
-  for (const run of process.env.BAKE_SKIP ? [] : cellRuns) {
+  for (const run of cellRuns) {
     const body = runBody(run, (e) => reaches(e, wide))
     if (!PAINTS.test(body)) continue
-    const r = resvg(doc(body, refs(run.items.map((i) => i.el).concat(run.items.flatMap((i) => i.chain))), wide), PROBE)
+    const r = resvg(doc(body, refs(run.items.map((i) => i.el), run.items.flatMap((i) => i.chain)), wide), PROBE)
     const img = r.render(), ab = alphaBox(img.pixels, img.width, 0, 0, img.width, img.height)
     gc()
     if (!ab) continue
@@ -242,20 +287,24 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   const spriteList: Sprite[] = []
   const spriteRun = new Map<number, number>()
   const spritePx: { level: number; w: number; h: number; px: Buffer; sprite: number }[] = []
-  for (const { run } of process.env.BAKE_SKIP ? [] : b.sprites) {
+  for (const { run, scale } of b.sprites) {
+    // Its pixels to its own unit, per level: the level's own, times how large its unit is.
+    const u = Math.min(64, Math.max(1 / 64, scale))
     const body = runDoc(run)
     let gb: Box | null = null
     try { const r = resvg(body, 1); const bb = r.getBBox(); if (bb) gb = [bb.x, bb.y, bb.x + bb.width, bb.y + bb.height] } catch { /* empty */ }
     if (!gb) continue
-    let margin = 6, box: Box = gb, ok = false
+    // A margin for strokes and soft edges, and edges on whole pixels at every level (2 units is a pixel at the smallest): in world units.
+    let margin = 6 / u, box: Box = gb, ok = false
+    const q = 2 / u
     const out: { level: number; w: number; h: number; px: Buffer; trim: [number, number, number, number] }[] = []
     for (let tries = 0; tries < 4 && !ok; tries++) {
-      box = [Math.floor((gb[0] - margin) / 2) * 2, Math.floor((gb[1] - margin) / 2) * 2, Math.ceil((gb[2] + margin) / 2) * 2, Math.ceil((gb[3] + margin) / 2) * 2]
+      box = [Math.floor((gb[0] - margin) / q) * q, Math.floor((gb[1] - margin) / q) * q, Math.ceil((gb[2] + margin) / q) * q, Math.ceil((gb[3] + margin) / q) * q]
       out.length = 0; ok = true
       for (const L of LEVELS) {
-        const w = Math.round((box[2] - box[0]) * L), h = Math.round((box[3] - box[1]) * L)
+        const w = Math.round((box[2] - box[0]) * L * u), h = Math.round((box[3] - box[1]) * L * u)
         if (w > MAX_SPRITE || h > MAX_SPRITE) break
-        const r = resvg(doc(runBody(run), refs(run.items.map((i) => i.el).concat(run.items.flatMap((i) => i.chain))), box), L)
+        const r = resvg(doc(runBody(run), refs(run.items.map((i) => i.el), run.items.flatMap((i) => i.chain)), box), L * u)
         const img = r.render(), ipx = img.pixels
         const ab = alphaBox(ipx, img.width, 0, 0, img.width, img.height)
         if (!ab) break
@@ -267,7 +316,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     if (!out.length) continue
     const id = spriteList.length
     spriteRun.set(run.id, id)
-    spriteList.push({ box, at: LEVELS.map(() => null) })
+    spriteList.push({ box, u, at: LEVELS.map(() => null) })
     for (const o of out) spritePx.push({ level: o.level, w: o.w, h: o.h, px: o.px, sprite: id })
   }
   log(`sprites: ${spriteList.length} measured and painted (${Date.now() - t0}ms)`)
@@ -308,7 +357,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
         const px = Buffer.alloc(W * H * 4)
         for (const it of page.items) { const s = it.sp; for (let y = 0; y < s.h; y++) s.px.copy(px, ((it.y + y) * W + it.x) * 4, y * s.w * 4, (y + 1) * s.w * 4) }
         const file = `s/${li}-${g}-${pages.length}.webp`
-        files.set(file, await webp(px, W, H))
+        await encodeLater(file, px, W, H, () => {})
         const pi = pages.length
         pages.push({ file, w: W, h: H, level: L, group: g })
         for (const it of page.items) spriteList[it.sp.sprite].at[li] = [pi, it.x, it.y, it.sp.w, it.sp.h]
@@ -324,6 +373,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
       await flush()
     }
   }
+  await encoded()
   stats.spritePages = pages.length
   log(`sprite sheets: ${pages.length} (${Date.now() - t0}ms)`)
 
@@ -344,11 +394,13 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   /* ---- the cells ---- */
   const levelIndex: { cols: number; rows: number; day: Record<number, number[]>; night: Record<number, number[]> }[] = []
   let cellFiles = 0, cellBytes = 0
-  for (const L of process.env.BAKE_SKIP ? [] : LEVELS) {
+  let posterW = 0, posterPx = Buffer.alloc(0)
+  for (const L of LEVELS) {
     const li = LEVELS.indexOf(L)
     const S = CELL / L
     const cols = Math.ceil((extent[2] - extent[0]) / S), rows = Math.ceil((extent[3] - extent[1]) / S)
     const idx = { cols, rows, day: {} as Record<number, number[]>, night: {} as Record<number, number[]> }
+    if (li === 0) { posterW = cols * CELL; posterPx = Buffer.alloc(cols * CELL * rows * CELL * 4) }
     for (let cy = 0; cy < rows; cy++) {
       const y0 = extent[1] + cy * S, y1 = y0 + S
       // Each run's piece of each cell in this row.
@@ -395,20 +447,10 @@ export async function paint(b: Built, view: [number, number, number, number], ha
           const x0 = Math.min(...sg.parts.map((f) => f.x)), y0b = Math.min(...sg.parts.map((f) => f.y))
           const x1 = Math.max(...sg.parts.map((f) => f.x + f.w)), y1b = Math.max(...sg.parts.map((f) => f.y + f.h))
           const w = x1 - x0, h = y1b - y0b, px = Buffer.alloc(w * h * 4)
-          for (const f of sg.parts) {
-            for (let y = 0; y < f.h; y++) {
-              let si = y * f.w * 4, di = ((f.y - y0b + y) * w + (f.x - x0)) * 4
-              for (let x = 0; x < f.w; x++, si += 4, di += 4) {
-                const a = f.px[si + 3]
-                if (!a) continue
-                if (a === 255) { px[di] = f.px[si]; px[di + 1] = f.px[si + 1]; px[di + 2] = f.px[si + 2]; px[di + 3] = 255; continue }
-                const k = (255 - a) / 255
-                px[di] = f.px[si] + px[di] * k; px[di + 1] = f.px[si + 1] + px[di + 1] * k; px[di + 2] = f.px[si + 2] + px[di + 2] * k; px[di + 3] = a + px[di + 3] * k
-              }
-            }
-          }
+          for (const f of sg.parts) over(px, w, f.px, f.w, f.h, f.x - x0, f.y - y0b)
           out.push({ night: sg.night, first: sg.first, x: x0, y: y0b, w, h, px })
         }
+        if (li === 0) for (const o of out) if (!o.night) over(posterPx, posterW, o.px, o.w, o.h, cx * CELL + o.x, cy * CELL + o.y)
         // Into one image per cell (and one for the night), stacked in shelves.
         for (const night of [false, true]) {
           const mine = out.filter((o) => o.night === night)
@@ -419,8 +461,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
           const px = Buffer.alloc(W * H * 4)
           mine.forEach((o, i) => { for (let yy = 0; yy < o.h; yy++) o.px.copy(px, ((at[i][1] + yy) * W + at[i][0]) * 4, yy * o.w * 4, (yy + 1) * o.w * 4) })
           const file = `c/${li}/${night ? 'n' : ''}${cx}_${cy}.webp`
-          const buf = await webp(px, W, H)
-          files.set(file, buf); cellFiles++; cellBytes += buf.length
+          await encodeLater(file, px, W, H, (n) => { cellFiles++; cellBytes += n })
           const ci = cy * cols + cx
           const list2: number[] = []
           mine.forEach((o, i) => list2.push(o.first, at[i][0], at[i][1], o.w, o.h, o.x, o.y))
@@ -429,6 +470,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
       }
     }
     levelIndex.push(idx)
+    await encoded()
     gc()
     log(`level ${L}: ${cols}x${rows} cells (${Date.now() - t0}ms, ${cellFiles} files so far, ${(cellBytes / 1e6).toFixed(1)} MB, rss ${(process.memoryUsage().rss / 1e6).toFixed(0)} MB)`)
   }
@@ -437,7 +479,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   /* ---- hit masks ---- */
   const masks: Scene['masks'] = {}
   const RES = 1
-  for (const m of process.env.BAKE_MASK ? b.masks.filter((x) => x.key === process.env.BAKE_MASK) : b.masks) {
+  for (const m of b.masks) {
     const own: El = { ...m.el, attrs: { ...m.el.attrs } }
     delete own.attrs.transform
     let inh = ''
@@ -448,7 +490,6 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     try { const bb = resvg(doc(body, defs), 1).getBBox(); if (bb) gb = [bb.x, bb.y, bb.x + bb.width, bb.y + bb.height] } catch { /* empty */ }
     if (!gb) continue
     const box: Box = [Math.floor(gb[0] - 3), Math.floor(gb[1] - 3), Math.ceil(gb[2] + 3), Math.ceil(gb[3] + 3)]
-    if (process.env.BAKE_DEBUG) { log(`mask ${m.key} ${box.join(" ")}`); if (process.env.BAKE_DUMP && m.key === process.env.BAKE_MASK) (await import("node:fs")).writeFileSync(process.env.BAKE_DUMP, doc(body, defs, box)) }
     const img = resvg(doc(body, defs, box), RES).render()
     const w = img.width, h = img.height, mpx = img.pixels
     const bits = new Uint8Array(Math.ceil((w * h) / 8))
@@ -457,10 +498,31 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   }
   log(`masks: ${Object.keys(masks).length} (${Date.now() - t0}ms)`)
 
-  /* ---- the whole island, small, for before the cells arrive (and without script) ---- */
-  {
-    const everything = b.runs.filter((r) => r.items.length && !r.night)
-    void everything
+  /* ---- the poster: the island, small, for the moment before the cells arrive ---- */
+  // Everything that stands still, by day, at the smallest level, over the
+  // open sea: what the canvas will draw first, without the things that move
+  // (the buildings drop in once it is ready). Cut to the island's own view,
+  // and opaque, so a lossy picture is small.
+  let posterOut: Scene['poster'] = null
+  if (posterPx.length) {
+    const L0 = LEVELS[0]
+    const ox = Math.round((vx - extent[0]) * L0), oy = Math.round((vy - extent[1]) * L0)
+    const pw = Math.round(vw * L0), ph = Math.round(vh * L0)
+    const sea = b.root.find((n): n is Node & { k: 'sea' } => n.k === 'sea')
+    const px = Buffer.alloc(pw * ph * 3)
+    const stops = (sea?.stops ?? [[0, '#8ccbff']]).map(([o, c]) => [o, ...rgb(c)] as [number, number, number, number])
+    for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
+      // The sea's colour here: its gradient, round its middle, squashed as the engine draws it.
+      const wx = vx + (x + 0.5) / L0, wy = vy + (y + 0.5) / L0
+      const t = sea ? Math.min(1, Math.hypot(wx - sea.cx, (wy - sea.cy) / sea.sy) / sea.r) : 0
+      let i = 0; while (i < stops.length - 1 && stops[i + 1][0] < t) i++
+      const s0 = stops[i], s1 = stops[Math.min(stops.length - 1, i + 1)], k = s1[0] > s0[0] ? Math.min(1, Math.max(0, (t - s0[0]) / (s1[0] - s0[0]))) : 0
+      const si = ((oy + y) * posterW + ox + x) * 4, di = (y * pw + x) * 3
+      const a = (posterPx[si + 3] ?? 0) / 255
+      for (let c = 0; c < 3; c++) px[di + c] = Math.round((posterPx[si + c] ?? 0) + (s0[c + 1] + (s1[c + 1] - s0[c + 1]) * k) * (1 - a))
+    }
+    files.set('poster.webp', await sharp(px, { raw: { width: pw, height: ph, channels: 3 } }).webp({ quality: 80, effort: 5, smartSubsample: true }).toBuffer())
+    posterOut = { file: 'poster.webp', w: pw, h: ph }
   }
 
   /* ---- the scene ---- */
@@ -477,8 +539,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   root.forEach(findKf)
   const keyframes = Object.fromEntries(Object.entries(b.keyframes))
   const levelsOut = levelIndex.map((ix, i) => { const file = `L${i}.json`; files.set(file, Buffer.from(JSON.stringify(ix))); return { scale: LEVELS[i], cols: ix.cols, rows: ix.rows, index: file } })
-  const scene: Scene = { v: 1, hash, view, levels: LEVELS, cell: CELL, extent, lv: levelsOut, root, keyframes, sprites: spriteList, pages, groups, masks, pokes: b.pokes }
-  void LAYERS; void grow
+  const scene: Scene = { v: 1, hash, view, levels: LEVELS, cell: CELL, extent, lv: levelsOut, root, keyframes, sprites: spriteList, pages, groups, masks, pokes: b.pokes, poster: posterOut }
   stats.ms = Date.now() - t0
   return { scene, files, levels: levelsOut, stats }
 }

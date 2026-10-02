@@ -1,29 +1,34 @@
 ---
 import Paper from '../layouts/Paper.astro'
 import { SITE } from '../site.config'
-import { listedGames, CATEGORIES } from '../data/games'
+import { CATEGORIES } from '../data/games'
 import { META, dailyFor } from '../data/game-meta'
 import { withBase } from '../lib/base'
 import { faviconSvg } from '../lib/favicon'
-import { buildIsland } from '../lib/island/world'
-import { resvgRaster } from '../lib/island/raster'
+import { homeGames, homeIsland, homeBake } from '../lib/island/home'
+import { cardCss } from '../lib/island/moves'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
 import { inkIcon } from '../lib/ink-icon'
-import '../styles/island.css'
 
 /*
  * The homepage is Tiny Island: every game is a building on one illustrated
- * map, standing in the district its subject belongs to, drawn here at build
- * time (lib/island) so the picture needs no script to appear. The camera,
- * the cards that pop up and the dive into a game are lib/island/camera.ts.
+ * map, standing in the district its subject belongs to. It is drawn at build
+ * time (lib/island) and baked into pictures (lib/island/bake) that one canvas
+ * draws (lib/island/engine); a small picture of it stands in until the canvas
+ * can, and a whole still one without script. The camera, the cards that pop
+ * up and the dive into a game are lib/island/camera.ts.
  * Under the island, every game again as a card, for anyone who would rather
  * scan a list than explore.
  */
-const games = listedGames().sort((a, b) => b.added.localeCompare(a.added))
+const games = homeGames()
 const count = games.length
-const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`) })), { raster: resvgRaster })
+const island = homeIsland()
+const baked = homeBake()
 const [vx, vy, vw, vh] = island.viewBox
+const poster = baked.scene.poster
+// The cards' copies of the buildings move by the island's own rules.
+const cardStyle = cardCss('.gc-svg', Object.values(baked.cards).join(''), island.css)
 
 const districtOf = Object.fromEntries(PLACES.map(([s, d]) => [s, d]))
 const tintOf = (slug: string) => DISTRICTS.find((d) => d.key === districtOf[slug])?.tint ?? '#e3e9ff'
@@ -48,7 +53,7 @@ const frame = (slug: string) => {
 const daily = dailyFor(new Date())
 const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug) }]))
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
-const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug) }
+const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes }
 
 // The passport: a page per district, in the order you would walk the island
 // from the middle, each game a stamp drawn here and inked by the page once
@@ -78,11 +83,13 @@ const book = BOOK.map((key) => {
     <section class="isl" aria-label={`Tiny Island: ${count} games, each one a building`}>
       <div class="isl-box" id="islBox" tabindex="0">
         <div class="isl-stage" id="islStage">
-          <div class="isle isl-world" id="isle" style={`--vx:${vx}px;--vy:${vy}px;--vw:${vw}px;--vh:${vh}px`}>
-            {island.layers.map((l) => <svg class={`isl-layer isl-layer--${l.kind}${l.kind === 'surf' || l.kind === 'weather' ? ` isl-${l.kind}-${l.slug}` : ''}`} viewBox={`${vx} ${vy} ${vw} ${vh}`} xmlns="http://www.w3.org/2000/svg" aria-hidden={l.kind === 'landmark' ? undefined : 'true'} set:html={l.body} />)}
-          </div>
+          <canvas class="isl-canvas" id="islCanvas" aria-hidden="true"></canvas>
+          {poster && <img class="isl-poster" id="islPoster" src={baked.base + poster.file} width={poster.w} height={poster.h} alt="" fetchpriority="high" decoding="async" />}
+          <noscript><img class="isl-still" src={baked.base + 'still.webp'} alt={`Tiny Island: ${count} games, each one a building`} /></noscript>
         </div>
-        <style is:inline set:html={island.css}></style>
+        <nav class="isl-links" aria-label="The games on the island">
+          {games.map((g) => <a class="isl-lm" href={withBase(`/${g.slug}/`)} data-slug={g.slug}>{g.title}: {g.blurb}</a>)}
+        </nav>
         <div class="isl-labels" aria-hidden="true"></div>
         <div class="isl-card" hidden role="dialog" aria-live="polite">
           <p class="isl-card-title"></p>
@@ -232,8 +239,9 @@ const book = BOOK.map((key) => {
               <li class="gcard-slot gs-slot" data-slug={g.slug} data-cat={g.category} data-search={`${g.title} ${g.blurb} ${g.description}`.toLowerCase()}>
                 <a class="gc" href={withBase(`/${g.slug}/`)} style={`--tint:${tintOf(g.slug)}`}>
                   <span class="gc-art" aria-hidden="true">
-                    <svg class="isle gc-svg" viewBox={frame(g.slug)} xmlns="http://www.w3.org/2000/svg" data-art={g.slug}>
+                    <svg class="gc-svg" viewBox={frame(g.slug)} xmlns="http://www.w3.org/2000/svg" data-art={g.slug}>
                       <polygon points={a.foot} fill="#ffffff" fill-opacity="0.75" stroke="#1b2340" stroke-opacity="0.18" stroke-width="1.5" />
+                      <Fragment set:html={baked.cards[g.slug] ?? ''} />
                     </svg>
                   </span>
                   <span class="gc-body">
@@ -253,6 +261,7 @@ const book = BOOK.map((key) => {
           })}
         </ul>
         <p class="gs-empty" id="empty" hidden>Nothing matches that. Try a shorter word.</p>
+        <style is:inline set:html={cardStyle}></style>
       </div>
     </section>
 
@@ -275,6 +284,9 @@ const book = BOOK.map((key) => {
 
 <script>
   import { initIsland, type GameInfo } from '../lib/island/camera'
+  import { flagNodes, balloonNodes } from '../lib/island/extras'
+  import { RULES } from '../lib/island/moves'
+  import type { Node } from '../lib/island/scene'
   import { flip, PLAY } from '../lib/motion'
   import { bestKey, dailyFor } from '../data/game-meta'
   import { faviconHref } from '../lib/favicon'
@@ -317,10 +329,13 @@ const book = BOOK.map((key) => {
     anchors: Record<string, { x0: number; y0: number; x1: number; y1: number; bx: number; by: number; district: string; slug: string }>
     games: Record<string, GameInfo>
     slugs: string[]
+    base: string
+    posterScale: number
+    pokes: string[]
   }
-  const svg = document.getElementById('isle')!
   const box = document.getElementById('islBox')!
-  const NS = 'http://www.w3.org/2000/svg'
+  // The baked island: asked for at once, and the camera works over the poster until it is in.
+  const scene = fetch(data.base + 'scene.json').then((r) => (r.ok ? r.json() : Promise.reject(new Error(`scene.json: ${r.status}`))))
 
   /* ---- bests, from this browser ------------------------------------------ */
   const readBest = (slug: string): string | null => {
@@ -344,7 +359,7 @@ const book = BOOK.map((key) => {
     'The whale only shows off at dawn. Do not tell anyone I told you.',
   ]
   const foundEl = document.getElementById('islFound') as HTMLButtonElement, toastEl = document.getElementById('islToast')!
-  const kinds = [...new Set([...document.querySelectorAll<SVGElement>('#isle [data-poke]')].map((e) => e.dataset.poke!))]
+  const kinds = data.pokes
   const readFound = () => { try { return new Set<string>(JSON.parse(localStorage.getItem('isl-found') ?? '[]')) } catch { return new Set<string>() } }
   const found = readFound()
   let toastT = 0, note = 0
@@ -356,10 +371,7 @@ const book = BOOK.map((key) => {
   }
   foundEl.addEventListener('click', () => toast(found.size >= kinds.length ? 'Every secret on the island. You know it better than we do.' : 'Poke anything that moves. Some things only come at certain hours.'))
   showFound()
-  const onPoke = (el: Element) => {
-    const kind = (el as SVGElement).dataset.poke!
-    el.classList.remove('poked'); void (el as SVGGraphicsElement).getBBox(); el.classList.add('poked')
-    clearTimeout(Number((el as SVGElement).dataset.pokeT)); (el as SVGElement).dataset.pokeT = String(window.setTimeout(() => el.classList.remove('poked'), 5200))
+  const onPoke = (kind: string) => {
     const first = !found.has(kind)
     if (first) { found.add(kind); try { localStorage.setItem('isl-found', JSON.stringify([...found])) } catch {} showFound(); sound?.found() }
     sound?.poke(kind)
@@ -370,7 +382,16 @@ const book = BOOK.map((key) => {
     if (first) toast(found.size === kinds.length ? `You found ${NAMES[kind] ?? kind}, and that is all ${kinds.length}. Well done.` : `You found ${NAMES[kind] ?? kind}. ${tally}`)
   }
 
-  const isle = initIsland({ box, stage: document.getElementById('islStage')!, world: svg, bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games, onPoke, onEnter: () => sound?.dive() })
+  const isle = initIsland({
+    box, stage: document.getElementById('islStage')!,
+    canvas: document.getElementById('islCanvas') as HTMLCanvasElement,
+    poster: document.getElementById('islPoster') as HTMLImageElement | null, posterScale: data.posterScale,
+    scene, base: data.base,
+    state: () => ({ time: box.dataset.time ?? 'day', season: box.dataset.season ?? '', hour: Number(box.dataset.hour ?? new Date().getHours()) }),
+    bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games,
+    links: new Map([...box.querySelectorAll<HTMLAnchorElement>('.isl-lm')].map((a) => [a.dataset.slug!, a])),
+    onPoke, onEnter: () => sound?.dive(),
+  })
   // The map is a window, not a scroller: focusing a building near the edge
   // must never scroll the box itself and push the top bar out of view.
   box.addEventListener('scroll', () => { box.scrollLeft = 0; box.scrollTop = 0 })
@@ -392,7 +413,7 @@ const book = BOOK.map((key) => {
   const season = ask.get('season') ?? bySeason()
   if (season) box.dataset.season = season
   // The hour, for the secrets that keep their own (?hour=3 asks for one).
-  const showHour = () => { box.dataset.hour = ask.get('hour') ?? String(new Date().getHours()) }
+  const showHour = () => { box.dataset.hour = ask.get('hour') ?? String(new Date().getHours()); isle.redraw() }
   showHour(); setInterval(showHour, 60 * 1000)
   const byClock = (h = new Date().getHours()) => (h >= 6 && h < 8 ? 'dawn' : h >= 8 && h < 18 ? 'day' : h >= 18 && h < 20 ? 'dusk' : 'night')
   const readTime = () => { try { return localStorage.getItem('isl-time') } catch { return null } }
@@ -403,6 +424,7 @@ const book = BOOK.map((key) => {
     const dark = t === 'night' || t === 'dusk'
     btnTime.setAttribute('aria-pressed', String(dark))
     btnTime.setAttribute('aria-label', dark ? 'Switch to day' : 'Switch to night')
+    isle.redraw()
   }
   btnTime.addEventListener('click', () => {
     const next = box.dataset.time === 'night' || box.dataset.time === 'dusk' ? 'day' : 'night'
@@ -413,35 +435,16 @@ const book = BOOK.map((key) => {
   showTime()
   setInterval(showTime, 5 * 60 * 1000)
 
-  // A layer of our own on top, for the balloon and the flags.
-  const extras = document.createElementNS(NS, 'svg')
-  const [bx0, by0, bw0, bh0] = data.bounds
-  extras.setAttribute('viewBox', `${bx0} ${by0} ${bw0} ${bh0}`)
-  extras.setAttribute('class', 'isl-layer'); extras.setAttribute('aria-hidden', 'true')
-  svg.append(extras)
-  const add = (markup: string) => { const g = document.createElementNS(NS, 'g'); g.innerHTML = markup; extras.append(g); return g }
-
-  /* ---- a flag on every building you have finished ------------------------- */
-  for (const s of data.slugs) {
-    if (!finished.has(s)) continue
-    const a = data.anchors[s]
-    const x = a.x1 - 14, y = a.y0 + 18
-    add(`<g class="flag-done"><path d="M${x} ${y}v-30" stroke="#1b2340" stroke-width="2.2"/><path d="M${x} ${y - 30}l18 5l-18 6z" fill="#ff4f6e" stroke="#1b2340" stroke-width="1.6" stroke-linejoin="round" class="flutter"/></g>`)
-  }
-
-  /* ---- today's challenge: a balloon tied over the building ---------------- */
+  /* ---- on the map for this visitor: a flag on every building finished, ---- */
+  /* ---- and today's challenge, a balloon tied over its building ----------- */
   const today = dailyFor(new Date())
   const ta = data.anchors[today.slug]
-  if (ta) {
-    const x = (ta.x0 + ta.x1) / 2, y = ta.y0 - 70
-    add(`<g class="balloon"><path d="M${x} ${y + 44}C${x - 6} ${y + 70} ${x + 6} ${y + 80} ${x} ${ta.y0 + 10}" fill="none" stroke="#1b2340" stroke-width="1.4" stroke-dasharray="3 4"/>` +
-      `<g class="bob"><path d="M${x - 26} ${y - 8}a26 28 0 1 1 52 0c0 15-11 24-17 30h-18c-6-6-17-15-17-30z" fill="#ff4f6e" stroke="#1b2340" stroke-width="2.2"/>` +
-      `<path d="M${x - 8} ${y - 34}c-7 26-5 46 0 56M${x + 8} ${y - 34}c7 26 5 46 0 56" fill="none" stroke="#fff" stroke-width="5"/>` +
-      `<path d="M${x - 9} ${y + 22}l3 9M${x + 9} ${y + 22}l-3 9" stroke="#1b2340" stroke-width="1.6"/>` +
-      `<rect x="${x - 8}" y="${y + 30}" width="16" height="12" rx="3" fill="#b8a1ff" stroke="#1b2340" stroke-width="2"/>` +
-      `<rect x="${x - 30}" y="${y - 62}" width="60" height="18" rx="9" fill="#4fe3c1" stroke="#1b2340" stroke-width="2"/>` +
-      `<text x="${x}" y="${y - 49}" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="11" fill="#1b2340">TODAY</text></g></g>`)
-  }
+  isle.withEngine((e) => {
+    const nodes: Node[] = []
+    for (const s of data.slugs) { if (!finished.has(s)) continue; const a = data.anchors[s]; nodes.push(...flagNodes(a.x1 - 14, a.y0 + 18)) }
+    if (ta) nodes.push(...balloonNodes((ta.x0 + ta.x1) / 2, ta.y0))
+    e.add(nodes)
+  })
   document.getElementById('btnToday')!.addEventListener('click', () => {
     box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
     isle.flyToSlug(today.slug, 2.2)
@@ -477,15 +480,13 @@ const book = BOOK.map((key) => {
   // it on there, and the other way round.
   const btnSound = document.getElementById('btnSound')!
   {
-    const ferryEl = svg.querySelector<SVGElement>('[style*="isl-ferry"]')
-    const ferry = () => {
-      const a = ferryEl?.getAnimations?.()[0], t = Number(a?.currentTime), d = Number(a?.effect?.getTiming().duration)
-      return Number.isFinite(t) && d > 0 ? (t % d) / d : null
-    }
+    // Where the ferry is along its crossing (0..1), to hear its horn from there.
+    let ferry = (): number | null => null
+    isle.withEngine((e) => { ferry = () => e.phase('isl-ferry') })
     const uf = data.anchors['universe-forecast']
     sound = islandSound(
       { districts: Object.fromEntries(data.districts.map((d) => [d.key, { x: d.x, y: d.y }])), rain: uf ? { x: (uf.x0 + uf.x1) / 2, y: uf.y0 } : undefined, land: data.land },
-      { view: isle.view, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '', awake: () => !document.hidden && !svg.classList.contains('is-paused'), ferry },
+      { view: isle.view, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '', awake: isle.awake, ferry: () => ferry() },
     )
   }
   const paintSound = () => {
@@ -633,6 +634,7 @@ const book = BOOK.map((key) => {
     const fresh = renderPassport()
     const firstNew = [...fresh][0]
     document.documentElement.classList.add('pp-open')
+    isle.pause(true)
     pp.showModal()
     if (PLAY) {
       ppBook.classList.remove('is-opening'); ppBook.classList.add('is-cover')
@@ -647,7 +649,7 @@ const book = BOOK.map((key) => {
   $pp('ppClose').addEventListener('click', () => pp.close())
   // A click on the dimmed page around the book closes it.
   pp.addEventListener('click', (e) => { if (e.target === pp) pp.close() })
-  pp.addEventListener('close', () => { document.documentElement.classList.remove('pp-open'); renderPassport() })
+  pp.addEventListener('close', () => { document.documentElement.classList.remove('pp-open'); isle.pause(false); renderPassport() })
   for (const [slug, b] of ppSlots) b.addEventListener('click', () => {
     pp.close()
     box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
@@ -697,21 +699,12 @@ const book = BOOK.map((key) => {
   {
     const now = new Date(), y = now.getFullYear(), day = (m: number, d: number, yy = y) => Date.UTC(yy, m, d)
     const pct = Math.floor(((day(now.getMonth(), now.getDate()) - day(0, 1)) / (day(0, 1, y + 1) - day(0, 1))) * 100)
-    document.querySelectorAll('.isle .pg-pct').forEach((el) => { el.textContent = `${pct}%` })
-    document.querySelectorAll('.isle .pg-year').forEach((el) => { el.textContent = `${y} SO FAR` })
-    document.querySelectorAll<SVGElement>('.isle .pg-bar').forEach((el) => el.setAttribute('width', String(Math.round(Number(el.dataset.w) * pct) / 100)))
+    const width = (w: string | undefined) => Math.round(Number(w) * pct) / 100
+    document.querySelectorAll('.gc-svg .pg-pct').forEach((el) => { el.textContent = `${pct}%` })
+    document.querySelectorAll('.gc-svg .pg-year').forEach((el) => { el.textContent = `${y} SO FAR` })
+    document.querySelectorAll<SVGElement>('.gc-svg .pg-bar').forEach((el) => el.setAttribute('width', String(width(el.dataset.w))))
+    isle.withEngine((e) => { e.setText('pg-pct', `${pct}%`); e.setText('pg-year', `${y} SO FAR`); e.setRectWidth('pg-bar', (d) => width(d.w)); isle.redraw() })
   }
-
-  // Each card gets its own copy of its building, made here rather than shipped
-  // twice in the page, and not a <use> of the map's: a <use> would make every
-  // animation on the island replay into its copy too, every frame.
-  document.querySelectorAll<SVGSVGElement>('[data-art]').forEach((sv) => {
-    const art = document.getElementById(`lm-${sv.dataset.art}`)
-    if (!art) return
-    const copy = art.cloneNode(true) as Element
-    copy.removeAttribute('id'); copy.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'))
-    sv.append(copy)
-  })
   // Each card's building moves only while that card is on screen. Every
   // animation on the page costs the whole page a frame, seen or not: with the
   // grid watched as one block, and woken 200px early, all thirty-one ran
@@ -720,15 +713,19 @@ const book = BOOK.map((key) => {
   document.querySelectorAll('.gc-svg').forEach((sv) => cardIo.observe(sv))
 
   /* ---- a few motions that need a clock rather than a keyframe ------------- */
-  if (PLAY) {
-    const years = document.querySelectorAll('.isle .wwa-year')
-    setInterval(() => { if (svg.classList.contains('is-paused')) return; const y = String(1300 + Math.floor(Math.random() * 720)); years.forEach((el) => { el.textContent = y }) }, 2400)
+  if (PLAY) isle.withEngine((e) => {
+    // Who Was Alive's year, on the map and on its card.
+    const years = document.querySelectorAll('.gc-svg .wwa-year')
+    setInterval(() => { if (!isle.awake()) return; const y = String(1300 + Math.floor(Math.random() * 720)); e.setText('wwa-year', y); years.forEach((el) => { el.textContent = y }) }, 2400)
+    // Life in Weeks fills in, a week at a time.
     let wk = 38
-    const cells = document.querySelectorAll<SVGElement>('#isle .liw-cell')
-    setInterval(() => { if (svg.classList.contains('is-paused')) return; wk = wk >= 63 ? 38 : wk + 1; cells.forEach((c) => c.setAttribute('fill', Number(c.dataset.k) < wk ? '#5fe0bf' : '#e8e1f5')) }, 900)
-    const wins = Array.from(document.querySelectorAll<SVGElement>('#isle .es-win'))
-    setInterval(() => { if (svg.classList.contains('is-paused')) return; wins.forEach((w) => w.classList.remove('lit')); for (let k = 0; k < 4; k++) wins[Math.floor(Math.random() * wins.length)]?.classList.add('lit') }, 800)
-  }
+    setInterval(() => { if (!isle.awake()) return; wk = wk >= 63 ? 38 : wk + 1; e.eachShape('liw-cell', (d, set) => set(Number(d.k) < wk ? '#5fe0bf' : '#e8e1f5')) }, 900)
+    // Every Second's windows, a few lit at a time.
+    const lit = RULES.find((r) => r.on.includes('es-win') && r.on.includes('lit'))?.base?.fill ?? '#ffe9a8'
+    const wins: ((fill: string | null) => void)[] = []
+    e.eachShape('es-win', (_, set) => wins.push(set))
+    setInterval(() => { if (!isle.awake()) return; wins.forEach((set) => set(null)); for (let k = 0; k < 4; k++) wins[Math.floor(Math.random() * wins.length)]?.(lit) }, 800)
+  })
 </script>
 
 <style>
@@ -752,12 +749,17 @@ const book = BOOK.map((key) => {
   .isl-box.is-grabbing { cursor: grabbing; }
   .isl-box:focus-visible { box-shadow: inset 0 0 0 4px #1b2340; }
   .isl-stage { position: absolute; inset: 0; }
-  .isl-world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
-  :global(.isl-layer) { position: absolute; left: var(--vx); top: var(--vy); width: var(--vw); height: var(--vh); max-width: none; overflow: visible; pointer-events: none; }
-  :global(.isl-layer a.lm) { pointer-events: visiblePainted; }
-  :global(.isle text) { user-select: none; }
-  :global(.isl-box.z-near .layer-banners) { opacity: 0; }
-  :global(.isl-box .layer-banners) { transition: opacity 0.3s; }
+  /* The island: one canvas, under the page's own names and cards. Until it
+     can draw, the poster stands in, placed by the camera (and without
+     script, the whole still picture, fitted to the box). */
+  .isl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .isl-poster { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; pointer-events: none; transition: opacity 0.4s ease; }
+  :global(.isl-box.is-live) .isl-poster { opacity: 0; }
+  :global(html:not(.js)) .isl-poster { display: none; }
+  .isl-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  /* A link for every building, out of sight: the keyboard's way round the
+     map (each one flies the camera there and shows its card). */
+  .isl-links { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
   .isl-top {
     position: absolute;
@@ -906,9 +908,8 @@ const book = BOOK.map((key) => {
     opacity: 0; transition: opacity 0.25s;
   }
   :global(.isl-box.z-near .isl-tag.is-on) { opacity: 1; }
-  /* The district names, the same size at every zoom; the drawn banners are
-     only for a page without script. */
-  :global(html.js .layer-banners) { display: none; }
+  /* The district names, the same size at every zoom (the still picture for a
+     page without script has them drawn on). */
   :global(.isl-dtag) {
     position: absolute; left: 0; top: 0;
     padding: 4px 13px;
@@ -1030,8 +1031,11 @@ const book = BOOK.map((key) => {
   @media (hover: none) { .gc-pin { opacity: 1; transform: none; } }
   .gs-empty { margin: 28px 0 0; padding: 28px; text-align: center; font-weight: 600; background: #fff; border: 2.5px dashed #1b2340; border-radius: 18px; }
   :global(.gs-grid .gc-svg:not(.is-live) *) { animation-play-state: paused !important; }
-  /* Not just paused: gone, so they hold no GPU layers (see island.css). */
+  /* Not just paused: gone, so they hold no GPU layers. A mover keeps its
+     place along its path. Without motion, all of them rest so. */
   :global(.gs-grid .gc-svg:not(.is-live) *:not(.mover)) { animation: none !important; }
+  :global(html:not(.play) .gc-svg *) { animation-play-state: paused !important; }
+  :global(html:not(.play) .gc-svg *:not(.mover)) { animation: none !important; transition: none !important; }
 
   .ft { background: #1b2340; color: #fff; padding: 36px 0 44px; }
   .ft-in { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px 24px; }
@@ -1087,7 +1091,6 @@ const book = BOOK.map((key) => {
      Global, because most of what it styles arrives by set:html (the stamps)
      or is built at runtime (the sightings), and scoped rules never reach
      either. Everything is under .pp, so nothing leaks. */
-  html.pp-open .isle * { animation-play-state: paused !important; }
   html.pp-open { overflow: hidden; }
 
   .pp {

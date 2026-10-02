@@ -65,6 +65,7 @@ export const KEYFRAMES = `
 @keyframes isl-shim { 0%, 100% { opacity: 0; } 30%, 45% { opacity: 0.8; } }
 @keyframes isl-glint { 0%, 55%, 100% { opacity: 0; transform: scale(0.3); } 72% { opacity: 0.95; transform: scale(1); } }
 @keyframes isl-flow { to { stroke-dashoffset: -9; } }
+@keyframes isl-spray { to { stroke-dashoffset: -7; } }
 @keyframes isl-fish { 0%, 70% { transform: translate(0, 0) rotate(0); opacity: 0; } 74% { opacity: 1; } 80% { transform: translate(14px, -22px) rotate(-30deg); } 86% { transform: translate(28px, 0) rotate(30deg); opacity: 1; } 88%, 100% { opacity: 0; transform: translate(28px, 0); } }
 @keyframes isl-step { to { transform: translateX(1.4px) translateY(-0.6px); } }
 @keyframes isl-cloud { from { transform: translateX(-900px); } to { transform: translateX(1400px); } }
@@ -199,7 +200,8 @@ export const RULES: Rule[] = [
   { on: ['tumble-ball'], loop: L('isl-spin', 3, 'linear'), fillBox: true, origin: 'center' },
 
   /* ---- town life ---- */
-  { on: ['fount'], loop: L('isl-flow', 0.7, 'linear') },
+  // One period of the spray's dashes (3 4) a loop, so it runs on without a jump.
+  { on: ['fount'], loop: L('isl-spray', 0.7, 'linear') },
   { on: ['fount-up'], loop: L('nat-spurt', 1.4, 'ease-in-out'), fillBox: true, origin: '50% 100%' },
   { on: ['kite'], loop: L('town-kite', 5, 'ease-in-out'), fillBox: true, origin: '0% 100%' },
   { on: ['swing'], loop: L('town-swing', 2.2, 'ease-in-out'), fillBox: true, origin: '50% 0%' },
@@ -354,8 +356,9 @@ const cssLoop = (l: Loop) => `${l.kf} ${l.dur}s ${l.ease ?? 'ease'}${l.delay ? `
  * Inline animation-delay and transform-origin on the elements still apply,
  * because shorthand here sets only what a rule says.
  */
-export function cardCss(scope: string): string {
-  const used = new Set<string>()
+export function cardCss(scope: string, markup = '', more = ''): string {
+  // Whatever the markup animates by an inline style of its own (a motion path), from the other keyframes given.
+  const used = new Set<string>([...markup.matchAll(/animation(?:-name)?:\s*([\w-]+)/g)].map((m) => m[1]))
   let css = ''
   for (const r of RULES) {
     if (r.when) continue
@@ -377,7 +380,7 @@ export function cardCss(scope: string): string {
     if (r.base?.fill) decl.push(`fill:${r.base.fill}`)
     if (decl.length) css += `${sel}{${decl.join(';')}}`
   }
-  const kf = KEYFRAMES.split('@keyframes').map((s) => s.trim()).filter((s) => used.has(s.split(/[\s{]/)[0])).map((s) => `@keyframes ${s}`).join('')
+  const kf = (KEYFRAMES + more).split('@keyframes').map((s) => s.trim()).filter((s) => used.has(s.split(/[\s{]/)[0])).map((s) => `@keyframes ${s}`).join('')
   return kf + css
 }
 export { cssLoop }

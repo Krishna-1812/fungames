@@ -14,7 +14,7 @@
  * (the state callback), which building is picked, which are dimmed, what was
  * poked. It answers what is under a point (hit).
  */
-import type { Anim, Box, LevelIndex, M, Node, Scene, Style, When } from './scene'
+import { sceneFrom, type Anim, type Box, type LevelIndex, type M, type Node, type Scene, type Style, type When } from './scene'
 import { ID, mulTo, invert, fnsMatrix, progress, sampleProp, ease, type Ease } from './anim'
 import { POKES, POKE_SAY, POKE_MS, POKE_INNER_ORIGIN, LANDMARK, LAYERS, type Loop } from './moves'
 
@@ -37,12 +37,13 @@ type Live = {
   /** A reaction played on it, and when it began. */
   over?: { a: Anim; at: number }
   speed?: { k: number; until: number }
+  /** Shown as it is at its height until then, without moving there (a poke's words, under reduced motion). */
+  hold?: { op: number; until: number }
   hasRun?: boolean
   text?: string
   fill?: string
 }
 
-const near = (a: number, b: number) => Math.abs(a - b) < 1e-6
 const toAnim = (l: Loop, org: [number, number], ref: [number, number] = [0, 0]): Anim => ({ kf: l.kf, dur: l.dur, delay: l.delay ?? 0, ease: l.ease ?? 'ease', iter: l.iter ?? Infinity, dir: ['normal', 'reverse', 'alternate', 'alternate-reverse'].indexOf(l.dir ?? 'normal'), fill: ['none', 'forwards', 'backwards', 'both'].indexOf(l.fill ?? 'none'), org, ref })
 const fbOrigin = (fb: Box | undefined, spec: string): [number, number] => {
   if (!fb) return [0, 0]
@@ -60,8 +61,11 @@ export function createEngine(o: {
   play: boolean
   state: () => IslandState
 }) {
-  const { canvas, base, scene } = o
-  const ctx = canvas.getContext('2d', { alpha: true })!
+  const { canvas, base } = o
+  const scene = sceneFrom(o.scene)
+  const main = canvas.getContext('2d', { alpha: true })!
+  /** The context being drawn into: the canvas's own, or a pool canvas while a group is drawn apart. */
+  let ctx: CanvasRenderingContext2D = main
   const live = new WeakMap<object, Live>()
   const L = (n: object): Live => live.get(n) ?? live.set(n, {}).get(n)!
   const KF = scene.keyframes
@@ -129,16 +133,15 @@ export function createEngine(o: {
   }
   loadIndex(0)
 
-  /* ---- prepared once: which groups hold still painting, landmark and poke nodes ---- */
+  /* ---- prepared once: which groups hold still painting, the buildings, what is tagged ---- */
   const lms = new Map<string, G>()
-  const pokeNodes: G[] = []
   const tagged = new Map<string, Node[]>()
+  const lmOf = new Map<Node, string>()
   const prep = (n: Node, inLm?: G): boolean => {
     if (n.k === 'run') return true
-    if ('tags' in n && n.tags) for (const t of n.tags) (tagged.get(t) ?? tagged.set(t, []).get(t)!).push(n)
+    if ('tags' in n && n.tags) { for (const t of n.tags) (tagged.get(t) ?? tagged.set(t, []).get(t)!).push(n); if (inLm?.lm) lmOf.set(n, inLm.lm) }
     if (n.k !== 'g') return false
     if (n.lm) { lms.set(n.lm, n); inLm = n }
-    if (n.poke) pokeNodes.push(n)
     let has = false
     for (const k of n.kids) has = prep(k, inLm) || has
     L(n).hasRun = has
@@ -162,23 +165,14 @@ export function createEngine(o: {
   let W = 1, H = 1, dpr = 1
   let hot: string | null = null
   let keep: Set<string> | null = null
-  const lmState = new Map<string, { lift: number; liftFrom: number; liftAt: number; liftTo: number; ring: number; dim: number; blinkAt: number }>()
-  const lmS = (s: string) => lmState.get(s) ?? lmState.set(s, { lift: 0, liftFrom: 0, liftAt: 0, liftTo: 0, ring: 0, dim: 1, blinkAt: -1e9 }).get(s)!
+  const lmState = new Map<string, { lift: number; ring: number; dim: number }>()
+  const lmS = (s: string) => lmState.get(s) ?? lmState.set(s, { lift: 0, ring: 0, dim: 1 }).get(s)!
   let introAt = -1
   const texts = new Map<string, string>()
   const fills = new Map<object, string>()
   const extra: Node[] = []
 
-  /* ---- night, clouds and the like: values that ease when the time changes ---- */
-  const tweens = new Map<string, { v: number; from: number; to: number; at: number; ms: number }>()
-  const tween = (key: string, to: number, ms: number) => {
-    let tw = tweens.get(key)
-    if (!tw) { tw = { v: to, from: to, to, at: now, ms }; tweens.set(key, tw); return to }
-    if (!near(tw.to, to)) { tw.from = tw.v; tw.to = to; tw.at = now; tw.ms = ms }
-    const k = o.play ? Math.min(1, (now - tw.at) / tw.ms) : 1
-    tw.v = tw.from + (tw.to - tw.from) * (k * k * (3 - 2 * k))
-    return tw.v
-  }
+  const cssEase = ease('ease')
   let st: IslandState = o.state()
   const whenOk = (w: When | undefined) => !w || ((!w.time || w.time.includes(st.time)) && (!w.season || w.season.includes(st.season)) && (!w.hour || w.hour.includes(st.hour)))
 
@@ -190,6 +184,7 @@ export function createEngine(o: {
   const pose = (n: { a?: Anim[]; base?: M; tags?: string[] }, t: number, out: Pose): Pose => {
     out.m = null; out.op = undefined; out.fill = undefined; out.doff = undefined
     const lv = L(n)
+    if (lv.hold) { if (now < lv.hold.until) { out.op = lv.hold.op; return out } lv.hold = undefined }
     let anims = n.a
     // A reaction (a poke) plays over the node's own loop while it lasts.
     if (lv.over) {
@@ -224,7 +219,6 @@ export function createEngine(o: {
   /** Visible world box (with a margin) and the current level's visible cells. */
   let vis: Box = [0, 0, 0, 0]
   let deviceM: M = [1, 0, 0, 1, 0, 0]
-  const scratch: M = [1, 0, 0, 1, 0, 0]
   const P: Pose = { m: null, op: undefined, fill: undefined, doff: undefined }
 
   const visibleCells = (li: number): number[] => {
@@ -253,7 +247,8 @@ export function createEngine(o: {
       const set = (night ? levels[li0]!.night : levels[li0]!.day).get(ci)
       if (!set) continue
       const img = [...set.values()][0]?.img
-      if (img && want(img, li0 === level ? 0 : 1)) { out.push({ li: li0, ci, night, clip: null }); continue }
+      if (img && want(img, li0 === level ? 0 : 1)) { out.push({ li: li0, ci, night, clip: null }); if (li0 !== level) blurry++; continue }
+      blurry++
       // Not loaded yet: the nearest coarser level that is, cut to this cell.
       let found = false
       for (let li = li0 - 1; li >= 0 && !found; li--) {
@@ -265,6 +260,7 @@ export function createEngine(o: {
         if (!im2) { found = true; break }
         if (want(im2, 2)) { out.push({ li, ci: c2, night, clip: box }); found = true }
       }
+      if (!found) gaps++
     }
     // Several finer cells can share one coarse stand-in: each draws only its own part.
     return out
@@ -290,7 +286,10 @@ export function createEngine(o: {
   }
 
   let alphaNow = 1
-  const setM = (m: M) => ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5])
+  // Changing the transform is one of the dearer calls on a phone: most sprites are drawn in device pixels, the transform left as it is.
+  let ident = false
+  const setM = (m: M) => { ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); ident = false }
+  const toIdent = () => { if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true } }
   const applyStyle = (s: Style, fillOverride?: string) => {
     const f = fillOverride ?? s.f
     if (f) ctx.fillStyle = f
@@ -305,6 +304,7 @@ export function createEngine(o: {
   const drawVector = (n: V, m: M, alpha: number) => {
     const lv = L(n)
     if (n.when && !whenOk(n.when)) return
+    if (n.bb && offscreen(m, n.bb)) return
     pose(n, tNow(), P)
     let mm = m
     if (n.m) mm = mulTo([1, 0, 0, 1, 0, 0], mm, n.m)
@@ -325,22 +325,31 @@ export function createEngine(o: {
     if (st.s) {
       ctx.globalAlpha = a * (st.so ?? 1)
       applyStyle({ ...st, f: null })
-      if (st.dash) { ctx.setLineDash(st.dash); ctx.lineDashOffset = P.doff ?? st.doff ?? 0 } else if (P.doff !== undefined) ctx.lineDashOffset = P.doff
+      let doff = P.doff ?? st.doff ?? 0
+      if (ringOwner.has(n) && o.play && ringOwner.get(n) === hot) doff = marchOffset(st.doff ?? 0)
+      if (st.dash) { ctx.setLineDash(st.dash); ctx.lineDashOffset = doff } else if (P.doff !== undefined) ctx.lineDashOffset = doff
       ctx.stroke(lv.path)
       if (st.dash) ctx.setLineDash([])
     }
   }
 
+  /** The text settings the context has now (a restore puts back older ones, so it forgets them). */
+  let textCtx: CanvasRenderingContext2D | null = null, textFont = '', textLs = ''
+  const restore = () => { ctx.restore(); textCtx = null; ident = false }
   const drawText = (n: T, m: M, alpha: number) => {
+    if (n.bb && offscreen(m, n.bb)) return
     pose(n, tNow(), P)
     const a = alpha * (P.op ?? n.op ?? 1)
     if (a <= 0.002) return
     const mm = n.m ? mulTo([1, 0, 0, 1, 0, 0], m, n.m) : m
     setM(mm)
-    ctx.font = n.font
+    // Setting a font makes the canvas read it again: only when it changes.
+    if (textCtx !== ctx) { textCtx = ctx; textFont = ''; textLs = '' }
+    if (textFont !== n.font) { ctx.font = n.font; textFont = n.font }
+    const ls = n.ls ? `${n.ls}px` : '0px'
+    if (textLs !== ls) { (ctx as unknown as { letterSpacing: string }).letterSpacing = ls; textLs = ls }
     ctx.textAlign = n.anchor
-    ctx.textBaseline = n.base
-    ;(ctx as unknown as { letterSpacing: string }).letterSpacing = n.ls ? `${n.ls}px` : '0px'
+    ctx.textBaseline = n.bl
     const s = (n.tags && n.tags.map((t) => texts.get(t)).find((x) => x !== undefined)) ?? n.s
     ctx.globalAlpha = a
     if (n.stroke) { ctx.strokeStyle = n.stroke; ctx.lineWidth = n.sw ?? 1; ctx.lineJoin = 'round'; ctx.strokeText(s, n.x, n.y) }
@@ -349,20 +358,28 @@ export function createEngine(o: {
 
   /** The best loaded size of a sprite, and draw it. */
   const drawSprite = (id: number, m: M, alpha: number) => {
-    const sp = scene.sprites[id]
-    const s = Math.hypot(m[0], m[1])
+    const sp = scene.sprites[id], u = sp.u
+    if (offscreen(m, sp.box)) return
+    // Screen pixels to one of its units, along its longer axis (a squashed one is as sharp as it is long).
+    const s = Math.max(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3]))
     // The size wanted: the smallest level at least as sharp as the screen.
-    let li = scene.levels.findIndex((l, i) => sp.at[i] && l >= s * 0.92)
+    let li = scene.levels.findIndex((l, i) => sp.at[i] && l * u >= s * 0.92)
     if (li < 0) { li = sp.at.length - 1; while (li > 0 && !sp.at[li]) li-- }
     let use = -1
     for (let k = li; k >= 0; k--) { const at = sp.at[k]; if (!at) continue; if (want(scene.pages[at[0]].file, k === li ? 0 : 3)) { use = k; break } }
     if (use < 0) for (let k = li + 1; k < sp.at.length; k++) { const at = sp.at[k]; if (at && imgs.get(scene.pages[at[0]].file)?.bm) { use = k; break } }
-    if (use < 0) return
+    if (use < 0) { gaps++; return }
+    if (use !== li) blurry++
     const at = sp.at[use]!, bm = imgs.get(scene.pages[at[0]].file)!.bm!
-    const sc = scene.levels[use], b = sp.box
-    setM(m)
+    const sc = scene.levels[use] * u, b = sp.box
     ctx.globalAlpha = alpha
-    ctx.drawImage(bm, at[1], at[2], at[3], at[4], b[0], b[1], at[3] / sc, at[4] / sc)
+    if (m[1] === 0 && m[2] === 0 && m[0] > 0 && m[3] > 0) {
+      toIdent()
+      ctx.drawImage(bm, at[1], at[2], at[3], at[4], m[0] * b[0] + m[4], m[3] * b[1] + m[5], (m[0] * at[3]) / sc, (m[3] * at[4]) / sc)
+    } else {
+      setM(m)
+      ctx.drawImage(bm, at[1], at[2], at[3], at[4], b[0], b[1], at[3] / sc, at[4] / sc)
+    }
   }
 
   /** How strongly something tagged shows: the night's layers, the clouds, a building's ring. */
@@ -370,14 +387,14 @@ export function createEngine(o: {
     let a = 1
     const N = LAYERS.night
     for (const t of tags) {
-      if (t === 'night-halos') a *= tween('halos', N.halos[st.time] ?? 0, N.fadeMs)
-      else if (t === 'night-cores') a *= tween('cores', N.cores[st.time] ?? 0, N.fadeMs)
-      else if (t === 'night-panes') a *= tween('panes', N.panes[st.time] ?? 0, N.fadeMs)
-      else if (t === 'night-shine') a *= tween('shine', N.shine[st.time] ?? 0, N.fadeMs)
-      else if (t === 'night-sky') a *= tween('sky', N.sky[st.time] ?? 0, N.fadeMs)
-      else if (t === 'night-veil') a *= tween('veil', N.veil[st.time]?.[1] ?? 0, N.fadeMs)
-      else if (t === 'layer-night') a *= tween('night', st.time === 'day' ? 0 : 1, N.fadeMs)
-      else if (t === 'cloud') a *= tween('cloud', st.time === 'night' ? LAYERS.cloud.night : st.near ? LAYERS.cloud.near : 1, LAYERS.cloud.fadeMs)
+      if (t === 'night-halos') a *= timed('halos', N.halos[st.time] ?? 0, N.fadeMs)
+      else if (t === 'night-cores') a *= timed('cores', N.cores[st.time] ?? 0, N.fadeMs)
+      else if (t === 'night-panes') a *= timed('panes', N.panes[st.time] ?? 0, N.fadeMs)
+      else if (t === 'night-shine') a *= timed('shine', N.shine[st.time] ?? 0, N.fadeMs)
+      else if (t === 'night-sky') a *= timed('sky', N.sky[st.time] ?? 0, N.fadeMs)
+      else if (t === 'night-veil') a *= timed('veil', N.veil[st.time]?.[1] ?? 0, N.fadeMs)
+      else if (t === 'layer-night') a *= timed('night', st.time === 'day' ? 0 : 1, N.fadeMs)
+      else if (t === 'cloud') a *= timed('cloud', st.time === 'night' ? LAYERS.cloud.night : st.near ? LAYERS.cloud.near : 1, LAYERS.cloud.fadeMs)
       else if (t === 'layer-beam') a *= st.time === 'dusk' ? LAYERS.beam.dusk : 1
       else if (t === 'lm-ring') { const lmn = ringOwner.get(n); a *= lmn ? lmS(lmn).ring : 0 }
       else if (t === 'isl-plane' && !o.play) a = 0
@@ -394,22 +411,32 @@ export function createEngine(o: {
     return undefined
   }
   const ringOwner = new Map<Node, string>()
+  const MARCH = toAnim(LANDMARK.ringMarch, [0, 0])
+  const marchEase = ease(MARCH.ease)
+  const marchOffset = (base: number) => { const p = progress(MARCH, (now - t0) / 1000); return p === null ? base : (sampleProp(KF[MARCH.kf], 'doff', p, marchEase, base) as number) }
   for (const [slug, g] of lms) for (const k of g.kids) if (k.k === 'v' && k.tags?.includes('lm-ring')) ringOwner.set(k, slug)
 
-  /** The device box of a box under a matrix, to cull by. */
-  const offscreen = (m: M, b: Box) => {
-    const xs = [m[0] * b[0] + m[2] * b[1] + m[4], m[0] * b[2] + m[2] * b[1] + m[4], m[0] * b[0] + m[2] * b[3] + m[4], m[0] * b[2] + m[2] * b[3] + m[4]]
-    const ys = [m[1] * b[0] + m[3] * b[1] + m[5], m[1] * b[2] + m[3] * b[1] + m[5], m[1] * b[0] + m[3] * b[3] + m[5], m[1] * b[2] + m[3] * b[3] + m[5]]
-    return Math.max(...xs) < 0 || Math.min(...xs) > canvas.width || Math.max(...ys) < 0 || Math.min(...ys) > canvas.height
+  /** A box under a matrix, on the device: x0, y0, x1, y1. */
+  const devBox = (m: M, b: Box): Box => {
+    const ax = m[0] * b[0], bx = m[0] * b[2], cx = m[2] * b[1], dx = m[2] * b[3]
+    const ay = m[1] * b[0], by = m[1] * b[2], cy = m[3] * b[1], dy = m[3] * b[3]
+    return [Math.min(ax, bx) + Math.min(cx, dx) + m[4], Math.min(ay, by) + Math.min(cy, dy) + m[5], Math.max(ax, bx) + Math.max(cx, dx) + m[4], Math.max(ay, by) + Math.max(cy, dy) + m[5]]
   }
-
-  // A pool of canvases for drawing a group apart (a building fading as a whole).
-  const pool: OffscreenCanvas[] = []
+  /** Whether a box under a matrix is wholly off the canvas, to cull by. */
+  const offscreen = (m: M, b: Box) => {
+    const d = devBox(m, b)
+    return d[2] < 0 || d[0] > canvas.width || d[3] < 0 || d[1] > canvas.height
+  }
 
   const drawNode = (n: Node, m: M, alpha: number) => {
     switch (n.k) {
       case 'run': return drawRun(n.id, alpha)
-      case 'spr': return drawSprite(n.id, m, alpha)
+      case 'spr': {
+        // A sprite has no motion of its own, but can be thrown by a reaction (the gull's flight).
+        const lv = live.get(n)
+        if (lv?.over) { pose(n as { a?: Anim[] }, tNow(), P); if (P.m) return drawSprite(n.id, mulTo([1, 0, 0, 1, 0, 0], m, P.m), alpha * (P.op ?? 1)) }
+        return drawSprite(n.id, m, alpha)
+      }
       case 'v': return drawVector(n, m, alpha)
       case 'txt': return drawText(n, m, alpha)
       case 'sea': return drawSea(n, alpha)
@@ -431,14 +458,15 @@ export function createEngine(o: {
     let a = alpha * (P.op ?? n.op ?? 1)
     if (n.tags) a *= tagAlpha(n.tags, n)
     if (a <= 0.002) return
-    // A building: lifted when picked, dropping in at the start, faded when filtered out.
+    // A building: faded when filtered out, and fading in as it drops in at the start.
+    // Either fade is of the building as a whole (as CSS opacity is), so it is drawn apart.
     let iso = false
     if (n.lm) {
       const s = lmS(n.lm)
-      const target = !keep || keep.has(n.lm) ? 1 : LANDMARK.dim
-      s.dim = target === s.dim ? s.dim : approach(s.dim, target, LANDMARK.dimMs)
-      a *= s.dim
+      s.dim = timed(`dim:${n.lm}`, !keep || keep.has(n.lm) ? 1 : LANDMARK.dim, LANDMARK.dimMs)
+      a *= s.dim * introPose(n.lm).op
       lv.drawn = mm.slice() as M; lv.frame = frameNo
+      if (a <= 0.002) return
       iso = a < 0.999
     }
     if (n.poke) { lv.drawn = mm.slice() as M; lv.frame = frameNo }
@@ -447,88 +475,99 @@ export function createEngine(o: {
       if (!lv.clip) lv.clip = new Path2D(n.clip)
       ctx.save(); setM(mm); ctx.clip(lv.clip)
     }
-    if (iso && n.bb) {
-      drawApart(n, mm, a)
-    } else {
-      for (const k of n.kids) drawNode(k, mm, a)
-    }
-    if (n.clip) ctx.restore()
+    if (iso && n.bb) drawApart(n, m, mm, a)
+    else for (const k of n.kids) drawNode(k, mm, a)
+    if (n.clip) restore()
   }
 
-  /** Draw a group into a canvas of its own and lay it down at once: a fade of the whole, as CSS opacity does. */
-  const drawApart = (n: G, mm: M, a: number) => {
-    const bb = n.bb!
-    // n.bb is in the parent's coordinates; the group's own transform is in mm, so measure on screen.
-    const parentM = mm
-    const pts = [[bb[0], bb[1]], [bb[2], bb[1]], [bb[0], bb[3]], [bb[2], bb[3]]].map(([x, y]) => [deviceM[0] * x + deviceM[2] * y + deviceM[4], deviceM[1] * x + deviceM[3] * y + deviceM[5]])
-    const x0 = Math.max(0, Math.floor(Math.min(...pts.map((p) => p[0]))) - 2), y0 = Math.max(0, Math.floor(Math.min(...pts.map((p) => p[1]))) - 2)
-    const x1 = Math.min(canvas.width, Math.ceil(Math.max(...pts.map((p) => p[0]))) + 2), y1 = Math.min(canvas.height, Math.ceil(Math.max(...pts.map((p) => p[1]))) + 2)
-    const w = x1 - x0, h = y1 - y0
+  // Canvases to draw a group apart in, reused.
+  const pool: OffscreenCanvas[] = []
+  /** Draw a group's contents into a canvas of its own, then lay that down at once: a fade of the whole, as CSS opacity does. */
+  const drawApart = (n: G, parentM: M, mm: M, a: number) => {
+    // Where it can reach on screen (its reach is in its parent's coordinates).
+    const [x0, y0, x1, y1] = devBox(parentM, n.bb!)
+    const X0 = Math.max(0, Math.floor(x0) - 2), Y0 = Math.max(0, Math.floor(y0) - 2)
+    const X1 = Math.min(canvas.width, Math.ceil(x1) + 2), Y1 = Math.min(canvas.height, Math.ceil(y1) + 2)
+    const w = X1 - X0, h = Y1 - Y0
     if (w <= 0 || h <= 0) return
-    let oc = pool.pop()
-    if (!oc) oc = new OffscreenCanvas(w, h)
+    const oc = pool.pop() ?? new OffscreenCanvas(w, h)
     if (oc.width < w || oc.height < h) { oc.width = Math.max(oc.width, w); oc.height = Math.max(oc.height, h) }
-    const octx = oc.getContext('2d')!
+    const octx = oc.getContext('2d')! as unknown as CanvasRenderingContext2D
     octx.setTransform(1, 0, 0, 1, 0, 0)
+    octx.globalAlpha = 1
     octx.clearRect(0, 0, w, h)
-    const saved = ctxRef.c
-    ctxRef.c = octx as unknown as CanvasRenderingContext2D
-    const shifted: M = [parentM[0], parentM[1], parentM[2], parentM[3], parentM[4] - x0, parentM[5] - y0]
-    const savedDev = deviceM
-    deviceM = [deviceM[0], deviceM[1], deviceM[2], deviceM[3], deviceM[4] - x0, deviceM[5] - y0]
+    octx.imageSmoothingEnabled = true
+    octx.imageSmoothingQuality = 'high'
+    // Everything as if the canvas began at (X0, Y0): the matrices, and the device matrix the still runs use.
+    const saved = ctx, savedDev = deviceM
+    ctx = octx; ident = false
+    deviceM = [deviceM[0], deviceM[1], deviceM[2], deviceM[3], deviceM[4] - X0, deviceM[5] - Y0]
+    const shifted: M = [mm[0], mm[1], mm[2], mm[3], mm[4] - X0, mm[5] - Y0]
     for (const k of n.kids) drawNode(k, shifted, 1)
-    deviceM = savedDev
-    ctxRef.c = saved
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx = saved; deviceM = savedDev; ident = false
+    toIdent()
     ctx.globalAlpha = a
-    ctx.drawImage(oc, 0, 0, w, h, x0, y0, w, h)
+    ctx.drawImage(oc, 0, 0, w, h, X0, Y0, w, h)
     pool.push(oc)
   }
-  // The context drawn into (the canvas's own, or a pool canvas while drawing a group apart).
-  const ctxRef = { c: ctx }
-  void ctxRef
 
-  const approach = (v: number, to: number, ms: number) => { const k = Math.min(1, frameDt / ms); return Math.abs(to - v) < 0.002 ? to : v + (to - v) * (1 - Math.pow(1 - Math.min(0.99, 3 * k), 1)) }
-  let frameDt = 16
+  /**
+   * A value moving to a target as a CSS transition does: when the target
+   * changes it sets off from wherever it is, over ms, eased. Without motion it
+   * is at its target at once.
+   */
+  const timers = new Map<string, { v: number; from: number; to: number; at: number }>()
+  const timed = (key: string, to: number, ms: number, e: Ease = cssEase): number => {
+    let tm = timers.get(key)
+    if (!tm) { tm = { v: to, from: to, to, at: now }; timers.set(key, tm); return to }
+    if (tm.to !== to) { tm.from = tm.v; tm.to = to; tm.at = now }
+    const k = o.play ? Math.min(1, (now - tm.at) / ms) : 1
+    tm.v = k >= 1 ? to : tm.from + (tm.to - tm.from) * e(k)
+    return tm.v
+  }
 
-  /** A building's art: lifted (with a spring) when picked, and its drop at the start. */
+  /**
+   * A building dropping in at the start: its art's transform and the whole
+   * building's opacity now. As the page's CSS had it, the drop is round the
+   * world's origin (the art has no transform box of its own), each building
+   * a little after the last.
+   */
+  const INTRO = toAnim(LANDMARK.intro, [0, 0])
+  const introEase = ease(INTRO.ease)
+  const introOut = { m: null as M | null, op: 1 }
+  const introPose = (slug: string) => {
+    introOut.m = null; introOut.op = 1
+    if (introAt < 0 || !o.play) return introOut
+    const t = (now - introAt) / 1000 - Number(lms.get(slug)?.data?.d ?? 0) / 1000
+    const p = progress(INTRO, t)
+    if (p === null) return introOut
+    const kf = KF[INTRO.kf]
+    introOut.m = fnsMatrix(sampleProp(kf, 'tf', p, introEase, null) as never, INTRO.ref, INTRO.org)
+    introOut.op = sampleProp(kf, 'op', p, introEase, 1) as number
+    return introOut
+  }
+
+  /** A building's art: lifted (with a spring) when picked, and dropping in at the start. */
+  const liftEase = ease(LANDMARK.liftEase)
   const artMatrix = (n: G, mm: M): M => {
     const owner = artOwner.get(n); if (!owner) return mm
     const s = lmS(owner)
-    // The lift springs, like the CSS transition it replaces (cubic-bezier 0.34, 1.56, 0.64, 1).
-    const target = owner === hot ? LANDMARK.lift : 0
-    if (target !== s.liftTo) { s.liftFrom = s.lift; s.liftTo = target; s.liftAt = now }
-    const k = o.play ? Math.min(1, (now - s.liftAt) / LANDMARK.liftMs) : 1
-    s.lift = s.liftFrom + (s.liftTo - s.liftFrom) * liftEase(k)
-    s.ring = approach(s.ring, owner === hot ? 1 : 0, LANDMARK.ringMs)
-    let out = s.lift ? mulTo([1, 0, 0, 1, 0, 0], mm, [1, 0, 0, 1, 0, -s.lift]) : mm
-    if (introAt >= 0 && o.play) {
-      const d = Number(lms.get(owner)?.data?.d ?? 0) / 1000
-      const a = toAnim(LANDMARK.intro, [0, 0])
-      const t = (now - introAt) / 1000 - d
-      const p = progress(a, t)
-      if (p !== null) {
-        const kf = KF[a.kf], e = ease(a.ease)
-        const fb = n.fb ?? [0, 0, 0, 0]
-        const org: [number, number] = [(fb[0] + fb[2]) / 2, (fb[1] + fb[3]) / 2]
-        out = mulTo([1, 0, 0, 1, 0, 0], out, fnsMatrix(sampleProp(kf, 'tf', p, e, null) as never, [0, 0], org))
-        const op = sampleProp(kf, 'op', p, e, 1) as number
-        introAlpha.set(owner, op)
-      } else introAlpha.delete(owner)
-    }
-    return out
+    s.lift = timed(`lift:${owner}`, owner === hot ? LANDMARK.lift : 0, LANDMARK.liftMs, liftEase)
+    s.ring = timed(`ring:${owner}`, owner === hot ? 1 : 0, LANDMARK.ringMs)
+    // The lift was a transition on the art's transform, which the drop (an animation) overrides while it runs.
+    const ip = introPose(owner)
+    if (ip.m) return mulTo([1, 0, 0, 1, 0, 0], mm, ip.m)
+    return s.lift ? mulTo([1, 0, 0, 1, 0, 0], mm, [1, 0, 0, 1, 0, -s.lift]) : mm
   }
-  const liftEase = ease(LANDMARK.liftEase)
-  const introAlpha = new Map<string, number>()
   const artOwner = new Map<Node, string>()
   for (const [slug, g] of lms) { const walkArt = (n: Node) => { if (n.k === 'g') { if (n.tags?.includes('lm-art')) artOwner.set(n, slug); n.kids.forEach(walkArt) } }; walkArt(g) }
 
   /** A still run: its piece in each visible cell, from the cells' own level or a stand-in. */
   const drawRun = (id: number, alpha: number) => {
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    toIdent()
     ctx.globalAlpha = alpha
     for (const night of [false, true]) {
-      if (night && st.time === 'day' && (tweens.get('night')?.v ?? 0) <= 0) continue
+      if (night && st.time === 'day' && (timers.get('night')?.v ?? 0) <= 0) continue
       for (const s of night ? sources.night : sources.day) {
         const lvl = levels[s.li]; if (!lvl) continue
         const f = (night ? lvl.night : lvl.day).get(s.ci)?.get(id)
@@ -546,12 +585,15 @@ export function createEngine(o: {
     ctx.transform(1, 0, 0, n.sy, 0, 0)
     ctx.fillStyle = g
     ctx.fillRect(vis[0], vis[1] / n.sy, vis[2] - vis[0], (vis[3] - vis[1]) / n.sy)
-    ctx.restore()
+    restore()
   }
+
+  /** Last frame: what had nothing to draw yet, and what was drawn from a coarser picture than it wanted. */
+  let gaps = 0, blurry = 0, lastGaps = 1, lastBlurry = 1
 
   /* ---- one frame ---- */
   function frame(t: number) {
-    frameDt = Math.min(100, Math.max(1, t - now))
+    gaps = levels[0] ? 0 : 1; blurry = levels[level] ? 0 : 1
     now = t; frameNo++
     st = o.state()
     const s = cam.z * dpr
@@ -564,8 +606,8 @@ export function createEngine(o: {
     deviceM = [s, 0, 0, s, Math.round(W * dpr / 2 - cam.x * s), Math.round(H * dpr / 2 - cam.y * s)]
     const inv = invert(deviceM), pad = 4 / s
     vis = [inv[4] - pad, inv[5] - pad, inv[0] * canvas.width + inv[4] + pad, inv[3] * canvas.height + inv[5] + pad]
-    sources = { day: planSources(false), night: st.time === 'day' && (tweens.get('night')?.v ?? 0) <= 0 ? [] : planSources(true) }
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    sources = { day: planSources(false), night: st.time === 'day' && (timers.get('night')?.v ?? 0) <= 0 ? [] : planSources(true) }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true
     ctx.globalAlpha = 1
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.imageSmoothingEnabled = true
@@ -573,9 +615,9 @@ export function createEngine(o: {
     for (const n of scene.root) drawNode(n, deviceM, 1)
     for (const n of extra) drawNode(n, deviceM, 1)
     ctx.globalAlpha = 1
+    lastGaps = gaps; lastBlurry = blurry
     pump()
     if (frameNo % 60 === 0) trim()
-    void scratch
   }
 
   /* ---- what is under a point ---- */
@@ -607,6 +649,12 @@ export function createEngine(o: {
   function poke(node: object) {
     const n = node as G
     const def = POKES[n.poke ?? '']
+    // Without motion nothing reacts; what was poked only says its word.
+    if (!o.play) {
+      const say = (k: Node) => { if ('tags' in k && k.tags?.includes('pk-say')) L(k).hold = { op: 1, until: now + POKE_MS }; if (k.k === 'g') k.kids.forEach(say) }
+      n.kids.forEach(say)
+      return
+    }
     if (def?.self) L(n).over = { a: toAnim(def.self, n.pokeOrg ?? [0, 0]), at: now }
     const inner = (k: Node) => {
       if (k.k === 'g' || k.k === 'v') {
@@ -627,10 +675,9 @@ export function createEngine(o: {
       for (const k of n.kids) if ('tags' in k && k.tags?.includes('pk-say')) L(k).over = { a: toAnim(POKE_SAY, [0, 0]), at: now }
     } else n.kids.forEach(inner)
   }
-  // A reaction for a kid with no group of its own (a sprite, a run of shapes): played on a wrapper made for it.
+  /** A reaction played on one thing a poked group holds, whatever kind it is. */
   const wrapOver = (k: Node, loop: Loop) => {
-    if (k.k === 'g' || k.k === 'v') { L(k).over = { a: toAnim(loop, [0, 0]), at: now }; return }
-    void loop
+    if (k.k === 'g' || k.k === 'v' || k.k === 'txt' || k.k === 'spr') L(k).over = { a: toAnim(loop, [0, 0]), at: now }
   }
 
   return {
@@ -643,9 +690,18 @@ export function createEngine(o: {
       if (w !== W || h !== H || ratio !== dpr) {
         W = w; H = h; dpr = ratio
         canvas.width = Math.round(w * ratio); canvas.height = Math.round(h * ratio)
+        // A canvas given a new size forgets its settings: so must we.
+        ident = false; textCtx = null
       }
     },
-    setHot(slug: string | null) { if (slug && slug !== hot) lmS(slug).blinkAt = now; hot = slug },
+    setHot(slug: string | null) {
+      // Pointing at Dinosaur Time makes its fossil blink, three times.
+      if (slug && slug !== hot && o.play) {
+        const b = LANDMARK.hoverBlink
+        for (const n of tagged.get(b.on) ?? []) if (lmOf.get(n) === slug) L(n).over = { a: toAnim(b.loop, [0, 0]), at: now }
+      }
+      hot = slug
+    },
     dim(set: Set<string> | null) { keep = set },
     intro() { introAt = now },
     setText(tag: string, s: string) { texts.set(tag, s) },
@@ -676,8 +732,12 @@ export function createEngine(o: {
     pokeKinds: scene.pokes,
     /** Call when the engine may have more to draw (an image arrived). */
     set onLoaded(f: (() => void) | null) { onLoaded = f },
-    /** Whether everything the current view wants at its own level is in. */
-    ready() { return levels[level] !== null && sources.day.every((s) => s.li === level) },
+    /** Whether the last frame drew everything in view (if not all of it at its sharpest yet). */
+    drawable() { return lastGaps === 0 },
+    /** Whether the last frame drew everything in view at its own sharpness. */
+    sharp() { return lastGaps === 0 && lastBlurry === 0 },
+    /** Stop the buildings dropping in (someone has started using the map). */
+    endIntro() { introAt = -1 },
     lmBox(slug: string) { return lms.get(slug)?.bb ?? null },
   }
 }

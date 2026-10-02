@@ -1042,7 +1042,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // the sea, stars, the lighthouse's beam going round, fireflies.
   const night = open('night')
   // Hidden in the markup itself, so a still render (or a page whose styles
-  // have not loaded) shows day; island.css shows it when data-time asks.
+  // have not loaded) shows day; the engine shows it when the time asks.
   night.attrs.visibility = 'hidden'
   night.add(new N('rect', { class: 'night-veil', x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: '#14205c', opacity: 0.5 }))
   {

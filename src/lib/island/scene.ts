@@ -36,7 +36,7 @@ export type Anim = {
   dur: number
   delay: number
   ease: string
-  /** Infinity for a loop. */
+  /** Infinity for a loop (written -1 in the scene file: JSON has no Infinity). */
   iter: number
   /** 0 normal, 1 reverse, 2 alternate, 3 alternate-reverse. */
   dir: number
@@ -100,7 +100,7 @@ export type Node =
   /** A simple shape, drawn from its outline every frame. */
   | { k: 'v'; d: string; st: Style; m?: M; a?: Anim[]; base?: M; when?: When; tags?: string[]; data?: Record<string, string>; fb?: Box; bb?: Box }
   /** A line of lettering, drawn with the page's own fonts. */
-  | { k: 'txt'; s: string; x: number; y: number; m?: M; font: string; fill: string | null; stroke?: string | null; sw?: number; op?: number; anchor: CanvasTextAlign; base: CanvasTextBaseline; ls?: number; a?: Anim[]; tags?: string[]; bb?: Box }
+  | { k: 'txt'; s: string; x: number; y: number; m?: M; font: string; fill: string | null; stroke?: string | null; sw?: number; op?: number; anchor: CanvasTextAlign; bl: CanvasTextBaseline; ls?: number; a?: Anim[]; tags?: string[]; bb?: Box }
   /** The open sea: a radial gradient as wide as the sky. */
   | { k: 'sea'; cx: number; cy: number; r: number; sy: number; stops: [number, string][]; rect: Box }
 
@@ -108,6 +108,8 @@ export type Node =
 export type Sprite = {
   /** Its box in its group's coordinates. */
   box: Box
+  /** World units to one of its own (its groups' scale): level k is painted at levels[k] × u pixels to its unit. */
+  u: number
   /** Per level: page index, x, y, width, height in that page. Absent above its largest size. */
   at: ([number, number, number, number, number] | null)[]
 }
@@ -147,4 +149,34 @@ export type Scene = {
   masks: Record<string, { box: Box; res: number; w: number; h: number; bits: string }>
   /** Every kind of thing there is to poke. */
   pokes: string[]
+  /** The island's still painting by day, small, over the sea, covering the view: shown until the canvas can draw. */
+  poster: { file: string; w: number; h: number } | null
+}
+
+/**
+ * The scene as its file holds it. JSON has no Infinity, so a loop's count is
+ * written -1; any other number that is not finite is a fault in the bake
+ * (JSON would quietly write it as null, and the engine read that as 0), so
+ * it stops the bake here, naming where it was.
+ */
+export function sceneJson(s: Scene): string {
+  return JSON.stringify(s, function (key, v) {
+    if (typeof v === 'number' && !Number.isFinite(v)) {
+      if (key === 'iter' && v === Infinity) return -1
+      throw new Error(`[island] the baked scene has ${v} for "${key}" in ${JSON.stringify(this).slice(0, 200)}`)
+    }
+    // A thousandth of a unit is far under a pixel even at the closest zoom (eight pixels a unit).
+    if (typeof v === 'number') return Math.round(v * 1000) / 1000
+    return v
+  })
+}
+
+/** The scene read back from its file: loops endless again. */
+export function sceneFrom(s: Scene): Scene {
+  const fix = (n: Node) => {
+    if ('a' in n && n.a) for (const a of n.a) if (a.iter < 0) a.iter = Infinity
+    if (n.k === 'g') n.kids.forEach(fix)
+  }
+  s.root.forEach(fix)
+  return s
 }

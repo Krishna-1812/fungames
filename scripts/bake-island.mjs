@@ -19,17 +19,36 @@ if (!input || !out || !hash) { console.error('usage: bake-island.mjs <island.jso
 
 const { build } = await import('../src/lib/island/bake/build.ts')
 const { paint } = await import('../src/lib/island/bake/draw.ts')
+const { sceneJson } = await import('../src/lib/island/scene.ts')
+const { SKIP_LAYERS } = await import('../src/lib/island/bake/index.ts')
+const { Resvg } = await import('@resvg/resvg-js')
+const sharp = (await import('sharp')).default
 
 const t0 = Date.now()
 const island = JSON.parse(fs.readFileSync(input, 'utf8'))
-const b = build(island)
+const b = build({ ...island, layers: island.layers.filter((l) => !SKIP_LAYERS.has(l.kind)) })
 for (const w of b.warnings) console.log(`  [island] warning: ${w}`)
 const p = await paint(b, island.viewBox, hash, (s) => console.log(`  [island] ${s}`))
 
 fs.rmSync(out, { recursive: true, force: true })
 const files = []
 for (const [f, buf] of p.files) { const fp = path.join(out, f); fs.mkdirSync(path.dirname(fp), { recursive: true }); fs.writeFileSync(fp, buf); files.push(f) }
-fs.writeFileSync(path.join(out, 'scene.json'), JSON.stringify(p.scene)); files.push('scene.json')
+fs.writeFileSync(path.join(out, 'scene.json'), sceneJson(p.scene)); files.push('scene.json')
+
+// The whole island as one still picture, names and buildings and all, by day:
+// for a page without script, which has no canvas.
+{
+  const [vx, vy, vw, vh] = island.viewBox, k = 0.6
+  // By day and out of season: no night, no beam, no weather, and none of what only comes at certain hours.
+  const { parse, write, classes } = await import('../src/lib/island/bake/xml.ts')
+  const AWAY = new Set(['ufo', 'dawn-whale', 'fireworks', 'night-dim'])
+  const day = island.layers.filter((l) => !['night', 'beam', 'weather'].includes(l.kind))
+    .map((l) => parse(l.body).map((n) => write(n, (e) => (classes(e).some((c) => AWAY.has(c)) ? null : e.attrs))).join(''))
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${Math.round(vw * k)}" height="${Math.round(vh * k)}"><style>${island.css}</style>${day.join('')}</svg>`
+  const img = new Resvg(svg, { fitTo: { mode: 'width', value: Math.round(vw * k) }, font: { loadSystemFonts: true } }).render()
+  const buf = await sharp(Buffer.from(img.pixels), { raw: { width: img.width, height: img.height, channels: 4, premultiplied: true } }).flatten({ background: '#8ccbff' }).webp({ quality: 80, effort: 5 }).toBuffer()
+  fs.writeFileSync(path.join(out, 'still.webp'), buf); files.push('still.webp')
+}
 fs.writeFileSync(path.join(out, 'cards.json'), JSON.stringify(b.cards))
 let bytes = 0
 for (const f of files) bytes += fs.statSync(path.join(out, f)).size

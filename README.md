@@ -239,8 +239,12 @@ as a card, with the four filters and search.
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
 | `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, rocks at the waterline, a dry wash across the Badlands, cliffs drawn as continuous walls (ink only at their top, foot and outside corners, strata at fixed heights so each layer runs on, a ledge at every terrace), one sun for every shadow, trees, walkers, and the layers it is painted in |
 | `src/lib/island/sound.ts` | the island heard: beds that never stop (the sea's swell and surf, wind on the peaks, a dry wind over the Badlands, the market's and the funfair's crowds, rain under the forecast's cloud, crickets after dark, the funfair's music box) and things that happen now and then (gulls, birdsong, a bell buoy, an owl, a far-off sheep, fireworks at New Year, the ferry's horn read off its own animation), each placed on the map with the camera as the listener, and a sound for every one of the eighteen things you can poke |
-| `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard, the hover card, names at close zoom, the mini-map, the dive into a game |
-| `src/styles/island.css` | every loop on the map |
+| `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard (a link per building, out of sight), the hover card, names at close zoom, the mini-map, the dive into a game; the one loop that draws the canvas, eased by time rather than by frame |
+| `src/lib/island/moves.ts` | every motion on the map, as one table: the loops (ported from the old stylesheet), the pokes, a building's lift, ring, fade and drop, the night's and the clouds' strengths; and the cards' CSS, made from the same table |
+| `src/lib/island/bake/` | the bake: `build.ts` sorts the drawing into still painting, sprites, shapes and lettering; `draw.ts` paints the squares, sprite sheets, hit masks and the poster with resvg; `index.ts` keeps the result under a hash (run by `scripts/bake-island.mjs`, in a process of its own) |
+| `src/lib/island/engine.ts` | the canvas: streams the squares by size, poses everything by its keyframes, fades whole buildings as one, answers what is under a point |
+| `src/lib/island/scene.ts`, `anim.ts`, `keyframes.ts` | the baked scene's format, and keyframes, easing and transforms worked out by hand |
+| `src/pages/island/[...file].ts` | serves the baked files, under the bake's hash |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
 
 **Things happen because of other things.** The ferry comes in to its jetty,
@@ -259,87 +263,78 @@ window, a building site counting the year), never as a giant icon; and its
 words are things a street would have: painted on a wall, on a billboard,
 in neon, pinned to a noticeboard, never a floating app window.
 
-Three things about performance, all found by measuring rather than guessing:
+**The island is drawn on one canvas**, from pictures baked at build time.
+The map is still written as SVG (all of the above), but the page does not
+show that SVG: dragging ten thousand SVG elements, however carefully split
+into layers and culled, ran at 8 to 17 frames a second, and the time went
+where no script can reach it, into Chrome working out its GPU layers and
+painting them. So the build takes the drawing apart (`lib/island/bake`):
 
-- **The island is painted in layers**, each its own `<svg>`: sea, boats,
-  ground, walkers, then every building in its own layer in depth order with
-  the trees between buildings sharing still layers, then banners and sky. An
-  animation inside one huge SVG makes Chrome rework the whole tree every
-  frame; in a small layer it only reworks that layer. Ten frames a second
-  became sixty.
-- **Only what is on screen and near the middle moves**: the camera picks up
-  to eight buildings and ten walkers at a time from far away and more up
-  close, and pauses the rest where they are. Anything else that moves on its
-  own (a glint on the sea, the white water on a fall) is marked `.amb` with
-  its box in `data-b`, and gets the same treatment from its own budget. Nothing moves that crosses the
-  whole map (the surf and the wave marks stand still), and nothing uses SMIL:
-  every mover is a CSS keyframe path generated at build time. The surf that
-  does roll in is two lines of wave, each in a layer of its own whose
-  opacity rises and falls in turn: fading a whole layer is free, where
-  moving a line round the whole coast would repaint the sea every frame.
-- **The cards are copies, not `<use>`s.** A `<use>` of a building replays every
-  animation on the island into its copy each frame even when the cards are
-  off screen. The page clones each building into its card once instead.
-  (The one `<use>` left is the coastline the shallows are drawn from: one
-  still outline, stroked eight times at different widths with round joins,
-  which grows it outwards into soft bands that follow the coast.)
+- **What never moves** is painted once, by resvg, into squares 512 pixels
+  across at five sizes (half a pixel to the map unit up to eight), and
+  stored as near-lossless WebP. Lossy WebP halves the colour resolution and
+  blurred every coloured edge even at 1:1; near-lossless keeps the art as
+  sharp as the SVG and came out smaller overall. Within a square, still
+  painting that nothing moving passes between is flattened into one piece,
+  so most squares are a single picture. Night is a second set of squares.
+- **What moves** is a small picture of its own (a sprite), painted at the
+  same five sizes and at the size it is actually seen (the trolley's cart is
+  drawn a thirty-second the size and scaled back up, so its sprite is
+  painted thirty-six times larger), packed into sheets.
+- **Only shapes whose own paint changes** (a lit window, a week filling in,
+  the clouds at night, the ring round a building) are drawn from their
+  outlines each frame: about two hundred. Fifteen hundred of them, the first
+  time round, held the canvas to twelve frames a second; as sprites, sixty.
+- **Lettering** is drawn in the page's own fonts, so it stays text-sharp.
+- **The open sea** is a gradient, drawn, not stored.
+- **Every motion** comes from one table (`lib/island/moves.ts`) and the
+  same keyframes the SVG had: the engine (`lib/island/engine.ts`) samples
+  them itself, easing, delays, directions and all, so a boat is where its
+  CSS would have put it.
 
-Six phases later the map was down to **eleven frames a second** (headless
-Chrome, an Intel laptop, 1280×800, the whole island in view), and the
-reasons were all of one kind: Chrome runs these CSS animations on the GPU,
-each in a layer of its own, and every such layer lifts whatever is painted
-over it into a layer too. There were 848 layers, nearly two hundred
-megapixels to composite every frame. Building each phase's commit and
-measuring it found where it went, and Chrome's own layer list said why:
+The engine fetches the squares for what is in view at the size the screen
+needs, drawing a coarser one cut to size until the sharp one arrives, and
+keeps the translation on whole pixels so nothing shimmers. A click is
+tested against a one-bit mask of each building and each thing to poke, so
+the click lands on the art, not its box. The bake takes about two minutes
+and runs only when the island changes (it is cached under a hash of the
+drawing and the code that bakes it); its files are served under that hash
+and cached for good. Until the canvas can draw, a small picture of the
+island's still painting stands in, moved by the same camera; then it fades
+and the buildings drop in. Without script the page shows the whole island
+as one still picture.
 
-- **Hidden things were still animating.** The UFO (out of sight except at
-  three in the morning) kept its seven lights chasing inside a
-  `display: none` group, and Chrome repainted the sky layer, which spans the
-  map, for them every frame: 26 fps became 11. The secrets that keep their
-  own hours are paused while they are away; the fireworks only get their
-  animation at New Year.
-- **The cards were animating below the fold.** The grid was watched as one
-  block and woken 200px early, and at a desktop's height it starts just
-  under the island, so all thirty-one buildings in it ran all the time.
-  Each card now moves only while it is itself on screen.
-- **A paused animation keeps its layer.** Culling paused the buildings and
-  walkers far from the middle, which stopped their frames but kept every
-  layer. Culled things now lose their animations outright and rest in
-  their still pose; only movers (a walker, a boat) are paused, so they hold
-  their place on the path.
-- **A filter on something moving is drawn again every frame.** The
-  balloons' and the plane's night dimming was `filter: brightness()`, and
-  took night from 36 fps to 13. They are dimmed now by a shade of the
-  veil's blue over their own silhouette.
+Dragging now holds sixty frames a second (headless Chrome, 1280×800, the
+whole island in view), where the SVG map managed 8 to 17. `check-island`
+holds the line on what made the difference: the number of shapes drawn
+from their outlines, and a hit mask for everything you can click.
 
-Eleven frames a second became about fifty by day and by night (45 to 59
-from run to run on a busy laptop), and the same on a phone. `check-island` holds the line: no filter anywhere on the map,
-culled things drop their animations, the hidden secrets are still. (Two
-ideas measured worse and were dropped: running the animations on the main
-thread instead, at 10 fps, and flattening every `opacity` onto fills.)
+(The SVG map's own lessons, kept because the cards under the map are still
+SVG: an animation inside a `display: none` group still repaints; a paused
+animation keeps its GPU layer; a filter on something moving is drawn again
+every frame; and a `<use>` of an animated building replays its animations
+into the copy, so each card holds its own copy of its building, and moves
+only while it is itself on screen.)
 
 **Day and night follow the visitor's clock**: dawn from six, day from eight,
-dusk from six in the evening, night from eight. The map's `data-time` turns
-on a night layer (hidden in the markup itself, so a still render is day; by
-day not in the page at all, `display: none`, so its loops cost nothing): a
-deep blue veil over everything and, above it, the light. Every lit window's
+dusk from six in the evening, night from eight. The map's `data-time` fades
+in a night layer over a second and a half (baked into squares of its own,
+fetched only once it is wanted): a deep blue veil over everything and, above
+it, the light. Every lit window's
 pane and every bulb is drawn again in its glow colour with a halo (about one
 window in five stays dark, as in a real town), and everything that shines by
 itself (neon, screens, the Ferris wheel's bulbs) is drawn again as it is by
 day, so it stays bright. A moon with its path on the sea, stars, fireflies,
-and the lighthouse's beam sweeping round, which is a layer of its own that
-the page turns whole: turning so big a shape inside a layer repainted half
-the map every frame. (A multiply blend graded the colours more prettily and
-cost two frames in three; the plain veil stayed.) The sun/moon button picks
+and the lighthouse's beam sweeping round. The sun/moon button picks
 day or night by hand and remembers it in this browser.
 
 **Poke anything that moves.** The whale dives, the sheep say baa, the
 windmill races, a balloon shoots up and drifts back, a crab scurries, the
 fountain leaps, a kite loops the loop, a gull flies off and comes back.
-Each is wrapped in a group with `data-poke` naming it; the camera hands a
-click that was not a drag to the page, which plays the wrapper's reaction
-once (so whatever moves inside keeps moving) and remembers, in this
-browser, which of the eighteen kinds you have found. A chip keeps the
+Each is wrapped in a group with `data-poke` naming it; a click that was
+not a drag, on its own pixels (its hit mask), plays the wrapper's reaction
+once (so whatever moves inside keeps moving), and the page remembers, in
+this browser, which of the eighteen kinds you have found. A chip keeps the
 count. Some are secrets: a castaway on the islet, buried treasure, a
 message in a bottle with a different note each time, a 32nd building
 tucked behind the stone circle, a whale that only breaches at dawn, and a

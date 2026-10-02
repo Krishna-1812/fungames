@@ -1,26 +1,49 @@
 /**
  * Tiny Island — the camera and everything you do to the map.
  *
- * The island is one SVG; the camera is its viewBox. Drag it (it keeps a little
- * of your throw), wheel or pinch to zoom round the point under your fingers,
- * double-click to dive in, or use the keyboard. Names appear once you are close
- * enough to read them. Hovering a building shows its card; clicking one dives
- * the camera into it and opens the game. Everything eases towards a target, so
- * nothing ever jumps, and under reduced motion everything simply goes there.
+ * The island is drawn on one canvas by the engine (lib/island/engine), from
+ * pictures baked at build time; the camera says where it looks. Drag it (it
+ * keeps a little of your throw), wheel or pinch to zoom round the point under
+ * your fingers, double-click to dive in, or use the keyboard: every building
+ * is also a link, out of sight, so Tab reaches each one and Enter goes in.
+ * Names appear once you are close enough to read them. Hovering a building
+ * shows its card; clicking one dives the camera into it and opens the game.
+ *
+ * Everything eases towards a target by the time that has passed, not by the
+ * frame, so it feels the same at 30 frames a second and at 120; and under
+ * reduced motion everything simply goes there.
+ *
+ * Until the canvas has what it needs to draw the view, a small picture of the
+ * island stands in for it (the poster), moved by the same camera; then the
+ * poster fades, and the buildings drop in.
  */
 import { PLAY } from '../motion'
+import { createEngine, type Engine, type IslandState } from './engine'
+import { POKE_MS } from './moves'
+import type { Scene } from './scene'
 
 export type Anchor = { slug: string; district: string; x0: number; y0: number; x1: number; y1: number; bx: number; by: number }
 export type GameInfo = { slug: string; title: string; blurb: string; href: string; best?: string | null; tint: string }
 
 type Cam = { x: number; y: number; z: number }
 
+/** A frame's worth of time at 60 frames a second: the unit the easing was tuned in. */
+const FRAME = 1000 / 60
+
 export function initIsland(o: {
   box: HTMLElement
   /** Where pointers land: the map itself, under the buttons. */
   stage: HTMLElement
-  /** The layers, all moved together by one transform. */
-  world: HTMLElement
+  canvas: HTMLCanvasElement
+  /** The island, small, shown until the canvas can draw: it covers the bounds, at this many pixels a unit. */
+  poster: HTMLImageElement | null
+  posterScale: number
+  /** The baked island, on its way. */
+  scene: Promise<Scene>
+  /** Where the baked files are, ending in a slash. */
+  base: string
+  /** The time of day, the season, the hour, as the page has them. */
+  state: () => Omit<IslandState, 'near'>
   bounds: [number, number, number, number]
   /** The island itself, without the sea: the camera never lets it all go off screen. */
   land?: [number, number, number, number]
@@ -28,23 +51,24 @@ export function initIsland(o: {
   districts?: { key: string; name: string; x: number; y: number }[]
   anchors: Record<string, Anchor>
   games: Record<string, GameInfo>
+  /** One link per building, for the keyboard and for anything reading the page. */
+  links: Map<string, HTMLAnchorElement>
   onEnter?: (slug: string) => void
-  /** Something that is not a building was clicked (it carries data-poke). */
-  onPoke?: (el: Element) => void
+  /** Something that is not a building was poked. */
+  onPoke?: (kind: string) => void
 }) {
-  const { box, stage, world, anchors, games } = o
-  const svg = world
+  const { box, stage, canvas, poster, anchors, games, links } = o
   const [bx, by, bw, bh] = o.bounds
   const card = box.querySelector<HTMLElement>('.isl-card')!
   const labels = box.querySelector<HTMLElement>('.isl-labels')!
   const mini = box.querySelector<SVGSVGElement>('.isl-mini svg')
   const miniView = mini?.querySelector<SVGRectElement>('.isl-mini-view') ?? null
   const hint = box.querySelector<HTMLElement>('.isl-hint')
-  const links = new Map<string, SVGAElement>()
-  svg.querySelectorAll<SVGAElement>('a.lm').forEach((a) => links.set(a.dataset.slug!, a))
 
   /* ---- the camera ------------------------------------------------------ */
   let W = box.clientWidth, H = box.clientHeight
+  // Past two device pixels per CSS pixel the island looks no sharper, and the canvas costs more than twice as much to fill.
+  const ratio = () => Math.min(2, window.devicePixelRatio || 1)
   const fitZ = () => Math.min(W / (bw * 0.86), H / (bh * 0.8))
   let zMin = fitZ() * 0.85, zMax = Math.max(fitZ() * 7, 3.4)
   const cam: Cam = { x: bx + bw / 2, y: by + bh * 0.56, z: fitZ() }
@@ -63,49 +87,111 @@ export function initIsland(o: {
       goal.y = Math.min(ly1 - iy, Math.max(ly0 + iy, goal.y))
     }
   }
-  const apply = () => {
-    const w = W / cam.z, h = H / cam.z
-    world.style.transform = `translate(${(W / 2 - cam.x * cam.z).toFixed(2)}px, ${(H / 2 - cam.y * cam.z).toFixed(2)}px) scale(${cam.z.toFixed(4)})`
-    const near = cam.z / fitZ()
-    box.classList.toggle('z-far', near < 1.25)
-    box.classList.toggle('z-near', near > 2.1)
-    if (miniView) { miniView.setAttribute('x', String(cam.x - w / 2)); miniView.setAttribute('y', String(cam.y - h / 2)); miniView.setAttribute('width', String(w)); miniView.setAttribute('height', String(h)) }
-    placeOverlays()
-    cull()
-  }
   const toScreen = (x: number, y: number) => [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2]
   const toWorld = (sx: number, sy: number) => [(sx - W / 2) / cam.z + cam.x, (sy - H / 2) / cam.z + cam.y]
 
-  let running = false, dragging = false
-  // While the zoom is changing, the island is one GPU layer that scales as a
-  // picture (re-drawing every vector at every step is a few frames a second);
-  // once it stops, the layer goes and the island is drawn sharp at its new size.
-  let promoted = false, demoteT = 0
-  const promote = () => { clearTimeout(demoteT); if (!promoted) { world.style.willChange = 'transform'; world.classList.add('is-zooming'); promoted = true } }
-  const demote = () => { clearTimeout(demoteT); demoteT = window.setTimeout(() => { if (!running && promoted) { world.style.willChange = ''; world.classList.remove('is-zooming'); promoted = false } }, 140) }
-  const tick = () => {
+  /* ---- the engine, once the scene is in, and the one loop that drives it ---- */
+  let near = false
+  let engine: Engine | null = null
+  const waiting: ((e: Engine) => void)[] = []
+  /** Do something with the engine now, or as soon as there is one. */
+  const withEngine = (fn: (e: Engine) => void) => { if (engine) fn(engine); else waiting.push(fn) }
+  o.scene.then((scene) => {
+    const e = createEngine({ canvas, base: o.base, scene, play: PLAY, state: () => ({ ...o.state(), near }) })
+    e.onLoaded = () => wake()
+    e.setHot(hot); e.dim(keep)
+    engine = e
+    for (const fn of waiting.splice(0)) fn(e)
+    wake()
+  }, (err) => console.error('[island] the map could not load', err))
+  let keep: Set<string> | null = null
+  let raf = 0, lastT = 0, visible = true, paused = false, dragging = false
+  function wake() { if (!raf && visible && !paused) raf = requestAnimationFrame(frame) }
+
+  /** One step of the camera towards its goal, over dt milliseconds. Whether it is still on its way. */
+  const step = (dt: number) => {
+    const f = dt / FRAME
     if (!dragging && (Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02)) {
-      goal.x -= vel.x / cam.z; goal.y -= vel.y / cam.z
-      vel.x *= 0.9; vel.y *= 0.9
+      goal.x -= (vel.x * f) / cam.z; goal.y -= (vel.y * f) / cam.z
+      const d = Math.pow(0.9, f); vel.x *= d; vel.y *= d
       clampGoal()
     }
-    const k = PLAY ? 0.16 : 1
+    // Each sixtieth of a second, a sixth of the way there.
+    const k = PLAY ? 1 - Math.pow(0.84, f) : 1
     const dz = goal.z - cam.z, dx = goal.x - cam.x, dy = goal.y - cam.y
-    cam.z += dz * k; cam.x += dx * k; cam.y += dy * k
-    apply()
     const moving = Math.abs(dz) > 0.0005 * cam.z || Math.abs(dx) * cam.z > 0.3 || Math.abs(dy) * cam.z > 0.3 || Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02
-    if (moving || dragging) requestAnimationFrame(tick)
-    else { Object.assign(cam, goal); apply(); cull(true); running = false; demote() }
+    if (moving) { cam.z += dz * k; cam.x += dx * k; cam.y += dy * k }
+    else Object.assign(cam, goal)
+    return moving
   }
-  const wake = () => { if (!running) { running = true; requestAnimationFrame(tick) } }
+
+  function frame(t: number) {
+    raf = 0
+    const dt = lastT ? Math.min(64, Math.max(1, t - lastT)) : FRAME
+    lastT = t
+    const moving = step(dt)
+    if (engine) { engine.setView(cam, W, H, ratio()); engine.frame(t) }
+    after()
+    // With motion there is always something moving on the island; without, draw only while something changes.
+    if ((engine && (PLAY || !engine.sharp())) || moving || dragging || hover.dirty) wake()
+    else lastT = 0
+  }
+
+  /* ---- after each frame: the page around the canvas ----------------------- */
+  const seen: Cam = { x: NaN, y: NaN, z: NaN }
+  let seenHot: string | null = null
+  function after() {
+    const moved = cam.x !== seen.x || cam.y !== seen.y || cam.z !== seen.z
+    if (moved || hot !== seenHot) {
+      Object.assign(seen, cam); seenHot = hot
+      const n = cam.z / fitZ()
+      box.classList.toggle('z-far', n < 1.25)
+      const wasNear = near
+      near = n > 2.1
+      if (near !== wasNear) box.classList.toggle('z-near', near)
+      if (miniView) {
+        const w = W / cam.z, h = H / cam.z
+        miniView.setAttribute('x', (cam.x - w / 2).toFixed(1)); miniView.setAttribute('y', (cam.y - h / 2).toFixed(1))
+        miniView.setAttribute('width', w.toFixed(1)); miniView.setAttribute('height', h.toFixed(1))
+      }
+      placeOverlays()
+      placePoster()
+    }
+    if (hover.dirty) hoverTest()
+    if (stage0 === 'poster' && fontsIn && engine?.drawable()) goLive()
+  }
+
+  /* ---- the poster, and going live ------------------------------------------ */
+  function placePoster() {
+    if (!poster || stage0 === 'gone') return
+    poster.style.transform = `translate(${(W / 2 - (cam.x - bx) * cam.z).toFixed(2)}px, ${(H / 2 - (cam.y - by) * cam.z).toFixed(2)}px) scale(${(cam.z / o.posterScale).toFixed(5)})`
+  }
+  let stage0: 'poster' | 'live' | 'gone' = 'poster'
+  // The lettering on the map is in the page's own fonts: wait for them, a little.
+  let fontsIn = !document.fonts
+  if (document.fonts) {
+    Promise.all(['600 16px Fredoka', '16px Silkscreen'].map((f) => document.fonts.load(f).catch(() => null))).finally(() => { fontsIn = true; wake() })
+    setTimeout(() => { fontsIn = true; wake() }, 2500)
+  }
+  function goLive() {
+    stage0 = 'live'
+    box.classList.add('is-live')
+    // The buildings drop in, unless the map is already being used.
+    if (PLAY && !interacted) { engine!.intro(); settle() }
+    const gone = () => { stage0 = 'gone'; if (poster) poster.hidden = true }
+    if (PLAY && poster) setTimeout(gone, 450)
+    else gone()
+  }
+
+  /* ---- zooming and flying ------------------------------------------------- */
   const zoomAt = (f: number, sx = W / 2, sy = H / 2) => {
     const [wx, wy] = toWorld(sx, sy)
     const z = Math.min(zMax, Math.max(zMin, goal.z * f))
     // Keep the point under the cursor where it is.
     goal.x = wx - (sx - W / 2) / z; goal.y = wy - (sy - H / 2) / z; goal.z = z
-    promote(); clampGoal(); wake()
+    clampGoal(); wake()
   }
-  const flyTo = (x: number, y: number, z: number) => { goal.x = x; goal.y = y; goal.z = z; vel = { x: 0, y: 0 }; if (Math.abs(z - cam.z) > 0.001) promote(); clampGoal(); wake() }
+  const flyTo = (x: number, y: number, z: number) => { goal.x = x; goal.y = y; goal.z = z; vel = { x: 0, y: 0 }; clampGoal(); wake() }
   const flyToSlug = (slug: string, zoom = 2.6) => {
     const a = anchors[slug]; if (!a) return
     // Close enough that the building is the subject, far enough that its card fits.
@@ -117,24 +203,28 @@ export function initIsland(o: {
 
   /* ---- pointers: drag, pinch, wheel, double-click ------------------------ */
   const ptrs = new Map<number, { x: number; y: number }>()
-  let moved = 0, last = { x: 0, y: 0, t: 0 }, pinch0 = 0, pinchZ = 1, pressed: Element | null = null
+  let moved = 0, last = { x: 0, y: 0, t: 0 }, pinch0 = 0, pinchZ = 1
+  let press = { x: 0, y: 0 }
   let interacted = false
   setTimeout(() => hint?.classList.add('is-gone'), 9000)
-  function firstTouch() { if (interacted) return; interacted = true; hint?.classList.add('is-gone'); svg.classList.remove('is-intro') }
+  function firstTouch() { if (interacted) return; interacted = true; hint?.classList.add('is-gone'); engine?.endIntro() }
+  const local = (e: { clientX: number; clientY: number }) => { const r = box.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
   stage.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    // The stage takes the pointer for the drag, which makes the click that
-    // follows land on the stage: remember what was really pressed.
-    pressed = e.target as Element
+    press = local(e)
     stage.setPointerCapture(e.pointerId)
     dragging = true; moved = 0; vel = { x: 0, y: 0 }
     last = { x: e.clientX, y: e.clientY, t: performance.now() }
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); pinchZ = goal.z }
-    box.classList.add('is-grabbing'); firstTouch(); wake()
+    box.classList.add('is-grabbing'); stage.style.cursor = ''; firstTouch(); wake()
   })
   stage.addEventListener('pointermove', (e) => {
-    if (!ptrs.has(e.pointerId)) return
+    if (!ptrs.has(e.pointerId)) {
+      // Just pointing (a mouse, no button down): what is under it, looked at in the next frame.
+      if (e.pointerType === 'mouse' && !dragging) { const p = local(e); hover.x = p.x; hover.y = p.y; hover.dirty = true; hover.on = true; wake() }
+      return
+    }
     const p = ptrs.get(e.pointerId)!
     const dx = e.clientX - p.x, dy = e.clientY - p.y
     p.x = e.clientX; p.y = e.clientY
@@ -142,11 +232,13 @@ export function initIsland(o: {
       const [a, b] = [...ptrs.values()]
       const d = Math.hypot(a.x - b.x, a.y - b.y), r = box.getBoundingClientRect()
       const z = Math.min(zMax, Math.max(zMin, (pinchZ * d) / Math.max(1, pinch0)))
-      const [wx, wy] = toWorld((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top)
-      goal.z = z; cam.z = z; promote()
-      goal.x = cam.x = wx - ((a.x + b.x) / 2 - r.left - W / 2) / z + (cam.x - wx) * 0
-      goal.y = cam.y = wy - ((a.y + b.y) / 2 - r.top - H / 2) / z
+      const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top
+      const [wx, wy] = toWorld(mx, my)
+      goal.z = cam.z = z
+      goal.x = cam.x = wx - (mx - W / 2) / z
+      goal.y = cam.y = wy - (my - H / 2) / z
       moved += 10
+      wake()
       return
     }
     moved += Math.abs(dx) + Math.abs(dy)
@@ -154,10 +246,11 @@ export function initIsland(o: {
     cam.x = goal.x; cam.y = goal.y
     const now = performance.now(), dt = Math.max(8, now - last.t)
     const cap = (v: number) => Math.max(-38, Math.min(38, v))
-    vel = { x: cap((dx / dt) * 16), y: cap((dy / dt) * 16) }
+    vel = { x: cap((dx / dt) * FRAME), y: cap((dy / dt) * FRAME) }
     last = { x: e.clientX, y: e.clientY, t: now }
     clampGoal()
     if (moved > 6) hideCard()
+    wake()
   })
   const up = (e: PointerEvent) => {
     ptrs.delete(e.pointerId)
@@ -168,13 +261,14 @@ export function initIsland(o: {
     wake()
   }
   stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up)
+  stage.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && hover.on) { hover.on = false; hover.dirty = true; wake() } })
   stage.addEventListener('wheel', (e) => {
     e.preventDefault(); firstTouch()
-    const r = box.getBoundingClientRect()
+    const p = local(e)
     const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.012 : 0.0022))
-    zoomAt(f, e.clientX - r.left, e.clientY - r.top)
+    zoomAt(f, p.x, p.y)
   }, { passive: false })
-  stage.addEventListener('dblclick', (e) => { const r = box.getBoundingClientRect(); zoomAt(2, e.clientX - r.left, e.clientY - r.top) })
+  stage.addEventListener('dblclick', (e) => { const p = local(e); zoomAt(2, p.x, p.y) })
   box.addEventListener('keydown', (e) => {
     const step = 80 / cam.z
     const map: Record<string, () => void> = {
@@ -185,33 +279,17 @@ export function initIsland(o: {
     e.preventDefault(); firstTouch(); map[e.key](); clampGoal(); wake()
   })
 
-  /* ---- motion only where you are looking --------------------------------- */
-  svg.classList.add('is-culling')
-  const boxed = (sel: string) => Array.from(svg.querySelectorAll<SVGElement>(sel)).map((el) => ({ el, b: (el.dataset.b ?? '0 0 0 0').split(' ').map(Number) }))
-  const walkerEls = boxed('.walker')
-  // The small ambient things: glints, falls, and whatever else moves on its own.
-  const ambEls = boxed('.amb')
-  let lastCull = 0
-  function cull(force = false) {
-    const now = performance.now()
-    if (!force && now - lastCull < 220) return
-    lastCull = now
-    const w = W / cam.z, h = H / cam.z, x0 = cam.x - w / 2, y0 = cam.y - h / 2, x1 = x0 + w, y1 = y0 + h
-    const seen = (b: number[]) => b[2] > x0 && b[0] < x1 && b[3] > y0 && b[1] < y1
-    // Fewer at once from far away, where the whole island is on screen and
-    // every moving thing makes the browser repaint more of it.
-    const near = cam.z / fitZ()
-    // A phone shows less of the island and has less to spare: two thirds as many.
-    const k = W < 700 ? 0.67 : 1
-    const LIVE_LM = Math.round((near < 1.3 ? 8 : near < 2 ? 11 : 14) * k), LIVE_WALK = Math.round((near < 1.3 ? 10 : near < 2 ? 12 : 16) * k), LIVE_AMB = Math.round((near < 1.3 ? 10 : near < 2 ? 14 : 18) * k)
-    const d = (b: number[]) => Math.hypot((b[0] + b[2]) / 2 - cam.x, (b[1] + b[3]) / 2 - cam.y)
-    const lm = Object.values(anchors).map((a) => ({ s: a.slug, b: [a.x0, a.y0, a.x1, a.y1] })).filter((a) => seen(a.b)).sort((p, q) => d(p.b) - d(q.b)).slice(0, LIVE_LM).map((a) => a.s)
-    const live = new Set(lm); if (hot) live.add(hot)
-    for (const [s, a] of links) a.classList.toggle('is-live', live.has(s))
-    const wl = new Set(walkerEls.filter((x) => seen(x.b)).sort((p, q) => d(p.b) - d(q.b)).slice(0, LIVE_WALK).map((x) => x.el))
-    for (const x of walkerEls) x.el.classList.toggle('is-live', wl.has(x.el))
-    const al = new Set(ambEls.filter((x) => seen(x.b)).sort((p, q) => d(p.b) - d(q.b)).slice(0, LIVE_AMB).map((x) => x.el))
-    for (const x of ambEls) x.el.classList.toggle('is-live', al.has(x.el))
+  /* ---- what is under the mouse ---------------------------------------------- */
+  const hover = { x: 0, y: 0, on: false, dirty: false, lm: null as string | null }
+  function hoverTest() {
+    hover.dirty = false
+    const h = hover.on && !dragging && engine ? engine.hit(hover.x, hover.y) : null
+    stage.style.cursor = h ? 'pointer' : ''
+    const lm = h?.lm ?? null
+    if (lm === hover.lm) return
+    hover.lm = lm
+    if (lm) showCard(lm)
+    else hideCard(false)
   }
 
   /* ---- names, when close enough to read them ----------------------------- */
@@ -243,9 +321,8 @@ export function initIsland(o: {
   function showCard(slug: string, extra = '') {
     const g = games[slug]; if (!g) return
     clearTimeout(hideT)
-    if (hot && hot !== slug) links.get(hot)?.classList.remove('is-hot')
     hot = slug
-    links.get(slug)?.classList.add('is-hot', 'is-live')
+    engine?.setHot(slug)
     card.querySelector('.isl-card-title')!.textContent = g.title
     card.querySelector('.isl-card-blurb')!.textContent = g.blurb
     cardBest.textContent = g.best ? `Best ${g.best}` : ''
@@ -256,19 +333,21 @@ export function initIsland(o: {
     card.hidden = false
     requestAnimationFrame(() => card.classList.add('is-on'))
     placeOverlays()
+    wake()
   }
   function hideCard(now = true) {
     const go = () => {
       card.classList.remove('is-on')
-      if (hot) links.get(hot)?.classList.remove('is-hot')
       hot = null
+      engine?.setHot(null)
+      wake()
     }
     clearTimeout(hideT)
     if (now) go(); else hideT = window.setTimeout(go, 260)
   }
   card.addEventListener('pointerenter', () => clearTimeout(hideT))
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && hot) { hideCard(); box.focus({ preventScroll: true }) } })
-  card.addEventListener('pointerleave', () => hideCard(false))
+  card.addEventListener('pointerleave', () => { hover.lm = null; hideCard(false) })
   cardPlay.addEventListener('click', (e) => { if (hot) { e.preventDefault(); enter(hot) } })
 
   function placeOverlays() {
@@ -284,7 +363,6 @@ export function initIsland(o: {
       card.style.transform = `translate(${(x - cw / 2).toFixed(0)}px, ${(below ? sb + 14 : sy - 14).toFixed(0)}px) translateY(${below ? '0' : '-100%'})`
       card.style.setProperty('--arrow', `${(sx - x + cw / 2).toFixed(0)}px`)
     }
-    const near = box.classList.contains('z-near')
     for (const { t, d } of dtags) {
       const [sx, sy] = toScreen(d.x, d.y)
       const on = !near && sx > -120 && sx < W + 120 && sy > -40 && sy < H + 40
@@ -305,18 +383,16 @@ export function initIsland(o: {
         t.classList.toggle('is-on', on)
         if (on) { placed.push(r); t.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translateX(-50%)` }
       }
-    }
+    } else for (const t of tags.values()) t.classList.remove('is-on')
   }
 
-  /* ---- buildings: hover, focus, click ------------------------------------ */
+  /* ---- buildings and pokes: hover, focus, click ------------------------------ */
   let touchish = false
   stage.addEventListener('pointerdown', (e) => { touchish = e.pointerType !== 'mouse' }, true)
   for (const [slug, a] of links) {
-    a.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && !dragging) showCard(slug) })
-    a.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hideCard(false) })
     a.addEventListener('focus', () => { flyToSlug(slug, 2.2); showCard(slug) })
-    // A click that reaches the link itself (the keyboard's Enter does).
-    a.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); pick(slug) })
+    // The keyboard's Enter.
+    a.addEventListener('click', (e) => { e.preventDefault(); pick(slug) })
   }
   // On a touch screen the first tap shows the card; the second goes in.
   function pick(slug: string) {
@@ -324,16 +400,19 @@ export function initIsland(o: {
     if (touchish && hot !== slug) { showCard(slug); flyToSlug(slug, 2); return }
     enter(slug)
   }
-  // A click with the mouse or a finger lands here, not on what was pressed:
-  // the stage took the pointer for dragging (see pointerdown). So this is
-  // where a building, or something to poke, is found and acted on.
-  stage.addEventListener('click', (e) => {
-    const t = (pressed ?? e.target) as Element
+  // A click with the mouse or a finger: what was under it when it went down.
+  stage.addEventListener('click', () => {
     if (moved > 6) return
-    const lm = t.closest<SVGAElement>('a.lm')
-    if (lm?.dataset.slug) { e.preventDefault(); pick(lm.dataset.slug); return }
-    const pk = t.closest('[data-poke]')
-    if (pk) { o.onPoke?.(pk); return }
+    const h = engine?.hit(press.x, press.y)
+    if (h?.lm) { pick(h.lm); return }
+    if (h?.poke) {
+      engine!.poke(h.poke.node)
+      o.onPoke?.(h.poke.kind)
+      wake()
+      // Without motion the canvas only draws when asked: once more when the reaction is over.
+      if (!PLAY) setTimeout(wake, POKE_MS + 60)
+      return
+    }
     hideCard()
   })
 
@@ -354,7 +433,7 @@ export function initIsland(o: {
     setTimeout(() => { location.href = g.href }, 980)
   }
   // Coming back with the browser's back button: open the iris again.
-  addEventListener('pageshow', (e) => { if (e.persisted) { entering = false; iris.classList.remove('is-closing'); zMax = Math.max(fitZ() * 7, 3.4) } })
+  addEventListener('pageshow', (e) => { if (e.persisted) { entering = false; iris.classList.remove('is-closing'); zMax = Math.max(fitZ() * 7, 3.4); clampGoal(); wake() } })
 
   /* ---- the mini-map ------------------------------------------------------- */
   mini?.addEventListener('pointerdown', (e) => {
@@ -364,32 +443,36 @@ export function initIsland(o: {
   })
 
   /* ---- sleeping when nobody is looking ------------------------------------ */
-  new IntersectionObserver(([e]) => {
-    const off = !e.isIntersecting
-    svg.classList.toggle('is-paused', off)
-  }).observe(box)
-
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) wake() }).observe(box)
   new ResizeObserver(() => {
     W = box.clientWidth; H = box.clientHeight
     zMin = fitZ() * 0.85; zMax = Math.max(fitZ() * 7, 3.4)
-    clampGoal(); Object.assign(cam, goal); apply()
+    clampGoal(); Object.assign(cam, goal); seen.z = NaN; wake()
   }).observe(box)
 
   /* ---- the opening: settle down from a little higher up ------------------- */
+  // Until the canvas can draw, the camera holds here, over the poster; then it settles.
   cam.z = fitZ() * 0.82; cam.y -= bh * 0.08
-  goal.z = fitZ() * (W < 700 ? 2.1 : 1.12)
-  goal.x = bx + bw / 2; goal.y = by + bh * 0.54
-  clampGoal(); apply()
-  if (PLAY) { svg.classList.add('is-intro'); promote(); setTimeout(wake, 150); setTimeout(() => svg.classList.remove('is-intro'), 3200) }
-  else Object.assign(cam, goal), apply()
+  goal.x = bx + bw / 2; goal.y = by + bh * 0.54; goal.z = fitZ() * (W < 700 ? 2.1 : 1.12)
+  clampGoal()
+  const settleTo = { ...goal }
+  if (PLAY) Object.assign(goal, cam)
+  else Object.assign(cam, goal)
+  function settle() { if (!interacted) { Object.assign(goal, settleTo); wake() } }
+  wake()
 
   return {
+    /** Do something with the engine (draw something, change a sign) as soon as the map has loaded. */
+    withEngine,
     flyToSlug, showCard, hideCard, home, enter,
     zoomIn: () => { firstTouch(); zoomAt(1.5) }, zoomOut: () => { firstTouch(); zoomAt(1 / 1.5) },
-    dim: (keep: Set<string> | null) => {
-      svg.classList.toggle('is-dimming', !!keep)
-      for (const [s, a] of links) a.classList.toggle('is-match', !!keep && keep.has(s))
-    },
+    dim: (set: Set<string> | null) => { keep = set; engine?.dim(set); wake() },
+    /** Draw again (the page changed something the island shows). */
+    redraw: wake,
+    /** Stop drawing altogether (a dialog over the page), or start again. */
+    pause: (on: boolean) => { paused = on; if (!on) wake() },
+    /** Whether the island is being drawn: on screen, the page in front, nothing over it. */
+    awake: () => visible && !paused && !document.hidden,
     worldPoint: (slug: string) => anchors[slug],
     /** What the camera is looking at, in map units: for the soundscape. */
     view: () => ({ x: cam.x, y: cam.y, w: W / cam.z, h: H / cam.z }),

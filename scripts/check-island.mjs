@@ -8,7 +8,9 @@
  *      buildings stand in the sea.
  *   3. Every building measured itself: a finite box of a sensible size.
  *   4. The roads reach every district.
- *   5. The markup is real SVG: resvg parses and rasterises the whole island.
+ *   5. The canvas can draw it: few shapes from outlines, a hit mask for every
+ *      building and thing to poke, a card for every game.
+ *   6. The markup is real SVG: resvg parses and rasterises the whole island.
  *
  *   node scripts/check-island.mjs            check
  *   node scripts/check-island.mjs --preview  also write public/_mockups/island-preview.html and .png
@@ -82,25 +84,27 @@ console.log(`  size  ${(island.svg.length / 1024).toFixed(0)} KB of markup, ${is
 check(island.hiddenLights > 0 && island.hiddenLights < island.lights.length * 0.4, `lights hidden behind something are left dark at night (${island.hiddenLights} of ${island.lights.length})`)
 check(island.svg.length < 900 * 1024, 'the island is under 900 KB of markup')
 
-// What it costs to keep the map moving. Each of these was a measured loss
-// (a headless Chrome on an Intel laptop, the whole island in view) and none
-// of them shows in a screenshot, so they are checked here rather than hoped
-// about.
-console.log('what it costs to keep moving')
+// What it costs to keep the map moving, now that a canvas draws it from the
+// bake (lib/island/bake). Each of these was a measured loss in headless
+// Chrome, and none of them shows in a screenshot, so they are checked here.
+console.log('what the canvas has to draw')
 {
-  const css = fs.readFileSync('src/styles/island.css', 'utf8') + island.css
-  // A filter on something that moves is drawn again, filter and all, every
-  // frame: the balloons' night dimming took the map from 36 fps to 13.
-  const filters = [...css.matchAll(/(?<![-\w])filter\s*:\s*(?!none)([^;}]+)/g)].map((m) => m[1].trim())
-  check(!filters.length, `no CSS filter on anything on the map${filters.length ? ` (found: ${filters.join(', ')})` : ''}`)
-  check(!/ filter="/.test(island.svg), 'and none in the drawing')
-  // A paused animation keeps its GPU layer, and every layer lifts whatever is
-  // painted over it into one of its own: culled things must lose theirs.
-  check(/\.isle\.is-culling \.lm:not\(\.is-live\) \.lm-art \*:not\([^)]*\)[^{]*\{ animation: none !important; \}/.test(css), 'culled buildings drop their animations, not just pause them')
-  // An animation inside a hidden group still runs, and repaints its layer:
-  // the secrets that keep their own hours are still while they are away.
-  for (const cls of ['ufo', 'dawn-whale']) check(new RegExp(`\\.isle \\.${cls} \\*[^{]*\\{ animation-play-state: paused !important; \\}`).test(css), `the ${cls} is still while it is hidden`)
-  check(!/^\.isle \.fw \{[^}]*animation/m.test(css), 'the fireworks only animate at New Year')
+  const { build } = await import('../src/lib/island/bake/build.ts')
+  const { SKIP_LAYERS } = await import('../src/lib/island/bake/index.ts')
+  const b = build({ ...island, layers: island.layers.filter((l) => !SKIP_LAYERS.has(l.kind)) })
+  const count = { g: 0, run: 0, spr: 0, v: 0, txt: 0, sea: 0 }
+  const lms = new Set(), pokes = new Set()
+  const walk = (n) => { count[n.k]++; if (n.lm) lms.add(n.lm); if (n.poke) pokes.add(n.poke); if (n.k === 'g') n.kids.forEach(walk) }
+  b.root.forEach(walk)
+  check(!b.warnings.length, `the bake understands every part of the drawing${b.warnings.length ? ` (${b.warnings.join('; ')})` : ''}`)
+  // Shapes drawn again from their outlines every frame: fifteen hundred of
+  // them held the map to twelve frames a second; as sprites, sixty.
+  check(count.v <= 320, `few shapes are drawn from their outlines every frame (${count.v}; ${count.spr} sprites, ${count.run} runs of still painting, ${count.txt} lines of lettering)`)
+  check(games.every((g) => lms.has(g.slug)), 'every building is something the canvas can pick out')
+  const masked = new Set(b.masks.map((m) => m.key))
+  check(games.every((g) => masked.has(`lm:${g.slug}`)), 'and every building has a hit mask, so a click lands on its art')
+  check(b.pokes.length === pokes.size && b.masks.filter((m) => m.key.startsWith('pk:')).length >= pokes.size, `every thing to poke has one too (${pokes.size} kinds)`)
+  check(games.every((g) => b.cards[g.slug]), 'every game has its building for its card')
 }
 
 console.log('rasterise')
