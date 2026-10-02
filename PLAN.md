@@ -2688,11 +2688,23 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     now written as relative steps and polygons as paths: 902 KB became
     845, and a render before and after is identical to the pixel.
 
-63. Next, in order, unless the order changes: the empty corners filled,
-    and cause and effect (people going in and out, boats docking); a real
-    night with weather and seasons; things to poke and easter eggs; a
-    passport of visited games and optional sound; then polish, phones and
-    speed.
+63. ~~**The island, made real: life, and cause and effect.**~~ **done.**
+    The empty corners filled: market stalls along the west promenade
+    (fruit, fish, flowers, ices, books) under a string of bulbs that light
+    at night; an islet far out to the west with a castaway waving, SOS in
+    the sand, a hut, and an X beside a chest that glints; a message in a
+    bottle; a ferry with its own jetty, two fishing boats at anchor, and a
+    speedboat. And things happen because of other things: the ferry ties up
+    and a passenger walks ashore while another hurries out to catch it;
+    cars stop at zebra crossings while someone crosses (checked in the
+    browser: across a whole cycle no car moves while its walker does);
+    people walk up to nine of the buildings, go in, and come out again.
+    The markup stayed under budget by setting round joins once per layer
+    for every shape to inherit: 894 KB became 826.
+
+64. Next, in order, unless the order changes: a real night with weather
+    and seasons; things to poke and easter eggs; a passport of visited
+    games and optional sound; then polish, phones and speed.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

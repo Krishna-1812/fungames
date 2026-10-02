@@ -228,10 +228,10 @@ as a card, with the four filters and search.
 
 | File | What it is |
 |---|---|
-| `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), painted faces (a sign, poster or mural drawn flat on a wall by shearing it onto the face), lettering and neon, bounds that every shape grows, CSS keyframe paths, and path data written short (relative steps, polygons as paths: the same picture in a tenth less markup) |
+| `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), painted faces (a sign, poster or mural drawn flat on a wall by shearing it onto the face), lettering and neon, bounds that every shape grows, CSS keyframe paths, and path data written short (relative steps, polygons as paths, round joins set once on each layer and inherited rather than repeated on every shape: the same picture in a fifth less markup) |
 | `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
 | `src/lib/island/nature.ts` | the wild things and the farm: snowy pines, cacti, reeds, hedges, topiary, toadstools, a rock arch, buttes, hoodoos and boulder heaps, crop fields, hay bales, the windmill, and the animals (sheep, deer, ducks, crabs, dolphins, a whale, gulls, butterflies, a tumbleweed) |
-| `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, fingerposts, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends) |
+| `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, fingerposts, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, market stalls and strings of lights, a ferry, fishing boats and a speedboat, an islet with a secret, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends, the first few pulling up at a zebra crossing) |
 | `src/lib/island/sky.ts` | hot-air balloons and a plane towing a banner |
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
@@ -239,6 +239,14 @@ as a card, with the four filters and search.
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard, the hover card, names at close zoom, the mini-map, the dive into a game |
 | `src/styles/island.css` | every loop on the map |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
+
+**Things happen because of other things.** The ferry comes in to its jetty,
+waits, and goes; while it is tied up, one passenger walks ashore and
+another hurries out to catch it. A few cars pull up at a zebra crossing
+while someone on the kerb walks over, then drive on. People walk up to a
+building's door, go in, and come out again a while later. Each pair runs
+on one clock (the same duration and delay, with the pauses written into
+both keyframes at build time), so they stay in step without any script.
 
 **One scale for everything.** A person is 21 pixels tall, and the rest is
 measured against them: a door is about 16, a storey about 18, a bicycle

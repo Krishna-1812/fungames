@@ -91,6 +91,10 @@ export function minPath(d: string): string {
   return s
 }
 
+/** Groups that set round joins for everything drawn inside them. */
+const joinRoots = new WeakSet<N>()
+export const joinRoot = <T extends N>(n: T) => { joinRoots.add(n); return n }
+
 export function render(n: N | string): string {
   if (typeof n === 'string') return n
   // A polygon goes out as the same shape in path data, which can be written
@@ -104,7 +108,10 @@ export function render(n: N | string): string {
   for (const k in attrs) {
     const v = attrs[k]
     if (v === undefined || v === null || v === '') continue
-    a += ` ${k}="${typeof v === 'number' ? fa(v) : esc(k === 'd' ? minPath(v) : v)}"`
+    // Round joins are inherited from the layer (and each building's art), so
+    // a shape saying so again is just bytes.
+    if (k === 'stroke-linejoin' && v === 'round' && !joinRoots.has(n)) continue
+    a +=` ${k}="${typeof v === 'number' ? fa(v) : esc(k === 'd' ? minPath(v) : v)}"`
   }
   return n.kids.length ? `<${tag}${a}>${n.kids.map(render).join('')}</${tag}>` : `<${tag}${a}/>`
 }

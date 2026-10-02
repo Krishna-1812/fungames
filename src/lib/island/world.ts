@@ -9,18 +9,21 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath } from './kit'
+import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot } from './kit'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { hotAirBalloon, plane as skyPlane } from './sky'
-import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle } from './town'
+import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet } from './town'
 import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, hoodoo, boulders, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
 
 export const GRID = 30
 const SEA = -12
 const BEACH = -6
 /** Piers: a run of ground points from a beach out over the water. */
-const PIERS: [number, number][][] = [[[5.5, 17.2], [5.5, 14.3]], [[14.5, 29.4], [14.5, 31.7]]]
+const PIERS: [number, number][][] = [[[5.5, 17.2], [5.5, 14.3]], [[14.5, 29.4], [14.5, 31.7]], [[21.5, 27.3], [21.5, 30.1]]]
+/** The ferry ties up at the end of the last pier, on its far side; a crossing takes this long. */
+const FERRY_DUR = 48
+const FERRY = { dock: [21.02, 29.75] as [number, number], from: [21.02, 47] as [number, number] }
 const f = (v: number) => Math.round(v * 10) / 10
 const f2 = (v: number) => Math.round(v * 100) / 100
 /** Sand: two tones for the tops, the wet edge, and the two faces of a step. */
@@ -160,7 +163,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // The island is painted in layers, each its own SVG, so an animation only
   // makes the browser rework the small layer it is in rather than the lot.
   const made: { kind: Layer['kind']; slug?: string; node: N }[] = []
-  const open = (kind: Layer['kind'], slug?: string) => { const node = new N('g', { class: `layer-${kind}` }); made.push({ kind, slug, node }); return node }
+  // Every layer joins its strokes round, once, for everything in it to
+  // inherit (render() then leaves the attribute off each shape).
+  const open = (kind: Layer['kind'], slug?: string) => { const node = joinRoot(new N('g', { class: `layer-${kind}`, 'stroke-linejoin': 'round' })); made.push({ kind, slug, node }); return node }
   let root = open('sea')
   const lights: [number, number][] = []
 
@@ -326,8 +331,28 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   })
   { const [x, y] = P(3, 29.5, SEA); root.add(whale(x, y)) }
   // Rowing boats tied up at the piers, and buoys off the harbour.
-  for (const [n, pts] of PIERS.entries()) { const [ei, ej] = pts[pts.length - 1], [si, sj] = pts[0]; const di = Math.sign(ei - si), dj = Math.sign(ej - sj); const [x, y] = P(ei - di * 0.6 + (dj ? 0.42 : 0), ej - dj * 0.6 + (di ? 0.42 : 0), SEA); root.add(rowboat(x, y, n ? C.cobalt : C.mint)) }
+  for (const [n, pts] of PIERS.slice(0, 2).entries()) { const [ei, ej] = pts[pts.length - 1], [si, sj] = pts[0]; const di = Math.sign(ei - si), dj = Math.sign(ej - sj); const [x, y] = P(ei - di * 0.6 + (dj ? 0.42 : 0), ej - dj * 0.6 + (di ? 0.42 : 0), SEA); root.add(rowboat(x, y, n ? C.cobalt : C.mint)) }
   ;[[30, 21], [26.5, 29.2], [31, 16.5]].forEach(([i, j], n) => { const [x, y] = P(i, j, SEA); root.add(buoy(x, y, n * 1.4)) })
+  // Two fishing boats at anchor, out past the rocks.
+  ;[[31.6, 11.4, C.mint, 0], [-2.6, 9.2, C.rasp, 2.2]].forEach(([i, j, c, d]) => { const [x, y] = P(i as number, j as number, SEA); root.add(fishingBoat(x, y, c as string, d as number)) })
+  // A speedboat racing along the bottom of the map and back.
+  {
+    const a = P(33, 27, SEA), b = P(25, 37.5, SEA)
+    const pose = (q: [number, number], dir: number) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px) scaleX(${dir})`
+    motionCss.push(`@keyframes isl-speed{0%{${pose(a, 1)}}44%{${pose(b, 1)}}50%{${pose(b, -1)}}94%{${pose(a, -1)}}100%{${pose(a, 1)}}}`)
+    const g = root.add(new N('g', { class: 'mover amb', 'data-b': `${f(b[0] - 60)} ${f(a[1] - 30)} ${f(a[0] + 60)} ${f(b[1] + 20)}`, style: 'animation:isl-speed 22s ease-in-out infinite -4s' }))
+    g.add(speedboat(C.rasp))
+  }
+  // The ferry: in from the open sea, a while at the jetty, out again.
+  {
+    const a = P(FERRY.from[0], FERRY.from[1], SEA), b = P(FERRY.dock[0], FERRY.dock[1], SEA)
+    const pose = (q: [number, number], dir: number) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px) scaleX(${dir})`
+    motionCss.push(`@keyframes isl-ferry{0%{${pose(a, -1)};opacity:0}4%{opacity:1}32%,62%{${pose(b, -1)}}62.4%{${pose(b, 1)}}95%{opacity:1}100%{${pose(a, 1)};opacity:0}}`)
+    const g = root.add(new N('g', { class: 'mover amb', 'data-b': `${f(a[0] - 40)} ${f(b[1] - 40)} ${f(b[0] + 40)} ${f(a[1] + 20)}`, style: `animation:isl-ferry ${FERRY_DUR}s linear infinite` }))
+    g.add(ferry())
+  }
+  // The islet with the secret, far out to the west.
+  secretIslet(new Pen(root), -1.4, 26.2)
 
   // The ground, a diagonal row at a time: tops merged by colour, then cliffs.
   root = open('ground')
@@ -654,7 +679,26 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       const [kind, body] = kinds[n % kinds.length]
       const a0 = r[0], b0 = r[r.length - 1]
       const axis: 'x' | 'y' = a0[0] !== b0[0] ? 'x' : 'y'
-      walkers.add(shuttle(kind, body, P(a0[0] + 0.5, a0[1] + 0.5), P(b0[0] + 0.5, b0[1] + 0.5), axis, `drive${n}`, r.length * (kind === 'bike' ? 3.2 : 2) + 4, n * 3.3))
+      const dur = r.length * (kind === 'bike' ? 3.2 : 2) + 4, delay = n * 3.3
+      const A = P(a0[0] + 0.5, a0[1] + 0.5), B = P(b0[0] + 0.5, b0[1] + 0.5)
+      // Cause and effect, part three: the first few stop at a zebra crossing
+      // half-way along, while someone waiting on the kerb walks over.
+      if (n < 4 && kind !== 'bike' && r.length >= 6) {
+        const mid = r[Math.floor(r.length / 2)], di = Math.sign(b0[0] - a0[0]), dj = Math.sign(b0[1] - a0[1])
+        const cx = mid[0] + 0.5, cy = mid[1] + 0.5
+        crossing(new Pen(walkers), cx, cy, axis === 'x' ? 'y' : 'x')
+        const back = kind === 'bus' ? 0.75 : 0.58
+        const sh = shuttle(kind, body, A, B, axis, `drive${n}`, dur, delay, [P(cx - di * back, cy - dj * back), P(cx + di * back, cy + dj * back)])
+        const [h1, h2] = sh.holds!
+        const kA = P(cx + dj * 0.4, cy + di * 0.4), kB = P(cx - dj * 0.4, cy - di * 0.4)
+        const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
+        motionCss.push(`@keyframes cross${n}{0%,${f(h1[0] + 1)}%{${tr(kA)}}${f(h1[1] - 1)}%,${f(h2[0] + 1)}%{${tr(kB)}}${f(h2[1] - 1)}%,100%{${tr(kA)}}}`)
+        const pg = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(kA[0], kB[0]) - 8)} ${f(Math.min(kA[1], kB[1]) - 24)} ${f(Math.max(kA[0], kB[0]) + 8)} ${f(Math.max(kA[1], kB[1]) + 3)}`, style: `animation:cross${n} ${dur}s linear infinite ${f(-delay)}s` }))
+        pg.add(walkerFigure(shirts[(n + 2) % shirts.length]))
+        walkers.add(sh)
+        return
+      }
+      walkers.add(shuttle(kind, body, A, B, axis, `drive${n}`, dur, delay))
     })
   }
 
@@ -679,7 +723,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       const [rx, ry] = P(pl.i, pl.j, pl.z)
       a.add(new N('path', { class: 'lm-ring', d: quad([P(pl.i - 0.08, pl.j - 0.08, pl.z), P(pl.i + pl.w + 0.08, pl.j - 0.08, pl.z), P(pl.i + pl.w + 0.08, pl.j + pl.d + 0.08, pl.z), P(pl.i - 0.08, pl.j + pl.d + 0.08, pl.z)]), fill: '#ffffff', 'fill-opacity': 0.35, stroke: '#ffffff', 'stroke-width': 3, 'stroke-dasharray': '6 6' }))
       void rx; void ry
-      const art = a.add(new N('g', { class: 'lm-art', id: `lm-${pl.slug}` }))
+      const art = a.add(joinRoot(new N('g', { class: 'lm-art', id: `lm-${pl.slug}`, 'stroke-linejoin': 'round' })))
       const b = new Bounds()
       const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights)
       pl.lm.draw(lp)
@@ -806,6 +850,21 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       at(3.75, 5.85, 9.6, (p) => sitter(p, 3.75, 5.85, C.cobalt, '#e0b899'))
     }
   }
+  // The promenade: a row of market stalls along Market Street's beach, lit
+  // by a string of bulbs from one to the next.
+  {
+    const cells = [...beach].map((k) => k.split(',').map(Number) as [number, number]).filter(([i, j]) => dist[i][j].key === 'market' && j >= 23 && i >= 6 && !reserved.has(key(i, j)) && !taken.has(key(i, j))).sort((a, b) => a[0] - b[0])
+    const kinds = ['fruit', 'fish', 'flowers', 'ices', 'books'] as const, stripes = [C.rasp, C.cobalt, C.mint, C.lilac, C.sky]
+    let prev: [number, number] | null = null, n = 0
+    for (const [i, j] of cells) {
+      if (n >= 5) break
+      reserved.add(key(i, j))
+      const x = i + 0.5, y = j + 0.42, m = n++
+      at(x, y, i + j + 0.9, (p) => stall(p, x, y, kinds[m], stripes[m]), BEACH)
+      if (prev && Math.hypot(prev[0] - x, prev[1] - y) < 1.8) { const q = prev; at((q[0] + x) / 2, (q[1] + y) / 2 + 0.3, i + j + 1.2, (p) => stringLights(p, [q[0] - 0.22, q[1] + 0.2], [x - 0.22, y + 0.2], 29), BEACH) }
+      prev = [x, y]
+    }
+  }
   // The beaches: umbrellas and towels, a sandcastle, surfboards, the lifeguard.
   {
     const sandy = [...beach].map((k) => k.split(',').map(Number) as [number, number]).filter(([i, j]) => dist[i][j].key !== 'badlands' && dist[i][j].key !== 'peaks')
@@ -823,7 +882,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     }
   }
   // Piers out from the beaches, each with someone fishing off the end.
-  for (const pts of PIERS) things.push({ depth: pts[0][0] + pts[0][1] + 0.4, draw: (layer) => pier(new Pen(layer), pts, BEACH + 1, C.rasp) })
+  for (const [n, pts] of PIERS.entries()) things.push({ depth: pts[0][0] + pts[0][1] + 0.4, draw: (layer) => pier(new Pen(layer), pts, BEACH + 1, n === 2 ? null : C.rasp) })
 
   // Trees, rocks and the odd lamp or bench, on the land left over.
   const treeKind = (d: District, coastal: boolean): TreeKind => {
@@ -868,6 +927,46 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       things.push({ depth: x + y, draw: (layer) => (snowy && kind === 'pine' ? snowPine(new Pen(layer, 0, 0, z), x, y, c === C.bloom ? C.leaf : c, sz) : tree(new Pen(layer, 0, 0, z), x, y, kind, c, sz)) })
     }
   }
+  // Cause and effect, part one: the ferry's passengers. One steps off when
+  // it ties up and walks the jetty ashore; another hurries out to catch it.
+  {
+    const z = BEACH + 3
+    const end = P(21.5, 29.85, z), land = P(21.5, 27.4, z), shore = P(20.7, 26.5, BEACH)
+    const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
+    motionCss.push(`@keyframes isl-off{0%,33%{${tr(end)};opacity:0}34%{opacity:1}52%{${tr(land)}}58%{${tr(shore)};opacity:1}60%,100%{${tr(shore)};opacity:0}}`)
+    motionCss.push(`@keyframes isl-on{0%,40%{${tr(shore)};opacity:0}41%{opacity:1}46%{${tr(land)}}59%{${tr(end)};opacity:1}61%,100%{${tr(end)};opacity:0}}`)
+    for (const [name, shirt] of [['isl-off', C.rasp], ['isl-on', C.mint]] as const) things.push({ depth: 21.5 + 30.5, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(shore[0] - 10)} ${f(land[1] - 30)} ${f(end[0] + 10)} ${f(end[1] + 4)}`, style: `animation:${name} ${FERRY_DUR}s linear infinite` })); g.add(walkerFigure(shirt)) } })
+  }
+  // Cause and effect, part two: people walking up to a building's door and
+  // going in, and a while later coming out again and walking off.
+  {
+    let made = 0
+    for (const pl of placed) {
+      if (pl.lm.water || made >= 10) continue
+      // A road cell against a side we can see, and two more along the road from it.
+      let door: [number, number] | null = null, r0: [number, number] | null = null
+      for (let b = pl.j; b < pl.j + pl.d && !door; b++) if (road.has(key(pl.i + pl.w, b))) { door = [pl.i + pl.w - 0.04, b + 0.5]; r0 = [pl.i + pl.w, b] }
+      for (let a = pl.i; a < pl.i + pl.w && !door; a++) if (road.has(key(a, pl.j + pl.d))) { door = [a + 0.5, pl.j + pl.d - 0.04]; r0 = [a, pl.j + pl.d] }
+      if (!door || !r0) continue
+      const path: [number, number][] = [r0]
+      for (let k = 0; k < 2; k++) { const [ci, cj] = path[path.length - 1]; const nx = [[1, 0], [0, 1], [-1, 0], [0, -1]].map(([di, dj]) => [ci + di, cj + dj] as [number, number]).find(([ni, nj]) => road.has(key(ni, nj)) && !path.some(([pi, pj]) => pi === ni && pj === nj)); if (!nx) break; path.push(nx) }
+      if (path.length < 3) continue
+      const pts = [...path].reverse().map(([i, j]) => P(i + 0.5, j + 0.5, 0)).concat([P(door[0], door[1], pl.z)])
+      const segs = pts.slice(1).map((q, k) => Math.hypot(q[0] - pts[k][0], q[1] - pts[k][1])), total = segs.reduce((x, y) => x + y, 0)
+      const name = `isl-visit${made}`, tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
+      let run = 0, fr = `0%{${tr(pts[0])};opacity:0}4%{opacity:1}`
+      pts.forEach((q, k) => { if (k) { run += segs[k - 1]; fr += `${f(4 + (36 * run) / total)}%{${tr(q)}}` } })
+      fr += `40.5%{opacity:1}41.5%,66%{opacity:0}67%{opacity:1}`
+      run = 0
+      ;[...pts].reverse().forEach((q, k, rv) => { if (k) { run += Math.hypot(q[0] - rv[k - 1][0], q[1] - rv[k - 1][1]); fr += `${f(67 + (29 * run) / total)}%{${tr(q)}}` } })
+      fr += `97%{opacity:1}100%{${tr(pts[0])};opacity:0}`
+      motionCss.push(`@keyframes ${name}{${fr}}`)
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]), m = made++
+      const dur = f(total / 9 + 14)
+      things.push({ depth: pl.i + pl.j + (pl.w + pl.d) / 2 + 0.02, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb visitor', 'data-b': `${f(Math.min(...xs) - 8)} ${f(Math.min(...ys) - 24)} ${f(Math.max(...xs) + 8)} ${f(Math.max(...ys) + 3)}`, style: `animation:${name} ${dur}s linear infinite ${f(-m * 3.7)}s` })); g.add(walkerFigure(shirts[(m + 3) % shirts.length])) } })
+    }
+  }
+
   things.sort((a, b) => a.depth - b.depth)
   // Every building gets a layer of its own; whatever stands between two
   // buildings shares one still layer.

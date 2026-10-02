@@ -8,6 +8,7 @@
  * screen box in `data-b`, so the camera can pause it (cull() in camera.ts).
  */
 import { C, INK, OUT, N, Pen, shade, S, motionCss, r1 } from './kit'
+import { person, tree } from './props'
 
 const f = (v: number) => Math.round(v * 10) / 10
 const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0)} ${f(x1)} ${f(y1)}`
@@ -325,12 +326,25 @@ export function campfire(p: Pen, x: number, y: number) {
  * is drawn side-on and slanted to lie along the road, and turned round at
  * each end. `a` and `b` are screen points; the road runs along x or y.
  */
-export function shuttle(kind: 'car' | 'bus' | 'bike', body: string, a: [number, number], b: [number, number], axis: 'x' | 'y', name: string, dur: number, delay: number): N {
+/**
+ * A car, bus or bike up and down one straight road. Given `stops` (a point
+ * short of a zebra crossing each way), it pulls up there for a moment on
+ * each trip: the returned times say when, so someone can cross.
+ */
+export function shuttle(kind: 'car' | 'bus' | 'bike', body: string, a: [number, number], b: [number, number], axis: 'x' | 'y', name: string, dur: number, delay: number, stops?: [[number, number], [number, number]]): N & { holds?: [number, number][] } {
   // Along x the road climbs to the right on screen; along y it climbs to the left.
   const skew = axis === 'x' ? 26.57 : -26.57
   const fwd = Math.sign(b[0] - a[0]) || 1
   const pose = (x: number, y: number, dir: number) => `transform:translate(${r1(x)}px,${r1(y)}px) skewY(${skew}deg) scaleX(${dir * fwd})`
-  motionCss.push(`@keyframes ${name}{0%{${pose(a[0], a[1], 1)}}46%{${pose(b[0], b[1], 1)}}50%{${pose(b[0], b[1], -1)}}96%{${pose(a[0], a[1], -1)}}100%{${pose(a[0], a[1], 1)}}}`)
+  let holds: [number, number][] | undefined
+  if (!stops) motionCss.push(`@keyframes ${name}{0%{${pose(a[0], a[1], 1)}}46%{${pose(b[0], b[1], 1)}}50%{${pose(b[0], b[1], -1)}}96%{${pose(a[0], a[1], -1)}}100%{${pose(a[0], a[1], 1)}}}`)
+  else {
+    const [s1, s2] = stops, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1
+    const t1 = (42 * Math.hypot(s1[0] - a[0], s1[1] - a[1])) / L, t2 = 50.2 + (42 * Math.hypot(s2[0] - b[0], s2[1] - b[1])) / L
+    const p2 = (v: number) => Math.round(v * 100) / 100
+    holds = [[p2(t1), p2(t1 + 8)], [p2(t2), p2(t2 + 8)]]
+    motionCss.push(`@keyframes ${name}{0%{${pose(a[0], a[1], 1)}}${p2(t1)}%,${p2(t1 + 8)}%{${pose(s1[0], s1[1], 1)}}50%{${pose(b[0], b[1], 1)}}50.2%{${pose(b[0], b[1], -1)}}${p2(t2)}%,${p2(t2 + 8)}%{${pose(s2[0], s2[1], -1)}}99.8%{${pose(a[0], a[1], -1)}}100%{${pose(a[0], a[1], 1)}}}`)
+  }
   const g = new N('g', { class: 'mover amb', 'data-b': box(Math.min(a[0], b[0]) - 26, Math.min(a[1], b[1]) - 24, Math.max(a[0], b[0]) + 26, Math.max(a[1], b[1]) + 8), style: `animation:${name} ${dur}s linear infinite ${f(-delay)}s` })
   g.add(new N('ellipse', { cx: 0, cy: 1, rx: kind === 'bus' ? 20 : kind === 'bike' ? 7 : 13, ry: 3.5, fill: INK, opacity: 0.15 }))
   if (kind === 'car') {
@@ -352,7 +366,137 @@ export function shuttle(kind: 'car' | 'bus' | 'bike', body: string, a: [number, 
     g.add(new N('circle', { cx: 0.5, cy: -19.5, r: 2.8, fill: SKIN[1], stroke: INK, 'stroke-width': 1 }))
     g.add(new N('path', { d: 'M-1 -9L0 -3', stroke: INK, 'stroke-width': 1.6, 'stroke-linecap': 'round' }))
   }
+  return Object.assign(g, { holds })
+}
+/**
+ * A market stall on the promenade: a counter under a striped awning on four
+ * poles, its goods on top, and the stallholder behind it.
+ */
+export function stall(p: Pen, x: number, y: number, kind: 'fruit' | 'fish' | 'flowers' | 'ices' | 'books', stripe: string) {
+  const w = 0.5, d = 0.3, x0 = x - w / 2, y0 = y - d / 2
+  // The stallholder first: they stand behind the counter.
+  person(p, x - 0.02, y0 + 0.02, [C.cobalt, C.lilac, C.mint, C.rasp, C.sky][stripe.length % 5], { hat: kind === 'fish' ? '#ffffff' : undefined, pose: kind === 'ices' ? 'wave' : 'stand' })
+  for (const [px, py] of [[x0 + 0.03, y0 + 0.03], [x0 + w - 0.03, y0 + 0.03]] as const) p.line([px, py, 0], [px, py, 25], { sw: 1.4 })
+  const c = p.box(x0, y0 + 0.08, w, d - 0.08, 9, { fill: C.wood, top: shade(C.wood, 1.18), sw: 1.1 })
+  p.quad(c, 'y', 0.06, 0.94, 2, 7, shade(C.wood, 0.7), { sw: 0.7 })
+  // The goods, along the top of the counter.
+  const [gx, gy] = p.at(x, y0 + 0.08 + (d - 0.08) / 2, 9)
+  if (kind === 'fruit') for (let k = 0; k < 7; k++) p.el('circle', { cx: gx - 9 + k * 3, cy: gy - 1 + (k % 2) * 1.5, r: 1.7, fill: [C.rasp, '#ffb3c2', C.mint, C.lilac][k % 4], stroke: INK, 'stroke-width': 0.5 })
+  if (kind === 'fish') { p.el('path', { d: `M${f(gx - 10)} ${f(gy)}h20l-2 2h-16z`, fill: '#e6f4ff', stroke: INK, 'stroke-width': 0.6 }); for (let k = 0; k < 4; k++) p.el('path', { d: `M${f(gx - 8 + k * 5)} ${f(gy - 0.5)}q2 -2 4 0q-2 2 -4 0zm4 0l1.5 -1v2z`, fill: '#b9c6e8', stroke: INK, 'stroke-width': 0.5 }) }
+  if (kind === 'flowers') for (let k = 0; k < 4; k++) { const bx = gx - 7.5 + k * 5; p.el('path', { d: `M${f(bx - 1.6)} ${f(gy + 1)}h3.2l-0.4 -3h-2.4z`, fill: C.cobalt, stroke: INK, 'stroke-width': 0.5 }); for (const [dx, dy] of [[-1.2, -4], [1, -4.6], [0, -5.6]]) p.el('circle', { cx: bx + dx, cy: gy + dy, r: 1.2, fill: ['#ff9fb2', '#ffffff', C.lilac, '#ffd1da'][k], stroke: INK, 'stroke-width': 0.4 }) }
+  if (kind === 'ices') { p.cyl(x - 0.1, y0 + 0.2, 0.07, 9, 4, '#ffffff', { sw: 0.8 }); p.el('path', { d: `M${f(gx + 3)} ${f(gy - 1)}l2 6l2 -6z`, fill: '#e3c9a0', stroke: INK, 'stroke-width': 0.6 }); p.el('circle', { cx: gx + 5, cy: gy - 2.4, r: 2.2, fill: '#ffd1da', stroke: INK, 'stroke-width': 0.6 }) }
+  if (kind === 'books') for (let k = 0; k < 6; k++) p.el('rect', { x: gx - 9 + k * 3, y: gy - 4 + (k % 3), width: 2.4, height: 4 - (k % 3), fill: [C.cobalt, C.rasp, C.mint, C.lilac][k % 4], stroke: INK, 'stroke-width': 0.4 })
+  // The front poles, then the awning over it all.
+  for (const [px, py] of [[x0 + 0.03, y0 + d], [x0 + w - 0.03, y0 + d]] as const) p.line([px, py, 0], [px, py, 25], { sw: 1.4 })
+  const n = 6
+  const aw = ['', '']
+  for (let k = 0; k < n; k++) {
+    const a = x0 - 0.04 + ((w + 0.08) * k) / n, b = x0 - 0.04 + ((w + 0.08) * (k + 1)) / n
+    aw[k % 2] += 'M' + [p.at(a, y0 - 0.02, 29), p.at(b, y0 - 0.02, 29), p.at(b, y0 + d + 0.08, 23), p.at(a, y0 + d + 0.08, 23)].map(([u, v]) => `${f(u)} ${f(v)}`).join('L') + 'Z'
+  }
+  p.path(aw[0], stripe, { sw: 0.9 }); p.path(aw[1], '#ffffff', { sw: 0.9 })
+  // A scalloped valance along the front.
+  let v = ''
+  for (let k = 0; k < n; k++) { const [ax, ay] = p.at(x0 - 0.04 + ((w + 0.08) * k) / n, y0 + d + 0.08, 23), [bx, by] = p.at(x0 - 0.04 + ((w + 0.08) * (k + 1)) / n, y0 + d + 0.08, 23); v += `M${f(ax)} ${f(ay)}Q${f((ax + bx) / 2)} ${f((ay + by) / 2 + 5)} ${f(bx)} ${f(by)}` }
+  p.path(v, 'none', { stroke: INK, sw: 3.4 })
+  p.path(v, 'none', { stroke: stripe, sw: 2 })
+}
+
+/** Lights strung between two points on poles, sagging a little; each bulb glows at night. */
+export function stringLights(p: Pen, a: [number, number], b: [number, number], z = 30) {
+  const [ax, ay] = p.at(a[0], a[1], z), [bx, by] = p.at(b[0], b[1], z)
+  const mx = (ax + bx) / 2, my = (ay + by) / 2 + 9
+  p.path(`M${f(ax)} ${f(ay)}Q${f(mx)} ${f(my)} ${f(bx)} ${f(by)}`, 'none', { sw: 0.8 })
+  for (let k = 1; k < 8; k++) {
+    const t = k / 8, x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * mx + t * t * bx, y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * my + t * t * by
+    p.light([x, y + 2], p.el('circle', { cx: x, cy: y + 2, r: 1.5, fill: ['#ffffff', '#ffd1da', '#d6ecff', '#d8f7ec'][k % 4], stroke: INK, 'stroke-width': 0.5, class: 'bulb' }))
+  }
+}
+
+/** A little passenger ferry, drawn at the origin, facing left: white hull, a cabin with windows, a funnel. */
+export function ferry(): string {
+  return `<path d="M-30 6L30 6L26 14L-26 14Z" fill="${C.deep}" opacity="0.16"/>` +
+    `<path d="M-34 2q-12 3 -24 2M34 2q12 3 24 2" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.75"/>` +
+    `<ellipse cx="0" cy="3" rx="34" ry="5.5" fill="#ffffff" opacity="0.5"/>` +
+    `<path d="M-32 -6L30 -6L26 5L-26 5Z" fill="#ffffff" stroke="${INK}" stroke-width="${OUT}" stroke-linejoin="round"/>` +
+    `<path d="M-31 -2H29" stroke="${C.cobalt}" stroke-width="3"/>` +
+    `<path d="M-20 -6V-18H18V-6Z" fill="#f4f6fc" stroke="${INK}" stroke-width="${OUT}" stroke-linejoin="round"/>` +
+    `<path d="M-23 -18H21" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>` +
+    [-15, -8, -1, 6, 13].map((x) => `<rect x="${x}" y="-15" width="4.6" height="5" rx="1" fill="${C.glass}" stroke="${INK}" stroke-width="0.8"/>`).join('') +
+    `<path d="M6 -18V-27H13V-18Z" fill="${C.rasp}" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round"/>` +
+    `<path d="M6 -24H13" stroke="#ffffff" stroke-width="1.4"/>` +
+    `<path d="M-28 -6V-12M-28 -12L-20 -10" fill="none" stroke="${INK}" stroke-width="1.1"/>`
+}
+
+/** A fishing boat at anchor: a wheelhouse, a mast with nets, gulls hoping. */
+export function fishingBoat(x: number, y: number, hull: string, delay: number): N {
+  const g = new N('g', { class: 'moored amb', 'data-b': box(x - 30, y - 40, x + 30, y + 14), style: `animation-delay:${f(-delay)}s` })
+  g.add(new N('path', { d: `M${f(x - 18)} ${f(y + 4)}L${f(x + 18)} ${f(y + 4)}L${f(x + 14)} ${f(y + 12)}L${f(x - 14)} ${f(y + 12)}Z`, fill: hull, opacity: 0.18 }))
+  g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 24, ry: 4.5, fill: '#ffffff', opacity: 0.5 }))
+  g.add(new N('path', { d: `M${f(x - 22)} ${f(y - 6)}L${f(x + 20)} ${f(y - 4)}L${f(x + 15)} ${f(y + 4)}L${f(x - 16)} ${f(y + 4)}Z`, fill: hull, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
+  g.add(new N('path', { d: `M${f(x - 21)} ${f(y - 3)}L${f(x + 19)} ${f(y - 1)}`, stroke: '#ffffff', 'stroke-width': 1.4 }))
+  g.add(new N('path', { d: `M${f(x + 2)} ${f(y - 5)}v-11h11v11z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
+  g.add(new N('rect', { x: f(x + 5), y: f(y - 13), width: 5, height: 4, fill: C.glass, stroke: INK, 'stroke-width': 0.8 }))
+  g.add(new N('path', { d: `M${f(x - 9)} ${f(y - 5)}V${f(y - 30)}M${f(x - 9)} ${f(y - 28)}L${f(x + 14)} ${f(y - 6)}M${f(x - 9)} ${f(y - 28)}L${f(x - 20)} ${f(y - 7)}`, fill: 'none', stroke: INK, 'stroke-width': 1.2, 'stroke-linecap': 'round' }))
+  g.add(new N('path', { d: `M${f(x - 19)} ${f(y - 8)}q4 -10 9 -18v14z`, fill: '#cfd6ec', stroke: INK, 'stroke-width': 0.8, opacity: 0.9 }))
+  g.add(new N('path', { d: `M${f(x - 9)} ${f(y - 30)}l7 2.5l-7 2.5z`, fill: C.rasp, stroke: INK, 'stroke-width': 0.8 }))
   return g
 }
+
+/** A speedboat, drawn at the origin, facing left, with a big white wake behind it. */
+export function speedboat(hull: string): string {
+  return `<path d="M12 1q16 2 32 0q-16 6 -32 4zM12 -1q12 -3 26 -6q-12 7 -26 9z" fill="#ffffff" opacity="0.8"/>` +
+    `<ellipse cx="0" cy="2" rx="16" ry="3.5" fill="#ffffff" opacity="0.55"/>` +
+    `<path d="M-16 -2Q-14 -6 -6 -6H12L13 2H-10Q-14 2 -16 -2Z" fill="${hull}" stroke="${INK}" stroke-width="${OUT}" stroke-linejoin="round"/>` +
+    `<path d="M-3 -6L1 -11H7L8 -6Z" fill="${C.glassHi}" stroke="${INK}" stroke-width="1.1" stroke-linejoin="round"/>` +
+    `<path d="M-14 -2H12" stroke="#ffffff" stroke-width="1.2"/>` +
+    `<circle cx="4" cy="-12" r="2.4" fill="#f1d9c6" stroke="${INK}" stroke-width="0.9"/>`
+}
+
+/**
+ * A little islet out at sea, with a secret: someone has been living here a
+ * while (a hut, SOS written in the sand, a wave for anyone passing), and
+ * beside an X, half dug up, a chest that glints.
+ */
+export function secretIslet(p: Pen, x: number, y: number) {
+  const [sx, sy] = p.at(x, y, -12)
+  p.el('ellipse', { cx: sx, cy: sy + 4, rx: 96, ry: 40, fill: '#cdf1f4', opacity: 0.8 })
+  p.el('ellipse', { cx: sx, cy: sy + 4, rx: 96, ry: 40, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, opacity: 0.8 })
+  p.el('ellipse', { cx: sx, cy: sy + 3, rx: 66, ry: 27, fill: '#ffffff', opacity: 0.75 })
+  // The mound: a sand bank all round, then the top.
+  p.el('path', { d: `M${f(sx - 58)} ${f(sy - 5)}v5a58 23 0 0 0 116 0v-5z`, fill: '#e3d7ba', stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' })
+  p.el('ellipse', { cx: sx, cy: sy - 5, rx: 58, ry: 23, fill: '#f6f0e1', stroke: INK, 'stroke-width': OUT })
+  p.el('path', { d: `M${f(sx - 50)} ${f(sy - 1)}a52 19 0 0 0 100 0`, fill: 'none', stroke: '#dccfae', 'stroke-width': 4, 'stroke-linecap': 'round' })
+  // A dune in the middle, so it is a mound of sand and not a plate.
+  p.el('ellipse', { cx: sx - 4, cy: sy - 10, rx: 34, ry: 12, fill: '#fbf7ec' })
+  p.el('path', { d: `M${f(sx - 36)} ${f(sy - 7)}q32 9 64 -2`, fill: 'none', stroke: '#e9dfc6', 'stroke-width': 2, 'stroke-linecap': 'round' })
+  for (const [dx, dy, c] of [[-40, -2, '#ffffff'], [30, 4, '#ffc9d6'], [44, -4, '#ffffff'], [-22, 8, '#ffc9d6']] as [number, number, string][]) p.el('path', { d: `M${f(sx + dx - 2)} ${f(sy + dy)}q2 -3.5 4 0z`, fill: c, stroke: INK, 'stroke-width': 0.5 })
+  // SOS in the sand, and an X with a chest beside it.
+  const sand = p.plane(x - 0.05, y + 0.62, -7)
+  sand.add(new N('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 0.32, fill: '#d2c39f', 'letter-spacing': 0.04 })).text('SOS')
+  const xm = p.plane(x + 0.62, y + 0.32, -7)
+  xm.add(new N('path', { d: 'M-0.1 -0.1L0.1 0.1M0.1 -0.1L-0.1 0.1', stroke: C.rasp, 'stroke-width': 0.05, 'stroke-linecap': 'round' }))
+  const z = -7
+  const ch = p.box(x + 0.66, y + 0.05, 0.16, 0.11, 5, { z0: z, fill: C.wood, sw: 1 })
+  p.band(ch, 1.5, 2.6, '#ffd98a')
+  p.poly([[x + 0.66, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 10], [x + 0.66, y + 0.05, z + 10]], shade(C.wood, 1.1), { sw: 1 })
+  const [gx, gy] = p.at(x + 0.74, y + 0.11, z + 6)
+  p.el('path', { d: `M${f(gx)} ${f(gy - 5)}l1.2 3.8l3.8 1.2l-3.8 1.2l-1.2 3.8l-1.2 -3.8l-3.8 -1.2l3.8 -1.2z`, fill: '#ffffff', stroke: '#ffd98a', 'stroke-width': 0.6, class: 'twinkle' })
+  // The castaway's hut: driftwood and a leaf roof.
+  const h = p.box(x - 0.15, y - 0.45, 0.34, 0.26, 13, { z0: z, fill: '#c9b8e8', sw: 1.2 })
+  p.door(h, 'y', 0.5, { w: 0.1, h: 8, fill: shade(C.wood, 0.7) })
+  p.gable(x - 0.15, y - 0.45, 0.34, 0.26, z + 13, 9, C.leaf2, 'y', { lines: 2, over: 0.08 })
+  tree(p.move(0, 0, z), x - 0.55, y - 0.3, 'palm', C.leaf, 1)
+  tree(p.move(0, 0, z), x + 0.62, y - 0.42, 'palm', C.leaf, 0.75)
+  person(p.move(0, 0, z), x - 0.42, y + 0.18, '#ffffff', { pose: 'wave', skin: '#e0b899' })
+  // A message in a bottle, bobbing in towards the island.
+  const [bx, by] = p.at(x - 1.6, y + 1.2, -12)
+  const b = p.el('g', { class: 'bob' })
+  b.add(new N('ellipse', { cx: f(bx), cy: f(by + 1), rx: 7, ry: 2, fill: '#ffffff', opacity: 0.6 }))
+  b.add(new N('path', { d: `M${f(bx - 6)} ${f(by - 1)}q0 -4 4 -4h5l2 -1.6v4.2l-2 -1h-5q-4 0 -4 -4z`, fill: '#bdf0da', stroke: INK, 'stroke-width': 0.9, opacity: 0.95 }))
+  b.add(new N('path', { d: `M${f(bx - 3)} ${f(by - 3)}h4`, stroke: '#ffffff', 'stroke-width': 1.4 }))
+  p.grow(sx - 100, sy - 60, sx + 100, sy + 46)
+}
+
 
 export { S }
