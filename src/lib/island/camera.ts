@@ -391,5 +391,7 @@ export function initIsland(o: {
       for (const [s, a] of links) a.classList.toggle('is-match', !!keep && keep.has(s))
     },
     worldPoint: (slug: string) => anchors[slug],
+    /** What the camera is looking at, in map units: for the soundscape. */
+    view: () => ({ x: cam.x, y: cam.y, w: W / cam.z, h: H / cam.z }),
   }
 }

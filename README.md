@@ -156,6 +156,8 @@ src/
     result-card.ts      the 1200x630 card for a *result*, not for a game
     share-card.ts       rasterising it in the browser, and sharing the file
     stats.ts            one key, one version, one shape, for what you finished
+    passport.ts         which games you have been to: first day, last day, how many days
+    passport-art.ts     the passport's stamps, one shape and one ink per district
     icons.ts            eighty-three drawn icons, shared across the games
     fusion-art.ts       the forty-four elements of Fusion, drawn
     icon-uses.ts        which game asks for which icon, and on what background
@@ -236,6 +238,7 @@ as a card, with the four filters and search.
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
 | `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, rocks at the waterline, a dry wash across the Badlands, cliffs drawn as continuous walls (ink only at their top, foot and outside corners, strata at fixed heights so each layer runs on, a ledge at every terrace), one sun for every shadow, trees, walkers, and the layers it is painted in |
+| `src/lib/island/sound.ts` | the island heard: beds that never stop (the sea's swell and surf, wind on the peaks, a dry wind over the Badlands, the market's and the funfair's crowds, rain under the forecast's cloud, crickets after dark, the funfair's music box) and things that happen now and then (gulls, birdsong, a bell buoy, an owl, a far-off sheep, fireworks at New Year, the ferry's horn read off its own animation), each placed on the map with the camera as the listener, and a sound for every one of the eighteen things you can poke |
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard, the hover card, names at close zoom, the mini-map, the dive into a game |
 | `src/styles/island.css` | every loop on the map |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
@@ -307,6 +310,36 @@ count. Some are secrets: a castaway on the islet, buried treasure, a
 message in a bottle with a different note each time, a 32nd building
 tucked behind the stone circle, a whale that only breaches at dawn, and a
 UFO that only comes at three in the morning (`?hour=3` to see it).
+
+**A passport.** Every game stamps it: the game shell records a visit once a
+day (a refresh is not a second visit), keeping the first day, the latest
+and on how many different days (`lib/passport.ts`, through the same
+hardened store as the stats, and `check-passport.mjs` hands it every
+failure a browser can throw). The book opens from the top bar: a cover that
+swings open on its spine, your details on the left (a rank from Just landed
+to Keeper of the island, the games visited and finished, districts complete,
+secrets seen, and a machine-readable strip that says the same), and a page
+per district on the right, where each game is a rubber stamp in that
+district's own shape and ink (a double ring for Sky Peaks, rope for the
+Harbour, a scalloped rosette for the Funfair, a hexagon, a shield, a clipped
+ticket, an oval), the game's own icon inside and the day printed in. A
+stamp you have not seen yet lands, with a thump if the sound is on; a
+district with every game stamped gets its seal. The last page is
+Sightings, the eighteen things to poke, with the secrets unnamed until
+found. Games played before the passport existed count, from their scores.
+
+**Surprise me** goes somewhere you have not been yet, says so on the card,
+fills the Play button while the camera waits, and dives in. Touch the map
+and it is called off.
+
+**Sound**, off until asked for, from the speaker in the top bar (the same
+switch as every game's). The island is heard from wherever the camera is:
+fly to the Harbour and the gulls and the bell buoy come up on that side;
+the funfair has its crowd and a music box going round; there is rain under
+the Universe Forecast's cloud. Zoomed out, it is mostly the sea. At night
+the birds stop and the crickets start; in winter the wind is up. Everything
+you poke has its own noise (the castaway's is SOS in Morse). It is all made
+live, like every other sound on the site.
 
 **The seasons follow the visitor's date**: snow from December to Twelfth
 Night, fireworks on New Year's Eve and Day, blossom falling in April, and
@@ -1068,6 +1101,13 @@ Spend It plays a rising run rather than the same clip fifty times.
 
 Audio is created lazily on the first gesture, respects a persisted mute
 preference, and every game gets the same speaker button in its chrome.
+
+The homepage builds a longer-lived graph on the same context and the same
+master (`lib/island/sound.ts`): looped noise through filters and slow
+wobbles for the sea, wind and crowds, oscillators trilled for crickets, a
+look-ahead scheduler for the music box, and one placed voice for the
+things that happen now and then. Each has a spot on the map and is turned
+up, down and across by where the camera is, every quarter of a second.
 
 ## Quality bar
 

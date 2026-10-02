@@ -8,6 +8,8 @@ import { faviconSvg } from '../lib/favicon'
 import { buildIsland } from '../lib/island/world'
 import { resvgRaster } from '../lib/island/raster'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
+import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
+import { inkIcon } from '../lib/ink-icon'
 import '../styles/island.css'
 
 /*
@@ -47,6 +49,18 @@ const daily = dailyFor(new Date())
 const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug) }]))
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
 const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug) }
+
+// The passport: a page per district, in the order you would walk the island
+// from the middle, each game a stamp drawn here and inked by the page once
+// this browser has been there. A small tilt each, from the name, so a page of
+// stamps looks stamped rather than typeset.
+const BOOK = ['oldtown', 'market', 'funfair', 'harbour', 'proving', 'badlands', 'peaks']
+const tilt = (s: string) => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 997; return ((h % 19) - 9) }
+const book = BOOK.map((key) => {
+  const d = DISTRICTS.find((x) => x.key === key)!
+  const list = games.filter((g) => districtOf[g.slug] === key).sort((a, b) => a.title.localeCompare(b.title))
+  return { key, name: d.name, ink: STAMP[key].ink, seal: sealSvg(key, d.name), games: list.map((g) => ({ slug: g.slug, title: g.title, rot: tilt(g.slug), stamp: stampSvg({ slug: g.slug, title: g.title, district: key, icon: META[g.slug]?.icon ?? 'star' }), ghost: inkIcon(META[g.slug]?.icon ?? 'star') })) }
+}).filter((p) => p.games.length)
 ---
 
 <Paper
@@ -82,9 +96,11 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
         <div class="isl-iris" aria-hidden="true"></div>
 
         <header class="isl-top">
-          <a class="isl-logo" href={withBase('/')}><span class="isl-logo-dot" aria-hidden="true" set:html={faviconSvg(true)} />{SITE.name}</a>
+          <a class="isl-logo" href={withBase('/')}><span class="isl-logo-dot" aria-hidden="true" set:html={faviconSvg(true)} /><span class="isl-logo-name">{SITE.name}</span></a>
           <nav class="isl-nav" aria-label="Island">
             <button type="button" class="isl-btn isl-btn--round" id="btnTime" aria-label="Switch to night" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-sun"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></g><path class="ic-moon" d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg></button>
+            <button type="button" class="isl-btn isl-btn--round" id="btnSound" aria-label="Turn sound on" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-waves" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></button>
+            <button type="button" class="isl-btn" id="btnPassport" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.5" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="10.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M8.6 10.5h6.8M12 7.1c-1.6 2-1.6 4.8 0 6.8M12 7.1c1.6 2 1.6 4.8 0 6.8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg><span>Passport</span><b class="isl-pp-n" id="ppCount" hidden></b><i class="isl-pp-new" id="ppNew" hidden></i></button>
             <button type="button" class="isl-btn" id="btnToday"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="6.5" fill="currentColor" opacity=".25" /><path d="M5.5 10a6.5 6.5 0 0 1 13 0c0 3-2.4 5-4 6.5h-5C7.9 15 5.5 13 5.5 10zM9.5 16.5 10.5 20h3l1-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Today</span></button>
             <button type="button" class="isl-btn isl-btn--hot" id="btnSurprise"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="9" r="1.6" fill="currentColor" /><circle cx="15" cy="15" r="1.6" fill="currentColor" /><circle cx="15" cy="9" r="1.6" fill="currentColor" /><circle cx="9" cy="15" r="1.6" fill="currentColor" /></svg><span>Surprise me</span></button>
           </nav>
@@ -107,6 +123,90 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
         <a class="isl-down" href="#games"><span>All {count} games</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
       </div>
     </section>
+
+    <dialog class="pp" id="pp" aria-labelledby="ppTitle">
+      <svg class="pp-defs" width="0" height="0" aria-hidden="true" focusable="false">
+        <filter id="pp-worn" x="-4%" y="-4%" width="108%" height="108%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" seed="7" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -10 7.2" result="holes" />
+          <feComposite in="SourceGraphic" in2="holes" operator="in" />
+        </filter>
+        <linearGradient id="pp-foil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9fffa" /><stop offset=".45" stop-color="#9fe9d9" /><stop offset=".55" stop-color="#d7f6ff" /><stop offset="1" stop-color="#86cfe0" /></linearGradient>
+      </svg>
+      <div class="pp-book" id="ppBook" data-view="you">
+        <section class="pp-page pp-left" aria-label="Your details">
+          <p class="pp-kicker">Tiny Island · Passport</p>
+          <h2 class="pp-h" id="ppTitle">Explorer’s passport</h2>
+          <div class="pp-id">
+            <div class="pp-photo" aria-hidden="true" style={`aspect-ratio:${vw}/${vh}`}>
+              <svg viewBox={`${vx} ${vy} ${vw} ${vh}`} preserveAspectRatio="xMidYMid meet"><path d={island.mini} fill="#1b2340" transform="translate(0 34)" /><path d={island.mini} fill="#4fe3c1" /></svg>
+              <span class="pp-photo-pin" id="ppPin"></span>
+            </div>
+            <dl class="pp-fields">
+              <div><dt>Holder</dt><dd>You</dd></div>
+              <div><dt>Rank</dt><dd><b id="ppRank">Just landed</b></dd></div>
+              <div><dt>First landed</dt><dd id="ppSince">Not yet</dd></div>
+              <div><dt>Issued at</dt><dd>The Harbour</dd></div>
+            </dl>
+          </div>
+          <ul class="pp-tally" role="list">
+            <li><b id="ppVisited">0</b><span>of {count} games visited</span></li>
+            <li><b id="ppFinished">0</b><span>finished</span></li>
+            <li><b id="ppDistricts">0</b><span>of {book.length} districts complete</span></li>
+            <li><b id="ppSecrets">0</b><span>secrets seen</span></li>
+          </ul>
+          <div class="pp-ticks" id="ppTicks" aria-hidden="true">{games.map((g) => <i data-tick={g.slug} style={`--ink:${STAMP[districtOf[g.slug]]?.ink ?? '#4637a6'}`} />)}</div>
+          <p class="pp-mrz" id="ppMrz" aria-hidden="true"></p>
+          <button type="button" class="pp-reset" id="ppReset">Start a new passport</button>
+        </section>
+        <section class="pp-page pp-right">
+          <div class="pp-tabs" role="tablist" aria-label="Passport pages">
+            <button type="button" role="tab" class="pp-tab pp-tab--you" data-tab="you" aria-selected="true">You</button>
+            {book.map((p) => <button type="button" role="tab" class="pp-tab" data-tab={p.key} aria-selected="false" style={`--ink:${p.ink}`}>{p.name.replace(/^The /, '')}<i data-tab-n={p.key}></i></button>)}
+            <button type="button" role="tab" class="pp-tab" data-tab="sightings" aria-selected="false" style="--ink:#2a6f8f">Sightings</button>
+          </div>
+          {book.map((p) => (
+            <div class="pp-sheet" role="tabpanel" data-sheet={p.key} aria-label={p.name} hidden style={`--ink:${p.ink}`}>
+              <header class="pp-sheet-head">
+                <h3>{p.name}</h3>
+                <p><b data-count={p.key}>0</b> of {p.games.length} stamped</p>
+              </header>
+              <div class="pp-seal-at" set:html={p.seal} />
+              <ul class="pp-grid" role="list">
+                {p.games.map((g) => (
+                  <li>
+                    <button type="button" class="pp-slot" data-slug={g.slug} style={`--rot:${g.rot}deg`} aria-label={`${g.title}: not visited yet. Show it on the island`}>
+                      <span class="pp-ghost" aria-hidden="true" set:html={g.ghost} />
+                      <Fragment set:html={g.stamp} />
+                      <span class="pp-name">{g.title}</span>
+                      <span class="pp-when">Not yet</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <div class="pp-sheet" role="tabpanel" data-sheet="sightings" aria-label="Sightings" hidden style="--ink:#2a6f8f">
+            <header class="pp-sheet-head">
+              <h3>Sightings</h3>
+              <p><b id="ppSightN">0</b> of <span id="ppSightT">18</span> seen</p>
+            </header>
+            <p class="pp-note">Everything on the island that does something when you poke it. Some only come out at certain hours.</p>
+            <ul class="pp-sights" id="ppSights" role="list"></ul>
+          </div>
+        </section>
+        <div class="pp-cover" aria-hidden="true">
+          <div class="pp-cover-front">
+            <p class="pp-cover-top">Tiny Island</p>
+            <svg class="pp-cover-emblem" viewBox={`${vx} ${vy} ${vw} ${vh}`} preserveAspectRatio="xMidYMid meet"><path d={island.mini} fill="url(#pp-foil)" /></svg>
+            <p class="pp-cover-word">Passport</p>
+            <p class="pp-cover-small">{count} games · one island</p>
+          </div>
+          <div class="pp-cover-back"></div>
+        </div>
+        <button type="button" class="pp-close" id="ppClose" aria-label="Close the passport"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
+      </div>
+    </dialog>
 
     <section class="gs" id="games" aria-labelledby="games-title">
       <div class="gs-wrap">
@@ -172,6 +272,10 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
   import { flip, PLAY } from '../lib/motion'
   import { bestKey, dailyFor } from '../data/game-meta'
   import { faviconHref } from '../lib/favicon'
+  import { readPassport, withHistory, newStamps, markSeen, rankFor, stampDate, clearPassport, type Visit } from '../lib/passport'
+  import { readAll } from '../lib/stats'
+  import { islandSound } from '../lib/island/sound'
+  import { isMuted, setMuted, unlock } from '../lib/audio'
 
   // The lighthouse in the tab says hello: once when the page opens, and again
   // each time you switch away to another tab, it flashes the island's Morse
@@ -217,6 +321,12 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
     try { const v = JSON.parse(localStorage.getItem(bestKey(slug)) ?? 'null'); return typeof v?.text === 'string' ? v.text : null } catch { return null }
   }
   for (const s of data.slugs) data.games[s].best = readBest(s)
+  const stats = readAll()
+  const finished = new Set(data.slugs.filter((s) => data.games[s].best || (stats.games[s]?.plays ?? 0) > 0))
+  // Every game this browser has been to: the passport's stamps, and any game
+  // with a score from before the passport existed.
+  const visits = (): Record<string, Visit> => withHistory(readPassport(), readAll(), data.slugs.filter((s) => data.games[s].best))
+  let sound: ReturnType<typeof islandSound> | null = null
   document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => { const b = data.games[el.dataset.best!]?.best; if (b) { el.textContent = `Best ${b}`; el.classList.add('has-best') } })
 
   /* ---- things to poke, and secrets to find ---------------------------------- */
@@ -245,7 +355,8 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
     el.classList.remove('poked'); void (el as SVGGraphicsElement).getBBox(); el.classList.add('poked')
     clearTimeout(Number((el as SVGElement).dataset.pokeT)); (el as SVGElement).dataset.pokeT = String(window.setTimeout(() => el.classList.remove('poked'), 5200))
     const first = !found.has(kind)
-    if (first) { found.add(kind); try { localStorage.setItem('isl-found', JSON.stringify([...found])) } catch {} showFound() }
+    if (first) { found.add(kind); try { localStorage.setItem('isl-found', JSON.stringify([...found])) } catch {} showFound(); sound?.found() }
+    sound?.poke(kind)
     const tally = `${kinds.filter((k) => found.has(k)).length} of ${kinds.length}`
     if (kind === 'bottle') { toast(`A note in the bottle: “${NOTES[note++ % NOTES.length]}”`, 7000); return }
     if (kind === 'house32') { toast(`You found the 32nd building. It is not a game. Not yet. (${tally})`, 5000); return }
@@ -253,7 +364,7 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
     if (first) toast(found.size === kinds.length ? `You found ${NAMES[kind] ?? kind}, and that is all ${kinds.length}. Well done.` : `You found ${NAMES[kind] ?? kind}. ${tally}`)
   }
 
-  const isle = initIsland({ box, stage: document.getElementById('islStage')!, world: svg, bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games, onPoke })
+  const isle = initIsland({ box, stage: document.getElementById('islStage')!, world: svg, bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games, onPoke, onEnter: () => sound?.dive() })
   // The map is a window, not a scroller: focusing a building near the edge
   // must never scroll the box itself and push the top bar out of view.
   box.addEventListener('scroll', () => { box.scrollLeft = 0; box.scrollTop = 0 })
@@ -306,7 +417,7 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
 
   /* ---- a flag on every building you have finished ------------------------- */
   for (const s of data.slugs) {
-    if (!data.games[s].best) continue
+    if (!finished.has(s)) continue
     const a = data.anchors[s]
     const x = a.x1 - 14, y = a.y0 + 18
     add(`<g class="flag-done"><path d="M${x} ${y}v-30" stroke="#1b2340" stroke-width="2.2"/><path d="M${x} ${y - 30}l18 5l-18 6z" fill="#ff4f6e" stroke="#1b2340" stroke-width="1.6" stroke-linejoin="round" class="flutter"/></g>`)
@@ -331,18 +442,217 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
     setTimeout(() => isle.showCard(today.slug, `Today: ${today.goal}`), PLAY ? 650 : 0)
   })
 
-  /* ---- surprise me: fly to one at random and open its card ---------------- */
-  let lastPick = ''
+  /* ---- surprise me: somewhere you have not been yet, and straight in ------ */
+  // The camera flies there, the card says where, and then it dives in. Any
+  // touch on the map, or Escape, calls it off and leaves you looking.
+  let lastPick = '', diveT = 0
+  const callOff = () => { if (!diveT) return; clearTimeout(diveT); diveT = 0; box.classList.remove('is-surprising') }
+  box.addEventListener('pointerdown', (e) => { if (!(e.target as Element).closest('#btnSurprise')) callOff() }, true)
+  box.addEventListener('keydown', (e) => { if (e.key === 'Escape') callOff() })
   document.getElementById('btnSurprise')!.addEventListener('click', () => {
-    let s = lastPick
-    while (s === lastPick) s = data.slugs[Math.floor(Math.random() * data.slugs.length)]
+    callOff()
+    const been = visits()
+    const fresh = data.slugs.filter((x) => !been[x] && x !== lastPick)
+    const pool = fresh.length ? fresh : data.slugs.filter((x) => x !== lastPick)
+    const s = pool[Math.floor(Math.random() * pool.length)]
     lastPick = s
+    const line = fresh.length ? (fresh.length === 1 ? 'The last place on the island you have not been. In you go…' : 'Somewhere you have not been yet. In you go…') : 'You have been everywhere, so: an old favourite. In you go…'
     box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
     isle.hideCard()
     isle.home()
+    box.classList.add('is-surprising')
     setTimeout(() => isle.flyToSlug(s, 2.4), PLAY ? 420 : 0)
-    setTimeout(() => isle.showCard(s), PLAY ? 1250 : 0)
+    setTimeout(() => isle.showCard(s, line), PLAY ? 1250 : 0)
+    diveT = window.setTimeout(() => { diveT = 0; box.classList.remove('is-surprising'); isle.enter(s) }, PLAY ? 3100 : 1800)
   })
+
+  /* ---- sound: off until asked for, and then the island is heard ------------ */
+  // The same switch as every game's speaker button: turning it on here turns
+  // it on there, and the other way round.
+  const btnSound = document.getElementById('btnSound')!
+  {
+    const ferryEl = svg.querySelector<SVGElement>('[style*="isl-ferry"]')
+    const ferry = () => {
+      const a = ferryEl?.getAnimations?.()[0], t = Number(a?.currentTime), d = Number(a?.effect?.getTiming().duration)
+      return Number.isFinite(t) && d > 0 ? (t % d) / d : null
+    }
+    const uf = data.anchors['universe-forecast']
+    sound = islandSound(
+      { districts: Object.fromEntries(data.districts.map((d) => [d.key, { x: d.x, y: d.y }])), rain: uf ? { x: (uf.x0 + uf.x1) / 2, y: uf.y0 } : undefined, land: data.land },
+      { view: isle.view, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '', awake: () => !document.hidden && !svg.classList.contains('is-paused'), ferry },
+    )
+  }
+  const paintSound = () => {
+    const on = !isMuted()
+    btnSound.setAttribute('aria-pressed', String(on))
+    btnSound.setAttribute('aria-label', on ? 'Turn sound off' : 'Turn sound on')
+  }
+  paintSound()
+  btnSound.addEventListener('click', () => {
+    unlock()
+    if (isMuted()) { setMuted(false); sound!.start(); toast('Sound on. Fly round the island and listen: every district sounds like itself.') }
+    else { setMuted(true); sound!.stop() }
+    paintSound()
+  })
+  // Sound left on from before: a browser will not play it until the page is
+  // touched, so the island starts at the first touch.
+  if (!isMuted()) {
+    const wake = () => { removeEventListener('pointerdown', wake, true); removeEventListener('keydown', wake, true); unlock(); sound!.start() }
+    addEventListener('pointerdown', wake, true); addEventListener('keydown', wake, true)
+  }
+
+  /* ---- the passport -------------------------------------------------------- */
+  const pp = document.getElementById('pp') as HTMLDialogElement
+  const ppBook = document.getElementById('ppBook')!
+  const btnPassport = document.getElementById('btnPassport')!
+  const ppCountEl = document.getElementById('ppCount')!, ppNewEl = document.getElementById('ppNew')!
+  const ppSlots = new Map([...pp.querySelectorAll<HTMLButtonElement>('.pp-slot')].map((b) => [b.dataset.slug!, b]))
+  const ppTabs = [...pp.querySelectorAll<HTMLButtonElement>('[data-tab]')]
+  const ppSheets = [...pp.querySelectorAll<HTMLElement>('[data-sheet]')]
+  const ppTicks = new Map([...pp.querySelectorAll<HTMLElement>('[data-tick]')].map((t) => [t.dataset.tick!, t]))
+  const wide = matchMedia('(min-width: 761px)')
+  const SECRET = new Set(['castaway', 'treasure', 'bottle', 'house32', 'dawnwhale', 'ufo'])
+  const $pp = (id: string) => document.getElementById(id)!
+  const pretty = (day: string) => stampDate(day).replace(/[A-Z]{3}/, (m) => m[0] + m.slice(1).toLowerCase())
+  const sheetOf = (slug: string) => data.anchors[slug]?.district
+  const firstSheet = ppSheets[0].dataset.sheet!
+
+  function renderPassport() {
+    const v = visits(), file = readPassport()
+    const fresh = new Set(newStamps(v, file.seen))
+    const total = data.slugs.length
+    let n = 0, since = '', latest = '', latestSlug = ''
+    for (const [slug, b] of ppSlots) {
+      const at = v[slug], g = data.games[slug]
+      b.classList.toggle('is-stamped', !!at)
+      b.classList.toggle('is-done', finished.has(slug))
+      b.classList.toggle('is-fresh', fresh.has(slug))
+      const date = b.querySelector('.pp-date')
+      if (date) (date.querySelector('textPath') ?? date).textContent = at ? (at.first ? stampDate(at.first) : 'EARLY DAYS') : ''
+      const when = !at ? 'Not yet' : (at.first ? pretty(at.first) : 'Before the passport') + (at.days > 1 ? ` · ${at.days} days` : '')
+      b.querySelector('.pp-when')!.textContent = when
+      b.setAttribute('aria-label', `${g.title}: ${at ? `stamped ${when}${finished.has(slug) ? ', finished' : ''}` : 'not visited yet'}. Show it on the island`)
+      ppTicks.get(slug)?.classList.toggle('is-on', !!at)
+      if (!at) continue
+      n++
+      if (at.first && (!since || at.first < since)) since = at.first
+      if (at.last && at.last >= latest) { latest = at.last; latestSlug = slug }
+    }
+    let complete = 0
+    for (const sh of ppSheets) {
+      const key = sh.dataset.sheet!
+      if (key === 'sightings') continue
+      const mine = [...sh.querySelectorAll('.pp-slot')], got = mine.filter((b) => b.classList.contains('is-stamped')).length
+      const done = got === mine.length
+      if (done) complete++
+      sh.classList.toggle('is-complete', done)
+      sh.querySelector(`[data-count="${key}"]`)!.textContent = String(got)
+      const tab = ppTabs.find((t) => t.dataset.tab === key)!
+      tab.classList.toggle('is-complete', done)
+      tab.querySelector('i')!.textContent = `${got}/${mine.length}`
+    }
+    const seen = kinds.filter((k) => found.has(k)).length
+    const rank = rankFor(n, total)
+    $pp('ppRank').textContent = rank
+    $pp('ppSince').textContent = since ? pretty(since) : n ? 'Before the passport' : 'Not yet'
+    $pp('ppVisited').textContent = String(n)
+    $pp('ppFinished').textContent = String(finished.size)
+    $pp('ppDistricts').textContent = String(complete)
+    $pp('ppSecrets').textContent = `${seen}/${kinds.length}`
+    // The machine-readable lines along the bottom of the page, which say
+    // exactly what the page above them does.
+    const pad = (x: number) => String(x).padStart(2, '0')
+    const l1 = `P<TINY<ISLAND<<${rank.toUpperCase().replace(/[^A-Z]+/g, '<')}`.padEnd(44, '<').slice(0, 44)
+    const body = `${pad(n)}OF${total}<<${pad(finished.size)}FIN<<${pad(seen)}OF${kinds.length}SEEN<<${since.replace(/-/g, '') || '00000000'}`.padEnd(43, '<').slice(0, 43)
+    const check = [...body].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 10
+    $pp('ppMrz').textContent = `${l1}\n${body}${check}`
+    // You are here: the last place you went.
+    const pin = $pp('ppPin'), la = data.anchors[latestSlug]
+    pin.hidden = !la
+    if (la) { const [bx, by, bw, bh] = data.bounds; pin.style.left = `${(((la.x0 + la.x1) / 2 - bx) / bw) * 100}%`; pin.style.top = `${((la.y1 - by) / bh) * 100}%` }
+    // Sightings: the ordinary ones are named before you find them; the
+    // secrets are not.
+    const sights = $pp('ppSights')
+    $pp('ppSightN').textContent = String(seen); $pp('ppSightT').textContent = String(kinds.length)
+    sights.replaceChildren(...[...kinds].sort((a, b) => Number(SECRET.has(a)) - Number(SECRET.has(b))).map((k) => {
+      const li = document.createElement('li'), got = found.has(k), name = NAMES[k] ?? k
+      li.className = `pp-sight${got ? ' is-seen' : ''}${SECRET.has(k) ? ' is-secret' : ''}`
+      li.innerHTML = `<span class="pp-sight-mark" aria-hidden="true">${got ? '<svg viewBox="0 0 20 20"><path d="M5 10.5l3.4 3.4L15 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '?'}</span>`
+      const t = document.createElement('span')
+      t.textContent = got || !SECRET.has(k) ? name.charAt(0).toUpperCase() + name.slice(1) : 'A secret'
+      li.append(t)
+      if (!got) { const s = document.createElement('small'); s.textContent = 'not yet'; li.append(s) }
+      return li
+    }))
+    ppCountEl.textContent = `${n}/${total}`; ppCountEl.hidden = n === 0
+    ppNewEl.textContent = `+${fresh.size}`; ppNewEl.hidden = fresh.size === 0
+    btnPassport.setAttribute('aria-label', `Passport: ${n} of ${total} games visited${fresh.size ? `, ${fresh.size} new stamp${fresh.size > 1 ? 's' : ''}` : ''}`)
+    return fresh
+  }
+
+  let landDelay = 0
+  function showSheet(tab: string, turn = true) {
+    if (tab === 'you' && wide.matches) tab = firstSheet
+    ppBook.dataset.view = tab
+    for (const t of ppTabs) t.setAttribute('aria-selected', String(t.dataset.tab === tab))
+    for (const sh of ppSheets) sh.hidden = sh.dataset.sheet !== tab
+    const sheet = ppSheets.find((sh) => sh.dataset.sheet === tab)
+    if (sheet && turn && PLAY) { sheet.classList.remove('is-turning'); void sheet.offsetWidth; sheet.classList.add('is-turning'); sound?.page() }
+    if (!sheet) return
+    // New stamps land, one after another, the first time their page is seen.
+    const landing = [...sheet.querySelectorAll<HTMLElement>('.pp-slot.is-fresh')]
+    landing.forEach((b, i) => {
+      const d = landDelay + 0.25 + i * 0.3
+      b.classList.remove('is-fresh')
+      if (!PLAY) return
+      b.style.setProperty('--d', `${d}s`)
+      b.classList.add('is-landing')
+      sound?.stamp(d + 0.22)
+      setTimeout(() => b.classList.remove('is-landing'), (d + 1.2) * 1000)
+    })
+    landDelay = 0
+    if (landing.length) { markSeen(landing.map((b) => b.dataset.slug!)); const left = newStamps(visits(), readPassport().seen).length; ppNewEl.textContent = `+${left}`; ppNewEl.hidden = left === 0 }
+  }
+  for (const t of ppTabs) t.addEventListener('click', () => showSheet(t.dataset.tab!))
+  // Arrow keys turn the pages, the way tabs should.
+  pp.querySelector('[role="tablist"]')!.addEventListener('keydown', (e) => {
+    const k = (e as KeyboardEvent).key
+    if (k !== 'ArrowRight' && k !== 'ArrowLeft') return
+    const shown = ppTabs.filter((t) => t.offsetParent !== null), i = shown.findIndex((t) => t.getAttribute('aria-selected') === 'true')
+    const next = shown[(i + (k === 'ArrowRight' ? 1 : -1) + shown.length) % shown.length]
+    next.focus(); showSheet(next.dataset.tab!)
+  })
+
+  function openPassport() {
+    const fresh = renderPassport()
+    const firstNew = [...fresh][0]
+    document.documentElement.classList.add('pp-open')
+    pp.showModal()
+    if (PLAY) {
+      ppBook.classList.remove('is-opening'); ppBook.classList.add('is-cover')
+      requestAnimationFrame(() => requestAnimationFrame(() => ppBook.classList.add('is-opening')))
+      setTimeout(() => ppBook.classList.remove('is-cover', 'is-opening'), 1000)
+      sound?.page()
+      landDelay = 0.75
+    }
+    showSheet(firstNew ? sheetOf(firstNew) ?? 'you' : 'you', false)
+  }
+  btnPassport.addEventListener('click', openPassport)
+  $pp('ppClose').addEventListener('click', () => pp.close())
+  // A click on the dimmed page around the book closes it.
+  pp.addEventListener('click', (e) => { if (e.target === pp) pp.close() })
+  pp.addEventListener('close', () => { document.documentElement.classList.remove('pp-open'); renderPassport() })
+  for (const [slug, b] of ppSlots) b.addEventListener('click', () => {
+    pp.close()
+    box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
+    setTimeout(() => { isle.flyToSlug(slug, 2.4); isle.showCard(slug) }, PLAY ? 350 : 0)
+  })
+  $pp('ppReset').addEventListener('click', () => {
+    if (!confirm('Start a new passport? The stamps go. Your scores, and the secrets you have found, stay.')) return
+    clearPassport()
+    renderPassport()
+  })
+  renderPassport()
 
   /* ---- the cards: filter, search, and "show on the island" ---------------- */
   const slots = Array.from(document.querySelectorAll<HTMLElement>('.gs-slot'))
@@ -698,4 +1008,292 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
   .ft-in { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px 24px; }
   .ft-name { margin: 0; font-weight: 700; font-size: 24px; }
   .ft-line { margin: 0; color: #c9d2f0; font-size: 15px; }
+
+  /* ================= the sound and passport buttons ================= */
+  #btnSound .ic-waves { display: none; }
+  #btnSound[aria-pressed='true'] .ic-waves { display: inline; }
+  #btnSound[aria-pressed='true'] .ic-off { display: none; }
+  #btnPassport { position: relative; }
+  .isl-pp-n { margin: -2px -4px -2px 0; padding: 1px 7px; font-size: 13px; border-radius: 999px; background: #e3e9ff; border: 2px solid #1b2340; }
+  .isl-pp-new {
+    position: absolute; top: -11px; right: -11px;
+    padding: 1px 7px; font: 700 12px/1.3 'Fredoka', system-ui, sans-serif; font-style: normal; color: #fff;
+    background: #ff4f6e; border: 2.5px solid #1b2340; border-radius: 999px;
+  }
+  :global(html.play) .isl-pp-new { animation: isl-pp-new 1.8s ease-in-out infinite; }
+  @keyframes isl-pp-new { 0%, 70%, 100% { transform: none; } 80% { transform: scale(1.18) rotate(-6deg); } 90% { transform: scale(1.05) rotate(4deg); } }
+  /* Both carry a display of their own, which would beat [hidden]. */
+  .isl-pp-n[hidden], .isl-pp-new[hidden] { display: none; }
+  /* Surprise me: the Play button fills while the camera waits to dive. */
+  .isl-box.is-surprising .isl-card-play {
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55));
+    background-repeat: no-repeat; background-size: 0% 100%;
+    animation: isl-fill 1.85s linear forwards;
+  }
+  @keyframes isl-fill { to { background-size: 100% 100%; } }
+  @media (max-width: 760px) { .isl-pp-n { display: none; } }
+  @media (max-width: 520px) {
+    .isl-logo-name { display: none; }
+    .isl-logo { padding: 9px 10px; }
+    .isl-top { gap: 6px; }
+    .isl-nav { gap: 6px; }
+    .isl-btn, .isl-btn--round { padding: 8px 9px; }
+  }
+</style>
+
+<style is:global>
+  /* ================= the passport =================
+     Global, because most of what it styles arrives by set:html (the stamps)
+     or is built at runtime (the sightings), and scoped rules never reach
+     either. Everything is under .pp, so nothing leaks. */
+  html.pp-open .isle * { animation-play-state: paused !important; }
+  html.pp-open { overflow: hidden; }
+
+  .pp {
+    --ppaper: #f6f8ff;
+    --pline: #dde5fb;
+    --pmute: #66718f;
+    position: fixed; inset: 0; z-index: 50;
+    width: 100%; height: 100%; max-width: none; max-height: none;
+    margin: 0; padding: 0; border: 0; background: transparent; overflow: visible;
+    color: #1b2340; font-family: 'Fredoka', system-ui, sans-serif;
+  }
+  .pp[open] { display: grid; place-items: center; }
+  .pp::backdrop { background: rgba(13, 20, 50, 0.6); }
+  html.play .pp[open]::backdrop { animation: pp-dim 0.3s ease-out; }
+  @keyframes pp-dim { from { opacity: 0; } }
+  .pp-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+  /* The site's headings are set in a serif; the island's are not. */
+  .pp h2, .pp h3 { font-family: 'Fredoka', system-ui, sans-serif; }
+
+  .pp-book {
+    position: relative;
+    display: grid; grid-template-columns: 1fr 1fr;
+    width: min(1060px, calc(100vw - 40px));
+    height: min(700px, calc(100dvh - 40px));
+    padding: 10px;
+    background: linear-gradient(135deg, #26347a, #1c275c);
+    border: 3px solid #1b2340; border-radius: 24px;
+    box-shadow: 0 6px 0 #1b2340, 0 34px 90px rgba(5, 10, 30, 0.5);
+    perspective: 2400px;
+  }
+  html.play .pp[open] .pp-book { animation: pp-rise 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+  @keyframes pp-rise { from { opacity: 0; transform: translateY(26px) scale(0.96); } }
+  /* The spine, stitched. */
+  .pp-book::before {
+    content: ''; position: absolute; left: 50%; top: 18px; bottom: 18px; z-index: 4; width: 0;
+    border-left: 2px dashed rgba(27, 35, 64, 0.28); pointer-events: none;
+  }
+  .pp-page {
+    position: relative; min-height: 0; overflow: auto; overscroll-behavior: contain;
+    padding: 26px 30px 24px;
+    background-color: var(--ppaper);
+    /* Guilloche, the wavy security print every passport page has. */
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='48'%3E%3Cg fill='none' stroke-width='1'%3E%3Cpath stroke='%23dfe6fb' d='M0 12C20 2 60 22 80 12S140 2 160 12M0 36C20 26 60 46 80 36S140 26 160 36'/%3E%3Cpath stroke='%23e9e2fb' d='M0 24C20 34 60 14 80 24S140 34 160 24M0 0C20 10 60-10 80 0S140 10 160 0M0 48C20 58 60 38 80 48S140 58 160 48'/%3E%3C/g%3E%3C/svg%3E");
+    scrollbar-width: thin; scrollbar-color: #c3cce6 transparent;
+  }
+  .pp-left { border-radius: 16px 5px 5px 16px; box-shadow: inset -22px 0 26px -22px rgba(27, 35, 64, 0.4); }
+  .pp-right { border-radius: 5px 16px 16px 5px; box-shadow: inset 22px 0 26px -22px rgba(27, 35, 64, 0.4); display: flex; flex-direction: column; }
+
+  /* ---- the page with your details ---- */
+  .pp-kicker { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #2a6f8f; }
+  .pp-h { margin: 4px 0 18px; font-size: 30px; font-weight: 700; line-height: 1.05; letter-spacing: -0.01em; }
+  .pp-id { display: grid; grid-template-columns: minmax(130px, 42%) 1fr; gap: 18px; align-items: start; }
+  .pp-photo {
+    position: relative; overflow: hidden;
+    background: #8ccbff; border: 3px solid #1b2340; border-radius: 14px;
+  }
+  .pp-photo svg { display: block; width: 100%; height: 100%; }
+  /* A hologram's sheen, the way the light catches a real one. */
+  .pp-photo::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.55) 45%, rgba(190, 255, 240, 0.35) 52%, transparent 66%);
+    background-size: 250% 100%; background-position: 120% 0;
+  }
+  html.play .pp[open] .pp-photo::after { animation: pp-holo 3.6s 0.8s ease-in-out infinite; }
+  @keyframes pp-holo { 0% { background-position: 120% 0; } 45%, 100% { background-position: -20% 0; } }
+  .pp-photo-pin {
+    position: absolute; width: 14px; height: 14px; margin: -14px 0 0 -7px;
+    background: #ff4f6e; border: 2.5px solid #1b2340; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  }
+  .pp-photo-pin[hidden] { display: none; }
+  .pp-photo-pin::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid #ff4f6e; opacity: 0; }
+  html.play .pp[open] .pp-photo-pin::after { animation: pp-ping 1.8s ease-out infinite; }
+  @keyframes pp-ping { from { opacity: 0.9; transform: scale(0.4); } to { opacity: 0; transform: scale(1.6); } }
+  .pp-fields { margin: 0; display: grid; gap: 10px; }
+  .pp-fields div { border-bottom: 1.5px solid var(--pline); padding-bottom: 6px; }
+  .pp-fields dt { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--pmute); }
+  .pp-fields dd { margin: 1px 0 0; font-size: 17px; font-weight: 600; }
+  .pp-fields b { color: #4637a6; }
+  .pp-tally { list-style: none; margin: 20px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pp-tally li { padding: 10px 12px; background: rgba(255, 255, 255, 0.8); border: 2px solid #1b2340; border-radius: 14px; box-shadow: 0 3px 0 #1b2340; }
+  .pp-tally b { display: block; font-size: 28px; line-height: 1; }
+  .pp-tally span { font-size: 13px; color: var(--pmute); font-weight: 600; }
+  .pp-ticks { display: flex; gap: 3px; margin: 16px 0 0; }
+  .pp-ticks i { flex: 1; height: 12px; border-radius: 3px; background: #dfe5f6; }
+  .pp-ticks i.is-on { background: var(--ink); }
+  .pp-mrz {
+    margin: 16px 0 0; padding: 10px 12px; white-space: pre; overflow: hidden;
+    font: 600 12.5px/1.5 ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace; letter-spacing: 0.1em; color: #3a4466;
+    background: rgba(220, 229, 250, 0.7); border-radius: 10px;
+  }
+  .pp-reset {
+    margin: 14px 0 0; padding: 0; background: none; border: 0; cursor: pointer;
+    font: 600 13px 'Fredoka', system-ui, sans-serif; color: var(--pmute); text-decoration: underline; text-underline-offset: 3px;
+  }
+  .pp-reset:hover { color: #c4306f; }
+
+  /* ---- the tabs down the edge of the pages ---- */
+  .pp-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+  .pp-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px; font: 600 13.5px 'Fredoka', system-ui, sans-serif; color: #1b2340; cursor: pointer;
+    background: #fff; border: 2px solid #1b2340; border-radius: 999px;
+    transition: background-color 0.15s, color 0.15s, transform 0.12s;
+  }
+  .pp-tab:hover { transform: translateY(-1px); background: #eef2ff; }
+  .pp-tab i { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--pmute); }
+  .pp-tab.is-complete::before { content: '✓'; font-weight: 700; color: var(--ink); }
+  .pp-tab[aria-selected='true'] { background: var(--ink, #1b2340); color: #fff; border-color: #1b2340; }
+  .pp-tab[aria-selected='true'] i, .pp-tab[aria-selected='true'].is-complete::before { color: rgba(255, 255, 255, 0.85); }
+  .pp-tab:focus-visible, .pp-slot:focus-visible, .pp-reset:focus-visible, .pp-close:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
+  .pp-tab--you { display: none; }
+
+  /* ---- a district's page ---- */
+  .pp-sheet { position: relative; flex: 1; }
+  .pp-sheet[hidden] { display: none; }
+  .pp-sheet.is-turning { animation: pp-turn 0.45s cubic-bezier(0.2, 0.8, 0.3, 1); transform-origin: 0 50%; }
+  @keyframes pp-turn { from { opacity: 0.15; transform: perspective(1400px) rotateY(-24deg) translateX(-10px); } }
+  .pp-sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; margin-bottom: 14px; border-bottom: 2px solid color-mix(in srgb, var(--ink) 30%, transparent); }
+  .pp-sheet-head h3 { margin: 0; font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+  .pp-sheet-head p { margin: 0; font-size: 14px; font-weight: 600; color: var(--pmute); white-space: nowrap; }
+  .pp-sheet-head b { color: var(--ink); font-size: 17px; }
+  .pp-note { margin: -4px 0 14px; font-size: 14px; line-height: 1.4; color: #4a5578; }
+  /* The district's seal, once every game in it is stamped. */
+  .pp-seal-at { --rot: -14deg; position: absolute; right: -6px; top: 40px; width: 118px; color: var(--ink); opacity: 0; pointer-events: none; z-index: 2; transform: rotate(var(--rot)); mix-blend-mode: multiply; }
+  .pp-seal-at svg { display: block; width: 100%; height: auto; }
+  .pp-sheet.is-complete .pp-seal-at { opacity: 0.85; }
+  html.play .pp-sheet.is-complete:not([hidden]) .pp-seal-at { animation: pp-seal 0.55s 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+  @keyframes pp-seal { 0% { opacity: 0; transform: rotate(4deg) scale(2); } 100% { opacity: 0.85; transform: rotate(var(--rot)) scale(1); } }
+
+  .pp-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px; }
+  .pp-slot {
+    position: relative; width: 100%;
+    display: grid; justify-items: center; align-content: start;
+    padding: 8px 4px 10px; margin: 0;
+    background: none; border: 0; border-radius: 16px; cursor: pointer;
+    color: var(--ink); font: inherit; text-align: center;
+    transition: background-color 0.15s;
+  }
+  .pp-slot:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .pp-stamp, .pp-ghost { grid-area: 1 / 1; width: min(100%, 132px); aspect-ratio: 1; }
+  .pp-stamp { display: block; opacity: 0; transform: rotate(var(--rot)); mix-blend-mode: multiply; }
+  .pp-stamp text { font-family: 'Fredoka', system-ui, sans-serif; }
+  .pp-ghost {
+    display: grid; place-items: center; box-sizing: border-box; padding: 26%;
+    color: #c5cde4; border: 2.5px dashed #c5cde4; border-radius: 50%;
+  }
+  .pp-ghost svg { width: 100%; height: 100%; display: block; opacity: 0.8; }
+  .pp-slot:hover .pp-ghost { color: #9aa6c8; border-color: #9aa6c8; }
+  .pp-slot.is-stamped .pp-stamp { opacity: 0.93; }
+  .pp-slot.is-stamped .pp-ghost { visibility: hidden; }
+  .pp-name { margin-top: 6px; font-size: 14px; font-weight: 600; line-height: 1.15; color: #1b2340; }
+  .pp-when { margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--pmute); }
+  .pp-slot:not(.is-stamped) .pp-name { color: #7d88a8; }
+  .pp-slot.is-done::after {
+    content: 'Finished'; position: absolute; top: 4px; right: 2px;
+    padding: 2px 7px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: #fff; background: var(--ink); border: 2px solid #1b2340; border-radius: 8px; transform: rotate(7deg);
+  }
+
+  /* A new stamp lands: down hard, a little bounce, a ring of ink. */
+  .pp-slot.is-landing .pp-stamp { animation: pp-land 0.5s var(--d, 0s) cubic-bezier(0.25, 0.9, 0.35, 1.25) both; }
+  @keyframes pp-land {
+    0% { opacity: 0; transform: rotate(calc(var(--rot) + 16deg)) scale(2.2); }
+    55% { opacity: 1; transform: rotate(var(--rot)) scale(0.9); }
+    100% { opacity: 0.93; transform: rotate(var(--rot)) scale(1); }
+  }
+  .pp-slot.is-stamped.is-landing .pp-ghost { visibility: visible; animation: pp-gone 0.12s calc(var(--d, 0s) + 0.26s) both; }
+  @keyframes pp-gone { to { opacity: 0; } }
+  .pp-slot.is-landing::before {
+    content: ''; position: absolute; left: 50%; top: 8px; width: min(100% - 8px, 132px); aspect-ratio: 1; translate: -50% 0;
+    border: 3px solid var(--ink); border-radius: 50%; opacity: 0; pointer-events: none;
+    animation: pp-splash 0.6s calc(var(--d, 0s) + 0.27s) ease-out both;
+  }
+  @keyframes pp-splash { from { opacity: 0.55; transform: scale(0.7); } to { opacity: 0; transform: scale(1.45); } }
+  .pp-slot.is-landing .pp-when { animation: pp-when 0.4s calc(var(--d, 0s) + 0.35s) both; }
+  @keyframes pp-when { from { opacity: 0; transform: translateY(4px); } }
+
+  /* ---- sightings ---- */
+  .pp-sights { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pp-sight {
+    display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+    font-size: 14.5px; font-weight: 600; color: #7d88a8;
+    background: rgba(255, 255, 255, 0.6); border: 2px dashed #c5cde4; border-radius: 12px;
+  }
+  .pp-sight small { margin-left: auto; font-size: 11.5px; font-weight: 500; }
+  .pp-sight-mark {
+    flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+    font-size: 13px; font-weight: 700; color: #9aa6c8; border: 2px solid #c5cde4; border-radius: 50%;
+  }
+  .pp-sight-mark svg { width: 16px; height: 16px; }
+  .pp-sight.is-seen { color: #1b2340; background: #fff; border: 2px solid #1b2340; }
+  .pp-sight.is-seen .pp-sight-mark { color: #fff; background: var(--ink); border-color: #1b2340; }
+  .pp-sight.is-secret:not(.is-seen) { font-style: italic; }
+  .pp-sight.is-secret.is-seen .pp-sight-mark { background: #c4306f; }
+
+  /* ---- the cover, which opens on the way in ---- */
+  .pp-cover { position: absolute; top: 10px; bottom: 10px; left: 50%; right: 10px; z-index: 6; display: none; transform-origin: 0 50%; transform-style: preserve-3d; pointer-events: none; }
+  .pp-book.is-cover .pp-cover { display: block; }
+  .pp-book.is-opening .pp-cover { transform: rotateY(-178deg); transition: transform 0.9s cubic-bezier(0.55, 0.05, 0.3, 1); }
+  .pp-cover-front, .pp-cover-back { position: absolute; inset: 0; backface-visibility: hidden; }
+  .pp-cover-front {
+    display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center;
+    border-radius: 5px 16px 16px 5px; color: #c4f4e8;
+    background: radial-gradient(120% 80% at 30% 20%, #33479a, #212e6a 60%, #1a2456);
+    box-shadow: inset 0 0 0 12px transparent, inset 0 0 0 14px rgba(196, 244, 232, 0.35);
+  }
+  .pp-cover-back { transform: rotateY(180deg); border-radius: 16px 5px 5px 16px; background: #e9eefc; }
+  .pp-cover-top, .pp-cover-word, .pp-cover-small { margin: 0; text-transform: uppercase; }
+  .pp-cover-top { font-size: 16px; font-weight: 700; letter-spacing: 0.32em; }
+  .pp-cover-word {
+    font-size: 40px; font-weight: 700; letter-spacing: 0.24em; margin-right: -0.24em;
+    background: linear-gradient(100deg, #eafffa, #8fe6d4 40%, #e3f6ff 55%, #7dc8dc); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .pp-cover-small { font-size: 12px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.75; }
+  .pp-cover-emblem { width: 190px; height: auto; filter: drop-shadow(0 2px 0 rgba(10, 16, 44, 0.6)); }
+
+  .pp-close {
+    position: absolute; top: -16px; right: -16px; z-index: 8;
+    display: grid; place-items: center; width: 44px; height: 44px; padding: 0; cursor: pointer;
+    color: #1b2340; background: #fff; border: 3px solid #1b2340; border-radius: 50%; box-shadow: 0 3px 0 #1b2340;
+  }
+  .pp-close svg { width: 18px; height: 18px; }
+  .pp-close:hover { background: #eef2ff; }
+
+  /* ---- a phone: one page at a time, your details behind a tab ---- */
+  @media (max-width: 760px) {
+    .pp-book { display: flex; flex-direction: column; width: calc(100vw - 16px); height: calc(100dvh - 16px); padding: 6px; border-radius: 20px; }
+    .pp-book::before { display: none; }
+    .pp-page { padding: 18px 16px; }
+    .pp-right { order: 0; flex: 1; border-radius: 15px; box-shadow: none; }
+    .pp-left { order: 1; display: none; border-radius: 0 0 15px 15px; box-shadow: none; }
+    .pp-book[data-view='you'] .pp-right { flex: none; padding-bottom: 0; border-radius: 15px 15px 0 0; }
+    .pp-book[data-view='you'] .pp-left { display: block; flex: 1; padding-top: 4px; }
+    .pp-tab--you { display: inline-flex; }
+    .pp-tabs { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 14px; padding: 0 56px 4px 16px; scrollbar-width: none; }
+    .pp-tab { flex: none; }
+    .pp-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+    .pp-sights { grid-template-columns: 1fr; }
+    .pp-h { font-size: 24px; }
+    .pp-mrz { font-size: min(12px, 2.55vw); letter-spacing: 0.04em; }
+    .pp-cover { left: 6px; right: 6px; top: 6px; bottom: 6px; }
+    .pp-cover-front { border-radius: 15px; }
+    .pp-close { top: 12px; right: 12px; width: 40px; height: 40px; }
+    .pp-seal-at { width: 92px; top: 34px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pp *, .pp *::before, .pp *::after { animation: none !important; transition: none !important; }
+  }
 </style>

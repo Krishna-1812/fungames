@@ -35,6 +35,16 @@ function ac(): AudioContext | null {
   return ctx
 }
 
+/**
+ * The shared context and the master everything goes through, for a page that
+ * builds a longer-lived graph of its own (the island's soundscape). It is
+ * behind the same mute, so nothing built on it can be heard while sound is off.
+ */
+export function output(): { ctx: AudioContext; out: AudioNode } | null {
+  const c = ac()
+  return c && master ? { ctx: c, out: master } : null
+}
+
 /** Call from any pointerdown/keydown so the first sound is not swallowed. */
 export function unlock() {
   const c = ac()

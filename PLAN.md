@@ -2731,8 +2731,24 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     (only the card's Play button did). The camera now remembers what was
     pressed and acts on that, for buildings and pokes alike.
 
-66. Next, in order, unless the order changes: a passport of visited
-    games and optional sound; then polish, phones and speed.
+66. ~~**The island, made real: a passport, and sound.**~~ **done.** Every
+    game stamps a passport, once a day, with the first day, the latest and
+    how many days; the book opens from the top bar on a cover that swings
+    open, with your details and a rank on one page and a page per
+    district, each game a rubber stamp in its district's shape and ink
+    with its own icon and the day, landing with a thump the first time you
+    see it, and a seal for a district done. Sightings lists the eighteen
+    things to poke. Surprise me goes somewhere you have not been and dives
+    in. The sound, off until asked for, is the island heard from where the
+    camera is: the sea, wind, crowds, rain under the cloud, crickets at
+    night, a music box at the funfair, gulls and a bell at the harbour, the
+    ferry's horn as it comes and goes, and a noise for everything you poke.
+    Looking at the stamps found the icons melting: they are flat colours
+    with no outline, so in one ink the Earth was a disc; each colour now
+    prints at its own strength, like a one-colour tint.
+
+67. Next: polish, phones and speed; then the site's name and the support
+    link.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

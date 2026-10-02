@@ -7,6 +7,7 @@
 import { roll, confetti, PLAY } from './motion'
 import { isMuted, setMuted, unlock, sfx } from './audio'
 import { bestKey } from '../data/game-meta'
+import { recordVisit } from './passport'
 
 export type ShellOptions = {
   slug: string
@@ -70,6 +71,9 @@ export function createShell(opts: ShellOptions) {
   const soundBtn = $<HTMLButtonElement>(shell, '[data-act="sound"]')
   const soundLabel = $(soundBtn, '[data-sound-label]')
   const newBestBadge = $(tile('best'), '[data-new-best]')
+
+  // A stamp in the island's passport: once a day, however often the page loads.
+  recordVisit(opts.slug)
 
   let paused = false
   let best = readBest(opts.slug)

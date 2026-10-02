@@ -62,6 +62,10 @@ export function setStore(s: Store | null) {
   store = s
 }
 
+/** The same probed store, for the other small records the site keeps (the
+ *  island's passport): one place decides whether storage can be trusted. */
+export const siteStore = (): Store | null => getStore()
+
 function getStore(): Store | null {
   if (store !== undefined) return store
   try {
