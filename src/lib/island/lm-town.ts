@@ -1,5 +1,5 @@
 /** Old Town: people and time — lives, weeks, days, births and rules. */
-import { C, INK, N, OUT, shade, r1 as f, type Landmark } from './kit'
+import { C, INK, N, OUT, shade, r1 as f, letter, type Landmark } from './kit'
 import { person, tree, flag, lamp, flowers, bench, fence } from './props'
 
 export const town: Record<string, Landmark> = {
@@ -78,25 +78,44 @@ export const town: Record<string, Landmark> = {
   } },
 
   'every-second': { size: [2, 2], draw(p) {
-    const houses: [number, number, string][] = [[0.1, 0.1, C.rasp], [0.95, 0.15, C.cobalt], [0.15, 0.95, C.lilac], [1.2, 1.0, C.sky], [0.65, 1.5, C.mint]]
-    houses.forEach(([x, y, roof], k) => {
-      const b = p.box(x, y, 0.58, 0.46, 20, { fill: k % 2 ? '#ffffff' : '#f4f1ff' })
-      p.gable(x, y, 0.58, 0.46, 20, 13, roof, 'x', { lines: 2 })
-      p.windows(b, 'x', { cols: 1, z0: 7, h: 7, wide: 0.4, cls: 'es-win', pane: '#e3e8f7' })
-      p.windows(b, 'y', { cols: 2, z0: 7, h: 7, wide: 0.4, cls: 'es-win', pane: '#e3e8f7' })
-      p.box(x + 0.08, y + 0.08, 0.08, 0.08, 10, { z0: 24, fill: C.stone2, sw: 1 })
+    // A terrace of three tall houses, front gables to the street, where a
+    // window lights up every time someone is born; a stork brings another.
+    const houses: [number, number, string, string][] = [[0.14, 30, C.rasp, '#ffffff'], [0.7, 38, C.cobalt, '#f4f1ff'], [1.26, 32, C.lilac, '#eef6ff']]
+    const y0 = 0.22, d = 0.82, w = 0.56
+    houses.forEach(([x, h, roof, wall], k) => {
+      const b = p.box(x, y0, w, d, h, { fill: wall, trim: shade(roof, 1.25) })
+      p.windows(b, 'y', { cols: 2, z0: h - 13, h: 8, wide: 0.42, cls: 'es-win', pane: '#e3e8f7' })
+      p.windows(b, 'y', { cols: 2, z0: 5, h: 8, wide: 0.3, cls: 'es-win', pane: '#e3e8f7' })
+      p.door(b, 'y', 0.5, { w: 0.13, h: 13, fill: shade(roof, 0.9) })
+      if (k === houses.length - 1) {
+        p.windows(b, 'x', { cols: 3, z0: h - 13, h: 8, wide: 0.38, cls: 'es-win', pane: '#e3e8f7' })
+        p.windows(b, 'x', { cols: 3, z0: 5, h: 8, wide: 0.38, cls: 'es-win', pane: '#e3e8f7' })
+      }
+      p.gable(x, y0, w, d, h, 15, roof, 'y', { lines: 2, over: 0.015 })
+      p.box(x + 0.36, y0 + 0.14, 0.09, 0.09, 12, { z0: h + 6, fill: C.stone2, sw: 1 })
     })
-    // A stork on the tallest roof, and a +1 floating up.
-    const [kx, ky] = p.at(1.49, 1.23, 34)
-    p.path(`M${f(kx - 5)} ${f(ky - 6)}q5 -4 10 0q-2 5 -10 0zM${f(kx + 5)} ${f(ky - 7)}l3 -9M${f(kx + 8)} ${f(ky - 16)}l6 2`, '#ffffff', { sw: 1.2 })
-    p.path(`M${f(kx - 2)} ${f(ky - 4)}v5M${f(kx + 1)} ${f(ky - 4)}v5`, 'none', { sw: 1, stroke: C.rasp })
-    const [x, y] = p.at(1.7, 0.45, 40)
-    const pl = p.group('es-plus')
-    pl.el('circle', { cx: x, cy: y, r: 11, fill: C.mint, stroke: INK, 'stroke-width': OUT })
-    pl.el('text', { x, y: y + 4, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 10.5, fill: INK }).text('+1')
-    p.grow(x - 12, y - 40, x + 12, y + 12)
-    flowers(p, 1.85, 1.85); tree(p, 1.8, 0.95, 'blossom', C.leaf)
-    person(p, 1.05, 1.95, C.lilac, { pose: 'wave' })
+    // The stork's nest on the tallest chimney, and the stork coming home.
+    const [nx, ny] = p.at(1.11, 0.4, 56)
+    p.el('ellipse', { cx: nx, cy: ny, rx: 7, ry: 3, fill: C.wood, stroke: INK, 'stroke-width': 1.1 })
+    p.path(`M${f(nx - 3)} ${f(ny - 2)}q3 -5 7 -1q-2 3 -7 1zM${f(nx + 3)} ${f(ny - 4)}l2 -7l4 1`, '#ffffff', { sw: 1 })
+    const [sx, sy] = p.at(1.7, 0.1, 104)
+    const st = p.group('glide')
+    st.path(`M${f(sx - 14)} ${f(sy - 6)}q7 -2 14 4q7 -6 14 -4q-8 3 -12 8h-4q-4 -5 -12 -8z`, '#ffffff', { sw: 1.1 })
+    st.path(`M${f(sx + 2)} ${f(sy + 1)}l9 -3l3 1`, 'none', { sw: 1, stroke: C.rasp })
+    st.path(`M${f(sx - 1)} ${f(sy + 2)}v6`, 'none', { sw: 0.8 })
+    st.path(`M${f(sx - 5)} ${f(sy + 8)}q4 -3 8 0q1 5 -4 6q-5 -1 -4 -6z`, '#ffe1e8', { sw: 1 })
+    p.grow(sx - 16, sy - 12, sx + 16, sy + 16)
+    // Front gardens behind a picket fence, gaps for the gates.
+    for (const [a, b] of [[0.14, 0.32], [0.52, 0.88], [1.08, 1.44], [1.64, 1.82]] as const) fence(p, [[a, 1.6], [b, 1.6]], 6, '#ffffff')
+    flowers(p, 0.3, 1.3); flowers(p, 1.62, 1.32, [C.sky, '#ffffff', C.lilac])
+    // A pram, parked.
+    const [qx, qy] = p.at(1.0, 1.36)
+    p.path(`M${f(qx - 6)} ${f(qy - 6)}h11a6 6 0 0 1 -11 -6z`, C.sky, { sw: 1.1 })
+    p.path(`M${f(qx - 6)} ${f(qy - 12)}a6 6 0 0 1 6 6h-6z`, shade(C.sky, 0.8), { sw: 1 })
+    p.el('circle', { cx: qx - 4, cy: qy - 1.5, r: 1.6, fill: INK }); p.el('circle', { cx: qx + 3, cy: qy - 1.5, r: 1.6, fill: INK })
+    p.path(`M${f(qx + 5)} ${f(qy - 6)}l3 -4`, 'none', { sw: 1 })
+    person(p, 1.25, 1.85, C.lilac, { pose: 'wave' })
+    tree(p, 1.88, 1.85, 'blossom', C.leaf, 0.85)
   } },
 
   'rule-cascade': { size: [2, 2], draw(p) {
@@ -106,45 +125,75 @@ export const town: Record<string, Landmark> = {
     p.box(0.14, 0.09, 1.52, 1.32, 5, { z0: 58, fill: C.cobalt })
     p.box(0.6, 0.5, 0.5, 0.4, 10, { z0: 63, fill: C.stone2 })
     flag(p.move(0, 0, 73), 0.85, 0.7, 0, C.rasp, 18)
-    // The noticeboard of rules on its posts.
-    p.line([0.45, 1.7, 0], [0.45, 1.7, 14], { sw: 2 }); p.line([1.35, 1.7, 0], [1.35, 1.7, 14], { sw: 2 })
-    const [bx, by] = p.at(0.9, 1.7, 14)
-    p.path(`M${f(bx - 36)} ${f(by - 46)}h72v46h-72z`, '#ffffff', { sw: 2 })
-    p.el('text', { x: bx, y: by - 37, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 6.8, fill: INK }).text('THE RULES')
-    for (let k = 0; k < 4; k++) {
-      p.el('rect', { x: bx - 28, y: by - 31 + k * 7.5, width: 40, height: 2.6, rx: 1.3, fill: '#c9cde0' })
-      p.el('text', { x: bx + 22, y: by - 27.5 + k * 7.5, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 7.5, fill: k === 3 ? C.rasp : '#11a887', class: 'rc-tick', style: `animation-delay:${k * 0.5}s` }).text(k === 3 ? '✗' : '✓')
+    // A ticket machine on a post: take a number, wait for ever.
+    p.line([1.9, 1.08, 0], [1.9, 1.08, 14], { sw: 2 })
+    const tm = p.box(1.84, 1.02, 0.12, 0.12, 9, { z0: 13, fill: C.rasp, sw: 1.1 })
+    p.quad(tm, 'y', 0.25, 0.75, 3, 5.5, '#ffffff', { sw: 0.7 })
+    const [kx, ky] = p.at(1.9, 1.14, 15)
+    p.path(`M${f(kx - 2)} ${f(ky + 1)}l1 5h3l-1 -5z`, '#ffffff', { sw: 0.7 })
+    // The queue that does not move.
+    for (const [x, c] of [[1.8, C.mint], [1.95, C.sky]] as const) person(p, x, 1.35, c)
+    // The village noticeboard: posts, a little roof, and the rules pinned up
+    // on top of one another, each one changing the last.
+    for (const x of [0.4, 1.4]) p.box(x - 0.03, 1.7, 0.06, 0.06, 30, { fill: C.wood, sw: 1 })
+    const nb = p.box(0.34, 1.7, 1.12, 0.05, 19, { z0: 9, fill: C.wood, sw: 1.2 })
+    p.quad(nb, 'y', 0.03, 0.97, 1.5, 17.5, '#dfe4f2', { sw: 0.9 })
+    p.gable(0.3, 1.64, 1.2, 0.16, 29, 5, C.cobalt, 'x', { lines: 0 })
+    const g = p.face(nb, 'y', 0.5, 1.5, { w: 36, h: 17 })
+    const notes: [number, number, number, number, number, string][] = [[-14, -15, 9, 11, -6, '#ffffff'], [-3, -15.5, 8, 7, 4, '#ffe1e8'], [6, -15, 9, 9, -3, '#d6f5ec'], [-5, -8, 7, 6, 7, '#e3e0ff'], [9, -5.5, 6, 5, -8, '#ffffff']]
+    for (const [x, y, w, h, a, c] of notes) {
+      const n = g.add(new N('g', { transform: `rotate(${a} ${f(x + w / 2)} ${f(y + h / 2)})` }))
+      n.add(new N('rect', { x, y, width: w, height: h, fill: c, stroke: INK, 'stroke-width': 0.5 }))
+      for (let k = 1; k * 2 < h - 1; k++) n.add(new N('path', { d: `M${f(x + 1.2)} ${f(y + 1 + k * 2)}h${f(w - 2.4 - (k % 2) * 1.5)}`, stroke: '#9aa3c0', 'stroke-width': 0.5 }))
+      n.add(new N('circle', { cx: x + w / 2, cy: y + 0.9, r: 0.8, fill: C.rasp }))
     }
-    p.grow(bx - 38, by - 48, bx + 38, by)
+    // The newest rule, on top: ticks, and a cross where it contradicts.
+    const top = g.add(new N('g', { transform: 'rotate(2 2 -9)' }))
+    top.add(new N('rect', { x: -4, y: -16, width: 12, height: 14, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6 }))
+    letter(top, 2, -12.4, 'RULES', { size: 3, ls: 0.2 })
+    for (let k = 0; k < 3; k++) {
+      top.add(new N('path', { d: `M-2.5 ${f(-9.6 + k * 2.6)}h6`, stroke: '#9aa3c0', 'stroke-width': 0.6 }))
+      letter(top, 5.8, -8.6 + k * 2.6, k === 2 ? '✗' : '✓', { size: 2.8, fill: k === 2 ? C.rasp : '#11a887', cls: 'rc-tick' }).attrs.style = `animation-delay:${k * 0.5}s`
+    }
+    top.add(new N('circle', { cx: 2, cy: -15.1, r: 0.9, fill: C.cobalt }))
     // The lamp, and the moth that will not leave it.
     lamp(p, 1.85, 1.75, 34)
     const [lx, ly] = p.at(1.85, 1.75, 36)
     const moth = p.group('rc-moth', { style: `transform-origin:${f(lx + 5)}px ${f(ly)}px` })
     moth.path(`M${f(lx + 18)} ${f(ly)}l-5 -5v10zM${f(lx + 18)} ${f(ly)}l5 -5v10z`, '#a49dcf', { sw: 1 })
-    // A queue that does not move.
-    for (const [x, c] of [[1.8, C.mint], [1.95, C.sky]] as const) person(p, x, 1.35, c)
-    p.sign(1.9, 1.05, 16, 34, 9, '#ffffff', 'TAKE A NUMBER', { size: 4.6 })
+    person(p, 0.95, 1.95, C.lilac, { pose: 'look' })
   } },
 
   'from-memory': { size: [2, 2], draw(p) {
-    const st = p.box(0.15, 0.15, 1.1, 1.0, 28, { fill: C.white, trim: C.rasp })
-    p.gable(0.15, 0.15, 1.1, 1.0, 28, 16, C.rasp, 'y', { lines: 2 })
-    p.windows(st, 'x', { cols: 2, z0: 8, h: 12, wide: 0.55 })
-    p.door(st, 'y', 0.5, { w: 0.24, h: 16, fill: C.lilac })
+    // An art school, with a mural on its side wall: someone's bicycle,
+    // drawn from memory, again and again, never quite right.
+    const st = p.box(0.12, 0.12, 1.02, 1.32, 30, { fill: C.white, trim: C.rasp })
+    p.gable(0.12, 0.12, 1.02, 1.32, 30, 16, C.rasp, 'y', { lines: 3 })
+    p.windows(st, 'y', { cols: 2, z0: 9, h: 12, wide: 0.42 })
+    p.door(st, 'y', 0.5, { w: 0.2, h: 16, fill: C.lilac })
     // A skylight in the roof, for the north light painters want.
-    p.poly([[0.75, 0.3, 36], [0.75, 0.6, 36], [0.72, 0.6, 42], [0.72, 0.3, 42]], C.glass, { sw: 1 })
-    // The easel, with the wrong bicycle on it...
-    const [ex, ey] = p.at(1.55, 1.45)
-    p.path(`M${f(ex - 16)} ${f(ey)}L${f(ex)} ${f(ey - 58)}L${f(ex + 16)} ${f(ey)}M${f(ex)} ${f(ey - 58)}L${f(ex + 4)} ${f(ey + 4)}`, 'none', { sw: 2.2, stroke: C.wood })
-    p.path(`M${f(ex - 26)} ${f(ey - 52)}h52v36h-52z`, '#ffffff', { sw: 1.8 })
-    p.el('path', { d: `M${f(ex - 17)} ${f(ey - 26)}a7 7 0 1 1 1 0M${f(ex + 14)} ${f(ey - 26)}a7 7 0 1 0 -1 0M${f(ex - 17)} ${f(ey - 26)}l10 -12l10 12l-6 -14h-6M${f(ex + 3)} ${f(ey - 40)}l6 -4`, fill: 'none', stroke: C.cobalt, 'stroke-width': 1.8, 'stroke-linecap': 'round', class: 'fm-draw' })
-    // ...and the right one parked beside it.
-    const [cx, cy] = p.at(0.55, 1.75)
-    p.path(`M${f(cx - 15)} ${f(cy - 8)}a8 8 0 1 0 0.1 0M${f(cx + 15)} ${f(cy - 8)}a8 8 0 1 0 0.1 0`, 'none', { sw: 2 })
-    p.path(`M${f(cx - 15)} ${f(cy - 8)}l8 -12h13l9 12M${f(cx - 7)} ${f(cy - 20)}l7 12l8 -12M${f(cx + 6)} ${f(cy - 20)}l-2 -5h5M${f(cx - 9)} ${f(cy - 23)}h6`, 'none', { sw: 2, stroke: C.rasp })
+    p.poly([[0.68, 0.3, 38], [0.68, 0.7, 38], [0.66, 0.7, 44], [0.66, 0.3, 44]], C.glass, { sw: 1 })
+    p.quad(st, 'x', 0.08, 0.92, 4, 27, '#fdfdff', { sw: 1.1 })
+    const m = p.face(st, 'x', 0.5, 4, { w: 40, h: 23 })
+    m.add(new N('path', {
+      d: 'M-14 -9a5.5 5.5 0 1 1 0.1 0M10 -9a5.5 5.5 0 1 0 -0.1 0M-14 -9l7 -9l9 0l2 9M-7 -18l4 9l7 0M10 -9l-3 -11h4M-9 -20h4M-3 -9l-2 2',
+      fill: 'none', stroke: C.cobalt, 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'fm-draw',
+    }))
+    letter(m, 0, -1, 'FROM MEMORY', { size: 3.6, fill: C.rasp, ls: 0.4 })
+    // A painter at an easel out front, the easel and canvas painter-sized.
+    const [ex, ey] = p.at(1.46, 1.86)
+    p.path(`M${f(ex - 7)} ${f(ey)}L${f(ex)} ${f(ey - 27)}L${f(ex + 7)} ${f(ey)}M${f(ex)} ${f(ey - 27)}L${f(ex + 2)} ${f(ey + 2)}`, 'none', { sw: 1.5, stroke: C.wood })
+    p.path(`M${f(ex - 10)} ${f(ey - 25)}h20v14h-20z`, '#ffffff', { sw: 1.2 })
+    p.path(`M${f(ex - 6)} ${f(ey - 14.5)}a2.6 2.6 0 1 1 0.1 0M${f(ex + 5)} ${f(ey - 14.5)}a2.6 2.6 0 1 0 -0.1 0M${f(ex - 6)} ${f(ey - 14.5)}l4 -5h4l2 5`, 'none', { sw: 0.9, stroke: C.cobalt })
+    p.path(`M${f(ex - 9)} ${f(ey - 11)}h18`, 'none', { sw: 1.3, stroke: C.wood })
+    person(p, 1.78, 1.82, C.lilac, { hat: C.rasp, pose: 'look' })
+    // The real bicycle, parked by the door, the size a bicycle is.
+    const [cx, cy] = p.at(0.62, 1.72)
+    p.path(`M${f(cx - 8)} ${f(cy - 4.5)}a4.5 4.5 0 1 0 0.1 0M${f(cx + 8)} ${f(cy - 4.5)}a4.5 4.5 0 1 0 0.1 0`, 'none', { sw: 1.4 })
+    p.path(`M${f(cx - 8)} ${f(cy - 4.5)}l4 -7h8l4 7M${f(cx - 4)} ${f(cy - 11.5)}l4 7l4 -7M${f(cx + 4)} ${f(cy - 11.5)}l-1 -3h3M${f(cx - 5)} ${f(cy - 13)}h3`, 'none', { sw: 1.4, stroke: C.rasp })
+    p.grow(cx - 14, cy - 16, cx + 14, cy)
     // Paint pots.
-    for (const [x, c] of [[1.2, C.rasp], [1.3, C.mint], [1.4, C.cobalt]] as const) p.cyl(x, 1.85, 0.05, 0, 6, c, { sw: 1 })
-    person(p, 1.85, 1.7, C.lilac, { hat: C.rasp, pose: 'look' })
+    for (const [x, c] of [[1.25, C.rasp], [1.33, C.mint], [1.41, C.cobalt]] as const) p.cyl(x, 1.6, 0.04, 0, 5, c, { sw: 0.9 })
     tree(p, 1.8, 0.35, 'cypress', C.leaf)
   } },
 }

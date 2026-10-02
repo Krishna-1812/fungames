@@ -115,7 +115,11 @@ export class Pen {
     return { fill, stroke: o.stroke ?? INK, 'stroke-width': o.sw ?? OUT, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: o.op, class: o.cls, id: o.id, style: o.style }
   }
   poly(pts: [number, number, number][], fill: string, o: Draw = {}) {
-    return this.el('polygon', { points: pts.map((p) => this.at(...p).map(f).join(',')).join(' '), ...this.sty(o, fill) })
+    // A polygon is closed, so it has no ends to cap: leaving the attribute
+    // off changes nothing on screen and saves a few dozen kilobytes.
+    const sty: Attrs = this.sty(o, fill)
+    delete sty['stroke-linecap']
+    return this.el('polygon', { points: pts.map((p) => this.at(...p).map(f).join(',')).join(' '), ...sty })
   }
   /** A path in screen space; its points grow the bounds. */
   path(d: string, fill: string, o: Draw = {}) { pathBounds(d, this.b); return this.el('path', { d, ...this.sty(o, fill) }) }
@@ -260,6 +264,18 @@ export class Pen {
     g.el('ellipse', { cx: x - rx * 0.4, cy: y - rx * 0.55, rx: rx * 0.22, ry: rx * 0.12, fill: '#fff', opacity: 0.6, transform: `rotate(-35 ${f(x - rx * 0.4)} ${f(y - rx * 0.55)})` })
     return g
   }
+  /**
+   * A group painted onto a box face: a sign, a poster, a mural. Inside it,
+   * x runs left to right along the face in screen pixels (a tile is 32) and
+   * y runs down, from the point (u, z) on the face, so a plain rect or a line
+   * of text drawn there lies flat on the wall instead of facing the camera.
+   */
+  face(b: Box, face: 'x' | 'y', u: number, z: number, o: { cls?: string; w?: number; h?: number } = {}): N {
+    const [sx, sy] = face === 'x' ? this.at(b.x + b.w, b.y + u * b.d, b.z0 + z) : this.at(b.x + u * b.w, b.y + b.d, b.z0 + z)
+    const w = o.w ?? 0, h = o.h ?? 0
+    this.grow(sx - w / 2, sy - h - w / 4, sx + w / 2, sy + h + w / 4)
+    return this.el('g', { transform: `translate(${f(sx)} ${f(sy)}) skewY(${face === 'x' ? -26.565 : 26.565})`, class: o.cls })
+  }
   /** A flat sign facing the viewer, bottom-centred on a point. */
   sign(x: number, y: number, z: number, w: number, h: number, fill: string, label?: string, o: { size?: number; ink?: string; rx?: number; cls?: string; font?: string } = {}) {
     const [sx, sy] = this.at(x, y, z)
@@ -311,6 +327,27 @@ export type Landmark = { size: [number, number]; water?: boolean; draw: (p: Pen)
 
 /** Screen-space helpers shared by the landmark files. */
 export const r1 = (v: number) => Math.round(v * 10) / 10
+
+/** A line of lettering inside a group (a painted sign, say): centred on x by default. */
+export function letter(g: N, x: number, y: number, s: string, o: { size?: number; fill?: string; weight?: number; anchor?: string; font?: string; ls?: number; cls?: string; stroke?: string; sw?: number; op?: number } = {}) {
+  return g.add(new N('text', {
+    x, y, 'text-anchor': o.anchor ?? 'middle', 'font-family': o.font ?? 'Fredoka, system-ui, sans-serif', 'font-weight': o.weight ?? 700,
+    'font-size': o.size ?? 8, fill: o.fill ?? INK, 'letter-spacing': o.ls, class: o.cls, stroke: o.stroke, 'stroke-width': o.sw, 'stroke-linejoin': o.stroke ? 'round' : undefined, opacity: o.op,
+  })).text(s)
+}
+
+/**
+ * Neon lettering: a soft wide glow under a bright tube with a white-hot
+ * core, so it reads as light by day and properly glows by night.
+ */
+export function neon(g: N, x: number, y: number, s: string, c: string, o: { size?: number; font?: string; cls?: string; anchor?: string; ls?: number } = {}) {
+  const t = g.add(new N('g', { class: o.cls ?? 'neon' }))
+  const base = { size: o.size ?? 8, font: o.font, anchor: o.anchor, ls: o.ls, weight: 700 }
+  letter(t, x, y, s, { ...base, fill: 'none', stroke: c, sw: 3.4, op: 0.35 })
+  letter(t, x, y, s, { ...base, fill: c, stroke: c, sw: 0.6 })
+  letter(t, x, y, s, { ...base, fill: '#ffffff', op: 0.55, size: base.size })
+  return t
+}
 
 /**
  * Movement along a path, as plain CSS keyframes rather than SMIL. SMIL's

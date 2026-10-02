@@ -1,5 +1,5 @@
 /** The Proving Grounds: tests of the actual you. */
-import { C, INK, N, OUT, shade, r1 as f, motionPath, type Landmark } from './kit'
+import { C, INK, N, OUT, shade, r1 as f, motionPath, letter, type Landmark } from './kit'
 import { person, tree, lamp, fence, flag } from './props'
 
 
@@ -39,72 +39,100 @@ export const proving: Record<string, Landmark> = {
   } },
 
   'not-a-robot': { size: [2, 2], draw(p) {
-    // The checkbox, big enough to read from the other end of the island.
-    p.line([0.35, 0.35, 0], [0.35, 0.35, 44], { sw: 2.6 }); p.line([0.95, 0.35, 0], [0.95, 0.35, 44], { sw: 2.6 })
-    const [bx, by] = p.at(0.65, 0.35, 44)
-    p.path(`M${f(bx - 46)} ${f(by - 36)}h92v36h-92z`, '#ffffff', { sw: 2.2 })
-    p.path(`M${f(bx - 38)} ${f(by - 27)}h18v18h-18z`, '#ffffff', { sw: 2 })
-    p.el('path', { d: `M${f(bx - 34)} ${f(by - 18)}l4.5 5.5l9 -11`, fill: 'none', stroke: '#11a887', 'stroke-width': 3.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'nar-tick' })
-    p.el('text', { x: bx + 12, y: by - 15, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 600, 'font-size': 8, fill: INK }).text("I'm not a robot")
-    p.el('circle', { cx: bx + 36, cy: by - 26, r: 4, fill: 'none', stroke: C.cobalt, 'stroke-width': 1.4 })
-    // The booth and its barrier.
-    const bo = p.box(1.25, 0.2, 0.55, 0.55, 30, { fill: C.white, trim: C.cobalt })
-    p.windows(bo, 'y', { cols: 1, z0: 12, h: 12, wide: 0.7 })
-    p.windows(bo, 'x', { cols: 1, z0: 12, h: 12, wide: 0.7 })
-    p.box(1.2, 0.15, 0.65, 0.65, 5, { z0: 30, fill: C.cobalt })
-    person(p.move(0, 0, 0), 1.52, 0.5, C.slate, { hat: C.slate, k: 0.9 })
-    p.box(1.2, 0.95, 0.12, 0.12, 20, { fill: C.stone2, sw: 1.2 })
-    const [px, py] = p.at(1.26, 1.01, 17)
+    // A border checkpoint for humans: a lane, a canopy, a booth, a barrier,
+    // and at the front of the queue a robot in a hat and a stuck-on moustache.
+    tree(p, 1.85, 0.22, 'round', C.leaf, 0.85)
+    const lane = p.plane(0, 0.75, 0)
+    lane.add(new N('rect', { width: 2, height: 0.62, fill: '#cfd3e6', stroke: INK, 'stroke-width': 0.031 }))
+    lane.add(new N('path', { d: 'M0.08 0.04H1.92M0.08 0.58H1.92', stroke: '#ffffff', 'stroke-width': 0.03 }))
+    lane.add(new N('rect', { x: 1.12, y: 0.06, width: 0.06, height: 0.5, fill: '#ffffff' }))
+    lane.add(new N('text', { x: 1.32, y: 0.31, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 0.16, fill: '#ffffff', transform: 'rotate(-90 1.32 0.31)' })).text('STOP')
+    p.grow(...p.at(0, 0.75), ...p.at(2, 1.37))
+    for (const x of [0.16, 0.86]) p.box(x - 0.04, 0.6, 0.08, 0.08, 34, { fill: '#e3e8f7', sw: 1.1 })
+    // The booth, and the officer with a clipboard.
+    const bo = p.box(1.12, 0.12, 0.46, 0.44, 26, { fill: C.white, trim: C.cobalt })
+    p.windows(bo, 'y', { cols: 1, z0: 9, h: 11, wide: 0.7 })
+    p.windows(bo, 'x', { cols: 1, z0: 9, h: 11, wide: 0.6 })
+    p.box(1.08, 0.08, 0.54, 0.52, 3, { z0: 26, fill: C.cobalt })
+    const [ox, oy] = p.at(1.76, 0.5)
+    person(p, 1.76, 0.5, C.slate, { hat: C.slate })
+    p.el('rect', { x: ox + 2.5, y: oy - 14, width: 5, height: 6.5, rx: 0.8, fill: '#ffffff', stroke: INK, 'stroke-width': 1, transform: `rotate(12 ${f(ox + 5)} ${f(oy - 11)})` })
+    // The barrier, from its post by the booth across the lane.
+    p.box(1.0, 0.6, 0.1, 0.1, 15, { fill: C.stone2, sw: 1.1 })
+    const [px, py] = p.at(1.05, 0.65, 13)
+    const [ex, ey] = p.at(1.05, 1.42, 13)
     const bar = p.group('nar-bar', { style: `transform-origin:${f(px)}px ${f(py)}px` })
-    bar.path(`M${f(px)} ${f(py - 3)}l-92 14v7l92 -14z`, '#ffffff', { sw: 1.6 })
-    for (let k = 0; k < 4; k++) bar.path(`M${f(px - 12 - k * 21)} ${f(py - 1 + (12 + k * 21) * 0.152)}l-10 1.5v6l10 -1.5z`, C.rasp, { sw: 0 })
-    p.grow(px - 96, py - 50, px, py + 20)
-    // Lights: stop and go.
-    p.line([1.9, 1.1, 0], [1.9, 1.1, 30], { sw: 2.2 })
-    p.box(1.84, 1.04, 0.12, 0.12, 14, { z0: 22, fill: C.slate, sw: 1.2 })
-    p.circle(1.9, 1.16, 31, 2.5, C.rasp, { sw: 0.8, cls: 'nar-stop' }); p.circle(1.9, 1.16, 25, 2.5, C.mint, { sw: 0.8, cls: 'nar-go' })
-    // The queue: a person, and a robot doing its best impression of one.
-    person(p, 0.95, 1.55, C.mint)
-    const [rx, ry] = p.at(0.6, 1.75)
+    bar.path(`M${f(px)} ${f(py)}L${f(ex)} ${f(ey)}`, 'none', { sw: 4.6 })
+    bar.path(`M${f(px)} ${f(py)}L${f(ex)} ${f(ey)}`, 'none', { sw: 2.8, stroke: '#ffffff' })
+    bar.el('path', { d: `M${f(px)} ${f(py)}L${f(ex)} ${f(ey)}`, stroke: C.rasp, 'stroke-width': 2.8, 'stroke-dasharray': '4 4', fill: 'none' })
+    p.grow(ex - 4, py - 40, px + 4, ey + 4)
+    // The queue: a robot doing its best impression of a person, and a person.
+    const [rx, ry] = p.at(1.4, 1.04)
     const r = p.group('robot')
-    r.el('ellipse', { cx: rx, cy: ry + 1, rx: 8, ry: 3, fill: INK, opacity: 0.15 })
-    r.path(`M${f(rx - 4)} ${f(ry)}v-8M${f(rx + 4)} ${f(ry)}v-8`, 'none', { sw: 2.6 })
-    r.path(`M${f(rx - 10)} ${f(ry - 30)}h20v22h-20z`, C.sky, { sw: 1.8 })
-    r.path(`M${f(rx - 6)} ${f(ry - 22)}h12v6h-12z`, '#ffffff', { sw: 1 })
-    r.path(`M${f(rx - 8)} ${f(ry - 46)}h16v14h-16z`, '#dfe4f5', { sw: 1.8 })
-    r.path(`M${f(rx)} ${f(ry - 46)}v-7`, 'none', { sw: 1.6 })
-    r.el('circle', { cx: rx, cy: ry - 54, r: 2.6, fill: C.rasp, class: 'blink' })
-    r.el('circle', { cx: rx - 3.5, cy: ry - 40, r: 1.8, fill: INK }); r.el('circle', { cx: rx + 3.5, cy: ry - 40, r: 1.8, fill: INK })
-    r.path(`M${f(rx - 3)} ${f(ry - 35)}h6`, 'none', { sw: 1.2 })
-    r.path(`M${f(rx + 10)} ${f(ry - 26)}l6 -6`, 'none', { sw: 2.2, cls: 'wave-arm' })
-    lamp(p, 0.1, 1.9)
-    void OUT
+    r.el('ellipse', { cx: rx, cy: ry + 0.5, rx: 6, ry: 2.2, fill: INK, opacity: 0.15 })
+    r.path(`M${f(rx - 2.5)} ${f(ry)}v-5M${f(rx + 2.5)} ${f(ry)}v-5`, 'none', { sw: 2 })
+    r.path(`M${f(rx - 6)} ${f(ry - 15)}h12v10h-12z`, C.sky, { sw: 1.3 })
+    r.path(`M${f(rx - 3.5)} ${f(ry - 12)}h7v3.5h-7z`, '#ffffff', { sw: 0.8 })
+    r.path(`M${f(rx - 5)} ${f(ry - 24)}h10v8.5h-10z`, '#dfe4f5', { sw: 1.3 })
+    r.el('circle', { cx: rx - 2.2, cy: ry - 21, r: 1.2, fill: INK }); r.el('circle', { cx: rx + 2.2, cy: ry - 21, r: 1.2, fill: INK })
+    r.path(`M${f(rx - 3.4)} ${f(ry - 18.2)}q1.7 -1.6 3.4 0q1.7 -1.6 3.4 0`, 'none', { sw: 1.3 })
+    r.path(`M${f(rx - 5.6)} ${f(ry - 24.5)}a5.6 4 0 0 1 11.2 0z`, C.slate, { sw: 1 })
+    r.path(`M${f(rx - 7.5)} ${f(ry - 24.5)}h15`, 'none', { sw: 1.4 })
+    r.path(`M${f(rx + 6)} ${f(ry - 13)}l4 -4`, 'none', { sw: 1.6, cls: 'wave-arm' })
+    p.grow(rx - 9, ry - 30, rx + 11, ry + 2)
+    person(p, 1.8, 0.98, C.mint)
+    // The front posts, then the canopy, its name painted round the fascia.
+    for (const x of [0.16, 0.86]) p.box(x - 0.04, 1.38, 0.08, 0.08, 34, { fill: '#e3e8f7', sw: 1.1 })
+    const cn = p.box(0.06, 0.52, 0.88, 1.02, 9, { z0: 34, fill: C.white, top: '#f4f6fc' })
+    p.band(cn, 0.6, 8.4, C.cobalt)
+    p.poly([[0.12, 0.6, 43], [0.88, 0.6, 43], [0.88, 1.46, 43], [0.12, 1.46, 43]], '#e9edf8', { sw: 0.8 })
+    const fx = p.face(cn, 'x', 0.5, 2.6, { w: 36, h: 8 })
+    letter(fx, 0, 0, 'HUMANS ONLY', { size: 5, fill: '#ffffff', ls: 0.3 })
+    const fy = p.face(cn, 'y', 0.5, 2.4, { w: 28, h: 8 })
+    fy.add(new N('rect', { x: -12, y: -5, width: 5, height: 5, rx: 0.9, fill: '#ffffff', stroke: INK, 'stroke-width': 0.7 }))
+    fy.add(new N('path', { d: 'M-11 -2.6l1.3 1.5l2.6 -3.2', fill: 'none', stroke: '#11a887', 'stroke-width': 1.3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'nar-tick' }))
+    letter(fy, 2.6, -0.2, 'HUMAN', { size: 4.8, fill: '#ffffff', ls: 0.3 })
+    // Stop and go, facing the queue.
+    p.line([1.1, 1.5, 0], [1.1, 1.5, 30], { sw: 2.2 })
+    p.box(1.04, 1.44, 0.12, 0.12, 14, { z0: 22, fill: C.slate, sw: 1.2 })
+    p.circle(1.16, 1.5, 31, 2.4, C.rasp, { sw: 0.8, cls: 'nar-stop' }); p.circle(1.16, 1.5, 25.5, 2.4, C.mint, { sw: 0.8, cls: 'nar-go' })
+    lamp(p, 1.9, 1.9)
   } },
 
   'steady-hand': { size: [3, 1], draw(p) {
     // A safety net that nobody trusts.
     const net = p.plane(0.3, 0.3, 14)
     net.add(new N('rect', { width: 2.4, height: 0.4, fill: '#ffffff', 'fill-opacity': 0.4, stroke: INK, 'stroke-width': 0.038 }))
-    for (let k = 1; k < 12; k++) net.add(new N('line', { x1: k * 0.2, y1: 0, x2: k * 0.2, y2: 0.4, stroke: INK, 'stroke-width': 0.6, opacity: 0.5 }))
+    for (let k = 1; k < 12; k++) net.add(new N('line', { x1: k * 0.2, y1: 0, x2: k * 0.2, y2: 0.4, stroke: INK, 'stroke-width': 0.02, opacity: 0.5 }))
+    for (let k = 1; k < 4; k++) net.add(new N('line', { x1: 0, y1: k * 0.1, x2: 2.4, y2: k * 0.1, stroke: INK, 'stroke-width': 0.02, opacity: 0.5 }))
     p.grow(...p.at(0.3, 0.3, 14), ...p.at(2.7, 0.7, 14))
+    for (const [x, y] of [[0.3, 0.3], [2.7, 0.3], [0.3, 0.7], [2.7, 0.7]] as const) p.line([x, y, 0], [x, y, 14], { sw: 1.2 })
+    // Two towers: striped masts, a platform and rail on each, a ladder up.
     for (const x of [0.2, 2.8]) {
-      p.cyl(x, 0.5, 0.1, 0, 76, '#ffffff', { bands: [[20, 26, C.rasp], [48, 54, C.rasp]] })
-      p.box(x - 0.16, 0.34, 0.32, 0.32, 3, { z0: 72, fill: C.wood, sw: 1.2 })
-      const [sx, sy] = p.at(x, 0.5, 80); p.path(`M${f(sx - 8)} ${f(sy)}l8 -12l8 12z`, C.rasp)
-      for (let z = 8; z < 72; z += 9) p.line([x + 0.12, 0.62, z], [x + 0.12, 0.38, z], { sw: 1 })
+      p.cyl(x, 0.5, 0.09, 0, 72, '#ffffff', { bands: [[18, 24, C.rasp], [42, 48, C.rasp]] })
+      for (let z = 6; z < 72; z += 7) p.line([x + 0.12, 0.62, z], [x + 0.12, 0.42, z], { sw: 0.9 })
+      p.line([x + 0.12, 0.62, 0], [x + 0.12, 0.62, 72], { sw: 1 }); p.line([x + 0.12, 0.42, 0], [x + 0.12, 0.42, 72], { sw: 1 })
+      p.box(x - 0.18, 0.32, 0.36, 0.36, 3, { z0: 72, fill: C.wood, sw: 1.2 })
+      for (const [a, b] of [[[x - 0.18, 0.68], [x + 0.18, 0.68]], [[x + 0.18, 0.32], [x + 0.18, 0.68]]] as const) {
+        p.line([a[0], a[1], 75], [a[0], a[1], 84], { sw: 1 }); p.line([b[0], b[1], 75], [b[0], b[1], 84], { sw: 1 })
+        p.line([a[0], a[1], 84], [b[0], b[1], 84], { sw: 1.3 })
+      }
     }
-    p.line([0.2, 0.5, 76], [2.8, 0.5, 76], { sw: 2 })
-    const [wx, wy] = p.at(1.5, 0.5, 76)
+    p.line([0.2, 0.5, 78], [2.8, 0.5, 78], { sw: 1.8 })
+    // The walker, the same size as everyone watching, with a long pole.
+    const [wx, wy] = p.at(1.5, 0.5, 78)
     const walker = p.group('sh-walk', { style: `transform-origin:${f(wx)}px ${f(wy)}px` })
-    walker.path(`M${f(wx - 34)} ${f(wy - 20)}q34 -6 68 0`, 'none', { sw: 2.4 })
-    walker.el('circle', { cx: wx - 34, cy: wy - 20, r: 2.2, fill: C.rasp }); walker.el('circle', { cx: wx + 34, cy: wy - 20, r: 2.2, fill: C.rasp })
-    walker.path(`M${f(wx)} ${f(wy - 30)}v-2M${f(wx)} ${f(wy - 8)}l-5 8M${f(wx)} ${f(wy - 8)}l5 8`, 'none', { sw: 2.4 })
-    walker.path(`M${f(wx - 4)} ${f(wy - 30)}h8v22h-8z`, C.mint, { sw: 1.4 })
-    walker.el('circle', { cx: wx, cy: wy - 35, r: 5, fill: '#f1d9c6', stroke: INK, 'stroke-width': 1.3 })
-    p.grow(wx - 50, wy - 50, wx + 50, wy)
+    walker.path(`M${f(wx - 26)} ${f(wy - 9)}q26 -5 52 0`, 'none', { sw: 1.6 })
+    walker.el('circle', { cx: wx - 26, cy: wy - 9, r: 1.6, fill: C.rasp }); walker.el('circle', { cx: wx + 26, cy: wy - 9, r: 1.6, fill: C.rasp })
+    walker.path(`M${f(wx - 1.8)} ${f(wy)}l0.6 -6M${f(wx + 1.8)} ${f(wy)}l-0.6 -6`, 'none', { sw: 2 })
+    walker.path(`M${f(wx - 3.4)} ${f(wy - 14)}h6.8v8.5h-6.8z`, C.mint, { sw: 1.2 })
+    walker.path(`M${f(wx - 3)} ${f(wy - 12)}l-6 2.5M${f(wx + 3)} ${f(wy - 12)}l6 2.5`, 'none', { sw: 1.5 })
+    walker.el('circle', { cx: wx, cy: wy - 17.5, r: 3.4, fill: '#f1d9c6', stroke: INK, 'stroke-width': 1.2 })
+    walker.path(`M${f(wx - 3.6)} ${f(wy - 18.5)}a3.6 3.2 0 0 1 7.2 0z`, C.rasp, { sw: 1 })
+    p.grow(wx - 50, wy - 30, wx + 50, wy)
     // A crowd holding its breath.
     for (let k = 0; k < 4; k++) person(p, 0.9 + k * 0.35, 0.98, [C.sky, C.lilac, C.rasp, C.cobalt][k], { pose: k === 1 ? 'wave' : 'look' })
-    flag(p, 2.8, 0.5, 80, C.mint, 16)
+    flag(p, 2.8, 0.5, 84, C.mint, 14)
     void fence; void tree
   } },
 }

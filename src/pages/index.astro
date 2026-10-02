@@ -327,6 +327,16 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
     setTimeout(() => { isle.flyToSlug(s, 2.4); isle.showCard(s) }, PLAY ? 500 : 0)
   }))
 
+  // The building site counts the year as it is today, not as it was on the
+  // day the page was built (its storeys only change each quarter anyway).
+  {
+    const now = new Date(), y = now.getFullYear(), day = (m: number, d: number, yy = y) => Date.UTC(yy, m, d)
+    const pct = Math.floor(((day(now.getMonth(), now.getDate()) - day(0, 1)) / (day(0, 1, y + 1) - day(0, 1))) * 100)
+    document.querySelectorAll('.isle .pg-pct').forEach((el) => { el.textContent = `${pct}%` })
+    document.querySelectorAll('.isle .pg-year').forEach((el) => { el.textContent = `${y} SO FAR` })
+    document.querySelectorAll<SVGElement>('.isle .pg-bar').forEach((el) => el.setAttribute('width', String(Math.round(Number(el.dataset.w) * pct) / 100)))
+  }
+
   // Each card gets its own copy of its building, made here rather than shipped
   // twice in the page, and not a <use> of the map's: a <use> would make every
   // animation on the island replay into its copy too, every frame.

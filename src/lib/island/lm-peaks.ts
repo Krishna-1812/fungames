@@ -1,5 +1,5 @@
 /** Sky Peaks: space, sky and scale, on the highest ground. */
-import { C, INK, N, OUT, P, shade, r1 as f, motionPath, type Landmark, type Pen } from './kit'
+import { C, INK, N, OUT, P, shade, r1 as f, motionPath, letter, type Landmark, type Pen } from './kit'
 import { person, lamp, bench, flag, tree, fence } from './props'
 
 const star = (p: Pen, x: number, y: number, r: number, cls = 'twinkle', delay = 0) =>
@@ -112,8 +112,17 @@ export const peaks: Record<string, Landmark> = {
   speed: { size: [2, 2], draw(p) {
     p.disc(1, 1, 0.9, 0, '#eef0f8')
     const pl = p.box(0.5, 0.5, 1, 1, 20, { fill: C.stone, trim: C.cobalt })
-    p.sign(1.02, 1.52, 4, 44, 12, '#2c355e', '1,670 km/h', { size: 7, ink: C.mint, font: 'Silkscreen, monospace' })
+    // An LED board set into the plinth: how fast you are going, standing still.
+    p.quad(pl, 'y', 0.06, 0.94, 4, 15, '#2c355e', { sw: 1.2 })
+    const led = p.face(pl, 'y', 0.5, 7.4, { w: 30, h: 10 })
+    letter(led, 0, 0, '1,670 km/h', { size: 5.2, fill: C.mint, font: 'Silkscreen, monospace', weight: 400 })
     const [x, y] = p.at(1, 1, 60)
+    // It stands on something: a stem from the plinth, and a brass meridian
+    // ring holding it at the poles, like a desk globe the size of a house.
+    p.cyl(1, 1, 0.16, 20, 4, C.stone2, { sw: 1.2 })
+    p.path(`M${f(x - 3)} ${f(y + 36)}v-6h6v6z`, C.slate, { sw: 1.2 })
+    p.path(`M${f(x - 12)} ${f(y - 39)}A40 40 0 0 1 ${f(x + 14)} ${f(y + 37)}`, 'none', { sw: 6 })
+    p.path(`M${f(x - 12)} ${f(y - 39)}A40 40 0 0 1 ${f(x + 14)} ${f(y + 37)}`, 'none', { sw: 3, stroke: C.lilac })
     p.el('circle', { cx: x, cy: y, r: 32, fill: C.sky, stroke: INK, 'stroke-width': OUT })
     const cp = p.el('clipPath', { id: 'sp-clip' }); cp.add(new N('circle', { cx: x, cy: y, r: 31 }))
     const land = p.el('g', { 'clip-path': 'url(#sp-clip)' })
@@ -130,26 +139,42 @@ export const peaks: Record<string, Landmark> = {
   } },
 
   scale: { size: [2, 2], draw(p) {
-    p.disc(1.3, 1.3, 0.42, 0, '#62e8c9', { sw: 1 })
-    const [ax, ay] = p.at(1.3, 1.3)
-    p.el('ellipse', { cx: ax, cy: ay, rx: 2.8, ry: 1.8, fill: INK })
-    p.el('path', { d: `M${f(ax - 2)} ${f(ay)}l-2 2M${f(ax + 2)} ${f(ay)}l2 2`, stroke: INK, 'stroke-width': 0.8 })
-    // The stand: an easel of timber holding the lens up.
-    p.line([0.35, 1.65, 0], [0.8, 1.05, 52], { sw: 4.5, stroke: C.wood })
-    p.line([0.35, 1.65, 0], [0.8, 1.05, 52], { sw: 1.2, stroke: shade(C.wood, 1.2) })
-    p.line([0.8, 1.05, 0], [0.8, 1.05, 52], { sw: 3.5, stroke: C.wood })
-    const [lx, ly] = p.at(0.95, 0.95, 84)
-    const lens = p.group('sc-lens')
-    lens.circle(0.95, 0.95, 84, 38, '#eef7ff')
-    lens.el('circle', { cx: lx, cy: ly, r: 38, fill: 'none', stroke: INK, 'stroke-width': 9 })
-    lens.el('circle', { cx: lx, cy: ly, r: 38, fill: 'none', stroke: C.cobalt, 'stroke-width': 5 })
-    lens.el('circle', { cx: lx, cy: ly, r: 33, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.2, opacity: 0.8 })
-    const atom = lens.group('spin-slow')
-    for (const [a, c] of [[0, C.cobalt], [60, C.rasp], [-60, C.mint]] as const) atom.el('ellipse', { cx: lx, cy: ly, rx: 25, ry: 9, fill: 'none', stroke: c, 'stroke-width': 2.2, transform: `rotate(${a} ${f(lx)} ${f(ly)})` })
-    for (const a of [0, 120, 240]) { const r = (a * Math.PI) / 180; atom.el('circle', { cx: lx + Math.cos(r) * 25, cy: ly + Math.sin(r) * 9, r: 2.6, fill: '#fff', stroke: INK, 'stroke-width': 1, transform: `rotate(${a / 2} ${f(lx)} ${f(ly)})` }) }
-    lens.el('circle', { cx: lx, cy: ly, r: 5.5, fill: C.rasp, stroke: INK, 'stroke-width': 1.3 })
-    lens.el('path', { d: `M${f(lx - 26)} ${f(ly - 16)}q9 -12 23 -14`, fill: 'none', stroke: '#fff', 'stroke-width': 4, 'stroke-linecap': 'round' })
-    person(p, 1.6, 1.75, C.lilac, { pose: 'look', hat: C.mint })
-    tree(p, 1.8, 0.3, 'bush', C.leaf)
+    // The Tower of Scales: each storey a size smaller than the one below,
+    // and on top, where a weather vane would be, an atom.
+    p.box(0.12, 0.12, 1.76, 1.76, 5, { fill: C.stone })
+    p.box(0.22, 0.22, 1.56, 1.56, 3, { z0: 5, fill: '#e3e8f7', sw: 1.2 })
+    const tiers: [number, number, string, number][] = [[0.38, 30, C.cobalt, 3], [0.56, 24, C.lilac, 2], [0.72, 18, C.mint, 1]]
+    let z = 8
+    const boxes = tiers.map(([e, h, trim, cols]) => {
+      const w = 2 - e * 2
+      const t = p.box(e, e, w, w, h, { z0: z, fill: C.white, trim })
+      p.windows(t, 'x', { cols, z0: h * 0.3, h: h * 0.38, wide: 0.45 })
+      p.windows(t, 'y', { cols, z0: h * 0.3, h: h * 0.38, wide: 0.45 })
+      // A ledge round the top, so each storey reads as a step in.
+      p.box(e - 0.04, e - 0.04, w + 0.08, w + 0.08, 2.5, { z0: z + h, fill: '#eef1fb', sw: 1.1 })
+      z += h + 2.5
+      return t
+    })
+    p.door(boxes[0], 'y', 0.5, { w: 0.26, h: 15, fill: C.cobalt })
+    // The lantern on top, and the vane.
+    p.cyl(1, 1, 0.2, z, 12, C.glass, { top: '#eef1fb', bands: [[0, 2, C.white]] })
+    p.dome(1, 1, 0.24, z + 12, C.cobalt)
+    p.line([1, 1, z + 20], [1, 1, z + 44], { sw: 2 })
+    const [vx, vy] = p.at(1, 1, z + 48)
+    p.path(`M${f(vx - 14)} ${f(vy + 10)}h28M${f(vx)} ${f(vy + 4)}v12`, 'none', { sw: 1.3 })
+    p.path(`M${f(vx - 14)} ${f(vy + 10)}l-4 -3v6zM${f(vx + 14)} ${f(vy + 10)}l5 0l-3 -3`, C.rasp, { sw: 1 })
+    const atom = p.group('spin-slow')
+    for (const [ang, c] of [[0, C.cobalt], [60, C.rasp], [-60, C.mint]] as const) atom.el('ellipse', { cx: vx, cy: vy, rx: 13, ry: 4.6, fill: 'none', stroke: c, 'stroke-width': 1.8, transform: `rotate(${ang} ${f(vx)} ${f(vy)})` })
+    atom.el('circle', { cx: vx, cy: vy, r: 3.2, fill: C.rasp, stroke: INK, 'stroke-width': 1.1 })
+    for (const ang of [0, 120, 240]) { const r = (ang * Math.PI) / 180; atom.el('circle', { cx: vx + Math.cos(r) * 13, cy: vy + Math.sin(r) * 4.6, r: 1.7, fill: '#fff', stroke: INK, 'stroke-width': 0.8, transform: `rotate(${ang / 2} ${f(vx)} ${f(vy)})` }) }
+    p.grow(vx - 18, vy - 16, vx + 18, vy + 20)
+    // Visitors: one looking a long way up, one with a magnifying glass at the flowers.
+    person(p, 1.75, 1.92, C.lilac, { pose: 'look', hat: C.mint })
+    const [gx, gy] = p.at(0.32, 1.86)
+    person(p, 0.32, 1.86, C.rasp)
+    p.el('path', { d: `M${f(gx + 3)} ${f(gy - 11)}l5 4`, stroke: INK, 'stroke-width': 1.6, 'stroke-linecap': 'round' })
+    p.el('circle', { cx: gx + 10, cy: gy - 5, r: 3.2, fill: '#eef7ff', stroke: INK, 'stroke-width': 1.3 })
+    tree(p, 1.86, 0.2, 'bush', C.leaf)
+    tree(p, 0.18, 1.2, 'pine', C.leaf, 0.75)
   } },
 }

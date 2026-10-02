@@ -1,5 +1,5 @@
 /** The Harbour: the deep, the shore, the waves and the signals. */
-import { C, INK, N, OUT, shade, r1 as f, type Landmark, type Pen } from './kit'
+import { C, INK, N, OUT, shade, r1 as f, letter, type Landmark, type Pen } from './kit'
 import { person, crate, barrel, tree, flag, lamp } from './props'
 
 const planks = (p: Pen, x: number, y: number, w: number, d: number, z: number, along: 'x' | 'y') => {
@@ -120,21 +120,53 @@ export const harbour: Record<string, Landmark> = {
   } },
 
   'paper-folds': { size: [2, 1], water: true, draw(p) {
+    // The Fold House: a boathouse on stilts whose roof is a sheet of paper
+    // folded like a fan, with a paper crane for a weather vane and a dotted
+    // line to the moon, which is where forty-two folds would get you.
+    for (const x of [0.12, 0.7, 1.3, 1.88]) for (const y of [0.12, 0.88]) p.line([x, y, -14], [x, y, 4], { sw: 3.2, stroke: C.wood })
+    planks(p, 0.04, 0.06, 1.92, 0.88, 4, 'x')
+    const h = p.box(0.16, 0.14, 1.32, 0.62, 24, { z0: 8, fill: C.white, trim: C.sky })
+    p.windows(h, 'y', { cols: 2, z0: 7, h: 9, wide: 0.34 })
+    p.door(h, 'y', 0.5, { w: 0.2, h: 16, fill: C.cobalt })
+    p.windows(h, 'x', { cols: 1, z0: 11, h: 8, wide: 0.34 })
+    const tag = p.face(h, 'x', 0.5, 5, { w: 18, h: 6 })
+    letter(tag, 0, 0, '× 42', { size: 4.6, fill: C.cobalt })
+    // The fan-folded roof: alternate creases up and down, faces lit and shaded.
+    const n = 6, x0 = 0.12, x1 = 1.52, yA = 0.08, yB = 0.82, lo = 32, hi = 46
+    const zs = Array.from({ length: n + 1 }, (_, k) => (k % 2 ? hi : lo))
+    for (let k = 0; k < n; k++) {
+      const xa = x0 + ((x1 - x0) * k) / n, xb = x0 + ((x1 - x0) * (k + 1)) / n
+      p.poly([[xa, yA, zs[k]], [xb, yA, zs[k + 1]], [xb, yB, zs[k + 1]], [xa, yB, zs[k]]], k % 2 ? '#e1e6f6' : '#ffffff', { sw: 1.1 })
+    }
+    const front: [number, number, number][] = zs.map((z, k) => [x0 + ((x1 - x0) * k) / n, yB, z])
+    p.poly([[x0, yB, lo], ...front, [x1, yB, lo]], shade('#ffffff', 0.86), { sw: 1.1 })
+    // The vane: a paper crane on a pole from the first ridge.
+    p.line([x0 + (x1 - x0) / n, 0.44, hi], [x0 + (x1 - x0) / n, 0.44, hi + 16], { sw: 1.2 })
+    const [cx, cy] = p.at(x0 + (x1 - x0) / n, 0.44, hi + 18)
+    p.path(`M${f(cx - 8)} ${f(cy + 1)}l6 -2l2 -7l2 7l7 -3l-5 5h-9z`, '#ffffff', { sw: 1 })
+    p.path(`M${f(cx + 7)} ${f(cy - 2)}l3 -3`, 'none', { sw: 1 })
+    // Someone folding on the deck, and a mooring post with rope.
+    const [fx, fy] = p.at(1.65, 0.5, 8)
+    person(p.move(0, 0, 8), 1.65, 0.5, C.rasp, { hat: C.cobalt })
+    p.path(`M${f(fx + 2)} ${f(fy - 11)}l5 -2l1 4l-5 2z`, '#ffffff', { sw: 0.8 })
+    p.cyl(1.86, 0.82, 0.04, 8, 7, C.wood, { sw: 1 })
+    // A paper boat, a boat's size, tied up alongside.
     const b = p.group('bob')
-    const [x, y] = b.at(1, 0.5, -6)
-    b.el('ellipse', { cx: x, cy: y + 6, rx: 60, ry: 9, fill: '#ffffff', opacity: 0.4 })
-    b.path(`M${f(x - 56)} ${f(y - 18)}L${f(x + 56)} ${f(y - 18)}L${f(x + 36)} ${f(y + 6)}L${f(x - 36)} ${f(y + 6)}Z`, '#ffffff')
-    b.path(`M${f(x - 56)} ${f(y - 18)}L${f(x)} ${f(y - 5)}L${f(x + 56)} ${f(y - 18)}M${f(x)} ${f(y - 5)}L${f(x)} ${f(y + 6)}`, 'none', { sw: 1.2, stroke: '#9aa3c0' })
-    b.path(`M${f(x - 30)} ${f(y - 18)}L${f(x)} ${f(y - 84)}L${f(x + 30)} ${f(y - 18)}Z`, '#f4f6fc')
-    b.path(`M${f(x)} ${f(y - 84)}L${f(x + 30)} ${f(y - 18)}L${f(x + 8)} ${f(y - 18)}Z`, '#dfe4f5')
-    b.path(`M${f(x)} ${f(y - 84)}L${f(x)} ${f(y - 18)}M${f(x - 16)} ${f(y - 50)}L${f(x)} ${f(y - 40)}`, 'none', { sw: 1, stroke: '#9aa3c0' })
-    // The dotted line, forty-two folds up, to a moon.
+    const [bx, by] = b.at(1.2, 1.12, -9)
+    b.el('ellipse', { cx: bx, cy: by + 3, rx: 14, ry: 3, fill: '#ffffff', opacity: 0.4 })
+    b.path(`M${f(bx - 13)} ${f(by - 5)}h26l-5 7h-16z`, '#ffffff', { sw: 1.1 })
+    b.path(`M${f(bx - 7)} ${f(by - 5)}l7 -16l7 16z`, '#f4f6fc', { sw: 1.1 })
+    b.path(`M${f(bx)} ${f(by - 21)}l7 16h-5z`, '#dfe4f5', { sw: 0 })
+    b.path(`M${f(bx - 13)} ${f(by - 5)}l13 4l13 -4`, 'none', { sw: 0.7, stroke: '#9aa3c0' })
+    p.path(`M${f(bx + 10)} ${f(by - 4)}Q${f(bx + 22)} ${f(by - 2)} ${f(p.at(1.86, 0.82, 12)[0])} ${f(p.at(1.86, 0.82, 12)[1])}`, 'none', { sw: 0.8 })
+    // The dotted line, forty-two folds up, to the moon.
+    const [rx, ry] = p.at(x0 + (x1 - x0) / n, 0.44, hi + 24)
     const [mx, my] = p.at(1.7, 0.1, 170)
-    p.el('path', { d: `M${f(x + 4)} ${f(y - 90)}Q${f(x + 40)} ${f(y - 140)} ${f(mx - 10)} ${f(my + 6)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-dasharray': '3 6' })
+    p.el('path', { d: `M${f(rx + 4)} ${f(ry)}Q${f(rx + 40)} ${f(ry - 50)} ${f(mx - 10)} ${f(my + 6)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-dasharray': '3 6' })
     p.circle(1.7, 0.1, 170, 11, '#ffffff')
     p.el('circle', { cx: mx + 3, cy: my - 2, r: 2.5, fill: '#dfe4f5' })
     // Two paper cranes on the wind.
-    for (const [dx, dy, d] of [[-50, -110, 0], [-80, -80, 1.4]]) p.el('path', { d: `M${f(x + dx)} ${f(y + dy)}l8 -6l2 6l8 -2l-8 5z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.1, class: 'glide', style: `animation-delay:${d}s` })
-    p.grow(x - 90, my - 14, x + 60, y + 10)
+    for (const [dx, dy, d] of [[-20, -70, 0], [-46, -48, 1.4]]) p.el('path', { d: `M${f(rx + dx)} ${f(ry + dy)}l8 -6l2 6l8 -2l-8 5z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.1, class: 'glide', style: `animation-delay:${d}s` })
+    p.grow(rx - 60, my - 14, mx + 14, by + 8)
   } },
 }

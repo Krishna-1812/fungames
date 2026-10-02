@@ -30,8 +30,17 @@ export function tree(p: Pen, x: number, y: number, kind: TreeKind, c = C.leaf, k
     return
   }
   if (kind === 'cypress') {
-    p.path(`M${f(bx)} ${f(by - 44 * k)}C${f(bx + 11 * k)} ${f(by - 34 * k)} ${f(bx + 10 * k)} ${f(by - 10 * k)} ${f(bx)} ${f(by - 5 * k)}C${f(bx - 10 * k)} ${f(by - 10 * k)} ${f(bx - 11 * k)} ${f(by - 34 * k)} ${f(bx)} ${f(by - 44 * k)}Z`, c)
-    p.path(`M${f(bx + 2 * k)} ${f(by - 40 * k)}C${f(bx + 10 * k)} ${f(by - 30 * k)} ${f(bx + 9 * k)} ${f(by - 12 * k)} ${f(bx + 1 * k)} ${f(by - 6 * k)}`, 'none', { sw: 2.5 * k, stroke: shade(c, 0.8) })
+    // A tall Italian cypress: a narrow flame of foliage in tufts, widest a
+    // third of the way up, shaded down its right side.
+    const q = (x0: number, y0: number) => `${f(bx + x0 * k)} ${f(by + y0 * k)}`
+    const left = `M${q(0, -5)}Q${q(-7, -6)} ${q(-7.5, -13)}Q${q(-9.5, -19)} ${q(-7, -25)}Q${q(-8.5, -31)} ${q(-5.5, -36)}Q${q(-5.5, -42)} ${q(-2.5, -45)}Q${q(-1, -50)} ${q(0, -51)}`
+    const right = `Q${q(1, -50)} ${q(2.5, -45)}Q${q(5.5, -42)} ${q(5.5, -36)}Q${q(8.5, -31)} ${q(7, -25)}Q${q(9.5, -19)} ${q(7.5, -13)}Q${q(7, -6)} ${q(0, -5)}Z`
+    p.path(left + right, c)
+    p.path(`M${q(0.5, -50)}` + right.replace(/Z$/, '') + `Q${q(3, -20)} ${q(0.5, -50)}Z`, shade(c, 0.78), { sw: 0, op: 0.85 })
+    // Tufts: little lit scallops down the left side.
+    for (const [x0, y0] of [[-4, -40], [-5.5, -29], [-6, -18], [-3, -10]]) p.path(`M${q(x0, y0)}q${f(2 * k)} ${f(-3 * k)} ${f(4.5 * k)} ${f(-1 * k)}`, 'none', { sw: 1.1, stroke: shade(c, 1.25) })
+    p.path(left + right, 'none')
+    p.grow(bx - 10 * k, by - 52 * k, bx + 10 * k, by)
     return
   }
   if (kind === 'palm') {

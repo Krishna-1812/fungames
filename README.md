@@ -228,7 +228,7 @@ as a card, with the four filters and search.
 
 | File | What it is |
 |---|---|
-| `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), bounds that every shape grows, CSS keyframe paths |
+| `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), painted faces (a sign, poster or mural drawn flat on a wall by shearing it onto the face), lettering and neon, bounds that every shape grows, CSS keyframe paths |
 | `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
 | `src/lib/island/nature.ts` | the wild things and the farm: snowy pines, cacti, reeds, hedges, topiary, toadstools, a rock arch and buttes, crop fields, hay bales, the windmill, and the animals (sheep, deer, ducks, crabs, dolphins, a whale, gulls, butterflies, a tumbleweed) |
 | `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, fingerposts, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends) |
@@ -239,6 +239,14 @@ as a card, with the four filters and search.
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard, the hover card, names at close zoom, the mini-map, the dive into a game |
 | `src/styles/island.css` | every loop on the map |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
+
+**One scale for everything.** A person is 21 pixels tall, and the rest is
+measured against them: a door is about 16, a storey about 18, a bicycle
+about 18 long. A game shows up as a building that holds its idea (a tower
+with an atom for a weather vane, a museum with an old computer in the
+window, a building site counting the year), never as a giant icon; and its
+words are things a street would have: painted on a wall, on a billboard,
+in neon, pinned to a noticeboard, never a floating app window.
 
 Three things about performance, all found by measuring rather than guessing:
 

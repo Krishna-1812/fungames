@@ -91,7 +91,9 @@ export const badlands: Record<string, Landmark> = {
     for (let z = 6; z < top; z += 8) p.line([1.95, 1.45, z], [1.95, 1.6, z], { sw: 1.2 })
     person(p.move(0, 0, top), 1, 1.3, C.rasp, { hat: '#ffffff', pose: 'wave' })
     flag(p.move(0, 0, top), 0.3, 1.5, 0, C.mint)
-    p.sign(0.35, 2.3, 6, 36, 12, '#ffffff', '66 MYA', { size: 7 })
+    // A survey marker on two stakes: how far down the line is.
+    for (const dx of [-0.12, 0.12]) p.line([0.35 + dx, 2.3 - dx, 0], [0.35 + dx, 2.3 - dx, 10], { sw: 1.6, stroke: C.wood })
+    p.sign(0.35, 2.3, 8, 36, 12, '#ffffff', '66 MYA', { size: 7 })
   } },
 
   fusion: { size: [2, 2], draw(p) {

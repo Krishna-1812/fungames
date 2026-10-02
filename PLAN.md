@@ -2657,7 +2657,27 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     units were rounded to nothing (the roads' centre lines had never shown),
     and under reduced motion every boat and walker sat in one corner.
 
-61. Then reassess again.
+61. ~~**The island, made real: one scale and real signs.**~~ **done.** The
+    first of seven phases from an outside look at the map. The games that
+    were giant icons are buildings now: Scale is a tower that steps in
+    storey by storey with an atom for a weather vane, Internet Artifacts a
+    museum with an old computer in its window and a floppy disk for a shop
+    sign, Progress a building site whose hoarding counts the year (live, in
+    the page), Paper Folds a boathouse with a fan-folded paper roof, Not a
+    Robot a border checkpoint with a robot in a hat at the front of the
+    queue. The app widgets became street things: a real rooftop billboard,
+    neon and an LED ticker on the dark mall, a village noticeboard of pinned
+    rules, a mast of screens at the funfair, an estate agent's SOLD board,
+    a mural of the wrong bicycle. Everyone is the same size (the tightrope
+    walker, the robot, the bike and the easel were all too big), the house
+    cluster in Old Town is a terrace, and the cypress is a cypress. The
+    barrier at the checkpoint had always swung down into the road; it lifts.
+
+62. Next, in order, unless the order changes: the land and water made more
+    believable; the empty corners filled and cause and effect (people going
+    in and out, boats docking); a real night with weather and seasons;
+    things to poke and easter eggs; a passport of visited games and
+    optional sound; then polish, phones and speed.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
