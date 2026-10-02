@@ -14,7 +14,7 @@ import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, clou
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { hotAirBalloon, plane as skyPlane } from './sky'
 import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle } from './town'
-import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
+import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, hoodoo, boulders, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed } from './nature'
 
 export const GRID = 30
 const SEA = -12
@@ -28,7 +28,7 @@ const SAND = ['#f6f0e1', '#efe7d3', '#d9ccad', '#e3d7ba', '#cbbb98']
 const key = (i: number, j: number) => `${i},${j}`
 
 export type Anchor = { slug: string; district: DistrictKey; x0: number; y0: number; x1: number; y1: number; bx: number; by: number; foot: string }
-export type Layer = { kind: 'sea' | 'boats' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
+export type Layer = { kind: 'sea' | 'surf' | 'boats' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
 export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
@@ -92,7 +92,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // or tuft lands on them. Each is only used if its ground really is free.
   const reserved = new Set<string>()
   const FIELDS: [number, number, number, number, 'lavender' | 'wheat' | 'greens'][] = [[9, 13, 1, 3, 'lavender'], [19, 15, 2, 3, 'wheat'], [22, 19, 2, 3, 'greens']]
-  const SPOTS: { mill: [number, number]; bale: [number, number][]; arch: [number, number]; buttes: [number, number, number][] } = { mill: [8, 15], bale: [[8, 16], [9, 12], [21, 15], [21, 16]], arch: [20, 7], buttes: [[22, 3, 34], [25, 6, 26], [18, 5, 20]] }
+  const SPOTS: { mill: [number, number]; bale: [number, number][]; arch: [number, number]; buttes: [number, number, number][]; hoodoos: [number, number][]; boulders: [number, number][] } = { mill: [8, 15], bale: [[8, 16], [9, 12], [21, 15], [21, 16]], arch: [20, 7], buttes: [[22, 3, 34], [25, 6, 26], [18, 5, 20]], hoodoos: [[18, 4], [20, 9], [24, 3]], boulders: [[19, 6], [26, 6], [23, 4], [20, 10]] }
 
   /* ---- roads: found by searching round the buildings -------------------- */
   const road = new Set<string>()
@@ -140,6 +140,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   const bales = SPOTS.bale.filter((c) => claim([c]))
   const archAt = claim([SPOTS.arch]) ? SPOTS.arch : null
   const buttes = SPOTS.buttes.filter(([i, j]) => claim([[i, j]]))
+  const hoodoos = SPOTS.hoodoos.filter((c) => claim([c]))
+  const boulderAt = SPOTS.boulders.filter((c) => claim([c]))
+  // A dry wash across the Badlands: a riverbed that only runs once a year,
+  // winding down to the western beach. Its cells are kept clear.
+  const WASH: [number, number][] = [[25.5, 8.7], [24.7, 7.6], [23.6, 7.4], [22.7, 6.4], [22.4, 5.0], [22.0, 4.1], [21.4, 3.3], [21.0, 2.4], [20.5, 2.05]]
+  const washCells = [...new Set(WASH.map(([u, v]) => key(Math.floor(u), Math.floor(v))))].map((k) => k.split(',').map(Number) as [number, number])
+  const wash = claim(washCells) ? WASH : null
 
   if (process.env.ISLAND_ASCII) {
     const rows = ['    ' + [...Array(GRID).keys()].map((j) => j % 10).join('')]
@@ -148,6 +155,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     console.log(out)
   }
   /* ---- the painting ------------------------------------------------------ */
+  // A fixed hash, for choices that must line up from one tile to the next.
+  const hz = (a: number, b: number, c: number) => { const v = Math.sin(a * 12.9898 + b * 78.233 + c * 3.71) * 43758.5453; return v - Math.floor(v) }
   // The island is painted in layers, each its own SVG, so an animation only
   // makes the browser rework the small layer it is in rather than the lot.
   const made: { kind: Layer['kind']; slug?: string; node: N }[] = []
@@ -217,6 +226,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     const [x, y] = P(i + 0.5, j + 0.5, SEA)
     root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(26 * k), ry: f(11 * k), fill: '#ffffff', opacity: 0.55 }))
     root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(19 * k), ry: f(8 * k), fill: '#cdf1f4' }))
+    root.add(new N('path', { d: `M${f(x - 12 * k)} ${f(y + 4)}L${f(x - 1 * k)} ${f(y + 16 * k)}L${f(x + 11 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.22 }))
     root.add(new N('path', { d: `M${f(x - 14 * k)} ${f(y + 4)}L${f(x - 10 * k)} ${f(y - 8 * k)}L${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}Z`, fill: C.rock, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
     root.add(new N('path', { d: `M${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}L${f(x + 1 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.55 }))
     root.add(new N('path', { d: `M${f(x - 9 * k)} ${f(y - 8 * k)}l5 -3`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.7 }))
@@ -233,6 +243,15 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     root.add(new N('path', { d: `M${f(x - 34)} ${f(y + 3)}q34 14 68 0`, fill: 'none', stroke: SAND[2], 'stroke-width': 2.4, 'stroke-linecap': 'round' }))
     for (const [dx, dy] of [[-14, 1], [10, 4], [20, 0]]) root.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r: 1.3, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6 }))
   }
+  // Shimmer: short streaks of light lying flat on the water, a few at a
+  // time catching the sun, thickest just off the shore.
+  const shim = root.add(new N('g', { class: 'shimmer' }))
+  for (let k = 0; k < 40; k++) {
+    const u = hz(k, 1, 21) * (GRID + 10) - 5, v = hz(k, 2, 22) * (GRID + 10) - 5
+    if (nearLand(u, v, 0.8) || !nearLand(u, v, 4.5)) continue
+    const [x, y] = P(u, v, SEA), w = 6 + hz(k, 3, 23) * 10
+    shim.add(new N('path', { d: `M${f(x - w)} ${f(y)}h${f(w * 2)}M${f(x - w * 0.5)} ${f(y + 3)}h${f(w)}`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', class: 'shim amb', 'data-b': `${f(x - w)} ${f(y - 2)} ${f(x + w)} ${f(y + 5)}`, style: `animation-delay:${f(-hz(k, 4, 24) * 6)}s` }))
+  }
   // Glints of sun on the water, here and there.
   const glints = root.add(new N('g', { class: 'glints' }))
   for (let k = 0; k < 26; k++) {
@@ -241,17 +260,48 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     const [x, y] = P(u, v, SEA), r = 3 + R() * 3
     glints.add(new N('path', { d: `M${f(x)} ${f(y - r)}Q${f(x)} ${f(y)} ${f(x + r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y + r)}Q${f(x)} ${f(y)} ${f(x - r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y - r)}Z`, fill: '#ffffff', class: 'glint amb', 'data-b': `${f(x - r)} ${f(y - r)} ${f(x + r)} ${f(y + r)}`, style: `animation-delay:${f(-R() * 4)}s` }))
   }
-  let foam = ''
+  // Foam where the water meets the land: the coast's outline once more,
+  // stroked narrow and white, so it hugs every beach and cliff foot.
+  const coastT = `translate(${f(sox)} ${f(soy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)`
+  const foamG = root.add(new N('g', { transform: coastT }))
+  foamG.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': 0.86, 'stroke-linejoin': 'round', opacity: 0.35 }))
+  foamG.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': 0.42, 'stroke-linejoin': 'round', opacity: 0.9 }))
+  // Rocks at the waterline, here and there along the sides we can see: a
+  // few stones in a ring of their own foam, never in front of a pier or a
+  // building that stands in the sea.
+  const pierCells = new Set(PIERS.flatMap((pts) => pts.map(([u, v]) => key(Math.floor(u), Math.floor(v)))))
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
     if (!isLand(i, j)) continue
-    const e = (a: [number, number], b: [number, number]) => { const p1 = P(a[0], a[1], SEA), p2 = P(b[0], b[1], SEA); foam += `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}` }
-    if (!isLand(i + 1, j)) e([i + 1.08, j], [i + 1.08, j + 1])
-    if (!isLand(i - 1, j)) e([i - 0.08, j], [i - 0.08, j + 1])
-    if (!isLand(i, j + 1)) e([i, j + 1.08], [i + 1, j + 1.08])
-    if (!isLand(i, j - 1)) e([i, j - 0.08], [i + 1, j - 0.08])
+    for (const [di, dj] of [[1, 0], [0, 1]]) {
+      const ni = i + di, nj = j + dj
+      if (isLand(ni, nj) || waterSlug.has(key(ni, nj)) || pierCells.has(key(ni, nj)) || hz(i * 3 + di, j * 5 + dj, 7) > 0.16) continue
+      const u = di ? i + 1.16 : i + 0.25 + hz(i, j, 1) * 0.5, v = dj ? j + 1.16 : j + 0.25 + hz(j, i, 2) * 0.5
+      const [x, y] = P(u, v, SEA)
+      const big = 0.55 + hz(i, j, 3) * 0.35
+      root.add(new N('ellipse', { cx: f(x + 3), cy: f(y + 2), rx: f(19 * big), ry: f(7 * big), fill: '#ffffff', opacity: 0.6 }))
+      for (const [dx, dy, k] of [[0, 0, big], [10 * big, 3, big * 0.6], [-9 * big, 3.5, big * 0.45]] as [number, number, number][]) {
+        const X = x + dx, Y = y + dy
+        root.add(new N('path', { d: `M${f(X - 11 * k)} ${f(Y + 3)}L${f(X - 8 * k)} ${f(Y - 6 * k)}L${f(X + 1 * k)} ${f(Y - 10 * k)}L${f(X + 9 * k)} ${f(Y - 4 * k)}L${f(X + 10 * k)} ${f(Y + 3)}Z`, fill: C.rock, stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
+        root.add(new N('path', { d: `M${f(X + 1 * k)} ${f(Y - 10 * k)}L${f(X + 9 * k)} ${f(Y - 4 * k)}L${f(X + 10 * k)} ${f(Y + 3)}L${f(X + 1 * k)} ${f(Y + 3)}Z`, fill: C.rockDark, opacity: 0.5 }))
+      }
+      root.add(new N('path', { d: `M${f(x - 15 * big)} ${f(y + 4)}q${f(15 * big)} ${f(5 * big)} ${f(30 * big)} 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round' }))
+    }
   }
-  root.add(new N('path', { d: foam, fill: 'none', stroke: '#ffffff', 'stroke-width': 3.2, 'stroke-linecap': 'round', opacity: 0.9 }))
-  root.add(new N('path', { d: foam, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-dasharray': '5 9', class: 'surf', opacity: 0.7 }))
+
+  // The surf: two lines of breaking wave, a little way out, each in a layer
+  // of its own whose opacity rises and falls in turn, so the waves seem to
+  // roll in to the shore. Fading a whole layer costs the browser nothing;
+  // moving a line round the whole coast would cost it every frame.
+  for (const [k, w0, w1] of [['out', 1.66, 1.82], ['in', 1.1, 1.24]] as [string, number, number][]) {
+    root = open('surf', k)
+    const id = `isl-surf-${k}`
+    const m = root.add(new N('mask', { id, maskUnits: 'userSpaceOnUse', x: f(sx0 - 400), y: f(sy1 - 1400), width: f(sx1 - sx0 + 800), height: f(sy2 - sy1 + 2000) }))
+    const mg = m.add(new N('g', { transform: coastT }))
+    mg.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': w1, 'stroke-linejoin': 'round' }))
+    mg.add(new N('use', { href: '#isl-coast', fill: '#000000', stroke: '#000000', 'stroke-width': w0, 'stroke-linejoin': 'round' }))
+    root.add(new N('rect', { x: f(sx0 - 400), y: f(sy1 - 1400), width: f(sx1 - sx0 + 800), height: f(sy2 - sy1 + 2000), fill: '#ffffff', mask: `url(#${id})` }))
+  }
+  root = open('sea')
 
   // Boats sailing round the island, and fish that jump.
   root = open('boats')
@@ -291,6 +341,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   const field = (i: number, j: number) => 0.5 + 0.22 * Math.sin(i * 0.55 + j * 0.31 + 1.7) + 0.2 * Math.cos(j * 0.62 - i * 0.23) + 0.08 * Math.sin(i * 2.1 + j * 1.7)
   const grassTones = (d: District) => [shade(d.ground[0], 0.95), d.ground[0], mix(d.ground[0], d.ground[1], 0.5), d.ground[1], mix(d.ground[1], '#ffffff', 0.14)]
   const FACE = { soil: ['#c9cfe6', '#a3add6'], rock: ['#a9a1d6', '#8a80c2'], sand: [SAND[3], SAND[4]], slate: ['#c2bde3', '#a59ed2'] }
+  // The Badlands' dust: soft patches of five tones, one with a little rose in it.
+  const DUST = ['#c6bce0', '#cec4e5', '#d6cdea', '#d5c5e3', '#ddd5ee']
+  // Tops that should read as one surface, with no seam between tiles.
+  const seamless = new Set<string>()
   const drip = (along: (u: number, z: number) => [number, number], h: number, seed: number) => {
     const pts: [number, number][] = [along(0, h + 0.5), along(1, h + 0.5)]
     for (let k = 8; k >= 0; k--) { const u = k / 8, deep = 2.5 + 3.2 * Math.abs(Math.sin(seed * 1.7 + k * 1.9)) * (k % 2 ? 1 : 0.45); pts.push(along(u, h - deep)) }
@@ -302,7 +356,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   let splash = ''
   for (let s = 0; s < GRID * 2; s++) {
     const tops = new Map<string, string>(), cliffs = new Map<string, string>(), lips = new Map<string, string>()
-    let strata = '', wetTop = '', wetFall = '', wetHi = ''
+    let strata = '', wetTop = '', wetFall = '', wetHi = '', ink = '', foot = '', wetFoot = '', ledge = '', ledgeHi = ''
     const add = (m: Map<string, string>, c: string, d: string) => m.set(c, (m.get(c) ?? '') + d)
     for (let i = 0; i < GRID; i++) {
       const j = s - i
@@ -311,11 +365,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       const isBeach = beach.has(k), snowy = d.key === 'peaks' && (h >= 48 || (h === 36 && n > 0.62))
       let top: string, lip: string | null = null, face: string[]
       if (taken.has(k)) { top = (i + j) % 2 ? '#eef0f8' : '#e6e9f4'; face = FACE.soil }
-      else if (isBeach && d.key === 'badlands') { top = n > 0.5 ? '#ddd8ef' : '#d5cfe9'; face = FACE.slate }
-      else if (isBeach) { top = n > 0.5 ? SAND[0] : SAND[1]; face = FACE.sand }
-      else if (snowy) { top = n > 0.55 ? '#f7faff' : '#e9f0ff'; lip = '#ffffff'; face = FACE.rock }
+      else if (isBeach && d.key === 'badlands') { top = n > 0.5 ? '#ddd8ef' : '#d5cfe9'; face = FACE.slate; seamless.add(top) }
+      else if (isBeach) { top = n > 0.5 ? SAND[0] : SAND[1]; face = FACE.sand; seamless.add(top) }
+      else if (snowy) { top = n > 0.55 ? '#f7faff' : '#e9f0ff'; lip = '#ffffff'; face = FACE.rock; seamless.add(top) }
       else {
-        const t = grassTones(d)
+        const t = d.key === 'badlands' ? DUST : grassTones(d)
+        if (d.key === 'badlands') seamless.add(t[Math.max(0, Math.min(t.length - 1, Math.floor(n * t.length)))])
         top = t[Math.max(0, Math.min(t.length - 1, Math.floor(n * t.length)))]
         lip = shade(d.ground[0], d.key === 'badlands' ? 0.86 : 0.8)
         face = d.key === 'badlands' || d.key === 'peaks' ? FACE.rock : FACE.soil
@@ -323,30 +378,56 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       const tq = quad([P(i, j, h), P(i + 1, j, h), P(i + 1, j + 1, h), P(i, j + 1, h)])
       add(tops, top, tq); mini += tq
       if (isBeach) {
-        const w = 0.2
+        const w = 0.26
         if (!isLand(i + 1, j)) wetSand += quad([P(i + 1 - w, j, h), P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1 - w, j + 1, h)])
         if (!isLand(i, j + 1)) wetSand += quad([P(i, j + 1 - w, h), P(i + 1, j + 1 - w, h), P(i + 1, j + 1, h), P(i, j + 1, h)])
         if (!isLand(i - 1, j)) wetSand += quad([P(i, j, h), P(i + w, j, h), P(i + w, j + 1, h), P(i, j + 1, h)])
         if (!isLand(i, j - 1)) wetSand += quad([P(i, j, h), P(i + 1, j, h), P(i + 1, j + w, h), P(i, j + w, h)])
       }
       const hr = H(i + 1, j), hd = H(i, j + 1)
-      const rocky = face === FACE.rock
-      // The two faces we can see, with a lip of grass (or snow) along the top,
-      // a line of strata across the taller ones, and the odd crack in rock.
+      const rocky = face === FACE.rock, sandy = face === FACE.sand
+      // The two faces we can see, with a lip of grass (or snow) along the top.
+      // A run of faces reads as one wall: ink only along its top and foot and
+      // up the corners that stick out, not at every tile; the rock's layers
+      // sit at the same heights everywhere, so each runs on from tile to tile,
+      // with a ledge at every terrace; and the foot is darker, wet at the sea.
       const detail = (hi: number, lo: number, along: (u: number, z: number) => [number, number]) => {
         const tall = hi - lo
-        if (tall >= 12) { const z = lo + tall * (0.42 + 0.12 * Math.sin(i * 3.1 + j)); strata += seg(along(0.02, z), along(0.98, z)) }
+        ink += seg(along(0, hi), along(1, hi)) + seg(along(0, lo), along(1, lo))
+        const b = Math.min(6, tall * 0.42)
+        foot += quad([along(0, lo + b), along(1, lo + b), along(1, lo), along(0, lo)])
+        if (lo <= SEA) wetFoot += quad([along(0, SEA + 2.6), along(1, SEA + 2.6), along(1, SEA), along(0, SEA)])
+        if (sandy) return
+        for (let z = Math.ceil((lo + 2) / 2) * 2; z < hi - 2.5; z += 2) {
+          const m = ((z % 12) + 12) % 12
+          if (m === 0 && rocky) { ledge += seg(along(0, z - 1.2), along(1, z - 1.2)); ledgeHi += seg(along(0, z), along(1, z)); continue }
+          if (rocky ? m % 4 !== 0 : m !== 6) continue
+          // Gaps in a layer, so it weathers rather than ruling a line.
+          const g0 = hz(i, j, z), g1 = hz(j, i, z + 1)
+          if (g0 < 0.18) continue
+          strata += g1 < 0.3 ? seg(along(0, z), along(0.55, z)) : g1 > 0.8 ? seg(along(0.4, z), along(1, z)) : seg(along(0, z), along(1, z))
+        }
         if (rocky && tall >= 10 && R() < 0.7) { const p = along(0.2 + R() * 0.6, lo + tall * (0.25 + R() * 0.4)); strata += `M${f(p[0])} ${f(p[1])}l1.5 -4l-1 -3` }
+      }
+      // A corner's ink, less whatever part of it the next face along shares.
+      const corner = (pt: (z: number) => [number, number], lo: number, hi: number, ni: number, nj: number, ai: number, aj: number) => {
+        const shared = isLand(ni, nj) && H(ai, aj) < H(ni, nj) ? [Math.max(lo, H(ai, aj)), Math.min(hi, H(ni, nj))] : null
+        const parts: [number, number][] = shared && shared[0] < shared[1] ? [[lo, shared[0]], [shared[1], hi]] : [[lo, hi]]
+        for (const [a, b] of parts) if (b - a > 0.3) ink += seg(pt(a), pt(b))
       }
       if (hr < h) {
         add(cliffs, face[0], quad([P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hr), P(i + 1, j, hr)]))
         if (lip) add(lips, lip, snowy ? drip((u, z) => P(i + 1, j + u, z), h, i * 7 + j) : quad([P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1, j + 1, h - 2.6), P(i + 1, j, h - 2.6)]))
         detail(h, hr, (u, z) => P(i + 1, j + u, z))
+        corner((z) => P(i + 1, j + 1, z), hr, h, i, j + 1, i + 1, j + 1)
+        corner((z) => P(i + 1, j, z), hr, h, i, j - 1, i + 1, j - 1)
       }
       if (hd < h) {
         add(cliffs, face[1], quad([P(i, j + 1, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hd), P(i, j + 1, hd)]))
         if (lip) add(lips, lip, snowy ? drip((u, z) => P(i + u, j + 1, z), h, i + j * 5) : quad([P(i, j + 1, h), P(i + 1, j + 1, h), P(i + 1, j + 1, h - 2.6), P(i, j + 1, h - 2.6)]))
         detail(h, hd, (u, z) => P(i + u, j + 1, z))
+        corner((z) => P(i + 1, j + 1, z), hd, h, i + 1, j, i + 1, j + 1)
+        corner((z) => P(i, j + 1, z), hd, h, i - 1, j, i - 1, j + 1)
       }
       // The river: a channel across the top, and a fall down every step.
       if (wet.has(k)) {
@@ -365,11 +446,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
         }
       }
     }
-    for (const [c, d] of tops) ground.add(new N('path', { d, fill: c, stroke: shade(c, 0.94), 'stroke-width': 0.7 }))
-    if (wetSand) { ground.add(new N('path', { d: wetSand, fill: '#e4d8bb' })); wetSand = '' }
-    for (const [c, d] of cliffs) ground.add(new N('path', { d, fill: c, stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
+    for (const [c, d] of tops) ground.add(new N('path', { d, fill: c, stroke: seamless.has(c) ? c : shade(c, 0.95), 'stroke-width': 0.7 }))
+    if (wetSand) { ground.add(new N('path', { d: wetSand, fill: '#dccfae' })); wetSand = '' }
+    for (const [c, d] of cliffs) ground.add(new N('path', { d, fill: c, stroke: c, 'stroke-width': 0.7, 'stroke-linejoin': 'round' }))
+    if (foot) ground.add(new N('path', { d: foot, fill: INK, opacity: 0.13 }))
+    if (wetFoot) ground.add(new N('path', { d: wetFoot, fill: '#3b4f9e', opacity: 0.3 }))
     for (const [c, d] of lips) ground.add(new N('path', { d, fill: c }))
-    if (strata) ground.add(new N('path', { d: strata, fill: 'none', stroke: INK, 'stroke-width': 1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.2 }))
+    if (strata) ground.add(new N('path', { d: strata, fill: 'none', stroke: INK, 'stroke-width': 1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.22 }))
+    if (ledge) ground.add(new N('path', { d: ledge, fill: 'none', stroke: INK, 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.22 }))
+    if (ledgeHi) ground.add(new N('path', { d: ledgeHi, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.3, 'stroke-linecap': 'round', opacity: 0.45 }))
+    if (ink) ground.add(new N('path', { d: ink, fill: 'none', stroke: INK, 'stroke-width': 1.3, 'stroke-linecap': 'round' }))
     if (wetTop) ground.add(new N('path', { d: wetTop, fill: '#8fd3ff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
     if (wetHi) ground.add(new N('path', { d: wetHi, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.75 }))
     if (wetFall) ground.add(new N('path', { d: wetFall, fill: '#b9e6ff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
@@ -418,6 +504,30 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     po.add(new N('circle', { cx: f2(fx2 + 0.03), cy: f2(fy2), r: 0.045, fill: '#ffc4d4', stroke: INK, 'stroke-width': 0.02 }))
   }
 
+  // The dry wash: dark banks, a pale bed of dried mud cracked into plates,
+  // and a scatter of pebbles the last flood left behind.
+  if (wash) {
+    const wg = plane.add(new N('g', { class: 'wash' }))
+    let d = `M${wash[0][0]} ${wash[0][1]}`
+    for (let k = 1; k < wash.length; k++) { const [a, b] = wash[k - 1], [c, e] = wash[k]; d += `Q${f2(a)} ${f2(b)} ${f2((a + c) / 2)} ${f2((b + e) / 2)}` }
+    d += `L${wash[wash.length - 1][0]} ${wash[wash.length - 1][1]}`
+    wg.add(new N('path', { d, fill: 'none', stroke: '#a99cd2', 'stroke-width': 0.56, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    wg.add(new N('path', { d, fill: 'none', stroke: '#e6e0f2', 'stroke-width': 0.42, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    wg.add(new N('path', { d, fill: 'none', stroke: '#d9d1ec', 'stroke-width': 0.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    let cr = '', pb = ''
+    for (let k = 0; k < wash.length - 1; k++) {
+      const [a, b] = wash[k], [c, e] = wash[k + 1]
+      for (let q = 0; q < 3; q++) {
+        const t = (q + 0.5) / 3, u = a + (c - a) * t, v = b + (e - b) * t, o = (hz(k, q, 4) - 0.5) * 0.24
+        const nx = -(e - b), ny = c - a, L = Math.hypot(nx, ny) || 1, px = u + (nx / L) * o, py = v + (ny / L) * o
+        cr += `M${f2(px - 0.07)} ${f2(py)}l0.05 -0.06l0.08 0.02l0.04 0.07`
+        pb += `M${f2(px + 0.1)} ${f2(py + 0.05)}a0.025 0.025 0 1 0 0.05 0a0.025 0.025 0 1 0 -0.05 0`
+      }
+    }
+    wg.add(new N('path', { d: cr, fill: 'none', stroke: '#b7aada', 'stroke-width': 0.022, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    wg.add(new N('path', { d: pb, fill: '#a59ad3', stroke: INK, 'stroke-width': 0.012 }))
+  }
+
   // Zebra crossings on the roads into the busiest junctions.
   {
     let n = 0
@@ -432,8 +542,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     }
   }
 
-  // Every building throws a soft shadow down and to the right, longer the
-  // taller it is. Measured by drawing it once into nothing.
+  // Every building throws a soft shadow the way everything else does: the
+  // sun is behind the island on the right, so shadows fall towards the
+  // front left, on the side of each building that is in shade. Longer the
+  // taller it is, measured by drawing the building once into nothing.
   {
     const keep = motionCss.length
     const sg = root.add(new N('g', { class: 'shadows', transform: `translate(${f(ox)} ${f(oy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
@@ -443,7 +555,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       pl.lm.draw(new Pen(new N('g'), pl.i, pl.j, pl.z, b, []))
       const [, footY] = P(pl.i + pl.w / 2, pl.j + pl.d / 2, pl.z)
       const L = Math.min(2.4, Math.max(0.3, (footY - b.y0) / 80))
-      for (const [k, op] of [[1, 0.06], [0.6, 0.06]]) sg.add(new N('rect', { x: f2(pl.i), y: f2(pl.j + 0.06), width: f2(pl.w + L * k), height: f2(pl.d - 0.12), rx: 0.3, fill: INK, opacity: op }))
+      const x0 = pl.i + 0.06, y0 = pl.j + 0.06, x1 = pl.i + pl.w - 0.06, y1 = pl.j + pl.d - 0.06
+      for (const [k, op] of [[1, 0.07], [0.55, 0.07]]) {
+        const a = L * k * 0.5
+        const d = `M${f2(x0)} ${f2(y0)}L${f2(x1)} ${f2(y0)}L${f2(x1)} ${f2(y1)}L${f2(x1 - a)} ${f2(y1 + a)}L${f2(x0 - a)} ${f2(y1 + a)}L${f2(x0 - a)} ${f2(y0 + a)}Z`
+        sg.add(new N('path', { d, fill: INK, stroke: INK, 'stroke-width': 0.14, 'stroke-linejoin': 'round', opacity: op }))
+      }
     }
     motionCss.length = keep
   }
@@ -473,6 +590,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
         const crack = `M${pts.map((p) => p.map(f).join(' ')).join('L')}M${f(bx2)} ${f(by2)}L${f(cx2)} ${f(cy2)}`
         tufts.set('crack', (tufts.get('crack') ?? '') + crack)
       }
+      if (h === 0 && hz(i, j, 11) < 0.5) {
+        const u = i + 0.15 + hz(i, j, 12) * 0.45, v = j + 0.2 + hz(j, i, 13) * 0.5
+        let rp = ''
+        for (let q = 0; q < 3; q++) { const [a1, b1] = P(u + q * 0.08, v - q * 0.05, h), [a2, b2] = P(u + q * 0.08 + 0.3, v - q * 0.05 + 0.06, h); rp += `M${f(a1)} ${f(b1)}Q${f((a1 + a2) / 2)} ${f((b1 + b2) / 2 - 2)} ${f(a2)} ${f(b2)}` }
+        tufts.set('ripple', (tufts.get('ripple') ?? '') + rp)
+      }
       continue
     }
     if (h < 0) continue
@@ -488,7 +611,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     }
   }
   const tuftG = root.add(new N('g', { class: 'tufts' }))
-  for (const [c, d] of tufts) tuftG.add(new N('path', c === 'crack' ? { d, fill: 'none', stroke: '#9d95c9', 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } : filled(c) ? { d, fill: c, stroke: INK, 'stroke-width': 0.5 } : { d, fill: 'none', stroke: c, 'stroke-width': 1.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+  for (const [c, d] of tufts) tuftG.add(new N('path', c === 'crack' ? { d, fill: 'none', stroke: '#9d95c9', 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } : c === 'ripple' ? { d, fill: 'none', stroke: '#ebe5f6', 'stroke-width': 1.1, 'stroke-linecap': 'round', opacity: 0.9 } : filled(c) ? { d, fill: c, stroke: INK, 'stroke-width': 0.5 } : { d, fill: 'none', stroke: c, 'stroke-width': 1.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
 
   // Fields, laid flat: lavender under Sky Peaks, wheat on the Proving
   // Grounds, an allotment by the harbour.
@@ -570,6 +693,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   for (const [i, j] of bales) for (const [u, v] of [[0.35, 0.4], [0.65, 0.62]]) at(i + u, j + v, i + j + u + v, (p) => bale(p, i + u, j + v))
   if (archAt) at(archAt[0] + 0.5, archAt[1] + 0.5, archAt[0] + archAt[1] + 1, (p) => arch(p, archAt[0] + 0.5, archAt[1] + 0.5))
   for (const [i, j, h] of buttes) at(i + 0.5, j + 0.5, i + j + 1, (p) => butte(p, i + 0.5, j + 0.5, h))
+  for (const [n, [i, j]] of hoodoos.entries()) for (const [u, v, h, k] of [[0.38, 0.4, 44 - n * 6, 1], [0.66, 0.56, 30, 0.8], [0.4, 0.74, 22, 0.7]] as [number, number, number, number][]) at(i + u, j + v, i + j + u + v, (p) => hoodoo(p, i + u, j + v, h, k))
+  for (const [n, [i, j]] of boulderAt.entries()) at(i + 0.5, j + 0.5, i + j + 1, (p) => boulders(p, i + 0.5, j + 0.5, 0.85 + (n % 2) * 0.25))
   // Sheep graze the low slopes of Sky Peaks; deer stand at the forest edge.
   ;[[10.5, 3.4, false], [10.35, 5.3, true], [11.45, 6.6, false], [9.55, 9.55, true], [10.6, 7.7, false]].forEach(([i, j, flip], n) => {
     if (!free(Math.floor(i as number), Math.floor(j as number))) return

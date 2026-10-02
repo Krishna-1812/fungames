@@ -2673,11 +2673,26 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     cluster in Old Town is a terrace, and the cypress is a cypress. The
     barrier at the checkpoint had always swung down into the road; it lifts.
 
-62. Next, in order, unless the order changes: the land and water made more
-    believable; the empty corners filled and cause and effect (people going
-    in and out, boats docking); a real night with weather and seasons;
-    things to poke and easter eggs; a passport of visited games and
-    optional sound; then polish, phones and speed.
+62. ~~**The island, made real: land and water.**~~ **done.** Cliffs are
+    walls now, not stacks of boxes: ink only along a wall's top and foot and
+    up the corners that stick out, the rock's layers at the same heights on
+    every tile so each one runs on round the hill, a ledge at every terrace,
+    a darker foot and a wet line where the sea meets it. Sand and the
+    Badlands' dust have no seams between tiles. Surf rolls in (two lines of
+    wave, fading in turn), foam hugs every shore, rocks stand at the
+    waterline. The Badlands stopped looking like a car park: a dry wash
+    winding down to the beach, hoodoos, boulder heaps, rocks of three
+    shapes, wind ripples in the dust. Boats leave wakes and are reflected,
+    so are the rocks; the water shimmers. Every shadow falls the same way,
+    away from one sun. All that took the markup over budget, so paths are
+    now written as relative steps and polygons as paths: 902 KB became
+    845, and a render before and after is identical to the pixel.
+
+63. Next, in order, unless the order changes: the empty corners filled,
+    and cause and effect (people going in and out, boats docking); a real
+    night with weather and seasons; things to poke and easter eggs; a
+    passport of visited games and optional sound; then polish, phones and
+    speed.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

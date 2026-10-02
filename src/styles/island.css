@@ -76,7 +76,13 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 /* The sea's marks stand still: a mark that moves across the whole map makes
    the browser repaint the whole map, every frame. */
 .isle .wave { opacity: 0.5; }
+/* The surf: the outer line of wave, then the inner one, rolling in. */
+.isle .isl-layer--surf { opacity: 0.35; will-change: opacity; animation: isl-surf 5.2s ease-in-out infinite; }
+.isle .isl-surf-in { animation-delay: 1.6s; }
+@keyframes isl-surf { 0%, 100% { opacity: 0; } 35% { opacity: 0.6; } 70% { opacity: 0.08; } }
 /* Sun on the water: a glint swells and goes, here and there. */
+.isle .shim { opacity: 0; animation: isl-shim 6s ease-in-out infinite; }
+@keyframes isl-shim { 0%, 100% { opacity: 0; } 30%, 45% { opacity: 0.8; } }
 .isle .glint { opacity: 0; animation: isl-glint 5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes isl-glint { 0%, 55%, 100% { opacity: 0; transform: scale(0.3); } 72% { opacity: 0.95; transform: scale(1); } }
 /* White water running down each fall of the river. */
@@ -166,7 +172,7 @@ html.play .isle.is-intro .lm-art { animation: isl-pop 0.8s cubic-bezier(0.34, 1.
 .isle .firefly { opacity: 0; }
 [data-time='night'] .isle .firefly { animation: sky-firefly 4.5s ease-in-out infinite; }
 @keyframes sky-firefly { 0%, 100% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 50% { opacity: 0.3; transform: translate(9px, -7px); } 70% { opacity: 1; } 85% { transform: translate(-4px, 4px); } }
-[data-time='night'] .isle .glint { visibility: hidden; }
+[data-time='night'] .isle .glint, [data-time='night'] .isle .shim { visibility: hidden; }
 /* At night the clouds go dusky blue and thin, and the balloons and the plane
    are lit only by the town below. */
 [data-time='night'] .isle .cloud { opacity: 0.55; }

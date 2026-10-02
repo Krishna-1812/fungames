@@ -37,15 +37,76 @@ export class N {
   text(s: string) { this.kids.push(esc(s)); return this }
 }
 
+/**
+ * A path's data, written shorter: every absolute line-to becomes a relative
+ * one (a step of a few pixels instead of two four-digit coordinates), and
+ * the numbers drop what SVG lets them drop: a leading zero, the space before
+ * a minus. The island draws thousands of short segments, so this is most of
+ * a hundred kilobytes. Anything it cannot follow is left exactly as it was.
+ */
+export function minPath(d: string): string {
+  const toks = d.match(/[a-zA-Z]|-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?/g)
+  if (!toks) return d
+  const K = 1000, q = (s: string) => Math.round(Number(s) * K)
+  const num = (v: number) => { let s = String(v / K); if (s.startsWith('0.')) s = s.slice(1); else if (s.startsWith('-0.')) s = '-' + s.slice(2); return s }
+  const out: string[] = []
+  const push = (cmd: string, vals: number[]) => {
+    let s = cmd
+    vals.forEach((v, i) => { const t = num(v); s += i === 0 || t.startsWith('-') || (t.startsWith('.') && /\.\d*$/.test(s) && !/[a-zA-Z]$/.test(s)) ? t : ' ' + t })
+    out.push(s)
+  }
+  const ARGS: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0 }
+  let i = 0, cx = 0, cy = 0, sx = 0, sy = 0, cmd = ''
+  try {
+    while (i < toks.length) {
+      if (/[a-zA-Z]/.test(toks[i])) cmd = toks[i++]
+      else if (!cmd) return d
+      const C = cmd.toUpperCase(), rel = cmd !== C, n = ARGS[C]
+      if (n === undefined) return d
+      if (n === 0) { out.push(cmd); cx = sx; cy = sy; if (i < toks.length && !/[a-zA-Z]/.test(toks[i])) return d; continue }
+      const v = toks.slice(i, i + n).map(q); i += n
+      if (v.length < n || v.some((x) => !Number.isFinite(x))) return d
+      if (C === 'M') {
+        if (rel) { cx += v[0]; cy += v[1] } else { cx = v[0]; cy = v[1] }
+        push(rel ? 'm' : 'M', v); sx = cx; sy = cy; cmd = rel ? 'l' : 'L'; continue
+      }
+      if (C === 'L') {
+        const dx = rel ? v[0] : v[0] - cx, dy = rel ? v[1] : v[1] - cy
+        push('l', [dx, dy]); cx += dx; cy += dy; continue
+      }
+      push(cmd, v)
+      if (C === 'H') cx = rel ? cx + v[0] : v[0]
+      else if (C === 'V') cy = rel ? cy + v[0] : v[0]
+      else { const ex = v[n - 2], ey = v[n - 1]; if (rel) { cx += ex; cy += ey } else { cx = ex; cy = ey } }
+    }
+  } catch { return d }
+  // Repeated commands of one kind run together: "l1 2l3 4" is "l1 2 3 4".
+  let s = '', last = ''
+  for (const t of out) {
+    const c = t[0]
+    if (c === last && c !== 'M' && c !== 'm' && c !== 'Z' && c !== 'z') { const rest = t.slice(1); s += rest.startsWith('-') ? rest : ' ' + rest }
+    else s += t
+    last = c
+  }
+  return s
+}
+
 export function render(n: N | string): string {
   if (typeof n === 'string') return n
-  let a = ''
-  for (const k in n.attrs) {
-    const v = n.attrs[k]
-    if (v === undefined || v === null || v === '') continue
-    a += ` ${k}="${typeof v === 'number' ? fa(v) : esc(v)}"`
+  // A polygon goes out as the same shape in path data, which can be written
+  // relative, and so is a good deal shorter.
+  let tag = n.tag, attrs = n.attrs
+  if (tag === 'polygon' && typeof attrs.points === 'string') {
+    const { points, ...rest } = attrs
+    tag = 'path'; attrs = { d: 'M' + (points as string).split(' ').map((q) => q.replace(',', ' ')).join('L') + 'Z', ...rest }
   }
-  return n.kids.length ? `<${n.tag}${a}>${n.kids.map(render).join('')}</${n.tag}>` : `<${n.tag}${a}/>`
+  let a = ''
+  for (const k in attrs) {
+    const v = attrs[k]
+    if (v === undefined || v === null || v === '') continue
+    a += ` ${k}="${typeof v === 'number' ? fa(v) : esc(k === 'd' ? minPath(v) : v)}"`
+  }
+  return n.kids.length ? `<${tag}${a}>${n.kids.map(render).join('')}</${tag}>` : `<${tag}${a}/>`
 }
 
 export class Bounds {

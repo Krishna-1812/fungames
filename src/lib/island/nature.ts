@@ -286,6 +286,48 @@ export function gullsCircling(cx: number, cy: number, rx: number, ry: number, na
 }
 
 /** A butterfly flitting in a little loop over a meadow. */
+/**
+ * A hoodoo: a thin, weathered spire of soft rock, banded, wider at the
+ * foot, with a flat cap of harder stone balanced on top that keeps the rain
+ * off. Two or three stand together.
+ */
+export function hoodoo(p: Pen, x: number, y: number, h = 40, k = 1) {
+  const fill = '#bfaee6', band = '#a28fda', cap = '#9b8ad0'
+  const [sx, sy] = p.at(x, y)
+  p.el('ellipse', { cx: sx - 6 * k, cy: sy + 2, rx: 14 * k, ry: 5 * k, fill: INK, opacity: 0.12 })
+  const w0 = 7.5 * k, w1 = 3.6 * k
+  // The column: a wobbling taper, its lit and shaded halves.
+  const xs = (t: number) => w0 + (w1 - w0) * t + Math.sin(t * 9 + x * 3) * 1.1 * k
+  let l = '', r = ''
+  for (let q = 0; q <= 8; q++) { const t = q / 8, z = t * h; l += `${q ? 'L' : 'M'}${f(sx - xs(t))} ${f(sy - z)}`; r = `L${f(sx + xs(t))} ${f(sy - z)}` + r }
+  p.path(l + r + 'Z', fill, { sw: 1.3 })
+  let rr = `M${f(sx)} ${f(sy)}`
+  for (let q = 0; q <= 8; q++) { const t = q / 8; rr += `L${f(sx + xs(t))} ${f(sy - t * h)}` }
+  p.path(rr + `L${f(sx)} ${f(sy - h)}Z`, shade(fill, 0.84), { sw: 0, op: 0.9 })
+  for (let z = 7; z < h - 4; z += 8) { const t = z / h; p.path(`M${f(sx - xs(t))} ${f(sy - z)}q${f(xs(t))} ${f(2.4 * k)} ${f(xs(t) * 2)} 0`, 'none', { stroke: band, sw: 1.6 * k }) }
+  p.path(l + r + 'Z', 'none', { sw: 1.3 })
+  // The cap.
+  p.el('ellipse', { cx: sx, cy: sy - h - 1, rx: 7.5 * k, ry: 3.4 * k, fill: cap, stroke: INK, 'stroke-width': 1.3 })
+  p.el('path', { d: `M${f(sx - 7.5 * k)} ${f(sy - h - 1)}a${f(7.5 * k)} ${f(3.4 * k)} 0 0 0 ${f(15 * k)} 0v-3a${f(7.5 * k)} ${f(3.4 * k)} 0 0 1 ${f(-15 * k)} 0z`, fill: cap, stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' })
+  p.el('ellipse', { cx: sx, cy: sy - h - 4, rx: 7.5 * k, ry: 3.4 * k, fill: '#c9bdf0', stroke: INK, 'stroke-width': 1.3 })
+  p.grow(sx - 16 * k, sy - h - 9 * k, sx + 10 * k, sy + 4)
+}
+
+/** A heap of round boulders, the big one cracked, gravel at their feet. */
+export function boulders(p: Pen, x: number, y: number, k = 1) {
+  const [sx, sy] = p.at(x, y)
+  p.el('ellipse', { cx: sx - 6 * k, cy: sy + 2, rx: 20 * k, ry: 6 * k, fill: INK, opacity: 0.12 })
+  for (const [dx, dy, r, c] of [[-8, -1, 7, '#b4a6e2'], [6, -3, 9.5, '#bfb2ea'], [-1, 3, 5.5, '#aa9bdc'], [14, 3, 4, '#b4a6e2']] as [number, number, number, string][]) {
+    const X = sx + dx * k, Y = sy + dy * k, R0 = r * k
+    p.el('path', { d: `M${f(X - R0)} ${f(Y)}a${f(R0)} ${f(R0 * 0.82)} 0 0 1 ${f(R0 * 2)} 0q0 ${f(R0 * 0.5)} ${f(-R0)} ${f(R0 * 0.55)}q${f(-R0)} 0 ${f(-R0)} ${f(-R0 * 0.55)}z`, fill: c, stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' })
+    p.el('path', { d: `M${f(X + R0 * 0.1)} ${f(Y + R0 * 0.55)}q${f(R0 * 0.9)} 0 ${f(R0 * 0.9)} ${f(-R0 * 0.55)}a${f(R0)} ${f(R0 * 0.82)} 0 0 0 ${f(-R0 * 0.5)} ${f(-R0 * 0.7)}q${f(R0 * 0.2)} ${f(R0 * 0.7)} ${f(-R0 * 0.4)} ${f(R0 * 1.25)}z`, fill: shade(c, 0.8), opacity: 0.75 })
+    p.el('path', { d: `M${f(X - R0 * 0.55)} ${f(Y - R0 * 0.35)}q${f(R0 * 0.2)} ${f(-R0 * 0.35)} ${f(R0 * 0.55)} ${f(-R0 * 0.45)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.3, 'stroke-linecap': 'round', opacity: 0.6 })
+  }
+  p.el('path', { d: `M${f(sx + 6 * k)} ${f(sy - 12 * k)}l1.5 4l-2 3l1 3`, fill: 'none', stroke: INK, 'stroke-width': 1, 'stroke-linecap': 'round', opacity: 0.6 })
+  for (const [dx, dy] of [[-15, 4], [-12, 6], [19, 5], [2, 8], [9, 7]]) p.el('circle', { cx: sx + dx * k, cy: sy + dy * k, r: 1.1 * k, fill: '#a59ad3', stroke: INK, 'stroke-width': 0.5 })
+  p.grow(sx - 18 * k, sy - 16 * k, sx + 20 * k, sy + 9 * k)
+}
+
 export function butterfly(p: Pen, x: number, y: number, z: number, c: string, delay: number) {
   const [bx, by] = p.at(x, y, z)
   const g = p.el('g', { class: 'bfly amb', 'data-b': box(bx - 18, by - 16, bx + 18, by + 10), style: `animation-delay:${f(-delay)}s` })

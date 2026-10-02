@@ -274,6 +274,7 @@ export function pier(p: Pen, pts: [number, number][], z: number, fisher: string 
 /** A rowing boat moored at a point on the water, bobbing on its rope. */
 export function rowboat(x: number, y: number, c: string): N {
   const g = new N('g', { class: 'moored amb', 'data-b': box(x - 20, y - 12, x + 20, y + 8) })
+  g.add(new N('path', { d: `M${f(x - 11)} ${f(y + 3)}Q${f(x)} ${f(y + 6)} ${f(x + 10)} ${f(y + 3)}L${f(x + 13)} ${f(y + 9)}Q${f(x)} ${f(y + 11)} ${f(x - 13)} ${f(y + 7)}Z`, fill: c, opacity: 0.18 }))
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 18, ry: 4.5, fill: '#ffffff', opacity: 0.5 }))
   g.add(new N('path', { d: `M${f(x - 15)} ${f(y - 4)}Q${f(x)} ${f(y - 1)} ${f(x + 15)} ${f(y - 6)}L${f(x + 10)} ${f(y + 3)}Q${f(x)} ${f(y + 5)} ${f(x - 11)} ${f(y + 2)}Z`, fill: c, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
   g.add(new N('path', { d: `M${f(x - 12)} ${f(y - 3.5)}Q${f(x)} ${f(y - 0.5)} ${f(x + 12)} ${f(y - 5)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.2 }))

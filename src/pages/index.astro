@@ -65,7 +65,7 @@ const data = { bounds: island.viewBox, land: island.land, districts, anchors: is
       <div class="isl-box" id="islBox" tabindex="0">
         <div class="isl-stage" id="islStage">
           <div class="isle isl-world" id="isle" style={`--vx:${vx}px;--vy:${vy}px;--vw:${vw}px;--vh:${vh}px`}>
-            {island.layers.map((l) => <svg class={`isl-layer isl-layer--${l.kind}`} viewBox={`${vx} ${vy} ${vw} ${vh}`} xmlns="http://www.w3.org/2000/svg" aria-hidden={l.kind === 'landmark' ? undefined : 'true'} set:html={l.body} />)}
+            {island.layers.map((l) => <svg class={`isl-layer isl-layer--${l.kind}${l.kind === 'surf' ? ` isl-surf-${l.slug}` : ''}`} viewBox={`${vx} ${vy} ${vw} ${vh}`} xmlns="http://www.w3.org/2000/svg" aria-hidden={l.kind === 'landmark' ? undefined : 'true'} set:html={l.body} />)}
           </div>
         </div>
         <style is:inline set:html={island.css}></style>

@@ -12,11 +12,25 @@ export type TreeKind = 'round' | 'pine' | 'palm' | 'cypress' | 'bush' | 'rock' |
 export function tree(p: Pen, x: number, y: number, kind: TreeKind, c = C.leaf, k = 1) {
   const [bx, by] = p.at(x, y)
   if (kind === 'rock') {
+    const v = Math.floor(Math.abs(Math.sin(x * 12.99 + y * 78.23) * 437.5)) % 3
+    p.el('ellipse', { cx: bx - 4 * k, cy: by + 2, rx: 12 * k, ry: 3.6 * k, fill: INK, opacity: 0.1 })
+    if (v === 1) {
+      p.path(`M${f(bx - 10 * k)} ${f(by + 2)}Q${f(bx - 11 * k)} ${f(by - 11 * k)} ${f(bx)} ${f(by - 12 * k)}Q${f(bx + 11 * k)} ${f(by - 11 * k)} ${f(bx + 10 * k)} ${f(by + 2)}Z`, C.rock)
+      p.path(`M${f(bx + 1 * k)} ${f(by - 12 * k)}Q${f(bx + 11 * k)} ${f(by - 11 * k)} ${f(bx + 10 * k)} ${f(by + 2)}L${f(bx + 2 * k)} ${f(by + 2)}Q${f(bx + 6 * k)} ${f(by - 6 * k)} ${f(bx + 1 * k)} ${f(by - 12 * k)}Z`, C.rockDark, { sw: 0, op: 0.5 })
+      p.path(`M${f(bx - 6 * k)} ${f(by - 6 * k)}q2 -3 5 -4`, 'none', { stroke: '#ffffff', sw: 1.3, op: 0.6 })
+      return
+    }
+    if (v === 2) {
+      p.path(`M${f(bx - 7 * k)} ${f(by + 2)}L${f(bx - 6 * k)} ${f(by - 17 * k)}L${f(bx - 1 * k)} ${f(by - 19 * k)}L${f(bx)} ${f(by + 2)}Z`, C.rock)
+      p.path(`M${f(bx + 1 * k)} ${f(by + 2)}L${f(bx + 2 * k)} ${f(by - 13 * k)}L${f(bx + 8 * k)} ${f(by - 11 * k)}L${f(bx + 9 * k)} ${f(by + 2)}Z`, shade(C.rock, 0.86))
+      p.path(`M${f(bx - 6 * k)} ${f(by - 9 * k)}h5M${f(bx + 2 * k)} ${f(by - 5 * k)}h6`, 'none', { sw: 0.9, op: 0.4 })
+      return
+    }
     p.path(`M${f(bx - 11 * k)} ${f(by + 2)}L${f(bx - 8 * k)} ${f(by - 9 * k)}L${f(bx + 1 * k)} ${f(by - 14 * k)}L${f(bx + 10 * k)} ${f(by - 6 * k)}L${f(bx + 11 * k)} ${f(by + 2)}Z`, C.rock)
     p.path(`M${f(bx + 1 * k)} ${f(by - 14 * k)}L${f(bx + 10 * k)} ${f(by - 6 * k)}L${f(bx + 11 * k)} ${f(by + 2)}L${f(bx + 2 * k)} ${f(by + 2)}Z`, C.rockDark, { sw: 0, op: 0.55 })
     return
   }
-  p.el('ellipse', { cx: bx, cy: by + 1, rx: 12 * k, ry: 5 * k, fill: INK, opacity: 0.12 })
+  p.el('ellipse', { cx: bx - 6 * k, cy: by + 1.5, rx: 14 * k, ry: 4.6 * k, fill: INK, opacity: 0.12 })
   if (kind === 'bush') {
     for (const [dx, dy, r] of [[-5, -4, 6], [4, -5, 6.5], [0, -9, 6]]) p.el('circle', { cx: bx + dx * k, cy: by + dy * k, r: r * k, fill: c, stroke: INK, 'stroke-width': OUT })
     p.grow(bx - 12 * k, by - 16 * k, bx + 12 * k, by)
@@ -68,7 +82,7 @@ export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: 
   const [bx, by] = p.at(x, y)
   const k = o.k ?? 1, skin = o.skin ?? '#f1d9c6'
   const g = p.group(o.cls)
-  g.el('ellipse', { cx: bx, cy: by + 0.5, rx: 4.5 * k, ry: 1.8 * k, fill: INK, opacity: 0.15 })
+  g.el('ellipse', { cx: bx - 2 * k, cy: by + 0.5, rx: 5 * k, ry: 1.8 * k, fill: INK, opacity: 0.15 })
   g.el('path', { d: `M${f(bx - 1.8 * k)} ${f(by)}v${f(-6 * k)}M${f(bx + 1.8 * k)} ${f(by)}v${f(-6 * k)}`, stroke: INK, 'stroke-width': 2 * k, 'stroke-linecap': 'round', fill: 'none' })
   g.el('rect', { x: bx - 3.4 * k, y: by - 14 * k, width: 6.8 * k, height: 9 * k, rx: 2.6 * k, fill: shirt, stroke: INK, 'stroke-width': 1.2 })
   if (o.pose === 'wave') g.el('path', { d: `M${f(bx + 3 * k)} ${f(by - 12 * k)}l${f(4 * k)} ${f(-5 * k)}`, stroke: INK, 'stroke-width': 1.8 * k, 'stroke-linecap': 'round', class: 'wave-arm' })
@@ -81,7 +95,7 @@ export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: 
 /** The figure a walker carries along its path, drawn at the origin. */
 export function walkerFigure(shirt: string, k = 1): string {
   const s = (v: number) => f(v * k)
-  return `<ellipse cx="0" cy="0.5" rx="${s(4.5)}" ry="${s(1.8)}" fill="${INK}" opacity="0.15"/>` +
+  return `<ellipse cx="${s(-2)}" cy="0.5" rx="${s(5)}" ry="${s(1.8)}" fill="${INK}" opacity="0.15"/>` +
     `<g class="legs"><path d="M${s(-1.8)} 0v${s(-6)}" stroke="${INK}" stroke-width="${s(2)}" stroke-linecap="round" class="leg-a"/><path d="M${s(1.8)} 0v${s(-6)}" stroke="${INK}" stroke-width="${s(2)}" stroke-linecap="round" class="leg-b"/></g>` +
     `<rect x="${s(-3.4)}" y="${s(-14)}" width="${s(6.8)}" height="${s(9)}" rx="${s(2.6)}" fill="${shirt}" stroke="${INK}" stroke-width="1.2"/>` +
     `<circle cx="0" cy="${s(-17.5)}" r="${s(3.4)}" fill="#f1d9c6" stroke="${INK}" stroke-width="1.2"/>`
@@ -135,10 +149,17 @@ export function flag(p: Pen, x: number, y: number, z: number, c: string, h = 22,
   p.grow(bx - 2, by - h - 2, bx + 16, by)
 }
 
-/** A sailboat, drawn at the origin, for a boat that moves along a path. */
+/**
+ * A sailboat, drawn at the origin, for a boat that moves along a path: its
+ * sails reflected faintly in the water under it, and a wake spreading out
+ * either side, since it sails both ways round.
+ */
 export function sailboat(hull: string, sail = '#ffffff', k = 1): string {
   const s = (v: number) => f(v * k)
-  return `<ellipse cx="0" cy="${s(3)}" rx="${s(24)}" ry="${s(5)}" fill="#ffffff" opacity="0.45"/>` +
+  return `<path d="M${s(1)} ${s(7)}L${s(1)} ${s(30)}L${s(14)} ${s(9)}ZM${s(-1)} ${s(7)}L${s(-1)} ${s(23)}L${s(-11)} ${s(8)}Z" fill="${sail}" opacity="0.22"/>` +
+    `<path d="M${s(-14)} ${s(6)}L${s(13)} ${s(6)}L${s(10)} ${s(11)}L${s(-11)} ${s(11)}Z" fill="${hull}" opacity="0.18"/>` +
+    `<path d="M${s(-22)} ${s(4)}q${s(-12)} ${s(3)} ${s(-26)} ${s(2)}M${s(22)} ${s(4)}q${s(12)} ${s(3)} ${s(26)} ${s(2)}M${s(-18)} ${s(8)}q${s(-9)} ${s(3)} ${s(-18)} ${s(3)}M${s(18)} ${s(8)}q${s(9)} ${s(3)} ${s(18)} ${s(3)}" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" opacity="0.75"/>` +
+    `<ellipse cx="0" cy="${s(3)}" rx="${s(24)}" ry="${s(5)}" fill="#ffffff" opacity="0.45"/>` +
     `<path d="M${s(-20)} ${s(-3)}L${s(20)} ${s(-3)}L${s(13)} ${s(6)}L${s(-14)} ${s(6)}Z" fill="${hull}" stroke="${INK}" stroke-width="${OUT}" stroke-linejoin="round"/>` +
     `<path d="M${s(-20)} ${s(-3)}L${s(20)} ${s(-3)}" stroke="#ffffff" stroke-width="1.4"/>` +
     `<path d="M${s(1)} ${s(-4)}L${s(1)} ${s(-34)}L${s(17)} ${s(-7)}Z" fill="${sail}" stroke="${INK}" stroke-width="${OUT}" stroke-linejoin="round" class="sail"/>` +

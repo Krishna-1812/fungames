@@ -228,14 +228,14 @@ as a card, with the four filters and search.
 
 | File | What it is |
 |---|---|
-| `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), painted faces (a sign, poster or mural drawn flat on a wall by shearing it onto the face), lettering and neon, bounds that every shape grows, CSS keyframe paths |
+| `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), painted faces (a sign, poster or mural drawn flat on a wall by shearing it onto the face), lettering and neon, bounds that every shape grows, CSS keyframe paths, and path data written short (relative steps, polygons as paths: the same picture in a tenth less markup) |
 | `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
-| `src/lib/island/nature.ts` | the wild things and the farm: snowy pines, cacti, reeds, hedges, topiary, toadstools, a rock arch and buttes, crop fields, hay bales, the windmill, and the animals (sheep, deer, ducks, crabs, dolphins, a whale, gulls, butterflies, a tumbleweed) |
+| `src/lib/island/nature.ts` | the wild things and the farm: snowy pines, cacti, reeds, hedges, topiary, toadstools, a rock arch, buttes, hoodoos and boulder heaps, crop fields, hay bales, the windmill, and the animals (sheep, deer, ducks, crabs, dolphins, a whale, gulls, butterflies, a tumbleweed) |
 | `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, fingerposts, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends) |
 | `src/lib/island/sky.ts` | hot-air balloons and a plane towing a banner |
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
-| `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, trees, walkers, and the layers it is painted in |
+| `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, rocks at the waterline, a dry wash across the Badlands, cliffs drawn as continuous walls (ink only at their top, foot and outside corners, strata at fixed heights so each layer runs on, a ledge at every terrace), one sun for every shadow, trees, walkers, and the layers it is painted in |
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard, the hover card, names at close zoom, the mini-map, the dive into a game |
 | `src/styles/island.css` | every loop on the map |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
@@ -262,7 +262,10 @@ Three things about performance, all found by measuring rather than guessing:
   own (a glint on the sea, the white water on a fall) is marked `.amb` with
   its box in `data-b`, and gets the same treatment from its own budget. Nothing moves that crosses the
   whole map (the surf and the wave marks stand still), and nothing uses SMIL:
-  every mover is a CSS keyframe path generated at build time.
+  every mover is a CSS keyframe path generated at build time. The surf that
+  does roll in is two lines of wave, each in a layer of its own whose
+  opacity rises and falls in turn: fading a whole layer is free, where
+  moving a line round the whole coast would repaint the sea every frame.
 - **The cards are copies, not `<use>`s.** A `<use>` of a building replays every
   animation on the island into its copy each frame even when the cards are
   off screen. The page clones each building into its card once instead.
