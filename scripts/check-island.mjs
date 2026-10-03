@@ -11,7 +11,8 @@
  *   5. The canvas can draw it: few shapes from outlines, a hit mask for every
  *      building and thing to poke, a card for every game.
  *   6. The twelve messages in bottles are all there, apart, each with its
- *      number and its note; the signposts point down real roads to districts.
+ *      number and its note; the signposts point down real roads to districts;
+ *      the pigeons have a square, the ball a beach, every game a parade route.
  *   7. The markup is real SVG: resvg parses and rasterises the whole island.
  *
  *   node scripts/check-island.mjs            check
@@ -109,6 +110,16 @@ console.log('bottles and signposts')
   check(posts.every((p) => p.boards.every((b) => Math.abs(b.dx) + Math.abs(b.dy) === 1 && Number.isFinite(b.steps) && b.steps > 0)), 'every board points along a road to somewhere that road reaches')
   const to = new Set(posts.flatMap((p) => p.boards.map((b) => b.to)))
   check(to.size >= 5, `and between them they point the way to most districts (${[...to].join(', ')})`)
+  const { play: pl, grid } = island
+  const g = (i, j) => (i < 0 || j < 0 || i >= GRID || j >= GRID ? '0' : grid[i * GRID + j])
+  check(grid.length === GRID * GRID && /^[01b]+$/.test(grid), 'the page gets the island’s ground, a letter a tile')
+  check(g(...pl.square) === '1' && g(...pl.board) === '1' && Math.abs(pl.square[0] - pl.board[0]) + Math.abs(pl.square[1] - pl.board[1]) === 1, 'the pigeons’ square and the noticeboard stand side by side, on land')
+  check(pl.ball.cells.length >= 4 && pl.ball.cells.every(([i, j]) => g(i, j) === 'b'), `the ball has a stretch of beach to roll on (${pl.ball.cells.length} tiles)`)
+  const routes = Object.entries(pl.routes)
+  check(games.every((x) => pl.routes[x.slug]?.length), 'the parade has a way to every game')
+  const start = routes[0]?.[1][0]?.join()
+  check(routes.every(([, r]) => r[0].join() === start && r.every((c, k) => !k || Math.abs(c[0] - r[k - 1][0]) + Math.abs(c[1] - r[k - 1][1]) === 1)), 'every route sets off from the same square and goes a tile at a time')
+  check(island.svg.includes('data-poke="notice"'), 'the noticeboard is something to poke')
 }
 
 // What it costs to keep the map moving, now that a canvas draws it from the

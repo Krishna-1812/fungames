@@ -241,6 +241,8 @@ as a card, with the four filters and search.
 | `src/lib/island/sound.ts` | the island heard: beds that never stop (the sea's swell and surf, wind on the peaks, a dry wind over the Badlands, the market's and the funfair's crowds, rain under the forecast's cloud, crickets after dark, the funfair's music box) and things that happen now and then (gulls, birdsong, a bell buoy, an owl, a far-off sheep, fireworks at New Year, the ferry's horn read off its own animation), each placed on the map with the camera as the listener, and a sound for every one of the eighteen things you can poke |
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom (two fingers also carry the map), edges that give and spring back, held arrow keys that glide, resting on a painted size so the pixels land 1:1, keyboard (a link per building, out of sight), the hover card, names at close zoom, the mini-map, the dive into a game and the circle that carries you through, the view kept for the visit; the one loop that draws the canvas, eased by time rather than by frame |
 | `src/lib/island/postcard.ts` | the postcard: the view painted again at the card's size, "Greetings from" the district in big lettering, a perforated stamp with the nearest building on it, and a postmark with the day |
+| `src/lib/island/play.ts` | what answers back, drawn live in the painting's own order: the beach ball you can throw, the pigeons that go up as you come near, rings on the water where it is touched, and the day's parade |
+| `src/lib/island/timetable.ts` | the noticeboard's timetable: what is on now and next, by the visitor's clock |
 | `src/lib/bottles.ts` | the twelve messages in bottles: their notes, which ones this browser has found and when, and the passport covers they earn |
 | `src/lib/island/perf.ts` | the `?perf` meter: frame rate, the last two seconds of frames, the engine's time, and its canvas calls |
 | `src/lib/island/moves.ts` | every motion on the map, as one table: the loops (ported from the old stylesheet), the pokes, a building's lift, ring, fade and drop, the night's and the clouds' strengths; and the cards' CSS, made from the same table |
@@ -250,6 +252,7 @@ as a card, with the four filters and search.
 | `src/pages/island/[...file].ts` | serves the baked files, under the bake's hash |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
 | `scripts/check-bottles.mjs` | the bottles' record against stores that throw, are full, or hold nonsense: a bottle found once, covers earned at three, six, nine and twelve and only worn once earned |
+| `scripts/check-timetable.mjs` | the noticeboard against hours whose answers are known by hand: the bell, the lighthouse, Friday's fireworks and not Thursday's, the dawn whale, the ferry at each stage of its crossing, the three o'clock visitor kept secret until seen |
 | `scripts/bench-island.mjs` | drags the built island in headless Chrome and fails below 45 frames a second, or when a view needs more canvas calls than its budget (`npm run bench:island`, and the last step of `npm run check`) |
 
 **Things happen because of other things.** The ferry comes in to its jetty,
@@ -449,6 +452,34 @@ passport a new cover (Lagoon, Kelp forest, Nebula, and Pearl for all
 twelve), put on from the same page; the book is shown in it from then on.
 `lib/bottles.ts` keeps the record in the same hardened store as the
 passport, and `check-bottles.mjs` runs it against every way a store fails.
+
+**Things that answer back.** A beach ball lies on the sand at the front of the
+island: pick it up and throw it, and it flies, bounces, and rolls to a stop
+(throw it into the sea and it floats, rings spreading round it, and the tide
+brings it back). A tap kicks it. Pigeons peck about the square by the
+fountain, where an old man feeds them; come near with the pointer, a finger,
+the ball or the parade and the whole flock goes up, circles, and settles
+again. The water rings wherever it is touched, and trails rings after the
+mouse. All of it moves by elapsed time, and none of it is baked: the engine
+calls the page back (`LiveLayer` in `engine.ts`) just after the sea, just
+after the walkers and over everything, so the ball and the pigeons are hidden
+by whatever stands in front of them the way the island's own walkers are.
+The bake records where each layer of the painting ends so the engine knows
+where those are, and keeps a window in front of every building with a road
+before it, so what the page walks along the road is drawn again there.
+Under reduced motion none of it moves.
+
+**What's on.** A noticeboard by the pigeons' square (and the Today button)
+opens the island's timetable, every line of it something the map really does,
+by the visitor's own clock: today's challenge; the parade, which marches from
+the town square to the day's game and back every five minutes (a drum major,
+a flag in the game's district ink, a drummer, a trumpet, two children with
+balloons and a dog), so everyone sees it at the same moment; the ferry (live:
+coming in, at the jetty, leaving); the bell in the square on the hour, which
+rings the hour if sound is on and puts every pigeon up; the lighthouse, lit
+from dusk; fireworks on Friday nights from eight to ten as well as New Year;
+the whale that only comes up at dawn; and, at three in the morning, something
+the board will not name until you have seen it. Each line can take you there.
 
 **Postcards.** The camera button over the zoom buttons (or P) frames whatever
 is on screen as a postcard. The engine paints the view again at the card's

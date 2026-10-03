@@ -14,7 +14,7 @@ import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, clou
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { beacon } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
-import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, type Emblem } from './town'
+import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
 import { STAMP } from '../passport-art'
 import { glassOf, BOTTLE_COUNT } from '../bottles'
 import { RULES } from './moves'
@@ -81,7 +81,14 @@ export type Layer = { kind: 'sea' | 'surf' | 'boats' | 'beam' | 'weather' | 'gro
 export type Bottle = { n: number; i: number; j: number; district: DistrictKey }
 /** A signpost: where it stands (in tiles), and the district each of its boards points to. */
 export type Signpost = { i: number; j: number; at: [number, number]; boards: { dx: number; dy: number; to: DistrictKey; steps: number }[] }
-export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[] }
+/**
+ * What the page brings to life on the map itself (lib/island/play.ts): the
+ * square the pigeons live on, the noticeboard beside it, the stretch of beach
+ * the ball can roll on, and for every building the roads from the town square
+ * to its door, for the day's parade. All in tiles.
+ */
+export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]> }
+export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
 /**
@@ -900,7 +907,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       for (let q = Math.floor(pl.i); q <= fi; q++) front.push([q, fj])
       const onRoad = front.filter((c) => road.has(key(...c)))
       const passing = goers.filter((g) => onRoad.some((c) => g.cells.has(key(...c))))
-      if (!passing.length) return
+      // (Kept with no one in it too: the day's parade walks through it.)
+      if (!onRoad.length) return
       const id = `isl-front-${pl.slug}`, up = 30
       layer.add(new N('clipPath', { id })).add(new N('path', { d: onRoad.map(([i, j]) => quad([P(i, j, up), P(i + 1, j, up), P(i + 1, j, 0), P(i + 1, j + 1, 0), P(i, j + 1, 0), P(i, j + 1, up)])).join('') }))
       const fg = layer.add(new N('g', { class: 'lm-front', 'clip-path': `url(#${id})` }))
@@ -1136,6 +1144,70 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   }
   // Piers out from the beaches, each with someone fishing off the end.
   for (const [n, pts] of PIERS.entries()) things.push({ depth: pts[0][0] + pts[0][1] + 0.4, draw: (layer) => pier(new Pen(layer), pts, BEACH + 1, n === 2 ? null : C.rasp) })
+
+  /* ---- what the page brings to life: pigeons, a noticeboard, a ball, the parade ---- */
+  // The pigeons' square and the noticeboard beside it: two free tiles side by
+  // side next to a road, as near the town square (the hub) as there are, with
+  // no building just in front of either to hide them.
+  let square: [number, number] = hub, board: [number, number] = hub
+  {
+    let best: { a: [number, number]; b: [number, number]; d: number } | null = null
+    const ok = (i: number, j: number) => free(i, j) && height[i][j] === 0 && !coast(i, j)
+    const byRoad = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([u, v]) => road.has(key(i + u, j + v)))
+    for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) for (const [u, v] of [[1, 0], [0, 1]]) {
+      const hidden = (a: number, b: number) => [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2], [2, 2]].some(([x, y]) => taken.has(key(a + x, b + y)))
+      if (!ok(i, j) || !ok(i + u, j + v) || !byRoad(i + u, j + v) || hidden(i, j) || hidden(i + u, j + v)) continue
+      const d = Math.hypot(i - hub[0], j - hub[1])
+      if (!best || d < best.d) best = { a: [i, j], b: [i + u, j + v], d }
+    }
+    if (best) {
+      square = best.a; board = best.b
+      reserved.add(key(...square)); reserved.add(key(...board))
+      at(square[0] + 0.5, square[1] + 0.5, square[0] + square[1] + 0.2, (p) => pigeonSquare(p, square[0] + 0.5, square[1] + 0.5, new Pen(ground)))
+      at(board[0] + 0.5, board[1] + 0.5, board[0] + board[1] + 1, (p) => noticeboard(p, board[0] + 0.5, board[1] + 0.45))
+    }
+  }
+  // The ball's beach: the widest open stretch of sand at the front, that the
+  // ball can roll about on (and off, into the sea, which brings it back).
+  const ball = { at: [0, 0] as [number, number], cells: [] as [number, number][] }
+  {
+    const sand = (i: number, j: number) => beach.has(key(i, j))
+    const reach = (from: [number, number]) => {
+      const seen = new Set([key(...from)]), out: [number, number][] = [from], q = [from]
+      while (q.length && out.length < 16) { const [i, j] = q.shift()!; for (const [u, v] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = key(i + u, j + v); if (seen.has(k) || !sand(i + u, j + v)) continue; seen.add(k); out.push([i + u, j + v]); q.push([i + u, j + v]) } }
+      return out
+    }
+    let best: { c: [number, number]; n: number } | null = null
+    for (const k of beach) {
+      const c = k.split(',').map(Number) as [number, number]
+      if (reserved.has(k) || c[0] + c[1] < 30) continue
+      const open = reach(c).filter(([i, j]) => !reserved.has(key(i, j))).length
+      if (open < 4) continue
+      const score = c[0] + c[1] + open
+      if (!best || score > best.n) best = { c, n: score }
+    }
+    if (best) { ball.cells = reach(best.c); ball.at = [best.c[0] + 0.5, best.c[1] + 0.5]; reserved.add(key(...best.c)) }
+  }
+  // The day's parade: for every building, the roads from the town square to
+  // the road cell nearest its door.
+  const parades: Record<string, [number, number][]> = {}
+  {
+    const prev = new Map<string, string>([[key(...hub), '']]), q: [number, number][] = [hub]
+    while (q.length) { const [i, j] = q.shift()!; for (const [u, v] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = key(i + u, j + v); if (prev.has(k) || !road.has(k)) continue; prev.set(k, key(i, j)); q.push([i + u, j + v]) } }
+    const back = (k: string) => { const out: [number, number][] = []; let c: string | undefined = k; while (c) { out.unshift(c.split(',').map(Number) as [number, number]); c = prev.get(c) || undefined } return out }
+    // To the road cell nearest the building (most stand on one; the rest, up the
+    // peaks or out at sea, as close as the roads go).
+    const reached = [...prev.keys()].map((k) => k.split(',').map(Number) as [number, number])
+    for (const pl of placed) {
+      const cx = pl.i + pl.w / 2, cy = pl.j + pl.d / 2
+      let bestK = '', bestD = Infinity
+      for (const [a, b] of reached) {
+        const d = Math.hypot(a + 0.5 - cx, b + 0.5 - cy) - Math.max(pl.w, pl.d) / 2
+        if (d < bestD - 0.01 || (Math.abs(d - bestD) <= 0.01 && back(key(a, b)).length < back(bestK).length)) { bestD = d; bestK = key(a, b) }
+      }
+      if (bestK) parades[pl.slug] = back(bestK)
+    }
+  }
 
   // Trees, rocks and the odd lamp or bench, on the land left over.
   const treeKind = (d: District, coastal: boolean): TreeKind => {
@@ -1421,7 +1493,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts }
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join('') }
 }
 
 export { OUT, bench }

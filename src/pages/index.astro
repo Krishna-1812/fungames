@@ -72,7 +72,7 @@ const pillBottle = `<svg viewBox="0 0 44 70" aria-hidden="true"><path d="M17 4h1
 const daily = dailyFor(new Date())
 const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug) }]))
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
-const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
+const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, play: island.play, grid: island.grid, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
 
 // The passport: a page per district, in the order you would walk the island
 // from the middle, each game a stamp drawn here and inked by the page once
@@ -154,6 +154,16 @@ const book = BOOK.map((key) => {
           <button type="button" class="isl-note-x" id="islNoteX" aria-label="Put the note away"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
         </div>
         <div class="isl-flash" aria-hidden="true"></div>
+        <div class="isl-board" id="islBoard" hidden role="dialog" aria-labelledby="islBoardH">
+          <header class="isl-board-head">
+            <p class="isl-board-kicker">The noticeboard by the town square</p>
+            <h2 class="isl-board-h" id="islBoardH">What’s on today</h2>
+            <p class="isl-board-date" id="islBoardDate"></p>
+          </header>
+          <ul class="isl-board-list" id="islBoardList" role="list"></ul>
+          <p class="isl-board-foot">Everything here runs by your own clock.</p>
+          <button type="button" class="isl-board-x" id="islBoardX" aria-label="Close the noticeboard"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
+        </div>
 
         <div class="isl-zoom" role="group" aria-label="Zoom">
           <button type="button" class="isl-snap" id="zSnap" aria-label="Make a postcard of this view" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="12" cy="12.4" r="3.6" fill="#fff" stroke="currentColor" stroke-width="2" /><circle cx="17" cy="9" r="1" fill="currentColor" /></svg><span class="isl-snap-tip" aria-hidden="true">Postcard</span></button>
@@ -390,6 +400,8 @@ const book = BOOK.map((key) => {
   import { isMuted, setMuted, unlock } from '../lib/audio'
   import { readBottles, findBottle, wearCover, count, NOTES, COVERS, BOTTLE_COUNT, type Cover } from '../lib/bottles'
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
+  import { createPlay, type PlayData } from '../lib/island/play'
+  import { timetable, isFest, type Row } from '../lib/island/timetable'
 
   // The lighthouse in the tab says hello: once when the page opens, and again
   // each time you switch away to another tab, it flashes the island's Morse
@@ -429,6 +441,8 @@ const book = BOOK.map((key) => {
     posterScale: number
     pokes: string[]
     bottles: { n: number; district: string; where: string }[]
+    play: PlayData
+    grid: string
     inks: Record<string, string>
   }
   const box = document.getElementById('islBox')!
@@ -453,7 +467,7 @@ const book = BOOK.map((key) => {
   const NAMES: Record<string, string> = { whale: 'the whale', dawnwhale: 'the dawn whale', sheep: 'a sheep', windmill: 'the windmill', balloon: 'a balloon', crab: 'a crab', fountain: 'the fountain', kite: 'a kite', dolphin: 'a dolphin', duck: 'a duck', gull: 'a gull', deer: 'the deer', ferry: 'the ferry', castaway: 'the castaway', treasure: 'the buried treasure', house32: 'the 32nd building', ufo: 'a UFO' }
   const foundEl = document.getElementById('islFound') as HTMLButtonElement, toastEl = document.getElementById('islToast')!
   // The bottles are counted one by one on a page of their own, not among the sightings.
-  const kinds = data.pokes.filter((k) => k !== 'bottle')
+  const kinds = data.pokes.filter((k) => k !== 'bottle' && k !== 'notice')
   const readFound = () => { try { return new Set<string>(JSON.parse(localStorage.getItem('isl-found') ?? '[]')) } catch { return new Set<string>() } }
   const found = readFound()
   let toastT = 0
@@ -515,6 +529,7 @@ const book = BOOK.map((key) => {
 
   const onPoke = (kind: string, n?: number) => {
     if (kind === 'bottle') { if (n) onBottle(n); return }
+    if (kind === 'notice') { openBoard(); return }
     const first = !found.has(kind)
     if (first) { found.add(kind); try { localStorage.setItem('isl-found', JSON.stringify([...found])) } catch {} showFound(); sound?.found() }
     sound?.poke(kind)
@@ -524,16 +539,30 @@ const book = BOOK.map((key) => {
     if (first) toast(found.size === kinds.length ? `You found ${NAMES[kind] ?? kind}, and that is all ${kinds.length}. Well done.` : `You found ${NAMES[kind] ?? kind}. ${tally}`)
   }
 
+  /* ---- what answers back: a ball, pigeons, the water, the parade (lib/island/play) ---- */
+  const play = createPlay({
+    data: data.play, grid: data.grid, play: PLAY,
+    daily: () => dailyFor(new Date()).slug,
+    ink: () => data.inks[data.anchors[dailyFor(new Date()).slug]?.district] ?? '#5b82ff',
+    sound: () => sound,
+  })
+  const ask0 = new URLSearchParams(location.search)
+  const fest = () => isFest(new Date()) || ask0.get('fest') === '1'
+
   const isle = initIsland({
     box, stage: document.getElementById('islStage')!,
     canvas: document.getElementById('islCanvas') as HTMLCanvasElement,
     poster: document.getElementById('islPoster') as HTMLImageElement | null, posterScale: data.posterScale,
     scene, base: data.base,
-    state: () => ({ time: box.dataset.time ?? 'day', season: box.dataset.season ?? '', hour: Number(box.dataset.hour ?? new Date().getHours()) }),
+    state: () => ({ time: box.dataset.time ?? 'day', season: box.dataset.season ?? '', hour: Number(box.dataset.hour ?? new Date().getHours()), fest: fest() }),
     bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games,
     links: new Map([...box.querySelectorAll<HTMLAnchorElement>('.isl-lm')].map((a) => [a.dataset.slug!, a])),
     onPoke, onEnter: () => sound?.dive(),
+    grab: play.grab, pointer: play.pointer, grabbable: play.overBall,
   })
+  isle.withEngine((e) => e.setLive(play.live))
+  // ?perf: the live things too, for scripts that test them.
+  if (ask0.has('perf')) (window as unknown as { __play: unknown }).__play = play
   // The bottles found on earlier visits are not on the beaches any more.
   isle.withEngine((e) => e.setGone(Object.keys(readBottles().found).map(Number)))
   // The map is a window, not a scroller: focusing a building near the edge
@@ -598,11 +627,95 @@ const book = BOOK.map((key) => {
     if (ta) nodes.push(...balloonNodes((ta.x0 + ta.x1) / 2, ta.y0))
     e.add(nodes)
   })
-  document.getElementById('btnToday')!.addEventListener('click', () => {
+  const goToday = () => {
     box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
     isle.flyToSlug(today.slug, 2.2)
     setTimeout(() => isle.showCard(today.slug, `Today: ${today.goal}`), PLAY ? 650 : 0)
+  }
+  document.getElementById('btnToday')!.addEventListener('click', () => openBoard())
+
+  /* ---- the noticeboard: what's on, by the clock (lib/island/timetable) ---- */
+  // Opened from the board itself on the map, or the Today button. It says
+  // what is on now and next, and each line can take you there.
+  const boardEl = byId('islBoard'), boardList = byId('islBoardList')
+  let ferryPhase = (): number | null => null
+  isle.withEngine((e) => { ferryPhase = () => e.phase('isl-ferry') })
+  let boardT = 0
+  const P = (i: number, j: number, z = 0): [number, number] => [(i - j) * 32, (i + j) * 16 - z]
+  const go = (x: number, y: number, n: number) => { closeBoard(); box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' }); setTimeout(() => isle.flyToPoint(x, y, n), PLAY ? 250 : 0) }
+  const lh = data.anchors['share-this-page']
+  const ACTIONS: Partial<Record<Row['key'], [string, () => void]>> = {
+    today: ['Take me there', () => { closeBoard(); goToday() }],
+    parade: ['Show me', () => { const [x, y] = play.parade().on ? play.paradeAt() : play.square(); go(x, y - 14, 3.6) }],
+    ferry: ['Show me', () => { const [x, y] = P(21.02, 29.75, -12); go(x, y - 20, 3) }],
+    bells: ['Show me', () => { const [x, y] = play.square(); go(x, y - 10, 4) }],
+    lighthouse: ['Show me', () => { if (lh) go((lh.x0 + lh.x1) / 2, (lh.y0 + lh.y1) / 2, 2.6) }],
+    fireworks: ['Look', () => { closeBoard(); isle.home() }],
+    whale: ['Show me', () => { const [x, y] = P(36, 21, -12); go(x, y, 2.2) }],
+  }
+  const rowsNow = () => timetable(new Date(), {
+    daily: { title: data.games[today.slug]?.title ?? today.slug, goal: today.goal },
+    parade: (() => { const p = play.parade(); return { on: p.on, next: p.next, to: data.games[p.to]?.title ?? p.to } })(),
+    ferry: ferryPhase(), shown: box.dataset.time ?? 'day', seenThree: found.has('ufo'),
   })
+  function paintBoard(first = false) {
+    const rows = rowsNow()
+    byId('islBoardDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    if (first) {
+      boardList.replaceChildren(...rows.map((r, k) => {
+        const li = document.createElement('li')
+        li.className = 'isl-row'; li.dataset.key = r.key; li.style.setProperty('--tilt', `${((k * 7) % 5) - 2}deg`)
+        li.innerHTML = '<span class="isl-row-pin" aria-hidden="true"></span><p class="isl-row-title"></p><p class="isl-row-line"></p><p class="isl-row-when"><i class="isl-row-dot" aria-hidden="true"></i><span></span></p>'
+        const act = ACTIONS[r.key]
+        if (act) { const b = document.createElement('button'); b.type = 'button'; b.className = 'isl-row-go'; b.textContent = act[0]; b.addEventListener('click', act[1]); li.append(b) }
+        return li
+      }))
+    }
+    for (const r of rows) {
+      const li = boardList.querySelector<HTMLElement>(`[data-key="${r.key}"]`); if (!li) continue
+      li.classList.toggle('is-now', r.now)
+      li.querySelector('.isl-row-title')!.textContent = r.title
+      li.querySelector('.isl-row-line')!.textContent = r.line
+      li.querySelector('.isl-row-when span')!.textContent = r.when
+      const b = li.querySelector<HTMLButtonElement>('.isl-row-go'); if (b) b.setAttribute('aria-label', `${b.textContent}: ${r.title}`)
+    }
+  }
+  function openBoard() {
+    hideNote(); isle.hideCard()
+    paintBoard(true)
+    boardEl.hidden = false
+    boardEl.classList.remove('is-on'); void boardEl.offsetWidth; boardEl.classList.add('is-on')
+    clearInterval(boardT); boardT = window.setInterval(() => paintBoard(), 1000)
+    sound?.page()
+    boardEl.querySelector<HTMLButtonElement>('.isl-row-go')?.focus({ preventScroll: true })
+  }
+  function closeBoard() {
+    if (boardEl.hidden) return
+    clearInterval(boardT)
+    boardEl.classList.remove('is-on')
+    window.setTimeout(() => { if (!boardEl.classList.contains('is-on')) boardEl.hidden = true }, 260)
+  }
+  byId('islBoardX').addEventListener('click', closeBoard)
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !boardEl.hidden) closeBoard() })
+  byId('islStage').addEventListener('pointerdown', closeBoard)
+
+  /* ---- the clock's own events: the bell on the hour, the parade's drum ---- */
+  {
+    let rung = -1, beat = 0
+    setInterval(() => {
+      const d = new Date()
+      if (d.getMinutes() === 0 && d.getSeconds() < 4 && rung !== d.getHours()) {
+        rung = d.getHours()
+        if (isle.awake()) { play.bells(); sound?.bells(d.getHours() % 12 || 12) }
+      }
+    }, 1000)
+    // The band, heard while the parade is on screen.
+    setInterval(() => {
+      if (!sound?.on || !isle.awake() || !play.parade().on) return
+      const [x, y] = play.paradeAt(), v = isle.view()
+      if (Math.abs(x - v.x) < v.w * 0.6 && Math.abs(y - v.y) < v.h * 0.6) sound.drum(beat++)
+    }, 400)
+  }
 
   /* ---- surprise me: somewhere you have not been yet, and straight in ------ */
   // The camera flies there, the card says where, and then it dives in. Any
@@ -639,7 +752,7 @@ const book = BOOK.map((key) => {
     const uf = data.anchors['universe-forecast']
     sound = islandSound(
       { districts: Object.fromEntries(data.districts.map((d) => [d.key, { x: d.x, y: d.y }])), rain: uf ? { x: (uf.x0 + uf.x1) / 2, y: uf.y0 } : undefined, land: data.land },
-      { view: isle.view, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '', awake: isle.awake, ferry: () => ferry() },
+      { view: isle.view, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '', awake: isle.awake, ferry: () => ferry(), fest },
     )
   }
   const paintSound = () => {
@@ -1279,6 +1392,62 @@ const book = BOOK.map((key) => {
   .isl-note-x svg { width: 15px; height: 15px; }
   .isl-note button:focus-visible { outline: 3px solid #8ccbff; outline-offset: 2px; }
 
+  /* The noticeboard: a board of pinned notes, over the map. */
+  .isl-board {
+    position: absolute; left: 50%; top: 84px; z-index: 7;
+    width: min(560px, calc(100% - 28px)); max-height: calc(100% - 110px); overflow: auto; overscroll-behavior: contain;
+    padding: 18px 18px 14px;
+    color: #1b2340; font-family: 'Fredoka', system-ui, sans-serif;
+    background: #e9e3f6; background-image: radial-gradient(rgba(27, 35, 64, 0.06) 1px, transparent 1.4px); background-size: 9px 9px;
+    border: 6px solid #9b8bd6; outline: 3px solid #1b2340; outline-offset: -1px; border-radius: 16px; box-shadow: 0 7px 0 #1b2340, 0 24px 60px rgba(13, 20, 50, 0.3);
+    transform: translate(-50%, 16px) scale(0.97); opacity: 0;
+    transition: opacity 0.22s, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    scrollbar-width: thin;
+  }
+  .isl-board[hidden] { display: none; }
+  .isl-board.is-on { opacity: 1; transform: translate(-50%, 0); }
+  .isl-board-head { text-align: center; margin: 0 34px 12px; }
+  .isl-board-kicker { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6a5bb0; }
+  .isl-board-h { margin: 2px 0 0; font: 700 26px/1.1 'Fredoka', system-ui, sans-serif; letter-spacing: -0.01em; }
+  .isl-board-date { margin: 3px 0 0; font-size: 14px; font-weight: 600; color: #4a5372; }
+  .isl-board-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  :global(.isl-row) {
+    position: relative; display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center;
+    padding: 11px 13px 10px 15px;
+    background: #fdfeff; border: 2px solid #1b2340; border-radius: 4px 4px 10px 10px; box-shadow: 0 3px 0 rgba(27, 35, 64, 0.85);
+    transform: rotate(var(--tilt, 0deg));
+  }
+  :global(.isl-row:nth-child(3n + 2)) { background: #f0fbf7; }
+  :global(.isl-row:nth-child(3n)) { background: #f3f5ff; }
+  :global(.isl-row-pin) { position: absolute; left: 50%; top: -6px; width: 11px; height: 11px; margin-left: -5px; border-radius: 50%; background: #ff4f6e; border: 2px solid #1b2340; }
+  :global(.isl-row:nth-child(2n) .isl-row-pin) { background: #5b82ff; }
+  :global(.isl-row:nth-child(3n) .isl-row-pin) { background: #4fe3c1; }
+  :global(.isl-row p) { margin: 0; grid-column: 1; }
+  :global(.isl-row-title) { font-size: 16.5px; font-weight: 700; line-height: 1.15; }
+  :global(.isl-row-line) { margin-top: 2px !important; font-size: 13.5px; font-weight: 500; line-height: 1.3; color: #4a5372; }
+  :global(.isl-row-when) { display: flex; align-items: center; gap: 6px; margin-top: 5px !important; font-size: 13.5px; font-weight: 700; color: #1b2340; }
+  :global(.isl-row-dot) { width: 8px; height: 8px; border-radius: 50%; background: #c5cde4; border: 1.5px solid #1b2340; }
+  :global(.isl-row.is-now .isl-row-dot) { background: #4fe3c1; }
+  :global(.isl-row.is-now .isl-row-when) { color: #0f7f66; }
+  :global(html.play .isl-row.is-now .isl-row-dot) { animation: isl-now 1.4s ease-in-out infinite; }
+  @keyframes isl-now { 50% { box-shadow: 0 0 0 4px rgba(79, 227, 193, 0.35); } }
+  :global(.isl-row-go) {
+    grid-column: 2; grid-row: 1 / span 3;
+    padding: 7px 13px; font: 700 14px 'Fredoka', system-ui, sans-serif; color: #1b2340; white-space: nowrap; cursor: pointer;
+    background: #fff; border: 2.5px solid #1b2340; border-radius: 12px; box-shadow: 0 3px 0 #1b2340;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
+  }
+  :global(.isl-row-go:hover) { background: #e3f3ff; }
+  :global(.isl-row-go:active) { transform: translateY(3px); box-shadow: 0 0 0 #1b2340; }
+  :global(.isl-row-go:focus-visible) { outline: 3px solid #4fe3c1; outline-offset: 2px; }
+  :global(.isl-row[data-key='today'] .isl-row-go) { background: #4fe3c1; }
+  :global(.isl-row[data-key='three']) { background: #fdfeff; }
+  .isl-board-foot { margin: 12px 0 0; text-align: center; font-size: 12.5px; font-weight: 600; color: #6a5bb0; }
+  .isl-board-x { position: absolute; right: 10px; top: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; color: #1b2340; background: #fff; border: 2.5px solid #1b2340; border-radius: 50%; cursor: pointer; }
+  .isl-board-x:hover { background: #eef2ff; }
+  .isl-board-x svg { width: 15px; height: 15px; }
+  .isl-board-x:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
+
   /* The camera's flash. */
   .isl-flash { position: absolute; inset: 0; z-index: 8; background: #fff; opacity: 0; pointer-events: none; }
   .isl-box.is-flashing .isl-flash { animation: isl-flash 0.55s ease-out; }
@@ -1389,6 +1558,10 @@ const book = BOOK.map((key) => {
     .isl-note { bottom: 84px; padding: 18px 18px 14px; }
     .isl-note-text { font-size: 17px; line-height: 26px; }
     .isl-pills { bottom: 84px; }
+    .isl-board { top: 72px; max-height: calc(100% - 84px); padding: 14px 12px 12px; }
+    .isl-board-h { font-size: 22px; }
+    :global(.isl-row) { grid-template-columns: 1fr; }
+    :global(.isl-row-go) { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 8px; padding: 6px 12px; font-size: 13.5px; }
     .isl-title { top: 78px; font-size: 14px; padding: 6px 14px; }
     .isl-zoom { bottom: 20px; }
     .isl-zoom button { width: 44px; height: 44px; }

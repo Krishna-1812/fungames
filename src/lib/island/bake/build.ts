@@ -25,6 +25,8 @@ export type RunItem = { el: El; chain: El[] }
 export type Run = { id: number; cell: boolean; night: boolean; items: RunItem[]; ctx: number; inherit: Record<string, string> }
 export type Built = {
   root: Node[]
+  /** Each top-level node's layer (sea, walkers...). */
+  layerAt: string[]
   runs: Run[]
   keyframes: Record<string, Keyframes>
   /** Sprites: their run, and for each the top node whose group it is sorted into. */
@@ -333,7 +335,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     const k = kindOf(el)
     if (k === 'skip') return
     if (el.tag === 'rect' && el.attrs.fill === 'url(#isl-sea)') { closeRun(c); c.out.push(seaNode(el)); return }
-    if (k === 'static' && !hasDyn(el)) { openRun(c).items.push({ el, chain: c.chain }); return }
+    // A window in front of a building is kept even when empty: the page walks its own people through it (LiveLayer.front in the engine).
+    if (k === 'static' && !hasDyn(el) && !classes(el).includes('lm-front')) { openRun(c).items.push({ el, chain: c.chain }); return }
     if (k === 'static') {
       // A still wrapper round something that moves. A clip or an opacity on it
       // must reach what moves inside, so such a wrapper is kept as a group.
@@ -469,6 +472,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
   }
 
   const root: Node[] = []
+  /** Each top-level node's layer (sea, walkers...): the engine draws the page's live things after a layer ends. */
+  const layerAt: string[] = []
   for (const L of layers) {
     const c: Ctx = { cell: true, night: L.attrs['data-layer'] === 'night', m: [...ID] as M, chain: [], out: root, run: null, ctx: ++ctxSeq, inherit: {}, top: null }
     const k = kindOf(L)
@@ -482,6 +487,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
       // The next still layer starts a new run: what lies between is decided per cell.
     } else visit(L, c)
     closeRun(c)
+    while (layerAt.length < root.length) layerAt.push(L.attrs['data-layer'] ?? '')
   }
 
   /* ---- what the cards under the map draw: each building's own art ---- */
@@ -506,7 +512,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
   for (const n of root) measure(n, ID)
   for (const sp of sprites) sp.scale = scaleOf.get(sp.run.id) ?? 1
 
-  return { root, runs, keyframes, sprites, masks, defs, pokes, cards, warnings }
+  return { root, layerAt, runs, keyframes, sprites, masks, defs, pokes, cards, warnings }
 
   /* ---- helpers needing the closure ---- */
 }

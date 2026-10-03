@@ -69,6 +69,65 @@ export function postbox(p: Pen, x: number, y: number) {
 }
 
 /** A fingerpost at a crossroads, its arms pointing off along the roads. */
+/**
+ * The noticeboard: a little roofed board on two posts, papers pinned to it,
+ * WHAT'S ON along the top. Poking it opens the island's timetable (the page's).
+ */
+export function noticeboard(p: Pen, x: number, y: number) {
+  const [bx, by] = p.at(x, y)
+  const w = p.el('g', { 'data-poke': 'notice', class: 'pk pk-notice' })
+  w.add(new N('circle', { cx: f(bx), cy: f(by - 18), r: 22, fill: 'transparent' }))
+  const q = new Pen(w, p.ox, p.oy, p.oz, p.b, p.lights)
+  q.el('ellipse', { cx: f(bx - 3), cy: f(by + 1), rx: 17, ry: 5, fill: INK, opacity: 0.13 })
+  // The posts.
+  for (const dx of [-12, 12]) { q.el('path', { d: `M${f(bx + dx)} ${f(by + (dx < 0 ? -1 : 1) * 1.5)}v-30`, stroke: INK, 'stroke-width': 3.6, 'stroke-linecap': 'round' }); q.el('path', { d: `M${f(bx + dx)} ${f(by + (dx < 0 ? -1 : 1) * 1.5)}v-30`, stroke: C.wood, 'stroke-width': 1.8, 'stroke-linecap': 'round' }) }
+  // The board, facing the road, and its frame.
+  const g = q.el('g', { transform: `translate(${f(bx)} ${f(by - 19)}) skewY(-6)` })
+  g.add(new N('rect', { x: -15, y: -11, width: 30, height: 19, rx: 1.6, fill: '#d9cdb8', stroke: INK, 'stroke-width': 1.3 }))
+  g.add(new N('rect', { x: -13.5, y: -9.5, width: 27, height: 16, rx: 0.8, fill: '#cbbd9f' }))
+  // Papers pinned up, each with a pin.
+  const papers: [number, number, number, number, string, number][] = [[-12, -8.6, 8.4, 9.6, '#ffffff', -4], [-2.6, -9, 7.6, 6.8, '#c9f7ea', 3], [5.6, -8.2, 6.6, 8.8, '#ffd1da', -2], [-3.2, -1, 8.6, 6.2, '#e3e9ff', 2]]
+  for (const [px, py, pw, ph, c, r] of papers) {
+    const pg = g.add(new N('g', { transform: `rotate(${r} ${f(px + pw / 2)} ${f(py)})` }))
+    pg.add(new N('rect', { x: px, y: py, width: pw, height: ph, fill: c, stroke: INK, 'stroke-width': 0.55 }))
+    for (let k = 1; k < Math.floor(ph / 2); k++) pg.add(new N('path', { d: `M${f(px + 1.2)} ${f(py + k * 2)}h${f(pw - 2.4)}`, stroke: '#9aa6c8', 'stroke-width': 0.5 }))
+    pg.add(new N('circle', { cx: f(px + pw / 2), cy: f(py + 0.9), r: 0.9, fill: C.rasp, stroke: INK, 'stroke-width': 0.35 }))
+  }
+  // The roof, and its sign.
+  q.el('path', { d: `M${f(bx - 19)} ${f(by - 29.5)}L${f(bx)} ${f(by - 38)}L${f(bx + 19)} ${f(by - 33.5)}L${f(bx + 19)} ${f(by - 31)}L${f(bx)} ${f(by - 35.4)}L${f(bx - 19)} ${f(by - 27)}Z`, fill: C.cobalt, stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' })
+  q.el('rect', { x: f(bx - 11), y: f(by - 45), width: 22, height: 7, rx: 1.5, fill: '#ffffff', stroke: INK, 'stroke-width': 1 })
+  q.el('text', { x: f(bx), y: f(by - 39.8), 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 4.6, fill: INK }).text("WHAT'S ON")
+  p.grow(bx - 22, by - 47, bx + 22, by + 6)
+}
+
+/**
+ * The square the pigeons live on: a round of paving, crumbs scattered on it,
+ * and the old man on his bench who feeds them. (The pigeons themselves are
+ * the page's: they fly off when you come near. See lib/island/play.ts.)
+ */
+export function pigeonSquare(p: Pen, x: number, y: number, ground: Pen) {
+  // The paving is ground, under everything that walks or stands on it.
+  const g = ground.plane(x, y)
+  g.add(new N('ellipse', { cx: 0, cy: 0, rx: 0.47, ry: 0.47, fill: '#e3e6f2', stroke: '#c3c8dd', 'stroke-width': 0.025 }))
+  g.add(new N('ellipse', { cx: 0, cy: 0, rx: 0.34, ry: 0.34, fill: 'none', stroke: '#d3d7e8', 'stroke-width': 0.02 }))
+  let d = ''
+  for (let k = 0; k < 18; k++) { const a = k * 2.4, r = 0.06 + (k % 6) * 0.045; d += `M${f2(Math.cos(a) * r)} ${f2(Math.sin(a) * r)}h0.012` }
+  g.add(new N('path', { d, stroke: '#c9a27a', 'stroke-width': 0.022, 'stroke-linecap': 'round' }))
+  const [bx, by] = p.at(x - 0.36, y + 0.3)
+  // The bench, and him on it, a bag of crumbs.
+  p.el('path', { d: `M${f(bx - 9)} ${f(by - 4)}h18M${f(bx - 8)} ${f(by - 4)}v4M${f(bx + 8)} ${f(by - 4)}v4`, stroke: INK, 'stroke-width': 1.4, 'stroke-linecap': 'round' })
+  p.el('path', { d: `M${f(bx - 9)} ${f(by - 5)}h18`, stroke: C.wood, 'stroke-width': 2.6, 'stroke-linecap': 'round' })
+  p.el('path', { d: `M${f(bx - 9)} ${f(by - 12)}h18`, stroke: C.wood, 'stroke-width': 2.2, 'stroke-linecap': 'round' })
+  p.el('path', { d: `M${f(bx - 2)} ${f(by - 4)}h6v4`, stroke: INK, 'stroke-width': 2, 'stroke-linecap': 'round', fill: 'none' })
+  p.el('rect', { x: f(bx - 5), y: f(by - 14.5), width: 6.4, height: 9.5, rx: 2.6, fill: '#8f9bc0', stroke: INK, 'stroke-width': 1.1 })
+  p.el('circle', { cx: f(bx - 1.8), cy: f(by - 17.6), r: 3.2, fill: SKIN[1], stroke: INK, 'stroke-width': 1.1 })
+  p.el('path', { d: `M${f(bx - 5.2)} ${f(by - 18.4)}a3.4 2.6 0 0 1 6.8 0z`, fill: '#5b6488', stroke: INK, 'stroke-width': 0.9 })
+  p.el('path', { d: `M${f(bx + 1.4)} ${f(by - 10)}l4 1.2`, stroke: INK, 'stroke-width': 1.6, 'stroke-linecap': 'round' })
+  p.el('rect', { x: f(bx + 4.6), y: f(by - 10.2), width: 3.4, height: 3.8, rx: 0.6, fill: '#efe2c8', stroke: INK, 'stroke-width': 0.7 })
+  p.grow(bx - 12, by - 22, bx + 12, by + 2)
+}
+const f2 = (v: number) => Math.round(v * 1000) / 1000
+
 /** The shape each district stamps its passport in, small, for a signpost's board (see passport-art). */
 export type Emblem = 'ring' | 'rope' | 'rosette' | 'hex' | 'shield' | 'ticket' | 'oval'
 function emblem(g: N, shape: Emblem, ink: string) {

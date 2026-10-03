@@ -151,6 +151,8 @@ export type Scene = {
   masks: Record<string, { box: Box; res: number; w: number; h: number; bits: string }>
   /** Every kind of thing there is to poke. */
   pokes: string[]
+  /** Where each layer of the painting ends among the top-level nodes: its kind, and the index just after its last node. */
+  ends?: [string, number][]
   /** The island's still painting by day, small, over the sea, covering the view: shown until the canvas can draw. */
   poster: { file: string; w: number; h: number } | null
 }

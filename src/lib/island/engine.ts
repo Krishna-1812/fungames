@@ -24,7 +24,25 @@ type G = Node & { k: 'g' }
 type V = Node & { k: 'v' }
 type T = Node & { k: 'txt' }
 type Cam = { x: number; y: number; z: number }
-export type IslandState = { time: string; season: string; hour: number; near: boolean }
+export type IslandState = { time: string; season: string; hour: number; near: boolean; fest?: boolean }
+/**
+ * Something the page draws itself, live, in the painting's own order (a ball
+ * you can throw, pigeons, a parade): given the canvas, the world-to-device
+ * matrix and the time, it draws and says how many canvas calls that took.
+ */
+export type LiveHook = (c: CanvasRenderingContext2D, m: M, t: number) => number
+export type LiveLayer = {
+  /** Drawn just after the layer of that kind (sea, walkers...), so whatever is painted later stands in front of it. */
+  after?: Partial<Record<string, LiveHook>>
+  /** Drawn over everything (what flies). */
+  top?: LiveHook
+  /**
+   * Drawn again in each window in front of a building (see drawGroup), so
+   * what walks the road there is not cut off by the wall behind it. inWin
+   * says whether a box in world units shows in the window, and if so clips to it.
+   */
+  front?: (c: CanvasRenderingContext2D, m: M, t: number, inWin: (b: Box) => boolean) => number
+}
 export type Hit = { lm?: string; poke?: { kind: string; node: object; n?: number } } | null
 
 /** Per-node bookkeeping the engine keeps beside the scene's own nodes. */
@@ -180,7 +198,8 @@ export function createEngine(o: {
 
   const cssEase = ease('ease')
   let st: IslandState = o.state()
-  const whenOk = (w: When | undefined) => !w || ((!w.time || w.time.includes(st.time)) && (!w.season || w.season.includes(st.season)) && (!w.hour || w.hour.includes(st.hour)))
+  // A festival night (Friday's fireworks) counts as the season 'fest' too.
+  const whenOk = (w: When | undefined) => !w || ((!w.time || w.time.includes(st.time)) && (!w.season || w.season.includes(st.season) || (!!st.fest && w.season.includes('fest'))) && (!w.hour || w.hour.includes(st.hour)))
 
   /* ---- posing a node at this moment ---- */
   const tNow = () => (o.play ? (now - t0) / 1000 : 0)
@@ -514,7 +533,11 @@ export function createEngine(o: {
     else for (const k of n.kids) drawNode(k, mm, a)
     if (n.clip) {
       if (!n.cb) restore()
-      else { if (win?.on) restore(); win = outer }
+      else {
+        // What the page walks along the road here, through the same window.
+        if (drawLive.front && win) { cs.paths += drawLive.front(ctx, deviceM, now, (b) => !outsideWin(devBox(deviceM, b))); ident = false; textCtx = null; ctx.globalAlpha = 1 }
+        if (win?.on) restore(); win = outer
+      }
     }
   }
 
@@ -683,6 +706,16 @@ export function createEngine(o: {
   /** Last frame: what had nothing to draw yet, and what was drawn from a coarser picture than it wanted. */
   let gaps = 0, blurry = 0, lastGaps = 1, lastBlurry = 1
 
+  /* ---- what the page draws live ---- */
+  let drawLive: LiveLayer = {}
+  /** The layers that end after each top-level node (sea, walkers...), for the hooks after them. */
+  const endsAfter = new Map<number, string[]>()
+  // Only where the last layer of each kind ends (the sea comes in more than one), so each hook runs once a frame.
+  const lastEnd = new Map<string, number>()
+  for (const [kind, at] of scene.ends ?? []) lastEnd.set(kind, at)
+  for (const [kind, at] of lastEnd) (endsAfter.get(at - 1) ?? endsAfter.set(at - 1, []).get(at - 1)!).push(kind)
+  const hook = (h: LiveHook) => { cs.paths += h(ctx, deviceM, now); ident = false; textCtx = null; ctx.globalAlpha = 1 }
+
   /* ---- one frame ---- */
   /** A colour to lay down before the island (a snapshot has no page behind it). */
   let under: string | null = null
@@ -709,8 +742,13 @@ export function createEngine(o: {
     if (under) { ctx.fillStyle = under; ctx.fillRect(0, 0, canvas.width, canvas.height) }
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
-    for (const n of scene.root) drawNode(n, deviceM, 1)
+    scene.root.forEach((n, i) => {
+      drawNode(n, deviceM, 1)
+      const ended = endsAfter.get(i)
+      if (ended) for (const k of ended) { const h = drawLive.after?.[k]; if (h) hook(h) }
+    })
     for (const n of extra) drawNode(n, deviceM, 1)
+    if (drawLive.top) hook(drawLive.top)
     ctx.globalAlpha = 1
     lastGaps = gaps; lastBlurry = blurry
     pump()
@@ -829,6 +867,8 @@ export function createEngine(o: {
     },
     /** Things the page adds on top: flags, the day's balloon. */
     add(nodes: Node[]) { extra.push(...nodes) },
+    /** What the page draws live, in the painting's order (see LiveLayer). */
+    setLive(l: LiveLayer) { drawLive = l },
     /** Bottles found: they fade away (at once, for those found on an earlier visit). */
     setGone(ns: Iterable<number>) { for (const n of ns) gone.add(n) },
     /**

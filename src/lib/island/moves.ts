@@ -295,6 +295,7 @@ export const POKES: Record<string, Poke> = {
   deer: { self: once('pk-run', 2.4, 'ease-in-out') },
   treasure: { self: once('pk-jiggle', 0.8, 'ease-in-out') },
   house32: { self: once('pk-jiggle', 0.8, 'ease-in-out') },
+  notice: { self: once('pk-jiggle', 0.8, 'ease-in-out') },
   ufo: { self: once('pk-zip', 3.4, 'ease-in-out') },
 }
 /** The origin a poke's own reaction turns and lifts round: the foot of what was poked. */
@@ -330,7 +331,8 @@ export const LAYERS = {
   beam: { loop: L('isl-beam', 10, 'linear'), when: { time: ['night', 'dusk'] } as When, dusk: 0.5 },
   snow: { loop: L('isl-sift', 40, 'linear'), when: { season: ['winter', 'newyear'] } as When },
   petals: { loop: L('isl-sift', 70, 'linear'), when: { season: ['spring'] } as When },
-  fireworks: { when: { season: ['newyear'], time: ['night', 'dusk'] } as When },
+  // New Year, and Friday nights from eight to ten (the page says when: see 'fest' in the engine).
+  fireworks: { when: { season: ['newyear', 'fest'], time: ['night', 'dusk'] } as When },
   ufo: { when: { hour: [3] } as When },
   dawnWhale: { when: { time: ['dawn'] } as When },
   nightDim: { when: NIGHT_ONLY },

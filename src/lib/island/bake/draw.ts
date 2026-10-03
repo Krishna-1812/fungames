@@ -533,13 +533,19 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     if (n.k === 'g') { n.kids = n.kids.map(remap).filter((x): x is Node => !!x); return n }
     return n
   }
-  const root = b.root.map(remap).filter((x): x is Node => !!x)
+  const root: Node[] = []
+  // Where each layer ends among what is left, for the hooks the page draws its live things at.
+  const ends: [string, number][] = []
+  b.root.forEach((n, i) => {
+    const r = remap(n); if (r) root.push(r)
+    if (b.layerAt[i] !== b.layerAt[i + 1]) ends.push([b.layerAt[i], root.length])
+  })
   const used = new Set<string>()
   const findKf = (n: Node) => { if ('a' in n && n.a) for (const a of n.a) used.add(a.kf); if (n.k === 'g') n.kids.forEach(findKf) }
   root.forEach(findKf)
   const keyframes = Object.fromEntries(Object.entries(b.keyframes))
   const levelsOut = levelIndex.map((ix, i) => { const file = `L${i}.json`; files.set(file, Buffer.from(JSON.stringify(ix))); return { scale: LEVELS[i], cols: ix.cols, rows: ix.rows, index: file } })
-  const scene: Scene = { v: 1, hash, view, levels: LEVELS, cell: CELL, extent, lv: levelsOut, root, keyframes, sprites: spriteList, pages, groups, masks, pokes: b.pokes, poster: posterOut }
+  const scene: Scene = { v: 1, hash, view, levels: LEVELS, cell: CELL, extent, lv: levelsOut, root, keyframes, sprites: spriteList, pages, groups, masks, pokes: b.pokes, poster: posterOut, ends }
   stats.ms = Date.now() - t0
   return { scene, files, levels: levelsOut, stats }
 }

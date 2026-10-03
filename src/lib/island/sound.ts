@@ -33,6 +33,8 @@ export type Listener = {
   awake(): boolean
   /** The ferry's place in its trip, 0..1, if it can be read. */
   ferry?(): number | null
+  /** A festival night (Friday's fireworks). */
+  fest?(): boolean
 }
 
 type Bed = { level: GainNode; pan: StereoPannerNode; at: (p: Places) => Pt | null; base: number }
@@ -262,7 +264,7 @@ export function islandSound(places: Places, ear: Listener) {
     if (roll(0.007)) bell(D.harbour ?? null)
     if (roll(0.012 * (1 - day))) owl([D.peaks, D.oldtown][Math.floor(Math.random() * 2)] ?? null)
     if (roll(0.008 * day)) baa(D.peaks ?? null)
-    if (season === 'newyear' && t === 'night' && roll(0.07)) boom(D.oldtown ?? null)
+    if ((season === 'newyear' || ear.fest?.()) && t === 'night' && roll(0.07)) boom(D.oldtown ?? null)
     // The ferry blows its horn as it comes in to the jetty and as it leaves.
     const ph = ear.ferry?.() ?? null
     if (ph !== null && ferryWas !== null) for (const at of [0.28, 0.625]) if (ferryWas < at && ph >= at) horn(D.harbour ?? null)
@@ -326,6 +328,16 @@ export function islandSound(places: Places, ear: Listener) {
     page: () => { if (on) hit({ dur: 0.3, gain: 0.06, freq: 1800, sweepTo: 4000, q: 0.5 }) },
     /** A bottle's note unrolled: the cork, then paper. */
     unroll: () => { if (!on) return; tone({ freq: 620, to: 1500, dur: 0.05, gain: 0.12, type: 'sine', delay: 0.5 }); hit({ dur: 0.42, gain: 0.07, freq: 2600, sweepTo: 5200, q: 0.5, delay: 0.62 }) },
+    /** The beach ball landing, harder or softer. */
+    thump: (k = 0.5) => { if (!on) return; tone({ freq: 190 + k * 60, to: 90, dur: 0.12, gain: 0.08 + k * 0.14, type: 'sine' }); hit({ dur: 0.05, gain: 0.04 + k * 0.05, freq: 700, type: 'lowpass' }) },
+    /** Something landing in the sea. */
+    splash: () => { if (!on) return; hit({ dur: 0.5, gain: 0.14, freq: 2200, sweepTo: 600, q: 0.6 }); tone({ freq: 520, to: 220, dur: 0.15, gain: 0.05, delay: 0.04 }) },
+    /** Pigeons going up: a clatter of wings. */
+    flutter: () => { if (!on) return; for (let k = 0; k < 9; k++) hit({ dur: 0.06, gain: 0.05 + (k % 3) * 0.015, freq: 900 + (k % 4) * 260, q: 1.2, delay: k * 0.045 + Math.random() * 0.03 }) },
+    /** The bell in the square, on the hour: as many strokes as the hour (up to twelve), and a hum after. */
+    bells: (n: number) => { if (!on) return; const strokes = Math.max(1, Math.min(12, n)); for (let k = 0; k < strokes; k++) { const d = k * 1.15; tone({ freq: 392, dur: 2.2, gain: 0.08, type: 'sine', delay: d }); tone({ freq: 392 * 2.76, dur: 1.2, gain: 0.025, type: 'sine', delay: d }); tone({ freq: 196, dur: 2.6, gain: 0.04, type: 'sine', delay: d }) } },
+    /** The parade's drum, a beat: k picks which of the bar it is. */
+    drum: (k = 0) => { if (!on) return; if (k % 4 === 0) tone({ freq: 110, to: 60, dur: 0.18, gain: 0.12 }); hit({ dur: 0.06, gain: k % 2 ? 0.05 : 0.08, freq: 1800, q: 1.5, type: 'bandpass' }) },
     /** A postcard taken: the shutter, and the film winding on. */
     shutter: () => { if (!on) return; hit({ dur: 0.025, gain: 0.3, freq: 3200, q: 2 }); hit({ dur: 0.04, gain: 0.2, freq: 1500, q: 3, delay: 0.08 }); for (let k = 0; k < 4; k++) hit({ dur: 0.018, gain: 0.05, freq: 2400, q: 6, delay: 0.24 + k * 0.045 }) },
   }

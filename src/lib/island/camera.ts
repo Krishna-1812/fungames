@@ -78,6 +78,16 @@ export function initIsland(o: {
   onEnter?: (slug: string) => void
   /** Something that is not a building was poked (and which one of its kind, if they are counted: a bottle). */
   onPoke?: (kind: string, n?: number) => void
+  /**
+   * A hand going down on the map at (x, y), in map units (z is screen pixels
+   * to a unit): something there that can be picked up (the ball) takes the
+   * pointer instead of the map, until it lets go.
+   */
+  grab?: (x: number, y: number, z: number, touch: boolean) => { move(x: number, y: number): void; up(): void } | null
+  /** The pointer over the map (hovering, pressing, or a tap on nothing in particular), for what reacts to it. */
+  pointer?: (x: number, y: number, z: number, kind: 'hover' | 'down' | 'tap') => void
+  /** Whether something that can be picked up is under (x, y): the cursor says so. */
+  grabbable?: (x: number, y: number, z: number) => boolean
 }) {
   const { box, stage, canvas, poster, anchors, games, links } = o
   const [bx, by, bw, bh] = o.bounds
@@ -359,8 +369,23 @@ export function initIsland(o: {
     const [a, b] = [...ptrs.values()], r = box.getBoundingClientRect()
     return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top }
   }
+  /** What a hand is holding instead of the map (the ball), and which pointer it is. */
+  let holding: { id: number; g: { move(x: number, y: number): void; up(): void } } | null = null
   stage.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return
+    if (!ptrs.size && !holding) {
+      const p0 = local(e), [wx, wy] = toWorld(p0.x, p0.y)
+      const g = o.grab?.(wx, wy, cam.z, e.pointerType !== 'mouse')
+      if (g) {
+        holding = { id: e.pointerId, g }
+        stage.setPointerCapture(e.pointerId)
+        // Not a click: nothing under it is picked as well.
+        moved = 99
+        firstTouch(); hideCard(); box.classList.add('is-grabbing'); wake()
+        return
+      }
+      o.pointer?.(wx, wy, cam.z, 'down')
+    }
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY })
     press = local(e)
     stage.setPointerCapture(e.pointerId)
@@ -373,9 +398,10 @@ export function initIsland(o: {
     box.classList.add('is-grabbing'); stage.style.cursor = ''; firstTouch(); wake()
   })
   stage.addEventListener('pointermove', (e) => {
+    if (holding && e.pointerId === holding.id) { const p = local(e), [wx, wy] = toWorld(p.x, p.y); holding.g.move(wx, wy); wake(); return }
     if (!ptrs.has(e.pointerId)) {
       // Just pointing (a mouse, no button down): what is under it, looked at in the next frame.
-      if (e.pointerType === 'mouse' && !dragging) { const p = local(e); hover.x = p.x; hover.y = p.y; hover.dirty = true; hover.on = true; wake() }
+      if (e.pointerType === 'mouse' && !dragging) { const p = local(e); hover.x = p.x; hover.y = p.y; hover.dirty = true; hover.on = true; const [wx, wy] = toWorld(p.x, p.y); o.pointer?.(wx, wy, cam.z, 'hover'); wake() }
       return
     }
     const p = ptrs.get(e.pointerId)!
@@ -406,6 +432,7 @@ export function initIsland(o: {
     wake()
   })
   const up = (e: PointerEvent) => {
+    if (holding && e.pointerId === holding.id) { holding.g.up(); holding = null; box.classList.remove('is-grabbing'); wake(); return }
     if (!ptrs.delete(e.pointerId)) return
     // From two fingers to one: the one left carries on dragging, without a throw from the change.
     if (ptrs.size) { vel = { x: 0, y: 0 }; return }
@@ -462,7 +489,8 @@ export function initIsland(o: {
   function hoverTest() {
     hover.dirty = false
     const h = hover.on && !dragging && engine ? engine.hit(hover.x, hover.y) : null
-    stage.style.cursor = h ? 'pointer' : ''
+    const [wx, wy] = toWorld(hover.x, hover.y)
+    stage.style.cursor = h ? 'pointer' : hover.on && o.grabbable?.(wx, wy, cam.z) ? 'grab' : ''
     const lm = h?.lm ?? null
     if (lm === hover.lm) return
     hover.lm = lm
@@ -612,6 +640,7 @@ export function initIsland(o: {
       if (!PLAY) setTimeout(wake, POKE_MS + 60)
       return
     }
+    { const [wx, wy] = toWorld(press.x, press.y); o.pointer?.(wx, wy, cam.z, 'tap') }
     hideCard()
   })
 
@@ -764,6 +793,8 @@ export function initIsland(o: {
     /** Do something with the engine (draw something, change a sign) as soon as the map has loaded. */
     withEngine,
     flyToSlug, showCard, hideCard, home, enter,
+    /** Fly to a point on the map, at n times the zoom that fits the island. */
+    flyToPoint: (x: number, y: number, n: number) => { firstTouch(); flyTo(x, y, fitZ() * n) },
     zoomIn: () => { firstTouch(); zoomAt(1.5) }, zoomOut: () => { firstTouch(); zoomAt(1 / 1.5) },
     dim: (set: Set<string> | null) => { keep = set; engine?.dim(set); wake() },
     /** Draw again (the page changed something the island shows). */
