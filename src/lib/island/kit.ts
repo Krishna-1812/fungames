@@ -296,16 +296,23 @@ export class Pen {
     const e = o.over ?? 0.06
     x -= e; y -= e; w += e * 2; d += e * 2
     const lines = o.lines ?? 3
+    // Three tones: the gable end in shade, the long slope, and along its
+    // ridge a lighter band where the sun catches the top of it.
+    const lit = mix(fill, '#ffffff', 0.24), r = 0.3
     if (axis === 'x') {
       const my = y + d / 2
       this.poly([[x + w, y, z], [x + w, y + d, z], [x + w, my, z + h]], shade(fill, 0.84), o)
       this.poly([[x, y + d, z], [x + w, y + d, z], [x + w, my, z + h], [x, my, z + h]], fill, o)
+      this.poly([[x, my, z + h], [x + w, my, z + h], [x + w, my + (d / 2) * r, z + h * (1 - r)], [x, my + (d / 2) * r, z + h * (1 - r)]], lit, { sw: 0 })
       for (let k = 1; k <= lines; k++) { const t = k / (lines + 1); this.line([x, my + (d / 2) * t, z + h * (1 - t)], [x + w, my + (d / 2) * t, z + h * (1 - t)], { sw: 0.8, stroke: shade(fill, 0.75) }) }
+      this.line([x, my, z + h], [x + w, my, z + h], { sw: o.sw ?? OUT, stroke: o.stroke ?? INK })
     } else {
       const mx = x + w / 2
       this.poly([[x + w, y, z], [x + w, y + d, z], [mx, y + d, z + h], [mx, y, z + h]], shade(fill, 0.96), o)
+      this.poly([[mx, y, z + h], [mx, y + d, z + h], [mx + (w / 2) * r, y + d, z + h * (1 - r)], [mx + (w / 2) * r, y, z + h * (1 - r)]], mix(shade(fill, 0.96), '#ffffff', 0.24), { sw: 0 })
       this.poly([[x, y + d, z], [x + w, y + d, z], [mx, y + d, z + h]], shade(fill, 0.8), o)
       for (let k = 1; k <= lines; k++) { const t = k / (lines + 1); this.line([mx + (w / 2) * t, y, z + h * (1 - t)], [mx + (w / 2) * t, y + d, z + h * (1 - t)], { sw: 0.8, stroke: shade(fill, 0.8) }) }
+      this.line([mx, y, z + h], [mx, y + d, z + h], { sw: o.sw ?? OUT, stroke: o.stroke ?? INK })
     }
   }
   cyl(cx: number, cy: number, r: number, z0: number, h: number, fill: string, o: Draw & { top?: string; side?: string; bands?: [number, number, string][] } = {}) {

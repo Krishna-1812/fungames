@@ -41,6 +41,14 @@ export type GameInfo = { slug: string; title: string; blurb: string; href: strin
 
 type Cam = { x: number; y: number; z: number }
 
+/**
+ * How close the island opens, as a share of the zoom that fits it all: close
+ * enough that the buildings are the subject and the coast peeks in at the
+ * edges, rather than a map of the whole. The Home button and the mini-map
+ * are the overview. Closer still on a phone's narrow screen.
+ */
+const OPEN = (w: number) => (w < 700 ? 2.1 : 1.6)
+
 /** A frame's worth of time at 60 frames a second: the unit the easing was tuned in. */
 const FRAME = 1000 / 60
 
@@ -493,6 +501,7 @@ export function initIsland(o: {
     clearTimeout(hideT)
     hot = slug
     engine?.setHot(slug)
+    pinHot(slug)
     card.querySelector('.isl-card-title')!.textContent = g.title
     card.querySelector('.isl-card-blurb')!.textContent = g.blurb
     cardBest.textContent = g.best ? `Best ${g.best}` : ''
@@ -512,6 +521,7 @@ export function initIsland(o: {
       card.classList.remove('is-on')
       hot = null
       engine?.setHot(null)
+      pinHot(null)
       wake()
     }
     clearTimeout(hideT)
@@ -647,11 +657,18 @@ export function initIsland(o: {
   addEventListener('pagereveal', (e) => { if (backIn) { backIn = false; skip(e) } })
 
   /* ---- the mini-map ------------------------------------------------------- */
-  mini?.addEventListener('pointerdown', (e) => {
-    const pt = mini.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY
-    const w = pt.matrixTransform(mini.getScreenCTM()!.inverse())
-    firstTouch(); flyTo(w.x, w.y, goal.z)
-  })
+  // Click a place on it to fly there; drag across it and the camera follows.
+  const miniTo = (e: PointerEvent) => {
+    const pt = mini!.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY
+    const w = pt.matrixTransform(mini!.getScreenCTM()!.inverse())
+    flyTo(w.x, w.y, goal.z)
+  }
+  mini?.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; mini.setPointerCapture(e.pointerId); firstTouch(); miniTo(e) })
+  mini?.addEventListener('pointermove', (e) => { if (mini.hasPointerCapture(e.pointerId)) miniTo(e) })
+  const pins = new Map([...(mini?.querySelectorAll<SVGElement>('.isl-mini-pin') ?? [])].map((p) => [p.dataset.slug!, p]))
+  let pinned: SVGElement | null = null
+  /** The pin of the building whose card is open, larger. */
+  const pinHot = (slug: string | null) => { pinned?.classList.remove('is-hot'); pinned = slug ? pins.get(slug) ?? null : null; pinned?.classList.add('is-hot') }
 
   /* ---- sleeping when nobody is looking ------------------------------------ */
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) wake() }).observe(box)
@@ -692,12 +709,12 @@ export function initIsland(o: {
   const settleTo: Cam = saved
     ? { x: saved.x, y: saved.y, z: saved.n * fitZ() }
     : cameFrom ? framing(cameFrom, 2.2)
-    : { x: bx + bw / 2, y: by + bh * 0.54, z: fitZ() * (W < 700 ? 2.1 : 1.12) }
+    : { x: bx + bw / 2, y: by + bh * 0.54, z: fitZ() * OPEN(W) }
   place(settleTo, settleTo, false)
   const opening = { intro: !saved && !cameFrom }
   if (cameFrom) Object.assign(cam, inside(cameFrom))
   else if (saved) Object.assign(cam, settleTo)
-  else { cam.z = fitZ() * 0.82; cam.y -= bh * 0.08 }
+  else { cam.z = settleTo.z * 0.62; cam.y -= bh * 0.08 }
   if (!opening.intro) hint?.classList.add('is-gone')
   if (PLAY) Object.assign(goal, cam)
   else { Object.assign(goal, settleTo); Object.assign(cam, settleTo) }

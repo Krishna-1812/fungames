@@ -46,8 +46,10 @@ const PHONE_WARN = 40
 /**
  * Canvas calls a frame, at most, at each view: about 30% above what the
  * island needed when these were set (1351, 1330, 636, 158 and 1465 in
- * October 2026), so ordinary new art fits and a slip (a thousand shapes left
- * as outlines, every tree a sprite of its own) does not.
+ * October 2026; after the art pass added rings on the water and people
+ * walking in front of buildings, 1480, 1368, 707, 183 and 1603), so ordinary
+ * new art fits and a slip (a thousand shapes left as outlines, every tree a
+ * sprite of its own) does not.
  */
 const BUDGET = { whole: 1750, opening: 1750, closer: 850, closest: 320, night: 1900 }
 
@@ -201,7 +203,7 @@ try {
   const busy = lm.map((p) => ({ p, k: lm.filter((q) => Math.hypot(q.x - p.x, q.y - p.y) < 260).length })).sort((a, b) => b.k - a.k)[0].p
   const views = [
     ['whole', 'the whole island', cx, by + bh * 0.56, 1, 'day'],
-    ['opening', 'the opening view', cx, by + bh * 0.54, 1.12, 'day'],
+    ['opening', 'the opening view', cx, by + bh * 0.54, 1.6, 'day'],
     ['closer', 'closer in, on the busiest corner', busy.x, busy.y, 3, 'day'],
     ['closest', 'as close as it goes, there', busy.x, busy.y, 7, 'day'],
     ['night', 'the whole island at night', cx, by + bh * 0.56, 1, 'night'],

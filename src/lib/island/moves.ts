@@ -63,6 +63,7 @@ export const KEYFRAMES = `
 @keyframes isl-jetski { 50% { transform: translate(-40px, 16px); } }
 @keyframes isl-surf { 0%, 100% { opacity: 0; } 35% { opacity: 0.6; } 70% { opacity: 0.08; } }
 @keyframes isl-shim { 0%, 100% { opacity: 0; } 30%, 45% { opacity: 0.8; } }
+@keyframes isl-ripple { 0% { transform: scale(0.5); opacity: 0; } 18% { opacity: 0.9; } 100% { transform: scale(1.55); opacity: 0; } }
 @keyframes isl-glint { 0%, 55%, 100% { opacity: 0; transform: scale(0.3); } 72% { opacity: 0.95; transform: scale(1); } }
 @keyframes isl-flow { to { stroke-dashoffset: -9; } }
 @keyframes isl-spray { to { stroke-dashoffset: -7; } }
@@ -177,6 +178,8 @@ export const RULES: Rule[] = [
   // White water running down each fall of the river, and up out of the
   // fountain. (Until the map moved to a canvas these named the keyframes
   // that slid the weather down the map, and flew off with it.)
+  // Rings spreading out round whatever sits in the water: a buoy, a rock, a moored boat, a duck.
+  { on: ['ripple'], loop: L('isl-ripple', 3.6, 'ease-out'), base: { opacity: 0 }, fillBox: true, origin: 'center' },
   { on: ['fall'], loop: L('isl-flow', 0.55, 'linear') },
   { on: ['fish'], loop: L('isl-fish', 7, 'ease-in-out'), base: { opacity: 0 } },
   { on: ['leg-a'], inside: 'walker', loop: L('isl-step', 0.5, 'ease-in-out', { dir: 'alternate' }) },

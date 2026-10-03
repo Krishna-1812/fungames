@@ -76,6 +76,8 @@ export type Node =
       when?: When
       /** A clip, as path data in this group's own coordinates. */
       clip?: string
+      /** A window drawn through only while something is in it: the clip's box, to skip it by (lm-front). */
+      cb?: Box
       /** Classes the engine looks for (the windmill's sails, a cloud...). */
       tags?: string[]
       /** A building (its slug) or a thing to poke (its kind). */

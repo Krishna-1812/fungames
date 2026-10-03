@@ -18,6 +18,7 @@ import { RULES, KEYFRAMES, LAYERS, POKES, POKE_SAY, LANDMARK, type Loop, type Ru
 import { parseKeyframes } from '../keyframes'
 import { parseSvgTransform, mul, ID, apply, fnsMatrix, progress, sampleProp, ease, touches } from '../anim'
 import type { Anim, Box, Keyframes, M, Node, Style } from '../scene'
+import { Bounds, pathBounds } from '../kit'
 
 export type RunItem = { el: El; chain: El[] }
 /** A still stretch of painting: in cells (world) or as a sprite (in its node's coordinates). */
@@ -345,6 +346,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
         if (m.some((v, i) => v !== ID[i])) node.m = m
         if (op !== undefined) node.op = Number(op)
         if (clip) node.clip = clipPathData(clip)
+        // A window in front of a building that people walk through (world.ts): its box, so the engine can skip it while no one is in it.
+        if (clip && classes(el).includes('lm-front')) { const bb = new Bounds(); pathBounds(node.clip!, bb); if (Number.isFinite(bb.x0)) node.cb = [bb.x0, bb.y0, bb.x1, bb.y1] }
         c.out.push(node)
         const inner: Ctx = { ...c, cell: false, m: [...ID] as M, chain: [], out: node.kids, run: null, ctx: ++ctxSeq, inherit: inheritFrom([...c.chain, el], c.inherit), top: c.top ?? node }
         for (const kid of el.kids) if (typeof kid !== 'string') visit(kid, inner)
@@ -482,7 +485,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
   /* ---- what the cards under the map draw: each building's own art ---- */
   const cards: Record<string, string> = {}
   for (const L of layers) for (const el of walk(L)) if (classes(el).includes('lm-art') && el.attrs.id?.startsWith('lm-')) {
-    cards[el.attrs.id.slice(3)] = el.kids.map((k) => write(k, (e) => { const a = { ...e.attrs }; delete a.id; delete a['data-l']; delete a['data-la']; delete a['data-b']; return a })).join('')
+    // The heavier line round a building's outside is for the map; a card's building is drawn small, where it would only be weight.
+    cards[el.attrs.id.slice(3)] = el.kids.filter((k) => typeof k === 'string' || !classes(k).includes('lm-rim')).map((k) => write(k, (e) => { const a = { ...e.attrs }; delete a.id; delete a['data-l']; delete a['data-la']; delete a['data-b']; return a })).join('')
   }
 
   const pokes = [...new Set(masks.filter((m) => m.key.startsWith('pk:')).map((m) => m.key.split(':')[2]))]

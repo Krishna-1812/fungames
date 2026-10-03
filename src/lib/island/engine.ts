@@ -322,6 +322,7 @@ export function createEngine(o: {
     if (n.tags) a *= tagAlpha(n.tags, n)
     if (a <= 0.002) return
     if (!lv.path) lv.path = new Path2D(n.d)
+    if (win && n.bb && outsideWin(devBox(m, n.bb))) return
     setM(mm)
     const st = n.st
     const fill = fills.get(n) ?? P.fill ?? tagFill(n) ?? undefined
@@ -352,6 +353,7 @@ export function createEngine(o: {
     const a = alpha * (P.op ?? n.op ?? 1)
     if (a <= 0.002) return
     const mm = n.m ? mulTo([1, 0, 0, 1, 0, 0], m, n.m) : m
+    if (win && n.bb && outsideWin(devBox(m, n.bb))) return
     setM(mm)
     // Setting a font makes the canvas read it again: only when it changes.
     if (textCtx !== ctx) { textCtx = ctx; textFont = ''; textLs = '' }
@@ -370,6 +372,7 @@ export function createEngine(o: {
   const drawSprite = (id: number, m: M, alpha: number) => {
     const sp = scene.sprites[id], u = sp.u
     if (offscreen(m, sp.box)) return
+    if (win && outsideWin(devBox(m, sp.box))) return
     // Screen pixels to one of its units, along its longer axis (a squashed one is as sharp as it is long).
     const s = Math.max(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3]))
     // The size wanted: the smallest level at least as sharp as the screen.
@@ -483,13 +486,37 @@ export function createEngine(o: {
     }
     if (n.poke) { lv.drawn = mm.slice() as M; lv.frame = frameNo }
     if (n.tags?.includes('lm-art')) mm = artMatrix(n, mm)
+    // A clip with a box of its own is a window that is mostly empty (people
+    // passing in front of a building): it is only set up once something in
+    // it is about to be drawn, and what lies outside its box is not drawn.
+    const outer = win
     if (n.clip) {
       if (!lv.clip) lv.clip = new Path2D(n.clip)
-      ctx.save(); setM(mm); ctx.clip(lv.clip)
+      if (n.cb) {
+        // Far out, a person is a few pixels tall and what the window puts right does not show: it is not worth its calls.
+        if (deviceM[0] < WIN_MIN || offscreen(mm, n.cb)) return
+        win = { path: lv.clip, m: mm, box: devBox(mm, n.cb), on: false }
+      } else { ctx.save(); setM(mm); ctx.clip(lv.clip) }
     }
     if (iso && n.bb) drawApart(n, m, mm, a)
     else for (const k of n.kids) drawNode(k, mm, a)
-    if (n.clip) restore()
+    if (n.clip) {
+      if (!n.cb) restore()
+      else { if (win?.on) restore(); win = outer }
+    }
+  }
+
+  /** Device pixels to a map unit below which the windows in front of buildings are left out. */
+  const WIN_MIN = 1.2
+  /** The window being drawn through (see drawGroup), if any, and whether its clip is set yet. */
+  let win: { path: Path2D; m: M; box: Box; on: boolean } | null = null
+  /** Whether a box on the device is wholly outside the window; and if not, set the window's clip. */
+  const outsideWin = (d: Box) => {
+    if (!win) return false
+    const b = win.box
+    if (d[2] < b[0] || d[0] > b[2] || d[3] < b[1] || d[1] > b[3]) return true
+    if (!win.on) { ctx.save(); setM(win.m); ctx.clip(win.path); win.on = true }
+    return false
   }
 
   // Canvases to draw a group apart in, reused.
@@ -599,6 +626,46 @@ export function createEngine(o: {
     ctx.fillStyle = g
     ctx.fillRect(vis[0], vis[1] / n.sy, vis[2] - vis[0], (vis[3] - vis[1]) / n.sy)
     restore()
+    if (o.play) drawWaves(n, alpha)
+  }
+
+  /**
+   * The open sea moving: little wave marks in three sets, each in turn
+   * fading in, drifting a short way with the wind and fading out again, then
+   * coming back somewhere else. Whatever is painted over the sea (the
+   * shallows, the land) hides them, so they are only ever out in deep water.
+   * One stroke a set, three a frame at most, whatever the zoom.
+   */
+  const WAVES = { sets: 3, each: 120, period: 8, drift: 26, alpha: 0.5 }
+  let waves: Path2D[] | null = null
+  const drawWaves = (n: Node & { k: 'sea' }, alpha: number) => {
+    if (!waves) {
+      let seed = 7
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+      const [x0, y0, x1, y1] = n.rect
+      waves = Array.from({ length: WAVES.sets }, () => {
+        const p = new Path2D()
+        for (let k = 0; k < WAVES.each; k++) {
+          const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0), s = 0.75 + rnd() * 0.5
+          p.moveTo(x, y); p.quadraticCurveTo(x + 5 * s, y - 3.6 * s, x + 10 * s, y); p.quadraticCurveTo(x + 15 * s, y - 3.6 * s, x + 20 * s, y)
+        }
+        return p
+      })
+    }
+    const t = (now - t0) / 1000
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    for (let k = 0; k < WAVES.sets; k++) {
+      const ph = t / WAVES.period + k / WAVES.sets, cyc = Math.floor(ph), u = ph - cyc
+      const a = 0.5 - 0.5 * Math.cos(u * Math.PI * 2)
+      if (a < 0.02) continue
+      // Each time round, the set comes back shifted somewhere new (it is out of sight as it moves).
+      const dx = ((cyc * 137 + k * 53) % 211) + u * WAVES.drift, dy = ((cyc * 89 + k * 31) % 157) - u * WAVES.drift * 0.3
+      const m = deviceM
+      setM([m[0], m[1], m[2], m[3], m[0] * dx + m[2] * dy + m[4], m[1] * dx + m[3] * dy + m[5]])
+      ctx.globalAlpha = alpha * WAVES.alpha * a
+      ctx.stroke(waves[k])
+      cs.paths++
+    }
   }
 
   /** Last frame: what had nothing to draw yet, and what was drawn from a coarser picture than it wanted. */

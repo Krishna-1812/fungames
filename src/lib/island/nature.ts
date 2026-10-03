@@ -215,6 +215,7 @@ export function duck(pts: [number, number][], name: string, dur: number, delay: 
   const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
   const g = new N('g', { class: 'mover amb', 'data-b': box(Math.min(...xs) - 8, Math.min(...ys) - 10, Math.max(...xs) + 8, Math.max(...ys) + 4), style: `animation:${name} ${dur}s linear infinite ${f(-delay)}s` })
   g.add(new N('ellipse', { cx: 0, cy: 1, rx: 7, ry: 2.2, fill: '#ffffff', opacity: 0.5 }))
+  g.add(new N('ellipse', { cx: 0, cy: 1, rx: 10, ry: 3.4, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.2, class: 'ripple', style: `animation-delay:${f(-delay * 0.7)}s` }))
   g.add(new N('path', { d: 'M-6 -1q0 4 6 4q7 0 7 -5q-3 1 -6 0q-5 -2 -7 1z', fill: body, stroke: INK, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }))
   g.add(new N('path', { d: 'M-3 -1.5q2 -1.5 5 0', fill: 'none', stroke: shade(body, 0.8), 'stroke-width': 1 }))
   g.add(new N('circle', { cx: 4.5, cy: -4.5, r: 2.6, fill: body === '#ffffff' ? '#ffffff' : '#2bb99a', stroke: INK, 'stroke-width': 1 }))

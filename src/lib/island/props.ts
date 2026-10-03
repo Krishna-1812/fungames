@@ -30,7 +30,9 @@ export function tree(p: Pen, x: number, y: number, kind: TreeKind, c = C.leaf, k
     p.path(`M${f(bx + 1 * k)} ${f(by - 14 * k)}L${f(bx + 10 * k)} ${f(by - 6 * k)}L${f(bx + 11 * k)} ${f(by + 2)}L${f(bx + 2 * k)} ${f(by + 2)}Z`, C.rockDark, { sw: 0, op: 0.55 })
     return
   }
-  p.el('ellipse', { cx: bx - 6 * k, cy: by + 1.5, rx: 14 * k, ry: 4.6 * k, fill: INK, opacity: 0.12 })
+  // A soft shadow, cast to the front left as every other is: a faint wide one round a darker core.
+  p.el('ellipse', { cx: bx - 7 * k, cy: by + 1.5, rx: 17 * k, ry: 5.8 * k, fill: INK, opacity: 0.06 })
+  p.el('ellipse', { cx: bx - 5 * k, cy: by + 1.2, rx: 11 * k, ry: 3.8 * k, fill: INK, opacity: 0.09 })
   if (kind === 'bush') {
     for (const [dx, dy, r] of [[-5, -4, 6], [4, -5, 6.5], [0, -9, 6]]) p.el('circle', { cx: bx + dx * k, cy: by + dy * k, r: r * k, fill: c, stroke: INK, 'stroke-width': OUT })
     p.grow(bx - 12 * k, by - 16 * k, bx + 12 * k, by)

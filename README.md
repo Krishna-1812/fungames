@@ -265,6 +265,46 @@ window, a building site counting the year), never as a giant icon; and its
 words are things a street would have: painted on a wall, on a billboard,
 in neon, pinned to a noticeboard, never a floating app window.
 
+**The games stand out from the ground.** Each building has a heavier line
+round its outside: every outlined shape of its art drawn once more
+underneath, in ink and 3.2 pixels wider, so only the part outside shows
+(`rim` in world.ts; moving parts are left out, since a still outline would
+be left behind them, and the cards under the map leave it off). Inside, the
+lines stay as drawn. Each building casts a soft shadow to the front left,
+longer the taller it is, and a darker band hugs its foot. The shadow is
+softened without a blur: the bake paints the map in strips, and a blur
+would stop at each strip's edge. Instead it is laid four times, each layer
+reaching a little further and fainter, and each layer is one sheet of shade
+so that two shadows meeting don't darken. Every pitched roof has three
+tones: the gable end in shade, the slope, and a lighter band along the
+ridge.
+
+**The ground.** Grass is one tone per district, with no seam between
+tiles. Light and shade across it are soft patches laid over it afterwards,
+following the same slow field, only where a tile and everything round it is
+open ground of one height, so a patch never lies over a step, a beach or a
+road. There are more tufts, clover in the meadows, pebbles kicked to the
+roadside, and worn grass either side of every road, so a road is trodden
+into the grass rather than laid on top of it. (The extra tufts come from a
+hash of the tile, not the island's random stream, so every tree and house
+after them stays where it was.)
+
+**The water moves.** Little wave marks drift across the open sea in three
+sets, each in turn fading in, drifting a short way and fading out, then
+coming back somewhere else. The engine draws them, one stroke a set, and
+whatever is painted over the sea hides them. Rings spread out round every
+buoy, rock, moored boat and duck.
+
+**People walk in front of buildings, and behind trees.** Everyone on the
+roads is painted below everything that stands up, which is right for
+anything in front of them. Walking past the front of a building, though,
+their heads would go behind its wall. So each building is followed by a
+window over the road cells along its two visible sides, through which
+everyone who uses those cells is drawn again, with the same animation and
+so in step. The engine only sets a window's clip once someone is actually
+in it, and leaves windows out when zoomed so far that a person is a few
+pixels tall.
+
 **The island is drawn on one canvas**, from pictures baked at build time.
 The map is still written as SVG (all of the above), but the page does not
 show that SVG: dragging ten thousand SVG elements, however carefully split
@@ -305,6 +345,15 @@ and cached for good. Until the canvas can draw, a small picture of the
 island's still painting stands in, moved by the same camera; then it fades
 and the buildings drop in. Without script the page shows the whole island
 as one still picture.
+
+The island opens close: 1.6 times the zoom that fits it all (2.1 on a
+phone), so the buildings are the subject and the coast peeks in at the
+edges. The Home button and the mini-map are the overview. The mini-map is
+that same small picture (already downloaded for the opening), framed on
+the buildings, dimmed after dark, with a pin for every game: white until
+played in this browser, mint once it has been, raspberry for the day's
+challenge, and larger while its card is open. Click it to fly there, or
+drag across it and the camera follows.
 
 Dragging now holds sixty frames a second (headless Chrome, 1280×800, the
 whole island in view), where the SVG map managed 8 to 17. `check-island`

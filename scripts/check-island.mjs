@@ -82,7 +82,10 @@ console.log(`  size  ${(island.svg.length / 1024).toFixed(0)} KB of markup, ${is
 // At night no window may glow through whatever stands in front of it; the
 // island hides those, and most lights should still be seen.
 check(island.hiddenLights > 0 && island.hiddenLights < island.lights.length * 0.4, `lights hidden behind something are left dark at night (${island.hiddenLights} of ${island.lights.length})`)
-check(island.svg.length < 900 * 1024, 'the island is under 900 KB of markup')
+// The page no longer ships this markup (the canvas draws the bake of it), so
+// this is not a download limit: it is what the bake has to read and paint, and
+// how long a build takes when the island changes.
+check(island.svg.length < 1600 * 1024, 'the island is under 1600 KB of markup')
 
 // What it costs to keep the map moving, now that a canvas draws it from the
 // bake (lib/island/bake). Each of these was a measured loss in headless
