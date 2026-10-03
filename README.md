@@ -233,13 +233,15 @@ as a card, with the four filters and search.
 | `src/lib/island/kit.ts` | the drawing kit: a tiny node tree serialised to SVG at build time, the isometric pen (boxes, roofs, cylinders, domes, windows, doors, awnings, signs), painted faces (a sign, poster or mural drawn flat on a wall by shearing it onto the face), lettering and neon, bounds that every shape grows, CSS keyframe paths, and path data written short (relative steps, polygons as paths, round joins set once on each layer and inherited rather than repeated on every shape: the same picture in a fifth less markup) |
 | `src/lib/island/props.ts` | trees, people, lamps, benches, fences, flowers, crates, flags, boats, birds, clouds |
 | `src/lib/island/nature.ts` | the wild things and the farm: snowy pines, cacti, reeds, hedges, topiary, toadstools, a rock arch, buttes, hoodoos and boulder heaps, crop fields, hay bales, the windmill, and the animals (sheep, deer, ducks, crabs, dolphins, a whale, gulls, butterflies, a tumbleweed) |
-| `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, fingerposts, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, market stalls and strings of lights, a ferry, fishing boats and a speedboat, an islet with a secret, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends, the first few pulling up at a zebra crossing) |
+| `src/lib/island/town.ts` | town life: cottages with smoking chimneys, post boxes, signposts (a board per road, in the ink and stamp shape of the district it leads to), messages in bottles on the beaches, zebra crossings, a bus stop, a fountain, a picnic, kite flyers, a playground, beach umbrellas, towels, a sandcastle, a lifeguard's chair, surfboards, piers with someone fishing, moored rowing boats, buoys, a campsite, market stalls and strings of lights, a ferry, fishing boats and a speedboat, an islet with a secret, and the traffic (cars, a bus and bikes, each slanted to lie along its road and turned round at the ends, the first few pulling up at a zebra crossing) |
 | `src/lib/island/sky.ts` | hot-air balloons and a plane towing a banner |
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
 | `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, rocks at the waterline, a dry wash across the Badlands, cliffs drawn as continuous walls (ink only at their top, foot and outside corners, strata at fixed heights so each layer runs on, a ledge at every terrace), one sun for every shadow, trees, walkers, and the layers it is painted in |
 | `src/lib/island/sound.ts` | the island heard: beds that never stop (the sea's swell and surf, wind on the peaks, a dry wind over the Badlands, the market's and the funfair's crowds, rain under the forecast's cloud, crickets after dark, the funfair's music box) and things that happen now and then (gulls, birdsong, a bell buoy, an owl, a far-off sheep, fireworks at New Year, the ferry's horn read off its own animation), each placed on the map with the camera as the listener, and a sound for every one of the eighteen things you can poke |
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom (two fingers also carry the map), edges that give and spring back, held arrow keys that glide, resting on a painted size so the pixels land 1:1, keyboard (a link per building, out of sight), the hover card, names at close zoom, the mini-map, the dive into a game and the circle that carries you through, the view kept for the visit; the one loop that draws the canvas, eased by time rather than by frame |
+| `src/lib/island/postcard.ts` | the postcard: the view painted again at the card's size, "Greetings from" the district in big lettering, a perforated stamp with the nearest building on it, and a postmark with the day |
+| `src/lib/bottles.ts` | the twelve messages in bottles: their notes, which ones this browser has found and when, and the passport covers they earn |
 | `src/lib/island/perf.ts` | the `?perf` meter: frame rate, the last two seconds of frames, the engine's time, and its canvas calls |
 | `src/lib/island/moves.ts` | every motion on the map, as one table: the loops (ported from the old stylesheet), the pokes, a building's lift, ring, fade and drop, the night's and the clouds' strengths; and the cards' CSS, made from the same table |
 | `src/lib/island/bake/` | the bake: `build.ts` sorts the drawing into still painting, sprites, shapes and lettering; `draw.ts` paints the squares, sprite sheets, hit masks and the poster with resvg; `index.ts` keeps the result under a hash (run by `scripts/bake-island.mjs`, in a process of its own) |
@@ -247,6 +249,7 @@ as a card, with the four filters and search.
 | `src/lib/island/scene.ts`, `anim.ts`, `keyframes.ts` | the baked scene's format, and keyframes, easing and transforms worked out by hand |
 | `src/pages/island/[...file].ts` | serves the baked files, under the bake's hash |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
+| `scripts/check-bottles.mjs` | the bottles' record against stores that throw, are full, or hold nonsense: a bottle found once, covers earned at three, six, nine and twelve and only worn once earned |
 | `scripts/bench-island.mjs` | drags the built island in headless Chrome and fails below 45 frames a second, or when a view needs more canvas calls than its budget (`npm run bench:island`, and the last step of `npm run check`) |
 
 **Things happen because of other things.** The ferry comes in to its jetty,
@@ -410,6 +413,53 @@ out of it, to where you were; come back any other way from a game and the
 camera starts inside that game's building and steps out. The buildings
 only drop in on the first visit. With reduced motion there is no circle and
 no dive: a click is the game.
+
+**Finding your way.** Signposts stand at the crossroads and wherever a road
+crosses from one district into the next: a board for each road out, saying
+where that road goes. Each board names the nearest district the road leads to
+(other than the one the post stands in, where it can), worked out by walking
+the roads from the junction; a road that reaches somewhere no quicker than
+another road does gets no board. The boards are painted in that district's
+passport ink, with its stamp's shape at the post end, so the colours on the
+signs are the colours in the book. Their names are only drawn once they are
+big enough to read (2.5 CSS pixels to a map unit and closer), which costs
+the frame nothing further out. `check-island` holds every post to it: two
+or three boards, no two the same way or to the same place, every one along a
+road, and the posts between them pointing to most of the island.
+
+**A first visit** gets one line where the hint would be: welcome, every
+building is a game, and a "Sound on?" button (a browser will not play sound
+until asked). It never stands in front of the games, goes when it is closed
+or answered or a while after the map is first used, and is shown once.
+
+**On a phone** a fingertip is wide and covers what it presses, so a tap that
+lands just off a building, a bottle or anything else you can poke still
+counts: if nothing is under the tap itself, rings round it are tried,
+nearest first, out to 24 pixels.
+
+**Messages in bottles.** Twelve bottles have washed up round the coast, one to
+a stretch of shore (each picked as far from the others as the beaches allow),
+with the twelfth still bobbing off the castaway's islet. Each glints now and
+then so the eye catches it. Tap one and it hops, the cork pops, and its note
+unrolls over the map; then it fades from the sand for good in this browser.
+Most notes are clues to something else on the island. The passport has a page
+for them: each bottle found, its note to read again, and for those not yet
+found, which district's shore to look along. Every three found earns the
+passport a new cover (Lagoon, Kelp forest, Nebula, and Pearl for all
+twelve), put on from the same page; the book is shown in it from then on.
+`lib/bottles.ts` keeps the record in the same hardened store as the
+passport, and `check-bottles.mjs` runs it against every way a store fails.
+
+**Postcards.** The camera button over the zoom buttons (or P) frames whatever
+is on screen as a postcard. The engine paints the view again at the card's
+own size (1800 by 1200, or upright on a phone), so it is as sharp from a
+phone as from a big screen; it waits, a few seconds at most, for the sharper
+squares that size wants. Across it, "Greetings from" the district in view in
+big white lettering with a shadow in the district's ink; in the corner a
+perforated stamp with the nearest building on it, painted close up by the
+same engine; over the stamp a postmark with the day. It is all drawn on a
+canvas in the page's own fonts, nothing fetched. The card comes up to save,
+or to send through the phone's own share sheet where there is one.
 
 (The SVG map's own lessons, kept because the cards under the map are still
 SVG: an animation inside a `display: none` group still repaints; a paused

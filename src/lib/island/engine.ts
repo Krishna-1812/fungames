@@ -12,7 +12,9 @@
  *
  * The page drives it: where the camera is (setView), what time of day it is
  * (the state callback), which building is picked, which are dimmed, what was
- * poked. It answers what is under a point (hit).
+ * poked, which bottles have been found and so are gone. It answers what is
+ * under a point (hit), and paints any view into a canvas of its own for a
+ * postcard (snapshot).
  */
 import { sceneFrom, type Anim, type Box, type LevelIndex, type M, type Node, type Scene, type Style, type When } from './scene'
 import { ID, mulTo, invert, fnsMatrix, progress, sampleProp, ease, type Ease } from './anim'
@@ -23,7 +25,7 @@ type V = Node & { k: 'v' }
 type T = Node & { k: 'txt' }
 type Cam = { x: number; y: number; z: number }
 export type IslandState = { time: string; season: string; hour: number; near: boolean }
-export type Hit = { lm?: string; poke?: { kind: string; node: object } } | null
+export type Hit = { lm?: string; poke?: { kind: string; node: object; n?: number } } | null
 
 /** Per-node bookkeeping the engine keeps beside the scene's own nodes. */
 type Live = {
@@ -61,7 +63,9 @@ export function createEngine(o: {
   play: boolean
   state: () => IslandState
 }) {
-  const { canvas, base } = o
+  const { base } = o
+  /** The canvas being drawn: the page's, or a postcard's while it is painted (snapshot). */
+  let canvas = o.canvas
   const scene = sceneFrom(o.scene)
   const main = canvas.getContext('2d', { alpha: true })!
   /** The context being drawn into: the canvas's own, or a pool canvas while a group is drawn apart. */
@@ -171,6 +175,8 @@ export function createEngine(o: {
   const texts = new Map<string, string>()
   const fills = new Map<object, string>()
   const extra: Node[] = []
+  /** The numbers of the bottles already found, which are not drawn (and so cannot be hit). */
+  const gone = new Set<number>()
 
   const cssEase = ease('ease')
   let st: IslandState = o.state()
@@ -413,6 +419,8 @@ export function createEngine(o: {
       else if (t === 'layer-beam') a *= st.time === 'dusk' ? LAYERS.beam.dusk : 1
       else if (t === 'lm-ring') { const lmn = ringOwner.get(n); a *= lmn ? lmS(lmn).ring : 0 }
       else if (t === 'isl-plane' && !o.play) a = 0
+      // A signpost's names, only once they are big enough to read.
+      else if (t === 'sign-words') a *= timed('sign-words', cam.z >= SIGN_Z ? 1 : 0, 260)
     }
     return a
   }
@@ -425,6 +433,8 @@ export function createEngine(o: {
     }
     return undefined
   }
+  /** CSS pixels to a map unit from which a signpost's names are drawn (they are 4.5 units tall). */
+  const SIGN_Z = 2.5
   const ringOwner = new Map<Node, string>()
   const MARCH = toAnim(LANDMARK.ringMarch, [0, 0])
   const marchEase = ease(MARCH.ease)
@@ -472,6 +482,8 @@ export function createEngine(o: {
     else if (n.base) mm = mulTo(mm, own, n.base)
     let a = alpha * (P.op ?? n.op ?? 1)
     if (n.tags) a *= tagAlpha(n.tags, n)
+    // A bottle that has been found: gone, after it has had a moment to hop.
+    if (n.poke && n.data?.n) a *= timed(`gone:${n.data.n}`, gone.has(Number(n.data.n)) ? 0 : 1, 700)
     if (a <= 0.002) return
     // A building: faded when filtered out, and fading in as it drops in at the start.
     // Either fade is of the building as a whole (as CSS opacity is), so it is drawn apart.
@@ -672,6 +684,8 @@ export function createEngine(o: {
   let gaps = 0, blurry = 0, lastGaps = 1, lastBlurry = 1
 
   /* ---- one frame ---- */
+  /** A colour to lay down before the island (a snapshot has no page behind it). */
+  let under: string | null = null
   function frame(t: number) {
     const began = performance.now()
     cs = { ...NO_STATS }
@@ -692,6 +706,7 @@ export function createEngine(o: {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true
     ctx.globalAlpha = 1
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    if (under) { ctx.fillStyle = under; ctx.fillRect(0, 0, canvas.width, canvas.height) }
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
     for (const n of scene.root) drawNode(n, deviceM, 1)
@@ -725,7 +740,7 @@ export function createEngine(o: {
     scene.root.forEach(collect)
     for (let i = order.length - 1; i >= 0; i--) {
       const it = order[i]
-      if (test(it.n, it.key)) return it.lm ? { lm: it.lm } : { poke: { kind: it.n.poke!, node: it.n } }
+      if (test(it.n, it.key)) return it.lm ? { lm: it.lm } : { poke: { kind: it.n.poke!, node: it.n, n: it.n.data?.n ? Number(it.n.data.n) : undefined } }
     }
     return null
   }
@@ -814,6 +829,31 @@ export function createEngine(o: {
     },
     /** Things the page adds on top: flags, the day's balloon. */
     add(nodes: Node[]) { extra.push(...nodes) },
+    /** Bottles found: they fade away (at once, for those found on an earlier visit). */
+    setGone(ns: Iterable<number>) { for (const n of ns) gone.add(n) },
+    /**
+     * Paint a view into a canvas of its own, at one pixel to a CSS pixel: the
+     * island as it is this moment, centred on (x, y), at zoom z, w by h. The
+     * page's own canvas, and what its last frame cost and drew, are as they
+     * were. Whether everything in the view was drawn at its own sharpness: if
+     * not, what it still wants is on its way, and another try will be sharper.
+     */
+    snapshot(target: HTMLCanvasElement, view: Cam, w: number, h: number): { drawable: boolean; sharp: boolean } {
+      const was = { canvas, ctx, cam: { ...cam }, W, H, dpr, stats: lastStats, gaps: lastGaps, blurry: lastBlurry }
+      target.width = Math.round(w); target.height = Math.round(h)
+      canvas = target
+      ctx = target.getContext('2d')!
+      ident = false; textCtx = null
+      cam.x = view.x; cam.y = view.y; cam.z = view.z; W = w; H = h; dpr = 1
+      // The sea's colour under everything, as the page's own background is under its canvas.
+      under = '#8ccbff'
+      try { frame(performance.now()) } finally { under = null }
+      const out = { drawable: lastGaps === 0, sharp: lastGaps === 0 && lastBlurry === 0 }
+      canvas = was.canvas; ctx = was.ctx; Object.assign(cam, was.cam); W = was.W; H = was.H; dpr = was.dpr
+      lastStats = was.stats; lastGaps = was.gaps; lastBlurry = was.blurry
+      ident = false; textCtx = null
+      return out
+    },
     pokeKinds: scene.pokes,
     /** Call when the engine may have more to draw (an image arrived). */
     set onLoaded(f: (() => void) | null) { onLoaded = f },

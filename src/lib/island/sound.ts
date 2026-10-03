@@ -324,5 +324,9 @@ export function islandSound(places: Places, ear: Listener) {
     stamp: (k = 0) => { if (!on) return; tone({ freq: 150, to: 60, dur: 0.16, gain: 0.25, delay: k }); hit({ dur: 0.08, gain: 0.16, freq: 900, type: 'lowpass', delay: k }) },
     /** The passport's cover opening. */
     page: () => { if (on) hit({ dur: 0.3, gain: 0.06, freq: 1800, sweepTo: 4000, q: 0.5 }) },
+    /** A bottle's note unrolled: the cork, then paper. */
+    unroll: () => { if (!on) return; tone({ freq: 620, to: 1500, dur: 0.05, gain: 0.12, type: 'sine', delay: 0.5 }); hit({ dur: 0.42, gain: 0.07, freq: 2600, sweepTo: 5200, q: 0.5, delay: 0.62 }) },
+    /** A postcard taken: the shutter, and the film winding on. */
+    shutter: () => { if (!on) return; hit({ dur: 0.025, gain: 0.3, freq: 3200, q: 2 }); hit({ dur: 0.04, gain: 0.2, freq: 1500, q: 3, delay: 0.08 }); for (let k = 0; k < 4; k++) hit({ dur: 0.018, gain: 0.05, freq: 2400, q: 6, delay: 0.24 + k * 0.045 }) },
   }
 }

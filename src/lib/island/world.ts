@@ -14,7 +14,9 @@ import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, clou
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { beacon } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
-import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble } from './town'
+import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, type Emblem } from './town'
+import { STAMP } from '../passport-art'
+import { glassOf, BOTTLE_COUNT } from '../bottles'
 import { RULES } from './moves'
 import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch, butte, hoodoo, boulders, field as cropField, bale, windmill, sheep, duck, crab, dolphin, whale, gullStanding, gullsCircling, butterfly, deer, tumbleweed, dawnWhale } from './nature'
 
@@ -75,7 +77,11 @@ function rim(art: N): N {
 
 export type Anchor = { slug: string; district: DistrictKey; x0: number; y0: number; x1: number; y1: number; bx: number; by: number; foot: string }
 export type Layer = { kind: 'sea' | 'surf' | 'boats' | 'beam' | 'weather' | 'ground' | 'walkers' | 'things' | 'landmark' | 'night' | 'banners' | 'sky'; slug?: string; body: string }
-export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string }
+/** A message in a bottle: its number, where it lies (in tiles), and the district whose shore it is on. */
+export type Bottle = { n: number; i: number; j: number; district: DistrictKey }
+/** A signpost: where it stands (in tiles), and the district each of its boards points to. */
+export type Signpost = { i: number; j: number; at: [number, number]; boards: { dx: number; dy: number; to: DistrictKey; steps: number }[] }
+export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[] }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
 /**
@@ -979,21 +985,65 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       else at(i + 0.82, j + 0.14, i + j + 0.96, (p) => flowers(p, i + 0.82, j + 0.16))
     }
   }
-  // Signposts at the busiest crossroads, a bus stop, and a fountain.
+  // Signposts at the crossroads, and where a road crosses from one district
+  // into the next: a board for each road out, saying which district it leads to: the district whose own end of the roads (its gate,
+  // or the hub for Old Town) is fewest steps away that way, and nearer that
+  // way than any other. A road that leads nowhere in particular, or that leads
+  // as quickly as another road does to the same place, gets no board. Each
+  // board wears its district's passport ink and stamp shape, and its name.
+  const signposts: Signpost[] = []
   {
-    const tint = (k: DistrictKey) => shade(D(k).tint, 0.85)
-    let posts = 0
-    for (let i = 0; i < GRID && posts < 4; i++) for (let j = 0; j < GRID && posts < 4; j++) {
-      if (!road.has(key(i, j))) continue
-      const out = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => road.has(key(i + a, j + b)))
-      if (out.length < 3) continue
-      // The free corner beside the junction.
-      const corner = [[1, 1], [-1, 1], [1, -1], [-1, -1]].find(([a, b]) => free(i + a, j + b) && height[i + a][j + b] === 0 && !coast(i + a, j + b))
+    const NAME: Record<DistrictKey, string> = { peaks: 'Sky Peaks', badlands: 'Badlands', proving: 'Proving', harbour: 'Harbour', funfair: 'Funfair', market: 'Market', oldtown: 'Old Town' }
+    const goalOf = (k: DistrictKey): [number, number] => (k === 'oldtown' ? hub : gates[k])
+    /** Steps along the roads from a cell to every road cell, never through the one blocked. */
+    const along = (from: [number, number], block: string) => {
+      const d = new Map<string, number>([[key(...from), 0]]), q: [number, number][] = [from]
+      while (q.length) {
+        const c = q.shift()!, n = d.get(key(...c))!
+        for (const [u, v] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nk = key(c[0] + u, c[1] + v)
+          if (nk === block || d.has(nk) || !road.has(nk)) continue
+          d.set(nk, n + 1); q.push([c[0] + u, c[1] + v])
+        }
+      }
+      return d
+    }
+    const outOf = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([u, v]) => road.has(key(i + u, j + v)))
+    const cells: [number, number][] = []
+    for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (road.has(key(i, j)) && outOf(i, j).length >= 3) cells.push([i, j])
+    // A straight stretch of road where the district changes underfoot.
+    for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
+      const o = road.has(key(i, j)) ? outOf(i, j) : []
+      if (o.length === 2 && o[0][0] === -o[1][0] && o.some(([u, v]) => dist[i + u][j + v].key !== dist[i][j].key)) cells.push([i, j])
+    }
+    for (const [i, j] of cells) {
+      if (signposts.length >= 8) break
+      const out = outOf(i, j)
+      if (signposts.some((q) => Math.abs(q.i - i) + Math.abs(q.j - j) < 5)) continue
+      // A free spot beside the junction (a corner, or a side no road leaves by), best one with no
+      // building just in front of it to hide the post.
+      const behind = (a: number, b: number) => [[1, 0], [0, 1], [1, 1]].some(([u, v]) => taken.has(key(a + u, b + v)))
+      const spots = [[1, 1], [-1, 1], [1, -1], [-1, -1], [1, 0], [0, 1], [-1, 0], [0, -1]].filter(([u, v]) => free(i + u, j + v) && height[i + u][j + v] === 0 && !coast(i + u, j + v))
+      const corner = spots.find(([u, v]) => !behind(i + u, j + v)) ?? spots[0]
       if (!corner) continue
+      const ways = out.map(([u, v]) => ({ u, v, d: along([i + u, j + v], key(i, j)) }))
+      // A board names the nearest district its road leads to, other than the one it stands in where it can.
+      const pick = new Map<number, { to: DistrictKey; steps: number; rank: number }>()
+      for (const D of DISTRICTS) {
+        const g = key(...goalOf(D.key))
+        const by = ways.map((w) => (w.d.get(g) ?? Infinity) + 1)
+        const best = Math.min(...by), w = by.indexOf(best)
+        // Unreachable, or no quicker this way than another: no board says so.
+        if (!Number.isFinite(best) || by.filter((x) => x - best < 2).length > 1) continue
+        const cur = pick.get(w), rank = best + (D.key === dist[i][j].key ? 1000 : 0)
+        if (!cur || rank < cur.rank) pick.set(w, { to: D.key, steps: best, rank })
+      }
+      const boards = [...pick].map(([w, p]) => ({ dx: ways[w].u, dy: ways[w].v, to: p.to, steps: p.steps })).sort((x, y) => x.steps - y.steps).slice(0, 3)
+      if (boards.length < 2) continue
       const [ci, cj] = [i + corner[0], j + corner[1]]
-      const arms = out.slice(0, 3).map(([a, b]) => ({ dx: a, dy: b, c: tint(dist[i + a * 3]?.[j + b * 3]?.key ?? dist[i][j].key) }))
-      posts++
-      at(ci + 0.5 - corner[0] * 0.3, cj + 0.5 - corner[1] * 0.3, ci + cj + 1 - (corner[0] + corner[1]) * 0.3, (p) => signpost(p, ci + 0.5 - corner[0] * 0.3, cj + 0.5 - corner[1] * 0.3, arms))
+      const x = ci + 0.5 - corner[0] * 0.3, y = cj + 0.5 - corner[1] * 0.3
+      signposts.push({ i, j, at: [x, y], boards })
+      at(x, y, ci + cj + 1 - (corner[0] + corner[1]) * 0.3, (p) => signpost(p, x, y, boards.map((q) => ({ dx: q.dx, dy: q.dy, ink: STAMP[q.to].ink, name: NAME[q.to], shape: STAMP[q.to].shape as Emblem }))))
       reserved.add(key(ci, cj))
     }
   }
@@ -1053,6 +1103,36 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
       else if (kind === 1) at(i + 0.5, j + 0.5, i + j + 1, (p) => (m === 1 ? lifeguard(p, i + 0.5, j + 0.5) : sandcastle(p, i + 0.5, j + 0.5)), z)
       else { at(i + 0.4, j + 0.4, i + j + 0.8, (p) => surfboard(p, i + 0.4, j + 0.4, ROOFS[(m + 2) % ROOFS.length]), z); at(i + 0.6, j + 0.55, i + j + 1.15, (p) => towel(p, i + 0.6, j + 0.55, towels[(m + 1) % towels.length]), z); at(i + 0.62, j + 0.58, i + j + 1.2, (p) => sitter(p, i + 0.62, j + 0.58, '#ffffff', '#c99a78'), z) }
     }
+  }
+  // Messages in bottles, washed up round the coast (lib/bottles keeps which
+  // ones this browser has found): picked one at a time, each as far as the
+  // beaches allow from all the others, so they lie along every stretch of
+  // shore; on the wet sand at the water's edge, never at the foot of a pier.
+  // Numbered round the coast. The last is out at sea, off the castaway's islet.
+  const bottles: Bottle[] = []
+  {
+    const feet = PIERS.map((pts) => pts[0].map(Math.floor))
+    const sea = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([u, v]) => !isLand(i + u, j + v))
+    const cand = [...beach].map((k) => k.split(',').map(Number) as [number, number])
+      .filter(([i, j]) => !reserved.has(key(i, j)) && sea(i, j).length > 0 && !feet.some(([u, v]) => Math.abs(u - i) + Math.abs(v - j) <= 1))
+      .sort((p, q) => p[0] - q[0] || p[1] - q[1])
+    const picked: [number, number][] = []
+    // The first is the beach nearest the front; then each the farthest from those already picked.
+    if (cand.length) picked.push(cand.reduce((m, c) => (c[0] + c[1] > m[0] + m[1] ? c : m)))
+    while (picked.length < BOTTLE_COUNT - 1 && picked.length < cand.length) {
+      let best = cand[0], bd = -1
+      for (const c of cand) { if (picked.includes(c)) continue; const d = Math.min(...picked.map((p) => Math.hypot(p[0] - c[0], p[1] - c[1]))); if (d > bd) { bd = d; best = c } }
+      picked.push(best)
+    }
+    const round = ([i, j]: [number, number]) => Math.atan2(j - 14.5, i - 14.5)
+    picked.sort((p, q) => round(p) - round(q)).forEach(([i, j], k) => {
+      const w = sea(i, j), u = w.reduce((t, [a]) => t + a, 0) / w.length, v = w.reduce((t, [, b]) => t + b, 0) / w.length
+      const x = i + 0.5 + u * 0.24, y = j + 0.5 + v * 0.24, n = k + 1
+      reserved.add(key(i, j))
+      bottles.push({ n, i: f2(x), j: f2(y), district: dist[i][j].key })
+      at(x, y, i + j + 0.95, (p) => { beachBottle(p, x, y, n, glassOf(n), (i * 7 + j * 3) % 2 === 1) })
+    })
+    bottles.push({ n: BOTTLE_COUNT, i: -3, j: 27.4, district: 'market' })
   }
   // Piers out from the beaches, each with someone fishing off the end.
   for (const [n, pts] of PIERS.entries()) things.push({ depth: pts[0][0] + pts[0][1] + 0.4, draw: (layer) => pier(new Pen(layer), pts, BEACH + 1, n === 2 ? null : C.rasp) })
@@ -1341,7 +1421,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini }
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts }
 }
 
 export { OUT, bench }

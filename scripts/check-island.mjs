@@ -10,7 +10,9 @@
  *   4. The roads reach every district.
  *   5. The canvas can draw it: few shapes from outlines, a hit mask for every
  *      building and thing to poke, a card for every game.
- *   6. The markup is real SVG: resvg parses and rasterises the whole island.
+ *   6. The twelve messages in bottles are all there, apart, each with its
+ *      number and its note; the signposts point down real roads to districts.
+ *   7. The markup is real SVG: resvg parses and rasterises the whole island.
  *
  *   node scripts/check-island.mjs            check
  *   node scripts/check-island.mjs --preview  also write public/_mockups/island-preview.html and .png
@@ -24,6 +26,7 @@ const { LANDMARKS, PLACES, DISTRICTS } = await import('../src/lib/island/landmar
 const { buildIsland, GRID } = await import('../src/lib/island/world.ts')
 const { Resvg } = await import('@resvg/resvg-js')
 const { resvgRaster } = await import('../src/lib/island/raster.ts')
+const { BOTTLE_COUNT, NOTES } = await import('../src/lib/bottles.ts')
 
 let failures = 0
 const fail = (m) => { failures++; console.log(`  FAIL  ${m}`) }
@@ -87,6 +90,27 @@ check(island.hiddenLights > 0 && island.hiddenLights < island.lights.length * 0.
 // how long a build takes when the island changes.
 check(island.svg.length < 1600 * 1024, 'the island is under 1600 KB of markup')
 
+console.log('bottles and signposts')
+{
+  const ns = island.bottles.map((b) => b.n).sort((a, b) => a - b)
+  check(ns.length === BOTTLE_COUNT && ns.every((n, k) => n === k + 1), `every bottle is washed up somewhere (${ns.length} of ${BOTTLE_COUNT}, numbered 1 to ${BOTTLE_COUNT})`)
+  check(ns.every((n) => NOTES[n]?.text && NOTES[n]?.from), 'and every one has a note in it, and who it is from')
+  check(ns.every((n) => (island.svg.match(new RegExp(`data-n="${n}"`, 'g')) ?? []).length === 1), 'each is drawn once, with its number on it')
+  // On the island's own beaches, and not in a heap: a hunt round the whole coast.
+  const ashore = island.bottles.filter((b) => b.n !== BOTTLE_COUNT)
+  let near = Infinity
+  for (const a of ashore) for (const b of ashore) if (a !== b) near = Math.min(near, Math.hypot(a.i - b.i, a.j - b.j))
+  check(near >= 3, `no two bottles on the beaches lie within three tiles of each other (nearest ${near.toFixed(1)})`)
+  check(new Set(ashore.map((b) => b.district)).size >= 5, `they are spread round the shores of most districts (${new Set(ashore.map((b) => b.district)).size})`)
+  const posts = island.signposts
+  check(posts.length >= 4, `there are signposts at the crossroads (${posts.length})`)
+  check(posts.every((p) => p.boards.length >= 2 && p.boards.length <= 3), 'each has two or three boards')
+  check(posts.every((p) => new Set(p.boards.map((b) => `${b.dx},${b.dy}`)).size === p.boards.length && new Set(p.boards.map((b) => b.to)).size === p.boards.length), 'no two boards on a post point the same way, or to the same place')
+  check(posts.every((p) => p.boards.every((b) => Math.abs(b.dx) + Math.abs(b.dy) === 1 && Number.isFinite(b.steps) && b.steps > 0)), 'every board points along a road to somewhere that road reaches')
+  const to = new Set(posts.flatMap((p) => p.boards.map((b) => b.to)))
+  check(to.size >= 5, `and between them they point the way to most districts (${[...to].join(', ')})`)
+}
+
 // What it costs to keep the map moving, now that a canvas draws it from the
 // bake (lib/island/bake). Each of these was a measured loss in headless
 // Chrome, and none of them shows in a screenshot, so they are checked here.
@@ -108,6 +132,11 @@ console.log('what the canvas has to draw')
   check(games.every((g) => masked.has(`lm:${g.slug}`)), 'and every building has a hit mask, so a click lands on its art')
   check(b.pokes.length === pokes.size && b.masks.filter((m) => m.key.startsWith('pk:')).length >= pokes.size, `every thing to poke has one too (${pokes.size} kinds)`)
   check(games.every((g) => b.cards[g.slug]), 'every game has its building for its card')
+  // The page tells the bottles apart by their numbers, and hides the ones found.
+  const nums = []
+  const look = (n) => { if (n.k !== 'g') return; if (n.poke === 'bottle') nums.push(n.data?.mask ? Number(n.data?.n) : NaN); n.kids.forEach(look) }
+  b.root.forEach(look)
+  check(nums.length === BOTTLE_COUNT && new Set(nums).size === BOTTLE_COUNT && nums.every((n) => n >= 1 && n <= BOTTLE_COUNT), `every bottle reaches the canvas with its number and a hit mask (${nums.length})`)
 }
 
 console.log('rasterise')

@@ -76,8 +76,8 @@ export function initIsland(o: {
   /** One link per building, for the keyboard and for anything reading the page. */
   links: Map<string, HTMLAnchorElement>
   onEnter?: (slug: string) => void
-  /** Something that is not a building was poked. */
-  onPoke?: (kind: string) => void
+  /** Something that is not a building was poked (and which one of its kind, if they are counted: a bottle). */
+  onPoke?: (kind: string, n?: number) => void
 }) {
   const { box, stage, canvas, poster, anchors, games, links } = o
   const [bx, by, bw, bh] = o.bounds
@@ -582,14 +582,31 @@ export function initIsland(o: {
     if (touchish && hot !== slug) { showCard(slug); flyToSlug(slug, 2); return }
     enter(slug)
   }
+  /**
+   * What a finger meant. A fingertip is wide and hides what it presses, so a
+   * tap that lands just off a building (or a bottle) still counts: if nothing
+   * is under the tap itself, rings round it are tried, nearest first, out to
+   * about the width of a fingertip.
+   */
+  const RINGS = [9, 16, 24]
+  const fingerHit = (x: number, y: number) => {
+    const h = engine?.hit(x, y)
+    if (h || !touchish || !engine) return h ?? null
+    for (const r of RINGS) for (let k = 0; k < 8; k++) {
+      const t = (k / 8) * Math.PI * 2 + (r === 16 ? Math.PI / 8 : 0)
+      const q = engine.hit(x + Math.cos(t) * r, y + Math.sin(t) * r)
+      if (q) return q
+    }
+    return null
+  }
   // A click with the mouse or a finger: what was under it when it went down.
   stage.addEventListener('click', () => {
     if (moved > 6) return
-    const h = engine?.hit(press.x, press.y)
+    const h = fingerHit(press.x, press.y)
     if (h?.lm) { pick(h.lm); return }
     if (h?.poke) {
       engine!.poke(h.poke.node)
-      o.onPoke?.(h.poke.kind)
+      o.onPoke?.(h.poke.kind, h.poke.n)
       wake()
       // Without motion the canvas only draws when asked: once more when the reaction is over.
       if (!PLAY) setTimeout(wake, POKE_MS + 60)

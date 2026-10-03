@@ -10,6 +10,7 @@ import { cardCss } from '../lib/island/moves'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
 import { inkIcon } from '../lib/ink-icon'
+import { COVERS, BOTTLE_COUNT, glassOf } from '../lib/bottles'
 
 /*
  * The homepage is Tiny Island: every game is a building on one illustrated
@@ -61,10 +62,17 @@ const frame = (slug: string) => {
   return `${(cx - w / 2).toFixed(1)} ${(bottom - h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`
 }
 
+// Messages in bottles: where each lies (for the passport's hint), and how a bottle is drawn in the book.
+const DNAME = Object.fromEntries(DISTRICTS.map((d) => [d.key, d.name]))
+const bottles = island.bottles.map((b) => ({ n: b.n, district: b.district, where: b.n === BOTTLE_COUNT ? 'Out at sea, to the west' : `On the shore of ${DNAME[b.district].replace(/^The /, 'the ')}` }))
+const bottleArt = (glass: string) => `<svg class="pp-bottle-svg" viewBox="0 0 44 70" aria-hidden="true" focusable="false"><path d="M17 4h10v4h-1v9c0 3 9 7 9 17v26a6 6 0 0 1-6 6H15a6 6 0 0 1-6-6V34c0-10 9-14 9-17V8h-1z" fill="${glass}" stroke="#1b2340" stroke-width="2.4" stroke-linejoin="round"/><rect x="16.5" y="1.5" width="11" height="7" rx="2" fill="#c69f78" stroke="#1b2340" stroke-width="2"/><rect x="14" y="34" width="16" height="22" rx="3" fill="#fffdf7" stroke="#9aa6c8" stroke-width="1.2"/><path d="M14 45h16" stroke="#ff4f6e" stroke-width="2"/><path d="M12.6 36.5v17" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".8"/></svg>`
+const bottleGhost = `<svg class="pp-bottle-svg" viewBox="0 0 44 70" aria-hidden="true" focusable="false"><path d="M17 4h10v4h-1v9c0 3 9 7 9 17v26a6 6 0 0 1-6 6H15a6 6 0 0 1-6-6V34c0-10 9-14 9-17V8h-1z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="4 3.5" stroke-linejoin="round"/><text x="22" y="50" text-anchor="middle" font-family="Fredoka, system-ui, sans-serif" font-weight="700" font-size="17" fill="currentColor">?</text></svg>`
+const pillBottle = `<svg viewBox="0 0 44 70" aria-hidden="true"><path d="M17 4h10v4h-1v9c0 3 9 7 9 17v26a6 6 0 0 1-6 6H15a6 6 0 0 1-6-6V34c0-10 9-14 9-17V8h-1z" fill="#bdf0da" stroke="#1b2340" stroke-width="4" stroke-linejoin="round"/><rect x="14" y="34" width="16" height="22" rx="3" fill="#fffdf7"/></svg>`
+
 const daily = dailyFor(new Date())
 const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug) }]))
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
-const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes }
+const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
 
 // The passport: a page per district, in the order you would walk the island
 // from the middle, each game a stamp drawn here and inked by the page once
@@ -126,10 +134,29 @@ const book = BOOK.map((key) => {
         <h1 class="isl-title">{count} small games on one tiny island</h1>
         <p class="isl-hint"><span class="isl-hint-long">Drag to explore · click any building to play</span><span class="isl-hint-short">Drag · pinch · tap a building</span></p>
 
-        <button type="button" class="isl-found" id="islFound" hidden></button>
+        <div class="isl-welcome" id="islWelcome" hidden>
+          <span class="isl-welcome-mark" aria-hidden="true" set:html={faviconSvg(true)} />
+          <p><b>Welcome to Tiny Island!</b> <span class="isl-welcome-long">Every building is a game: drag to look round, click one to play.</span><span class="isl-welcome-short">Tap a building to play.</span></p>
+          <button type="button" class="isl-welcome-sound" id="welcomeSound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg><span>Sound on?</span></button>
+          <button type="button" class="isl-welcome-x" id="welcomeX" aria-label="Close the welcome"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
+        </div>
+
+        <div class="isl-pills">
+          <button type="button" class="isl-found" id="islFound" hidden></button>
+          <button type="button" class="isl-bpill" id="islBottles" hidden><span class="isl-bpill-art" set:html={pillBottle} /><span id="islBottlesN"></span></button>
+        </div>
         <p class="isl-toast" id="islToast" role="status" aria-live="polite"></p>
+        <div class="isl-note" id="islNote" hidden role="status" aria-live="polite">
+          <p class="isl-note-no" id="islNoteNo"></p>
+          <p class="isl-note-text" id="islNoteText"></p>
+          <p class="isl-note-from" id="islNoteFrom"></p>
+          <p class="isl-note-foot"><span id="islNoteCount"></span><button type="button" class="isl-note-book" id="islNoteBook">See them all</button></p>
+          <button type="button" class="isl-note-x" id="islNoteX" aria-label="Put the note away"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
+        </div>
+        <div class="isl-flash" aria-hidden="true"></div>
 
         <div class="isl-zoom" role="group" aria-label="Zoom">
+          <button type="button" class="isl-snap" id="zSnap" aria-label="Make a postcard of this view" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="12" cy="12.4" r="3.6" fill="#fff" stroke="currentColor" stroke-width="2" /><circle cx="17" cy="9" r="1" fill="currentColor" /></svg><span class="isl-snap-tip" aria-hidden="true">Postcard</span></button>
           <button type="button" id="zIn" aria-label="Zoom in">+</button>
           <button type="button" id="zOut" aria-label="Zoom out">−</button>
           <button type="button" id="zHome" aria-label="Show the whole island"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 9.5 10 4l7 5.5M5.5 8v8h9V8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" /></svg></button>
@@ -146,6 +173,22 @@ const book = BOOK.map((key) => {
     </section>
     {/* Over the whole window, not just the map: it hands over to the game page, which opens it again. */}
     <div class="isl-iris" aria-hidden="true"></div>
+
+    <dialog class="pc" id="pc" aria-labelledby="pcTitle">
+      <div class="pc-in">
+        <h2 class="pc-h" id="pcTitle">A postcard from <span id="pcPlace">Tiny Island</span></h2>
+        <div class="pc-frame" id="pcFrame">
+          <img class="pc-img" id="pcImg" alt="" />
+          <p class="pc-wait" id="pcWait"><span class="pc-dot" aria-hidden="true"></span>Developing…</p>
+        </div>
+        <div class="pc-row">
+          <button type="button" class="pc-btn pc-btn--go" id="pcShare" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 16.5 4l-3.4 12.5-3.6-4.1zM9.5 12.4 16.5 4" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round" /></svg><span>Send it</span></button>
+          <a class="pc-btn" id="pcSave" href="#" download><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9m-4-4 4 4 4-4M4 15.5h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg><span>Save picture</span></a>
+          <button type="button" class="pc-btn pc-btn--plain" id="pcDone">Back to the island</button>
+        </div>
+        <button type="button" class="pc-close" id="pcClose" aria-label="Close the postcard"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
+      </div>
+    </dialog>
 
     <dialog class="pp" id="pp" aria-labelledby="ppTitle">
       <svg class="pp-defs" width="0" height="0" aria-hidden="true" focusable="false">
@@ -177,6 +220,7 @@ const book = BOOK.map((key) => {
             <li><b id="ppFinished">0</b><span>finished</span></li>
             <li><b id="ppDistricts">0</b><span>of {book.length} districts complete</span></li>
             <li><b id="ppSecrets">0</b><span>secrets seen</span></li>
+            <li class="pp-tally-bottles"><b id="ppBottles">0</b><span>of {BOTTLE_COUNT} bottles found</span><span class="pp-bpips" id="ppBPips" aria-hidden="true">{bottles.map((b) => <i data-pip={b.n} style={`--glass:${glassOf(b.n)}`} />)}</span></li>
           </ul>
           <div class="pp-ticks" id="ppTicks" aria-hidden="true">{games.map((g) => <i data-tick={g.slug} style={`--ink:${STAMP[districtOf[g.slug]]?.ink ?? '#4637a6'}`} />)}</div>
           <p class="pp-mrz" id="ppMrz" aria-hidden="true"></p>
@@ -186,6 +230,7 @@ const book = BOOK.map((key) => {
           <div class="pp-tabs" role="tablist" aria-label="Passport pages">
             <button type="button" role="tab" class="pp-tab pp-tab--you" data-tab="you" aria-selected="true">You</button>
             {book.map((p) => <button type="button" role="tab" class="pp-tab" data-tab={p.key} aria-selected="false" style={`--ink:${p.ink}`}>{p.name.replace(/^The /, '')}<i data-tab-n={p.key}></i></button>)}
+            <button type="button" role="tab" class="pp-tab" data-tab="bottles" aria-selected="false" style="--ink:#1f7fa8">Bottles<i id="ppBTab"></i></button>
             <button type="button" role="tab" class="pp-tab" data-tab="sightings" aria-selected="false" style="--ink:#2a6f8f">Sightings</button>
           </div>
           {book.map((p) => (
@@ -209,6 +254,39 @@ const book = BOOK.map((key) => {
               </ul>
             </div>
           ))}
+          <div class="pp-sheet" role="tabpanel" data-sheet="bottles" aria-label="Messages in bottles" hidden style="--ink:#1f7fa8">
+            <header class="pp-sheet-head">
+              <h3>Messages in bottles</h3>
+              <p><b id="ppBN">0</b> of {BOTTLE_COUNT} found</p>
+            </header>
+            <p class="pp-note">Twelve bottles have washed up round the coast, each with a note inside. Tap one on the island to open it. Every three you find earns your passport a new cover.</p>
+            <ul class="pp-bottles" role="list">
+              {bottles.map((b) => (
+                <li>
+                  <button type="button" class="pp-bottle" data-n={b.n} data-where={b.where} aria-label={`Bottle ${b.n}: not found yet`}>
+                    <span class="pp-bottle-found" set:html={bottleArt(glassOf(b.n))} />
+                    <span class="pp-bottle-ghost" set:html={bottleGhost} />
+                    <span class="pp-bottle-no">No. {b.n}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div class="pp-letter" id="ppLetter" aria-live="polite">
+              <p class="pp-letter-no" id="ppLetterNo">Pick a bottle to read its note.</p>
+              <p class="pp-letter-text" id="ppLetterText"></p>
+              <p class="pp-letter-from" id="ppLetterFrom"></p>
+            </div>
+            <h4 class="pp-sub">Passport covers</h4>
+            <div class="pp-covers" role="radiogroup" aria-label="Passport cover">
+              {COVERS.map((c) => (
+                <button type="button" role="radio" class="pp-coverbtn" data-cover={c.key} data-need={c.need} aria-checked="false" style={`--a:${c.face[0]};--b:${c.face[1]};--c:${c.face[2]};--t:${c.ink}`}>
+                  <span class="pp-swatch" aria-hidden="true"><span>P</span></span>
+                  <span class="pp-cname">{c.name}</span>
+                  <span class="pp-cneed">{c.need ? `${c.need} bottles` : 'As issued'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div class="pp-sheet" role="tabpanel" data-sheet="sightings" aria-label="Sightings" hidden style="--ink:#2a6f8f">
             <header class="pp-sheet-head">
               <h3>Sightings</h3>
@@ -310,6 +388,8 @@ const book = BOOK.map((key) => {
   import { readAll } from '../lib/stats'
   import { islandSound } from '../lib/island/sound'
   import { isMuted, setMuted, unlock } from '../lib/audio'
+  import { readBottles, findBottle, wearCover, count, NOTES, COVERS, BOTTLE_COUNT, type Cover } from '../lib/bottles'
+  import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
 
   // The lighthouse in the tab says hello: once when the page opens, and again
   // each time you switch away to another tab, it flashes the island's Morse
@@ -348,8 +428,11 @@ const book = BOOK.map((key) => {
     base: string
     posterScale: number
     pokes: string[]
+    bottles: { n: number; district: string; where: string }[]
+    inks: Record<string, string>
   }
   const box = document.getElementById('islBox')!
+  const byId = (id: string) => document.getElementById(id)!
   // The baked island: asked for at once, and the camera works over the poster until it is in.
   const scene = fetch(data.base + 'scene.json').then((r) => (r.ok ? r.json() : Promise.reject(new Error(`scene.json: ${r.status}`))))
 
@@ -367,18 +450,13 @@ const book = BOOK.map((key) => {
   document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => { const b = data.games[el.dataset.best!]?.best; if (b) { el.textContent = `Best ${b}`; el.classList.add('has-best') } })
 
   /* ---- things to poke, and secrets to find ---------------------------------- */
-  const NAMES: Record<string, string> = { whale: 'the whale', dawnwhale: 'the dawn whale', sheep: 'a sheep', windmill: 'the windmill', balloon: 'a balloon', crab: 'a crab', fountain: 'the fountain', kite: 'a kite', dolphin: 'a dolphin', duck: 'a duck', gull: 'a gull', deer: 'the deer', ferry: 'the ferry', castaway: 'the castaway', treasure: 'the buried treasure', bottle: 'a message in a bottle', house32: 'the 32nd building', ufo: 'a UFO' }
-  const NOTES = [
-    'Day 212. The crabs have started to trust me. Send biscuits. (The castaway, the islet out west)',
-    'Whoever finds this: there are eighteen secrets on this island. You have found one of them.',
-    'If you are reading this, try the windmill. Try everything. Something comes at three in the morning.',
-    'The whale only shows off at dawn. Do not tell anyone I told you.',
-  ]
+  const NAMES: Record<string, string> = { whale: 'the whale', dawnwhale: 'the dawn whale', sheep: 'a sheep', windmill: 'the windmill', balloon: 'a balloon', crab: 'a crab', fountain: 'the fountain', kite: 'a kite', dolphin: 'a dolphin', duck: 'a duck', gull: 'a gull', deer: 'the deer', ferry: 'the ferry', castaway: 'the castaway', treasure: 'the buried treasure', house32: 'the 32nd building', ufo: 'a UFO' }
   const foundEl = document.getElementById('islFound') as HTMLButtonElement, toastEl = document.getElementById('islToast')!
-  const kinds = data.pokes
+  // The bottles are counted one by one on a page of their own, not among the sightings.
+  const kinds = data.pokes.filter((k) => k !== 'bottle')
   const readFound = () => { try { return new Set<string>(JSON.parse(localStorage.getItem('isl-found') ?? '[]')) } catch { return new Set<string>() } }
   const found = readFound()
-  let toastT = 0, note = 0
+  let toastT = 0
   const toast = (msg: string, ms = 3400) => { toastEl.textContent = msg; toastEl.classList.add('is-on'); clearTimeout(toastT); toastT = window.setTimeout(() => toastEl.classList.remove('is-on'), ms) }
   const showFound = () => {
     const n = kinds.filter((k) => found.has(k)).length
@@ -387,12 +465,60 @@ const book = BOOK.map((key) => {
   }
   foundEl.addEventListener('click', () => toast(found.size >= kinds.length ? 'Every secret on the island. You know it better than we do.' : 'Poke anything that moves. Some things only come at certain hours.'))
   showFound()
-  const onPoke = (kind: string) => {
+
+  /* ---- messages in bottles ------------------------------------------------- */
+  // Tap one and it hops, the cork comes out, and its note unrolls over the
+  // map; then it is gone from the beach (for good, in this browser). Every
+  // three found earns the passport a new cover (lib/bottles).
+  const bottlesEl = byId('islBottles') as HTMLButtonElement, noteEl = byId('islNote')
+  const showBottles = () => {
+    const n = count(readBottles())
+    bottlesEl.hidden = n === 0
+    byId('islBottlesN').textContent = `${n} of ${BOTTLE_COUNT}`
+    bottlesEl.setAttribute('aria-label', `Messages in bottles: ${n} of ${BOTTLE_COUNT} found. Open them in the passport`)
+  }
+  showBottles()
+  let noteT = 0
+  const hideNote = () => { clearTimeout(noteT); noteEl.classList.remove('is-on'); noteT = window.setTimeout(() => { noteEl.hidden = true }, 300) }
+  function showNote(n: number, total: number, cover: Cover | null) {
+    const note = NOTES[n]; if (!note) return
+    byId('islNoteNo').textContent = `Message in a bottle · No. ${n}`
+    byId('islNoteText').textContent = `“${note.text}”`
+    byId('islNoteFrom').textContent = `— ${note.from}`
+    byId('islNoteCount').textContent = total >= BOTTLE_COUNT && cover
+      ? `Every bottle found! The ${cover.name} cover is yours.`
+      : cover ? `${total} of ${BOTTLE_COUNT} found · new passport cover: ${cover.name}` : `${total} of ${BOTTLE_COUNT} found`
+    noteEl.classList.toggle('has-prize', !!cover)
+    clearTimeout(noteT)
+    noteEl.hidden = false
+    noteEl.classList.remove('is-on'); void noteEl.offsetWidth
+    noteEl.classList.add('is-on')
+    noteT = window.setTimeout(hideNote, 16000)
+  }
+  noteEl.addEventListener('pointerenter', () => clearTimeout(noteT))
+  noteEl.addEventListener('pointerleave', () => { clearTimeout(noteT); noteT = window.setTimeout(hideNote, 6000) })
+  byId('islNoteX').addEventListener('click', hideNote)
+  // Back to the map: a hand on it puts the note away (on a phone it covers much of the view).
+  byId('islStage').addEventListener('pointerdown', () => { if (!noteEl.hidden && noteEl.classList.contains('is-on')) hideNote() })
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !noteEl.hidden) hideNote() })
+  const onBottle = (n: number) => {
+    const r = findBottle(n)
+    sound?.poke('bottle')
+    if (r.first) {
+      sound?.found(); sound?.unroll()
+      // It hops first, then fades from the sand.
+      window.setTimeout(() => isle.withEngine((e) => { e.setGone([n]); isle.redraw() }), PLAY ? 950 : 0)
+      showBottles()
+    }
+    showNote(n, r.total, r.cover)
+  }
+
+  const onPoke = (kind: string, n?: number) => {
+    if (kind === 'bottle') { if (n) onBottle(n); return }
     const first = !found.has(kind)
     if (first) { found.add(kind); try { localStorage.setItem('isl-found', JSON.stringify([...found])) } catch {} showFound(); sound?.found() }
     sound?.poke(kind)
     const tally = `${kinds.filter((k) => found.has(k)).length} of ${kinds.length}`
-    if (kind === 'bottle') { toast(`A note in the bottle: “${NOTES[note++ % NOTES.length]}”`, 7000); return }
     if (kind === 'house32') { toast(`You found the 32nd building. It is not a game. Not yet. (${tally})`, 5000); return }
     if (kind === 'treasure') { toast(`Buried treasure! It is full of maps of other islands. (${tally})`, 5000); return }
     if (first) toast(found.size === kinds.length ? `You found ${NAMES[kind] ?? kind}, and that is all ${kinds.length}. Well done.` : `You found ${NAMES[kind] ?? kind}. ${tally}`)
@@ -408,6 +534,8 @@ const book = BOOK.map((key) => {
     links: new Map([...box.querySelectorAll<HTMLAnchorElement>('.isl-lm')].map((a) => [a.dataset.slug!, a])),
     onPoke, onEnter: () => sound?.dive(),
   })
+  // The bottles found on earlier visits are not on the beaches any more.
+  isle.withEngine((e) => e.setGone(Object.keys(readBottles().found).map(Number)))
   // The map is a window, not a scroller: focusing a building near the edge
   // must never scroll the box itself and push the top bar out of view.
   box.addEventListener('scroll', () => { box.scrollLeft = 0; box.scrollTop = 0 })
@@ -520,12 +648,41 @@ const book = BOOK.map((key) => {
     btnSound.setAttribute('aria-label', on ? 'Turn sound off' : 'Turn sound on')
   }
   paintSound()
+  const soundOn = () => { unlock(); setMuted(false); sound!.start(); paintSound(); toast('Sound on. Fly round the island and listen: every district sounds like itself.') }
   btnSound.addEventListener('click', () => {
-    unlock()
-    if (isMuted()) { setMuted(false); sound!.start(); toast('Sound on. Fly round the island and listen: every district sounds like itself.') }
-    else { setMuted(true); sound!.stop() }
-    paintSound()
+    if (isMuted()) soundOn()
+    else { setMuted(true); sound!.stop(); paintSound() }
+    welcomeAway()
   })
+
+  /* ---- a first visit: one line to say hello, and ask about sound ------------ */
+  // Never in the way: it sits where the hint would, says what the island is,
+  // and offers sound (which a browser will not play until asked). It goes when
+  // closed, when sound is answered, or a while after the map is first used,
+  // and it is only ever shown once.
+  const welcome = byId('islWelcome')
+  let welcomeT = 0
+  function welcomeAway() {
+    if (welcome.hidden || welcome.classList.contains('is-going')) return
+    clearTimeout(welcomeT)
+    welcome.classList.add('is-going'); welcome.classList.remove('is-on')
+    window.setTimeout(() => { welcome.hidden = true }, 450)
+  }
+  {
+    let first = false
+    try { first = !localStorage.getItem('isl-welcomed') && !Object.keys(visits()).length && !count(readBottles()) } catch {}
+    if (first) {
+      box.classList.add('is-welcoming')
+      try { localStorage.setItem('isl-welcomed', '1') } catch {}
+      // Sound already chosen in a game: nothing to ask.
+      byId('welcomeSound').hidden = !isMuted()
+      window.setTimeout(() => { welcome.hidden = false; requestAnimationFrame(() => welcome.classList.add('is-on')) }, PLAY ? 1400 : 0)
+      byId('welcomeSound').addEventListener('click', () => { soundOn(); welcomeAway() })
+      byId('welcomeX').addEventListener('click', welcomeAway)
+      // Once the map is being used, it has done its job: it goes a little later.
+      box.addEventListener('pointerdown', (e) => { if (!welcomeT && !(e.target as Element).closest('.isl-welcome')) welcomeT = window.setTimeout(welcomeAway, 12000) }, true)
+    }
+  }
   // Sound left on from before: a browser will not play it until the page is
   // touched, so the island starts at the first touch.
   if (!isMuted()) {
@@ -573,7 +730,7 @@ const book = BOOK.map((key) => {
     let complete = 0
     for (const sh of ppSheets) {
       const key = sh.dataset.sheet!
-      if (key === 'sightings') continue
+      if (key === 'sightings' || key === 'bottles') continue
       const mine = [...sh.querySelectorAll('.pp-slot')], got = mine.filter((b) => b.classList.contains('is-stamped')).length
       const done = got === mine.length
       if (done) complete++
@@ -616,11 +773,67 @@ const book = BOOK.map((key) => {
       if (!got) { const s = document.createElement('small'); s.textContent = 'not yet'; li.append(s) }
       return li
     }))
+    renderBottles()
     ppCountEl.textContent = `${n}/${total}`; ppCountEl.hidden = n === 0
     ppNewEl.textContent = `+${fresh.size}`; ppNewEl.hidden = fresh.size === 0
     btnPassport.setAttribute('aria-label', `Passport: ${n} of ${total} games visited${fresh.size ? `, ${fresh.size} new stamp${fresh.size > 1 ? 's' : ''}` : ''}`)
     return fresh
   }
+
+  /* ---- the passport's bottles, and its cover ---- */
+  const ppBottleBtns = [...pp.querySelectorAll<HTMLButtonElement>('.pp-bottle')]
+  const ppPips = [...pp.querySelectorAll<HTMLElement>('[data-pip]')]
+  const ppCovers = [...pp.querySelectorAll<HTMLButtonElement>('.pp-coverbtn')]
+  /** Put a cover on the book: its board round the pages, and the face it opens from. */
+  function applyCover(key: string) {
+    const c = COVERS.find((x) => x.key === key) ?? COVERS[0]
+    ppBook.dataset.cover = c.key
+    const set = (k: string, v: string) => ppBook.style.setProperty(k, v)
+    set('--cv-a', c.board[0]); set('--cv-b', c.board[1]); set('--cf-1', c.face[0]); set('--cf-2', c.face[1]); set('--cf-3', c.face[2]); set('--cf-ink', c.ink)
+  }
+  function renderBottles() {
+    const file = readBottles(), n = count(file)
+    for (const b of ppBottleBtns) {
+      const k = Number(b.dataset.n), got = k in file.found, day = file.found[k]
+      b.classList.toggle('is-found', got)
+      b.setAttribute('aria-label', got ? `Bottle ${k}: found${day ? ` ${pretty(day)}` : ''}. Read its note` : `Bottle ${k}: not found yet. ${b.dataset.where}`)
+    }
+    for (const p of ppPips) p.classList.toggle('is-on', Number(p.dataset.pip) in file.found)
+    $pp('ppBottles').textContent = String(n); $pp('ppBN').textContent = String(n); $pp('ppBTab').textContent = `${n}/${BOTTLE_COUNT}`
+    for (const c of ppCovers) {
+      const open = n >= Number(c.dataset.need)
+      c.disabled = !open
+      c.classList.toggle('is-locked', !open)
+      c.setAttribute('aria-checked', String(c.dataset.cover === file.cover))
+    }
+    applyCover(file.cover)
+  }
+  for (const b of ppBottleBtns) b.addEventListener('click', () => {
+    const k = Number(b.dataset.n), file = readBottles(), note = NOTES[k]
+    for (const o of ppBottleBtns) o.classList.toggle('is-reading', o === b)
+    const letter = $pp('ppLetter')
+    letter.classList.toggle('is-open', k in file.found)
+    if (k in file.found && note) {
+      $pp('ppLetterNo').textContent = `No. ${k}${file.found[k] ? ` · found ${pretty(file.found[k])}` : ''}`
+      $pp('ppLetterText').textContent = `“${note.text}”`
+      $pp('ppLetterFrom').textContent = `— ${note.from}`
+    } else {
+      $pp('ppLetterNo').textContent = `No. ${k} · not found yet`
+      $pp('ppLetterText').textContent = `${b.dataset.where}. Look along the water’s edge for a glint.`
+      $pp('ppLetterFrom').textContent = ''
+    }
+    if (PLAY) { letter.classList.remove('is-turning'); void letter.offsetWidth; letter.classList.add('is-turning') }
+  })
+  for (const c of ppCovers) c.addEventListener('click', () => {
+    if (!wearCover(c.dataset.cover!)) return
+    sound?.stamp()
+    renderBottles()
+    if (PLAY) { ppBook.classList.remove('is-recovered'); void ppBook.offsetWidth; ppBook.classList.add('is-recovered') }
+  })
+  // The bottle counter on the map opens the book at the bottles.
+  const openAt = (tab: string) => { openPassport(); showSheet(tab, false) }
+  bottlesEl.addEventListener('click', () => openAt('bottles'))
+  byId('islNoteBook').addEventListener('click', () => { hideNote(); openAt('bottles') })
 
   let landDelay = 0
   function showSheet(tab: string, turn = true) {
@@ -686,6 +899,92 @@ const book = BOOK.map((key) => {
     renderPassport()
   })
   renderPassport()
+
+  /* ---- postcards: the view, framed, to keep or send ------------------------ */
+  // The camera button takes whatever is on the screen: the engine paints it
+  // again at the card's own size (lib/island/postcard), with a close-up of
+  // the nearest building for the stamp, and the card comes up to be saved or
+  // sent through the phone's own share sheet. Until the map has loaded there
+  // is nothing to take, so the button waits.
+  {
+    const btn = byId('zSnap') as HTMLButtonElement
+    const pc = byId('pc') as HTMLDialogElement, img = byId('pcImg') as HTMLImageElement
+    const save = byId('pcSave') as HTMLAnchorElement, share = byId('pcShare') as HTMLButtonElement
+    let url = '', file: File | null = null, taking = false, place = 'Tiny Island'
+    isle.withEngine(() => { btn.disabled = false })
+    const nearest = <T,>(xs: T[], at: (t: T) => [number, number], x: number, y: number) => xs.reduce<{ t: T | null; d: number }>((b, t) => { const [u, v] = at(t), d = Math.hypot(u - x, v - y); return d < b.d ? { t, d } : b }, { t: null, d: Infinity }).t
+    const close = () => pc.close()
+    async function take() {
+      if (taking) return
+      taking = true
+      isle.hideCard()
+      sound?.shutter()
+      if (PLAY) { box.classList.remove('is-flashing'); void box.offsetWidth; box.classList.add('is-flashing') }
+      const v = isle.view(), shape = shapeFor(v.w, v.h), cr = crop(v, shape), ps = photoSize(shape)
+      // Where it is from: the district whose name is nearest the middle, unless the whole island is in it.
+      const [, , bw] = data.bounds
+      const d = cr.w > bw * 0.55 ? null : nearest(data.districts, (q) => [q.x, q.y], cr.x, cr.y)
+      place = d ? d.name : 'Tiny Island'
+      const ink = d ? data.inks[d.key] ?? '#4637a6' : '#4637a6'
+      // The stamp: the building nearest the middle, close up.
+      const lm = nearest(Object.values(data.anchors), (a) => [(a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2], cr.x, cr.y)
+      byId('pcPlace').textContent = place
+      pc.classList.add('is-developing'); img.removeAttribute('src')
+      save.removeAttribute('href'); share.hidden = true
+      document.documentElement.classList.add('pp-open')
+      isle.pause(true)
+      pc.showModal()
+      const photo = document.createElement('canvas'), stamp = document.createElement('canvas')
+      try {
+        await Promise.all(['700 80px Fredoka', '600 40px Fredoka'].map((f) => document.fonts?.load(f).catch(() => null)))
+        // Paint until everything in both is sharp (the sharper pictures it wants come in meanwhile), or a few seconds have gone.
+        const until = performance.now() + 6000
+        await new Promise<void>((done) => {
+          const once = () => isle.withEngine((e) => {
+            const a = e.snapshot(photo, { x: cr.x, y: cr.y, z: cr.z }, ps.w, ps.h)
+            let b = { sharp: true }
+            if (lm) { const sw = (lm.x1 - lm.x0) * 1.35, sh = (lm.y1 - lm.y0) * 1.22, z = Math.min(STAMP_PHOTO.w / sw, STAMP_PHOTO.h / sh); b = e.snapshot(stamp, { x: (lm.x0 + lm.x1) / 2, y: (lm.y0 + lm.y1) / 2 + (lm.y1 - lm.y0) * 0.04, z }, STAMP_PHOTO.w, STAMP_PHOTO.h) }
+            if ((a.sharp && b.sharp) || performance.now() > until) done()
+            else window.setTimeout(once, 140)
+          })
+          once()
+        })
+        const card = drawPostcard({ photo, stamp: lm ? stamp : null, place, ink, value: String(data.slugs.length), date: new Date(), host: location.host, shape })
+        const blob = await new Promise<Blob | null>((r) => card.toBlob(r, 'image/jpeg', 0.92))
+        if (!blob) throw new Error('the postcard could not be made')
+        if (url) URL.revokeObjectURL(url)
+        url = URL.createObjectURL(blob)
+        const name = `tiny-island-${place.toLowerCase().replace(/^the /, '').replace(/[^a-z]+/g, '-')}.jpg`
+        file = new File([blob], name, { type: 'image/jpeg' })
+        img.src = url
+        img.alt = `A postcard of Tiny Island: greetings from ${place}, with a stamp and a postmark`
+        save.href = url; save.download = name
+        share.hidden = !(navigator.canShare?.({ files: [file] }))
+        await img.decode().catch(() => null)
+        pc.classList.remove('is-developing')
+        ;(share.hidden ? save : share).focus()
+      } catch (err) {
+        console.error('[island] postcard', err)
+        byId('pcWait').textContent = 'The camera jammed. Try again in a moment.'
+      } finally { taking = false }
+    }
+    btn.addEventListener('click', take)
+    share.addEventListener('click', async () => {
+      if (!file) return
+      try { await navigator.share({ files: [file], title: `Greetings from ${place}`, text: `Greetings from ${place}, on Tiny Island: ${location.origin}` }) }
+      catch (e) { if ((e as Error).name !== 'AbortError') save.click() }
+    })
+    byId('pcDone').addEventListener('click', close)
+    byId('pcClose').addEventListener('click', close)
+    pc.addEventListener('click', (e) => { if (e.target === pc) close() })
+    pc.addEventListener('close', () => {
+      document.documentElement.classList.remove('pp-open'); isle.pause(false)
+      byId('pcWait').innerHTML = '<span class="pc-dot" aria-hidden="true"></span>Developing…'
+      btn.focus({ preventScroll: true })
+    })
+    // P on the map takes one too.
+    box.addEventListener('keydown', (e) => { if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey && !e.altKey && !btn.disabled && !(e.target as Element).closest('input')) { e.preventDefault(); take() } })
+  }
 
   /* ---- the cards: filter, search, and "show on the island" ---------------- */
   const slots = Array.from(document.querySelectorAll<HTMLElement>('.gs-slot'))
@@ -860,6 +1159,16 @@ const book = BOOK.map((key) => {
   .isl-zoom { position: absolute; right: clamp(14px, 3vw, 32px); bottom: 24px; z-index: 5; display: grid; gap: 10px; }
   .isl-zoom button { width: 48px; height: 48px; padding: 0; justify-content: center; font-size: 26px; line-height: 1; }
   .isl-zoom svg { width: 20px; height: 20px; }
+  .isl-zoom .isl-snap { position: relative; margin-bottom: 6px; background: #e3f3ff; }
+  .isl-zoom .isl-snap svg { width: 24px; height: 24px; }
+  .isl-zoom .isl-snap:hover { background: #cfe9ff; }
+  .isl-zoom .isl-snap:disabled { opacity: 0.5; cursor: default; }
+  .isl-snap-tip {
+    position: absolute; right: calc(100% + 10px); top: 50%; transform: translate(6px, -50%);
+    padding: 5px 11px; font: 700 14px 'Fredoka', system-ui, sans-serif; white-space: nowrap; color: #fff;
+    background: #1b2340; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+  }
+  @media (hover: hover) { .isl-snap:hover:not(:disabled) .isl-snap-tip, .isl-snap:focus-visible .isl-snap-tip { opacity: 1; transform: translate(0, -50%); } }
   .isl-mini {
     position: absolute; left: clamp(14px, 3vw, 32px); bottom: 24px; z-index: 5;
     width: 196px; height: 132px;
@@ -874,13 +1183,22 @@ const book = BOOK.map((key) => {
   .isl-mini-pin.is-today { fill: #ff4f6e; }
   .isl-mini-pin.is-hot { transform: scale(1.7); }
   .isl-down { position: absolute; left: 50%; bottom: 24px; z-index: 4; transform: translateX(-50%); display: none; }
-  /* How many of the island's secrets you have found, once you have found one. */
-  .isl-found {
-    position: absolute; left: clamp(14px, 3vw, 32px); bottom: 150px; z-index: 5;
+  /* How many of the island's secrets you have found, and how many bottles, once there is one of either. */
+  .isl-pills { position: absolute; left: clamp(14px, 3vw, 32px); bottom: 150px; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; pointer-events: none; }
+  .isl-pills > * { pointer-events: auto; }
+  .isl-found, .isl-bpill {
+    display: inline-flex; align-items: center;
     padding: 7px 14px; font: 700 14px 'Fredoka', system-ui, sans-serif; color: #1b2340;
     background: #fff; border: 2.5px solid #1b2340; border-radius: 999px; box-shadow: 0 3px 0 #1b2340; cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
   }
-  .isl-found[hidden] { display: none; }
+  .isl-found:hover, .isl-bpill:hover { background: #eef4ff; }
+  .isl-found:active, .isl-bpill:active { transform: translateY(3px); box-shadow: 0 0 0 #1b2340; }
+  .isl-found[hidden], .isl-bpill[hidden] { display: none; }
+  .isl-bpill { gap: 7px; padding-left: 10px; }
+  .isl-bpill-art { display: inline-flex; width: 11px; height: 18px; transform: rotate(-14deg); }
+  .isl-bpill-art :global(svg) { width: 100%; height: 100%; }
+  .isl-found:focus-visible, .isl-bpill:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
   .isl-found::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: #4fe3c1; border: 2px solid #1b2340; vertical-align: -1px; }
   .isl-toast {
     position: absolute; left: 50%; bottom: 90px; z-index: 6; max-width: min(520px, calc(100% - 32px)); margin: 0;
@@ -889,6 +1207,82 @@ const book = BOOK.map((key) => {
     transform: translate(-50%, 12px); opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s;
   }
   .isl-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+  /* A first visit's hello, where the hint would be (which it replaces). */
+  .isl-box.is-welcoming .isl-hint { display: none; }
+  .isl-welcome {
+    position: absolute; left: 50%; bottom: 24px; z-index: 6;
+    display: flex; align-items: center; gap: 12px;
+    width: max-content; max-width: calc(100% - 28px);
+    padding: 8px 8px 8px 12px;
+    background: #fff; border: 3px solid #1b2340; border-radius: 999px; box-shadow: 0 5px 0 #1b2340;
+    font: 500 15.5px/1.3 'Fredoka', system-ui, sans-serif; color: #1b2340;
+    transform: translate(-50%, 22px); opacity: 0;
+    transition: opacity 0.4s, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .isl-welcome[hidden] { display: none; }
+  .isl-welcome.is-on { opacity: 1; transform: translate(-50%, 0); }
+  .isl-welcome.is-going { opacity: 0; transform: translate(-50%, 14px); transition-timing-function: ease; }
+  .isl-welcome p { margin: 0; }
+  .isl-welcome b { font-weight: 700; }
+  .isl-welcome-mark { flex: none; display: inline-flex; width: 34px; height: 34px; }
+  .isl-welcome-mark :global(svg) { width: 100%; height: 100%; }
+  .isl-welcome-short { display: none; }
+  .isl-welcome-sound {
+    flex: none; display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px 7px 11px; font: 700 15px 'Fredoka', system-ui, sans-serif; color: #1b2340; cursor: pointer;
+    background: #4fe3c1; border: 2.5px solid #1b2340; border-radius: 999px; box-shadow: 0 3px 0 #1b2340;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
+  }
+  .isl-welcome-sound[hidden] { display: none; }
+  .isl-welcome-sound:hover { background: #6debcd; }
+  .isl-welcome-sound:active { transform: translateY(3px); box-shadow: 0 0 0 #1b2340; }
+  .isl-welcome-sound svg { width: 19px; height: 19px; }
+  .isl-welcome-x { flex: none; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: #4a5372; background: none; border: 0; border-radius: 50%; cursor: pointer; }
+  .isl-welcome-x:hover { background: #eef2ff; color: #1b2340; }
+  .isl-welcome-x svg { width: 16px; height: 16px; }
+  .isl-welcome button:focus-visible { outline: 3px solid #8ccbff; outline-offset: 2px; }
+  @media (pointer: coarse), (max-width: 760px) { .isl-welcome-long { display: none; } .isl-welcome-short { display: inline; } }
+  :global(html.play) .isl-welcome.is-on .isl-welcome-mark { animation: isl-wave 1.6s 0.5s ease-in-out 2; }
+  @keyframes isl-wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 60% { transform: rotate(9deg); } }
+
+  /* A bottle's note, unrolled over the map. */
+  .isl-note {
+    position: absolute; left: 50%; bottom: 108px; z-index: 7;
+    width: min(430px, calc(100% - 28px));
+    margin: 0; padding: 20px 24px 16px;
+    color: #1b2340; font-family: 'Fredoka', system-ui, sans-serif;
+    background-color: #fdfeff;
+    background-image: repeating-linear-gradient(180deg, transparent 0 27px, rgba(140, 203, 255, 0.35) 27px 28.5px);
+    background-position: 0 16px;
+    border: 3px solid #1b2340; border-radius: 6px 6px 18px 18px; box-shadow: 0 6px 0 #1b2340, 0 24px 50px rgba(13, 20, 50, 0.28);
+    transform: translateX(-50%) rotate(-1.2deg);
+    transform-origin: 50% 0;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .isl-note[hidden] { display: none; }
+  .isl-note.is-on { opacity: 1; pointer-events: auto; }
+  /* The roll at the top it unwinds from. */
+  .isl-note::before { content: ''; position: absolute; left: -9px; right: -9px; top: -12px; height: 18px; background: linear-gradient(180deg, #ffffff, #e3ebfb); border: 3px solid #1b2340; border-radius: 9px; }
+  :global(html.play) .isl-note.is-on { animation: isl-unroll 0.6s 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.05) both; }
+  @keyframes isl-unroll { from { clip-path: inset(-20px -20px 100% -20px); } to { clip-path: inset(-20px -20px -40px -20px); } }
+  .isl-note-no { margin: 2px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #1f7fa8; }
+  .isl-note-text { margin: 8px 0 0; font-size: 19px; font-weight: 500; line-height: 28.5px; }
+  .isl-note-from { margin: 2px 0 0; text-align: right; font-size: 15px; font-weight: 600; color: #4a5372; line-height: 28.5px; }
+  .isl-note-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 0; padding-top: 10px; border-top: 2px dashed #c5cde4; font-size: 14px; font-weight: 600; color: #4a5372; }
+  .isl-note.has-prize .isl-note-foot span { color: #c4306f; font-weight: 700; }
+  .isl-note-book { flex: none; padding: 5px 12px; font: 700 13.5px 'Fredoka', system-ui, sans-serif; color: #1b2340; background: #e3f3ff; border: 2px solid #1b2340; border-radius: 999px; cursor: pointer; }
+  .isl-note-book:hover { background: #cfe9ff; }
+  .isl-note-x { position: absolute; right: 8px; top: 10px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; color: #4a5372; background: none; border: 0; border-radius: 50%; cursor: pointer; }
+  .isl-note-x:hover { background: #eef2ff; color: #1b2340; }
+  .isl-note-x svg { width: 15px; height: 15px; }
+  .isl-note button:focus-visible { outline: 3px solid #8ccbff; outline-offset: 2px; }
+
+  /* The camera's flash. */
+  .isl-flash { position: absolute; inset: 0; z-index: 8; background: #fff; opacity: 0; pointer-events: none; }
+  .isl-box.is-flashing .isl-flash { animation: isl-flash 0.55s ease-out; }
+  @keyframes isl-flash { 0% { opacity: 0; } 12% { opacity: 0.85; } 100% { opacity: 0; } }
   .isl-down:active { transform: translateX(-50%) translateY(4px); }
 
   /* The card that pops up over a building. */
@@ -987,6 +1381,14 @@ const book = BOOK.map((key) => {
     .isl-logo { font-size: 17px; }
     .isl-mini { display: none; }
     .isl-hint { bottom: 86px; font-size: 14px; }
+    /* Clear of the zoom buttons down the right. */
+    .isl-welcome { bottom: 84px; left: calc(50% - 32px); max-width: calc(100% - 92px); gap: 8px; font-size: 14.5px; padding: 6px 6px 6px 9px; }
+    .isl-welcome-mark { width: 28px; height: 28px; }
+    .isl-welcome-sound { padding: 6px 11px 6px 9px; font-size: 14px; }
+    .isl-welcome-sound span { display: none; }
+    .isl-note { bottom: 84px; padding: 18px 18px 14px; }
+    .isl-note-text { font-size: 17px; line-height: 26px; }
+    .isl-pills { bottom: 84px; }
     .isl-title { top: 78px; font-size: 14px; padding: 6px 14px; }
     .isl-zoom { bottom: 20px; }
     .isl-zoom button { width: 44px; height: 44px; }
@@ -1166,7 +1568,8 @@ const book = BOOK.map((key) => {
     width: min(1060px, calc(100vw - 40px));
     height: min(700px, calc(100dvh - 40px));
     padding: 10px;
-    background: linear-gradient(135deg, #26347a, #1c275c);
+    background: linear-gradient(135deg, var(--cv-a, #26347a), var(--cv-b, #1c275c));
+    transition: background-color 0.4s;
     border: 3px solid #1b2340; border-radius: 24px;
     box-shadow: 0 6px 0 #1b2340, 0 34px 90px rgba(5, 10, 30, 0.5);
     perspective: 2400px;
@@ -1346,8 +1749,8 @@ const book = BOOK.map((key) => {
   .pp-cover-front, .pp-cover-back { position: absolute; inset: 0; backface-visibility: hidden; }
   .pp-cover-front {
     display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center;
-    border-radius: 5px 16px 16px 5px; color: #c4f4e8;
-    background: radial-gradient(120% 80% at 30% 20%, #33479a, #212e6a 60%, #1a2456);
+    border-radius: 5px 16px 16px 5px; color: var(--cf-ink, #c4f4e8);
+    background: radial-gradient(120% 80% at 30% 20%, var(--cf-1, #33479a), var(--cf-2, #212e6a) 60%, var(--cf-3, #1a2456));
     box-shadow: inset 0 0 0 12px transparent, inset 0 0 0 14px rgba(196, 244, 232, 0.35);
   }
   .pp-cover-back { transform: rotateY(180deg); border-radius: 16px 5px 5px 16px; background: #e9eefc; }
@@ -1358,6 +1761,72 @@ const book = BOOK.map((key) => {
     background: linear-gradient(100deg, #eafffa, #8fe6d4 40%, #e3f6ff 55%, #7dc8dc); -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .pp-cover-small { font-size: 12px; font-weight: 600; letter-spacing: 0.2em; opacity: 0.75; }
+  /* The pearl cover is pale: its lettering is printed dark. */
+  .pp-book[data-cover='pearl'] .pp-cover-word { background-image: linear-gradient(100deg, #2b3a7c, #5a4bc9 45%, #1f67c9 60%, #2b3a7c); }
+  .pp-book[data-cover='pearl'] .pp-cover-emblem { filter: drop-shadow(0 2px 0 rgba(43, 58, 124, 0.5)); }
+  .pp-book[data-cover='pearl']::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.5) 46%, rgba(205, 240, 255, 0.4) 52%, transparent 66%); background-size: 250% 100%; background-position: 120% 0; }
+  html.play .pp[open] .pp-book[data-cover='pearl']::after { animation: pp-holo 4.2s 0.6s ease-in-out infinite; }
+  /* A new cover put on: the book gives a little bounce. */
+  html.play .pp-book.is-recovered { animation: pp-recover 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  @keyframes pp-recover { 40% { transform: scale(0.985) rotate(-0.4deg); } }
+
+  /* ---- bottles, on your page ---- */
+  .pp-tally .pp-tally-bottles { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 10px; }
+  .pp-tally-bottles b { grid-row: 1 / 3; }
+  .pp-bpips { display: flex; gap: 4px; margin-top: 4px; }
+  .pp-bpips i { width: 11px; height: 17px; border-radius: 3px 3px 5px 5px; border: 1.5px dashed #b7c1dc; }
+  .pp-bpips i.is-on { background: var(--glass); border: 1.5px solid #1b2340; }
+
+  /* ---- the bottles' own page ---- */
+  .pp-bottles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px 6px; }
+  .pp-bottle {
+    position: relative; width: 100%; display: grid; justify-items: center; gap: 4px;
+    padding: 8px 2px 6px; margin: 0; background: none; border: 0; border-radius: 14px; cursor: pointer;
+    font: inherit; color: #b7c1dc; transition: background-color 0.15s;
+  }
+  .pp-bottle:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .pp-bottle.is-reading { background: color-mix(in srgb, var(--ink) 13%, transparent); }
+  .pp-bottle-found, .pp-bottle-ghost { grid-area: 1 / 1; display: block; width: 34px; height: 54px; }
+  .pp-bottle-svg { display: block; width: 100%; height: 100%; }
+  .pp-bottle-found { opacity: 0; transform: rotate(-8deg) scale(0.8); transition: opacity 0.3s, transform 0.4s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .pp-bottle.is-found .pp-bottle-found { opacity: 1; transform: rotate(-8deg); }
+  .pp-bottle.is-found .pp-bottle-ghost { visibility: hidden; }
+  .pp-bottle:hover .pp-bottle-ghost { color: #8f9bc0; }
+  .pp-bottle-no { font-size: 12px; font-weight: 700; color: #8f9bc0; }
+  .pp-bottle.is-found .pp-bottle-no { color: #1b2340; }
+  .pp-bottle:focus-visible, .pp-coverbtn:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
+  .pp-letter {
+    margin: 12px 0 0; padding: 12px 16px; min-height: 92px;
+    background-color: #fdfeff; background-image: repeating-linear-gradient(180deg, transparent 0 25px, rgba(140, 203, 255, 0.35) 25px 26.5px); background-position: 0 30px;
+    border: 2px solid #1b2340; border-radius: 12px; box-shadow: 0 3px 0 #1b2340;
+  }
+  .pp-letter.is-turning { animation: pp-turn 0.4s cubic-bezier(0.2, 0.8, 0.3, 1); transform-origin: 0 50%; }
+  .pp-letter p { margin: 0; }
+  .pp-letter-no { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
+  .pp-letter-text { margin-top: 4px !important; font-size: 16px; font-weight: 500; line-height: 26.5px; color: #4a5578; }
+  .pp-letter.is-open .pp-letter-text { color: #1b2340; }
+  .pp-letter-from { text-align: right; font-size: 14px; font-weight: 600; color: var(--pmute); line-height: 26.5px; }
+  .pp-sub { margin: 18px 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--pmute); }
+  .pp-covers { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .pp-coverbtn {
+    display: grid; justify-items: center; gap: 3px; padding: 8px 4px 7px; margin: 0;
+    font: inherit; color: #1b2340; background: rgba(255, 255, 255, 0.7); border: 2px solid #c5cde4; border-radius: 12px; cursor: pointer;
+    transition: border-color 0.15s, transform 0.12s, background-color 0.15s;
+  }
+  .pp-coverbtn:hover:not(:disabled) { transform: translateY(-2px); border-color: #1b2340; }
+  .pp-coverbtn[aria-checked='true'] { border-color: #1b2340; background: #fff; box-shadow: 0 3px 0 #1b2340; }
+  .pp-swatch {
+    position: relative; display: grid; place-items: center; width: 34px; height: 44px; border-radius: 3px 7px 7px 3px;
+    background: radial-gradient(120% 80% at 30% 20%, var(--a), var(--b) 60%, var(--c)); border: 2px solid #1b2340;
+    font-size: 15px; font-weight: 700; color: var(--t);
+  }
+  .pp-coverbtn[aria-checked='true'] .pp-swatch::after { content: '✓'; position: absolute; right: -9px; bottom: -7px; display: grid; place-items: center; width: 18px; height: 18px; font-size: 11px; color: #fff; background: #13806a; border: 2px solid #1b2340; border-radius: 50%; }
+  .pp-cname { font-size: 12.5px; font-weight: 700; line-height: 1.1; text-align: center; }
+  .pp-cneed { font-size: 11px; font-weight: 600; color: var(--pmute); }
+  .pp-coverbtn.is-locked { cursor: default; }
+  .pp-coverbtn.is-locked .pp-swatch { filter: grayscale(1) opacity(0.35); }
+  .pp-coverbtn.is-locked .pp-swatch span { visibility: hidden; }
+  .pp-coverbtn.is-locked .pp-cname { color: #7d88a8; }
   .pp-cover-emblem { width: 190px; height: auto; filter: drop-shadow(0 2px 0 rgba(10, 16, 44, 0.6)); }
 
   .pp-close {
@@ -1388,8 +1857,66 @@ const book = BOOK.map((key) => {
     .pp-cover-front { border-radius: 15px; }
     .pp-close { top: 12px; right: 12px; width: 40px; height: 40px; }
     .pp-seal-at { width: 92px; top: 34px; }
+    .pp-bottles { grid-template-columns: repeat(4, 1fr); }
+    .pp-covers { grid-template-columns: repeat(3, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) {
     .pp *, .pp *::before, .pp *::after { animation: none !important; transition: none !important; }
   }
+
+  /* ================= the postcard ================= */
+  .pc {
+    position: fixed; inset: 0; z-index: 50; width: 100%; height: 100%; max-width: none; max-height: none;
+    margin: 0; padding: 0; border: 0; background: transparent; overflow: auto;
+    color: #1b2340; font-family: 'Fredoka', system-ui, sans-serif;
+  }
+  .pc[open] { display: grid; place-items: center; }
+  .pc::backdrop { background: rgba(13, 20, 50, 0.66); }
+  html.play .pc[open]::backdrop { animation: pp-dim 0.3s ease-out; }
+  .pc-in { position: relative; display: grid; justify-items: center; gap: 16px; width: min(980px, calc(100vw - 32px)); padding: 18px 0 24px; }
+  .pc-h { margin: 0; font: 700 clamp(20px, 2.6vw, 28px)/1.1 'Fredoka', system-ui, sans-serif; color: #fff; text-align: center; letter-spacing: -0.01em; }
+  .pc-frame { position: relative; display: grid; place-items: center; width: 100%; max-height: calc(100dvh - 190px); aspect-ratio: 3 / 2; }
+  .pc-img {
+    display: block; max-width: 100%; max-height: calc(100dvh - 190px); width: auto; height: auto;
+    border-radius: 6px; box-shadow: 0 2px 0 rgba(255, 255, 255, 0.25), 0 26px 70px rgba(5, 10, 30, 0.6);
+    transform: rotate(-1.2deg);
+  }
+  html.play .pc:not(.is-developing) .pc-img { animation: pc-in 0.65s cubic-bezier(0.2, 0.9, 0.3, 1.15), pc-develop 1.4s ease-out; }
+  @keyframes pc-in { from { opacity: 0; transform: translateY(40px) rotate(-6deg) scale(0.92); } }
+  @keyframes pc-develop { from { filter: brightness(1.7) saturate(0.2) contrast(0.7); } }
+  .pc.is-developing .pc-img { visibility: hidden; }
+  .pc-wait { position: absolute; display: none; align-items: center; gap: 10px; margin: 0; padding: 10px 18px; font-size: 17px; font-weight: 600; color: #fff; background: rgba(27, 35, 64, 0.6); border-radius: 999px; }
+  .pc.is-developing .pc-wait { display: inline-flex; }
+  .pc-dot { width: 12px; height: 12px; border-radius: 50%; background: #ff4f6e; box-shadow: 0 0 0 3px rgba(255, 79, 110, 0.3); }
+  html.play .pc-dot { animation: pc-blink 1s steps(2, jump-none) infinite; }
+  @keyframes pc-blink { 50% { opacity: 0.25; } }
+  .pc-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .pc-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; font: 700 17px 'Fredoka', system-ui, sans-serif; color: #1b2340; text-decoration: none; cursor: pointer;
+    background: #fff; border: 3px solid #1b2340; border-radius: 16px; box-shadow: 0 4px 0 #0c1230;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
+  }
+  .pc-btn[hidden] { display: none; }
+  .pc-btn svg { width: 20px; height: 20px; }
+  .pc-btn:hover { background: #eef4ff; }
+  .pc-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #0c1230; }
+  .pc-btn--go { background: #4fe3c1; }
+  .pc-btn--go:hover { background: #6debcd; }
+  .pc-btn--plain { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.55); box-shadow: none; }
+  .pc-btn--plain:hover { background: rgba(255, 255, 255, 0.12); }
+  .pc.is-developing .pc-btn:not(.pc-btn--plain) { visibility: hidden; }
+  .pc-btn:focus-visible, .pc-close:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 3px; }
+  .pc-close {
+    position: absolute; top: 8px; right: 0; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; cursor: pointer;
+    color: #1b2340; background: #fff; border: 3px solid #1b2340; border-radius: 50%; box-shadow: 0 3px 0 #0c1230;
+  }
+  .pc-close svg { width: 18px; height: 18px; }
+  @media (max-width: 760px) {
+    .pc-in { gap: 12px; padding-top: 64px; }
+    .pc-frame { aspect-ratio: auto; max-height: calc(100dvh - 230px); }
+    .pc-img { max-height: calc(100dvh - 230px); }
+    .pc-close { top: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pc *, .pc::backdrop { animation: none !important; transition: none !important; } }
 </style>

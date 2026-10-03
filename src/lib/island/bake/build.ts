@@ -44,7 +44,7 @@ const SHAPES = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polygon', 
 /** Presentation attributes that children inherit. */
 const INHERITED = ['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'letter-spacing', 'dominant-baseline', 'visibility']
 /** Classes the engine finds and drives by itself. */
-const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg-year', 'pg-bar', 'dt-fossil', 'cloud-puff', 'cloud-base', 'night-veil', 'lm-ring', 'lm-art', 'pk-say', 'mill-sails', 'fount-up', 'kite', 'cloud', 'isl-plane', 'walker', 'dsi-count'])
+const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg-year', 'pg-bar', 'dt-fossil', 'cloud-puff', 'cloud-base', 'night-veil', 'lm-ring', 'lm-art', 'pk-say', 'mill-sails', 'fount-up', 'kite', 'cloud', 'isl-plane', 'walker', 'dsi-count', 'sign-words'])
 /**
  * Of those, the ones whose own paint the engine changes (a fill, a dash, a
  * width): drawn from their outlines. Everything else that moves is a
@@ -430,6 +430,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     if (cs.includes('lm')) { node.lm = el.attrs['data-slug']; node.data = { d: (styleOf(el)['--d'] ?? '0ms').replace('ms', '') } }
     if (el.attrs['data-poke']) {
       node.poke = el.attrs['data-poke']
+      // Which one of its kind (the bottles are counted one by one).
+      if (el.attrs['data-n'] !== undefined) node.data = { ...(node.data ?? {}), n: String(el.attrs['data-n']) }
       const fb = fillBox(el)
       if (fb) node.pokeOrg = [fb[0] + (fb[2] - fb[0]) / 2, fb[3]]
     }

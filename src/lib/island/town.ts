@@ -69,20 +69,65 @@ export function postbox(p: Pen, x: number, y: number) {
 }
 
 /** A fingerpost at a crossroads, its arms pointing off along the roads. */
-export function signpost(p: Pen, x: number, y: number, arms: { dx: number; dy: number; c: string }[]) {
+/** The shape each district stamps its passport in, small, for a signpost's board (see passport-art). */
+export type Emblem = 'ring' | 'rope' | 'rosette' | 'hex' | 'shield' | 'ticket' | 'oval'
+function emblem(g: N, shape: Emblem, ink: string) {
+  const cx = 0
+  const w = { fill: 'none', stroke: '#ffffff', 'stroke-width': 1.05, 'stroke-linejoin': 'round' }
+  const at = (d: string) => g.add(new N('path', { d, ...w }))
+  if (shape === 'ring') { g.add(new N('circle', { cx: f(cx), cy: 0, r: 2.7, ...w })); g.add(new N('circle', { cx: f(cx), cy: 0, r: 1.2, fill: '#ffffff' })) }
+  else if (shape === 'rope') g.add(new N('circle', { cx: f(cx), cy: 0, r: 2.6, ...w, 'stroke-width': 1.5, 'stroke-dasharray': '1.1 0.75' }))
+  else if (shape === 'rosette') {
+    let d = ''
+    for (let k = 0; k < 16; k++) { const r = k % 2 ? 2.05 : 2.95, t = (k / 16) * Math.PI * 2; d += `${k ? 'L' : 'M'}${f(cx + Math.cos(t) * r)} ${f(Math.sin(t) * r)}` }
+    g.add(new N('path', { d: d + 'Z', fill: '#ffffff' }))
+    g.add(new N('circle', { cx: f(cx), cy: 0, r: 1, fill: ink }))
+  } else if (shape === 'hex') {
+    let d = ''
+    for (let k = 0; k < 6; k++) { const t = (k / 6) * Math.PI * 2 + Math.PI / 6; d += `${k ? 'L' : 'M'}${f(cx + Math.cos(t) * 2.9)} ${f(Math.sin(t) * 2.9)}` }
+    at(d + 'Z')
+  } else if (shape === 'shield') at(`M${f(cx - 2.4)} -2.7h4.8v1.9c0 2-1.1 3.1-2.4 3.9c-1.3-0.8-2.4-1.9-2.4-3.9z`)
+  else if (shape === 'ticket') at(`M${f(cx - 2.2)} -2.2h4.4l0.9 0.9v2.6l-0.9 0.9h-4.4l-0.9-0.9v-2.6z`)
+  else g.add(new N('ellipse', { cx: f(cx), cy: 0, rx: 3.1, ry: 2.15, ...w }))
+}
+
+/**
+ * A signpost at a crossroads: a board for each road out, painted in the ink
+ * of the district that road leads to, with that district's passport stamp
+ * shape at the post end and its name along the rest (the names are only
+ * drawn close enough to read them: see sign-words in the engine). Each board
+ * points along its road; it is drawn on the road's own slant, and always
+ * reads left to right, so a board pointing left has its arrow at its left.
+ */
+export function signpost(p: Pen, x: number, y: number, arms: { dx: number; dy: number; ink: string; name: string; shape: Emblem }[]) {
   const [bx, by] = p.at(x, y)
-  p.path(`M${f(bx)} ${f(by)}V${f(by - 30)}`, 'none', { sw: 2.4, stroke: C.wood })
-  p.path(`M${f(bx)} ${f(by)}V${f(by - 30)}`, 'none', { sw: 0.8, stroke: shade(C.wood, 1.2) })
-  arms.forEach((a, n) => {
-    const z = 27 - n * 6
-    const [tx, ty] = p.at(x + a.dx * 0.32, y + a.dy * 0.32, z)
-    const [ox, oy] = p.at(x, y, z)
-    const ang = Math.atan2(ty - oy, tx - ox)
-    const ex = ox + Math.cos(ang) * 15, ey = oy + Math.sin(ang) * 15
-    const nx = -Math.sin(ang) * 2.4, ny = Math.cos(ang) * 2.4
-    p.path(`M${f(ox + nx)} ${f(oy + ny)}L${f(ex + nx)} ${f(ey + ny)}L${f(ex + Math.cos(ang) * 3)} ${f(ey + Math.sin(ang) * 3)}L${f(ex - nx)} ${f(ey - ny)}L${f(ox - nx)} ${f(oy - ny)}Z`, a.c, { sw: 1.1 })
-  })
-  p.el('circle', { cx: bx, cy: by - 31, r: 1.8, fill: C.wood, stroke: INK, 'stroke-width': 1 })
+  const TOP = 36, L = 32, HB = 3.7
+  // The foot: its shadow, thrown back to the left.
+  p.el('ellipse', { cx: f(bx), cy: f(by + 0.5), rx: 6, ry: 2.6, fill: INK, opacity: 0.12 })
+  p.el('path', { d: `M${f(bx - 1.5)} ${f(by)}l-11 5.5`, stroke: INK, 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.08 })
+  const board = (a: (typeof arms)[number], n: number) => {
+    const z = TOP - 5 - n * 8.2
+    const [ox, oy] = p.at(x, y, z), [tx, ty] = p.at(x + a.dx, y + a.dy, z)
+    const ex = tx - ox, ey = ty - oy
+    const s = ex >= 0 ? 1 : -1, skew = ex * ey > 0 ? 26.565 : -26.565
+    p.grow(ox - L - 2, oy - L * 0.5 - HB - 2, ox + L + 2, oy + L * 0.5 + HB + 2)
+    const g = p.el('g', { transform: `translate(${f(ox)} ${f(oy)}) skewY(${skew})` })
+    const x0 = s * 1.2, x1 = s * (L - 4.6), x2 = s * L
+    // The board, a strip of its edge lit, and a nail.
+    g.add(new N('path', { d: `M${f(x0)} ${-HB}L${f(x1)} ${-HB}L${f(x2)} 0L${f(x1)} ${HB}L${f(x0)} ${HB}Z`, fill: a.ink, stroke: INK, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }))
+    g.add(new N('path', { d: `M${f(x0 + s * 1.3)} ${-HB + 1.1}L${f(x1 - s * 0.6)} ${-HB + 1.1}`, stroke: '#ffffff', 'stroke-width': 0.9, 'stroke-linecap': 'round', opacity: 0.32 }))
+    g.add(new N('circle', { cx: f(s * 2.8), cy: 0, r: 0.7, fill: INK, opacity: 0.55 }))
+    emblem(g.add(new N('g', { transform: `translate(${f(s * 7.2)} 0) scale(0.82)` })), a.shape, a.ink)
+    g.add(new N('g', { class: 'sign-words' })).add(new N('text', { x: f((s * (L + 7.6)) / 2), y: 1.6, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 4.5, 'letter-spacing': 0.15, fill: '#ffffff' })).text(a.name)
+  }
+  // Boards pointing away from us are behind the post, the others in front.
+  const all = arms.map((a, n) => ({ a, n }))
+  for (const { a, n } of all) if (a.dx + a.dy < 0) board(a, n)
+  p.path(`M${f(bx)} ${f(by)}V${f(by - TOP)}`, 'none', { sw: 4.2, stroke: INK })
+  p.path(`M${f(bx)} ${f(by - 0.6)}V${f(by - TOP + 0.6)}`, 'none', { sw: 2.2, stroke: C.wood })
+  p.path(`M${f(bx + 0.55)} ${f(by - 1.5)}V${f(by - TOP + 2)}`, 'none', { sw: 0.7, stroke: shade(C.wood, 1.22) })
+  p.el('path', { d: `M${f(bx - 2.6)} ${f(by - TOP)}l2.6 -2.4l2.6 2.4z`, fill: shade(C.wood, 0.85), stroke: INK, 'stroke-width': 1, 'stroke-linejoin': 'round' })
+  for (const { a, n } of all) if (a.dx + a.dy >= 0) board(a, n)
 }
 
 /** Zebra stripes across a road, laid flat in tile units. */
@@ -508,9 +553,9 @@ export function secretIslet(p: Pen, x: number, y: number) {
   cw.add(new N('circle', { cx: f(qx), cy: f(qy - 9), r: 13, fill: 'transparent' }))
   person(new Pen(cw, p.ox, p.oy, p.oz + z, p.b, p.lights), x - 0.42, y + 0.18, '#ffffff', { pose: 'wave', skin: '#e0b899' })
   sayBubble(cw, qx, qy - 26, 'help!')
-  // A message in a bottle, bobbing in towards the island.
+  // A message in a bottle, bobbing in towards the island: the twelfth of them (lib/bottles).
   const [bx, by] = p.at(x - 1.6, y + 1.2, -12)
-  const bw = p.el('g', { 'data-poke': 'bottle', class: 'pk pk-bottle' })
+  const bw = p.el('g', { 'data-poke': 'bottle', 'data-n': 12, class: 'pk pk-bottle' })
   bw.add(new N('circle', { cx: f(bx), cy: f(by - 2), r: 12, fill: 'transparent' }))
   const b = bw.add(new N('g', { class: 'bob' }))
   b.add(new N('ellipse', { cx: f(bx), cy: f(by + 1), rx: 7, ry: 2, fill: '#ffffff', opacity: 0.6 }))
@@ -520,6 +565,37 @@ export function secretIslet(p: Pen, x: number, y: number) {
 }
 
 
+
+/**
+ * A message in a bottle, washed up on a beach: pale glass on the wet sand, a
+ * cork, a rolled note inside tied with a ribbon, and a glint of sun on it now
+ * and then so it catches the eye. A thing to poke, with its number, which the
+ * page counts (lib/bottles).
+ */
+export function beachBottle(p: Pen, x: number, y: number, n: number, glass: string, flip: boolean) {
+  const [sx, sy] = p.at(x, y)
+  const w = p.el('g', { 'data-poke': 'bottle', 'data-n': n, class: 'pk pk-bottle' })
+  w.add(new N('circle', { cx: f(sx), cy: f(sy - 2), r: 13, fill: 'transparent' }))
+  // Wet sand round it, and its shadow.
+  w.add(new N('ellipse', { cx: f(sx), cy: f(sy + 1.4), rx: 12.5, ry: 4.4, fill: '#cdbf9c', opacity: 0.55 }))
+  w.add(new N('ellipse', { cx: f(sx - 1.5), cy: f(sy + 1.6), rx: 9.5, ry: 2.6, fill: INK, opacity: 0.13 }))
+  const k = flip ? -1 : 1
+  const g = w.add(new N('g', { transform: `translate(${f(sx)} ${f(sy - 2.6)}) rotate(${k * -9}) scale(${k * 1.04} 1.04)` }))
+  g.add(new N('path', { d: 'M-8 -3.3h9q2.6 0 3.7 1.85h3.3v-0.45h1.1v3.8h-1.1v-0.45h-3.3q-1.1 1.85-3.7 1.85h-9a3.3 3.3 0 0 1 0-6.6z', fill: glass, stroke: INK, 'stroke-width': 1, 'stroke-linejoin': 'round' }))
+  // The note inside, rolled and tied.
+  g.add(new N('rect', { x: -6.4, y: -1.75, width: 7.2, height: 3.5, rx: 1.4, fill: '#fffdf7', stroke: '#9aa6c8', 'stroke-width': 0.45 }))
+  g.add(new N('path', { d: 'M-2.6 -1.75v3.5', stroke: C.rasp, 'stroke-width': 0.9 }))
+  // The cork.
+  g.add(new N('rect', { x: 9.1, y: -1.45, width: 2.4, height: 2.9, rx: 0.7, fill: '#c69f78', stroke: INK, 'stroke-width': 0.75 }))
+  // Light on the glass.
+  g.add(new N('path', { d: 'M-7 -2.15h6.4', stroke: '#ffffff', 'stroke-width': 1.1, 'stroke-linecap': 'round', opacity: 0.85 }))
+  g.add(new N('path', { d: 'M5.2 -0.6h2.2', stroke: '#ffffff', 'stroke-width': 0.8, 'stroke-linecap': 'round', opacity: 0.7 }))
+  // The glint, a star of light that comes and goes.
+  const gx = sx + k * 3.2, gy = sy - 7.6
+  w.add(new N('path', { d: `M${f(gx)} ${f(gy - 4.6)}l1.1 3.5l3.5 1.1l-3.5 1.1l-1.1 3.5l-1.1 -3.5l-3.5 -1.1l3.5 -1.1z`, fill: '#ffffff', stroke: '#8fd3ff', 'stroke-width': 0.6, class: 'twinkle', style: `animation-delay:${f(-((n * 0.77) % 2.4))}s` }))
+  p.grow(sx - 14, sy - 14, sx + 14, sy + 6)
+  return w
+}
 
 /**
  * The 32nd building: a hobbit-hole of a house dug into the back of Sky
