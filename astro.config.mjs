@@ -29,4 +29,25 @@ export default defineConfig({
   trailingSlash: 'always',
   build: { format: 'directory' },
   output: 'static',
+  vite: { plugins: [islandFilesInDev()] },
 })
+
+/**
+ * The homepage island's baked files are served by one catch-all endpoint
+ * (src/pages/island/[...file].ts). Built, they are plain files; but in
+ * `astro dev`, trailingSlash 'always' turns away /island/<hash>/c/0/0_0.webp
+ * for not ending in a slash, and the island never loads. This adds the slash
+ * on the way in, in dev only.
+ */
+function islandFilesInDev() {
+  return {
+    name: 'island-files-in-dev',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url && /\/island\/[0-9a-f]+\/[^?]+\.(?:webp|json)(?:\?|$)/.test(req.url)) req.url = req.url.replace(/\.(webp|json)(\?|$)/, (_, ext, q) => `.${ext}/${q}`)
+        next()
+      })
+    },
+  }
+}

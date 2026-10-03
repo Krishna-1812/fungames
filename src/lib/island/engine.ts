@@ -215,6 +215,13 @@ export function createEngine(o: {
   }
 
   /* ---- drawing ---- */
+  /**
+   * What the last frame cost, counted as it is drawn: the canvas calls (on a
+   * phone each is a few microseconds of the main thread, and their number,
+   * not the pixels, is what decides the frame rate), and what they drew.
+   */
+  const NO_STATS = { calls: 0, images: 0, transforms: 0, paths: 0, texts: 0, frags: 0, sprites: 0, apart: 0, ms: 0 }
+  let cs = { ...NO_STATS }, lastStats = { ...NO_STATS }
   let level = 0
   /** Visible world box (with a margin) and the current level's visible cells. */
   let vis: Box = [0, 0, 0, 0]
@@ -283,13 +290,14 @@ export function createEngine(o: {
     const dx0 = Math.round(m[0] * wx0 + m[4]), dy0 = Math.round(m[3] * wy0 + m[5]), dx1 = Math.round(m[0] * wx1 + m[4]), dy1 = Math.round(m[3] * wy1 + m[5])
     if (dx1 <= dx0 || dy1 <= dy0) return
     ctx.drawImage(bm, sx, sy, sw, sh, dx0, dy0, dx1 - dx0, dy1 - dy0)
+    cs.images++; cs.frags++
   }
 
   let alphaNow = 1
   // Changing the transform is one of the dearer calls on a phone: most sprites are drawn in device pixels, the transform left as it is.
   let ident = false
-  const setM = (m: M) => { ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); ident = false }
-  const toIdent = () => { if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true } }
+  const setM = (m: M) => { ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); ident = false; cs.transforms++ }
+  const toIdent = () => { if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true; cs.transforms++ } }
   const applyStyle = (s: Style, fillOverride?: string) => {
     const f = fillOverride ?? s.f
     if (f) ctx.fillStyle = f
@@ -321,6 +329,7 @@ export function createEngine(o: {
       ctx.globalAlpha = a * (st.fo ?? 1)
       ctx.fillStyle = fill ?? st.f!
       ctx.fill(lv.path, st.rule ?? 'nonzero')
+      cs.paths++
     }
     if (st.s) {
       ctx.globalAlpha = a * (st.so ?? 1)
@@ -329,6 +338,7 @@ export function createEngine(o: {
       if (ringOwner.has(n) && o.play && ringOwner.get(n) === hot) doff = marchOffset(st.doff ?? 0)
       if (st.dash) { ctx.setLineDash(st.dash); ctx.lineDashOffset = doff } else if (P.doff !== undefined) ctx.lineDashOffset = doff
       ctx.stroke(lv.path)
+      cs.paths++
       if (st.dash) ctx.setLineDash([])
     }
   }
@@ -352,8 +362,8 @@ export function createEngine(o: {
     ctx.textBaseline = n.bl
     const s = (n.tags && n.tags.map((t) => texts.get(t)).find((x) => x !== undefined)) ?? n.s
     ctx.globalAlpha = a
-    if (n.stroke) { ctx.strokeStyle = n.stroke; ctx.lineWidth = n.sw ?? 1; ctx.lineJoin = 'round'; ctx.strokeText(s, n.x, n.y) }
-    if (n.fill) { ctx.fillStyle = n.fill; ctx.fillText(s, n.x, n.y) }
+    if (n.stroke) { ctx.strokeStyle = n.stroke; ctx.lineWidth = n.sw ?? 1; ctx.lineJoin = 'round'; ctx.strokeText(s, n.x, n.y); cs.texts++ }
+    if (n.fill) { ctx.fillStyle = n.fill; ctx.fillText(s, n.x, n.y); cs.texts++ }
   }
 
   /** The best loaded size of a sprite, and draw it. */
@@ -375,11 +385,13 @@ export function createEngine(o: {
     ctx.globalAlpha = alpha
     if (m[1] === 0 && m[2] === 0 && m[0] > 0 && m[3] > 0) {
       toIdent()
-      ctx.drawImage(bm, at[1], at[2], at[3], at[4], m[0] * b[0] + m[4], m[3] * b[1] + m[5], (m[0] * at[3]) / sc, (m[3] * at[4]) / sc)
+      // On whole device pixels, as the cells are: a sprite at rest is as crisp as the ground it stands on, and moves with it.
+      ctx.drawImage(bm, at[1], at[2], at[3], at[4], Math.round(m[0] * b[0] + m[4]), Math.round(m[3] * b[1] + m[5]), (m[0] * at[3]) / sc, (m[3] * at[4]) / sc)
     } else {
       setM(m)
       ctx.drawImage(bm, at[1], at[2], at[3], at[4], b[0], b[1], at[3] / sc, at[4] / sc)
     }
+    cs.images++; cs.sprites++
   }
 
   /** How strongly something tagged shows: the night's layers, the clouds, a building's ring. */
@@ -508,6 +520,7 @@ export function createEngine(o: {
     toIdent()
     ctx.globalAlpha = a
     ctx.drawImage(oc, 0, 0, w, h, X0, Y0, w, h)
+    cs.images++; cs.apart++
     pool.push(oc)
   }
 
@@ -593,6 +606,8 @@ export function createEngine(o: {
 
   /* ---- one frame ---- */
   function frame(t: number) {
+    const began = performance.now()
+    cs = { ...NO_STATS }
     gaps = levels[0] ? 0 : 1; blurry = levels[level] ? 0 : 1
     now = t; frameNo++
     st = o.state()
@@ -618,6 +633,9 @@ export function createEngine(o: {
     lastGaps = gaps; lastBlurry = blurry
     pump()
     if (frameNo % 60 === 0) trim()
+    cs.calls = cs.images + cs.transforms + cs.paths + cs.texts
+    cs.ms = performance.now() - began
+    lastStats = cs
   }
 
   /* ---- what is under a point ---- */
@@ -739,6 +757,12 @@ export function createEngine(o: {
     /** Stop the buildings dropping in (someone has started using the map). */
     endIntro() { introAt = -1 },
     lmBox(slug: string) { return lms.get(slug)?.bb ?? null },
+    /** What the last frame cost and drew, and what is loaded: for the ?perf meter and the speed check. */
+    stats() {
+      let loaded = 0, bytes = 0
+      for (const im of imgs.values()) if (im.bm) { loaded++; bytes += im.bytes }
+      return { ...lastStats, level, scale: scene.levels[level], dpr, w: canvas.width, h: canvas.height, gaps: lastGaps, blurry: lastBlurry, loaded, bytes, queued: queue.length + inflight }
+    },
   }
 }
 export type Engine = ReturnType<typeof createEngine>

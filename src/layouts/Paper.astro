@@ -7,6 +7,7 @@ import Colophon from '../components/paper/Colophon.astro'
 import '../styles/paper/tokens.css'
 import '../styles/paper/base.css'
 import '../styles/paper/motion.css'
+import '../styles/island-arrival.css'
 
 /**
  * The Paper & Ink page. Every page in the new design system sits in this:
@@ -99,6 +100,31 @@ const favicon = faviconHref(true)
         d.classList.add('js')
         if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matches) d.classList.add('play')
         setTimeout(function () { if (!d.classList.contains('motion-ready')) d.classList.remove('play') }, 2500)
+        // Come in from the island through a building: the circle of the game's
+        // colour it closed (lib/island/camera.ts) opens again from the same
+        // point, over the first paint, in place of the usual page transition.
+        try {
+          var dive = sessionStorage.getItem('isl-iris')
+          if (dive) {
+            sessionStorage.removeItem('isl-iris')
+            var v = JSON.parse(dive)
+            if (d.classList.contains('play') && v && v.path === location.pathname && Date.now() - v.at < 8000) {
+              var w = innerWidth, h = innerHeight, x = v.x * w, y = v.y * h
+              d.style.setProperty('--iris-tint', String(v.tint))
+              d.style.setProperty('--iris-x', x.toFixed(0) + 'px')
+              d.style.setProperty('--iris-y', y.toFixed(0) + 'px')
+              d.style.setProperty('--iris-end', Math.ceil(Math.hypot(Math.max(x, w - x), Math.max(y, h - y)) * 1.12 + 8) + 'px')
+              d.classList.add('iris-in')
+              addEventListener('pagereveal', function (e) {
+                var vt = e.viewTransition
+                if (!vt) return
+                vt.ready.catch(function () {}); vt.finished.catch(function () {})
+                vt.skipTransition()
+              }, { once: true })
+              setTimeout(function () { d.classList.remove('iris-in') }, 1200)
+            }
+          }
+        } catch (e) {}
       })()
     </script>
 

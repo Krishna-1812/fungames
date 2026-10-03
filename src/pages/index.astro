@@ -100,7 +100,6 @@ const book = BOOK.map((key) => {
             <a class="isl-card-play" href="#"><span>Play</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10m-4-4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
           </div>
         </div>
-        <div class="isl-iris" aria-hidden="true"></div>
 
         <header class="isl-top">
           <a class="isl-logo" href={withBase('/')}><span class="isl-logo-dot" aria-hidden="true" set:html={faviconSvg(true)} /><span class="isl-logo-name">{SITE.name}</span></a>
@@ -130,6 +129,8 @@ const book = BOOK.map((key) => {
         <a class="isl-down" href="#games"><span>All {count} games</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
       </div>
     </section>
+    {/* Over the whole window, not just the map: it hands over to the game page, which opens it again. */}
+    <div class="isl-iris" aria-hidden="true"></div>
 
     <dialog class="pp" id="pp" aria-labelledby="ppTitle">
       <svg class="pp-defs" width="0" height="0" aria-hidden="true" focusable="false">
@@ -920,15 +921,30 @@ const book = BOOK.map((key) => {
   :global(.isl-dtag.is-on) { opacity: 1; }
   :global([data-time='night'] .isl-dtag), :global([data-time='night'] .isl-tag) { background: #dfe6fa; }
 
-  /* The circle that closes round a building as you go in. */
-  .isl-iris {
-    position: absolute; inset: 0; z-index: 8; pointer-events: none;
-    background: var(--tint, #e3e9ff);
-    clip-path: circle(150% at 50% 50%);
-    opacity: 0;
+  /* The circle of the game's colour that opens from a building as you go in,
+     a paler ring running just ahead of it; the game's page opens it again
+     from the same point. Coming back, it closes into the building. Where it
+     is (--ix, --iy) and how far it has to go (--ir) come from the script. */
+  .isl-iris { position: fixed; inset: 0; z-index: 1000; pointer-events: none; visibility: hidden; }
+  .isl-iris::before, .isl-iris::after {
+    content: ''; position: absolute; inset: 0;
+    clip-path: circle(0px at var(--ix, 50%) var(--iy, 50%));
   }
-  .isl-iris.is-closing { opacity: 1; animation: isl-iris 0.6s cubic-bezier(0.7, 0, 0.84, 0) forwards; }
-  @keyframes isl-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(150% at 50% 50%); } }
+  .isl-iris::before { background: color-mix(in srgb, var(--tint, #e3e9ff) 38%, #fff); }
+  .isl-iris::after { background: var(--tint, #e3e9ff); }
+  .isl-iris.is-closing, .isl-iris.is-opening { visibility: visible; }
+  .isl-iris.is-closing::before { animation: isl-iris-grow 0.56s cubic-bezier(0.7, 0, 0.84, 0) forwards; }
+  .isl-iris.is-closing::after { animation: isl-iris-grow 0.56s cubic-bezier(0.7, 0, 0.84, 0) 0.06s forwards; }
+  .isl-iris.is-opening::after { animation: isl-iris-shrink 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .isl-iris.is-opening::before { animation: isl-iris-shrink 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both; }
+  @keyframes isl-iris-grow {
+    from { clip-path: circle(0px at var(--ix, 50%) var(--iy, 50%)); }
+    to { clip-path: circle(var(--ir, 150vmax) at var(--ix, 50%) var(--iy, 50%)); }
+  }
+  @keyframes isl-iris-shrink {
+    from { clip-path: circle(var(--ir, 150vmax) at var(--ix, 50%) var(--iy, 50%)); }
+    to { clip-path: circle(0px at var(--ix, 50%) var(--iy, 50%)); }
+  }
 
   @media (max-width: 760px) {
     .isl-box { height: 80svh; min-height: 480px; }

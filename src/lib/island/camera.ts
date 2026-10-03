@@ -13,13 +13,27 @@
  * frame, so it feels the same at 30 frames a second and at 120; and under
  * reduced motion everything simply goes there.
  *
+ * The edges give: drag past them and the map follows less and less, throw it
+ * and it runs on a little and springs back, and the same for zooming past the
+ * nearest or farthest. Held arrow keys glide, faster the longer they are held.
+ * Where the camera comes to rest close to a size the island was painted at,
+ * it settles on exactly that size, and every pixel of the painting lands on
+ * one of the screen's.
+ *
  * Until the canvas has what it needs to draw the view, a small picture of the
  * island stands in for it (the poster), moved by the same camera; then the
  * poster fades, and the buildings drop in.
+ *
+ * Going into a game, the camera dives into its building and a circle of the
+ * game's colour opens from it over the page; the game's page then opens the
+ * same circle from the same point (Paper.astro). The view is kept for the
+ * visit, so coming back finds the island where it was left, the camera
+ * stepping back out of the building just played.
  */
 import { PLAY } from '../motion'
 import { createEngine, type Engine, type IslandState } from './engine'
 import { POKE_MS } from './moves'
+import { perfMeter } from './perf'
 import type { Scene } from './scene'
 
 export type Anchor = { slug: string; district: string; x0: number; y0: number; x1: number; y1: number; bx: number; by: number }
@@ -66,27 +80,76 @@ export function initIsland(o: {
   const hint = box.querySelector<HTMLElement>('.isl-hint')
 
   /* ---- the camera ------------------------------------------------------ */
-  let W = box.clientWidth, H = box.clientHeight
+  // A page opened out of sight (a hidden frame) has no size yet: the window's stands in until it has.
+  const sizeW = () => box.clientWidth || innerWidth || 1280, sizeH = () => box.clientHeight || innerHeight || 800
+  let W = sizeW(), H = sizeH()
   // Past two device pixels per CSS pixel the island looks no sharper, and the canvas costs more than twice as much to fill.
   const ratio = () => Math.min(2, window.devicePixelRatio || 1)
   const fitZ = () => Math.min(W / (bw * 0.86), H / (bh * 0.8))
   let zMin = fitZ() * 0.85, zMax = Math.max(fitZ() * 7, 3.4)
   const cam: Cam = { x: bx + bw / 2, y: by + bh * 0.56, z: fitZ() }
+  /** Where the camera is going. */
   const goal: Cam = { ...cam }
+  /** Where hands (a drag, a throw, a wheel, a pinch) have asked it to go, before the edges push back. */
+  const raw: Cam = { ...cam }
   let vel = { x: 0, y: 0 }
-  const clampGoal = () => {
-    goal.z = Math.min(zMax, Math.max(zMin, goal.z))
-    const hw = W / goal.z / 2, hh = H / goal.z / 2
-    const padX = Math.max(0, bw / 2 - hw * 0.4), padY = Math.max(0, bh / 2 - hh * 0.4)
-    goal.x = Math.min(bx + bw / 2 + padX, Math.max(bx + bw / 2 - padX, goal.x))
-    goal.y = Math.min(by + bh / 2 + padY, Math.max(by + bh / 2 - padY, goal.y))
-    // However hard it is thrown, the middle of the view stays over the island.
-    if (o.land) {
-      const [lx0, ly0, lx1, ly1] = o.land, ix = (lx1 - lx0) * 0.12, iy = (ly1 - ly0) * 0.12
-      goal.x = Math.min(lx1 - ix, Math.max(lx0 + ix, goal.x))
-      goal.y = Math.min(ly1 - iy, Math.max(ly0 + iy, goal.y))
-    }
+
+  /* ---- the edges: where the camera may rest, and how it gives past them ---- */
+  const limZ = (z: number) => Math.min(zMax, Math.max(zMin, z))
+  /** Where the middle of the view may rest at zoom z: some of the island always in sight. */
+  const limX = (x: number, z: number) => {
+    const pad = Math.max(0, bw / 2 - (W / z / 2) * 0.4)
+    x = Math.min(bx + bw / 2 + pad, Math.max(bx + bw / 2 - pad, x))
+    // However hard it is thrown, the middle of the view comes back over the island.
+    if (o.land) { const [lx0, , lx1] = o.land, i = (lx1 - lx0) * 0.12; x = Math.min(lx1 - i, Math.max(lx0 + i, x)) }
+    return x
   }
+  const limY = (y: number, z: number) => {
+    const pad = Math.max(0, bh / 2 - (H / z / 2) * 0.4)
+    y = Math.min(by + bh / 2 + pad, Math.max(by + bh / 2 - pad, y))
+    if (o.land) { const [, ly0, , ly1] = o.land, i = (ly1 - ly0) * 0.12; y = Math.min(ly1 - i, Math.max(ly0 + i, y)) }
+    return y
+  }
+  /**
+   * How far past an edge the view goes when asked to go `over` past it: all
+   * of a short way, less and less of a long one, never more than `most`. (The
+   * curve a phone's own lists give at their ends.)
+   */
+  const give = (over: number, most: number) => Math.sign(over) * most * (1 - 1 / ((Math.abs(over) * 0.55) / most + 1))
+  /** Past a pan edge, in map units at zoom z (the give is measured on the screen). */
+  const givePan = (over: number, z: number) => give(over * z, Math.min(W, H) * 0.42) / z
+  /** Past the nearest or farthest zoom, as a factor. */
+  const giveZoom = (z: number) => { const l = limZ(z); return l === z ? z : l * Math.exp(give(Math.log(z / l), 0.22)) }
+  /** Put `to` where `from` asks, inside the edges, or (soft) giving past them. */
+  const place = (to: Cam, from: Cam, soft: boolean) => {
+    const z = soft ? giveZoom(from.z) : limZ(from.z)
+    const lx = limX(from.x, z), ly = limY(from.y, z)
+    to.z = z
+    to.x = soft ? lx + givePan(from.x - lx, z) : lx
+    to.y = soft ? ly + givePan(from.y - ly, z) : ly
+  }
+  const outside = (c: Cam) => limZ(c.z) !== c.z || limX(c.x, c.z) !== c.x || limY(c.y, c.z) !== c.y
+  /** Bring the goal inside the edges (the camera eases back after it), and forget what the hands asked. */
+  const clampGoal = () => { place(goal, goal, false); Object.assign(raw, goal); pace = 1 }
+  /**
+   * How quickly the camera closes on its goal, as a share of the usual: the
+   * step back out of a building is taken slowly, and anything the visitor
+   * does (which sets a goal) puts it back.
+   */
+  let pace = 1
+
+  /**
+   * The sizes the island was painted at, in device pixels to a unit. A camera
+   * at rest within a few percent of one moves onto it, so the painting is
+   * copied to the screen pixel for pixel rather than resampled.
+   */
+  let painted: number[] = []
+  const crisp = (z: number) => {
+    const s = z * ratio()
+    for (const l of painted) if (Math.abs(s / l - 1) < 0.06) return limZ(l / ratio()) === l / ratio() ? l / ratio() : z
+    return z
+  }
+
   const toScreen = (x: number, y: number) => [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2]
   const toWorld = (sx: number, sy: number) => [(sx - W / 2) / cam.z + cam.x, (sy - H / 2) / cam.z + cam.y]
 
@@ -101,6 +164,7 @@ export function initIsland(o: {
     e.onLoaded = () => wake()
     e.setHot(hot); e.dim(keep)
     engine = e
+    painted = scene.levels
     for (const fn of waiting.splice(0)) fn(e)
     wake()
   }, (err) => console.error('[island] the map could not load', err))
@@ -108,29 +172,83 @@ export function initIsland(o: {
   let raf = 0, lastT = 0, visible = true, paused = false, dragging = false
   function wake() { if (!raf && visible && !paused) raf = requestAnimationFrame(frame) }
 
+  /* ---- held keys: arrows glide, + and − keep zooming ----------------------- */
+  /** The keys held down, and since when. */
+  const held = new Map<string, number>()
+  const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+  /** Screen pixels a second: a held arrow sets off at the first, and is at the second after about a second. */
+  const GLIDE = [420, 1500]
+  const smooth = (k: number) => k * k * (3 - 2 * k)
+  const holdStep = (dt: number) => {
+    const now = performance.now()
+    let dx = 0, dy = 0, dz = 0
+    for (const [key, since] of held) {
+      const age = now - since
+      if (ARROWS[key]) {
+        const v = GLIDE[0] + (GLIDE[1] - GLIDE[0]) * smooth(Math.min(1, age / 1100))
+        dx += ARROWS[key][0] * v; dy += ARROWS[key][1] * v
+      }
+      // A tap of + or − is one step; held, after a moment, it keeps going, twice as close every second or so.
+      else if (age > 280) dz += key === 'in' ? 1 : -1
+    }
+    if (dx || dy) {
+      // Two arrows at once go no faster than one.
+      const n = Math.hypot(dx, dy) / Math.max(Math.abs(dx), Math.abs(dy))
+      goal.x += (dx / n) * (dt / 1000) / goal.z; goal.y += (dy / n) * (dt / 1000) / goal.z
+    }
+    if (dz) goal.z = limZ(goal.z * Math.exp(dz * 0.75 * (dt / 1000)))
+    clampGoal()
+  }
+
   /** One step of the camera towards its goal, over dt milliseconds. Whether it is still on its way. */
   const step = (dt: number) => {
     const f = dt / FRAME
     if (!dragging && (Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02)) {
-      goal.x -= (vel.x * f) / cam.z; goal.y -= (vel.y * f) / cam.z
+      raw.x -= (vel.x * f) / cam.z; raw.y -= (vel.y * f) / cam.z
       const d = Math.pow(0.9, f); vel.x *= d; vel.y *= d
-      clampGoal()
+      // Past an edge the throw runs on a little, slowing hard; then the camera springs back.
+      if (outside(raw)) { const e = Math.pow(0.62, f); vel.x *= e; vel.y *= e }
+      place(goal, raw, true)
+      if (Math.abs(vel.x) <= 0.02 && Math.abs(vel.y) <= 0.02) { vel = { x: 0, y: 0 }; settleSoon(0) }
     }
+    if (held.size) holdStep(dt)
     // Each sixtieth of a second, a sixth of the way there.
-    const k = PLAY ? 1 - Math.pow(0.84, f) : 1
+    const k = PLAY ? 1 - Math.pow(0.84, f * pace) : 1
     const dz = goal.z - cam.z, dx = goal.x - cam.x, dy = goal.y - cam.y
-    const moving = Math.abs(dz) > 0.0005 * cam.z || Math.abs(dx) * cam.z > 0.3 || Math.abs(dy) * cam.z > 0.3 || Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02
+    const moving = held.size > 0 || Math.abs(dz) > 0.0005 * cam.z || Math.abs(dx) * cam.z > 0.3 || Math.abs(dy) * cam.z > 0.3 || Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02
     if (moving) { cam.z += dz * k; cam.x += dx * k; cam.y += dy * k }
-    else Object.assign(cam, goal)
+    else { Object.assign(cam, goal); pace = 1 }
     return moving
   }
 
+  /**
+   * Once the hands let go (the wheel stops turning, the fingers lift, a throw
+   * runs out): back inside the edges, and onto the nearest painted size if
+   * the zoom is close to one, keeping still the point the hands were at.
+   */
+  let settleT = 0
+  const focus = { x: 0, y: 0 }
+  function settleSoon(ms: number) {
+    clearTimeout(settleT)
+    settleT = window.setTimeout(() => {
+      // Not while the hands are still on, nor once a dive has its own goal (the click that let go began one).
+      if (dragging || entering) return
+      // The point under the hands, where the camera is going.
+      const wx = goal.x + (focus.x - W / 2) / goal.z, wy = goal.y + (focus.y - H / 2) / goal.z
+      const z = crisp(limZ(goal.z))
+      goal.x = wx - (focus.x - W / 2) / z; goal.y = wy - (focus.y - H / 2) / z; goal.z = z
+      clampGoal(); wake()
+    }, ms)
+  }
+
+  const perf = new URLSearchParams(location.search).has('perf') ? perfMeter(box) : null
   function frame(t: number) {
     raf = 0
     const dt = lastT ? Math.min(64, Math.max(1, t - lastT)) : FRAME
     lastT = t
     const moving = step(dt)
     if (engine) { engine.setView(cam, W, H, ratio()); engine.frame(t) }
+    perf?.tick(t, engine ? engine.stats() : null)
     after()
     // With motion there is always something moving on the island; without, draw only while something changes.
     if ((engine && (PLAY || !engine.sharp())) || moving || dragging || hover.dirty) wake()
@@ -176,47 +294,74 @@ export function initIsland(o: {
   function goLive() {
     stage0 = 'live'
     box.classList.add('is-live')
-    // The buildings drop in, unless the map is already being used.
-    if (PLAY && !interacted) { engine!.intro(); settle() }
+    // The buildings drop in (the first time this visit), unless the map is already being used; then the camera settles.
+    if (PLAY && !interacted) { if (opening.intro) engine!.intro(); settle() }
     const gone = () => { stage0 = 'gone'; if (poster) poster.hidden = true }
     if (PLAY && poster) setTimeout(gone, 450)
     else gone()
   }
 
   /* ---- zooming and flying ------------------------------------------------- */
+  /** Zoom by f round a point on the screen, keeping what is under it there; settling on a painted size if one is near. */
   const zoomAt = (f: number, sx = W / 2, sy = H / 2) => {
     const [wx, wy] = toWorld(sx, sy)
-    const z = Math.min(zMax, Math.max(zMin, goal.z * f))
-    // Keep the point under the cursor where it is.
+    const z = crisp(limZ(goal.z * f))
     goal.x = wx - (sx - W / 2) / z; goal.y = wy - (sy - H / 2) / z; goal.z = z
     clampGoal(); wake()
   }
-  const flyTo = (x: number, y: number, z: number) => { goal.x = x; goal.y = y; goal.z = z; vel = { x: 0, y: 0 }; clampGoal(); wake() }
-  const flyToSlug = (slug: string, zoom = 2.6) => {
-    const a = anchors[slug]; if (!a) return
-    // Close enough that the building is the subject, far enough that its card fits.
+  /** Zoom to z keeping the map point (wx, wy) at (sx, sy), for a wheel or a pinch: past the nearest and farthest it gives, until the hands stop. */
+  const zoomSoft = (z: number, sx: number, sy: number, wx: number, wy: number) => {
+    pace = 1
+    raw.z = Math.min(zMax * 2, Math.max(zMin / 2, z))
+    const shown = giveZoom(raw.z)
+    raw.x = wx - (sx - W / 2) / shown; raw.y = wy - (sy - H / 2) / shown
+    place(goal, raw, true)
+  }
+  const flyTo = (x: number, y: number, z: number) => { goal.x = x; goal.y = y; goal.z = crisp(limZ(z)); vel = { x: 0, y: 0 }; clampGoal(); wake() }
+  /** A view of a building: close enough that it is the subject, far enough that its card fits. */
+  const framing = (slug: string, zoom: number): Cam => {
+    const a = anchors[slug]
     const fit = Math.min(W / ((a.x1 - a.x0) * 2.8), H / ((a.y1 - a.y0) * 2.6))
+    return { x: (a.x0 + a.x1) / 2, y: (a.y0 + a.y1) / 2 + (a.y1 - a.y0) * 0.1, z: Math.min(zMax, Math.max(fitZ() * 1.3, Math.min(fit, fitZ() * zoom))) }
+  }
+  /** Right up to a building, as the camera is at the end of a dive into it. */
+  const inside = (slug: string): Cam => {
+    const a = anchors[slug]
+    return { x: (a.x0 + a.x1) / 2, y: (a.y0 + a.y1) / 2, z: Math.min(zMax * 1.3, Math.min(W / (a.x1 - a.x0), H / (a.y1 - a.y0)) * 0.9) }
+  }
+  const flyToSlug = (slug: string, zoom = 2.6) => {
+    if (!anchors[slug]) return
     firstTouch()
-    flyTo((a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2 + (a.y1 - a.y0) * 0.1, Math.min(zMax, Math.max(fitZ() * 1.3, Math.min(fit, fitZ() * zoom))))
+    const v = framing(slug, zoom)
+    flyTo(v.x, v.y, v.z)
   }
   const home = () => { firstTouch(); flyTo(bx + bw / 2, by + bh * 0.56, fitZ()) }
 
   /* ---- pointers: drag, pinch, wheel, double-click ------------------------ */
   const ptrs = new Map<number, { x: number; y: number }>()
   let moved = 0, last = { x: 0, y: 0, t: 0 }, pinch0 = 0, pinchZ = 1
+  /** The point between two fingers, as it was at the last move. */
+  let mid = { x: 0, y: 0 }
   let press = { x: 0, y: 0 }
   let interacted = false
   setTimeout(() => hint?.classList.add('is-gone'), 9000)
   function firstTouch() { if (interacted) return; interacted = true; hint?.classList.add('is-gone'); engine?.endIntro() }
   const local = (e: { clientX: number; clientY: number }) => { const r = box.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
+  const twoFingers = () => {
+    const [a, b] = [...ptrs.values()], r = box.getBoundingClientRect()
+    return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top }
+  }
   stage.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY })
     press = local(e)
     stage.setPointerCapture(e.pointerId)
+    // A hand on the map catches it where it is, mid-throw or mid-flight.
+    if (!dragging) { goal.x = cam.x; goal.y = cam.y; Object.assign(raw, goal) }
     dragging = true; moved = 0; vel = { x: 0, y: 0 }
+    clearTimeout(settleT)
     last = { x: e.clientX, y: e.clientY, t: performance.now() }
-    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); pinchZ = goal.z }
+    if (ptrs.size === 2) { const t = twoFingers(); pinch0 = t.d; pinchZ = raw.z; mid = { x: t.x, y: t.y } }
     box.classList.add('is-grabbing'); stage.style.cursor = ''; firstTouch(); wake()
   })
   stage.addEventListener('pointermove', (e) => {
@@ -229,35 +374,37 @@ export function initIsland(o: {
     const dx = e.clientX - p.x, dy = e.clientY - p.y
     p.x = e.clientX; p.y = e.clientY
     if (ptrs.size === 2) {
-      const [a, b] = [...ptrs.values()]
-      const d = Math.hypot(a.x - b.x, a.y - b.y), r = box.getBoundingClientRect()
-      const z = Math.min(zMax, Math.max(zMin, (pinchZ * d) / Math.max(1, pinch0)))
-      const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top
-      const [wx, wy] = toWorld(mx, my)
-      goal.z = cam.z = z
-      goal.x = cam.x = wx - (mx - W / 2) / z
-      goal.y = cam.y = wy - (my - H / 2) / z
+      // Two fingers zoom round the point between them, and carry the map as that point moves.
+      const t = twoFingers()
+      const wx = raw.x + (mid.x - W / 2) / goal.z, wy = raw.y + (mid.y - H / 2) / goal.z
+      zoomSoft((pinchZ * t.d) / Math.max(1, pinch0), t.x, t.y, wx, wy)
+      mid = { x: t.x, y: t.y }
+      Object.assign(cam, goal)
+      focus.x = t.x; focus.y = t.y
       moved += 10
       wake()
       return
     }
     moved += Math.abs(dx) + Math.abs(dy)
-    goal.x -= dx / cam.z; goal.y -= dy / cam.z
+    raw.x -= dx / cam.z; raw.y -= dy / cam.z
+    place(goal, raw, true)
     cam.x = goal.x; cam.y = goal.y
     const now = performance.now(), dt = Math.max(8, now - last.t)
     const cap = (v: number) => Math.max(-38, Math.min(38, v))
     vel = { x: cap((dx / dt) * FRAME), y: cap((dy / dt) * FRAME) }
     last = { x: e.clientX, y: e.clientY, t: now }
-    clampGoal()
+    const lp = local(e); focus.x = lp.x; focus.y = lp.y
     if (moved > 6) hideCard()
     wake()
   })
   const up = (e: PointerEvent) => {
-    ptrs.delete(e.pointerId)
-    if (ptrs.size) return
+    if (!ptrs.delete(e.pointerId)) return
+    // From two fingers to one: the one left carries on dragging, without a throw from the change.
+    if (ptrs.size) { vel = { x: 0, y: 0 }; return }
     dragging = false; box.classList.remove('is-grabbing')
-    if (performance.now() - last.t > 80) vel = { x: 0, y: 0 }
-    if (!PLAY) vel = { x: 0, y: 0 }
+    if (performance.now() - last.t > 80 || !PLAY) vel = { x: 0, y: 0 }
+    // A throw settles when it runs out (in step); anything else, now.
+    if (Math.abs(vel.x) <= 0.02 && Math.abs(vel.y) <= 0.02) settleSoon(0)
     wake()
   }
   stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up)
@@ -266,18 +413,41 @@ export function initIsland(o: {
     e.preventDefault(); firstTouch()
     const p = local(e)
     const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.012 : 0.0022))
-    zoomAt(f, p.x, p.y)
+    const [wx, wy] = toWorld(p.x, p.y)
+    zoomSoft(raw.z * f, p.x, p.y, wx, wy)
+    focus.x = p.x; focus.y = p.y
+    settleSoon(170)
+    wake()
   }, { passive: false })
   stage.addEventListener('dblclick', (e) => { const p = local(e); zoomAt(2, p.x, p.y) })
+
+  /* ---- the keyboard ----------------------------------------------------------- */
+  // Arrows move, and held they glide; + and − zoom, and held keep zooming; 0 shows the whole island.
+  const keyOf = (k: string) => (ARROWS[k] ? k : k === '+' || k === '=' ? 'in' : k === '-' || k === '_' ? 'out' : k === '0' ? 'home' : null)
   box.addEventListener('keydown', (e) => {
-    const step = 80 / cam.z
-    const map: Record<string, () => void> = {
-      ArrowLeft: () => { goal.x -= step }, ArrowRight: () => { goal.x += step }, ArrowUp: () => { goal.y -= step }, ArrowDown: () => { goal.y += step },
-      '+': () => zoomAt(1.4), '=': () => zoomAt(1.4), '-': () => zoomAt(1 / 1.4), '0': home,
-    }
-    if (!map[e.key] || (e.target as HTMLElement).closest('.isl-card')) return
-    e.preventDefault(); firstTouch(); map[e.key](); clampGoal(); wake()
+    // The browser's own shortcuts (its zoom is ctrl and +) stay the browser's.
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const k = keyOf(e.key)
+    if (!k || (e.target as HTMLElement).closest('.isl-card')) return
+    e.preventDefault()
+    // A key held down repeats: the glide is the loop's to do.
+    if (e.repeat) return
+    firstTouch()
+    if (k === 'home') { home(); return }
+    if (k === 'in' || k === 'out') zoomAt(k === 'in' ? 1.4 : 1 / 1.4)
+    else { goal.x += (ARROWS[k][0] * 60) / goal.z; goal.y += (ARROWS[k][1] * 60) / goal.z; clampGoal() }
+    held.set(k, performance.now())
+    wake()
   })
+  addEventListener('keyup', (e) => {
+    const k = keyOf(e.key)
+    if (!k || !held.delete(k)) return
+    if (k === 'in' || k === 'out') { focus.x = W / 2; focus.y = H / 2; settleSoon(0) }
+  })
+  // A key let go of in another window would glide on for ever.
+  const letGo = () => held.clear()
+  addEventListener('blur', letGo)
+  document.addEventListener('visibilitychange', letGo)
 
   /* ---- what is under the mouse ---------------------------------------------- */
   const hover = { x: 0, y: 0, on: false, dirty: false, lm: null as string | null }
@@ -331,6 +501,8 @@ export function initIsland(o: {
     cardPlay.href = g.href
     card.style.setProperty('--tint', g.tint)
     card.hidden = false
+    // Its page is likely next: fetch it now, so the circle opens on it sooner.
+    prefetch(g.href)
     requestAnimationFrame(() => card.classList.add('is-on'))
     placeOverlays()
     wake()
@@ -416,24 +588,63 @@ export function initIsland(o: {
     hideCard()
   })
 
-  /* ---- going in: the camera dives, a circle closes, the game opens ------- */
-  const iris = box.querySelector<HTMLElement>('.isl-iris')!
+  /* ---- going in: the camera dives, a circle opens from the building, the game opens ---- */
+  const iris = document.querySelector<HTMLElement>('.isl-iris')!
   let entering = false
+  const prefetch = (href: string) => {
+    if (document.head.querySelector(`link[rel="prefetch"][href="${CSS.escape(href)}"]`)) return
+    const l = document.createElement('link'); l.rel = 'prefetch'; l.href = href
+    document.head.append(l)
+  }
   function enter(slug: string) {
     const g = games[slug]; if (!g || entering) return
     o.onEnter?.(slug)
+    // Where to come back to: here, and out of this building.
+    save(goal, slug)
     if (!PLAY) { location.href = g.href; return }
     entering = true
     hideCard()
-    const a = anchors[slug]
-    flyTo((a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2, Math.min(zMax * 1.3, Math.min(W / (a.x1 - a.x0), H / (a.y1 - a.y0)) * 0.9))
+    prefetch(g.href)
+    // In, closer than the camera goes otherwise.
     zMax *= 1.3
+    Object.assign(goal, inside(slug)); vel = { x: 0, y: 0 }; clampGoal(); wake()
+    // Where the building will be on the screen (the edges can stop it short of the middle).
+    const a = anchors[slug], r = box.getBoundingClientRect()
+    const x = r.left + ((a.x0 + a.x1) / 2 - goal.x) * goal.z + W / 2, y = r.top + ((a.y0 + a.y1) / 2 - goal.y) * goal.z + H / 2
+    const vw = innerWidth, vh = innerHeight
     iris.style.setProperty('--tint', g.tint)
-    setTimeout(() => iris.classList.add('is-closing'), 380)
-    setTimeout(() => { location.href = g.href }, 980)
+    iris.style.setProperty('--ix', `${x.toFixed(0)}px`); iris.style.setProperty('--iy', `${y.toFixed(0)}px`)
+    iris.style.setProperty('--ir', `${Math.ceil(Math.hypot(Math.max(x, vw - x), Math.max(y, vh - y))) + 2}px`)
+    setTimeout(() => { iris.classList.remove('is-opening'); iris.classList.add('is-closing') }, 380)
+    setTimeout(() => {
+      // The game's page opens the circle again from the same point (Paper.astro).
+      try { sessionStorage.setItem('isl-iris', JSON.stringify({ tint: g.tint, x: x / vw, y: y / vh, path: new URL(g.href, location.href).pathname, at: Date.now() })) } catch {}
+      location.href = g.href
+    }, 1020)
   }
-  // Coming back with the browser's back button: open the iris again.
-  addEventListener('pageshow', (e) => { if (e.persisted) { entering = false; iris.classList.remove('is-closing'); zMax = Math.max(fitZ() * 7, 3.4); clampGoal(); wake() } })
+  // The circle is the page change: the browser's own transition between pages is not wanted over it.
+  type WithTransition = Event & { viewTransition?: { skipTransition(): void; ready: Promise<void>; finished: Promise<void> } | null }
+  const skip = (e: Event) => {
+    const vt = (e as WithTransition).viewTransition; if (!vt) return
+    // A skipped transition rejects its promises: expected, so caught.
+    vt.ready.catch(() => {}); vt.finished.catch(() => {})
+    vt.skipTransition()
+  }
+  addEventListener('pageswap', (e) => { if (entering) skip(e) })
+  // Back from the game with the browser's back button, to this very page as it was left: the circle
+  // closes back into the building, and the camera steps back out of it.
+  let backIn = false
+  addEventListener('pageshow', (e) => {
+    if (!e.persisted || !entering) return
+    entering = false; backIn = true
+    zMax = Math.max(fitZ() * 7, 3.4)
+    iris.classList.remove('is-closing'); iris.classList.add('is-opening')
+    setTimeout(() => iris.classList.remove('is-opening'), 700)
+    const s = readSaved()
+    if (s) Object.assign(goal, { x: s.x, y: s.y, z: s.n * fitZ() })
+    clampGoal(); pace = 0.4; wake()
+  })
+  addEventListener('pagereveal', (e) => { if (backIn) { backIn = false; skip(e) } })
 
   /* ---- the mini-map ------------------------------------------------------- */
   mini?.addEventListener('pointerdown', (e) => {
@@ -445,21 +656,75 @@ export function initIsland(o: {
   /* ---- sleeping when nobody is looking ------------------------------------ */
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) wake() }).observe(box)
   new ResizeObserver(() => {
-    W = box.clientWidth; H = box.clientHeight
+    W = sizeW(); H = sizeH()
     zMin = fitZ() * 0.85; zMax = Math.max(fitZ() * 7, 3.4)
     clampGoal(); Object.assign(cam, goal); seen.z = NaN; wake()
   }).observe(box)
 
-  /* ---- the opening: settle down from a little higher up ------------------- */
-  // Until the canvas can draw, the camera holds here, over the poster; then it settles.
-  cam.z = fitZ() * 0.82; cam.y -= bh * 0.08
-  goal.x = bx + bw / 2; goal.y = by + bh * 0.54; goal.z = fitZ() * (W < 700 ? 2.1 : 1.12)
-  clampGoal()
-  const settleTo = { ...goal }
+  /* ---- the view, kept for the visit ---------------------------------------- */
+  // As a share of the zoom that fits the island, so a turned phone or a resized window keeps the place.
+  type Saved = { x: number; y: number; n: number; from?: string }
+  const KEY = 'isl-view'
+  function readSaved(): Saved | null {
+    try {
+      const v = JSON.parse(sessionStorage.getItem(KEY) ?? 'null')
+      return v && [v.x, v.y, v.n].every(Number.isFinite) ? v : null
+    } catch { return null }
+  }
+  function save(c: Cam, from?: string) { try { sessionStorage.setItem(KEY, JSON.stringify({ x: c.x, y: c.y, n: c.z / fitZ(), from })) } catch {} }
+  // Kept once there is a view worth keeping: the visitor has moved it, or the opening has settled.
+  addEventListener('pagehide', () => { if (!entering && (interacted || stage0 !== 'poster')) save(goal) })
+  /** The game this page was come back to from, if any: the camera steps out of its building. */
+  const cameFrom = (() => {
+    try {
+      const r = document.referrer && new URL(document.referrer)
+      if (!r || r.origin !== location.origin) return null
+      return Object.keys(anchors).find((s) => games[s] && new URL(games[s].href, location.href).pathname === r.pathname) ?? null
+    } catch { return null }
+  })()
+
+  /* ---- the opening ------------------------------------------------------------ */
+  // The first time this visit: settle down from a little higher up, and the
+  // buildings drop in. Back again: where the island was left, stepping out of
+  // the building just played, if there was one. Until the canvas can draw, the
+  // camera holds where it starts, over the poster; then it settles.
+  const saved = readSaved()
+  const settleTo: Cam = saved
+    ? { x: saved.x, y: saved.y, z: saved.n * fitZ() }
+    : cameFrom ? framing(cameFrom, 2.2)
+    : { x: bx + bw / 2, y: by + bh * 0.54, z: fitZ() * (W < 700 ? 2.1 : 1.12) }
+  place(settleTo, settleTo, false)
+  const opening = { intro: !saved && !cameFrom }
+  if (cameFrom) Object.assign(cam, inside(cameFrom))
+  else if (saved) Object.assign(cam, settleTo)
+  else { cam.z = fitZ() * 0.82; cam.y -= bh * 0.08 }
+  if (!opening.intro) hint?.classList.add('is-gone')
   if (PLAY) Object.assign(goal, cam)
-  else Object.assign(cam, goal)
-  function settle() { if (!interacted) { Object.assign(goal, settleTo); wake() } }
+  else { Object.assign(goal, settleTo); Object.assign(cam, settleTo) }
+  Object.assign(raw, goal)
+  function settle() {
+    if (interacted) return
+    Object.assign(goal, settleTo); goal.z = crisp(goal.z)
+    clampGoal()
+    if (cameFrom) pace = 0.4
+    wake()
+  }
   wake()
+
+  /* ---- ?perf: the numbers, for the meter's readers and scripts/bench-island.mjs ---- */
+  if (perf) {
+    (window as unknown as { __island: unknown }).__island = {
+      stats: () => engine?.stats() ?? null,
+      /** Whether everything in view is drawn at its sharpest. */
+      sharp: () => !!engine?.sharp(),
+      /** The zoom that fits the island, and the island's box. */
+      fit: () => fitZ(), bounds: o.bounds, anchors,
+      /** Put the camera somewhere at once (z as a share of the fitting zoom). */
+      jump: (x: number, y: number, n: number) => { firstTouch(); Object.assign(goal, { x, y, z: n * fitZ() }); clampGoal(); Object.assign(cam, goal); wake(); return { ...cam } },
+      view: () => ({ ...cam }),
+      time: (t: string) => { box.dataset.time = t; wake() },
+    }
+  }
 
   return {
     /** Do something with the engine (draw something, change a sign) as soon as the map has loaded. */

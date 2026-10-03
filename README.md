@@ -239,13 +239,15 @@ as a card, with the four filters and search.
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
 | `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, rocks at the waterline, a dry wash across the Badlands, cliffs drawn as continuous walls (ink only at their top, foot and outside corners, strata at fixed heights so each layer runs on, a ledge at every terrace), one sun for every shadow, trees, walkers, and the layers it is painted in |
 | `src/lib/island/sound.ts` | the island heard: beds that never stop (the sea's swell and surf, wind on the peaks, a dry wind over the Badlands, the market's and the funfair's crowds, rain under the forecast's cloud, crickets after dark, the funfair's music box) and things that happen now and then (gulls, birdsong, a bell buoy, an owl, a far-off sheep, fireworks at New Year, the ferry's horn read off its own animation), each placed on the map with the camera as the listener, and a sound for every one of the eighteen things you can poke |
-| `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom, keyboard (a link per building, out of sight), the hover card, names at close zoom, the mini-map, the dive into a game; the one loop that draws the canvas, eased by time rather than by frame |
+| `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom (two fingers also carry the map), edges that give and spring back, held arrow keys that glide, resting on a painted size so the pixels land 1:1, keyboard (a link per building, out of sight), the hover card, names at close zoom, the mini-map, the dive into a game and the circle that carries you through, the view kept for the visit; the one loop that draws the canvas, eased by time rather than by frame |
+| `src/lib/island/perf.ts` | the `?perf` meter: frame rate, the last two seconds of frames, the engine's time, and its canvas calls |
 | `src/lib/island/moves.ts` | every motion on the map, as one table: the loops (ported from the old stylesheet), the pokes, a building's lift, ring, fade and drop, the night's and the clouds' strengths; and the cards' CSS, made from the same table |
 | `src/lib/island/bake/` | the bake: `build.ts` sorts the drawing into still painting, sprites, shapes and lettering; `draw.ts` paints the squares, sprite sheets, hit masks and the poster with resvg; `index.ts` keeps the result under a hash (run by `scripts/bake-island.mjs`, in a process of its own) |
 | `src/lib/island/engine.ts` | the canvas: streams the squares by size, poses everything by its keyframes, fades whole buildings as one, answers what is under a point |
 | `src/lib/island/scene.ts`, `anim.ts`, `keyframes.ts` | the baked scene's format, and keyframes, easing and transforms worked out by hand |
 | `src/pages/island/[...file].ts` | serves the baked files, under the bake's hash |
 | `scripts/check-island.mjs` | one building and one place per listed game, no overlaps, land buildings on land, water ones in the sea, every building measured, roads to every district, and resvg renders the lot (`--preview` writes a PNG; `ISLAND_ASCII=1` prints the map's free ground, for placing things) |
+| `scripts/bench-island.mjs` | drags the built island in headless Chrome and fails below 45 frames a second, or when a view needs more canvas calls than its budget (`npm run bench:island`, and the last step of `npm run check`) |
 
 **Things happen because of other things.** The ferry comes in to its jetty,
 waits, and goes; while it is tied up, one passenger walks ashore and
@@ -308,6 +310,57 @@ Dragging now holds sixty frames a second (headless Chrome, 1280×800, the
 whole island in view), where the SVG map managed 8 to 17. `check-island`
 holds the line on what made the difference: the number of shapes drawn
 from their outlines, and a hit mask for everything you can click.
+
+**Keeping it that fast.** An island left alone always looks fine; the
+trouble only shows while it is dragged, and only on a phone does it show
+much. So `scripts/bench-island.mjs` builds nothing itself: it
+serves `dist/`, opens the island in headless Chrome and drags it round in
+circles with the mouse, failing under 45 frames a second; then reads the
+engine's own count of canvas calls at five views (the whole island, the
+opening, closer, closest, and night) against a budget for each, about 30%
+over what they cost now. On a phone the main thread pays a few microseconds
+for every call, so it is the count, not the pixels, that decides the frame
+rate, and a budget catches a slip on any machine, however fast. Last, it
+drags with a finger on a phone-sized screen with the CPU slowed down,
+which only warns, since how slow that is depends on the machine. It is the
+last step of `npm run check`, and skips (saying so) where there is no
+Chrome, Edge or Chromium; `--url` points it at a deployed site.
+
+Add `?perf` to the homepage's address to watch the same numbers live: a
+panel in the corner with the frame rate, a strip of the last two seconds of
+frames against the lines for 60 and 45 a second (the part the engine spent
+drawing shaded in), the drawing time, the canvas calls by kind, the cells
+and sprites drawn, the level and the screen's pixel ratio, and what has
+loaded.
+
+**How the camera feels.** Everything eases by the time that has passed, so
+the camera feels the same at 30 frames a second and at 120. The edges give
+rather than stop: drag past one and the map follows less and less of the
+way (the curve a phone's own lists have at their ends), throw it at one and
+it runs on a little, slowing hard, then springs back; zoom past the nearest
+or the farthest and it gives, then settles back when the wheel or the
+fingers stop. Two fingers zoom round the point between them and carry the
+map as that point moves. A held arrow key glides, starting at 420 pixels a
+second and reaching 1,500 after about a second; a held + or − keeps
+zooming; the browser's own ctrl-and-+ is left alone. Where the camera comes
+to rest within 6% of a size the island was painted at, it moves onto that
+size, and every pixel of the painting lands on one of the screen's: the
+squares were already placed on whole pixels, and now the sprites are too,
+so a building at rest is as crisp as the art.
+
+**Into a game and back.** Clicking a building dives the camera into it;
+a circle of the game's colour, a paler ring running just ahead, opens from
+the building over the whole window; and the game's page opens the same
+circle again from the same point, over its first paint (a few lines at the
+top of `Paper.astro`, given the point and the colour through
+sessionStorage), in place of the browser's usual page transition. The game's
+page is fetched as soon as its card shows, so it is usually there before
+the circle closes. The island keeps its view for the visit: come back with
+Back and the circle closes into the building while the camera steps slowly
+out of it, to where you were; come back any other way from a game and the
+camera starts inside that game's building and steps out. The buildings
+only drop in on the first visit. With reduced motion there is no circle and
+no dive: a click is the game.
 
 (The SVG map's own lessons, kept because the cards under the map are still
 SVG: an animation inside a `display: none` group still repaints; a paused
@@ -378,10 +431,9 @@ one copy's height and round, which the browser does without redrawing.
 `?season=winter`, `spring` or `newyear` and `?time=dawn`, `day`, `dusk` or
 `night` show any of them out of season.
 
-While a zoom is in motion the island is one GPU layer and its loops pause,
-then it is redrawn sharp; with reduced motion the camera jumps instead of
-flying and nothing on the map moves (anything that travels a path is held
-where its delay puts it along the way).
+With reduced motion the camera jumps instead of flying, the edges hold
+without springing, and nothing on the map moves (anything that travels a
+path is held where its delay puts it along the way).
 
 ---
 
@@ -1207,7 +1259,8 @@ node scripts/check-stats.mjs       # what the site remembers, against a hostile 
 ```
 
 `npm test` runs all of them and reports which suites failed; `npm run check`
-adds the production build. Each exits non-zero on its own. None needs a browser — the analysis in
+adds the production build, and then `npm run bench:island`, which times the
+built homepage island in headless Chrome (see The homepage). Each exits non-zero on its own. None needs a browser — the analysis in
 `lib/impact.ts`, `lib/casualties.ts`, `lib/telemetry.ts`, `lib/auction.ts`,
 `lib/cascade-rules.ts`, `data/dilemmas.ts`, `lib/powder-rules.ts`,
 `data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,

@@ -13,7 +13,8 @@
     "worker:dev": "wrangler dev worker/fusion-worker.js",
     "worker:deploy": "wrangler deploy",
     "test": "node scripts/check-all.mjs",
-    "check": "npm test && npm run build"
+    "bench:island": "node scripts/bench-island.mjs",
+    "check": "npm test && npm run build && npm run bench:island"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",

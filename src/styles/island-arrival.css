@@ -1,0 +1,30 @@
+/*
+ * In from the island: the circle the homepage closes round a building
+ * (lib/island/camera.ts), opening again on the game's page. Paper.astro's first
+ * script sets it up from sessionStorage before the first paint. It lives apart
+ * from the design system's motion.css because its colour is the game's own,
+ * given at run time.
+ */
+/* The game's colour over the first paint, with a hole that grows from where
+   the building was, a paler ring at its edge. */
+@property --iris-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+html.play.iris-in::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  --iris-pale: color-mix(in srgb, var(--iris-tint, #e3e9ff) 38%, #fff);
+  background: radial-gradient(
+    circle at var(--iris-x, 50%) var(--iris-y, 50%),
+    transparent var(--iris-r),
+    var(--iris-pale) calc(var(--iris-r) + 0.6px),
+    var(--iris-pale) calc(var(--iris-r) * 1.08 + 6px),
+    var(--iris-tint, #e3e9ff) calc(var(--iris-r) * 1.08 + 6.6px)
+  );
+  animation: iris-open 0.74s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+@keyframes iris-open {
+  from { --iris-r: 0px; }
+  to { --iris-r: var(--iris-end, 150vmax); }
+}
