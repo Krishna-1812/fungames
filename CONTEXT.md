@@ -359,12 +359,15 @@ the EU, EEA, UK and Switzerland). See README, "Analytics".
   privacy page, Forget me), every game through the shell, the island's
   events, admin login and an overview at `/admin/`, `check-analytics.mjs`.
   Needs the owner to connect Neon and set `ADMIN_PASSWORD` in Vercel.
-- **Phase 2:** the full dashboard (Overview, Live, Games with a page per
-  game, Island, Audience with a world map, Acquisition, Retention, Health),
-  filters, comparisons, CSV export, nightly summary tables.
+- **Phase 2 (done):** the full dashboard (Overview, Live, Games with a page
+  per game, Island, Audience with a world map, Acquisition, Retention,
+  Health), one filter row, comparisons, table views, CSV and raw exports,
+  light and dark. Nightly summary tables moved to phase 3, where raw events
+  start being trimmed (until then every query reads the raw rows, which is
+  fast at this size).
 - **Phase 3:** game-specific crowd statistics, island heat-maps, funnels,
   cohorts, visitor journeys, error detail, and raw events kept 90 days with
-  daily summaries kept for good.
+  nightly daily summaries (a Vercel cron) kept for good.
 
 ### Needs a decision from the owner
 

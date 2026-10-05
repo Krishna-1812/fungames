@@ -103,7 +103,7 @@ export async function shareResult(
     // `canShare` is the gate: several browsers expose `share` and reject files.
     if (navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: meta.title, text: meta.text })
+        await navigator.share({ files: [file], title: meta.title, text: `${meta.text} ${meta.url}` })
         return 'shared'
       } catch (e) {
         // A cancelled share sheet is not a failure and must not fall through
@@ -149,7 +149,9 @@ export function onShare(
     if (!c) return
     event.preventDefault()
     const btn = event.target
-    shareResult(c, { ...meta(c), url: location.href }).then((outcome) => {
+    // ?ref=share: a visit that arrives on it is counted as one a share brought back.
+    const url = new URL(location.href); url.hash = ''; url.searchParams.set('ref', 'share')
+    shareResult(c, { ...meta(c), url: url.href }).then((outcome) => {
       track('share', { outcome }, pageGame())
       // Saying what happened matters most where nothing visibly does: a
       // desktop download is silent apart from the browser's own shelf.

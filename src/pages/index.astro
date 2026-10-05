@@ -1145,7 +1145,7 @@ const book = BOOK.map((key) => {
     share.addEventListener('click', async () => {
       if (!file) return
       track('isl_postcard', { action: 'share', place })
-      try { await navigator.share({ files: [file], title: `Greetings from ${place}`, text: `Greetings from ${place}, on Tiny Island: ${location.origin}` }) }
+      try { await navigator.share({ files: [file], title: `Greetings from ${place}`, text: `Greetings from ${place}, on Tiny Island: ${location.origin}/?ref=postcard` }) }
       catch (e) { if ((e as Error).name !== 'AbortError') save.click() }
     })
     save.addEventListener('click', () => track('isl_postcard', { action: 'save', place }))

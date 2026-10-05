@@ -2,23 +2,42 @@
 /**
  * /admin/ — the site's analytics, for its owner only.
  *
- * The page itself is static and holds no data: it asks /api/admin/stats/,
- * which answers only with a valid session cookie (src/lib/analytics/auth.ts),
- * and shows a password box otherwise. Never linked, never indexed, left out
- * of the sitemap and robots.txt. Signing in also tells this browser to stop
- * counting its own visits.
+ * The page is static and holds no data: it asks /api/admin/stats/ for one tab
+ * at a time, which answers only with a valid session cookie
+ * (src/lib/analytics/auth.ts), and shows a password box otherwise. Never
+ * linked, never indexed, left out of the sitemap and robots.txt. Signing in
+ * also tells this browser to stop counting its own visits.
  *
- * Phase 1 of 3: the overview (the numbers that matter, the traffic, every
- * game, where visitors are from and on what, how fast the pages are, what
- * broke, who is here now, and the latest events). Phase 2 is the full
- * dashboard; phase 3 the deep views.
+ * One filter row scopes everything below it (a period, a comparison with the
+ * period before, a country, a kind of device, a game); the tabs are Overview,
+ * Live, Games (and a page per game), Island, Audience, Acquisition,
+ * Retention and Health. Everything the page shows is in the address
+ * (#tab=games&days=30&country=IN), so a view can be bookmarked or reloaded.
+ * The charts are src/lib/admin/; the queries, src/lib/analytics/report.ts.
  */
 import Paper from '../../layouts/Paper.astro'
 import { SITE } from '../../site.config'
 import { listedGames, GAMES } from '../../data/games'
+import { COUNTRY_SHAPES } from '../../data/population-geo'
 
 const titles = Object.fromEntries(GAMES.map((g) => [g.slug, g.title]))
-const listed = listedGames().length
+const listed = listedGames().map((g) => g.slug)
+
+// The map's country names, to the ISO codes Vercel reports, worked out here at
+// build time; Natural Earth's short forms are spelled out by hand.
+const ALIAS: Record<string, string> = {
+  'W. Sahara': 'EH', 'United States of America': 'US', 'Dem. Rep. Congo': 'CD', 'Dominican Rep.': 'DO', 'Falkland Is.': 'FK',
+  'Fr. S. Antarctic Lands': 'TF', "Côte d'Ivoire": 'CI', 'Central African Rep.': 'CF', 'Congo': 'CG', 'Eq. Guinea': 'GQ', 'eSwatini': 'SZ',
+  'Palestine': 'PS', 'Myanmar': 'MM', 'Turkey': 'TR', 'Solomon Is.': 'SB', 'N. Cyprus': 'CY', 'Somaliland': 'SO', 'Bosnia and Herz.': 'BA',
+  'Macedonia': 'MK', 'Trinidad and Tobago': 'TT', 'S. Sudan': 'SS',
+}
+const names = new Intl.DisplayNames(['en'], { type: 'region' })
+const byName = new Map<string, string>()
+for (let a = 65; a < 91; a++) for (let b = 65; b < 91; b++) {
+  const code = String.fromCharCode(a, b)
+  try { const nm = names.of(code); if (nm && nm !== code) byName.set(nm, code) } catch { /* not a region */ }
+}
+const isoByName = Object.fromEntries(COUNTRY_SHAPES.map((c) => [c.name, ALIAS[c.name] ?? byName.get(c.name) ?? '']).filter(([, v]) => v))
 ---
 
 <Paper title={`Analytics — ${SITE.name}`} noindex masthead={false} colophon={false} themeColor="#0b1029" colorScheme="dark" bodyClass="ad-body">
@@ -32,14 +51,8 @@ const listed = listedGames().length
         </div>
       </div>
       <div class="ad-tools" id="adTools" hidden>
-        <p class="ad-live" id="adLive"><span class="ad-live-dot" aria-hidden="true"></span><b id="adLiveN">0</b> here now</p>
-        <div class="ad-range" role="group" aria-label="Period">
-          <button type="button" data-days="1">24 h</button>
-          <button type="button" data-days="7" aria-pressed="true">7 days</button>
-          <button type="button" data-days="30">30 days</button>
-          <button type="button" data-days="90">90 days</button>
-        </div>
-        <button type="button" class="ad-ghost" id="adRefresh">Refresh</button>
+        <p class="ad-live" id="adLive"><span class="ad-live-dot" aria-hidden="true"></span><b id="adLiveN">–</b> here now</p>
+        <button type="button" class="ad-ghost" id="adTheme" aria-label="Switch theme">Theme</button>
         <button type="button" class="ad-ghost" id="adOut">Sign out</button>
       </div>
     </header>
@@ -57,371 +70,510 @@ const listed = listedGames().length
 
     <p class="ad-note" id="adNote" hidden></p>
 
-    <div class="ad-dash" id="adDash" hidden>
-      <section class="ad-kpis" id="adKpis" aria-label="Headline numbers"></section>
-
-      <section class="ad-card ad-wide">
-        <div class="ad-card-head"><h2>Traffic</h2><p class="ad-legend"><i class="k-vis"></i>Visitors <i class="k-views"></i>Page views</p></div>
-        <div class="ad-chart" id="adChart"></div>
-      </section>
-
-      <section class="ad-card ad-wide">
-        <div class="ad-card-head"><h2>Games</h2><p class="ad-sub" id="adGamesSub"></p></div>
-        <div class="ad-scroll"><table class="ad-table" id="adGames"></table></div>
-      </section>
-
-      <div class="ad-grid">
-        <section class="ad-card"><h2>Pages</h2><ol class="ad-bars" id="adPages"></ol></section>
-        <section class="ad-card"><h2>Countries</h2><ol class="ad-bars" id="adCountries"></ol></section>
-        <section class="ad-card"><h2>Came from</h2><ol class="ad-bars" id="adRefs"></ol></section>
-        <section class="ad-card"><h2>Devices</h2><ol class="ad-bars" id="adDevices"></ol></section>
-        <section class="ad-card"><h2>Browsers</h2><ol class="ad-bars" id="adBrowsers"></ol></section>
-        <section class="ad-card"><h2>Systems</h2><ol class="ad-bars" id="adOs"></ol></section>
+    <div id="adApp" hidden>
+      <div class="ad-filters" role="search" aria-label="What to show">
+        <div class="ad-range" role="group" aria-label="Period">
+          <button type="button" data-days="1">24 h</button>
+          <button type="button" data-days="7">7 days</button>
+          <button type="button" data-days="30">30 days</button>
+          <button type="button" data-days="90">90 days</button>
+          <button type="button" data-days="365">12 months</button>
+          <button type="button" data-days="custom" id="adCustomBtn">Custom</button>
+        </div>
+        <div class="ad-custom" id="adCustom" hidden>
+          <label>From <input type="date" id="adFrom" /></label>
+          <label>to <input type="date" id="adTo" /></label>
+          <button type="button" class="ad-mini" id="adApply">Apply</button>
+        </div>
+        <label class="ad-check"><input type="checkbox" id="adCompare" /> Compare with the period before</label>
+        <label class="ad-sel"><span>Country</span><select id="adCountry"><option value="">Everywhere</option></select></label>
+        <label class="ad-sel"><span>Device</span><select id="adDevice"><option value="">Every device</option><option value="phone">Phones</option><option value="tablet">Tablets</option><option value="desktop">Computers</option></select></label>
+        <label class="ad-sel"><span>Game</span><select id="adGame"><option value="">Every page</option></select></label>
+        <button type="button" class="ad-mini" id="adClear" hidden>Clear filters</button>
+        <span class="ad-grow"></span>
+        <button type="button" class="ad-mini" id="adExportViews" title="Every page view in this period, as CSV">Export views</button>
+        <button type="button" class="ad-mini" id="adExportEvents" title="Every event in this period, as CSV">Export events</button>
       </div>
-
-      <div class="ad-grid">
-        <section class="ad-card"><h2>Speed <span class="ad-sub">75th percentile</span></h2><div class="ad-vitals" id="adVitals"></div></section>
-        <section class="ad-card"><h2>Here now</h2><ol class="ad-feed" id="adNow"></ol></section>
-        <section class="ad-card"><h2>Errors</h2><ol class="ad-feed" id="adErrors"></ol></section>
-      </div>
-
-      <section class="ad-card ad-wide">
-        <h2>Latest events</h2>
-        <ol class="ad-feed ad-events" id="adEvents"></ol>
-      </section>
+      <nav class="ad-tabs" role="tablist" aria-label="Sections">
+        <button type="button" role="tab" data-tab="overview">Overview</button>
+        <button type="button" role="tab" data-tab="live">Live</button>
+        <button type="button" role="tab" data-tab="games">Games</button>
+        <button type="button" role="tab" data-tab="island">Island</button>
+        <button type="button" role="tab" data-tab="audience">Audience</button>
+        <button type="button" role="tab" data-tab="acquisition">Acquisition</button>
+        <button type="button" role="tab" data-tab="retention">Retention</button>
+        <button type="button" role="tab" data-tab="health">Health</button>
+      </nav>
+      <p class="ad-scope" id="adScope" aria-live="polite"></p>
+      <div class="ad-panel" id="adPanel" role="tabpanel"></div>
     </div>
   </main>
 
-  <script type="application/json" id="adData" set:html={JSON.stringify({ titles, listed })} />
+  <script type="application/json" id="adData" set:html={JSON.stringify({ titles, listed, isoByName })} />
 </Paper>
 
 <script>
-  const { titles, listed } = JSON.parse(document.getElementById('adData')!.textContent!) as { titles: Record<string, string>; listed: number }
-  const $ = (id: string) => document.getElementById(id)!
-  // Everything shown came from visitors' browsers: escape all of it.
-  const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
-  const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n.toLocaleString())
-  const dur = (ms: number) => { const s = Math.round(ms / 1000); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s` }
-  const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) + '%' : '–')
-  const ago = (t: string) => { const s = Math.max(0, Math.round((Date.now() - new Date(t).getTime()) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago` : `${Math.floor(s / 86400)}d ago` }
-  const regionName = (() => { try { const d = new Intl.DisplayNames(undefined, { type: 'region' }); return (c: string) => d.of(c) ?? c } catch { return (c: string) => c } })()
-  const gameName = (s: string | null) => (s ? titles[s] ?? s : '')
+  import * as Tabs from '../../lib/admin/tabs'
+  import { el, untip } from '../../lib/admin/ui'
 
-  let days = 7
+  const { titles, listed, isoByName } = JSON.parse(document.getElementById('adData')!.textContent!) as { titles: Record<string, string>; listed: string[]; isoByName: Record<string, string> }
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
   // ?test=1 on this page includes the traffic test runs mark as theirs (left out otherwise).
   const withTest = new URLSearchParams(location.search).get('test') === '1'
-  let timer = 0
 
-  type Kpis = { views: number; visitors: number; engagedMs: number; starts: number; ends: number; wins: number; shares: number; dives: number; errors: number; withId: number }
-  type Row = { k: string; views: number; visitors: number }
-  type Stats = {
-    kpis: Kpis; prev: Kpis; series: { t: string; views: number; visitors: number }[]
-    games: Record<string, number | string>[]; pages: Row[]; countries: Row[]; devices: Row[]; browsers: Row[]; os: Row[]; refs: Row[]
-    vitals: { metric: string; n: number; p75: number }[]; errors: { msg: string; n: number; pages: number; last: string }[]
-    recent: { ts: string; name: string; game: string | null; props: Record<string, unknown>; path: string; country: string | null; city: string | null; device: string | null }[]
-    live: { now: number; pages: { path: string; game: string | null; country: string | null; city: string | null; device: string | null; seen: string }[] }
-    range: { bucket: 'hour' | 'day' }
+  /* ---- the state, kept in the address -------------------------------------- */
+  type State = { tab: string; days: string; start: string; end: string; compare: boolean; country: string; device: string; game: string; slug: string }
+  const DEFAULT: State = { tab: 'overview', days: '7', start: '', end: '', compare: true, country: '', device: '', game: '', slug: '' }
+  function readState(): State {
+    const h = new URLSearchParams(location.hash.slice(1))
+    return { ...DEFAULT, ...Object.fromEntries([...h].filter(([k]) => k in DEFAULT)), compare: h.get('compare') !== '0' } as State
+  }
+  let st = readState()
+  function writeState(next: Partial<State>, push = true) {
+    st = { ...st, ...next }
+    const h = new URLSearchParams()
+    for (const [k, v] of Object.entries(st)) {
+      if (k === 'compare') { if (!v) h.set(k, '0') }
+      else if (v !== '' && v !== (DEFAULT as Record<string, unknown>)[k]) h.set(k, String(v))
+    }
+    const url = '#' + h.toString()
+    if (push) history.pushState(null, '', url); else history.replaceState(null, '', url)
+    paintControls()
+    load()
+  }
+  addEventListener('popstate', () => { st = readState(); paintControls(); load() })
+
+  const query = (extra: Record<string, string> = {}) => {
+    const q = new URLSearchParams({ tz })
+    if (st.days === 'custom' && st.start && st.end) {
+      q.set('start', new Date(st.start + 'T00:00').toISOString())
+      q.set('end', new Date(new Date(st.end + 'T00:00').getTime() + 864e5).toISOString())
+    } else q.set('days', st.days === 'custom' ? '7' : st.days)
+    if (st.country) q.set('country', st.country)
+    if (st.device) q.set('device', st.device)
+    if (st.game) q.set('game', st.game)
+    if (withTest) q.set('test', '1')
+    for (const [k, v] of Object.entries(extra)) q.set(k, v)
+    return q
   }
 
-  function show(which: 'login' | 'dash' | 'note', note = '') {
+  /* ---- signing in -------------------------------------------------------------- */
+  function show(which: 'login' | 'app' | 'note', note = '') {
     $('adLogin').hidden = which !== 'login'
-    $('adDash').hidden = which !== 'dash'
-    $('adTools').hidden = which !== 'dash'
+    $('adApp').hidden = which !== 'app'
+    $('adTools').hidden = which !== 'app'
     $('adNote').hidden = !note
     $('adNote').textContent = note
   }
-
-  async function load() {
-    clearTimeout(timer)
-    let r: Response
-    try { r = await fetch(`/api/admin/stats/?days=${days}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}${withTest ? '&test=1' : ''}`, { cache: 'no-store' }) }
-    catch { show('note', 'The site could not be reached. Check the connection and refresh.'); return }
-    if (r.status === 401) { show('login'); $('adPw').focus(); return }
-    const body = await r.json().catch(() => ({}))
-    if (!r.ok) { show('note', body.error ?? 'Something went wrong.'); return }
-    try { localStorage.setItem('funsite:admin', '1') } catch {}
-    show('dash')
-    render(body as Stats)
-    timer = window.setTimeout(load, 60_000)
-  }
-
-  /* ---- the pieces ------------------------------------------------------ */
-
-  function delta(now: number, before: number, invert = false) {
-    if (!before) return now ? '<span class="d-new">new</span>' : ''
-    const d = Math.round(((now - before) / before) * 100)
-    if (!d) return '<span class="d-flat">±0%</span>'
-    const good = invert ? d < 0 : d > 0
-    return `<span class="${good ? 'd-up' : 'd-down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d)}%</span>`
-  }
-
-  function kpis(s: Stats) {
-    const k = s.kpis, p = s.prev
-    const tiles: [string, string, string, string][] = [
-      ['Visitors', fmt(k.visitors), delta(k.visitors, p.visitors), `${pct(k.withId, k.visitors)} with an ID`],
-      ['Page views', fmt(k.views), delta(k.views, p.views), `${(k.views / Math.max(1, k.visitors)).toFixed(1)} a visitor`],
-      ['Games started', fmt(k.starts), delta(k.starts, p.starts), `${fmt(k.dives)} from the island`],
-      ['Games finished', fmt(k.ends), delta(k.ends, p.ends), `${pct(k.ends, k.starts)} of starts`],
-      ['Time on a page', dur(k.engagedMs), delta(k.engagedMs, p.engagedMs), 'actually looked at'],
-      ['Shares', fmt(k.shares), delta(k.shares, p.shares), `${fmt(k.errors)} script errors`],
-    ]
-    $('adKpis').innerHTML = tiles.map(([label, v, d, sub], i) => `
-      <div class="ad-kpi" style="--i:${i}"><p class="ad-kpi-label">${label}</p><p class="ad-kpi-v">${v}</p><p class="ad-kpi-d">${d}</p><p class="ad-kpi-sub">${esc(sub)}</p></div>`).join('')
-  }
-
-  function chart(s: Stats) {
-    const pts = s.series
-    const el = $('adChart')
-    if (!pts.length) { el.innerHTML = '<p class="ad-empty">No visits in this period yet.</p>'; return }
-    const W = 1000, H = 260, L = 44, B = 28, T = 12
-    const max = Math.max(1, ...pts.map((p) => p.views))
-    const x = (i: number) => L + (pts.length === 1 ? (W - L) / 2 : (i / (pts.length - 1)) * (W - L - 8))
-    const y = (v: number) => T + (1 - v / max) * (H - T - B)
-    const line = (key: 'views' | 'visitors') => pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join('')
-    const area = (key: 'views' | 'visitors') => `${line(key)}L${x(pts.length - 1).toFixed(1)},${H - B}L${x(0).toFixed(1)},${H - B}Z`
-    const ticks = [0, 0.5, 1].map((f) => Math.round(max * f))
-    const every = Math.max(1, Math.ceil(pts.length / 8))
-    const label = (t: string) => s.range.bucket === 'hour' ? t.slice(11, 16) : new Date(t.slice(0, 10) + 'T12:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
-    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Visitors and page views over the period">
-      <defs><linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6debcd" stop-opacity=".35"/><stop offset="1" stop-color="#6debcd" stop-opacity="0"/></linearGradient></defs>
-      ${ticks.map((v) => `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" class="g"/><text x="${L - 8}" y="${y(v) + 4}" class="ax" text-anchor="end">${fmt(v)}</text>`).join('')}
-      <path d="${line('views')}" class="l-views"/>
-      <path d="${area('visitors')}" fill="url(#gv)"/>
-      <path d="${line('visitors')}" class="l-vis"/>
-      ${pts.map((p, i) => `<g class="pt"><circle cx="${x(i)}" cy="${y(p.visitors)}" r="3.5" class="c-vis"/><title>${esc(label(p.t))}: ${p.visitors} visitors, ${p.views} views</title></g>`).join('')}
-      ${pts.map((p, i) => (i % every ? '' : `<text x="${x(i)}" y="${H - 8}" class="ax" text-anchor="middle">${esc(label(p.t))}</text>`)).join('')}
-    </svg>`
-  }
-
-  function games(s: Stats) {
-    const rows = s.games
-    $('adGamesSub').textContent = `${rows.length} of ${listed} games visited in this period`
-    const head = '<thead><tr><th scope="col">Game</th><th>Visitors</th><th>Views</th><th>Started</th><th>Finished</th><th>Won</th><th>From island</th><th>Shares</th><th>Restarts</th><th>Time</th></tr></thead>'
-    const top = Math.max(1, ...rows.map((r) => Number(r.visitors)))
-    $('adGames').innerHTML = head + '<tbody>' + (rows.length ? rows.map((r) => {
-      const v = Number(r.visitors)
-      return `<tr><th scope="row"><span class="ad-gname">${esc(gameName(String(r.game)))}</span><span class="ad-gbar" style="--w:${(v / top) * 100}%"></span></th>
-        <td>${fmt(v)}</td><td>${fmt(Number(r.views))}</td><td>${fmt(Number(r.starts))}</td>
-        <td>${fmt(Number(r.ends))} <span class="ad-dim">${pct(Number(r.ends), Number(r.starts))}</span></td>
-        <td>${pct(Number(r.wins), Number(r.ends))}</td><td>${fmt(Number(r.dives))}</td><td>${fmt(Number(r.shares))}</td><td>${fmt(Number(r.restarts))}</td>
-        <td>${Number(r.engagedMs) ? dur(Number(r.engagedMs)) : '–'}</td></tr>`
-    }).join('') : '<tr><td colspan="10" class="ad-empty">No game has been opened in this period yet.</td></tr>') + '</tbody>'
-  }
-
-  function bars(id: string, rows: Row[], name: (k: string) => string = (k) => k) {
-    const top = Math.max(1, ...rows.map((r) => r.visitors))
-    $(id).innerHTML = rows.length
-      ? rows.map((r) => `<li style="--w:${(r.visitors / top) * 100}%"><span class="ad-bar-k">${esc(name(r.k))}</span><span class="ad-bar-v">${fmt(r.visitors)}</span></li>`).join('')
-      : '<li class="ad-empty">Nothing yet.</li>'
-  }
-
-  // Google's own lines for good and poor, per metric.
-  const VITALS: Record<string, { good: number; poor: number; unit: 'ms' | '' ; name: string }> = {
-    LCP: { good: 2500, poor: 4000, unit: 'ms', name: 'Largest paint' },
-    INP: { good: 200, poor: 500, unit: 'ms', name: 'Response to input' },
-    CLS: { good: 0.1, poor: 0.25, unit: '', name: 'Layout shift' },
-    FCP: { good: 1800, poor: 3000, unit: 'ms', name: 'First paint' },
-    TTFB: { good: 800, poor: 1800, unit: 'ms', name: 'Server response' },
-  }
-  function vitals(s: Stats) {
-    const by = Object.fromEntries(s.vitals.map((v) => [v.metric, v]))
-    $('adVitals').innerHTML = Object.entries(VITALS).map(([k, m]) => {
-      const v = by[k]
-      if (!v) return `<div class="ad-vital"><p>${m.name} <span class="ad-dim">${k}</span></p><p class="ad-vital-v ad-dim">–</p></div>`
-      const rate = v.p75 <= m.good ? 'good' : v.p75 <= m.poor ? 'mid' : 'poor'
-      const val = m.unit === 'ms' ? (v.p75 >= 1000 ? (v.p75 / 1000).toFixed(2) + ' s' : Math.round(v.p75) + ' ms') : v.p75.toFixed(3)
-      return `<div class="ad-vital is-${rate}"><p>${m.name} <span class="ad-dim">${k} · ${fmt(v.n)}</span></p><p class="ad-vital-v">${val}</p></div>`
-    }).join('')
-  }
-
-  const where = (c: string | null, city: string | null) => [city, c ? regionName(c) : null].filter(Boolean).map(esc).join(', ') || 'somewhere'
-  function now(s: Stats) {
-    $('adLiveN').textContent = String(s.live.now)
-    $('adLive').classList.toggle('is-on', s.live.now > 0)
-    $('adNow').innerHTML = s.live.pages.length
-      ? s.live.pages.slice(0, 12).map((p) => `<li><b>${esc(p.game ? gameName(p.game) : p.path)}</b><span>${where(p.country, p.city)} · ${esc(p.device ?? '')} · ${ago(p.seen)}</span></li>`).join('')
-      : '<li class="ad-empty">Nobody in the last five minutes.</li>'
-    $('adErrors').innerHTML = s.errors.length
-      ? s.errors.map((e) => `<li><b>${esc(e.msg)}</b><span>${e.n}× on ${e.pages} page${e.pages === 1 ? '' : 's'} · ${ago(e.last)}</span></li>`).join('')
-      : '<li class="ad-empty">No errors. Lovely.</li>'
-  }
-
-  const EV: Record<string, string> = {
-    game_start: 'started', game_end: 'finished', game_result: 'result', game_best: 'personal best', game_level: 'level', game_restart: 'restarted',
-    game_pause: 'paused', game_howto: 'read how to play', sound: 'sound', share: 'shared', vital: 'speed', error: 'error', outbound: 'left for',
-    notfound: 'hit a 404', consent: 'consent', isl_dive: 'dived into', isl_card: 'looked at', isl_search: 'searched', isl_filter: 'filtered',
-    isl_surprise: 'surprise me', isl_today: 'today', isl_board: 'noticeboard', isl_board_go: 'noticeboard →', isl_poke: 'poked', isl_bottle: 'found a bottle',
-    isl_postcard: 'postcard', isl_passport: 'passport', isl_cover: 'cover', isl_time: 'day/night', isl_welcome: 'welcome', isl_minimap: 'mini-map',
-    isl_ball: 'threw the ball', isl_pigeons: 'put up the pigeons', isl_session: 'explored the island', isl_fps: 'island fps',
-  }
-  const propsText = (p: Record<string, unknown>) => Object.entries(p ?? {}).slice(0, 5).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')
-  function events(s: Stats) {
-    $('adEvents').innerHTML = s.recent.length
-      ? s.recent.map((e) => `<li><span class="ad-ev ad-ev-${esc(e.name.split('_')[0])}">${esc(EV[e.name] ?? e.name)}</span>
-          <b>${esc(e.game ? gameName(e.game) : e.path)}</b><span>${propsText(e.props)}</span>
-          <span class="ad-dim">${where(e.country, e.city)} · ${esc(e.device ?? '')} · ${ago(e.ts)}</span></li>`).join('')
-      : '<li class="ad-empty">Nothing has happened yet. Open a game in another browser and it shows up here.</li>'
-  }
-
-  function render(s: Stats) {
-    kpis(s); chart(s); games(s)
-    bars('adPages', s.pages, (k) => (k === '/' ? 'The island (home)' : k))
-    bars('adCountries', s.countries, regionName)
-    bars('adRefs', s.refs)
-    bars('adDevices', s.devices, (k) => k[0].toUpperCase() + k.slice(1))
-    bars('adBrowsers', s.browsers)
-    bars('adOs', s.os)
-    vitals(s); now(s); events(s)
-  }
-
-  /* ---- sign in, sign out, the period ------------------------------------ */
-
   $('adForm').addEventListener('submit', async (e) => {
     e.preventDefault()
-    const go = $('adGo') as HTMLButtonElement
+    const go = $<HTMLButtonElement>('adGo')
     go.disabled = true; $('adErr').textContent = ''
     try {
-      const r = await fetch('/api/admin/login/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: ($('adPw') as HTMLInputElement).value }) })
+      const r = await fetch('/api/admin/login/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: $<HTMLInputElement>('adPw').value }) })
       const b = await r.json().catch(() => ({}))
       if (!r.ok) { $('adErr').textContent = b.error ?? 'That did not work.'; return }
-      ;($('adPw') as HTMLInputElement).value = ''
-      await load()
+      $<HTMLInputElement>('adPw').value = ''
+      loadOptions(); load()
     } catch { $('adErr').textContent = 'The site could not be reached.' }
     finally { go.disabled = false }
   })
   $('adOut').addEventListener('click', async () => {
     await fetch('/api/admin/logout/', { method: 'POST' }).catch(() => {})
     try { localStorage.removeItem('funsite:admin') } catch {}
-    clearTimeout(timer)
-    show('login')
+    clearTimeout(timer); show('login')
   })
-  $('adRefresh').addEventListener('click', load)
+
+  /* ---- the theme ------------------------------------------------------------------ */
+  const root = document.documentElement
+  const themes = ['', 'light', 'dark'] as const
+  const themeName = { '': 'Theme: system', light: 'Theme: light', dark: 'Theme: dark' }
+  let theme: (typeof themes)[number] = ''
+  try { const t = localStorage.getItem('funsite:admin-theme'); if (t === 'light' || t === 'dark') theme = t } catch {}
+  const paintTheme = () => { if (theme) root.dataset.adTheme = theme; else delete root.dataset.adTheme; $('adTheme').textContent = themeName[theme] }
+  $('adTheme').addEventListener('click', () => {
+    theme = themes[(themes.indexOf(theme) + 1) % 3]
+    try { if (theme) localStorage.setItem('funsite:admin-theme', theme); else localStorage.removeItem('funsite:admin-theme') } catch {}
+    paintTheme()
+  })
+  paintTheme()
+
+  /* ---- the controls ------------------------------------------------------------------- */
+  const sel = (id: string) => $<HTMLSelectElement>(id)
+  function paintControls() {
+    for (const b of document.querySelectorAll<HTMLButtonElement>('[data-days]')) b.setAttribute('aria-pressed', String(b.dataset.days === st.days))
+    $('adCustom').hidden = st.days !== 'custom'
+    $<HTMLInputElement>('adFrom').value = st.start; $<HTMLInputElement>('adTo').value = st.end
+    $<HTMLInputElement>('adCompare').checked = st.compare
+    sel('adCountry').value = st.country; sel('adDevice').value = st.device; sel('adGame').value = st.game
+    $('adClear').hidden = !st.country && !st.device && !st.game
+    for (const t of document.querySelectorAll<HTMLButtonElement>('[data-tab]')) t.setAttribute('aria-selected', String(t.dataset.tab === st.tab || (st.tab === 'game' && t.dataset.tab === 'games')))
+  }
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-days]')) b.addEventListener('click', () => {
-    days = Number(b.dataset.days)
-    for (const o of document.querySelectorAll('[data-days]')) o.setAttribute('aria-pressed', String(o === b))
-    load()
+    if (b.dataset.days === 'custom') {
+      const d = (x: Date) => x.toLocaleDateString('en-CA')
+      $('adCustom').hidden = false
+      if (!st.start) { $<HTMLInputElement>('adFrom').value = d(new Date(Date.now() - 29 * 864e5)); $<HTMLInputElement>('adTo').value = d(new Date()) }
+      $<HTMLInputElement>('adFrom').focus()
+      return
+    }
+    writeState({ days: b.dataset.days!, start: '', end: '' })
   })
+  $('adApply').addEventListener('click', () => {
+    const s = $<HTMLInputElement>('adFrom').value, e = $<HTMLInputElement>('adTo').value
+    if (s && e && s <= e) writeState({ days: 'custom', start: s, end: e })
+  })
+  $('adCompare').addEventListener('change', () => writeState({ compare: $<HTMLInputElement>('adCompare').checked }, false))
+  sel('adCountry').addEventListener('change', () => writeState({ country: sel('adCountry').value }))
+  sel('adDevice').addEventListener('change', () => writeState({ device: sel('adDevice').value }))
+  sel('adGame').addEventListener('change', () => writeState({ game: sel('adGame').value }))
+  $('adClear').addEventListener('click', () => writeState({ country: '', device: '', game: '' }))
+  for (const t of document.querySelectorAll<HTMLButtonElement>('[data-tab]')) t.addEventListener('click', () => writeState({ tab: t.dataset.tab!, slug: '' }))
+  // Arrow keys between tabs.
+  document.querySelector('.ad-tabs')!.addEventListener('keydown', (e) => {
+    const k = (e as KeyboardEvent).key; if (k !== 'ArrowRight' && k !== 'ArrowLeft') return
+    const ts = [...document.querySelectorAll<HTMLButtonElement>('[data-tab]')], i = ts.findIndex((t) => t === document.activeElement)
+    const n = ts[(i + (k === 'ArrowRight' ? 1 : -1) + ts.length) % ts.length]; n.focus(); n.click()
+  })
+  const exportCsv = (what: string) => { location.href = '/api/admin/export/?' + query({ what }).toString() }
+  $('adExportViews').addEventListener('click', () => exportCsv('views'))
+  $('adExportEvents').addEventListener('click', () => exportCsv('events'))
+
+  async function loadOptions() {
+    try {
+      const r = await fetch('/api/admin/stats/?' + query({ tab: 'options', days: '365' }).toString())
+      if (!r.ok) return
+      const o = await r.json() as { countries: string[]; games: string[] }
+      const rn = (() => { try { return new Intl.DisplayNames(undefined, { type: 'region' }) } catch { return null } })()
+      const cs = o.countries.map((c) => [c, rn?.of(c) ?? c]).sort((a, b) => a[1].localeCompare(b[1]))
+      sel('adCountry').replaceChildren(el('option', { value: '', text: 'Everywhere' }), ...cs.map(([c, n]) => el('option', { value: c, text: n })))
+      const gs = [...new Set([...listed, ...o.games])].map((s) => [s, titles[s] ?? s]).sort((a, b) => a[1].localeCompare(b[1]))
+      sel('adGame').replaceChildren(el('option', { value: '', text: 'Every page' }), ...gs.map(([s, n]) => el('option', { value: s, text: n })))
+      paintControls()
+    } catch { /* the filter keeps its defaults */ }
+  }
+
+  /* ---- loading and drawing ---------------------------------------------------------------- */
+  let timer = 0, seq = 0
+  const panel = $('adPanel')
+  const bucketOf = (): Tabs.Bucket => {
+    const days = st.days === 'custom' && st.start && st.end ? (new Date(st.end).getTime() - new Date(st.start).getTime()) / 864e5 + 1 : Number(st.days)
+    return days <= 2.1 ? 'hour' : days <= 120 ? 'day' : 'week'
+  }
+  const ctx = (): Tabs.Ctx => ({
+    titles, isoByName, bucket: bucketOf(), compare: st.compare,
+    openGame: (slug) => { writeState({ tab: 'game', slug }); scrollTo({ top: 0 }) },
+    pickCountry: (iso) => writeState({ country: iso }),
+  })
+
+  const PERIOD: Record<string, string> = { '1': 'the last 24 hours', '7': 'the last 7 days', '30': 'the last 30 days', '90': 'the last 90 days', '365': 'the last 12 months' }
+  function scopeText() {
+    const parts = [st.days === 'custom' && st.start ? `${st.start} to ${st.end}` : PERIOD[st.days] ?? `the last ${st.days} days`]
+    if (st.country) { try { parts.push(new Intl.DisplayNames(undefined, { type: 'region' }).of(st.country) ?? st.country) } catch { parts.push(st.country) } }
+    if (st.device) parts.push(({ phone: 'phones', tablet: 'tablets', desktop: 'computers' } as Record<string, string>)[st.device] ?? st.device)
+    if (st.game) parts.push(titles[st.game] ?? st.game)
+    if (withTest) parts.push('including test runs')
+    return 'Showing ' + parts.join(' · ')
+  }
+
+  async function load() {
+    clearTimeout(timer)
+    const my = ++seq
+    const tab = st.tab === 'game' && !st.slug ? 'games' : st.tab
+    $('adScope').textContent = scopeText()
+    panel.classList.add('is-loading')
+    let r: Response
+    try { r = await fetch('/api/admin/stats/?' + query(tab === 'game' ? { tab, slug: st.slug } : { tab }).toString(), { cache: 'no-store' }) }
+    catch { panel.classList.remove('is-loading'); show('note', 'The site could not be reached. Check the connection and refresh.'); return }
+    if (my !== seq) return
+    if (r.status === 401) { show('login'); $('adPw').focus(); return }
+    const body = await r.json().catch(() => ({}))
+    if (my !== seq) return
+    if (!r.ok) { panel.classList.remove('is-loading'); show('note', body.error ?? 'Something went wrong.'); return }
+    try { localStorage.setItem('funsite:admin', '1') } catch {}
+    show('app')
+    render(tab, body)
+    // Live refreshes every ten seconds; everything else every minute (and the "here now" count with it).
+    timer = window.setTimeout(load, tab === 'live' ? 10_000 : 60_000)
+    if (tab !== 'live' && tab !== 'overview') refreshLive()
+  }
+  async function refreshLive() {
+    try {
+      const r = await fetch('/api/admin/stats/?' + query({ tab: 'live' }).toString(), { cache: 'no-store' })
+      if (r.ok) paintLive((await r.json()).now)
+    } catch { /* keep the last count */ }
+  }
+  function paintLive(n: number) { $('adLiveN').textContent = String(n); $('adLive').classList.toggle('is-on', n > 0) }
+
+  function render(tab: string, data: unknown) {
+    untip()
+    const c = ctx()
+    const out = el('div', { class: 'ad-tab-body' })
+    // Into the page first, so every chart can measure the width it has.
+    panel.replaceChildren(out)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const d = data as any
+    if (tab === 'overview') { Tabs.overview(out, d, c); paintLive(d.live.now) }
+    else if (tab === 'live') { Tabs.live(out, d, c); paintLive(d.now) }
+    else if (tab === 'games') Tabs.games(out, d, c, listed)
+    else if (tab === 'game') Tabs.game(out, d, st.slug, c, () => writeState({ tab: 'games', slug: '' }))
+    else if (tab === 'island') Tabs.island(out, d, c)
+    else if (tab === 'audience') Tabs.audience(out, d, c)
+    else if (tab === 'acquisition') Tabs.acquisition(out, d, c)
+    else if (tab === 'retention') Tabs.retention(out, d, c)
+    else if (tab === 'health') Tabs.health(out, d, c)
+    panel.classList.remove('is-loading')
+  }
+
+  paintControls()
+  loadOptions()
   load()
 </script>
 
 <style is:global>
-  body.ad-body { background: #0b1029; color: #e6eaff; }
-  body.ad-body .skip, body.ad-body .progress-bar { display: none; }
-</style>
-
-<style is:global>
-  /* Global, not scoped: nearly everything here is built by the script at run time,
-     which scoped styles never reach. Every selector starts from an ad- class. */
-  .ad {
-    --bg: #0b1029; --card: #121a3d; --card2: #18214a; --line: rgba(160, 175, 255, 0.14);
-    --ink: #eef1ff; --ink2: #b4bce6; --ink3: #7f88b8;
-    --mint: #6debcd; --sky: #8ccbff; --lilac: #b9a8ff; --rasp: #ff6f8f; --cobalt: #7a9bff;
-    max-width: 1400px; margin: 0 auto; padding: clamp(18px, 3vw, 40px) clamp(16px, 3vw, 40px) 80px;
-    font-family: var(--sans); color: var(--ink);
+  /*
+   * Global, not scoped: nearly everything here is built by the script at run
+   * time, which scoped styles never reach. Every selector starts from an ad-
+   * class (or body.ad-body), so none of it can touch another page.
+   *
+   * Two themes from the same roles. Series are the validated cool four (blue,
+   * aqua, violet, pink: no orange or yellow, colour-blind safe in both
+   * themes); q0–q5 is one blue ramp for magnitude; good, mid and poor are
+   * status, always with a word and a mark beside them.
+   */
+  body.ad-body {
+    color-scheme: light;
+    --page: #eef1f6; --surface: #ffffff; --surface-2: #f4f6fa; --line: rgba(17, 24, 52, 0.1); --grid: #e7eaf1; --axis: #c3c9d6;
+    --ink: #111827; --ink2: #4a5368; --ink3: #626b80; --accent: #4fe3c1; --on-accent: #0b1029; --focus: #5b82ff;
+    --s1: #2a78d6; --s2: #1baf7a; --s3: #4a3aa7; --s4: #e87ba4;
+    --q0: #edf0f5; --q1: #cde2fb; --q2: #9ec5f4; --q3: #6da7ec; --q4: #2a78d6; --q5: #184f95;
+    --good: #0b8a0b; --mid: #7d72d4; --poor: #d03b3b; --up: #0b7a52; --down: #c21d43;
+    --shadow: 0 1px 2px rgba(17, 24, 52, 0.05), 0 10px 30px -18px rgba(17, 24, 52, 0.25);
+    background: var(--page); color: var(--ink);
   }
-  .ad-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; margin-bottom: 28px; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-ad-theme='light']) body.ad-body {
+      color-scheme: dark;
+      --page: #0b1029; --surface: #121a3d; --surface-2: #18214a; --line: rgba(160, 175, 255, 0.14); --grid: #222b55; --axis: #38427a;
+      --ink: #eef1ff; --ink2: #b4bce6; --ink3: #8b94c4; --accent: #6debcd; --on-accent: #0b1029; --focus: #b9a8ff;
+      --s1: #3987e5; --s2: #199e70; --s3: #9085e9; --s4: #d55181;
+      --q0: #1a2350; --q1: #1d3566; --q2: #1c5cab; --q3: #3987e5; --q4: #6da7ec; --q5: #b7d3f6;
+      --good: #2bc52b; --mid: #a69cf0; --poor: #ef6666; --up: #5fe0b4; --down: #ff8fa6;
+      --shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.6);
+    }
+  }
+  :root[data-ad-theme='dark'] body.ad-body {
+    color-scheme: dark;
+    --page: #0b1029; --surface: #121a3d; --surface-2: #18214a; --line: rgba(160, 175, 255, 0.14); --grid: #222b55; --axis: #38427a;
+    --ink: #eef1ff; --ink2: #b4bce6; --ink3: #8b94c4; --accent: #6debcd; --on-accent: #0b1029; --focus: #b9a8ff;
+    --s1: #3987e5; --s2: #199e70; --s3: #9085e9; --s4: #d55181;
+    --q0: #1a2350; --q1: #1d3566; --q2: #1c5cab; --q3: #3987e5; --q4: #6da7ec; --q5: #b7d3f6;
+    --good: #2bc52b; --mid: #a69cf0; --poor: #ef6666; --up: #5fe0b4; --down: #ff8fa6;
+    --shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.6);
+  }
+  body.ad-body .skip, body.ad-body .progress-bar { display: none; }
+
+  .ad { max-width: 1480px; margin: 0 auto; padding: clamp(16px, 2.6vw, 36px) clamp(16px, 2.6vw, 36px) 80px; font-family: var(--sans); color: var(--ink); }
+  .ad button, .ad select, .ad input { font: inherit; color: inherit; }
+  .ad :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .ad-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; margin-bottom: 22px; }
   .ad-brand { display: flex; align-items: center; gap: 14px; }
-  .ad-mark { width: 44px; height: 44px; border-radius: 14px; background: conic-gradient(from 200deg, var(--mint), var(--sky), var(--lilac), var(--mint)); box-shadow: 0 8px 30px -8px rgba(109, 235, 205, 0.6); }
+  .ad-mark { width: 42px; height: 42px; border-radius: 13px; background: conic-gradient(from 200deg, #6debcd, #8ccbff, #b9a8ff, #6debcd); box-shadow: 0 8px 26px -10px rgba(91, 130, 255, 0.6); }
   .ad-kicker { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); font-weight: 600; }
-  .ad-h1 { margin: 0; font-family: var(--display); font-size: clamp(28px, 3.4vw, 42px); line-height: 1.05; color: var(--ink); }
-  .ad-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .ad-tools[hidden] { display: none; }
-  .ad-live { display: flex; align-items: center; gap: 8px; margin: 0 6px 0 0; color: var(--ink2); font-size: 14px; }
+  .ad-h1 { margin: 0; font-family: var(--display); font-size: clamp(28px, 3.2vw, 40px); line-height: 1.05; color: var(--ink); }
+  .ad-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ad-tools[hidden], #adApp[hidden], .ad-login[hidden], .ad-custom[hidden], .ad-mini[hidden] { display: none; }
+  .ad-live { display: flex; align-items: center; gap: 8px; margin: 0 8px 0 0; color: var(--ink2); font-size: 14px; }
   .ad-live b { color: var(--ink); font-size: 16px; }
   .ad-live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink3); }
-  .ad-live.is-on .ad-live-dot { background: var(--mint); box-shadow: 0 0 0 0 rgba(109, 235, 205, 0.6); animation: ad-pulse 2s infinite; }
-  @keyframes ad-pulse { 70% { box-shadow: 0 0 0 9px rgba(109, 235, 205, 0); } 100% { box-shadow: 0 0 0 0 rgba(109, 235, 205, 0); } }
-  .ad-range { display: flex; padding: 4px; gap: 2px; background: var(--card); border-radius: 999px; border: 1px solid var(--line); }
-  .ad-range button, .ad-ghost {
-    font: 600 13.5px/1 var(--sans); min-height: 36px; padding: 0 14px; border-radius: 999px; border: 0; cursor: pointer;
-    background: transparent; color: var(--ink2);
-  }
-  .ad-range button[aria-pressed='true'] { background: var(--mint); color: #0b1029; }
-  .ad-ghost { border: 1px solid var(--line); }
-  .ad-ghost:hover, .ad-range button:hover:not([aria-pressed='true']) { color: var(--ink); background: var(--card2); }
-  .ad button:focus-visible, .ad input:focus-visible { outline: 3px solid var(--lilac); outline-offset: 2px; }
+  .ad-live.is-on .ad-live-dot { background: var(--s2); animation: ad-pulse 2s infinite; }
+  @keyframes ad-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--s2) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
+  .ad-ghost, .ad-mini { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600 !important; font-size: 13.5px !important; color: var(--ink2) !important; }
+  .ad-ghost:hover, .ad-mini:hover { color: var(--ink) !important; background: var(--surface-2); }
+  .ad-mini { min-height: 30px; padding: 0 12px; font-size: 12.5px !important; }
+  .ad-mini[aria-pressed='true'] { background: var(--ink); color: var(--surface) !important; border-color: var(--ink); }
+
+  .ad-filters { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; margin: 0 -14px 4px; background: color-mix(in srgb, var(--page) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .ad-range { display: flex; flex-wrap: wrap; padding: 3px; gap: 2px; background: var(--surface); border-radius: 999px; border: 1px solid var(--line); }
+  .ad-range button { min-height: 32px; padding: 0 13px; border-radius: 999px; border: 0; background: transparent; cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--ink2); }
+  .ad-range button:hover { color: var(--ink); background: var(--surface-2); }
+  .ad-range button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+  .ad-custom { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink2); }
+  .ad-custom input { height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); }
+  .ad-check { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink2); cursor: pointer; }
+  .ad-check input { width: 16px; height: 16px; accent-color: var(--s1); }
+  .ad-sel { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink3); font-weight: 600; }
+  .ad-sel select { height: 32px; max-width: 190px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-size: 13.5px; font-weight: 500; color: var(--ink); }
+  .ad-grow { flex: 1; }
+
+  .ad-tabs { display: flex; gap: 2px; overflow-x: auto; margin: 14px 0 6px; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+  .ad-tabs button { flex: none; padding: 12px 14px 11px; border: 0; border-bottom: 2.5px solid transparent; background: none; cursor: pointer; font-weight: 600; font-size: 14.5px; color: var(--ink3); }
+  .ad-tabs button:hover { color: var(--ink); }
+  .ad-tabs button[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--s1); }
+  .ad-scope { margin: 10px 0 18px; font-size: 13px; color: var(--ink3); }
+  .ad-panel { transition: opacity 0.2s; }
+  .ad-panel.is-loading { opacity: 0.45; pointer-events: none; }
 
   .ad-login { display: grid; place-items: center; min-height: 60vh; }
-  .ad-login[hidden] { display: none; }
-  .ad-login-card { width: min(400px, 100%); padding: 32px; background: var(--card); border: 1px solid var(--line); border-radius: 24px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.6); }
+  .ad-login-card { width: min(400px, 100%); padding: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
   .ad-login-card h2 { margin: 0 0 6px; font-family: var(--display); font-size: 28px; color: var(--ink); }
   .ad-login-card p { margin: 0 0 18px; color: var(--ink2); font-size: 14px; line-height: 1.5; }
-  .ad-login-card code { background: var(--card2); padding: 1px 6px; border-radius: 6px; color: var(--mint); }
+  .ad-login-card code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
   .ad-login-card label { display: block; font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
-  .ad-login-card input { box-sizing: border-box; width: 100%; height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 500 16px var(--sans); }
-  .ad-login-card button { margin-top: 14px; width: 100%; height: 46px; border: 0; border-radius: 999px; background: var(--mint); color: #0b1029; font: 700 15px var(--sans); cursor: pointer; }
+  .ad-login-card input { box-sizing: border-box; width: 100%; height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--page); font-size: 16px; }
+  .ad-login-card button { margin-top: 14px; width: 100%; height: 46px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 15px; cursor: pointer; }
   .ad-login-card button:disabled { opacity: 0.6; }
-  .ad-err { min-height: 1.3em; margin: 12px 0 0 !important; color: var(--rasp) !important; }
-  .ad-note { padding: 20px 24px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); color: var(--ink2); }
+  .ad-err { min-height: 1.3em; margin: 12px 0 0 !important; color: var(--down) !important; }
+  .ad-note { padding: 20px 24px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); color: var(--ink2); }
 
-  .ad-dash[hidden] { display: none; }
-  .ad-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 18px; }
-  .ad-kpi { padding: 18px 18px 16px; border-radius: 20px; background: linear-gradient(160deg, var(--card2), var(--card)); border: 1px solid var(--line); }
-  .ad-kpi:nth-child(1) { box-shadow: inset 0 3px 0 var(--mint); }
-  .ad-kpi:nth-child(2) { box-shadow: inset 0 3px 0 var(--sky); }
-  .ad-kpi:nth-child(3) { box-shadow: inset 0 3px 0 var(--lilac); }
-  .ad-kpi:nth-child(4) { box-shadow: inset 0 3px 0 var(--cobalt); }
-  .ad-kpi:nth-child(5) { box-shadow: inset 0 3px 0 var(--mint); }
-  .ad-kpi:nth-child(6) { box-shadow: inset 0 3px 0 var(--rasp); }
-  .ad-kpi p { margin: 0; }
-  .ad-kpi-label { font-size: 12.5px; font-weight: 600; color: var(--ink2); letter-spacing: 0.02em; }
-  .ad-kpi-v { font-size: clamp(28px, 2.6vw, 36px); font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 2px !important; color: var(--ink); font-variant-numeric: tabular-nums; }
-  .ad-kpi-d { font-size: 13px; font-weight: 700; min-height: 1.2em; }
-  .ad-kpi-sub { font-size: 12.5px; color: var(--ink3); margin-top: 4px !important; }
-  .d-up { color: var(--mint); } .d-down { color: var(--rasp); } .d-flat { color: var(--ink3); } .d-new { color: var(--sky); }
+  .ad-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(196px, calc(50% - 6px)), 1fr)); gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 640px) { .ad-stat { padding: 13px 13px 12px 16px; } .ad-stat-v { font-size: 24px; } .ad-card { padding: 16px 14px 16px; } }
+  .ad-stat { position: relative; padding: 16px 18px 15px 20px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden; }
+  .ad-stat::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--s1); }
+  .ad-stat.k2::before { background: var(--s2); } .ad-stat.k3::before { background: var(--s3); } .ad-stat.k4::before { background: var(--s4); }
+  .ad-stat p { margin: 0; }
+  .ad-stat-l { font-size: 12.5px; font-weight: 600; color: var(--ink2); }
+  .ad-stat-v { font-size: clamp(26px, 2.3vw, 34px); font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 4px !important; color: var(--ink); line-height: 1.1; }
+  .ad-stat-s { font-size: 12.5px; color: var(--ink3); margin-top: 4px !important; line-height: 1.4; }
+  .ad-delta { display: inline-block; font-size: 12.5px; font-weight: 700; }
+  .ad-delta.is-up { color: var(--up); } .ad-delta.is-down { color: var(--down); } .ad-delta.is-flat { color: var(--ink3); } .ad-delta.is-new { color: var(--s1); }
 
-  .ad-card { padding: 20px 22px; border-radius: 22px; background: var(--card); border: 1px solid var(--line); min-width: 0; }
-  .ad-wide { margin-bottom: 18px; }
-  .ad-card h2 { margin: 0 0 14px; font: 700 16px var(--sans); color: var(--ink); }
-  .ad-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
-  .ad-sub { margin: 0; font-size: 13px; font-weight: 500; color: var(--ink3); }
-  .ad-legend { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink2); }
-  .ad-legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
-  .k-vis { background: var(--mint); } .k-views { background: var(--sky); margin-left: 10px; }
-  .ad-chart svg { width: 100%; height: auto; display: block; }
-  .ad-chart .g { stroke: var(--line); }
-  .ad-chart .ax { fill: var(--ink3); font: 500 12px var(--sans); }
-  .ad-chart .l-vis { fill: none; stroke: var(--mint); stroke-width: 2.5; stroke-linejoin: round; }
-  .ad-chart .l-views { fill: none; stroke: var(--sky); stroke-width: 2; stroke-dasharray: 5 5; opacity: 0.8; }
-  .ad-chart .c-vis { fill: var(--bg); stroke: var(--mint); stroke-width: 2; }
-  .ad-chart .pt:hover .c-vis { fill: var(--mint); }
+  .ad-section { margin: 26px 0 12px; }
+  .ad-section h2 { margin: 0; font-size: 18px; font-weight: 700; color: var(--ink); }
+  .ad-section p { margin: 4px 0 0; font-size: 13.5px; color: var(--ink3); max-width: 80ch; }
+  .ad-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .ad-card { min-width: 0; padding: 18px 20px 20px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .ad-card.span-1 { grid-column: span 1; } .ad-card.span-2 { grid-column: span 2; } .ad-card.span-3 { grid-column: span 3; } .ad-card.span-4, .ad-card.span-full { grid-column: 1 / -1; }
+  @media (max-width: 1100px) { .ad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ad-card.span-1 { grid-column: span 1; } .ad-card.span-2, .ad-card.span-3 { grid-column: 1 / -1; } }
+  @media (max-width: 640px) { .ad-grid { grid-template-columns: minmax(0, 1fr); } .ad-card.span-1 { grid-column: 1 / -1; } .ad-filters { position: static; } .ad-grow { display: none; } }
+  .ad-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .ad-card h3, .ad-section h2 { font-family: var(--sans); letter-spacing: 0; }
+  .ad-card h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .ad-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--ink3); line-height: 1.4; }
+  .ad-card-acts { display: flex; gap: 6px; flex: none; }
+  .ad-empty { margin: 8px 0; color: var(--ink3); font-size: 14px; }
 
-  .ad-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-bottom: 18px; }
+  .ad-svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .ad-svg .ax-grid { stroke: var(--grid); stroke-width: 1; }
+  .ad-svg .ax-base { stroke: var(--axis); stroke-width: 1; }
+  .ad-svg .ax-t { fill: var(--ink3); font: 500 11.5px var(--sans); }
+  .ad-svg .ax-cross { stroke: var(--ink3); stroke-width: 1; }
+  .ad-svg .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .ad-svg .line.is-dashed { stroke-dasharray: 2 4; }
+  .ad-svg .area { opacity: 0.12; }
+  .ad-svg .dot { stroke: var(--surface); stroke-width: 2; }
+  .ad-svg .bar { transition: opacity 0.15s; }
+  .ad-svg .bar.is-on { opacity: 0.75; }
+  .ad-svg .hit { cursor: crosshair; outline: none; }
+  .ad .line.s1, .ad .ad-spark .line { stroke: var(--s1); } .ad .line.s2 { stroke: var(--s2); } .ad .line.s3 { stroke: var(--s3); } .ad .line.s4 { stroke: var(--s4); }
+  .ad .area.s1, .ad .dot.s1, .ad .bar.s1 { fill: var(--s1); } .ad .area.s2, .ad .dot.s2, .ad .bar.s2 { fill: var(--s2); } .ad .area.s3, .ad .dot.s3, .ad .bar.s3 { fill: var(--s3); } .ad .area.s4, .ad .dot.s4, .ad .bar.s4 { fill: var(--s4); }
+  .ad-spark { display: block; }
+  .ad-spark .line { fill: none; stroke-width: 1.5; }
+
+  .ad-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: -4px 0 10px; font-size: 12.5px; color: var(--ink2); }
+  .ad-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .ad-legend b { color: var(--ink); } .ad-legend em { font-style: normal; color: var(--ink3); }
+  .ad-legend.is-values { margin: 12px 0 0; }
+  .ad-key { display: inline-block; width: 14px; height: 2.5px; border-radius: 2px; background: var(--s1); }
+  .ad-key.box { width: 10px; height: 10px; border-radius: 3px; }
+  .ad .ad-key.s2 { background: var(--s2); } .ad .ad-key.s3 { background: var(--s3); } .ad .ad-key.s4 { background: var(--s4); }
+  .ad .ad-key.is-dashed { background: repeating-linear-gradient(90deg, var(--s3) 0 3px, transparent 3px 6px); }
+
+  .ad-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .ad-bars > li { position: relative; display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; font-size: 13.5px; isolation: isolate; }
+  .ad-bars > li::before { content: ''; position: absolute; z-index: -1; inset: 0 auto 0 0; width: var(--w); border-radius: 9px; background: color-mix(in srgb, var(--s1) 16%, transparent); }
+  .ad-bars > li.s2::before { background: color-mix(in srgb, var(--s2) 18%, transparent); } .ad-bars > li.s3::before { background: color-mix(in srgb, var(--s3) 18%, transparent); } .ad-bars > li.s4::before { background: color-mix(in srgb, var(--s4) 20%, transparent); }
+  .ad-bar-btn { all: unset; display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; cursor: pointer; }
+  .ad-bar-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+  .ad-bars > li:has(.ad-bar-btn):hover { background: var(--surface-2); }
+  .ad-bar-k { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .ad-bar-note { color: var(--ink3); font-size: 12px; white-space: nowrap; }
+  .ad-bar-v { font-weight: 700; color: var(--ink2); white-space: nowrap; }
+  .ad-bars-more { font-size: 12.5px; color: var(--ink3); padding: 4px 10px; }
+
+  .ad-stack { display: flex; gap: 2px; height: 14px; border-radius: 5px; overflow: hidden; margin-top: 4px; }
+  .ad-stack.thin { height: 6px; margin: 10px 0 2px; }
+  .ad-stack span { min-width: 3px; background: var(--s1); }
+  .ad .ad-stack .s2 { background: var(--s2); } .ad .ad-stack .s3 { background: var(--s3); } .ad .ad-stack .s4 { background: var(--s4); }
+  .ad .ad-stack .s7 { background: var(--good); } .ad .ad-stack .s8 { background: var(--mid); } .ad .ad-stack .s9 { background: var(--poor); }
+
+  .ad-ramp { display: flex; align-items: center; gap: 3px; margin-top: 10px; font-size: 12px; color: var(--ink3); }
+  .ad-ramp i { width: 22px; height: 9px; border-radius: 2px; }
+  .ad-ramp span:first-child { margin-right: 4px; } .ad-ramp span:last-child { margin-left: 4px; }
+  .ad .q0 { background: var(--q0); fill: var(--q0); } .ad .q1 { background: var(--q1); fill: var(--q1); } .ad .q2 { background: var(--q2); fill: var(--q2); }
+  .ad .q3 { background: var(--q3); fill: var(--q3); } .ad .q4 { background: var(--q4); fill: var(--q4); } .ad .q5 { background: var(--q5); fill: var(--q5); }
+
+  .ad-week { display: grid; grid-template-columns: 34px repeat(24, minmax(0, 1fr)); gap: 2px; font-size: 11px; color: var(--ink3); }
+  .ad-week-h { text-align: left; font-variant-numeric: tabular-nums; }
+  .ad-week-d { display: flex; align-items: center; font-weight: 600; }
+  .ad-cell { aspect-ratio: 1.5; min-height: 12px; border-radius: 3px; outline-offset: 1px; }
+  .ad-cell:hover { outline: 2px solid var(--ink); }
+
+  .ad-map { display: block; width: 100%; height: auto; }
+  .ad-land { stroke: var(--surface); stroke-width: 0.25; transition: opacity 0.15s; }
+  .ad-land:hover, .ad-land:focus { opacity: 0.75; outline: none; }
+  .ad-dot-ring { fill: color-mix(in srgb, var(--s4) 35%, transparent); animation: ad-ring 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  .ad-dot-core { fill: var(--s4); stroke: var(--surface); stroke-width: 0.4; }
+  @keyframes ad-ring { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+
+  .ad-funnel { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .ad .ad-funnel li { position: relative; display: grid; grid-template-columns: 1fr auto; padding: 10px 12px; border-radius: 10px; isolation: isolate; background: none; }
+  .ad-funnel li::before { content: ''; position: absolute; z-index: -1; inset: 0 auto 0 0; width: var(--w); min-width: 4px; border-radius: 10px; background: var(--q2); opacity: 0.6; }
+  .ad-funnel li.q5::before { background: var(--q5); } .ad-funnel li.q4::before { background: var(--q4); } .ad-funnel li.q3::before { background: var(--q3); }
+  .ad-funnel-k { font-weight: 700; font-size: 14px; color: var(--ink); }
+  .ad-funnel-v { font-size: 13px; color: var(--ink2); text-align: right; }
+  .ad-funnel-v b { color: var(--ink); }
+  .ad-funnel-step { grid-column: 1 / -1; font-size: 12px; color: var(--ink2); margin-top: 2px; }
+
   .ad-scroll { overflow-x: auto; }
-  .ad-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .ad-table th, .ad-table td { padding: 10px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
-  .ad-table thead th { font-size: 12px; font-weight: 600; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.04em; }
-  .ad-table th[scope='row'], .ad-table thead th:first-child { text-align: left; position: relative; min-width: 200px; }
-  .ad-table th[scope='row'] { font-weight: 600; color: var(--ink); }
-  .ad-gname { position: relative; z-index: 1; }
-  .ad-gbar { position: absolute; left: 0; bottom: 4px; height: 3px; width: var(--w); border-radius: 2px; background: linear-gradient(90deg, var(--mint), var(--sky)); opacity: 0.7; }
-  .ad-table tbody tr:hover { background: var(--card2); }
+  .ad-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .ad-table th, .ad-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  /* Tabular figures only where numbers line up: in Zalando Sans they widen the spaces too. */
+  .ad-table td.a-r { font-variant-numeric: tabular-nums; }
+  .ad-table .a-l { text-align: left; } .ad-table .a-r { text-align: right; }
+  .ad-table td.a-l { white-space: normal; min-width: 120px; }
+  .ad-table thead th { font-size: 12px; font-weight: 600; color: var(--ink3); }
+  .ad-table thead button { all: unset; cursor: pointer; }
+  .ad-table thead button:focus-visible { outline: 2px solid var(--focus); }
+  .ad-table thead button[aria-sort='descending']::after { content: ' ↓'; } .ad-table thead button[aria-sort='ascending']::after { content: ' ↑'; }
+  .ad-table tbody th { font-weight: 600; color: var(--ink); }
+  .ad-table tbody tr.is-link { cursor: pointer; }
+  .ad-table tbody tr:hover { background: var(--surface-2); }
+
+  .ad-feed { list-style: none; margin: 0; padding: 0; display: grid; }
+  .ad-feed li { display: grid; grid-template-columns: 130px minmax(120px, 210px) 1fr auto; gap: 12px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--ink2); }
+  .ad-feed b { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ad-feed-p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ad-ev { justify-self: start; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--ink); background: color-mix(in srgb, var(--s1) 16%, transparent); white-space: nowrap; }
+  .ad-ev.k-game { background: color-mix(in srgb, var(--s2) 20%, transparent); } .ad-ev.k-isl { background: color-mix(in srgb, var(--s3) 18%, transparent); } .ad-ev.k-error { background: color-mix(in srgb, var(--poor) 22%, transparent); }
   .ad-dim { color: var(--ink3); font-weight: 500; }
+  @media (max-width: 760px) { .ad-feed li { grid-template-columns: 1fr; gap: 2px; } }
 
-  .ad-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .ad-bars li { position: relative; display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 10px; font-size: 14px; overflow: hidden; }
-  .ad-bars li::before { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--w); background: linear-gradient(90deg, rgba(109, 235, 205, 0.22), rgba(140, 203, 255, 0.12)); border-radius: 10px; }
-  .ad-bar-k, .ad-bar-v { position: relative; }
-  .ad-bar-k { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ad-bar-v { font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
+  .ad-game-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 4px 0 16px; }
+  .ad-game-head h2 { margin: 0; font-family: var(--display); font-size: clamp(26px, 3vw, 36px); color: var(--ink); }
+  .ad-back { min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; font-size: 13.5px; }
+  .ad-open { margin-left: auto; font-size: 13.5px; font-weight: 600; color: var(--s1); }
+  .ad-games td:nth-child(2) { width: 100px; }
 
-  .ad-vitals { display: grid; gap: 8px; }
-  .ad-vital { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--card2); border-left: 4px solid var(--ink3); }
-  .ad-vital p { margin: 0; font-size: 14px; color: var(--ink); }
-  .ad-vital-v { font-weight: 800; font-variant-numeric: tabular-nums; }
-  .ad-vital.is-good { border-left-color: var(--mint); } .ad-vital.is-mid { border-left-color: var(--sky); } .ad-vital.is-poor { border-left-color: var(--rasp); }
+  .ad-vitals { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .ad-vital { padding: 16px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .ad-vital p { margin: 0; }
+  .ad-status { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+  .ad-status i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; font-style: normal; font-size: 10.5px; color: #fff; }
+  .ad-status.is-good i { background: var(--good); } .ad-status.is-mid i { background: var(--mid); } .ad-status.is-poor i { background: var(--poor); }
 
-  .ad-feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .ad-feed li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; font-size: 13.5px; color: var(--ink2); }
-  .ad-feed li:nth-child(odd) { background: rgba(255, 255, 255, 0.025); }
-  .ad-feed b { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
-  .ad-events li { grid-template-columns: 150px minmax(120px, 220px) 1fr auto; align-items: baseline; gap: 12px; }
-  .ad-ev { display: inline-block; justify-self: start; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--card2); color: var(--sky); white-space: nowrap; }
-  .ad-ev-game { color: var(--mint); } .ad-ev-isl { color: var(--lilac); } .ad-ev-error { color: var(--rasp); }
-  .ad-empty { color: var(--ink3) !important; font-style: italic; }
-  @media (max-width: 760px) {
-    .ad-events li { grid-template-columns: 1fr; }
-    .ad-tools { width: 100%; }
+  .ad-tip { position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; min-width: 120px; max-width: 280px; padding: 9px 12px; border-radius: 12px; background: var(--ink); color: var(--surface); box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.45); font: 500 12.5px/1.4 var(--sans); }
+  .ad-tip[hidden] { display: none; }
+  .ad-tip p { margin: 0; }
+  .ad-tip-t { opacity: 0.75; margin-bottom: 4px !important; }
+  .ad-tip-r { display: flex; align-items: center; gap: 7px; }
+  .ad-tip-r b { font-size: 14px; font-weight: 800; }
+  .ad-tip .ad-key { flex: none; }
+  .ad-tip .ad-key.s2 { background: var(--s2); } .ad-tip .ad-key.s3 { background: var(--s3); } .ad-tip .ad-key.s4 { background: var(--s4); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ad-live.is-on .ad-live-dot, .ad-dot-ring { animation: none; }
+    .ad-panel { transition: none; }
   }
-  @media (prefers-reduced-motion: reduce) { .ad-live.is-on .ad-live-dot { animation: none; } }
 </style>

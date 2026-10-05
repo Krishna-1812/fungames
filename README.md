@@ -1315,9 +1315,12 @@ site is static; only `src/pages/api/` runs on request, as Vercel functions
 | `src/lib/analytics/client.ts` | the tracker in every page: batches (one a moment after load, then every 15 s while anything waits, the rest as the page hides), engaged time (visible, and touched in the last two minutes), scroll depth, Web Vitals, script errors, links out, the consent bar, and what the privacy page needs |
 | `src/lib/analytics/db.ts` | Neon Postgres in production, PGlite in dev and in the checker; the tables (`views`, `events`, `salts`), and the daily hash that counts visitors with no ID |
 | `src/lib/analytics/ingest.ts` | writing a batch, Forget me, and pruning (thirteen months; test runs after two days) |
-| `src/lib/analytics/report.ts` | every number the admin page shows, as SQL |
+| `src/lib/analytics/report.ts` | every number the admin page shows, as SQL, through one filter (a period, a country, a kind of device, a game) |
+| `src/lib/analytics/csv.ts` | CSV a spreadsheet reads back as written, with formulas in visitors' words defused |
+| `src/lib/admin/` | the dashboard: `ui.ts` (cards with a table view and CSV, stat tiles, the tooltip), `charts.ts` (lines, bars, a world map, the week, a funnel, sparklines, all SVG in the theme's tokens), `tabs.ts` (what each tab shows) |
+| `scripts/seed-analytics.mjs` | a month of made-up traffic for the dev database, so the dashboard can be worked on locally (refuses to run with a real DATABASE_URL) |
 | `src/lib/analytics/auth.ts` | the admin's session: an HMAC-signed, HttpOnly, SameSite=Strict cookie keyed by `ADMIN_PASSWORD` |
-| `src/pages/api/` | `collect`, `forget`, `health` and `admin/{login,logout,stats}` |
+| `src/pages/api/` | `collect`, `forget`, `health` and `admin/{login,logout,stats,export}` |
 | `src/pages/admin/`, `src/pages/privacy.astro` | the dashboard, and the page that says what is counted, with this browser's own switches |
 | `scripts/check-analytics.mjs` | the rules above, proved, with the real SQL run against a real Postgres |
 
@@ -1333,6 +1336,34 @@ noticeboard, Surprise me, postcards, the passport, searches and filters, the
 ball, the pigeons, a summary of how the map was explored, and how smoothly it
 drew; Web Vitals, script errors, 404s and links out. Nothing typed into a
 game, no IP address, no user agent.
+
+**The dashboard.** One filter row scopes everything below it: 24 hours to 12
+months or a custom range, a comparison with the period before, a country, a
+kind of device and a game, all kept in the address so a view can be
+bookmarked. Eight tabs: **Overview** (eight headline numbers against the
+period before, traffic with last period dotted beside it, games started and
+finished, the most played, countries, referrers, devices); **Live** (a world
+map with a dot per page open in the last five minutes, events a minute, and
+everything as it happens, every ten seconds); **Games** (every game in a
+sortable table with a sparkline, completion and time, and a page per game:
+its funnel from opening to sharing, its trend, a distribution for every
+number it reports and a count for every word, how long a game takes, where
+players came from, milestones and shares); **Island** (dives, cards, pokes and
+first finds, districts explored, bottles, searches and the ones that found
+nothing, the noticeboard, postcards, the passport, frame rate by device);
+**Audience** (a world map, regions, cities, the week in visitors' own time,
+devices, systems, browsers, languages, window widths, pixel density,
+connections, timezones, dark mode, reduced motion); **Acquisition** (how
+visitors arrive, by kind and by site and page, campaigns, returns through a
+shared link or a postcard, first and last pages, page-to-page paths, shares
+and links out); **Retention** (new and returning, days visited, games a
+visitor, passports, consent); **Health** (Core Web Vitals at the 75th
+percentile with good, needs-work and poor rated against Google's lines, by
+device and by page; script errors grouped by message and file; broken links;
+the island's frame rate). Every chart has a table view and a CSV, and the
+whole period's raw views or events export as CSV. Light and dark themes
+(following the system, or picked), cool colours only, validated for
+colour-blind readers.
 
 **Visitors.** A random ID in the browser's storage makes a returning visitor
 the same visitor. In the EU, the EEA, the UK and Switzerland (the collection

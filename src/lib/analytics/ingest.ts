@@ -28,7 +28,7 @@ export async function ingest(d: Db, b: Batch, o: Origin, now = new Date()): Prom
     const r = parseRef(v.ref, o.host)
     const cols: Record<string, unknown> = {
       pid: b.pid, ts: now, seen: now, vid: b.vid, dh, test: b.test, consent: b.consent,
-      path: v.path, game: slugOf(v.path), title: v.title ?? null, status: v.status ?? null,
+      path: v.path, game: v.status === 404 ? null : slugOf(v.path), title: v.title ?? null, status: v.status ?? null,
       ref_host: r.ref_host, ref_path: r.ref_path, from_path: r.from_path, sref: v.sref ?? null,
       utm_source: v.utm_source ?? null, utm_medium: v.utm_medium ?? null, utm_campaign: v.utm_campaign ?? null,
       country: o.country, region: o.region, city: o.city, lat: o.lat, lon: o.lon,

@@ -317,5 +317,10 @@ export function parseRef(ref: string | undefined, host: string): { ref_host: str
   return { ref_host: h.slice(0, 100), ref_path: cleanPath(u.pathname), from_path: null }
 }
 
-/** The games' slugs, as a path names them: `/orbit/` is `orbit`. */
-export const slugOf = (path: string) => path.match(/^\/([a-z][a-z0-9-]{1,40})\/$/)?.[1] ?? null
+/** Pages at the top level that are not games. */
+const NOT_GAMES = new Set(['privacy', 'admin', 'island', 'og', 'api'])
+/** The games' slugs, as a path names them: `/orbit/` is `orbit` (and `/privacy/` is no game). */
+export function slugOf(path: string) {
+  const s = path.match(/^\/([a-z][a-z0-9-]{1,40})\/$/)?.[1] ?? null
+  return s && !NOT_GAMES.has(s) ? s : null
+}

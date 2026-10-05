@@ -101,7 +101,7 @@ console.log('\nwhat the server reads off a request')
   const own = S.parseRef('https://fungames.vercel.app/orbit/?x=1', 'fungames.vercel.app')
   check(own.ref_host === null && own.from_path === '/orbit/', 'this site’s own page is kept as the path it came from')
   check(S.parseRef('android-app://com.slack/', 'x').ref_host === null && S.parseRef('nonsense', 'x').ref_host === null, 'anything that is not a web address is left out')
-  check(S.slugOf('/orbit/') === 'orbit' && S.slugOf('/') === null && S.slugOf('/admin/x/') === null, 'a game is known by its path')
+  check(S.slugOf('/orbit/') === 'orbit' && S.slugOf('/') === null && S.slugOf('/admin/x/') === null && S.slugOf('/privacy/') === null && S.slugOf('/admin/') === null, 'a game is known by its path, and the privacy and admin pages are not games')
 }
 
 console.log('\nthe source')
@@ -167,17 +167,57 @@ console.log('\nthe database')
   check(o.countries.some((c) => c.k === 'DE') && o.refs[0]?.k === 'reddit.com', 'countries and referrers')
   check(o.series.length >= 1 && o.series.reduce((a, s) => a + s.views, 0) === 3, 'the traffic series adds up to the views')
   check(o.live.now === 0, 'nobody is "here now" a day later')
-  const live = await Rp.live(d, new Date(NOW + 60_000))
+  const live = await Rp.live(d, {}, new Date(NOW + 60_000))
   check(live.now >= 1, 'but they were, a minute after they arrived')
   let threw = false
-  try { await Rp.top(d, 'path; drop table views', r.from, r.to) } catch { threw = true }
+  try { await Rp.top(d, 'path; drop table views', r) } catch { threw = true }
   check(threw, 'a column the report does not know is refused before any SQL is written')
-  check(Rp.rangeOf(7, 'Asia/Kolkata').tz === 'Asia/Kolkata' && Rp.rangeOf(7, "x'; drop").tz === 'UTC' && Rp.rangeOf(9999, 'UTC').from.getTime() > Date.now() - 366 * 864e5, 'a range is clamped, and a timezone that is not one is UTC')
+  check(Rp.rangeOf(7, 'Asia/Kolkata').tz === 'Asia/Kolkata' && Rp.rangeOf(7, "x'; drop").tz === 'UTC' && Rp.rangeOf(9999, 'UTC').from.getTime() > Date.now() - 401 * 864e5, 'a range is clamped, and a timezone that is not one is UTC')
 
   // Web Vitals: the 75th percentile.
   for (let k = 1; k <= 8; k++) await I.ingest(d, batch({ pid: id('w'), view: k === 1 ? { path: '/' } : undefined, e: [{ n: 'vital', t: NOW, p: { metric: 'LCP', value: k * 1000 } }] }), origin, t0)
-  const lcp = (await Rp.vitals(d, r.from, r.to)).find((x) => x.metric === 'LCP')
+  const lcp = (await Rp.vitals(d, r)).find((x) => x.metric === 'LCP')
   check(lcp && lcp.n === 8 && Math.abs(lcp.p75 - 6250) < 1, `LCP at the 75th percentile of 1–8 s is 6.25 s (got ${lcp?.p75})`)
+
+  // Every tab of the admin page, run for real.
+  await I.ingest(d, batch({ pid: id('r'), vid: id('u'), c: 'yes', view: { path: '/orbit/', vw: 390, touch: true, dark: true, tz: 'Asia/Kolkata', lang: 'hi-IN', first_days: 0 }, e: [
+    { n: 'game_start', t: NOW }, { n: 'game_end', t: NOW + 5000, p: { kind: 'lose', score: '1', ms: 5000 }, g: 'orbit' },
+    { n: 'game_result', t: NOW + 5000, p: { score: 1, sheet: 'a4' }, g: 'orbit' }, { n: 'game_result', t: NOW + 6000, p: { score: 5, sheet: 'a4' }, g: 'orbit' },
+    { n: 'game_level', t: NOW + 4000, p: { text: 'Halfway' }, g: 'orbit' }, { n: 'error', t: NOW, p: { msg: 'x is undefined', src: 'orbit.js', line: 3 } },
+    { n: 'isl_poke', t: NOW, p: { kind: 'whale', first: true } }, { n: 'isl_session', t: NOW, p: { secs: 20, drags: 3, districts: 'harbour peaks', n_districts: 2, cards: 1 } },
+    { n: 'isl_search', t: NOW, p: { q: 'zzz', results: 0 } }, { n: 'isl_fps', t: NOW, p: { fps: 58 } } ] }), { ...origin, ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1' }, t0)
+  const tabs = {}
+  for (const t of ['games', 'island', 'audience', 'acquisition', 'retention', 'health', 'options']) {
+    try { tabs[t] = await Rp[t](d, r) } catch (e) { tabs[t] = e }
+  }
+  try { tabs.game = await Rp.game(d, r, 'orbit') } catch (e) { tabs.game = e }
+  const broken = Object.entries(tabs).filter(([, v]) => v instanceof Error).map(([k, v]) => k + ': ' + v.message)
+  check(!broken.length, `every tab's SQL runs on a real Postgres${broken.length ? ' (' + broken.join('; ') + ')' : ''}`)
+  if (!broken.length) {
+    const g = tabs.game
+    check(g.funnel.views === 2 && g.funnel.started === 2 && g.funnel.finished === 2 && g.funnel.won === 1, 'a game\u2019s funnel: page loads that saw it, started it, finished it, won it')
+    const score = g.results.find((x) => x.k === 'score'), sheet = g.words.find((x) => x.k === 'sheet')
+    check(score && score.count === 2 && score.min === 1 && score.max === 5 && score.bins.reduce((a, b) => a + b.n, 0) === 2, 'its numbers become a distribution')
+    check(sheet && sheet.values[0].k === 'a4' && sheet.values[0].n === 2 && g.levels[0]?.k === 'Halfway', 'its words and levels become counts')
+    check(g.duration.median === 5 && g.kinds.lose === 1, 'how long a game took, and how it ended')
+    check(tabs.island.pokes[0]?.k === 'whale' && tabs.island.session.drags === 3 && tabs.island.districts.length === 2 && tabs.island.empties[0]?.k === 'zzz', 'the island: pokes, how it was explored, searches that found nothing')
+    check(tabs.audience.devices.some((x) => x.k === 'phone') && tabs.audience.flags.dark === 1 && tabs.audience.langs.some((x) => x.k === 'hi') && tabs.audience.week.length >= 1, 'the audience: devices, dark mode, languages, the week')
+    check(tabs.acquisition.kinds.some((x) => x.k === 'Social') && tabs.acquisition.refs.some((x) => x.k === 'reddit.com'), 'acquisition: where visits came from, by kind and by site')
+    check(tabs.retention.ids.n === 2 && tabs.retention.consent.some((x) => x.k === 'yes'), 'retention: visitors with an ID, and the consent each came with')
+    check(tabs.health.errors[0]?.msg === 'x is undefined' && tabs.health.fps.some((x) => x.k === 'phone' && x.median === 58), 'health: errors, and how smoothly the island drew on which device')
+    check(tabs.options.countries.includes('IN') && tabs.options.games.includes('orbit'), 'the filter offers what has traffic')
+    const ph = await Rp.games(d, { ...r, device: 'phone' })
+    check(ph.length === 1 && ph[0].views === 1, 'a filter (phones only) narrows every number')
+  }
+  const fq = Rp.filterOf(new URLSearchParams('days=30&country=IN&device=phone&game=orbit&tz=Asia/Kolkata'))
+  check(fq.country === 'IN' && fq.device === 'phone' && fq.game === 'orbit' && fq.bucket === 'day', 'the filter is read from the query string')
+  const bad = Rp.filterOf(new URLSearchParams("country=India&device=fridge&game=../x&start=2026-01-01&end=2020-01-01"))
+  check(!bad.country && !bad.device && !bad.game && bad.to.getTime() - bad.from.getTime() === 7 * 864e5, 'and anything that is not a country, a device, a game or a range is ignored')
+  const custom = Rp.filterOf(new URLSearchParams('start=2026-09-01T00:00:00Z&end=2026-09-08T00:00:00Z'), new Date(NOW))
+  check(custom.from.toISOString().startsWith('2026-09-01') && custom.bucket === 'day', 'a custom range')
+  check(Rp.bucketsOf({ from: new Date(Date.UTC(2026, 9, 1)), to: new Date(Date.UTC(2026, 9, 8)), tz: 'UTC', bucket: 'day' }).length === 7 && Rp.bucketsOf({ from: new Date(NOW - 864e5), to: new Date(NOW), tz: 'UTC', bucket: 'hour' }).length === 24 && Rp.bucketsOf({ from: new Date(NOW - 864e5 + 1800e3), to: new Date(NOW + 1800e3), tz: 'UTC', bucket: 'hour' }).length === 25, 'every day (or hour) of a range has its place on the chart, empty or not')
+  const C = await import('../src/lib/analytics/csv.ts')
+  check(C.csvCell('=HYPERLINK("x")') === '"\'=HYPERLINK(""x"")"' && C.csvCell('a,b') === '"a,b"' && C.csvCell(null) === '' && C.toCsv([{ a: 1, b: 'x' }]).includes('a,b\r\n1,x'), 'CSV: quoted, and a visitor\u2019s formula is defused before a spreadsheet can run it')
 
   // The daily hash: the same address and browser are one visitor today, and someone else tomorrow.
   const h1 = await DB.dailyHash(d, '1.2.3.4', 'ua', new Date(NOW))
@@ -189,7 +229,7 @@ console.log('\nthe database')
   // Forget me.
   const gone = await I.forget(d, id('v'))
   check(gone === 1 && (await d.query('select count(*)::int as n from events where pid = $1', [id('p')]))[0].n === 0, 'Forget me deletes the visitor’s views and every event in them')
-  check((await d.query('select count(*)::int as n from views'))[0].n === 4, 'and nobody else’s')
+  check((await d.query('select count(*)::int as n from views'))[0].n === 5, 'and nobody else’s')
 
   // Thirteen months.
   await d.query("update views set ts = now() - interval '400 days' where pid = $1", [id('x')])
@@ -198,7 +238,7 @@ console.log('\nthe database')
   check((await d.query('select count(*)::int as n from views where pid = $1', [id('x')]))[0].n === 0, 'records older than thirteen months are deleted')
   await d.query("update views set ts = now() - interval '3 days' where pid = $1", [id('t')])
   await I.prune(d, new Date())
-  check((await d.query('select count(*)::int as n from views where pid = $1', [id('t')]))[0].n === 0 && (await d.query('select count(*)::int as n from views'))[0].n === 2, 'a test run older than two days is deleted, and nothing else is')
+  check((await d.query('select count(*)::int as n from views where pid = $1', [id('t')]))[0].n === 0 && (await d.query('select count(*)::int as n from views'))[0].n === 3, 'a test run older than two days is deleted, and nothing else is')
   await pg.close()
 }
 
