@@ -194,6 +194,9 @@ export function recordPlay(
 
   file.games[slug] = next
   writeAll(file)
+  // The numbers an ending reports, for the site's analytics (lib/analytics/client.ts
+  // listens; under plain Node, in the checkers, there is no document and nothing to tell).
+  if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('funsite:result', { detail: { slug, props: last } }))
   return next
 }
 

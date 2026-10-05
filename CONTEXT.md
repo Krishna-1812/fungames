@@ -20,11 +20,11 @@ neal.fun the site was modelled on).
 | **What it is** | A neal.fun-style site: an illustrated homepage (Tiny Island) and 32 self-contained interactive games, toys and visualisations |
 | **Live site** | <https://fungames-mu.vercel.app> (Vercel, deploys on every push to `main`) |
 | **Repo** | <https://github.com/Krishna-1812/fungames> |
-| **Stack** | Astro 5, static output, TypeScript; three.js (Orbit), Leaflet (Asteroid Launcher); resvg + sharp at build time. No database, no accounts, no server of its own |
+| **Stack** | Astro 5, static output, TypeScript; three.js (Orbit), Leaflet (Asteroid Launcher); resvg + sharp at build time. Static pages; only the analytics API (`src/pages/api/`) runs as Vercel functions, on Neon Postgres |
 | **Size** | 32 games (31 on the island + Powder, unlisted but routable), 201 commits, 61 checker scripts, all passing |
 | **Look** | "Paper & Ink" design system for the games; a cool palette only (mint, lagoon, navy, lilac, raspberry; **no orange or yellow**) |
 | **Sound** | Every sound is synthesised live in the browser. There is not one audio file on the site |
-| **Player data** | Lives only in each visitor's `localStorage` (passport, scores, bottles, settings). Nothing is sent anywhere |
+| **Player data** | Progress lives in each visitor's `localStorage` (passport, scores, bottles, settings). Visits and game events are counted for the admin page at `/admin/` (see README, "Analytics"; `/privacy/` for visitors) |
 | **Built** | 4 September – 3 October 2026 |
 
 ### Waiting on the owner (blocking a real launch)
@@ -348,6 +348,23 @@ From the 1 October study of neal.fun's Cursor Camp. ✅ = built and live.
 ---
 
 ## 8. What is left
+
+### Analytics (in progress, 3 phases)
+
+Requested 5 October 2026: an admin analytics page capturing everything.
+Decisions: Vercel + Neon Postgres; an anonymous visitor ID (asked first in
+the EU, EEA, UK and Switzerland). See README, "Analytics".
+
+- **Phase 1 (done):** collection (tracker, API, database, consent bar,
+  privacy page, Forget me), every game through the shell, the island's
+  events, admin login and an overview at `/admin/`, `check-analytics.mjs`.
+  Needs the owner to connect Neon and set `ADMIN_PASSWORD` in Vercel.
+- **Phase 2:** the full dashboard (Overview, Live, Games with a page per
+  game, Island, Audience with a world map, Acquisition, Retention, Health),
+  filters, comparisons, CSV export, nightly summary tables.
+- **Phase 3:** game-specific crowd statistics, island heat-maps, funnels,
+  cohorts, visitor journeys, error detail, and raw events kept 90 days with
+  daily summaries kept for good.
 
 ### Needs a decision from the owner
 

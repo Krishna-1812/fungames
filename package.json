@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
+    "build": "astro build && node scripts/vercel-headers.mjs",
+    "preview": "node scripts/preview.mjs",
     "worker:dev": "wrangler dev worker/fusion-worker.js",
     "worker:deploy": "wrangler deploy",
     "test": "node scripts/check-all.mjs",
@@ -17,12 +17,18 @@
     "check": "npm test && npm run build && npm run bench:island"
   },
   "dependencies": {
+    "@astrojs/vercel": "^8.2.11",
+    "@neondatabase/serverless": "^1.2.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/leaflet": "^1.9.22",
     "@types/three": "^0.185.4",
     "astro": "^5.14.1",
     "leaflet": "^1.9.4",
     "sharp": "^0.34.5",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "web-vitals": "^6.2.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
   }
 }

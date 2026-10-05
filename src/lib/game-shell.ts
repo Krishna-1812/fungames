@@ -8,6 +8,7 @@ import { roll, confetti, PLAY } from './motion'
 import { isMuted, setMuted, unlock, sfx } from './audio'
 import { bestKey } from '../data/game-meta'
 import { recordVisit } from './passport'
+import { track } from './analytics/client'
 
 export type ShellOptions = {
   slug: string
@@ -75,6 +76,20 @@ export function createShell(opts: ShellOptions) {
   // A stamp in the island's passport: once a day, however often the page loads.
   recordVisit(opts.slug)
 
+  // Analytics: every game reports the same things through here (see
+  // lib/analytics/shape.ts for the list). The game starts at the first touch,
+  // click or key, and its ending says how long that took.
+  const slug = opts.slug
+  const sent = (n: Parameters<typeof track>[0], p: Parameters<typeof track>[1] = {}) => track(n, p, slug)
+  let startedAt = 0
+  const begin = () => {
+    if (startedAt) return
+    startedAt = performance.now()
+    sent('game_start', { after_ms: Math.round(startedAt) })
+  }
+  addEventListener('pointerdown', begin, { once: true, capture: true })
+  addEventListener('keydown', begin, { once: true, capture: true })
+
   let paused = false
   let best = readBest(opts.slug)
   let runStartBest = best
@@ -122,9 +137,10 @@ export function createShell(opts: ShellOptions) {
     roll(val('best'), text)
     // Beaten means beaten *the best this run started with* — improving on
     // something you set two minutes ago in the same game is not a record.
-    if (!runStartBest) return 'first'
+    if (!runStartBest) { sent('game_best', { kind: 'first', value, text }); return 'first' }
     if (value <= runStartBest.value) return false
     if (!beatenThisRun) {
+      sent('game_best', { kind: 'beaten', value, text })
       beatenThisRun = true
       tile('best').classList.add('is-best')
       newBestBadge.hidden = false
@@ -154,12 +170,14 @@ export function createShell(opts: ShellOptions) {
     void levelUpEl.offsetWidth
     levelUpEl.style.animation = ''
     announce(text + '.')
+    sent('game_level', { text })
     levelT = window.setTimeout(() => { levelUpEl.hidden = true }, PLAY ? 1450 : 900)
   }
 
   /* ---- endings ---------------------------------------------------- */
 
   function end(kind: 'win' | 'lose', e: Ending) {
+    sent('game_end', { kind, score: e.score, title: e.title, ms: startedAt ? Math.round(performance.now() - startedAt) : 0 })
     stage.classList.toggle('is-lost', kind === 'lose')
     $(result, '[data-result-kicker]').textContent = e.kicker ?? (kind === 'win' ? '✓ Finished' : 'Game over')
     $(result, '[data-result-title]').textContent = e.title
@@ -264,13 +282,14 @@ export function createShell(opts: ShellOptions) {
     const b = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null
     if (!b) return
     const act = b.dataset.act
-    if (act === 'pause') openPanel(pausePanel, b)
-    else if (act === 'howto') openPanel(howtoPanel, b)
-    else if (act === 'restart' || act === 'again') restart()
+    if (act === 'pause') { sent('game_pause'); openPanel(pausePanel, b) }
+    else if (act === 'howto') { sent('game_howto'); openPanel(howtoPanel, b) }
+    else if (act === 'restart' || act === 'again') { sent('game_restart', { from: act }); restart() }
     else if (act === 'sound') {
       unlock()
       setMuted(!isMuted())
       paintSound()
+      sent('sound', { on: !isMuted() })
       if (!isMuted()) sfx.click()
     }
   })

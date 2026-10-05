@@ -65,3 +65,9 @@ import { withBase } from '../lib/base'
   .btn:active { transform: translateY(0) rotate(0deg); box-shadow: 1px 2px 0 rgba(22, 21, 26, 0.18); }
   @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
 </style>
+
+<script>
+  import { start } from '../lib/analytics/client'
+  // A broken link is worth knowing about: this page reports itself as a 404.
+  start({ status: 404 })
+</script>

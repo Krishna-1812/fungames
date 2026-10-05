@@ -26,6 +26,7 @@
  */
 
 import { resultCardSvg, CARD, type ResultCard } from './result-card'
+import { track, pageGame } from './analytics/client'
 
 export type ShareOutcome = 'shared' | 'downloaded' | 'copied' | 'dismissed' | 'failed'
 
@@ -149,6 +150,7 @@ export function onShare(
     event.preventDefault()
     const btn = event.target
     shareResult(c, { ...meta(c), url: location.href }).then((outcome) => {
+      track('share', { outcome }, pageGame())
       // Saying what happened matters most where nothing visibly does: a
       // desktop download is silent apart from the browser's own shelf.
       if (!(btn instanceof HTMLElement)) return

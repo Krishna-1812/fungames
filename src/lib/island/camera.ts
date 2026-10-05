@@ -76,6 +76,8 @@ export function initIsland(o: {
   /** One link per building, for the keyboard and for anything reading the page. */
   links: Map<string, HTMLAnchorElement>
   onEnter?: (slug: string) => void
+  /** A building's card came up (hovered, tapped or focused). */
+  onCard?: (slug: string) => void
   /** Something that is not a building was poked (and which one of its kind, if they are counted: a bottle). */
   onPoke?: (kind: string, n?: number) => void
   /**
@@ -529,6 +531,7 @@ export function initIsland(o: {
     clearTimeout(hideT)
     hot = slug
     engine?.setHot(slug)
+    o.onCard?.(slug)
     pinHot(slug)
     card.querySelector('.isl-card-title')!.textContent = g.title
     card.querySelector('.isl-card-blurb')!.textContent = g.blurb

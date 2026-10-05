@@ -48,6 +48,8 @@ export function createPlay(o: {
   /** The district ink of today's game, for the parade's flag. */
   ink: () => string
   sound: () => Sounds | null
+  /** The flock went up (`all`: every one of them, as the bell does). */
+  onScare?: (all: boolean) => void
 }) {
   const ground = (i: number, j: number) => { const a = Math.floor(i), b = Math.floor(j); return a < 0 || b < 0 || a >= GRID || b >= GRID ? '0' : o.grid[a * GRID + b] }
   const ballCells = new Set(o.data.ball.cells.map(([i, j]) => `${i},${j}`))
@@ -178,6 +180,7 @@ export function createPlay(o: {
       any = true
     }
     if (!any) return
+    o.onScare?.(all)
     // One goes, they all go: a flock.
     for (const b of birds) if (!b.fly) {
       const [bx, by] = at(b.i, b.j)

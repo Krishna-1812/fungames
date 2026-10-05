@@ -1,0 +1,128 @@
+---
+/**
+ * /privacy/ — what the site counts, what it never does, and this browser's
+ * own record: its ID (if it has one), and buttons to change its mind or have
+ * everything held under that ID deleted. The rules themselves live in
+ * src/lib/analytics/shape.ts; this page says them in words.
+ */
+import Paper from '../layouts/Paper.astro'
+import { SITE } from '../site.config'
+---
+
+<Paper title={`Privacy — ${SITE.name}`} description="What this site counts about visits, what it never does, and how to switch it off.">
+  <main id="main" class="wrap pv">
+    <p class="label meta">Privacy</p>
+    <h1 class="pv-title">We count visits, not people.</h1>
+    <p class="pv-lead">
+      Every game here runs in your browser. To know which ones people enjoy, the site counts what happens on its pages:
+      that a game was started or finished, how long a page was looked at, roughly where in the world and on what kind of device.
+      It never asks who you are, and nothing is sold or shared with anyone.
+    </p>
+
+    <section class="pv-you" aria-labelledby="pv-you-h">
+      <h2 id="pv-you-h" class="pv-h">This browser</h2>
+      <p class="pv-state" id="pvState">Checking…</p>
+      <p class="pv-id" id="pvId" hidden>Its ID: <code id="pvIdVal"></code></p>
+      <div class="pv-acts">
+        <button type="button" class="pv-btn pv-yes" id="pvYes">Count my visits</button>
+        <button type="button" class="pv-btn" id="pvNo">Stop using an ID</button>
+        <button type="button" class="pv-btn pv-forget" id="pvForget">Forget me</button>
+      </div>
+      <p class="pv-said" id="pvSaid" role="status" aria-live="polite"></p>
+    </section>
+
+    <div class="pv-cols">
+      <section aria-labelledby="pv-what">
+        <h2 id="pv-what" class="pv-h">What is counted</h2>
+        <ul>
+          <li>Which pages are opened, for how long they are actually looked at, and how far down they are read.</li>
+          <li>What happens in a game: started, finished, won or lost, the score it reports, restarts, shares.</li>
+          <li>What happens on the island: which buildings are visited, what is poked, bottles found, postcards made, what the games list is searched for.</li>
+          <li>The site a visit came from (its address without anything after the path), and campaign tags on a link.</li>
+          <li>The country, region and city the request came from, read from the address and then forgotten.</li>
+          <li>The kind of device, its system and browser, the screen's size, language, timezone, and whether dark mode or reduced motion is on.</li>
+          <li>How fast pages load, and any script errors, so broken things get fixed.</li>
+        </ul>
+      </section>
+      <section aria-labelledby="pv-never">
+        <h2 id="pv-never" class="pv-h">What is never kept</h2>
+        <ul>
+          <li>Your IP address or your browser's full identifying string.</li>
+          <li>Anything you type or draw inside a game: your messages, your drawings, the words of your answers, or your birth date (Life in Weeks reports only an age decade).</li>
+          <li>Anything from other sites. There are no advertising or tracking cookies, and no fingerprinting.</li>
+          <li>Visits from browsers with Global Privacy Control switched on are counted without an ID.</li>
+        </ul>
+      </section>
+    </div>
+
+    <section aria-labelledby="pv-idh">
+      <h2 id="pv-idh" class="pv-h">The visitor ID</h2>
+      <p>
+        A random string kept in this browser's storage (not a cookie), so that a visitor who comes back on another day can be told apart from a new one.
+        It says nothing about you, and it is never linked to anything outside this site. In the EU, the EEA, the UK and Switzerland it is only made once you say yes;
+        elsewhere it is made on the first visit, and the buttons above take it away. Without it you are still counted, as an anonymous visit for that day only.
+      </p>
+      <p>
+        Records are kept in a database run for this site (Neon Postgres, through Vercel) for at most thirteen months, and are deleted after that.
+        Questions: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
+      </p>
+    </section>
+  </main>
+</Paper>
+
+<script>
+  import { held, setConsent, forgetMe } from '../lib/analytics/client'
+  const $ = (id: string) => document.getElementById(id)!
+  const say = (s: string) => { $('pvSaid').textContent = s }
+  function paint() {
+    const h = held()
+    const state = h.gpc
+      ? 'Global Privacy Control is on in this browser, so it is counted without an ID, whatever is chosen here.'
+      : h.consent === 'no' ? 'Counted without an ID: each visit is anonymous, and only for that day.'
+      : h.vid ? 'Counted with an ID, so a return visit is known to be the same browser.'
+      : 'No ID has been made in this browser.'
+    $('pvState').textContent = state
+    $('pvId').hidden = !h.vid
+    $('pvIdVal').textContent = h.vid ?? ''
+    ;($('pvYes') as HTMLButtonElement).disabled = h.gpc || (!!h.vid && h.consent !== 'no')
+    ;($('pvNo') as HTMLButtonElement).disabled = !h.vid
+  }
+  $('pvYes').addEventListener('click', () => { setConsent('yes'); paint(); say('Thank you. Visits from this browser are counted with an ID now.') })
+  $('pvNo').addEventListener('click', () => { setConsent('no'); paint(); say('Done. The ID is gone from this browser; visits are counted without one.') })
+  $('pvForget').addEventListener('click', async () => {
+    say('Deleting…')
+    const ok = await forgetMe()
+    paint()
+    say(ok ? 'Everything held under this browser’s ID has been deleted, and no new one will be made.' : 'The ID is gone from this browser, but the server could not be reached to delete its records. Try again in a moment.')
+  })
+  paint()
+</script>
+
+<style>
+  .pv { padding-block: clamp(96px, 12vw, 160px) var(--section); max-width: calc(860px + var(--gutter) * 2); }
+  .pv-title { font-size: var(--fs-h1); margin: 10px 0 18px; }
+  .pv-lead { font-size: var(--fs-lead); color: var(--ink2); max-width: var(--prose); margin: 0 0 var(--s5); }
+  .pv-h { font-size: var(--fs-h3); margin: 0 0 12px; }
+  .pv section { margin-bottom: var(--s5); }
+  .pv p, .pv li { max-width: var(--prose); line-height: 1.6; color: var(--ink2); }
+  .pv ul { padding-left: 1.1em; margin: 0; }
+  .pv li + li { margin-top: 8px; }
+  .pv a { color: var(--t-cobalt); }
+  .pv-cols { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .pv-you { background: var(--card); border-radius: var(--r-lg); padding: clamp(20px, 3vw, 32px); box-shadow: var(--shadow-block); }
+  .pv-state { margin: 0 0 8px; font-weight: 600; color: var(--ink) !important; }
+  .pv-id { margin: 0 0 16px; font-size: var(--fs-small); }
+  .pv-id code { font-size: 13px; background: var(--paper); padding: 2px 8px; border-radius: 8px; word-break: break-all; }
+  .pv-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .pv-btn {
+    font: 600 15px/1 var(--sans); min-height: 44px; padding: 0 18px; border-radius: var(--r-pill);
+    border: 1.5px solid var(--ink); background: var(--card); color: var(--ink); cursor: pointer;
+  }
+  .pv-btn:hover:not(:disabled) { background: var(--paper); }
+  .pv-btn:disabled { border-color: var(--paper3); color: var(--ink3); cursor: default; }
+  .pv-yes:not(:disabled) { background: var(--mint); border-color: var(--mint); }
+  .pv-yes:hover:not(:disabled) { background: #7ff0d6; }
+  .pv-forget { border-color: var(--t-red); color: var(--t-red); }
+  .pv-btn:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
+  .pv-said { min-height: 1.4em; margin: 12px 0 0; font-size: var(--fs-small); color: var(--t-teal) !important; }
+</style>

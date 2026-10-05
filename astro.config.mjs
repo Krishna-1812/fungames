@@ -1,4 +1,7 @@
-import { defineConfig } from 'astro/config'
+import { defineConfig, passthroughImageService } from 'astro/config'
+import vercel from '@astrojs/vercel'
+import { existsSync, readdirSync } from 'node:fs'
+import { sep } from 'node:path'
 
 /*
  * Where the site is served from, worked out from the host building it rather
@@ -28,9 +31,26 @@ export default defineConfig({
   // Trailing slashes match neal.fun's /game-name/ URL shape.
   trailingSlash: 'always',
   build: { format: 'directory' },
+  // Every page is still built ahead of time. Only the routes that say
+  // `prerender = false` (the analytics API, src/pages/api/) run on request,
+  // as Vercel functions.
   output: 'static',
+  // PGlite is the dev stand-in for the database (src/lib/analytics/db.ts):
+  // 18 MB of WebAssembly that production never loads. The adapter takes a
+  // list of files, not a pattern, so its files are listed.
+  adapter: vercel({ excludeFiles: devOnlyFiles('node_modules/@electric-sql') }),
+  // No page uses astro:assets, so the functions need no image service (sharp
+  // alone would add 20 MB to them). The share and OG images are made at build
+  // time, which is unaffected.
+  image: { service: passthroughImageService() },
   vite: { plugins: [islandFilesInDev()] },
 })
+
+/** Every file under a folder, as the adapter's excludeFiles wants them. */
+function devOnlyFiles(dir) {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => './' + `${e.parentPath ?? e.path}/${e.name}`.split(sep).join('/'))
+}
 
 /**
  * The homepage island's baked files are served by one catch-all endpoint

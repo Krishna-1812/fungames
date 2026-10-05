@@ -16,3 +16,6 @@ dist/
 
 # macOS
 .DS_Store
+
+# the Vercel adapter's build output
+.vercel/

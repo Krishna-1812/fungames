@@ -1302,6 +1302,65 @@ removing the rule that made the popover work in the first place.
 
 ---
 
+## Analytics
+
+The site counts its own visits, and its owner reads them at `/admin/`
+(never linked, never indexed, behind a password). Everything else on the
+site is static; only `src/pages/api/` runs on request, as Vercel functions
+(the `@astrojs/vercel` adapter, with every page still prerendered).
+
+| File | What it is |
+|---|---|
+| `src/lib/analytics/shape.ts` | what may be sent: every event by name, the limits on a batch, props cleaned flat and small, Life in Weeks' age coarsened to a decade; and what the server reads off a request (the device from the user agent, bots, referrers without their query, who must be asked before an ID is stored) |
+| `src/lib/analytics/client.ts` | the tracker in every page: batches (one a moment after load, then every 15 s while anything waits, the rest as the page hides), engaged time (visible, and touched in the last two minutes), scroll depth, Web Vitals, script errors, links out, the consent bar, and what the privacy page needs |
+| `src/lib/analytics/db.ts` | Neon Postgres in production, PGlite in dev and in the checker; the tables (`views`, `events`, `salts`), and the daily hash that counts visitors with no ID |
+| `src/lib/analytics/ingest.ts` | writing a batch, Forget me, and pruning (thirteen months; test runs after two days) |
+| `src/lib/analytics/report.ts` | every number the admin page shows, as SQL |
+| `src/lib/analytics/auth.ts` | the admin's session: an HMAC-signed, HttpOnly, SameSite=Strict cookie keyed by `ADMIN_PASSWORD` |
+| `src/pages/api/` | `collect`, `forget`, `health` and `admin/{login,logout,stats}` |
+| `src/pages/admin/`, `src/pages/privacy.astro` | the dashboard, and the page that says what is counted, with this browser's own switches |
+| `scripts/check-analytics.mjs` | the rules above, proved, with the real SQL run against a real Postgres |
+
+**What is counted.** Each page load (its path, where it came from, the
+country, region and city from Vercel's headers, the kind of device, screen,
+language, timezone, dark mode and reduced motion, and from the passport the
+browser already keeps, how long ago it first came and how many games it has
+seen); how long it is really looked at and how far down; every game's start,
+ending (won or lost, its score and time), result numbers, personal bests,
+levels, restarts, pauses, how-to opens, sound and shares, all through the
+game shell; on the island, dives into games, cards, pokes, bottles, the
+noticeboard, Surprise me, postcards, the passport, searches and filters, the
+ball, the pigeons, a summary of how the map was explored, and how smoothly it
+drew; Web Vitals, script errors, 404s and links out. Nothing typed into a
+game, no IP address, no user agent.
+
+**Visitors.** A random ID in the browser's storage makes a returning visitor
+the same visitor. In the EU, the EEA, the UK and Switzerland (the collection
+endpoint says which, from the request's country) it is made only after the
+consent bar is answered yes; elsewhere on the first visit. Declined, or with
+Global Privacy Control on, a visitor is counted by a daily hash of address
+and browser under a salt that is thrown away each day. `/privacy/` shows the
+browser's state and can take the ID back or have everything under it deleted.
+
+**Not counted:** the admin's own browser (signing in marks it), crawlers and
+headless browsers, and other sites posting to the endpoint. A test run can
+ask to be counted (`localStorage['funsite:analytics-test'] = '1'`); it is
+stored as test traffic, left out of every number unless `/admin/?test=1`, and
+deleted after two days.
+
+**Setting it up** is two steps in the Vercel project, both the owner's:
+Storage → Create Database → Neon (free) → connect it; and Settings →
+Environment Variables → `ADMIN_PASSWORD`. Then redeploy. `/api/health/` says
+whether each is there (yes or no, never the values). Tables make themselves
+on the first request.
+
+**Building with the adapter.** The static site is now in `dist/client`
+(`npm run preview` serves it, as `astro preview` has no Vercel mode), and
+the deployable output in `.vercel/output`. Vercel routes by that output's
+own table and ignores `vercel.json`'s headers, so `scripts/vercel-headers.mjs`
+copies them in after every build. PGlite is a dev dependency, kept out of the
+function by `astro.config.mjs`.
+
 ## Sound
 
 There is not a single audio file on this site. `lib/audio.ts` is a small

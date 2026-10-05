@@ -18,7 +18,7 @@
  *      a finger. Below 40 a second is a warning, not a failure, since how
  *      slow "slowed down" is depends on the machine this runs on.
  *
- *   node scripts/bench-island.mjs                serves dist/ (npm run build first)
+ *   node scripts/bench-island.mjs                serves the build (dist/client; npm run build first)
  *   node scripts/bench-island.mjs --url <url>    a running or deployed site instead
  *   node scripts/bench-island.mjs --cpu 4        slow the phone CPU down more
  *   node scripts/bench-island.mjs --strict       fail, rather than skip, without Chrome
@@ -178,7 +178,8 @@ if (!exe) {
 }
 let server = null, base = opt('--url')
 if (!base) {
-  const dist = join(root, 'dist')
+  // The Vercel adapter puts the static site in dist/client; a plain static build in dist.
+  const dist = existsSync(join(root, 'dist', 'client', 'index.html')) ? join(root, 'dist', 'client') : join(root, 'dist')
   if (!existsSync(join(dist, 'index.html'))) { console.log('  FAIL  no dist/index.html: run `npm run build` first, or pass --url'); process.exit(1) }
   server = await serve(dist)
   base = `http://127.0.0.1:${server.address().port}/`

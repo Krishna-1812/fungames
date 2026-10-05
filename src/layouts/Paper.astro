@@ -8,6 +8,7 @@ import '../styles/paper/tokens.css'
 import '../styles/paper/base.css'
 import '../styles/paper/motion.css'
 import '../styles/island-arrival.css'
+import '../styles/consent.css'
 
 /**
  * The Paper & Ink page. Every page in the new design system sits in this:
@@ -162,7 +163,10 @@ const favicon = faviconHref(true)
     {colophon && <Colophon />}
     <script>
       import { initMotion } from '../lib/motion'
+      import { start } from '../lib/analytics/client'
       initMotion()
+      // Visits, counted (lib/analytics/client.ts; what and how is on /privacy/).
+      start()
     </script>
   </body>
 </html>

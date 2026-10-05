@@ -372,7 +372,7 @@ const book = BOOK.map((key) => {
     <footer class="ft">
       <div class="gs-wrap ft-in">
         <p class="ft-name">{SITE.name}</p>
-        <p class="ft-line">{count} small games, real maths, nothing to sign up for. Everything runs in your browser.</p>
+        <p class="ft-line">{count} small games, real maths, nothing to sign up for. Everything runs in your browser; visits are counted anonymously (<a class="ft-privacy" href={withBase('/privacy/')}>privacy</a>).</p>
         {SITE.buyMeACoffee && (
           <a class="ft-coffee" href={`https://www.buymeacoffee.com/${SITE.buyMeACoffee}`} target="_blank" rel="noopener">
             <span class="ft-coffee-icon" aria-hidden="true" set:html={inkIcon('coffee')} />
@@ -398,6 +398,7 @@ const book = BOOK.map((key) => {
   import { readAll } from '../lib/stats'
   import { islandSound } from '../lib/island/sound'
   import { isMuted, setMuted, unlock } from '../lib/audio'
+  import { track, onLeave } from '../lib/analytics/client'
   import { readBottles, findBottle, wearCover, count, NOTES, COVERS, BOTTLE_COUNT, type Cover } from '../lib/bottles'
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
   import { createPlay, type PlayData } from '../lib/island/play'
@@ -517,6 +518,7 @@ const book = BOOK.map((key) => {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !noteEl.hidden) hideNote() })
   const onBottle = (n: number) => {
     const r = findBottle(n)
+    track('isl_bottle', { n, first: r.first, total: r.total })
     sound?.poke('bottle')
     if (r.first) {
       sound?.found(); sound?.unroll()
@@ -529,8 +531,9 @@ const book = BOOK.map((key) => {
 
   const onPoke = (kind: string, n?: number) => {
     if (kind === 'bottle') { if (n) onBottle(n); return }
-    if (kind === 'notice') { openBoard(); return }
+    if (kind === 'notice') { openBoard('map'); return }
     const first = !found.has(kind)
+    track('isl_poke', { kind, first })
     if (first) { found.add(kind); try { localStorage.setItem('isl-found', JSON.stringify([...found])) } catch {} showFound(); sound?.found() }
     sound?.poke(kind)
     const tally = `${kinds.filter((k) => found.has(k)).length} of ${kinds.length}`
@@ -540,12 +543,18 @@ const book = BOOK.map((key) => {
   }
 
   /* ---- what answers back: a ball, pigeons, the water, the parade (lib/island/play) ---- */
+  /* ---- analytics: what the island's visitors do (lib/analytics/shape.ts lists it all) ---- */
+  let diveFrom = 'map'
+  const carded = new Set<string>()
   const play = createPlay({
     data: data.play, grid: data.grid, play: PLAY,
     daily: () => dailyFor(new Date()).slug,
     ink: () => data.inks[data.anchors[dailyFor(new Date()).slug]?.district] ?? '#5b82ff',
     sound: () => sound,
+    // Once in a while is enough to know people do it.
+    onScare: (all) => { const now = Date.now(); if (now - scaredAt > 30_000) { scaredAt = now; track('isl_pigeons', { bell: all }) } },
   })
+  let scaredAt = 0
   const ask0 = new URLSearchParams(location.search)
   const fest = () => isFest(new Date()) || ask0.get('fest') === '1'
 
@@ -557,10 +566,54 @@ const book = BOOK.map((key) => {
     state: () => ({ time: box.dataset.time ?? 'day', season: box.dataset.season ?? '', hour: Number(box.dataset.hour ?? new Date().getHours()), fest: fest() }),
     bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games,
     links: new Map([...box.querySelectorAll<HTMLAnchorElement>('.isl-lm')].map((a) => [a.dataset.slug!, a])),
-    onPoke, onEnter: () => sound?.dive(),
-    grab: play.grab, pointer: play.pointer, grabbable: play.overBall,
+    onPoke, onEnter: (slug) => { sound?.dive(); track('isl_dive', { from: diveFrom }, slug); diveFrom = 'map' },
+    onCard: (slug) => { if (!carded.has(slug)) { carded.add(slug); track('isl_card', {}, slug) } },
+    grab: (x, y, z, touch) => {
+      const h = play.grab(x, y, z, touch)
+      return h && { move: h.move, up() { h.up(); track('isl_ball', { touch }) } }
+    }, pointer: play.pointer, grabbable: play.overBall,
   })
   isle.withEngine((e) => e.setLive(play.live))
+
+  // How the island was explored, summed up as the page is left: drags,
+  // wheel turns, the closest it was looked at, and which districts were in
+  // the middle of the screen at some point (sampled every two seconds).
+  {
+    const seen = new Set<string>()
+    let drags = 0, wheels = 0, closest = Infinity, looked = 0
+    const stageEl = document.getElementById('islStage')!
+    stageEl.addEventListener('pointerdown', () => { drags++ }, { passive: true })
+    stageEl.addEventListener('wheel', () => { wheels++ }, { passive: true })
+    let minied = 0
+    box.querySelector('.isl-mini svg')?.addEventListener('pointerdown', () => { if (Date.now() - minied > 20_000) { minied = Date.now(); track('isl_minimap') } })
+    setInterval(() => {
+      if (document.visibilityState !== 'visible' || !isle.awake()) return
+      const v = isle.view()
+      looked += 2
+      closest = Math.min(closest, v.w)
+      let best = '', bd = Infinity
+      for (const d of data.districts) { const dd = Math.hypot(d.x - v.x, d.y - v.y); if (dd < bd) { bd = dd; best = d.key } }
+      if (best && v.w < data.bounds[2] * 0.6) seen.add(best)
+    }, 2000)
+    onLeave(() => {
+      if (!looked) return
+      track('isl_session', { drags, wheels, secs: looked, closest_w: Number.isFinite(closest) ? Math.round(closest) : 0, districts: [...seen].sort().join(' '), n_districts: seen.size, cards: carded.size })
+    })
+    // How smoothly it draws on this device: five seconds of frames, once, a little after it has settled.
+    setTimeout(() => {
+      if (document.visibilityState !== 'visible' || !PLAY) return
+      let frames = 0, slow = 0, last = performance.now()
+      const t0 = last
+      const step = (now: number) => {
+        frames++
+        if (now - last > 50) slow++
+        last = now
+        if (now - t0 < 5000) requestAnimationFrame(step)
+        else track('isl_fps', { fps: Math.round((frames * 1000) / (now - t0)), slow, dpr: devicePixelRatio, w: innerWidth })
+      }
+      requestAnimationFrame(step)
+    }, 8000)
+  }
   // ?perf: the live things too, for scripts that test them.
   if (ask0.has('perf')) (window as unknown as { __play: unknown }).__play = play
   // The bottles found on earlier visits are not on the beaches any more.
@@ -603,6 +656,7 @@ const book = BOOK.map((key) => {
     const next = box.dataset.time === 'night' || box.dataset.time === 'dusk' ? 'day' : 'night'
     const clock = byClock(), clockDark = clock === 'night' || clock === 'dusk'
     try { if ((next === 'night') === clockDark) localStorage.removeItem('isl-time'); else localStorage.setItem('isl-time', next) } catch {}
+    track('isl_time', { mode: next })
     showTime()
   })
   showTime()
@@ -632,7 +686,7 @@ const book = BOOK.map((key) => {
     isle.flyToSlug(today.slug, 2.2)
     setTimeout(() => isle.showCard(today.slug, `Today: ${today.goal}`), PLAY ? 650 : 0)
   }
-  document.getElementById('btnToday')!.addEventListener('click', () => openBoard())
+  document.getElementById('btnToday')!.addEventListener('click', () => { track('isl_today'); openBoard('today') })
 
   /* ---- the noticeboard: what's on, by the clock (lib/island/timetable) ---- */
   // Opened from the board itself on the map, or the Today button. It says
@@ -667,7 +721,7 @@ const book = BOOK.map((key) => {
         li.className = 'isl-row'; li.dataset.key = r.key; li.style.setProperty('--tilt', `${((k * 7) % 5) - 2}deg`)
         li.innerHTML = '<span class="isl-row-pin" aria-hidden="true"></span><p class="isl-row-title"></p><p class="isl-row-line"></p><p class="isl-row-when"><i class="isl-row-dot" aria-hidden="true"></i><span></span></p>'
         const act = ACTIONS[r.key]
-        if (act) { const b = document.createElement('button'); b.type = 'button'; b.className = 'isl-row-go'; b.textContent = act[0]; b.addEventListener('click', act[1]); li.append(b) }
+        if (act) { const b = document.createElement('button'); b.type = 'button'; b.className = 'isl-row-go'; b.textContent = act[0]; b.addEventListener('click', () => { track('isl_board_go', { row: r.key }); act[1]() }); li.append(b) }
         return li
       }))
     }
@@ -680,7 +734,8 @@ const book = BOOK.map((key) => {
       const b = li.querySelector<HTMLButtonElement>('.isl-row-go'); if (b) b.setAttribute('aria-label', `${b.textContent}: ${r.title}`)
     }
   }
-  function openBoard() {
+  function openBoard(from: string) {
+    track('isl_board', { from })
     hideNote(); isle.hideCard()
     paintBoard(true)
     boardEl.hidden = false
@@ -731,6 +786,7 @@ const book = BOOK.map((key) => {
     const pool = fresh.length ? fresh : data.slugs.filter((x) => x !== lastPick)
     const s = pool[Math.floor(Math.random() * pool.length)]
     lastPick = s
+    track('isl_surprise', { fresh: fresh.length }, s)
     const line = fresh.length ? (fresh.length === 1 ? 'The last place on the island you have not been. In you go…' : 'Somewhere you have not been yet. In you go…') : 'You have been everywhere, so: an old favourite. In you go…'
     box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
     isle.hideCard()
@@ -738,7 +794,7 @@ const book = BOOK.map((key) => {
     box.classList.add('is-surprising')
     setTimeout(() => isle.flyToSlug(s, 2.4), PLAY ? 420 : 0)
     setTimeout(() => isle.showCard(s, line), PLAY ? 1250 : 0)
-    diveT = window.setTimeout(() => { diveT = 0; box.classList.remove('is-surprising'); isle.enter(s) }, PLAY ? 3100 : 1800)
+    diveT = window.setTimeout(() => { diveT = 0; box.classList.remove('is-surprising'); diveFrom = 'surprise'; isle.enter(s) }, PLAY ? 3100 : 1800)
   })
 
   /* ---- sound: off until asked for, and then the island is heard ------------ */
@@ -765,6 +821,7 @@ const book = BOOK.map((key) => {
   btnSound.addEventListener('click', () => {
     if (isMuted()) soundOn()
     else { setMuted(true); sound!.stop(); paintSound() }
+    track('sound', { on: !isMuted() })
     welcomeAway()
   })
 
@@ -790,8 +847,8 @@ const book = BOOK.map((key) => {
       // Sound already chosen in a game: nothing to ask.
       byId('welcomeSound').hidden = !isMuted()
       window.setTimeout(() => { welcome.hidden = false; requestAnimationFrame(() => welcome.classList.add('is-on')) }, PLAY ? 1400 : 0)
-      byId('welcomeSound').addEventListener('click', () => { soundOn(); welcomeAway() })
-      byId('welcomeX').addEventListener('click', welcomeAway)
+      byId('welcomeSound').addEventListener('click', () => { track('isl_welcome', { answer: 'sound' }); soundOn(); welcomeAway() })
+      byId('welcomeX').addEventListener('click', () => { track('isl_welcome', { answer: 'closed' }); welcomeAway() })
       // Once the map is being used, it has done its job: it goes a little later.
       box.addEventListener('pointerdown', (e) => { if (!welcomeT && !(e.target as Element).closest('.isl-welcome')) welcomeT = window.setTimeout(welcomeAway, 12000) }, true)
     }
@@ -939,6 +996,7 @@ const book = BOOK.map((key) => {
   })
   for (const c of ppCovers) c.addEventListener('click', () => {
     if (!wearCover(c.dataset.cover!)) return
+    track('isl_cover', { cover: c.dataset.cover! })
     sound?.stamp()
     renderBottles()
     if (PLAY) { ppBook.classList.remove('is-recovered'); void ppBook.offsetWidth; ppBook.classList.add('is-recovered') }
@@ -971,7 +1029,7 @@ const book = BOOK.map((key) => {
     landDelay = 0
     if (landing.length) { markSeen(landing.map((b) => b.dataset.slug!)); const left = newStamps(visits(), readPassport().seen).length; ppNewEl.textContent = `+${left}`; ppNewEl.hidden = left === 0 }
   }
-  for (const t of ppTabs) t.addEventListener('click', () => showSheet(t.dataset.tab!))
+  for (const t of ppTabs) t.addEventListener('click', () => { track('isl_passport', { tab: t.dataset.tab! }); showSheet(t.dataset.tab!) })
   // Arrow keys turn the pages, the way tabs should.
   pp.querySelector('[role="tablist"]')!.addEventListener('keydown', (e) => {
     const k = (e as KeyboardEvent).key
@@ -983,6 +1041,7 @@ const book = BOOK.map((key) => {
 
   function openPassport() {
     const fresh = renderPassport()
+    track('isl_passport', { tab: 'open', new_stamps: fresh.size })
     const firstNew = [...fresh][0]
     document.documentElement.classList.add('pp-open')
     isle.pause(true)
@@ -1075,6 +1134,7 @@ const book = BOOK.map((key) => {
         share.hidden = !(navigator.canShare?.({ files: [file] }))
         await img.decode().catch(() => null)
         pc.classList.remove('is-developing')
+        track('isl_postcard', { action: 'made', place, shape })
         ;(share.hidden ? save : share).focus()
       } catch (err) {
         console.error('[island] postcard', err)
@@ -1084,9 +1144,11 @@ const book = BOOK.map((key) => {
     btn.addEventListener('click', take)
     share.addEventListener('click', async () => {
       if (!file) return
+      track('isl_postcard', { action: 'share', place })
       try { await navigator.share({ files: [file], title: `Greetings from ${place}`, text: `Greetings from ${place}, on Tiny Island: ${location.origin}` }) }
       catch (e) { if ((e as Error).name !== 'AbortError') save.click() }
     })
+    save.addEventListener('click', () => track('isl_postcard', { action: 'save', place }))
     byId('pcDone').addEventListener('click', close)
     byId('pcClose').addEventListener('click', close)
     pc.addEventListener('click', (e) => { if (e.target === pc) close() })
@@ -1121,9 +1183,16 @@ const book = BOOK.map((key) => {
     // The island dims whatever the filter leaves out.
     isle.dim(filter === 'all' && !term ? null : keep)
   }
-  chips.forEach((c) => c.addEventListener('click', () => { filter = c.dataset.filter!; apply() }))
-  let t = 0
-  q.addEventListener('input', () => { clearTimeout(t); t = window.setTimeout(apply, 90) })
+  chips.forEach((c) => c.addEventListener('click', () => { filter = c.dataset.filter!; apply(); track('isl_filter', { filter }) }))
+  let t = 0, said = 0
+  q.addEventListener('input', () => {
+    clearTimeout(t); t = window.setTimeout(apply, 90)
+    // What people look for, once they have stopped typing: the words (cut short) and how many games matched.
+    clearTimeout(said); said = window.setTimeout(() => {
+      const term = q.value.trim().toLowerCase().slice(0, 40)
+      if (term.length >= 2) track('isl_search', { q: term, results: slots.filter((x) => !x.hidden).length })
+    }, 1200)
+  })
   if (filter !== 'all') apply()
   document.querySelectorAll<HTMLButtonElement>('[data-pin]').forEach((b) => b.addEventListener('click', () => {
     const s = b.dataset.pin!

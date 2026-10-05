@@ -1,9 +1,10 @@
 # Getting this running on a new machine
 
 This is a normal git repository, hosted on GitHub at
-<https://github.com/Krishna-1812/fungames>. There is no database, no cloud
-service tied to any one machine, and nothing to migrate by hand — cloning the
-repo is the whole handoff.
+<https://github.com/Krishna-1812/fungames>. Nothing is tied to any one
+machine and nothing needs migrating by hand: cloning the repo is the whole
+handoff. The one piece of state outside it, the analytics database, lives in
+the Vercel project (see below).
 
 ---
 
@@ -88,7 +89,14 @@ fungames/
 
 ## Nothing to migrate
 
-No database. No environment variables. No secrets. No accounts.
+The games need no database, no secrets and no accounts.
+
+The analytics (the admin page at `/admin/`) do, and both live in the Vercel
+project, not on any machine: a Neon Postgres database connected under
+Storage (it sets `DATABASE_URL`), and `ADMIN_PASSWORD` under Environment
+Variables. Locally, `npm run dev` runs the same endpoints against PGlite,
+an in-process Postgres kept in `node_modules/.cache/`, so nothing needs
+setting up; set `ADMIN_PASSWORD` in the shell that starts it to sign in.
 
 Player progress (Fusion discoveries, Steady Hand's best score, Spend It's
 basket, your birth date in Life in Weeks, the mute setting) lives in each
