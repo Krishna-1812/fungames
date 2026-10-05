@@ -11,7 +11,7 @@ import { parseBatch, isBot, mustAsk } from '../../lib/analytics/shape'
 import { getDb } from '../../lib/analytics/db'
 import { ingest, prune } from '../../lib/analytics/ingest'
 import { isAdmin } from '../../lib/analytics/auth'
-import { clientIp, geo, json, foreign, limited } from '../../lib/analytics/request'
+import { clientIp, geo, json, foreign, limited, siteHost } from '../../lib/analytics/request'
 
 export const prerender = false
 
@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   if (limited(ip, 1 + batch.events.length, 900, 600_000)) return json(answer, 429)
   try {
     const d = await getDb()
-    await ingest(d, batch, { ip, ua, host: new URL(request.url).host, ...g }, now)
+    await ingest(d, batch, { ip, ua, host: siteHost(request), ...g }, now)
     if (now.getTime() - pruned > 3600_000) { pruned = now.getTime(); await prune(d, now) }
   } catch (e) {
     // Analytics must never break the site: the page has already moved on.

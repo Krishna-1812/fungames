@@ -43,6 +43,11 @@ export default defineConfig({
   // alone would add 20 MB to them). The share and OG images are made at build
   // time, which is unaffected.
   image: { service: passthroughImageService() },
+  // Astro's own cross-site check compares Origin with the function's
+  // request.url, which behind Vercel is not the public address, so it
+  // refused the site's own requests. The API checks Origin itself, against
+  // the forwarded host (src/lib/analytics/request.ts).
+  security: { checkOrigin: false },
   vite: { plugins: [islandFilesInDev()] },
 })
 

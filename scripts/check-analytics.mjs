@@ -202,6 +202,18 @@ console.log('\nthe database')
   await pg.close()
 }
 
+console.log('\nwhere a request is from')
+{
+  const Q = await import('../src/lib/analytics/request.ts')
+  // Behind Vercel the function sees an internal URL; the forwarded host is the site's.
+  const req = (origin, extra = {}) => new Request('https://internal-abc123.vercel.app/api/collect/', { method: 'POST', headers: { 'x-forwarded-host': 'fungames-mu.vercel.app', 'x-forwarded-proto': 'https', ...(origin ? { origin } : {}), ...extra } })
+  check(!Q.foreign(req('https://fungames-mu.vercel.app')), 'the site’s own page is not foreign, though the function’s own URL names another host')
+  check(Q.foreign(req('https://evil.example')) && !Q.foreign(req(null)), 'another site is; a request with no Origin (a beacon, a server) is let through to the other checks')
+  check(Q.isHttps(req(null)) && !Q.isHttps(new Request('http://localhost:4321/x')), 'https is read from the forwarded protocol')
+  const g = Q.geo(req(null, { 'x-vercel-ip-country': 'IN', 'x-vercel-ip-city': 'S%C3%A3o%20Paulo', 'x-vercel-ip-latitude': '18.52043', 'x-vercel-ip-longitude': 'nope' }))
+  check(g.country === 'IN' && g.city === 'São Paulo' && g.lat === 18.5 && g.lon === null, 'Vercel’s location headers: decoded, rounded to a tenth of a degree, junk dropped')
+}
+
 console.log('\nthe admin’s session')
 {
   const s = await A.signSession('correct horse', NOW)

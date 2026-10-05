@@ -28,11 +28,19 @@ export function geo(req: Request) {
 export const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers } })
 
+/**
+ * The host the visitor asked for. Behind Vercel the function's own request.url
+ * can name an internal address, so the forwarded host is the one to trust.
+ */
+export const siteHost = (req: Request) => req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? new URL(req.url).host
+/** Whether the visitor's connection is https (for the cookie's Secure flag). */
+export const isHttps = (req: Request) => (req.headers.get('x-forwarded-proto') ?? new URL(req.url).protocol.replace(':', '')) === 'https'
+
 /** A request from another site, which a browser marks with its Origin. */
 export function foreign(req: Request): boolean {
   const o = req.headers.get('origin')
   if (!o) return false
-  try { return new URL(o).host !== new URL(req.url).host } catch { return true }
+  try { return new URL(o).host !== siteHost(req) } catch { return true }
 }
 
 /**
