@@ -259,6 +259,13 @@ import { withBase } from '../lib/base'
     phoneIntervalMin: 0, extraDistractionsPerDay: 0,
   }
 
+  const PICK_ROW: Record<keyof DayInputs, string> = {
+    workHours: 'Work / school, hours', homeHours: 'Home, hours', sleepHours: 'Sleep, hours',
+    morningMin: 'Morning routine, minutes', lunchMin: 'Lunch, minutes', dinnerMin: 'Dinner, minutes',
+    commuteMin: 'Commute one way, minutes', phoneIntervalMin: 'Phone checked every, minutes',
+    extraDistractionsPerDay: 'Other interruptions a day',
+  }
+
   const fmtH = (h: number) => `${h.toFixed(1)}h`
   const fmtMin = (m: number) => (m >= 60 ? `${(m / 60).toFixed(m % 60 ? 1 : 0)}h` : `${Math.round(m)}m`)
 
@@ -379,6 +386,12 @@ import { withBase } from '../lib/base'
       if (key === 'phoneIntervalMin') $('v-phone').textContent = state.phoneIntervalMin > 0 ? `every ${Math.round(state.phoneIntervalMin)}m` : 'off'
       if (key === 'extraDistractionsPerDay') $('v-extra').textContent = String(Math.round(state.extraDistractionsPerDay))
       render()
+    })
+    // The value let go of, once the slider has settled.
+    let settle = 0
+    input.addEventListener('change', () => {
+      clearTimeout(settle)
+      settle = window.setTimeout(() => shell.pick('Typical day, as set', Number(input.value), PICK_ROW[input.id as keyof DayInputs]), 1500)
     })
   })
 
@@ -507,11 +520,16 @@ import { withBase } from '../lib/base'
     }
   }
 
+  let reached = 1
   function checkSections() {
-    for (const id of PACING_SECTIONS) {
+    PACING_SECTIONS.forEach((id, i) => {
       const el = document.getElementById(id)
-      if (el && el.getBoundingClientRect().top < innerHeight * 0.9) activate(id)
-    }
+      if (el && el.getBoundingClientRect().top < innerHeight * 0.9) {
+        activate(id)
+        // Sections down the page: 1 is the basics, 5 the interruptions.
+        if (i + 2 > reached) shell.progress(reached = i + 2)
+      }
+    })
     const results = document.getElementById('sec-results')
     if (!recorded && results && results.getBoundingClientRect().top < innerHeight) {
       // Belt and suspenders: whatever might have kept an earlier section

@@ -217,6 +217,7 @@ import { SCENARIOS } from '../lib/powder-goals'
     const r = REACTIONS.find((x) => x.id === id)
     if (!r) return
     found.add(id)
+    shell.pick('Reaction discovered', describe(r))
     try { localStorage.setItem(SAVE, JSON.stringify([...found])) } catch { /* not worth breaking the sim over */ }
     announce(r)
     if (found.size === REACTIONS.length) {
@@ -364,6 +365,7 @@ import { SCENARIOS } from '../lib/powder-goals'
     bar.classList.add('won')
     setTimeout(() => bar.classList.remove('won'), 2400)
     if (wasNew) toastText('Solved — ' + active.name)
+    shell.pick('Scenario solved', active.name)
     // The card waits under the grid; the grid is what you are looking at.
     shell.win({
       scroll: false,
@@ -391,7 +393,7 @@ import { SCENARIOS } from '../lib/powder-goals'
     const b = (e.target as HTMLElement).closest('button[data-sc]') as HTMLElement | null
     if (!b) return
     const sc = SCENARIOS.find((s) => s.id === b.dataset.sc)
-    if (sc) loadScenario(sc)
+    if (sc) { shell.pick('Scenario opened', sc.name); loadScenario(sc) }
   })
   document.getElementById('scRetry')!.addEventListener('click', () => {
     if (active) loadScenario(active)
@@ -469,6 +471,8 @@ import { SCENARIOS } from '../lib/powder-goals'
     hintTimer = window.setTimeout(() => hintEl.classList.add('faded'), 2600)
   }
 
+  // For the crowd: which materials people reach for, once each per visit.
+  const tried = new Set<number>()
   DRAWABLE.forEach((d, n) => {
     const b = document.createElement('button')
     b.type = 'button'
@@ -484,6 +488,7 @@ import { SCENARIOS } from '../lib/powder-goals'
     b.append(sw, label)
     b.addEventListener('click', () => {
       unlock(); sfx.blip(n)
+      if (!tried.has(d.id)) { tried.add(d.id); shell.pick('Material chosen', d.name) }
       pick(d.id)
       b.classList.remove('picked')
       void b.offsetWidth // restart the animation even if it's already mid-way

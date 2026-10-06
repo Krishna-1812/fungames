@@ -42,6 +42,8 @@ export const EVENTS = {
   game_restart: 'a game was restarted',
   game_pause: 'the pause panel was opened',
   game_howto: 'the how-to-play panel was opened',
+  game_pick: 'a choice, discovery or step inside a game (the crowd statistics)',
+  game_quit: 'a page was left while a game was going: where it stopped',
   sound: 'sound was switched on or off',
   share: 'a result was shared, saved or copied',
   // the island
@@ -65,6 +67,7 @@ export const EVENTS = {
   isl_pigeons: 'the pigeons were put up',
   isl_session: 'how the island was explored, sent as the page closes',
   isl_fps: 'how smoothly the island drew on this device',
+  isl_tap: 'a tap or click on the island, where it landed on the map (the heat-map)',
 } as const
 
 export type EventName = keyof typeof EVENTS
@@ -138,6 +141,47 @@ export function gameResult(slug: string, last: Props): Props {
   }
   return p
 }
+
+/**
+ * The top three frames of an error's stack, as `function file:line:col`, from
+ * Chrome's shape (`at f (url:1:2)`) or Firefox's and Safari's (`f@url:1:2`).
+ * Only this site's own scripts are named (`host`); anything else, an
+ * extension's or another site's, is `(other)`.
+ */
+export function framesOf(stack: string, host: string): string[] {
+  const out: string[] = []
+  for (const raw of stack.split('\n')) {
+    const l = raw.trim()
+    const m = l.match(/^at (?:(.+?) \()?(.+?):(\d+):(\d+)\)?$/) ?? l.match(/^(.*?)@(.+?):(\d+):(\d+)$/)
+    if (!m) continue
+    const [, fn, url, ln, cl] = m
+    let own = false
+    try { own = new URL(url).host === host } catch { /* not a url: native code, eval */ }
+    const file = own ? url.split(/[?#]/)[0].split('/').pop() : '(other)'
+    out.push(`${(fn || '(anonymous)').slice(0, 40)} ${file}:${ln}:${cl}`.slice(0, LIMITS.str))
+    if (out.length === 3) break
+  }
+  return out
+}
+
+/**
+ * Games whose score is the player: Life in Weeks' score, best and title are
+ * the weeks they have lived and their share of ninety years. The shell's own
+ * events (an ending, a best, a level, a page left mid-game) carry them like
+ * any game's, so they are cut from every event about that game, here, on the
+ * server, whatever an old or altered page sends.
+ */
+const PERSONAL: Record<string, string[]> = { 'life-in-weeks': ['score', 'title', 'value', 'text', 'at'] }
+export function scrub(game: string | null, p: Props): Props {
+  const cut = game ? PERSONAL[game] : undefined
+  if (!cut) return p
+  const out = { ...p }
+  for (const k of cut) delete out[k]
+  return out
+}
+/** The same, as SQL, for rows stored before the rule (the nightly run applies it). */
+export const SCRUB_SQL = Object.entries(PERSONAL).map(([g, ks]) =>
+  `update events set props = props ${ks.map((k) => `- '${k}'`).join(' ')} where game = '${g}' and name <> 'game_result' and (${ks.map((k) => `props ? '${k}'`).join(' or ')})`)
 
 /* ---- the batch -------------------------------------------------------- */
 
@@ -246,7 +290,8 @@ export function parseBatch(body: string, now: number): Batch | null {
       const x = e as Record<string, unknown>
       if (!isEvent(x.n)) continue
       const t = typeof x.t === 'number' && x.t <= now && now - x.t < 864e5 ? Math.round(x.t) : now
-      events.push({ n: x.n, t, p: cleanProps(x.p), g: typeof x.g === 'string' && SLUG.test(x.g) ? x.g : null })
+      const g = typeof x.g === 'string' && SLUG.test(x.g) ? x.g : null
+      events.push({ n: x.n, t, p: x.n === 'game_result' && g ? gameResult(g, cleanProps(x.p)) : scrub(g, cleanProps(x.p)), g })
     }
   }
   let eng: Batch['eng'] = null

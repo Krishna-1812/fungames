@@ -147,6 +147,7 @@ import GameShell from '../layouts/GameShell.astro'
   let fast = false
   let bids = 0
   let finished = false
+  let bidsAtLot = 0
 
   const shell = createShell({
     slug: 'auction',
@@ -233,6 +234,8 @@ import GameShell from '../layouts/GameShell.astro'
     $('calls').textContent = ''
     say(`Lot ${idx + 1}. ${lot.title}. I have ${money(state.current)} to start.`, 'auctioneer')
     shell.levelUp(`Lot ${idx + 1}`)
+    shell.progress(idx + 1)
+    bidsAtLot = bids
     paintStrip()
     paintPrice(true)
     paintRoom()
@@ -319,6 +322,10 @@ import GameShell from '../layouts/GameShell.astro'
     const wasYours = state.sold && state.leader === 'you'
     const out = commit(state, everyone)
     outcomes.push(out)
+    // For the crowd: what people did on each lot, and how far over value the buyers went.
+    const lot = lots[idx]
+    shell.pick('What people did on each lot', wasYours ? 'Bought it' : bids > bidsAtLot ? 'Bid, then lost it' : 'Never bid', lot.title)
+    if (wasYours) shell.pick('Paid vs worth on each lot (%)', Math.round((withPremium(out.hammer) / lot.value - 1) * 100), lot.title)
     if (!out.sold) {
       say('Not sold. It did not reach the reserve.', 'auctioneer')
       sfx.bad()

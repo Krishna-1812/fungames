@@ -182,6 +182,7 @@ const total = PATTERNS.length
   let results: Result[] = []
   let idx = -1
   let resolved = false
+  let shownAt = 0
   let timers: number[] = []
   const clearTimers = () => { timers.forEach(clearInterval); timers = [] }
 
@@ -535,6 +536,8 @@ const total = PATTERNS.length
       slot.inert = true
       const p = PATTERNS[idx]
       results.push({ id: p.id, title: p.title, real: p.real, outcome, note })
+      shell.pick('Fell for each pattern', outcome === 'fell', p.title)
+      shell.pick('Seconds to decide, per pattern', Math.round((performance.now() - shownAt) / 1000), p.title)
       const good = outcome === 'dodged'
       verdict.className = 'dp-verdict ' + (good ? 'is-dodged' : 'is-fell')
       $('vSign').textContent = good ? '✓' : '✗'
@@ -588,6 +591,8 @@ const total = PATTERNS.length
       el.classList.add('is-loading')
     }
     MOUNTS[p.id](slot, api)
+    shell.progress(i + 1)
+    shownAt = performance.now()
     shell.announce(`Site ${i + 1}: ${p.site}. ${p.lede}`)
     paintStrip()
     paintTally()

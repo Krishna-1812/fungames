@@ -53,6 +53,15 @@ export async function ingest(d: Db, b: Batch, o: Origin, now = new Date()): Prom
      where pid = $1`,
     [b.pid, now, b.vid, Math.round(b.eng?.ms ?? 0), Math.round(b.eng?.scroll ?? 0), b.consent],
   )
+  // The ID's first and last visit. Every batch with an ID, since the ID often
+  // comes in the second (the first's answer is what says one may be made).
+  if (b.vid) {
+    await d.query(
+      `insert into visitors (vid, first, last, test) values ($1, $2, $2, $3)
+       on conflict (vid) do update set last = greatest(visitors.last, excluded.last)`,
+      [b.vid, now, b.test],
+    )
+  }
   if (b.events.length) {
     const vals: unknown[] = []
     const rows = b.events.map((e, i) => {
@@ -67,6 +76,7 @@ export async function ingest(d: Db, b: Batch, o: Origin, now = new Date()): Prom
 /** Everything held about one visitor ID, gone (the privacy page's Forget me). */
 export async function forget(d: Db, vid: string): Promise<number> {
   await d.query('delete from events where pid in (select pid from views where vid = $1)', [vid])
+  await d.query('delete from visitors where vid = $1', [vid])
   const gone = await d.query<{ pid: string }>('delete from views where vid = $1 returning pid', [vid])
   return gone.length
 }
@@ -76,8 +86,10 @@ export async function prune(d: Db, now = new Date()): Promise<void> {
   const cut = new Date(now.getTime() - 396 * 864e5)
   await d.query('delete from events where ts < $1', [cut])
   await d.query('delete from views where ts < $1', [cut])
+  await d.query('delete from visitors where last < $1', [cut])
   // Test runs are only worth keeping while they are being looked at.
   const testCut = new Date(now.getTime() - 2 * 864e5)
   await d.query('delete from events where pid in (select pid from views where test and ts < $1)', [testCut])
   await d.query('delete from views where test and ts < $1', [testCut])
+  await d.query('delete from visitors where test and last < $1', [testCut])
 }

@@ -213,10 +213,13 @@ import GameShell from '../layouts/GameShell.astro'
   const YEAR = DEFAULT
   const DAY = Math.max(0, RINGS.findIndex((u) => u.id === 'day'))
 
-  function markRead(i: number) {
+  function markRead(i: number, how: 'Clicked' | 'Held in focus') {
     if (i < 0 || seen.has(i)) return
     seen.add(i)
     rows[i].btn.classList.add('read')
+    if (seen.size === 1) { shell.pick('First channel read', RINGS[i].id); shell.pick('How the first was read', how) }
+    shell.pick('Channel read', RINGS[i].id)
+    shell.progress(seen.size)
     shell.setLevel(`${seen.size} / ${N}`)
     shell.considerBest(seen.size, `${seen.size} / ${N}`)
     if (seen.size === N && !ended) finish()
@@ -257,7 +260,7 @@ import GameShell from '../layouts/GameShell.astro'
     // Focus follows the keyboard as well, or the dial would be inert to it.
     row.btn.addEventListener('focus', () => { hovered = i; syncPressed() })
     row.btn.addEventListener('blur', () => { if (hovered === i) hovered = -1; syncPressed() })
-    row.btn.addEventListener('click', () => { pinned = pinned === i ? -1 : i; syncPressed(); markRead(i) })
+    row.btn.addEventListener('click', () => { pinned = pinned === i ? -1 : i; syncPressed(); markRead(i, 'Clicked') })
   })
 
   /* ------------------------------------------------------------------------
@@ -295,7 +298,7 @@ import GameShell from '../layouts/GameShell.astro'
   dialHost.addEventListener('pointerdown', (e) => {
     aim(e)
     // On a touchscreen there is no hover, so the tap has to do the pinning.
-    if (hovered >= 0) { pinned = pinned === hovered ? -1 : hovered; syncPressed(); markRead(hovered) }
+    if (hovered >= 0) { pinned = pinned === hovered ? -1 : hovered; syncPressed(); markRead(hovered, 'Clicked') }
   })
   dialHost.addEventListener('pointerleave', () => {
     hovered = -1
@@ -395,7 +398,7 @@ import GameShell from '../layouts/GameShell.astro'
     // Dwell: the same ring in focus, uninterrupted, for long enough to read.
     const f = focus()
     if (f !== dwellOn) { dwellOn = f; dwellFrom = +d }
-    else if (f >= 0 && !seen.has(f) && +d - dwellFrom >= DWELL_MS) markRead(f)
+    else if (f >= 0 && !seen.has(f) && +d - dwellFrom >= DWELL_MS) markRead(f, 'Held in focus')
 
     // The aperture and the plate read whichever ring is under the pointer.
     if (sv) {

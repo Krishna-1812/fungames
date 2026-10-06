@@ -292,6 +292,7 @@ import { ROUND_SIZE } from '../data/memory'
     void (brief as HTMLElement).offsetWidth
     brief.classList.add('is-turning')
     if (i === ROUND.length - 1) shell.levelUp('Last one.')
+    shell.progress(i + 1)
   }
 
   function doReveal() {
@@ -302,6 +303,9 @@ import { ROUND_SIZE } from '../data/memory'
     end()
     const s = likeness(refPoints(it.svg), strokes)
     scores[i] = s
+    // The score and the stroke count per thing; never the drawing itself.
+    shell.pick('Likeness for each thing (%)', s.score, it.reveal)
+    shell.pick('Strokes for each thing', strokes.length, it.reveal)
     // Rendered from the stroke list rather than grabbed off the pad, so the
     // gallery is sharp whatever size the pad happened to be.
     saved[i] = renderStrokes(strokes, 300).toDataURL('image/png')
@@ -356,6 +360,7 @@ import { ROUND_SIZE } from '../data/memory'
     el('comparison').hidden = !sideBySide
     padBox.hidden = sideBySide
     el('compareBtn').setAttribute('aria-pressed', String(sideBySide))
+    shell.pick('Comparison view chosen', sideBySide ? 'Side by side' : 'Overlay')
     el('compareBtn').firstElementChild!.textContent = sideBySide ? 'Overlay drawings' : 'Side by side'
   })
 
@@ -370,6 +375,7 @@ import { ROUND_SIZE } from '../data/memory'
     try {
       const blob = await memoryPostcard(snapshot, it.svg, it.prompt, s ? { score: s.score, verdict: verdictFor(s.score) } : undefined)
       download(blob, 'from-memory-postcard.png')
+      shell.pick('Postcard downloaded', it.reveal)
       if (i === roundIndex) el('exportStatus').textContent = 'Postcard ready. Check your downloads.'
     } catch {
       if (i === roundIndex) el('exportStatus').textContent = 'The postcard could not be created. Try again.'

@@ -304,6 +304,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   /* ---- helpful votes: local, in memory, gone on reload ------------------- */
 
   const pressed = new Set<string>()
+  const votedOnce = new Set<string>()
   const voteKey = (id: string, i: number) => `${id}:${i}`
 
   /* ---- the shell ----------------------------------------------------------- */
@@ -339,6 +340,8 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     if (seen.has(item.id)) return
     seen.add(item.id)
     paintStrip()
+    shell.pick('Product opened', item.name)
+    shell.progress(seen.size)
     if (ended || seen.size < ITEMS.length) return
     ended = true
     const all = ITEMS.reduce((n, i) => n + i.reviews.length, 0)
@@ -367,6 +370,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     sfx.tick()
     const mode = (e.currentTarget as HTMLSelectElement).value
     const order = sortOrder(mode)
+    shell.pick('Products sorted by', (e.currentTarget as HTMLSelectElement).selectedOptions[0].text)
     for (const li of tiles()) li.style.order = String(order.indexOf(li.dataset.id!))
   })
 
@@ -592,11 +596,15 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
       if (mode === sortMode) return
       sortMode = mode
       sfx.tick()
+      shell.pick('Reviews sorted by', sortBtn.textContent!)
       for (const b of product.querySelectorAll<HTMLButtonElement>('[data-sort]'))
         b.setAttribute('aria-pressed', String(b === sortBtn))
       renderReviews(BY_ID.get(currentId!)!)
       return
     }
+
+    const cross = t.closest<HTMLAnchorElement>('.er-crosslink')
+    if (cross) shell.pick('"Also regretted" link followed', BY_ID.get(cross.hash.slice(1))?.name ?? '?')
 
     const vote = t.closest<HTMLButtonElement>('.er-helpful')
     if (vote && currentId) {
@@ -609,6 +617,8 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
       vote.setAttribute('aria-pressed', String(on))
       paintStrip()
       vote.querySelector('.er-votes')!.textContent = nf.format(item.reviews[i].helpful + (on ? 1 : 0))
+      // Each review counted once per visit, however often it is toggled.
+      if (on && !votedOnce.has(key)) { votedOnce.add(key); shell.pick('Review marked helpful', item.reviews[i].title.slice(0, 60)) }
       if (on) {
         sfx.pop(i % 5)
         const r = vote.getBoundingClientRect()

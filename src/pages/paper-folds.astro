@@ -1689,6 +1689,7 @@ const SHEET_ICONS: Record<string, string> = {
   function reset() {
     ended = false
     n = 0; u = 0; imaginary = false; lastMark = null
+    furthest = 0; reported = false; past = false
     aiming = ''; overtook = null; overtookUntil = 0
     el('passedChip').classList.remove('show')
     yaw = 0
@@ -1702,7 +1703,9 @@ const SHEET_ICONS: Record<string, string> = {
     if (!b) return
     const s = sheetById(b.dataset.sheet!)
     if (!s || s === sheet) return
+    endRun()
     sheet = s
+    shell.pick('Sheet chosen', s.name)
     unlock(); sfx.click()
     reset()
   })
@@ -1710,7 +1713,9 @@ const SHEET_ICONS: Record<string, string> = {
   document.querySelector('.ways')!.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('.way') as HTMLElement | null
     if (!b || b.dataset.mode === mode) return
+    endRun()
     mode = b.dataset.mode as any
+    shell.pick('Way of folding', b.textContent!.trim())
     unlock(); sfx.click()
     reset()
   })
@@ -1720,6 +1725,7 @@ const SHEET_ICONS: Record<string, string> = {
     if (!imaginary && n >= limit()) {
       // The button stops pretending, and says so, before it carries on.
       imaginary = true
+      if (!past) { past = true; shell.pick('Folded on past the real limit', sheet.name) }
       unlock(); sfx.click()
       paint()
       return
@@ -1783,7 +1789,12 @@ const SHEET_ICONS: Record<string, string> = {
   }
 
   let ended = false
-  const shell = createShell({ slug: 'paper-folds', onRestart: () => { reset(); el('scene').scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' }) } })
+  // For the crowd: the furthest fold of this run, reported once when the run ends.
+  let furthest = 0, reported = false, past = false
+  function endRun() {
+    if (furthest && !reported) { reported = true; shell.pick('Furthest fold on each sheet', furthest, sheet.name) }
+  }
+  const shell = createShell({ slug: 'paper-folds', onRestart: () => { endRun(); reset(); el('scene').scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' }) } })
 
   function paintStrip() {
     const lim = limit()
@@ -1791,8 +1802,10 @@ const SHEET_ICONS: Record<string, string> = {
     shell.setLevel(`${n} / ${MAX_FOLDS}`)
     shell.setMoves(`${Math.min(n, lim)} / ${lim}`)
     if (n > 0) shell.considerBest(n, `Fold ${n}`)
+    if (n > furthest) shell.progress(furthest = n)
     if (n >= MAX_FOLDS && !ended) {
       ended = true
+      endRun()
       recordPlay('paper-folds', { folds: n, sheet: sheet.id, real: lim }, { folds: 'high' })
       shell.win({
         kicker: `Fold ${MAX_FOLDS} · ${sheet.name}`,

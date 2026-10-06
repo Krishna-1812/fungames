@@ -20,7 +20,7 @@
  * asks to be, which is stored as test traffic), or before the page is used.
  */
 import { readPassport } from '../passport'
-import { gameResult, type EventName, type Props } from './shape'
+import { gameResult, framesOf, scrub, type EventName, type Props } from './shape'
 
 const ENDPOINT = '/api/collect/'
 const K = { vid: 'funsite:vid', consent: 'funsite:consent', admin: 'funsite:admin', test: 'funsite:analytics-test' }
@@ -64,7 +64,8 @@ export const pageGame = () => location.pathname.match(/^\/([a-z][a-z0-9-]+)\/$/)
 /** Queue one event. Safe to call before `start()`, and from anywhere. */
 export function track(n: EventName, p: Props = {}, g: string | null = null) {
   if (state.started && !state.on) return
-  state.queue.push({ n, t: Date.now(), p, g })
+  // A game whose score is the player (Life in Weeks) never sends it at all.
+  state.queue.push({ n, t: Date.now(), p: n === 'game_result' ? p : scrub(g, p), g })
   if (state.on && state.queue.length >= 20) flush()
 }
 
@@ -199,6 +200,11 @@ export async function forgetMe(): Promise<boolean> {
 export const held = () => ({ vid: ls.get(K.vid), consent: ls.get(K.consent), gpc: gpc() })
 const gpc = () => (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true
 
+/* ---- errors ------------------------------------------------------------ */
+
+/** A script's file name, without its folder or query. */
+const fileOf = (src: string) => src.split(/[?#]/)[0].split('/').pop() ?? ''
+
 /* ---- start ------------------------------------------------------------- */
 
 function viewOf(status?: number) {
@@ -271,13 +277,18 @@ export function start(opts: { status?: number } = {}) {
     track('outbound', { host: a.hostname.replace(/^www\./, ''), path: a.pathname.slice(0, 60) })
   }, { capture: true })
 
-  // What broke, and where (the message and the file, never the page's contents).
-  const err = (msg: string, src: string, line: number, col: number, kind: string) => {
+  // What broke, and where (the message, the file and the top of the stack, never the page's contents).
+  const err = (msg: string, src: string, line: number, col: number, kind: string, x?: unknown) => {
     if (state.errors++ >= 5) return
-    track('error', { msg, src: src.split('/').pop()?.split('?')[0] ?? '', line, col, kind })
+    const p: Props = { msg, src: fileOf(src), line, col, kind }
+    if (x instanceof Error) {
+      p.type = x.name
+      framesOf(x.stack ?? '', location.host).forEach((f, i) => { p['st' + (i + 1)] = f })
+    }
+    track('error', p, pageGame())
   }
-  addEventListener('error', (e) => { if (e.message) err(e.message, e.filename ?? '', e.lineno ?? 0, e.colno ?? 0, 'error') })
-  addEventListener('unhandledrejection', (e) => err(String((e.reason as Error)?.message ?? e.reason ?? 'rejected'), '', 0, 0, 'promise'))
+  addEventListener('error', (e) => { if (e.message) err(e.message, e.filename ?? '', e.lineno ?? 0, e.colno ?? 0, 'error', e.error) })
+  addEventListener('unhandledrejection', (e) => err(String((e.reason as Error)?.message ?? e.reason ?? 'rejected'), '', 0, 0, 'promise', e.reason))
 
   // What a game reports at its ending (lib/stats.ts sends it this way, to stay free of this module).
   document.addEventListener('funsite:result', (e) => {

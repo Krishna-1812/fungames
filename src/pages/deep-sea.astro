@@ -240,6 +240,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
           const r = e.target.getBoundingClientRect()
           ring(r.left + r.width / 2, r.top + r.height / 2, 'rgba(255,255,255,0.5)', 20)
           e.target.classList.add('focused')
+          shell.pick('Creature reached', e.target.querySelector('h2')!.textContent!)
         }
       },
       { rootMargin: '-42% 0px -42% 0px' }
@@ -263,6 +264,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
 
   let ended = false
   let deepestZone = 0
+  let deepestHundred = 0
   const shell = createShell({
     slug: 'deep-sea',
     // Back to the surface, not a reload: nothing about the dive needs resetting
@@ -270,6 +272,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
     onRestart: () => {
       ended = false
       deepestZone = 0
+      deepestHundred = 0
       scrollTo({ top: dive.getBoundingClientRect().top + scrollY - 16, behavior: 'instant' })
     },
   })
@@ -356,7 +359,11 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
     if (zoneIdx > deepestZone) {
       deepestZone = zoneIdx
       shell.levelUp(zone.label)
+      shell.pick('Zone reached', zone.label)
     }
+    // Where people stop: the deepest 100 m passed, told only when it grows.
+    const hundred = Math.floor(metres / 100) * 100
+    if (hundred > deepestHundred) shell.progress(deepestHundred = hundred)
     clearTimeout(stripT)
     stripT = window.setTimeout(paintStrip, 180)
     if (!ended && metres >= TOTAL - 0.5) reachedBottom()

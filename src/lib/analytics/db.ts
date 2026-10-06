@@ -16,6 +16,10 @@
  *
  * and `salts`, one random value per day for the daily hash, dropped the day
  * after, so last week's hashes cannot be recomputed by anyone.
+ *
+ * Then `visitors` (each ID's first and last visit), the nightly summaries
+ * `daily_counts` and `daily_props` (./rollup.ts), which outlive the raw
+ * events' 90 days, and `meta`, which remembers when they last ran.
  */
 
 export type Db = { query<T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<T[]> }
@@ -91,6 +95,24 @@ export const SCHEMA = [
   `create index if not exists events_name_ts on events (name, ts)`,
   `create index if not exists events_pid on events (pid)`,
   `create table if not exists salts (day date primary key, salt text not null)`,
+  // Every visitor ID's first and last visit, kept past the raw rows, so the
+  // return-visit groups (by the week of a first visit) last.
+  `create table if not exists visitors (vid text primary key, first timestamptz not null, last timestamptz not null, test boolean not null default false)`,
+  `create index if not exists visitors_first on visitors (first)`,
+  // The nightly summaries (./rollup.ts), kept for good once raw events are
+  // 90 days old: every event counted per UTC day, game, country and device...
+  `create table if not exists daily_counts (
+    day date not null, name text not null, game text not null default '', country text not null default '', device text not null default '',
+    n integer not null, primary key (day, name, game, country, device)
+  )`,
+  // ...and the values worth keeping of a few events' props: the crowd's
+  // choices (game_pick), where games were left (game_quit), levels reached,
+  // the things poked on the island, how results were shared.
+  `create table if not exists daily_props (
+    day date not null, name text not null, game text not null default '', k text not null, of text not null default '', v text not null,
+    n integer not null, primary key (day, name, game, k, of, v)
+  )`,
+  `create table if not exists meta (k text primary key, v text not null, at timestamptz not null default now())`,
 ]
 
 /** The database, with its tables made if they are not there yet (once per process). */

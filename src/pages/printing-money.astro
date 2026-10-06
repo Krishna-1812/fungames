@@ -419,10 +419,16 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   const elapsedS = () => (performance.now() - t0) / 1000
 
   // A rate counts as read once most of it has been on screen.
+  // progress: the furthest rate read, counting down the page from 1.
   const read = new Set<Element>()
+  let furthest = 0
   if ('IntersectionObserver' in window) {
     const seen = new IntersectionObserver((entries) => {
-      for (const e of entries) if (e.isIntersecting) { read.add(e.target); seen.unobserve(e.target) }
+      for (const e of entries) if (e.isIntersecting) {
+        read.add(e.target); seen.unobserve(e.target)
+        const n = stages.findIndex((st) => st.el === e.target) + 1
+        if (n > furthest) shell.progress(furthest = n)
+      }
     }, { threshold: 0.5 })
     for (const st of stages) seen.observe(st.el)
   }
@@ -464,6 +470,8 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     const years = dollars / (wage * 2080)
     const yearsText = years >= 10 ? Math.round(years).toLocaleString('en-US') : years.toFixed(1)
     paintStrip()
+    shell.pick('Seconds to reach the end', Math.round(elapsed))
+    shell.pick('Entered own wage', currentWageRate != null)
     shell.considerBest(Math.round(elapsed), clock(elapsed))
     shell.win({
       celebrate: false,

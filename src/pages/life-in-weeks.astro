@@ -265,27 +265,35 @@ const WEEKS = 52
 
   el('ask').addEventListener('submit', (e) => {
     e.preventDefault()
-    if (el('dob').value) show(el('dob').value)
+    // Only how the grid came up, never the date.
+    if (el('dob').value) {
+      shell.pick('Grid shown from', changedVia ? 'A changed date' : 'A date typed in')
+      if (changedVia) shell.pick('Date changed with', changedVia)
+      changedVia = null
+      show(el('dob').value)
+    }
   })
 
-  function askAgain() {
+  let changedVia: string | null = null
+  function askAgain(via: string) {
+    changedVia = via
     shell.reset()
     el('result').hidden = true
     el('ask').hidden = false
     el('ask').scrollIntoView({ block: 'center' })
     el('dob').focus({ preventScroll: true })
   }
-  el('changeBtn').addEventListener('click', askAgain)
+  el('changeBtn').addEventListener('click', () => askAgain('The button under the grid'))
   // The result card's own button means the same thing here, and the shell
   // would otherwise reload the page — which brings the same date straight back.
   document.querySelector('[data-act="again"]').addEventListener('click', (e) => {
     e.stopPropagation()
-    askAgain()
+    askAgain('The result card')
   }, { capture: true })
 
   try {
     const saved = localStorage.getItem(KEY)
-    if (saved) { el('dob').value = saved; show(saved) }
+    if (saved) { el('dob').value = saved; shell.pick('Grid shown from', 'A saved date'); show(saved) }
   } catch {}
 </script>
 

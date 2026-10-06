@@ -572,7 +572,10 @@ const book = BOOK.map((key) => {
       const h = play.grab(x, y, z, touch)
       return h && { move: h.move, up() { h.up(); track('isl_ball', { touch }) } }
     }, pointer: play.pointer, grabbable: play.overBall,
+    // Where people tap, for the admin page's heat-map: rounded to ten map units, and at most eighty a visit.
+    onTap: (x, y, z, hit, what) => { if (taps++ < 80) track('isl_tap', { x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10, z: Math.round(z * 100) / 100, hit, what }) },
   })
+  let taps = 0
   isle.withEngine((e) => e.setLive(play.live))
 
   // How the island was explored, summed up as the page is left: drags,
@@ -581,6 +584,9 @@ const book = BOOK.map((key) => {
   {
     const seen = new Set<string>()
     let drags = 0, wheels = 0, closest = Infinity, looked = 0
+    // Where the middle of the screen was, every two seconds, on a 10 × 7 grid
+    // over the map (one base-36 digit a cell, up to 35): the heat-map of looking.
+    const LOOK_W = 10, LOOK_H = 7, look = new Array<number>(LOOK_W * LOOK_H).fill(0)
     const stageEl = document.getElementById('islStage')!
     stageEl.addEventListener('pointerdown', () => { drags++ }, { passive: true })
     stageEl.addEventListener('wheel', () => { wheels++ }, { passive: true })
@@ -591,13 +597,16 @@ const book = BOOK.map((key) => {
       const v = isle.view()
       looked += 2
       closest = Math.min(closest, v.w)
+      const [bx, by, bw, bh] = data.bounds
+      const cx = Math.floor(((v.x - bx) / bw) * LOOK_W), cy = Math.floor(((v.y - by) / bh) * LOOK_H)
+      if (cx >= 0 && cx < LOOK_W && cy >= 0 && cy < LOOK_H) look[cy * LOOK_W + cx] = Math.min(35, look[cy * LOOK_W + cx] + 1)
       let best = '', bd = Infinity
       for (const d of data.districts) { const dd = Math.hypot(d.x - v.x, d.y - v.y); if (dd < bd) { bd = dd; best = d.key } }
       if (best && v.w < data.bounds[2] * 0.6) seen.add(best)
     }, 2000)
     onLeave(() => {
       if (!looked) return
-      track('isl_session', { drags, wheels, secs: looked, closest_w: Number.isFinite(closest) ? Math.round(closest) : 0, districts: [...seen].sort().join(' '), n_districts: seen.size, cards: carded.size })
+      track('isl_session', { drags, wheels, secs: looked, closest_w: Number.isFinite(closest) ? Math.round(closest) : 0, districts: [...seen].sort().join(' '), n_districts: seen.size, cards: carded.size, look: look.map((c) => c.toString(36)).join(''), taps })
     })
     // How smoothly it draws on this device: five seconds of frames, once, a little after it has settled.
     setTimeout(() => {

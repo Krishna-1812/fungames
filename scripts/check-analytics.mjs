@@ -6,15 +6,21 @@
  *
  * - what may be sent: known events only, small flat props, nothing nested,
  *   timestamps kept honest, ids that are ids, a batch that fits;
- * - what a game reports: Life in Weeks' age coarsened to a decade;
+ * - what a game reports: Life in Weeks' age coarsened to a decade, and its
+ *   score (weeks lived) cut from every event, on the server too; an error's
+ *   stack kept to three frames, other sites' files unnamed;
  * - what the server reads off a request: devices, bots, referrers without
  *   their query strings, and who must be asked before an ID is stored;
  * - the source itself: every event the code sends is a known one, every
  *   known one is sent from somewhere, and no tracking call reads what a
- *   player typed;
+ *   player typed, and every game reports its crowd statistics;
  * - the database: a batch written, brought up to date, counted the way the
  *   admin page counts it; test traffic left out; Forget me forgets; old
  *   records go; the daily hash changes with the day;
+ * - phase 3: the crowd's choices, where runs stop and how far they get, the
+ *   island heat-maps, journeys, return visits, one error in detail, and the
+ *   nightly summaries (a day past 90 counted, then trimmed, idempotently,
+ *   and read back into every number a long range shows);
  * - the admin's session: signed, expiring, and useless once tampered with
  *   or once the password changes.
  *
@@ -71,6 +77,19 @@ console.log('\nwhat a game reports')
   check(!('weeks' in r) && r.age_decade === 30, 'Life in Weeks: weeks lived (an age to the week) becomes an age decade')
   const o = S.gameResult('orbit', { score: 3, sheet: 'a4' })
   check(o.score === 3 && o.sheet === 'a4', 'every other game’s numbers go as they are')
+  const lw = S.parseBatch(JSON.stringify({ v: 1, pid: id('a'), e: [
+    { n: 'game_end', t: NOW, p: { kind: 'win', score: '1,794', title: '38%', ms: 9 }, g: 'life-in-weeks' },
+    { n: 'game_quit', t: NOW, p: { score: '1,794', at: '1,794 weeks', ms: 9 }, g: 'life-in-weeks' },
+    { n: 'game_result', t: NOW, p: { weeks: 1794 }, g: 'life-in-weeks' },
+    { n: 'game_end', t: NOW, p: { kind: 'win', score: '12' }, g: 'orbit' }] }), NOW).events
+  check(!('score' in lw[0].p) && !('title' in lw[0].p) && lw[0].p.kind === 'win' && !('score' in lw[1].p) && !('at' in lw[1].p), 'Life in Weeks: the shell’s score and title (weeks lived) are cut on the server, from every event')
+  check(!('weeks' in lw[2].p) && lw[2].p.age_decade === 30 && lw[3].p.score === '12', 'its result is coarsened on the server too, whatever a page sends; other games keep their scores')
+  check(S.SCRUB_SQL.length === 1 && S.SCRUB_SQL[0].includes("- 'score'"), 'and rows stored before the rule are cleaned by the nightly run')
+  const chrome = 'TypeError: x is undefined\n    at draw (https://fungames-mu.vercel.app/_astro/orbit.Ab12.js?v=3:1:2345)\n    at https://fungames-mu.vercel.app/_astro/hoisted.js:4:5\n    at chrome-extension://abc/inject.js:9:9\n    at more (https://x.example/y.js:1:1)'
+  const ff = 'draw@https://fungames-mu.vercel.app/_astro/orbit.Ab12.js:1:2345\n@https://fungames-mu.vercel.app/_astro/hoisted.js:4:5'
+  const fc = S.framesOf(chrome, 'fungames-mu.vercel.app'), fx = S.framesOf(ff, 'fungames-mu.vercel.app')
+  check(fc.length === 3 && fc[0] === 'draw orbit.Ab12.js:1:2345' && fc[1] === '(anonymous) hoisted.js:4:5' && fc[2] === '(anonymous) (other):9:9', `an error’s stack: three frames, the site’s own files named, anything else (other) (got ${fc.join(' | ')})`)
+  check(fx[0] === 'draw orbit.Ab12.js:1:2345' && fx[1] === '(anonymous) hoisted.js:4:5', 'in Firefox’s and Safari’s shape too')
 }
 
 console.log('\nwhat the server reads off a request')
@@ -120,6 +139,20 @@ console.log('\nthe source')
   const unsent = Object.keys(S.EVENTS).filter((n) => !sent.has(n) && n !== 'game_result' && n !== 'consent' && n !== 'notfound' && n !== 'vital' && n !== 'error' && n !== 'outbound')
   check(!unsent.length, `every known event is sent from somewhere${unsent.length ? ' (not: ' + unsent.join(', ') + ')' : ''}`)
   check(!reads.length, `no tracking call reads what was typed into the page${reads.length ? ': ' + reads.join(' | ') : ''}`)
+  // A game's picks may read its own labels, but an input's value only where it is known to be safe.
+  const VALUE_OK = [
+    /Number\(input\.value\)/, // day-go: a slider, a number in its own fixed range
+    /msgInput\.value\.trim\(\) !== ''/, // share-this-page: whether a message was written, never what
+    /lot\.value/, // auction: what a lot is worth, the game's own data
+  ]
+  const pickReads = []
+  for (const f of files) for (const line of readFileSync(f, 'utf8').split('\n')) {
+    if (/\.pick\(/.test(line) && /\.value\b(?!\s*=[^=])/.test(line) && !VALUE_OK.some((re) => re.test(line))) pickReads.push(`${f}: ${line.trim().slice(0, 100)}`)
+  }
+  check(!pickReads.length, `no game's pick sends an input's value${pickReads.length ? ': ' + pickReads.join(' | ') : ''}`)
+  const picked = files.filter((f) => /pages[\\/][a-z-]+\.astro$/.test(f) && /createShell\(/.test(readFileSync(f, 'utf8')))
+  const silent = picked.filter((f) => !/shell\.(pick|progress)\(/.test(readFileSync(f, 'utf8')))
+  check(picked.length >= 32 && !silent.length, `every game (${picked.length}) reports its crowd statistics or where people get to${silent.length ? ' (not: ' + silent.join(', ') + ')' : ''}`)
   const client = readFileSync('src/lib/analytics/client.ts', 'utf8')
   check(/game_result', gameResult\(/.test(client), 'a game’s ending is coarsened (gameResult) before it leaves the browser')
   check(/globalPrivacyControl/.test(client) && /K\.consent/.test(client), 'the tracker reads Global Privacy Control and the stored answer')
@@ -219,6 +252,68 @@ console.log('\nthe database')
   const C = await import('../src/lib/analytics/csv.ts')
   check(C.csvCell('=HYPERLINK("x")') === '"\'=HYPERLINK(""x"")"' && C.csvCell('a,b') === '"a,b"' && C.csvCell(null) === '' && C.toCsv([{ a: 1, b: 'x' }]).includes('a,b\r\n1,x'), 'CSV: quoted, and a visitor\u2019s formula is defused before a spreadsheet can run it')
 
+  // Phase 3: the crowd, where runs stop, how far they get, the heat-maps, journeys, return visits, error detail.
+  const pick = (what, v, of) => ({ n: 'game_pick', t: NOW, p: of ? { what, v, of } : { what, v }, g: 'trolley' })
+  const tro = (pid, e, vid) => I.ingest(d, batch({ pid: id(pid), vid: vid ? id(vid) : undefined, c: vid ? 'yes' : 'no', view: { path: '/trolley/' }, e }), origin, t0)
+  await tro('A', [{ n: 'game_start', t: NOW }, pick('Choice on each dilemma', 'Pull the lever', 'The classic'), pick('Choice on each dilemma', 'Push them', 'The footbridge'), pick('City hit', 'Tokyo'), pick('Rock size (m)', 55),
+    { n: 'game_level', t: NOW, p: { text: 'Problem 2', i: 1 }, g: 'trolley' }, { n: 'game_level', t: NOW, p: { text: 'Problem 3', i: 2 }, g: 'trolley' }, { n: 'game_quit', t: NOW + 1, p: { at: 3, ms: 9000 }, g: 'trolley' }], 'k')
+  await tro('B', [{ n: 'game_start', t: NOW }, pick('Choice on each dilemma', 'Do nothing', 'The classic'), pick('City hit', 'Tokyo'), pick('City hit', 'Paris'), pick('Rock size (m)', 5500),
+    { n: 'game_level', t: NOW, p: { text: 'Problem 2', i: 1 }, g: 'trolley' }, { n: 'game_quit', t: NOW + 1, p: { at: 2, ms: 4000 }, g: 'trolley' }, { n: 'game_quit', t: NOW + 2, p: { at: 2, ms: 5000 }, g: 'trolley' }])
+  // A page that was left, came back and finished is not a page that stopped.
+  await tro('C', [{ n: 'game_start', t: NOW }, { n: 'game_quit', t: NOW + 1, p: { at: 1, ms: 100 }, g: 'trolley' }, { n: 'game_end', t: NOW + 2, p: { kind: 'win', score: '9', ms: 100 }, g: 'trolley' }])
+  const tg = await Rp.game(d, r, 'trolley')
+  const choice = tg.crowd.find((c) => c.what === 'Choice on each dilemma'), city = tg.crowd.find((c) => c.what === 'City hit'), rock = tg.crowd.find((c) => c.what === 'Rock size (m)')
+  check(choice?.kind === 'split' && choice.rows.find((x) => x.of === 'The classic')?.n === 2 && choice.rows.find((x) => x.of === 'The classic').values.length === 2, 'the crowd: a choice split by dilemma')
+  check(city?.kind === 'count' && city.values[0].k === 'Tokyo' && city.values[0].n === 2 && rock?.kind === 'number' && rock.count === undefined && rock.min === 55 && rock.max === 5500, 'a word counted, and a number spread out')
+  check(tg.stops.total === 2 && tg.stops.numeric && tg.stops.list.map((x) => x.k).join() === '2,3', `where runs stop: the last word of each page that left a run going, in order (got ${JSON.stringify(tg.stops.list)})`)
+  check(tg.reach.length === 2 && tg.reach[0].n === 2 && tg.reach[1].n === 1 && tg.reach[1].text === 'Problem 3', 'how far runs get: two reached the first level-up, one the second')
+  await I.ingest(d, batch({ pid: id('I'), view: { path: '/' }, e: [
+    { n: 'isl_tap', t: NOW, p: { x: 1010, y: 2020, z: 1.2, hit: 'game', what: 'orbit' } }, { n: 'isl_tap', t: NOW, p: { x: 1010, y: 2020, z: 1.2, hit: 'game', what: 'orbit' } },
+    { n: 'isl_card', t: NOW, g: 'orbit' }, { n: 'isl_dive', t: NOW, g: 'orbit', p: { from: 'map' } },
+    { n: 'isl_session', t: NOW, p: { secs: 10, look: '0'.repeat(30) + 'z' + '1'.repeat(39) } }, { n: 'isl_session', t: NOW + 5, p: { secs: 12, look: '0'.repeat(30) + 'z' + '2'.repeat(39) } }] }), { ...origin, ip: '192.0.2.44' }, t0)
+  await I.ingest(d, batch({ pid: id('J'), view: { path: '/orbit/', ref: 'https://fungames.vercel.app/' }, e: [{ n: 'game_start', t: NOW + 3000, g: 'orbit' }, { n: 'game_end', t: NOW + 9000, p: { kind: 'win', ms: 6000 }, g: 'orbit' }] }), { ...origin, ip: '192.0.2.44' }, new Date(NOW + 3000))
+  const isl = await Rp.island(d, r)
+  check(isl.heat.taps.length === 1 && isl.heat.taps[0].n === 2 && isl.heat.taps[0].x === 1000 && isl.heat.look[30] === 35 && isl.heat.look[31] === 2, 'the heat-maps: taps gathered on the map, and where the screen rested (each visit’s last summary only)')
+  const j = await Rp.journeys(d, r)
+  check(j.island[0] >= 1 && j.island[3] === 1 && j.island[4] === 1 && j.island[5] === 1 && j.games[1] >= 1, `journeys: the island’s funnel, step by step (got ${j.island.join(',')})`)
+  check(j.top.some((t) => t.k === '/ /orbit/') && j.flow.links.some((l) => l.s === 0 && l.a === '/' && l.b === '/orbit/') && j.lengths.length >= 2, 'the commonest visits, and the flow from page to page')
+  // Return visits: k first came three weeks before, and today.
+  await d.query("update visitors set first = first - interval '21 days' where vid = $1", [id('k')])
+  await d.query("insert into views (pid, ts, vid, dh, path) values ($1, now() - interval '1 day', $2, 'x', '/')", [id('o'), id('k')])
+  const ret = await Rp.retention(d, { ...r, to: new Date() })
+  check(ret.cohorts.weeks.length >= 1 && ret.cohorts.weeks.every((w) => w.size >= 1) && ret.returns.length === 3, 'return-visit groups by the week of a first visit, and the next-day, week and month return rates')
+  check((await d.query('select count(*)::int as n from visitors'))[0].n >= 2, 'every visitor ID’s first visit is kept apart from its page views')
+  await I.ingest(d, batch({ pid: id('E'), view: { path: '/orbit/' }, e: [{ n: 'error', t: NOW, g: 'orbit', p: { msg: 'boom', src: 'orbit.js', line: 9, col: 2, kind: 'error', type: 'TypeError', st1: 'draw orbit.js:9:2', st2: 'tick orbit.js:1:1' } }] }), origin, t0)
+  const hl = await Rp.health(d, r)
+  const boom = hl.errors.find((e) => e.msg === 'boom')
+  const ed = boom && await Rp.errorDetail(d, r, boom.key)
+  check(boom && /^[0-9a-f]{12}$/.test(boom.key) && ed.n === 1 && ed.stacks[0].k === 'draw orbit.js:9:2\ntick orbit.js:1:1' && ed.series.reduce((a, s) => a + s.n, 0) === 1 && ed.type === 'TypeError', 'one error in detail: its stack, its trend, where and on what')
+  check(hl.storage.tables.find((t) => t.t === 'events')?.rows > 0 && hl.storage.rawDays === 90, 'what the database holds, table by table')
+
+  // The nightly summaries: a day past 90 is counted, then its raw events go; counting again changes nothing.
+  const R0 = await import('../src/lib/analytics/rollup.ts')
+  const longAgo = new Date(NOW - 100 * 864e5)
+  await d.query("insert into views (pid, ts, dh, path, game, country, device) values ($1, $2, 'y', '/trolley/', 'trolley', 'IN', 'phone')", [id('L'), longAgo])
+  for (const [k, [name, props]] of [['game_end', { kind: 'win', score: '1,794', title: '38%' }], ['game_start', {}], ['game_end', { kind: 'win' }], ['game_pick', { what: 'Choice on each dilemma', v: 'Push them', of: 'The footbridge' }], ['game_quit', { at: 7 }]].entries()) {
+    await d.query('insert into events (pid, ts, name, game, props) values ($1, $2, $3, $4, $5::jsonb)', [id('L'), new Date(longAgo.getTime() + k * 1000), name, name === 'game_end' && props.score ? 'life-in-weeks' : 'trolley', JSON.stringify(props)])
+  }
+  const run1 = await R0.nightly(d, new Date(NOW))
+  check(run1.rolled.includes(R0.isoDay(longAgo)) && run1.trimmed === 5, `a night’s run counts every finished day, then lets raw events past 90 days go (rolled ${run1.rolled.length} days, trimmed ${run1.trimmed})`)
+  check((await d.query("select count(*)::int as n from events where props ? 'score' and game = 'life-in-weeks'"))[0].n === 0, 'and cleans what a game should never have sent about its player')
+  const dc = await d.query("select name, n from daily_counts where day = $1 and game = 'trolley' order by name", [R0.isoDay(longAgo)])
+  check(dc.find((x) => x.name === 'game_start')?.n === 1 && dc.find((x) => x.name === 'game_win')?.n === 1, 'the summary holds the day’s starts and wins')
+  const before = JSON.stringify(await d.query('select * from daily_counts order by 1, 2, 3, 4, 5'))
+  const run2 = await R0.nightly(d, new Date(NOW))
+  check(JSON.stringify(await d.query('select * from daily_counts order by 1, 2, 3, 4, 5')) === before && run2.trimmed === 0, 'counting again changes nothing, and a trimmed day’s summary is never emptied')
+  const wide = { ...r, from: new Date(NOW - 120 * 864e5), bucket: 'week' }
+  const kw = await Rp.kpis(d, wide)
+  const tw = await Rp.game(d, wide, 'trolley')
+  check(kw.starts >= 1 + o.kpis.starts && tw.kinds.win >= 1 && tw.crowd.find((c) => c.what === 'Choice on each dilemma')?.rows.some((x) => x.of === 'The footbridge' && x.n === 2), 'a range reaching past 90 days adds the summaries to the raw rows: starts, wins, the crowd')
+  check(tw.stops.list.some((x) => x.k === '7'), 'and where runs stopped, long ago')
+  const sw = await Rp.series(d, wide)
+  check(sw.reduce((a, s) => a + s.starts, 0) === kw.starts, 'the traffic chart’s starts add up to the headline, summaries included')
+  check(!(await R0.due(d, new Date(NOW))) && await R0.due(d, new Date(NOW + 27 * 3600e3)), 'it is due again after a day')
+
   // The daily hash: the same address and browser are one visitor today, and someone else tomorrow.
   const h1 = await DB.dailyHash(d, '1.2.3.4', 'ua', new Date(NOW))
   const h2 = await DB.dailyHash(d, '1.2.3.4', 'ua', new Date(NOW + 3600_000))
@@ -227,18 +322,20 @@ console.log('\nthe database')
   check((await d.query('select count(*)::int as n from salts'))[0].n === 1, 'and yesterday’s salt is gone, so yesterday’s hashes cannot be made again')
 
   // Forget me.
+  const viewsBefore = (await d.query('select count(*)::int as n from views'))[0].n
   const gone = await I.forget(d, id('v'))
   check(gone === 1 && (await d.query('select count(*)::int as n from events where pid = $1', [id('p')]))[0].n === 0, 'Forget me deletes the visitor’s views and every event in them')
-  check((await d.query('select count(*)::int as n from views'))[0].n === 5, 'and nobody else’s')
+  check((await d.query('select count(*)::int as n from views'))[0].n === viewsBefore - 1 && (await d.query('select count(*)::int as n from visitors where vid = $1', [id('v')]))[0].n === 0, 'and nobody else’s, and its first visit is forgotten too')
 
   // Thirteen months.
   await d.query("update views set ts = now() - interval '400 days' where pid = $1", [id('x')])
   await d.query("update events set ts = now() - interval '400 days' where pid = $1", [id('x')])
   await I.prune(d, new Date())
   check((await d.query('select count(*)::int as n from views where pid = $1', [id('x')]))[0].n === 0, 'records older than thirteen months are deleted')
+  const left = (await d.query('select count(*)::int as n from views'))[0].n
   await d.query("update views set ts = now() - interval '3 days' where pid = $1", [id('t')])
   await I.prune(d, new Date())
-  check((await d.query('select count(*)::int as n from views where pid = $1', [id('t')]))[0].n === 0 && (await d.query('select count(*)::int as n from views'))[0].n === 3, 'a test run older than two days is deleted, and nothing else is')
+  check((await d.query('select count(*)::int as n from views where pid = $1', [id('t')]))[0].n === 0 && (await d.query('select count(*)::int as n from views'))[0].n === left - 1, 'a test run older than two days is deleted, and nothing else is')
   await pg.close()
 }
 

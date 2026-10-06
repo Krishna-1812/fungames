@@ -354,6 +354,8 @@ const ROUND = TIERS.length
     const score = withPeeks(trace.score, peeks)
     current = { id, trace, peeks, score }
     results.push(current)
+    shell.pick('Accuracy, per figure', score, figureName(id))
+    shell.pick('Peeked, per figure', peeks > 0, figureName(id))
     phase = 'checked'
     peeking = false
 
@@ -834,7 +836,9 @@ const ROUND = TIERS.length
   }
   root.querySelector('.cd-modes')!.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-mode-btn]')
-    if (b) setMode(b.dataset.modeBtn as 'round' | 'free')
+    if (!b) return
+    if (b.dataset.modeBtn !== mode) shell.pick('Mode switched to', b.textContent!.trim())
+    setMode(b.dataset.modeBtn as 'round' | 'free')
   })
 
   /* ---- the free sky ---------------------------------------------------------- */
@@ -889,6 +893,8 @@ const ROUND = TIERS.length
         resultsEl.hidden = true
         searchInput.value = ''
         showConstellation(s.con)
+        // The catalogue's star, never what was typed to find it.
+        shell.pick('Star looked up', starLabel(s))
         hint.textContent = `${starLabel(s)}, magnitude ${s.mag.toFixed(2)}.`
       })
       li.append(b)
@@ -915,6 +921,7 @@ const ROUND = TIERS.length
   saveDialog.addEventListener('click', (e) => { if (e.target === saveDialog) saveDialog.close() })
   $('saveConfirm').addEventListener('click', async () => {
     const strokes: Stroke[] = freePad.chains.map((starIds) => ({ starIds }))
+    shell.pick('Lines in a shared drawing', lineCount(freePad))
     const url = new URL(location.href)
     url.searchParams.set('c', encodeStrokes(strokes))
     url.searchParams.set('n', nameInput.value.trim() || 'Untitled')

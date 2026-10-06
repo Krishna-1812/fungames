@@ -19,7 +19,11 @@ const { PGlite } = await import('@electric-sql/pglite')
 const pg = new PGlite('./node_modules/.cache/funsite-pglite')
 DB.useDb({ query: async (t, p = []) => (await pg.query(t, p)).rows })
 const d = await DB.getDb()
-await d.query('delete from events'); await d.query('delete from views')
+for (const t of ['events', 'views', 'visitors', 'daily_counts', 'daily_props', 'meta']) await d.query('delete from ' + t)
+// The island itself, for taps and looks that land where the buildings are.
+const W = await import('../src/lib/island/world.ts'), Ra = await import('../src/lib/island/raster.ts'), G = await import('../src/data/games.ts')
+const ISLE = W.buildIsland(G.listedGames().map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: `/${g.slug}/` })), { raster: Ra.resvgRaster })
+const [BX, BY, BW, BH] = ISLE.viewBox
 
 let seed = 7
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -62,6 +66,24 @@ const RESULT = {
 const REFS = [[undefined, 50], ['https://www.google.com/search?q=fun+games', 18], ['https://www.reddit.com/r/InternetIsBeautiful/comments/abc', 9], ['https://t.co/xyz', 5], ['https://news.ycombinator.com/item?id=1', 4], ['https://www.facebook.com/', 3], ['https://duckduckgo.com/', 3], ['https://neal.fun/', 2]]
 const POKES = ['whale', 'sheep', 'windmill', 'balloon', 'crab', 'fountain', 'kite', 'gull', 'castaway', 'treasure', 'house32', 'ufo']
 const SEARCH = ['space', 'orbit', 'asteroid', 'money', 'trolley', 'robot', 'password game', 'wordle', 'draw', 'ocean', 'infinite craft', 'time']
+// What each game's crowd chose (game_pick): a few games in detail, as their pages send them.
+const DILEMMAS = [['The classic', [['Pull the lever', 8], ['Do nothing', 2]]], ['The footbridge', [['Push them', 2], ['Do nothing', 8]]], ['The loop', [['Pull the lever', 6], ['Do nothing', 4]]], ['Five old, one young', [['Pull the lever', 4], ['Do nothing', 6]]], ['Your own child', [['Pull the lever', 1], ['Do nothing', 9]]], ['The surgeon', [['Harvest the organs', 1], ['Do nothing', 9]]], ['The self-driving car', [['Swerve', 5], ['Stay the course', 3], ['Override it', 2]]], ['The villain on the track', [['Pull the lever', 7], ['Do nothing', 3]]]]
+const PICKS = {
+  trolley: () => DILEMMAS.slice(0, 2 + Math.floor(rnd() * 7)).map(([of, opts]) => ['Choice on each dilemma', wpick(opts), of]),
+  asteroid: () => [['City hit', wpick([['Mumbai, India', 6], ['New York, USA', 5], ['Chelyabinsk, Russia', 3], ['London, UK', 3], ['Tokyo, Japan', 3], ['Open ocean', 2], ['A spot clicked on land', 4]])], ['Rock size (m)', +(10 ** (1 + rnd() * 3.2)).toPrecision(2)], ['Material', wpick([['Stone', 5], ['Iron', 4], ['Comet ice', 2]])], ['Speed (km/s)', Math.round(11 + rnd() * 60)], ['Entry angle (°)', Math.round(15 + rnd() * 75)]],
+  fusion: () => Array.from({ length: Math.floor(rnd() * 6) }, () => ['Element discovered', pick(['Steam', 'Mud', 'Lava', 'Stone', 'Plant', 'Life', 'Cloud', 'Rain', 'Glass', 'Brick', 'Human', 'Volcano'])]),
+  'steady-hand': () => ['Line', 'Circle', 'Square', 'Spiral'].map((sh) => ['Score kept, per shape', Math.round({ Line: 82, Circle: 70, Square: 64, Spiral: 48 }[sh] + (rnd() - 0.5) * 40), sh]),
+  'dark-patterns': () => ['Confirmshaming', 'Roach motel', 'Hidden costs', 'Sneak into basket', 'Forced continuity', 'Disguised ads'].map((p, i) => ['Fell for each pattern', rnd() < [0.2, 0.5, 0.35, 0.6, 0.45, 0.3][i], p]),
+  'rule-cascade': () => Array.from({ length: 3 + Math.floor(rnd() * 12) }, (_, i) => ['Seconds to clear each rule', Math.round(5 + rnd() * (10 + i * 8)), 'Rule ' + (i + 1)]),
+  'deep-sea': () => ['Sperm whale', 'Giant squid', 'Anglerfish', 'Gulper eel', 'Dumbo octopus'].slice(0, 1 + Math.floor(rnd() * 5)).map((c) => ['Creature reached', c]),
+  'ambient-mix': () => [['Preset picked', wpick([['Thunderstorm', 5], ['3am office', 3], ['Cafe', 4], ['Night train', 2]])], ['Layer brought in', pick(['Rain', 'Dial-up modem', 'Fireplace', 'Birds', 'Keyboard'])]],
+  auction: () => ['A Banksy print', 'A signed guitar', 'Moon rock', 'A vintage Rolex', 'The first tweet'].map((lot) => ['What people did on each lot', wpick([['Bought it', 3], ['Bid, then lost it', 4], ['Never bid', 3]]), lot]),
+  orbit: () => [['Challenge completed', pick(['A stable orbit', 'A moon', 'A slingshot', 'A binary star', 'A figure eight'])], ['Launch size picked', wpick([['Moon', 4], ['Planet', 5], ['Star', 1]])]],
+}
+// Where runs stop, when they stop: a number for the games that count their way through.
+const STOP = { 'rule-cascade': () => 1 + Math.floor(rnd() * rnd() * 25), trolley: () => 1 + Math.floor(rnd() * 8), 'not-a-robot': () => 1 + Math.floor(rnd() * rnd() * 12), 'deep-sea': () => Math.floor(rnd() * rnd() * 110) * 100, 'space-elevator': () => Math.floor(rnd() * 100) }
+const LEVELS = { 'not-a-robot': (i) => 'Check ' + (i + 1), 'rule-cascade': (i) => 'Rule ' + (i + 2), orbit: (i) => (i + 1) + ' / 8 challenges' }
+const STACKS = { "Cannot read properties of null (reading 'getContext')": ['TypeError', 'setup orbit-render.js:1:4211', 'start orbit.js:1:902'], 'WebGL context lost': ['Error', 'restore gl.js:1:1880', '(anonymous) fusion.js:1:12044'] }
 const NOW = Date.now()
 let views = 0, evs = 0
 for (let v = 0; v < 420; v++) {
@@ -72,7 +94,8 @@ for (let v = 0; v < 420; v++) {
   const vid = consent === 'yes' || consent === 'na' ? id() : null
   const ip = `10.${v % 250}.${Math.floor(rnd() * 250)}.${Math.floor(rnd() * 250)}`
   const days = wpick([[1, 60], [2, 20], [3, 10], [5, 6], [9, 4]])
-  const firstAgo = rnd() * 34 + 1
+  // Most first came this month; some long ago, past the 90 days raw events are kept.
+  const firstAgo = rnd() < 0.18 ? 90 + rnd() * 40 : rnd() * 34 + 1
   let gamesSeen = 0
   for (let k = 0; k < days; k++) {
     const dayAgo = Math.max(0, firstAgo - (k * firstAgo) / days - rnd())
@@ -100,6 +123,12 @@ for (let v = 0; v < 420; v++) {
       if (path === '/') {
         engaged = Math.round(8000 + rnd() * 90000)
         for (let c = 0; c < Math.floor(rnd() * 5); c++) e.push({ n: 'isl_card', t: at(3000 + c * 2000), g: wpick(GAMES) })
+        // Taps where they land: mostly on buildings, some round them, on the things to poke or on nothing.
+        for (let c = 0; c < Math.floor(rnd() * 9); c++) {
+          const a = ISLE.anchors[wpick(GAMES.filter(([g]) => ISLE.anchors[g]))]
+          const off = rnd() < 0.7 ? 18 : 140
+          e.push({ n: 'isl_tap', t: at(2000 + c * 900), p: { x: Math.round((a.bx + (rnd() - 0.5) * off) / 10) * 10, y: Math.round((a.by - 20 + (rnd() - 0.5) * off) / 10) * 10, z: 1, hit: off < 100 ? 'game' : rnd() < 0.4 ? 'poke' : 'none', what: '' } })
+        }
         if (rnd() < 0.45) e.push({ n: 'isl_poke', t: at(5000), p: { kind: pick(POKES.slice(0, rnd() < 0.85 ? 8 : 12)), first: rnd() < 0.6 } })
         if (rnd() < 0.15) e.push({ n: 'isl_bottle', t: at(7000), p: { n: 1 + Math.floor(rnd() * 12), first: true, total: 1 + Math.floor(rnd() * 5) } })
         if (rnd() < 0.2) e.push({ n: 'isl_search', t: at(6000), p: (() => { const q = pick(SEARCH); return { q, results: ['password game', 'wordle', 'infinite craft'].includes(q) ? 0 : 1 + Math.floor(rnd() * 3) } })() })
@@ -112,7 +141,14 @@ for (let v = 0; v < 420; v++) {
         if (rnd() < 0.15) e.push({ n: 'isl_pigeons', t: at(9000), p: { bell: false } })
         if (rnd() < 0.05) e.push({ n: 'isl_filter', t: at(9000), p: { filter: pick(['science', 'you', 'fun']) } })
         const ds = ['peaks', 'badlands', 'proving', 'harbour', 'funfair', 'market', 'oldtown'].filter(() => rnd() < 0.35)
-        e.push({ n: 'isl_session', t: at(engaged), p: { drags: Math.floor(rnd() * 20), wheels: Math.floor(rnd() * 10), secs: Math.round(engaged / 1000), districts: ds.join(' '), n_districts: ds.length, cards: 2 } })
+        // Where the screen rested, every two seconds: round the buildings, wandering.
+        const look = new Array(70).fill(0)
+        for (let q = 0; q < Math.round(engaged / 2000); q++) {
+          const a = ISLE.anchors[wpick(GAMES.filter(([g]) => ISLE.anchors[g]))]
+          const cx = Math.floor(((a.bx + (rnd() - 0.5) * 200 - BX) / BW) * 10), cy = Math.floor(((a.by + (rnd() - 0.5) * 160 - BY) / BH) * 7)
+          if (cx >= 0 && cx < 10 && cy >= 0 && cy < 7) look[cy * 10 + cx] = Math.min(35, look[cy * 10 + cx] + 1)
+        }
+        e.push({ n: 'isl_session', t: at(engaged), p: { drags: Math.floor(rnd() * 20), wheels: Math.floor(rnd() * 10), secs: Math.round(engaged / 1000), districts: ds.join(' '), n_districts: ds.length, cards: 2, look: look.map((c) => c.toString(36)).join('') } })
         e.push({ n: 'isl_fps', t: at(13000), p: { fps: Math.round((dev === 'phone' ? 44 : 56) + rnd() * 6), slow: Math.floor(rnd() * 3) } })
         if (pages[pi + 1]) e.push({ n: 'isl_dive', t: at(engaged - 500), p: { from: rnd() < 0.15 ? 'surprise' : 'map' }, g: S.slugOf(pages[pi + 1]) })
       } else if (game) {
@@ -120,9 +156,12 @@ for (let v = 0; v < 420; v++) {
         if (rnd() < 0.82) {
           e.push({ n: 'game_start', t: at(3000), p: { after_ms: 3000 } })
           if (rnd() < 0.08) e.push({ n: 'game_howto', t: at(2000) })
-          if (rnd() < 0.55) {
+          for (const [what, v, of] of PICKS[game]?.() ?? []) e.push({ n: 'game_pick', t: at(4000), p: of ? { what, v, of } : { what, v } })
+          const lv = Math.floor(rnd() * rnd() * 7)
+          for (let i = 0; i < lv; i++) e.push({ n: 'game_level', t: at(5000 + i * 3000), p: { text: LEVELS[game]?.(i) ?? ['Halfway', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6'][i], i: i + 1 } })
+          if (rnd() >= 0.55) e.push({ n: 'game_quit', t: at(30000), p: { ms: Math.round(5000 + rnd() * 120000), levels: lv, ...(STOP[game] ? { at: STOP[game]() } : lv ? { at: LEVELS[game]?.(lv - 1) ?? 'Level ' + (lv + 1) } : {}) } })
+          else {
             const ms = Math.round(20000 + rnd() * rnd() * 400000)
-            e.push({ n: 'game_level', t: at(ms / 2), p: { text: pick(['Halfway', 'Level 2', 'Level 3']) } })
             e.push({ n: 'game_end', t: at(ms), p: { kind: rnd() < 0.7 ? 'win' : 'lose', score: String(Math.round(rnd() * 100)), ms } })
             if (RESULT[game]) e.push({ n: 'game_result', t: at(ms), p: RESULT[game](), g: game })
             if (rnd() < 0.2) e.push({ n: 'game_best', t: at(ms), p: { kind: 'beaten' } })
@@ -131,7 +170,11 @@ for (let v = 0; v < 420; v++) {
           }
           if (rnd() < 0.1) e.push({ n: 'sound', t: at(4000), p: { on: true } })
         }
-        if (rnd() < 0.01) e.push({ n: 'error', t: at(5000), p: { msg: pick(["Cannot read properties of null (reading 'getContext')", 'WebGL context lost', 'ResizeObserver loop limit exceeded']), src: `${game}.js`, line: 1 + Math.floor(rnd() * 400), kind: 'error' } })
+        if (rnd() < 0.02) {
+          const msg = pick(["Cannot read properties of null (reading 'getContext')", 'WebGL context lost', 'ResizeObserver loop limit exceeded'])
+          const st = STACKS[msg]
+          e.push({ n: 'error', t: at(5000), g: game, p: { msg, src: `${game}.js`, line: 1, col: 1 + Math.floor(rnd() * 3) * 400, kind: 'error', ...(st ? { type: st[0], st1: st[1], st2: st[2] } : {}) } })
+        }
       }
       if (rnd() < 0.015) e.push({ n: 'outbound', t: at(6000), p: { host: 'buymeacoffee.com', path: '/krishna18' } })
       const view = { path, ref: pi === 0 ? ref : undefined, title: path, sw, sh, vw: sw, vh: sh - 120, dpr, touch, lang, tz, dark: rnd() < 0.42, rm: rnd() < 0.05, conn: ua.includes('Chrome') ? pick(['4g', '4g', '4g', '3g']) : undefined, mem: 8, cpu: 8, first_days: Math.round(Math.max(0, firstAgo - dayAgo)), games_seen: gamesSeen, visit_days: k + 1, sref: pi === 0 ? sref : undefined, ...(pi === 0 ? utm : {}) }
@@ -157,5 +200,8 @@ for (const [cc, city, lat, lon, path] of [['IN', 'Mumbai', 19.1, 72.9, '/orbit/'
   const b = S.parseBatch(JSON.stringify({ v: 1, pid: id(), vid: id(), c: 'na', view: { path }, e: [{ n: 'game_start', t: NOW - 30000 }] }), NOW)
   await I.ingest(d, b, { ip: '9.9.9.' + Math.floor(rnd() * 200), ua: UAS[4][0][1], host: 'localhost:4321', country: cc, region: null, city, lat, lon }, new Date(NOW - 60000))
 }
-console.log('seeded', views, 'views', evs, 'events')
+// The nightly summaries, over everything just written: days past 90 are counted, then their raw events go.
+const R0 = await import('../src/lib/analytics/rollup.ts')
+const run = await R0.nightly(d, new Date(), 200)
+console.log('seeded', views, 'views', evs, 'events; summarised', run.rolled.length, 'days and trimmed', run.trimmed, 'events past 90 days')
 await pg.close()

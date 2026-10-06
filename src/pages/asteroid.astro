@@ -261,6 +261,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
 
   let composition: Composition = 'rock'
   let target: { lat: number; lon: number; name: string } | null = null
+  /** The target as the crowd sees it: a listed city or preset, never a clicked coordinate. */
+  let targetPick = ''
 
   /** Slider 0–1000 maps logarithmically onto 1 m … 20 km. */
   const sliderToDiameter = (v: number) => Math.round(Math.exp(Math.log(1) + (v / 1000) * Math.log(20_000)))
@@ -397,6 +399,7 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
         ? `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`
         : 'Open ocean')
     target = { lat, lon, name: label }
+    targetPick = name ?? (isLand(lat, lon) ? 'A spot clicked on land' : 'Open ocean')
 
     if (!targetMarker) {
       targetMarker = L.circleMarker([lat, lon], {
@@ -566,6 +569,12 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     const casualties = estimateCasualties(result, target.lat, target.lon)
     launches++
     lastRun = { r: result, cas: casualties }
+    const inp = currentInput()
+    shell.pick('City hit', targetPick)
+    shell.pick('Rock size (m)', Number(inp.diameter.toPrecision(2)))
+    shell.pick('Material', el('comp').querySelector('[aria-pressed="true"]')?.textContent?.trim() || composition)
+    shell.pick('Speed (km/s)', inp.velocity / 1000)
+    shell.pick('Entry angle (°)', inp.angle)
     // First: render() starts a new run in the shell, so a best this launch
     // beats has to be offered after it, or the reset wipes the badge.
     render(result, casualties)

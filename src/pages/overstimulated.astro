@@ -117,6 +117,7 @@ import { iconSvg } from '../lib/icons'
   const started = performance.now()
   const timers: number[] = []
   const owned = new Set<string>()
+  let lastBought = 'Nothing'
 
   /* What the environment is driven by. 'load' chases the fraction owned rather
      than snapping to it, so a purchase ramps the room up over a second or so
@@ -218,9 +219,12 @@ import { iconSvg } from '../lib/icons'
     world.appendChild(p)
     hit({ dur: 0.09, gain: 0.16, freq: 900, q: 3 })
     const close = () => { p.classList.add('out'); setTimeout(() => p.remove(), 300) }
-    p.querySelector('.pop-no')!.addEventListener('click', close)
-    p.querySelector('.pop-yes')!.addEventListener('click', () => { close(); spawnAchievement() })
+    p.querySelector('.pop-no')!.addEventListener('click', () => { answered('No thanks'); close() })
+    p.querySelector('.pop-yes')!.addEventListener('click', () => { answered('Yes obviously'); close(); spawnAchievement() })
   }
+  // The popup recurs; only its first answer is counted.
+  let popupAnswered = false
+  const answered = (v: string) => { if (!popupAnswered) { popupAnswered = true; shell.pick('Newsletter popup, first answer', v) } }
 
   let cursorEls: HTMLElement[] = []
   const cursorPos = { x: innerWidth / 2, y: innerHeight / 2 }
@@ -334,6 +338,9 @@ import { iconSvg } from '../lib/icons'
     b.disabled = true
     b.querySelector('.buy-cost')!.textContent = 'on'
     up.apply()
+    shell.pick('Upgrade bought', up.name)
+    shell.progress(owned.size)
+    lastBought = up.name
 
     const r = b.getBoundingClientRect()
     burst(r.left + r.width / 2, r.top + r.height / 2, {
@@ -471,6 +478,7 @@ import { iconSvg } from '../lib/icons'
     world.style.removeProperty('--sy')
 
     const secs = Math.round((performance.now() - started) / 1000)
+    shell.pick('Last upgrade before stopping', lastBought)
 
     const stat = recordPlay(
       'overstimulated',

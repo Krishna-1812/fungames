@@ -644,6 +644,14 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     masterBtn.classList.remove('live')
   })
 
+  // Each layer a visitor brings in by hand, once a page.
+  const chosen = new Set()
+  function chose(L: { id: string; on: boolean }) {
+    if (!L.on || chosen.has(L.id)) return
+    chosen.add(L.id)
+    shell.pick('Layer brought in', LAYERS.find((l) => l.id === L.id)?.name ?? L.id)
+  }
+
   grid.addEventListener('click', async (e) => {
     const btn = e.target.closest('.toggle')
     if (!btn) return
@@ -651,6 +659,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     if (!running) await start()
     const L = layers.get(li.dataset.id)
     setLayer(L, !L.on)
+    chose(L)
   })
 
   grid.addEventListener('input', async (e) => {
@@ -659,7 +668,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     if (!running) await start()
     const L = layers.get(li.dataset.id)
     L.vol = Number(e.target.value) / 100
-    if (!L.on) setLayer(L, true)
+    if (!L.on) { setLayer(L, true); chose(L) }
     else L.out.gain.setTargetAtTime(L.vol, ctx.currentTime, 0.08)
   })
 
@@ -734,6 +743,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   const shareBtn = document.getElementById('shareBtn')
   shareBtn.addEventListener('click', async () => {
     writeUrl()
+    shell.pick('Layers in a shared mix', Object.keys(readMix().levels).length)
     const url = location.href
     let copied = false
     try {
@@ -756,6 +766,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     if (!running) await start()
     applyMix(p.mix)
     writeUrl()
+    shell.pick('Preset picked', p.name)
     for (const b of document.querySelectorAll('.preset')) b.classList.toggle('on', b === btn)
     note.textContent = p.note
   })

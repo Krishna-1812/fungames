@@ -91,6 +91,13 @@ export async function shareResult(
   card: ResultCard,
   meta: { title: string; text: string; url: string },
 ): Promise<ShareOutcome> {
+  // Every share is counted here, whichever button or page asked for it.
+  const outcome = await shareCard(card, meta)
+  track('share', { outcome }, pageGame())
+  return outcome
+}
+
+async function shareCard(card: ResultCard, meta: { title: string; text: string; url: string }): Promise<ShareOutcome> {
   let blob: Blob | null = null
   try {
     blob = await cardBlob(card)
@@ -152,7 +159,6 @@ export function onShare(
     // ?ref=share: a visit that arrives on it is counted as one a share brought back.
     const url = new URL(location.href); url.hash = ''; url.searchParams.set('ref', 'share')
     shareResult(c, { ...meta(c), url: url.href }).then((outcome) => {
-      track('share', { outcome }, pageGame())
       // Saying what happened matters most where nothing visibly does: a
       // desktop download is silent apart from the browser's own shelf.
       if (!(btn instanceof HTMLElement)) return

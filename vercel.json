@@ -4,6 +4,12 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "trailingSlash": true,
+  "crons": [
+    {
+      "path": "/api/cron/nightly/",
+      "schedule": "17 3 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

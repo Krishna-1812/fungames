@@ -36,19 +36,19 @@ import { SITE } from '../site.config'
         <h2 id="pv-what" class="pv-h">What is counted</h2>
         <ul>
           <li>Which pages are opened, for how long they are actually looked at, and how far down they are read.</li>
-          <li>What happens in a game: started, finished, won or lost, the score it reports, restarts, shares.</li>
-          <li>What happens on the island: which buildings are visited, what is poked, bottles found, postcards made, what the games list is searched for.</li>
+          <li>What happens in a game: started, finished, won or lost, the score it reports, restarts, shares, how far you got if you left part-way, and the choices it offers (which lever you pulled, which city you hit), so everyone can see how the crowd chose.</li>
+          <li>What happens on the island: which buildings are visited, what is poked, where on the map it was tapped and which parts were looked at, bottles found, postcards made, what the games list is searched for.</li>
           <li>The site a visit came from (its address without anything after the path), and campaign tags on a link.</li>
           <li>The country, region and city the request came from, read from the address and then forgotten.</li>
           <li>The kind of device, its system and browser, the screen's size, language, timezone, and whether dark mode or reduced motion is on.</li>
-          <li>How fast pages load, and any script errors, so broken things get fixed.</li>
+          <li>How fast pages load, and any script errors (the message and the lines of this site’s own code it happened in), so broken things get fixed.</li>
         </ul>
       </section>
       <section aria-labelledby="pv-never">
         <h2 id="pv-never" class="pv-h">What is never kept</h2>
         <ul>
           <li>Your IP address or your browser's full identifying string.</li>
-          <li>Anything you type or draw inside a game: your messages, your drawings, the words of your answers, or your birth date (Life in Weeks reports only an age decade).</li>
+          <li>Anything you type or draw inside a game: your messages, your drawings, the words of your answers, or your birth date (Life in Weeks reports only an age decade, and Who Was Alive only the decade of a year).</li>
           <li>Anything from other sites. There are no advertising or tracking cookies, and no fingerprinting.</li>
           <li>Visits from browsers with Global Privacy Control switched on are counted without an ID.</li>
         </ul>
@@ -63,7 +63,8 @@ import { SITE } from '../site.config'
         elsewhere it is made on the first visit, and the buttons above take it away. Without it you are still counted, as an anonymous visit for that day only.
       </p>
       <p>
-        Records are kept in a database run for this site (Neon Postgres, through Vercel) for at most thirteen months, and are deleted after that.
+        Records are kept in a database run for this site (Neon Postgres, through Vercel): what was done on a page for 90 days, the pages visited and an ID’s first and last visit for at most thirteen months, and then deleted.
+        After 90 days a day’s events are kept only as totals for that day (so many games started, so many people chose this answer), which say nothing about any one visitor and are kept for good.
         Questions: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
       </p>
     </section>

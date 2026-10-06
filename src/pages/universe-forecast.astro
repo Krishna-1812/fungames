@@ -1848,6 +1848,7 @@ import GameShell from '../layouts/GameShell.astro'
 
   for (const btn of document.querySelectorAll<HTMLButtonElement>('.filter')) {
     btn.addEventListener('click', () => {
+      if (btn.dataset.filter !== filter) shell.pick('Filter chosen', btn.firstChild!.textContent!.trim())
       filter = btn.dataset.filter!
       for (const b of document.querySelectorAll('.filter')) b.classList.toggle('is-on', b === btn)
       paintFeed()
@@ -1855,7 +1856,9 @@ import GameShell from '../layouts/GameShell.astro'
   }
 
   const moonScrub = $<HTMLInputElement>('moonScrub')
-  moonScrub.addEventListener('input', () => {
+  let moonScrubbed = false
+  moonScrub.addEventListener('input', (e) => {
+    if (!moonScrubbed && e.isTrusted) { moonScrubbed = true; shell.pick('Scrubbed the Moon', true) }
     moonOffset = Number(moonScrub.value)
     paintMoon()
   })
@@ -1985,8 +1988,14 @@ import GameShell from '../layouts/GameShell.astro'
     if (drawnEvents.size) shell.considerBest(drawnEvents.size, String(drawnEvents.size))
   }
   function noteDrawn(ev: SkyEvent) {
+    // Once per event: which, and how far down the two years it sits.
+    if (!drawnEvents.has(+ev.when)) {
+      shell.pick('Event drawn', ev.title)
+      shell.pick('Months ahead drawn', Math.round((+ev.when - Date.now()) / (30.44 * 86_400_000)))
+    }
     drawnKinds.add(ev.kind)
     drawnEvents.add(+ev.when)
+    shell.progress(drawnKinds.size)
     paintStrip()
     if (!ended && KINDS.every((k) => drawnKinds.has(k))) {
       ended = true

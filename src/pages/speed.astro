@@ -544,7 +544,8 @@ import { withBase } from '../lib/base'
 
   $('geoBtn').addEventListener('click', () => {
     const btn = $('geoBtn') as HTMLButtonElement
-    if (!('geolocation' in navigator)) { btn.textContent = 'Not available on this device'; return }
+    // Only how it went: the latitude itself never leaves the tab.
+    if (!('geolocation' in navigator)) { btn.textContent = 'Not available on this device'; shell.pick('Location button', 'Not available'); return }
     btn.textContent = 'Locating…'
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -553,8 +554,9 @@ import { withBase } from '../lib/base'
         btn.textContent = `Using your real latitude, ${latitude.toFixed(1)}°`
         btn.disabled = true
         paintFacts()
+        shell.pick('Location button', 'Used')
       },
-      () => { btn.textContent = "Couldn't get your location — using 40°N" },
+      () => { btn.textContent = "Couldn't get your location — using 40°N"; shell.pick('Location button', 'Refused or failed') },
       { timeout: 8000 },
     )
   })
@@ -659,6 +661,7 @@ import { withBase } from '../lib/base'
   /** The edge of the observable universe is the ending. The card waits under
       the closing paragraph; the page is not pulled past what it is saying. */
   function finish(dist: number, combinedKmS: number, elapsed: number) {
+    shell.pick('Seconds to reach the edge', Math.round(elapsed))
     shell.considerBest(Math.round(dist), shortKm(dist))
     shell.win({
       celebrate: false,
@@ -693,6 +696,7 @@ import { withBase } from '../lib/base'
   /* IntersectionObserver (see day-go.astro for why).                       */
   /* ---------------------------------------------------------------------- */
 
+  let furthest = 0
   function checkStages() {
     const before = activeCount
     let n = 0
@@ -701,6 +705,8 @@ import { withBase } from '../lib/base'
       if (el && el.getBoundingClientRect().top < innerHeight * 0.85) n++
     }
     if (n > activeCount) activeCount = n
+    // progress: speeds scrolled past, even when reduced motion counts them all.
+    if (n > furthest) shell.progress(furthest = n)
     if (!recorded) {
       const finale = document.getElementById('stage-finale')
       if (finale && finale.getBoundingClientRect().top < innerHeight) {

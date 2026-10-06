@@ -503,10 +503,16 @@ const INFO: Record<string, InfoContent> = {
   const sourceEl = dialog.querySelector<HTMLElement>('[data-info-source]')!
   const sourceLinkEl = dialog.querySelector<HTMLAnchorElement>('[data-info-source-link]')!
 
+  // Which scales get read, once each a page, and whose source gets followed.
+  const explained = new Set<string>()
+  let shownInfo: InfoContent | null = null
+  sourceLinkEl.addEventListener('click', () => { if (shownInfo) shell.pick('Source followed', shownInfo.source) })
   document.querySelectorAll<HTMLButtonElement>('[data-info]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const content = INFO[btn.dataset.info!]
       if (!content) return
+      shownInfo = content
+      if (!explained.has(content.title)) { explained.add(content.title); shell.pick('Scale explained', content.title) }
       titleEl.textContent = content.title
       introEl.textContent = content.intro
       sourceEl.textContent = content.source

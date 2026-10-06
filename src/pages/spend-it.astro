@@ -96,6 +96,7 @@ import { productSvg } from '../lib/spend-art'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
   import { recordPlay } from '../lib/stats'
+  import { onLeave } from '../lib/analytics/client'
     const { BUDGET, ICONS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const money = document.getElementById('money')
@@ -181,6 +182,8 @@ import { productSvg } from '../lib/spend-art'
     // Zero is the ending; selling anything afterwards takes it back.
     if (left === 0 && !won) { won = true; finish() }
     else if (left > 0 && won) { won = false; shell.reset() }
+    // progress: the share of the fortune spent, in whole percent.
+    if (!won) shell.progress(Math.round((1 - left / BUDGET) * 100))
 
     money.textContent = usd(left)
     money.classList.toggle('low', left < BUDGET * 0.1)
@@ -344,6 +347,7 @@ import { productSvg } from '../lib/spend-art'
 
   /** Exactly zero: the receipt becomes the result card. */
   function finish() {
+    tellBasket()
     const bought = items.filter((i) => i.n > 0)
     const { units, biggest } = buildShareCard(bought, 0)
     recordPlay('spend-it', { kinds: bought.length, things: units }, {})
@@ -374,7 +378,27 @@ import { productSvg } from '../lib/spend-art'
     })
   }
 
+  /* The basket as it stands when the page is left or emptied, not every
+     click: only what changed since it was last told (or came out of storage). */
+  let told: number[] = []
+  const named = new Set()
+  onLeave(() => { if (!won) tellBasket() })
+  function tellBasket() {
+    if (items.every((it, k) => it.n === told[k])) return
+    items.forEach((it, k) => {
+      if (it.n === told[k]) return
+      told[k] = it.n
+      if (!it.n) return
+      if (!named.has(it.name)) { named.add(it.name); shell.pick('Thing bought', it.name) }
+      shell.pick('How many, per thing', it.n, it.name)
+    })
+    const left = balance()
+    shell.pick('Spent it all', left === 0)
+    shell.pick('Fortune spent (%)', Math.round((1 - left / BUDGET) * 100))
+  }
+
   load()
+  told = items.map((i) => i.n)
   render()
 </script>
 

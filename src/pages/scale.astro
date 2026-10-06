@@ -269,12 +269,16 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   let ended = false
   const seen = new Set()
+  let furthest = -Infinity
+  let startedAt = performance.now()
   const shell = createShell({
     slug: 'scale',
     // Back to the proton, not a reload.
     onRestart: () => {
       ended = false
       seen.clear()
+      furthest = -Infinity
+      startedAt = performance.now()
       scrollTo({ top: root.getBoundingClientRect().top + scrollY - 16, behavior: 'instant' })
     },
   })
@@ -309,6 +313,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     clearTimeout(stripT)
     paintStrip()
     recordPlay('scale', { seen: seen.size }, { seen: 'high' })
+    shell.pick('Seconds to the edge', Math.round((performance.now() - startedAt) / 1000))
     shell.win({
       kicker: 'Forty-two orders of magnitude',
       title: 'Everything there is to see.',
@@ -459,6 +464,9 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     }
 
     at = { exp, t }
+    // progress: the widest power of ten (in metres) the screen has reached.
+    const p = Math.floor(exp)
+    if (p > furthest) shell.progress(furthest = p)
     clearTimeout(stripT)
     stripT = window.setTimeout(paintStrip, 180)
     if (!ended && t >= 0.999) reachedEnd()

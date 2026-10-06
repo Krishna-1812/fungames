@@ -349,7 +349,7 @@ From the 1 October study of neal.fun's Cursor Camp. ✅ = built and live.
 
 ## 8. What is left
 
-### Analytics (in progress, 3 phases)
+### Analytics (done, 3 phases)
 
 Requested 5 October 2026: an admin analytics page capturing everything.
 Decisions: Vercel + Neon Postgres; an anonymous visitor ID (asked first in
@@ -365,9 +365,19 @@ the EU, EEA, UK and Switzerland). See README, "Analytics".
   light and dark. Nightly summary tables moved to phase 3, where raw events
   start being trimmed (until then every query reads the raw rows, which is
   fast at this size).
-- **Phase 3:** game-specific crowd statistics, island heat-maps, funnels,
-  cohorts, visitor journeys, error detail, and raw events kept 90 days with
-  nightly daily summaries (a Vercel cron) kept for good.
+- **Phase 3 (done):** every game reports its own choices and discoveries
+  (`shell.pick`, wired into all 32) and where a run was when it was left
+  (`shell.progress` → `game_quit`); each game's page shows the crowd (Trolley
+  per dilemma, Asteroid cities and rock sizes, Fusion discoveries…), where
+  people stop and how far runs get. Island heat-maps on the island's own
+  picture (taps, where screens rested, dives per building). A Journeys tab
+  (two funnels, a page-to-page flow, the commonest visits). Return visits by
+  the week of a first visit. Errors with stack frames, each opening into
+  detail. Raw events kept 90 days, rolled into daily summaries kept for good
+  by a nightly Vercel cron (`/api/cron/nightly/`, with the admin page as a
+  fallback). Life in Weeks' score (the player's age) is now cut from every
+  event, server-side, and the nightly run cleaned the rows stored before.
+  Optional for the owner: a `CRON_SECRET` variable in Vercel.
 
 ### Needs a decision from the owner
 

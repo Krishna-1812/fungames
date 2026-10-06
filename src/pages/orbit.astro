@@ -284,6 +284,7 @@ import { GOALS } from '../lib/orbit-goals'
     }
     goalCount.textContent = `${tracker.done.size}/${GOALS.length}`
     shell.setLevel(`${tracker.done.size} / ${GOALS.length}`)
+    shell.progress(tracker.done.size)
     if (tracker.bestLaps > 0) shell.considerBest(tracker.bestLaps, lapsText(tracker.bestLaps))
     missionReadout()
     bestLaps.textContent = tracker.bestLaps
@@ -300,6 +301,7 @@ import { GOALS } from '../lib/orbit-goals'
   let toastTimer = 0
   function celebrate(ids: string[]) {
     save()
+    for (const id of ids) shell.pick('Challenge completed', GOALS.find((x) => x.id === id)?.name ?? id)
     paintGoals()
     // One lap can settle two or three of these at once — a near-circular first
     // orbit is First orbit and Round trip together — so name all of them
@@ -472,12 +474,15 @@ import { GOALS } from '../lib/orbit-goals'
     const p = local(e)
     aim.x1 = p.x; aim.y1 = p.y
   })
+  let launches = 0
   function release() {
     if (!aim) return
     // Velocity follows the drag direction shown by the aiming line.
     const vx = (aim.x1 - aim.x0) * 0.055
     const vy = (aim.y1 - aim.y0) * 0.055
     add(aim.x0, aim.y0, vx, vy, launchMass, true)
+    // How far people get, at a few milestones rather than every throw.
+    if ([1, 5, 10, 25, 50, 100].includes(++launches)) shell.pick('Bodies launched', launches)
     guide = false
     flightCard.hidden = true
     const speed = Math.hypot(vx, vy)
@@ -531,6 +536,7 @@ import { GOALS } from '../lib/orbit-goals'
       void b.offsetWidth
       b.classList.add('picked')
       unlock(); sfx.blip(Number(b.dataset.mass) > 100 ? 4 : 1)
+      shell.pick('Launch size picked', b.textContent!.trim())
     })
   })
 
@@ -642,9 +648,9 @@ import { GOALS } from '../lib/orbit-goals'
     sfx.whoosh()
   }
 
-  document.getElementById('presetSolar')!.addEventListener('click', () => { unlock(); solar() })
-  document.getElementById('presetBinary')!.addEventListener('click', () => { unlock(); binary() })
-  document.getElementById('presetChaos')!.addEventListener('click', () => { unlock(); chaos() })
+  document.getElementById('presetSolar')!.addEventListener('click', () => { unlock(); solar(); shell.pick('Scene started', 'Solar system') })
+  document.getElementById('presetBinary')!.addEventListener('click', () => { unlock(); binary(); shell.pick('Scene started', 'Binary') })
+  document.getElementById('presetChaos')!.addEventListener('click', () => { unlock(); chaos(); shell.pick('Scene started', 'Chaos') })
   document.getElementById('clearBtn')!.addEventListener('click', () => { unlock(); sfx.click(); clear() })
   document.getElementById('pauseBtn')!.addEventListener('click', () => {
     setPaused(!paused)
@@ -689,8 +695,8 @@ import { GOALS } from '../lib/orbit-goals'
       tip.textContent = 'Start on the bright dot. Drag downward a little, then release. Learn lets you retry.'
     }
   }
-  document.getElementById('learnBtn')!.addEventListener('click', () => lesson(false))
-  document.getElementById('demoBtn')!.addEventListener('click', () => lesson(true))
+  document.getElementById('learnBtn')!.addEventListener('click', () => { lesson(false); shell.pick('Scene started', 'Try a launch') })
+  document.getElementById('demoBtn')!.addEventListener('click', () => { lesson(true); shell.pick('Scene started', 'Watch an example') })
   document.getElementById('dismissLesson')!.addEventListener('click', () => { flightCard.hidden = true })
   document.getElementById('helpBtn')!.addEventListener('click', () => { flightCard.hidden = !flightCard.hidden })
 

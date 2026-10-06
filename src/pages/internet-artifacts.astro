@@ -419,6 +419,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   // the actual sound a 1990s modem made trying to connect, roughly.
   const dialBtn = document.getElementById('dialToggle')
   let dialOn = false
+  let dialTried = false
   let dialTimer: number | null = null
   const DIAL_FREQS = [1200, 2100, 1600, 2400, 1800, 1400]
   function dialTick() {
@@ -429,6 +430,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   dialBtn?.addEventListener('click', () => {
     unlock()
     dialOn = !dialOn
+    if (dialOn && !dialTried) { dialTried = true; shell.pick('Dial-up modem switched on', true) }
     dialBtn.setAttribute('aria-pressed', String(dialOn))
     dialBtn.classList.toggle('on', dialOn)
     if (dialOn) {
@@ -457,6 +459,8 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   let rearm = false
   let highestZone = 0
   let seenMost = 0
+  let yearTold = 0
+  const passed = new Set<HTMLElement>()
   const root = $('iaRoot')
   const shell = createShell({
     slug: 'internet-artifacts',
@@ -552,9 +556,15 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     if (zoneIdx > highestZone) {
       highestZone = zoneIdx
       shell.levelUp(zone.label)
+      shell.pick('Era reached', zone.label)
     }
+    // Where people stop: the latest whole year reached, and each artifact once per visit.
+    if (Math.floor(year) > yearTold) shell.progress(yearTold = Math.floor(year))
     let seen = 0
-    for (const c of cards) if (c.offsetTop <= topInReel) seen++
+    for (const c of cards) if (c.offsetTop <= topInReel) {
+      seen++
+      if (!passed.has(c)) { passed.add(c); shell.pick('Artifact reached', c.querySelector('h2')!.textContent!) }
+    }
     if (seen > seenMost) seenMost = seen
     at = { year, zoneIdx }
     clearTimeout(stripT)

@@ -8,7 +8,7 @@ import { roll, confetti, PLAY } from './motion'
 import { isMuted, setMuted, unlock, sfx } from './audio'
 import { bestKey } from '../data/game-meta'
 import { recordVisit } from './passport'
-import { track } from './analytics/client'
+import { track, onLeave } from './analytics/client'
 
 export type ShellOptions = {
   slug: string
@@ -82,13 +82,29 @@ export function createShell(opts: ShellOptions) {
   const slug = opts.slug
   const sent = (n: Parameters<typeof track>[0], p: Parameters<typeof track>[1] = {}) => track(n, p, slug)
   let startedAt = 0
+  // A run is "going" from the first touch until an ending; a page hidden
+  // while one is going says where it stopped (game_quit), which is how the
+  // dashboard knows where people give up.
+  let going = false, runAt = 0, levels = 0, at: string | number | null = null, told = false
   const begin = () => {
     if (startedAt) return
     startedAt = performance.now()
+    going = true; runAt = startedAt
     sent('game_start', { after_ms: Math.round(startedAt) })
   }
+  onLeave(() => {
+    if (!going) return
+    const p: Record<string, string | number> = { ms: Math.round(performance.now() - runAt), levels }
+    if (at !== null) p.at = at
+    if (shown.score !== undefined) p.score = shown.score
+    sent('game_quit', p)
+  })
+  // Choices and discoveries, at most 300 a page (a long Fusion session finds a lot).
+  let picks = 0
   addEventListener('pointerdown', begin, { once: true, capture: true })
   addEventListener('keydown', begin, { once: true, capture: true })
+  // A wheel is a hand on the game too: the scroll-through pages are often only ever wheeled.
+  addEventListener('wheel', begin, { once: true, capture: true, passive: true })
 
   let paused = false
   let best = readBest(opts.slug)
@@ -112,6 +128,7 @@ export function createShell(opts: ShellOptions) {
   const shown: Record<string, string> = {}
 
   function set(name: 'score' | 'level' | 'moves', text: string) {
+    if (name === 'level' && !told) at = text
     if (shown[name] === text) return
     const first = shown[name] === undefined
     shown[name] = text
@@ -170,13 +187,16 @@ export function createShell(opts: ShellOptions) {
     void levelUpEl.offsetWidth
     levelUpEl.style.animation = ''
     announce(text + '.')
-    sent('game_level', { text })
+    levels++
+    if (!told) at = text
+    sent('game_level', { text, i: levels })
     levelT = window.setTimeout(() => { levelUpEl.hidden = true }, PLAY ? 1450 : 900)
   }
 
   /* ---- endings ---------------------------------------------------- */
 
   function end(kind: 'win' | 'lose', e: Ending) {
+    going = false
     sent('game_end', { kind, score: e.score, title: e.title, ms: startedAt ? Math.round(performance.now() - startedAt) : 0 })
     stage.classList.toggle('is-lost', kind === 'lose')
     $(result, '[data-result-kicker]').textContent = e.kicker ?? (kind === 'win' ? '✓ Finished' : 'Game over')
@@ -217,6 +237,7 @@ export function createShell(opts: ShellOptions) {
     stage.classList.remove('is-lost')
     beatenThisRun = false
     runStartBest = best
+    levels = 0; at = null; told = false
     tile('best').classList.remove('is-best')
     newBestBadge.hidden = true
   }
@@ -263,6 +284,8 @@ export function createShell(opts: ShellOptions) {
   const restart = () => {
     for (const d of [pausePanel, howtoPanel]) closePanel(d)
     reset()
+    // A new run is going as soon as it is asked for.
+    if (startedAt) { going = true; runAt = performance.now() }
     if (opts.onRestart) opts.onRestart()
     else location.reload()
   }
@@ -324,6 +347,25 @@ export function createShell(opts: ShellOptions) {
     lose,
     reset,
     openHowTo: () => openPanel(howtoPanel),
+    /**
+     * A choice, a discovery or a step inside the game, for the crowd's
+     * statistics on the admin page: `what` names the question ("Choice on
+     * each dilemma"), `v` is the answer ("Pull the lever", or a number), and
+     * `of` splits it ("The fat man"). Only ever values from the game's own
+     * lists or numbers it computed: never anything the player typed.
+     */
+    pick(what: string, v: string | number | boolean, of?: string) {
+      if (picks++ >= 300) return
+      const p: Record<string, string | number | boolean> = { what, v }
+      if (of !== undefined) p.of = of
+      sent('game_pick', p)
+    },
+    /**
+     * Where the player has got to (a rule, a level, a depth, a check), for
+     * "where people stop" if the page is left before an ending. setLevel's
+     * text stands in for games that never call it.
+     */
+    progress(where: string | number) { at = where; told = true },
   }
 }
 

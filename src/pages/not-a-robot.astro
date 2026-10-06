@@ -1104,12 +1104,18 @@ const sceneDefs = HAND_DEFS
   /* ------------------------------------------------------------------ */
 
   let idx = 0
+  let retriesAt = 0, passedAt = -1
   let actionFn: (() => void) | null = null
 
   actionBtn.addEventListener('click', () => { unlock(); sfx.click(); actionFn?.() })
 
   const api: Api = {
     pass(note) {
+      // For the crowd: how many times each check turned people away before they got through.
+      if (passedAt !== idx) {
+        passedAt = idx
+        shell.pick('Rejections on each check', ev.retries - retriesAt, `${idx + 1}. ${CHECKS[idx].head.target}`)
+      }
       say(note ?? '', 'good')
       sfx.good()
       flash.hidden = false
@@ -1148,6 +1154,7 @@ const sceneDefs = HAND_DEFS
     statusEl.dataset.tone = tone
   }
 
+  let idxShown = -1
   function show(i: number) {
     if (i >= CHECKS.length) return finish()
     idx = i
@@ -1167,6 +1174,8 @@ const sceneDefs = HAND_DEFS
        computing against the fallback and staying blue for all twelve. */
     $('nr').style.setProperty('--heat', String(i))
     shell.setLevel(`${i + 1} / ${CHECKS.length}`)
+    shell.progress(i + 1)
+    if (i !== idxShown) { idxShown = i; retriesAt = ev.retries }
     paintHuman()
     skipBtn.hidden = true
     skipBtn.onclick = null
@@ -1271,6 +1280,7 @@ const sceneDefs = HAND_DEFS
     if (ev.cents !== null) extras.push(`Your ear was ${cents(ev.cents)} off the reference tone.`)
     if (ev.dodges) extras.push(`The checkbox got away from you ${ev.dodges} times.`)
     extras.push(`Twelve checks, ${plural(ev.retries, 'rejection')}, ${Math.floor(secs / 60)}m ${secs % 60}s.`)
+    if (ev.suffering !== null) shell.pick('Squares where people found suffering', ev.suffering)
     recordPlay(
       'not-a-robot',
       { verdict: r.verdict, humanity: r.humanity, retries: ev.retries, seconds: secs },

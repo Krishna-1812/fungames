@@ -371,6 +371,7 @@ const HUD_DIGITS = 6
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
+  import { onLeave } from '../lib/analytics/client'
 
   // The climb reads bottom-to-top — open at the ground, the bottom of the
   // stage, rather than the browser's default top-of-page, and stop the
@@ -527,6 +528,7 @@ const HUD_DIGITS = 6
   // A colour choice with a real, visible consequence: the rider inside the
   // cable car keeps it for the rest of the climb.
   const jacketPick = document.getElementById('jacketPick')
+  let lastJacket = ''
   jacketPick?.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest('.jacket-swatch') as HTMLElement | null
     if (!btn) return
@@ -535,6 +537,7 @@ const HUD_DIGITS = 6
     jacketPick.querySelectorAll('.jacket-swatch').forEach((b) => b.classList.remove('picked'))
     btn.classList.add('picked')
     jacketPick.classList.add('chosen')
+    if (btn.getAttribute('aria-label') !== lastJacket) shell.pick('Jacket picked', lastJacket = btn.getAttribute('aria-label')!)
     sfx.click()
   })
 
@@ -545,6 +548,7 @@ const HUD_DIGITS = 6
   let musicOn = false
   let musicTimer: number | null = null
   let musicStep = 0
+  let musicTried = false
   const MUSIC_MOTIF = [0, 2, 4, 7, 4, 2]
   function musicTick() {
     tone({ freq: 220 * Math.pow(2, MUSIC_MOTIF[musicStep % MUSIC_MOTIF.length] / 12), dur: 0.85, type: 'triangle', gain: 0.05 })
@@ -556,6 +560,7 @@ const HUD_DIGITS = 6
     musicBtn.setAttribute('aria-pressed', String(musicOn))
     musicBtn.classList.toggle('on', musicOn)
     if (musicOn) {
+      if (!musicTried) { musicTried = true; shell.pick('Turned on the music', true) }
       musicTick()
       musicTimer = window.setInterval(musicTick, 900)
     } else if (musicTimer !== null) {
@@ -599,12 +604,17 @@ const HUD_DIGITS = 6
   const KARMAN = 100_000
   let ended = false
   let highestZone = 0
+  // progress: the highest whole km of this climb; the pick, of the whole visit,
+  // told on leaving or at the line.
+  let topKm = -1, bestKm = 0, toldKm = -1
+  const tellKm = () => { if (bestKm > toldKm) shell.pick('Highest altitude (km)', toldKm = bestKm) }
   const shell = createShell({
     slug: 'space-elevator',
     // Back down to the ground rather than a reload: the jacket you picked
     // stays on.
-    onRestart: () => { ended = false; highestZone = 0; toGround() },
+    onRestart: () => { ended = false; highestZone = 0; topKm = -1; toGround() },
   })
+  onLeave(() => { if (!ended) tellKm() })
 
   /* The strip rolls its digits, so it is told once the scroll settles; the
      gauge on the sky is the live one. */
@@ -621,6 +631,7 @@ const HUD_DIGITS = 6
   }
 
   function reachedSpace(metres: number) {
+    tellKm()
     ended = true
     updateShareCard(metres)
     shell.levelUp('The edge of space')
@@ -688,6 +699,8 @@ const HUD_DIGITS = 6
 
     const zoneIdx = zones.indexOf(zone)
     at = { metres, zoneIdx }
+    const km = Math.floor(metres / 1000)
+    if (km > topKm) { shell.progress(topKm = km); bestKm = Math.max(bestKm, km) }
     // Each layer announces itself the first time you climb into it.
     if (zoneIdx > highestZone) {
       highestZone = zoneIdx

@@ -88,6 +88,8 @@ export function initIsland(o: {
   grab?: (x: number, y: number, z: number, touch: boolean) => { move(x: number, y: number): void; up(): void } | null
   /** The pointer over the map (hovering, pressing, or a tap on nothing in particular), for what reacts to it. */
   pointer?: (x: number, y: number, z: number, kind: 'hover' | 'down' | 'tap') => void
+  /** A click or tap on the map at (x, y) in map units, and what it landed on (for the admin page's heat-map). */
+  onTap?: (x: number, y: number, z: number, hit: 'game' | 'poke' | 'none', what: string) => void
   /** Whether something that can be picked up is under (x, y): the cursor says so. */
   grabbable?: (x: number, y: number, z: number) => boolean
 }) {
@@ -634,6 +636,7 @@ export function initIsland(o: {
   stage.addEventListener('click', () => {
     if (moved > 6) return
     const h = fingerHit(press.x, press.y)
+    { const [wx, wy] = toWorld(press.x, press.y); o.onTap?.(wx, wy, cam.z, h?.lm ? 'game' : h?.poke ? 'poke' : 'none', h?.lm ?? h?.poke?.kind ?? '') }
     if (h?.lm) { pick(h.lm); return }
     if (h?.poke) {
       engine!.poke(h.poke.node)

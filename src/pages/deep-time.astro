@@ -272,6 +272,7 @@ const fmt = (y: number) =>
           // this card again, so the class is a permanent record of "you were
           // here for this one" rather than a state that could get stuck on.
           e.target.classList.add('focused')
+          shell.pick('Event reached', e.target.querySelector('h2')!.textContent!)
         }
       },
       { rootMargin: '-42% 0px -42% 0px' }
@@ -292,12 +293,14 @@ const fmt = (y: number) =>
 
   let ended = false
   let deepestAct = 0
+  let furthestPct = 0
   const shell = createShell({
     slug: 'deep-time',
     // Back to the beginning of the Earth, not a reload.
     onRestart: () => {
       ended = false
       deepestAct = 0
+      furthestPct = 0
       scrollTo({ top: dig.getBoundingClientRect().top + scrollY - 16, behavior: 'instant' })
     },
   })
@@ -405,7 +408,11 @@ const fmt = (y: number) =>
     if (actIdx > deepestAct) {
       deepestAct = actIdx
       shell.levelUp(`Zooming in ${Math.round(acts[actIdx - 1].yearsPerPx / act.yearsPerPx)}×`)
+      shell.pick('Zoom reached', `1 px = ${act.yearsPerPx.toLocaleString('en-US')} yrs`)
     }
+    // Where people stop: how far down the page in 5% steps, told only when it grows.
+    const pct = Math.floor((clamped / totalHeight) * 20) * 5
+    if (pct > furthestPct) shell.progress(furthestPct = pct)
     clearTimeout(stripT)
     stripT = window.setTimeout(paintStrip, 180)
     if (!ended && clamped >= totalHeight - 1) reachedToday()

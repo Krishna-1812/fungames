@@ -1313,14 +1313,15 @@ site is static; only `src/pages/api/` runs on request, as Vercel functions
 |---|---|
 | `src/lib/analytics/shape.ts` | what may be sent: every event by name, the limits on a batch, props cleaned flat and small, Life in Weeks' age coarsened to a decade; and what the server reads off a request (the device from the user agent, bots, referrers without their query, who must be asked before an ID is stored) |
 | `src/lib/analytics/client.ts` | the tracker in every page: batches (one a moment after load, then every 15 s while anything waits, the rest as the page hides), engaged time (visible, and touched in the last two minutes), scroll depth, Web Vitals, script errors, links out, the consent bar, and what the privacy page needs |
-| `src/lib/analytics/db.ts` | Neon Postgres in production, PGlite in dev and in the checker; the tables (`views`, `events`, `salts`), and the daily hash that counts visitors with no ID |
+| `src/lib/analytics/db.ts` | Neon Postgres in production, PGlite in dev and in the checker; the tables (`views`, `events`, `visitors`, `daily_counts`, `daily_props`, `salts`, `meta`), and the daily hash that counts visitors with no ID |
 | `src/lib/analytics/ingest.ts` | writing a batch, Forget me, and pruning (thirteen months; test runs after two days) |
+| `src/lib/analytics/rollup.ts` | the nightly summaries (`daily_counts`, `daily_props`) and the 90-day trim of raw events, run by a Vercel cron (`/api/cron/nightly/`) or, failing that, by the admin page once a day; what the database holds, for the Health tab |
 | `src/lib/analytics/report.ts` | every number the admin page shows, as SQL, through one filter (a period, a country, a kind of device, a game) |
 | `src/lib/analytics/csv.ts` | CSV a spreadsheet reads back as written, with formulas in visitors' words defused |
-| `src/lib/admin/` | the dashboard: `ui.ts` (cards with a table view and CSV, stat tiles, the tooltip), `charts.ts` (lines, bars, a world map, the week, a funnel, sparklines, all SVG in the theme's tokens), `tabs.ts` (what each tab shows) |
-| `scripts/seed-analytics.mjs` | a month of made-up traffic for the dev database, so the dashboard can be worked on locally (refuses to run with a real DATABASE_URL) |
+| `src/lib/admin/` | the dashboard: `ui.ts` (cards with a table view and CSV, stat tiles, the tooltip), `charts.ts` (lines, bars, a world map, the week, a funnel, sparklines, split bars, spreads, a page-to-page flow, a return-visit grid and the island heat-maps, all in the theme's tokens), `tabs.ts` (what each tab shows) |
+| `scripts/seed-analytics.mjs` | four months of made-up traffic for the dev database (crowd choices, taps on the real map, errors with stacks, and days past 90 rolled up and trimmed), so the dashboard can be worked on locally (refuses to run with a real DATABASE_URL) |
 | `src/lib/analytics/auth.ts` | the admin's session: an HMAC-signed, HttpOnly, SameSite=Strict cookie keyed by `ADMIN_PASSWORD` |
-| `src/pages/api/` | `collect`, `forget`, `health` and `admin/{login,logout,stats,export}` |
+| `src/pages/api/` | `collect`, `forget`, `health`, `cron/nightly` and `admin/{login,logout,stats,export}` |
 | `src/pages/admin/`, `src/pages/privacy.astro` | the dashboard, and the page that says what is counted, with this browser's own switches |
 | `scripts/check-analytics.mjs` | the rules above, proved, with the real SQL run against a real Postgres |
 
@@ -1331,24 +1332,35 @@ browser already keeps, how long ago it first came and how many games it has
 seen); how long it is really looked at and how far down; every game's start,
 ending (won or lost, its score and time), result numbers, personal bests,
 levels, restarts, pauses, how-to opens, sound and shares, all through the
-game shell; on the island, dives into games, cards, pokes, bottles, the
+game shell; each game's own choices and discoveries (`shell.pick`: Trolley's
+answer to every dilemma, the city an asteroid hit, Fusion's discoveries, and
+so on for all 32) and where a run was when its page was left (`shell.progress`,
+sent as `game_quit`); on the island, dives into games, cards, pokes, bottles, the
 noticeboard, Surprise me, postcards, the passport, searches and filters, the
-ball, the pigeons, a summary of how the map was explored, and how smoothly it
-drew; Web Vitals, script errors, 404s and links out. Nothing typed into a
+ball, the pigeons, a summary of how the map was explored (with where the
+middle of the screen rested, on a 10 × 7 grid), every tap on the map (rounded
+to ten map units, eighty a visit), and how smoothly it drew; Web Vitals,
+script errors with the top three frames of their stack (this site's own
+files named, anything else `(other)`), 404s and links out. Life in Weeks'
+score is the player's age, so its score, best and title are cut from every
+event, on the server too. Nothing typed into a
 game, no IP address, no user agent.
 
 **The dashboard.** One filter row scopes everything below it: 24 hours to 12
 months or a custom range, a comparison with the period before, a country, a
 kind of device and a game, all kept in the address so a view can be
-bookmarked. Eight tabs: **Overview** (eight headline numbers against the
+bookmarked. Nine tabs: **Overview** (eight headline numbers against the
 period before, traffic with last period dotted beside it, games started and
 finished, the most played, countries, referrers, devices); **Live** (a world
 map with a dot per page open in the last five minutes, events a minute, and
 everything as it happens, every ten seconds); **Games** (every game in a
 sortable table with a sparkline, completion and time, and a page per game:
-its funnel from opening to sharing, its trend, a distribution for every
+its funnel from opening to sharing, its trend, what the crowd chose (a split
+bar per question, a spread per row, a distribution or a ranked count),
+where runs were left and how far they get, a distribution for every
 number it reports and a count for every word, how long a game takes, where
-players came from, milestones and shares); **Island** (dives, cards, pokes and
+players came from, milestones and shares); **Island** (heat-maps on the island's own picture: taps, where screens
+rested, and dives per building; dives, cards, pokes and
 first finds, districts explored, bottles, searches and the ones that found
 nothing, the noticeboard, postcards, the passport, frame rate by device);
 **Audience** (a world map, regions, cities, the week in visitors' own time,
@@ -1356,11 +1368,15 @@ devices, systems, browsers, languages, window widths, pixel density,
 connections, timezones, dark mode, reduced motion); **Acquisition** (how
 visitors arrive, by kind and by site and page, campaigns, returns through a
 shared link or a postcard, first and last pages, page-to-page paths, shares
-and links out); **Retention** (new and returning, days visited, games a
+and links out); **Journeys** (the island's funnel and any visit's, step by
+step; a flow of every visit's first four pages; the commonest whole visits;
+pages a visit); **Retention** (return visits by the week of a first visit,
+came back the next day, within a week and within a month, new and returning, days visited, games a
 visitor, passports, consent); **Health** (Core Web Vitals at the 75th
 percentile with good, needs-work and poor rated against Google's lines, by
-device and by page; script errors grouped by message and file; broken links;
-the island's frame rate). Every chart has a table view and a CSV, and the
+device and by page; script errors grouped by message and file, each opening
+into its trend, stack, lines, pages, browsers and latest occurrences; broken
+links; the island's frame rate; what the database holds, table by table). Every chart has a table view and a CSV, and the
 whole period's raw views or events export as CSV. Light and dark themes
 (following the system, or picked), cool colours only, validated for
 colour-blind readers.
@@ -1379,17 +1395,31 @@ ask to be counted (`localStorage['funsite:analytics-test'] = '1'`); it is
 stored as test traffic, left out of every number unless `/admin/?test=1`, and
 deleted after two days.
 
+**What is kept, and for how long.** Raw events are kept 90 days. Every
+night (a Vercel cron at 03:17 UTC; the admin page runs it too if a day has
+gone by) each finished day is counted into `daily_counts` (every event per
+day, game, country and device) and `daily_props` (the crowd's choices, where
+runs stopped, levels, pokes, shares), and only then are events past 90 days
+deleted. Counting is idempotent, the last three days are counted again for
+late arrivals, and a day already trimmed is never counted again. A range
+reaching back past 90 days reads the summaries for the older days (starts,
+finishes, wins, shares and the crowd stay complete; the page says what
+starts later). Page views and visitor IDs' first visits are kept thirteen
+months; the summaries hold nothing about anyone and are kept for good.
+
 **Setting it up** is two steps in the Vercel project, both the owner's:
 Storage → Create Database → Neon (free) → connect it; and Settings →
 Environment Variables → `ADMIN_PASSWORD`. Then redeploy. `/api/health/` says
 whether each is there (yes or no, never the values). Tables make themselves
-on the first request.
+on the first request. Optional: a `CRON_SECRET` variable makes the nightly
+endpoint answer only Vercel's cron and the admin (without it, anyone may
+ask, but it runs at most once in twenty hours and does nothing harmful).
 
 **Building with the adapter.** The static site is now in `dist/client`
 (`npm run preview` serves it, as `astro preview` has no Vercel mode), and
 the deployable output in `.vercel/output`. Vercel routes by that output's
-own table and ignores `vercel.json`'s headers, so `scripts/vercel-headers.mjs`
-copies them in after every build. PGlite is a dev dependency, kept out of the
+own table and ignores `vercel.json`'s headers and crons, so
+`scripts/vercel-headers.mjs` copies both in after every build. PGlite is a dev dependency, kept out of the
 function by `astro.config.mjs`.
 
 ## Sound

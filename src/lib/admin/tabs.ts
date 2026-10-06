@@ -3,8 +3,8 @@
  * and lays it out as stat tiles and cards. Nothing here fetches or decides
  * anything; the page script (src/pages/admin/index.astro) does that.
  */
-import { el, card, stats, section, fmt, full, pct, share, dur, ago, country, language, when, type Table } from './ui'
-import { lineChart, columns, barList, stackBar, weekGrid, funnel, spark, worldMap, VITALS, vitalValue, vitalRating, statusBadge, type BarRow } from './charts'
+import { el, card, stats, section, tableEl, fmt, full, pct, share, dur, ago, country, language, when, type Table } from './ui'
+import { lineChart, columns, barList, stackBar, weekGrid, funnel, spark, worldMap, splitBars, spreadRows, flowChart, cohortGrid, islandHeat, VITALS, vitalValue, vitalRating, statusBadge, type BarRow, type IslandMap } from './charts'
 
 export type Bucket = 'hour' | 'day' | 'week'
 export type Ctx = {
@@ -16,6 +16,10 @@ export type Ctx = {
   openGame: (slug: string) => void
   /** Narrow the whole page to one country. */
   pickCountry: (iso: string) => void
+  /** The island's picture and buildings, for the heat-maps (null if the build had no poster). */
+  heat: IslandMap | null
+  /** Ask the server for one more thing in the same filter (an error in detail). */
+  fetch: (params: Record<string, string>) => Promise<Any>
 }
 type KV = { k: string; n: number }
 type Top = { k: string; views: number; visitors: number }
@@ -133,6 +137,7 @@ export const EV: Record<string, string> = {
   isl_surprise: 'surprise me', isl_today: 'today', isl_board: 'noticeboard', isl_board_go: 'noticeboard', isl_poke: 'poked', isl_bottle: 'bottle',
   isl_postcard: 'postcard', isl_passport: 'passport', isl_cover: 'cover', isl_time: 'day/night', isl_welcome: 'welcome', isl_minimap: 'mini-map',
   isl_ball: 'ball', isl_pigeons: 'pigeons', isl_session: 'explored', isl_fps: 'island fps',
+  game_pick: 'picked', game_quit: 'left mid-game', isl_tap: 'tapped the map',
 }
 const propsText = (p: Record<string, unknown>) => Object.entries(p ?? {}).slice(0, 5).map(([k, v]) => `${k}: ${v}`).join(' · ')
 function feed(c: Ctx, events: Any[]) {
@@ -239,6 +244,7 @@ export function game(root: HTMLElement, d: Any, slug: string, c: Ctx, back: () =
     ] }),
     table: () => ({ cols: ['When', 'Views', 'Started', 'Finished'], rows: d.series.map((s: Any) => [when(s.t, c.bucket, true), s.views, s.starts, s.ends]) }),
   })
+  crowd(root, d)
   section(root, 'What players got', 'Every number the game reports at its ending, as a spread across everyone who finished')
   const g2 = grid(root)
   if (!d.results.length) card(g2, { title: 'Results', span: 4, empty: true, emptyText: 'Nobody has finished this game in this period yet.' })
@@ -267,6 +273,57 @@ export function game(root: HTMLElement, d: Any, slug: string, c: Ctx, back: () =
   card(g3, { title: 'Milestones reached', sub: 'Level-ups and milestones the game announced', span: 1, empty: !d.levels.length, emptyText: 'This game announces no milestones, or nobody reached one.', draw: (b) => barList(b, bars(d.levels), { limit: 10 }), table: () => kvTable(d.levels, 'Milestone') })
   card(g3, { title: 'Shares', sub: 'What happened when Share was pressed', span: 1, empty: !d.shares.length, emptyText: 'Not shared yet.', draw: (b) => barList(b, bars(d.shares, (k) => ({ shared: 'Sent from the share sheet', downloaded: 'Saved the card', copied: 'Copied the link', dismissed: 'Closed the sheet', failed: 'Could not share' })[k] ?? k)), table: () => kvTable(d.shares, 'Outcome') })
 }
+const yesNo = (k: string) => (k === 'true' ? 'Yes' : k === 'false' ? 'No' : k)
+const nfmt = (v: number) => (Math.abs(v) >= 100 ? fmt(Math.round(v)) : fmt(+v.toFixed(2)))
+
+/** The crowd's choices (game_pick), where runs stop (game_quit) and how far they get (game_level). */
+function crowd(root: HTMLElement, d: Any) {
+  section(root, 'What the crowd chose', 'Every choice, discovery and step the game reports, from everyone who played it in this period')
+  const g = grid(root)
+  if (!d.crowd.length) card(g, { title: 'Choices', span: 4, empty: true, emptyText: 'Nobody has made a choice in this game in this period yet.' })
+  for (const q of d.crowd) {
+    if (q.kind === 'split') card(g, {
+      title: q.what, sub: `${fmt(q.total)} answers across ${fmt(q.rows.length)} ${q.rows.length === 1 ? 'question' : 'questions'}`, span: q.rows.length > 4 ? 4 : 2,
+      draw: (b) => splitBars(b, q.rows, q.answers, { label: yesNo }),
+      table: () => {
+        const ans: string[] = [...new Set<string>(q.rows.flatMap((r: Any) => r.values.map((v: KV) => v.k)))]
+        return { cols: ['Question', 'Answers', ...ans.map(yesNo)], rows: q.rows.map((r: Any) => [r.of, r.n, ...ans.map((a) => r.values.find((v: KV) => v.k === a)?.n ?? 0)]) }
+      },
+    })
+    else if (q.kind === 'splitNumber') card(g, {
+      title: q.what, sub: `${fmt(q.total)} answers · the dot is the median, the thick line runs to the 90th percentile`, span: q.rows.length > 6 ? 4 : 2,
+      draw: (b) => spreadRows(b, q.rows),
+      table: () => ({ cols: ['For', 'Answers', 'Median', '90th percentile', 'Mean', 'Least', 'Most'], rows: q.rows.map((r: Any) => [r.of, r.n, +r.median.toFixed(2), +r.p90.toFixed(2), +r.mean.toFixed(2), +r.min.toFixed(2), +r.max.toFixed(2)]) }),
+    })
+    else if (q.kind === 'number') card(g, {
+      title: q.what, sub: `${fmt(q.total)} answers · median ${nfmt(q.median)} · from ${nfmt(q.min)} to ${nfmt(q.max)}${q.log ? ' · log scale' : ''}`, span: 2,
+      draw: (b) => columns(b, { labels: q.bins.map((x: Any) => nfmt(x.lo)), values: q.bins.map((x: Any) => x.n), tipTitle: (i) => `${nfmt(q.bins[i].lo)} to ${nfmt(q.bins[i].hi)}`, unit: 'answers', xLabel: (i) => nfmt(q.bins[i].lo), slot: 3 }),
+      table: () => ({ cols: ['From', 'To', 'Answers'], rows: q.bins.map((x: Any) => [+x.lo.toFixed(2), +x.hi.toFixed(2), x.n]) }),
+    })
+    else card(g, {
+      title: q.what, sub: `${fmt(q.total)} answers · ${fmt(q.distinct)} different`, span: 2,
+      draw: (b) => barList(b, q.values.map((v: KV) => ({ k: v.k, n: v.n, label: yesNo(v.k) })), { limit: 10, total: q.total, slot: 2 }),
+      table: () => kvTable(q.values, q.what, 'Answers', yesNo),
+    })
+  }
+  const st = d.stops, starts = d.funnel.started
+  section(root, 'Where people stop', 'Runs left going when the page was closed or hidden, and how far runs get')
+  const g2 = grid(root)
+  card(g2, {
+    title: 'Left mid-game, at', sub: st.total ? `${fmt(st.total)} runs left before an ending${starts ? ` · ${pct(st.total, starts)} of page loads that started` : ''}` : undefined, span: 2,
+    empty: !st.total, emptyText: 'Nobody has left this game mid-way in this period.',
+    draw: (b) => (st.numeric && st.list.length > 3
+      ? columns(b, { labels: st.list.map((x: Any) => x.k || 'start'), values: st.list.map((x: Any) => x.n), tipTitle: (i) => (st.list[i].k ? `Stopped at ${st.list[i].k}` : 'Stopped before any progress'), unit: 'runs', slot: 4 })
+      : barList(b, st.list.map((x: Any) => ({ k: x.k, n: x.n, label: x.k || 'Before any progress', note: x.ms ? `median ${dur(x.ms)} in` : undefined })), { limit: 12, slot: 4, total: st.total })),
+    table: () => ({ cols: ['Stopped at', 'Runs', 'Median time in (s)'], rows: st.list.map((x: Any) => [x.k || 'before any progress', x.n, x.ms ? Math.round(x.ms / 1000) : '']) }),
+  })
+  card(g2, {
+    title: 'How far runs get', sub: 'Pages that reached each level-up the game announced', span: 2, empty: !d.reach.length, emptyText: 'This game announces no levels, or nobody reached one.',
+    draw: (b) => barList(b, d.reach.map((r: Any) => ({ k: String(r.i), n: r.n, label: r.text || `Level-up ${r.i}`, note: `${pct(r.n, d.reach[0].n)} of the first` })), { limit: 14, slot: 1 }),
+    table: () => ({ cols: ['Step', 'Called', 'Reached it'], rows: d.reach.map((r: Any) => [r.i, r.text, r.n]) }),
+  })
+}
+
 /** A result's key, as a heading: `actualWork` → "Actual work", `depthM` → "Depth (m)". */
 const label = (k: string) => {
   const s = k.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().replace(/ km s$/, ' (km/s)').replace(/ km$/, ' (km)').replace(/ m$/, ' (m)')
@@ -275,6 +332,8 @@ const label = (k: string) => {
 
 /* ---- Island ----------------------------------------------------------------- */
 
+/** Which island heat-map is showing, kept across refreshes. */
+let heatMode: 'taps' | 'look' | 'dives' = 'taps'
 const POKES: Record<string, string> = { ufo: 'The UFO (3 a.m.)', house32: 'The 32nd building', treasure: 'Buried treasure', castaway: 'The castaway', whale: 'The whale', notice: 'The noticeboard' }
 export function island(root: HTMLElement, d: Any, c: Ctx) {
   const k = d.counts
@@ -289,6 +348,21 @@ export function island(root: HTMLElement, d: Any, c: Ctx) {
     { label: 'Ball and pigeons', value: fmt(k.ball), sub: `throws · ${fmt(k.pigeons)} flocks put up · ${fmt(k.minimap)} mini-map`, slot: 4 },
   ], false)
   const g = grid(root)
+  if (c.heat) {
+    const map = c.heat
+    const tapTotal = d.heat.taps.reduce((a: number, t: Any) => a + t.n, 0)
+    // The mode buttons redraw the chart in place.
+    const draw = (b: HTMLElement): void => islandHeat(b, { map, taps: d.heat.taps, look: d.heat.look, lookW: d.heat.lookW, lookH: d.heat.lookH, dives: d.dives, title: (s) => gameName(c, s), mode: heatMode, onMode: (m) => { heatMode = m; b.replaceChildren(); draw(b) } })
+    card(g, {
+      title: 'The island, heat-mapped', sub: `${fmt(tapTotal)} taps and clicks on the map · ${fmt(d.session.n)} visits’ worth of looking · ${fmt(k.dives)} dives`, span: 4,
+      draw,
+      table: () => heatMode === 'look'
+        ? { cols: ['Column', 'Row', 'Seconds'], rows: d.heat.look.map((v: number, i: number) => [i % d.heat.lookW + 1, Math.floor(i / d.heat.lookW) + 1, v * 2]).filter((r: number[]) => r[2]) }
+        : heatMode === 'dives' ? kvTable(d.dives, 'Game', 'Dives', (s) => gameName(c, s))
+        : { cols: ['Map x', 'Map y', 'Landed on', 'Taps'], rows: d.heat.taps.map((t: Any) => [t.x, t.y, t.hit, t.n]) },
+      file: 'island-heat',
+    })
+  }
   card(g, { title: 'Dived into', sub: 'Games entered from the map. Click one for its page', span: 2, empty: !d.dives.length, draw: (b) => barList(b, bars(d.dives, (s) => gameName(c, s), c.openGame), { limit: 12 }), table: () => kvTable(d.dives, 'Game', 'Dives', (s) => gameName(c, s)) })
   card(g, { title: 'Looked at', sub: 'Building cards opened (once a visit each)', span: 2, empty: !d.cards.length, draw: (b) => barList(b, bars(d.cards, (s) => gameName(c, s), c.openGame), { limit: 12 }), table: () => kvTable(d.cards, 'Game', 'Cards', (s) => gameName(c, s)) })
   card(g, { title: 'Poked', span: 1, empty: !d.pokes.length, draw: (b) => barList(b, bars(d.pokes, (p) => POKES[p] ?? cap(p)), { limit: 10 }), table: () => kvTable(d.pokes, 'Thing') })
@@ -360,6 +434,39 @@ export function acquisition(root: HTMLElement, d: Any, c: Ctx) {
   card(g, { title: 'Left for', sub: 'Links to other sites that were followed (Buy Me a Coffee among them)', span: 2, empty: !d.outbound.length, emptyText: 'Nobody has followed a link out yet.', draw: (b) => barList(b, bars(d.outbound)), table: () => kvTable(d.outbound, 'Site', 'Clicks') })
 }
 
+/* ---- Journeys -------------------------------------------------------------------- */
+
+export function journeys(root: HTMLElement, d: Any, c: Ctx) {
+  const [visits, isl, card1, dive, play, fin, shared] = d.island
+  const [, game, gplay, gfin, gshared] = d.games
+  const avg = d.lengths.reduce((a: number, r: KV) => a + (r.k === '8+' ? 8 : Number(r.k)) * r.n, 0) / Math.max(1, d.visits)
+  stats(root, [
+    { label: 'Visits', value: fmt(visits), sub: 'a visitor’s pages on one day', slot: 1 },
+    { label: 'Pages a visit', value: d.visits ? avg.toFixed(1) : '–', sub: `${pct(d.lengths.find((r: KV) => r.k === '1')?.n ?? 0, d.visits)} saw only one`, slot: 2 },
+    { label: 'Island to a game', value: pct(dive, isl), sub: 'of visits that saw the island went into a game from the map', slot: 3 },
+    { label: 'Played to the end', value: pct(gfin, gplay), sub: 'of visits that started a game finished one', slot: 4 },
+  ], false)
+  const g = grid(root)
+  const steps = (xs: [string, number][]) => xs.map(([k, n]) => ({ k, n }))
+  const islandSteps = steps([['Visits', visits], ['Saw the island', isl], ['Opened a building’s card', card1], ['Went into a game from the map', dive], ['Started playing', play], ['Finished a game', fin], ['Shared something', shared]])
+  const gameSteps = steps([['Visits', visits], ['Opened a game', game], ['Started playing', gplay], ['Finished a game', gfin], ['Shared something', gshared]])
+  card(g, { title: 'From the island', sub: 'Each step counts visits that did every step before it too', span: 2, empty: !visits,
+    draw: (b) => funnel(b, islandSteps), table: () => kvTable(islandSteps, 'Step', 'Visits') })
+  card(g, { title: 'Any visit, to a shared result', sub: 'However they arrived: straight to a game, from a link, from the island', span: 2, empty: !visits,
+    draw: (b) => funnel(b, gameSteps), table: () => kvTable(gameSteps, 'Step', 'Visits') })
+  const lab = (k: string) => (k === '(left)' ? 'Left the site' : k === '(other)' ? 'Another page' : pageName(c, k))
+  card(g, { title: 'Page to page', sub: 'The first four steps of every visit: the commonest pages at each step, and where visits ended', span: 4, empty: !d.visits,
+    draw: (b) => flowChart(b, { steps: d.flow.steps, links: d.flow.links, label: lab, heads: ['First page', 'Second', 'Third', 'Fourth'] }),
+    table: () => ({ cols: ['Step', 'From', 'To', 'Visits'], rows: d.flow.links.map((l: Any) => [`${l.s + 1} → ${l.s + 2}`, lab(l.a), lab(l.b), l.n]) }), file: 'page-flow' })
+  const path = (k: string) => k.split(' ').map((p) => (p === '…' ? '…' : pageName(c, p))).join(' → ')
+  card(g, { title: 'The commonest visits', sub: 'Whole visits, page by page (a reload is not a step; past five pages, …)', span: 2, empty: !d.top.length,
+    draw: (b) => barList(b, d.top.map((r: KV) => ({ k: r.k, n: r.n, label: path(r.k) })), { limit: 12, total: d.visits }),
+    table: () => kvTable(d.top, 'Visit', 'Times', path) })
+  card(g, { title: 'Pages in a visit', sub: 'Different pages, in a row', span: 2, empty: !d.lengths.length,
+    draw: (b) => columns(b, { labels: d.lengths.map((r: KV) => r.k), values: d.lengths.map((r: KV) => r.n), tipTitle: (i) => `${d.lengths[i].k} page${d.lengths[i].k === '1' ? '' : 's'}`, unit: 'visits', height: 200, slot: 2 }),
+    table: () => kvTable(d.lengths, 'Pages', 'Visits') })
+}
+
 /* ---- Retention ------------------------------------------------------------------- */
 
 export function retention(root: HTMLElement, d: Any, c: Ctx) {
@@ -370,7 +477,15 @@ export function retention(root: HTMLElement, d: Any, c: Ctx) {
     { label: 'Days a visitor', value: i.n ? i.days.toFixed(1) : '–', sub: 'on average, in this period', slot: 3 },
     { label: 'Games a visitor', value: i.n ? i.games.toFixed(1) : '–', sub: `${i.n ? i.views.toFixed(1) : '–'} page views each`, slot: 4 },
   ], false)
+  const rets: { k: string; n: number; back: number }[] = d.returns
+  stats(root, rets.map((r, j) => ({ label: `Came back ${r.k}`, value: r.n ? pct(r.back, r.n) : '–', sub: r.n ? `${fmt(r.back)} of ${fmt(r.n)} whose first visit was long enough ago` : 'too soon to tell', slot: j + 1 })).concat([{ label: 'New in twelve weeks', value: fmt(d.cohorts.weeks.reduce((x: number, w: Any) => x + w.size, 0)), sub: 'visitor IDs whose first visit was in the last twelve weeks', slot: 4 }]), false)
   const g = grid(root)
+  const weeks = d.cohorts.weeks
+  card(g, { title: 'Return visits, by the week people first came', sub: 'Each row is a week’s new visitors with an ID; each column, the share seen again that many weeks later. Not filtered by country, device or game', span: 4,
+    empty: !weeks.length, emptyText: 'No visitor with an ID has a first visit in the last twelve weeks yet.',
+    draw: (b) => cohortGrid(b, weeks, { now: new Date(), label: (iso) => 'Week of ' + new Date(iso + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) }),
+    table: () => ({ cols: ['Week of', 'People', ...Array.from({ length: 12 }, (_, j) => `Week ${j}`)], rows: weeks.map((w: Any) => [w.cohort, w.size, ...Array.from({ length: 12 }, (_, j) => w.back.find((x: Any) => x.wk === j)?.n ?? 0)]) }),
+    file: 'cohorts' })
   const labels: string[] = d.daily.map((r: Any) => r.t)
   card(g, { title: 'New and returning', sub: 'New: no earlier visit here, and an empty passport', span: 4, empty: !d.daily.length,
     draw: (b) => lineChart(b, { labels, ...timeline(c, labels), area: false, series: [{ name: 'New', values: d.daily.map((r: Any) => r.fresh), slot: 1 }, { name: 'Returning', values: d.daily.map((r: Any) => r.returning), slot: 2 }] }),
@@ -390,6 +505,41 @@ export function retention(root: HTMLElement, d: Any, c: Ctx) {
 }
 
 /* ---- Health -------------------------------------------------------------------------- */
+
+const fmtBytes = (b: number) => (b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b >= 1e3 ? Math.round(b / 1e3) + ' KB' : b + ' B')
+const KEPT: Record<string, string> = {
+  views: 'a row per page load, 13 months', events: 'a row per thing done, 90 days', visitors: 'each ID’s first and last visit',
+  daily_counts: 'every event counted per day, for good', daily_props: 'the crowd’s choices per day, for good', salts: 'today’s random salt', meta: 'when the summaries ran',
+}
+
+/** One error, in detail, under the errors table. */
+async function errorDetail(box: HTMLElement, e: Any, c: Ctx) {
+  box.replaceChildren(el('p', { class: 'ad-dim', text: 'Loading…' }))
+  let x: Any
+  try { x = await c.fetch({ tab: 'error', key: e.key }) } catch { box.replaceChildren(el('p', { class: 'ad-empty', text: 'That error could not be loaded.' })); return }
+  const close = el('button', { type: 'button', class: 'ad-mini', text: 'Close' })
+  close.addEventListener('click', () => box.replaceChildren())
+  box.replaceChildren(el('div', { class: 'ad-err-head' }, el('div', {}, el('p', { class: 'ad-kicker', text: [x.type, x.src].filter(Boolean).join(' · ') || 'Error' }), el('h4', { text: x.msg })), close))
+  stats(box, [
+    { label: 'Times', value: fmt(x.n), sub: x.first ? `first ${ago(x.first)}, last ${ago(x.last)}` : '', slot: 4 },
+    { label: 'Pages', value: fmt(x.paths.length), sub: x.paths[0] ? `most on ${pageName(c, x.paths[0].k)}` : '', slot: 1 },
+    { label: 'Browsers', value: fmt(x.browsers.length), sub: x.browsers[0]?.k ?? '', slot: 2 },
+    { label: 'Devices', value: fmt(x.devices.length), sub: x.devices.map((v: KV) => `${v.k} ${v.n}`).join(' · '), slot: 3 },
+  ], false)
+  const g = grid(box)
+  const labels: string[] = x.series.map((r: Any) => r.t)
+  card(g, { title: 'When', span: 4, draw: (b) => lineChart(b, { labels, ...timeline(c, labels), height: 160, series: [{ name: 'Times', values: x.series.map((r: Any) => r.n), slot: 4 }] }), table: () => ({ cols: ['When', 'Times'], rows: x.series.map((r: Any) => [when(r.t, c.bucket, true), r.n]) }) })
+  card(g, { title: 'Stack', sub: 'The top three frames, as the browsers reported them', span: 2, empty: !x.stacks.length, emptyText: 'No stack came with it (an error thrown as a string, or from another site’s script).',
+    draw: (b) => b.append(...x.stacks.slice(0, 4).map((s2: KV) => el('div', { class: 'ad-stackframe' }, el('pre', { text: s2.k }), el('span', { class: 'ad-dim', text: `${fmt(s2.n)} times` })))), table: () => kvTable(x.stacks, 'Stack', 'Times') })
+  card(g, { title: 'Where in the file', span: 1, empty: !x.lines.length, draw: (b) => barList(b, bars(x.lines), { slot: 4 }), table: () => kvTable(x.lines, 'Line', 'Times') })
+  card(g, { title: 'Pages', span: 1, empty: !x.paths.length, draw: (b) => barList(b, bars(x.paths, (p) => pageName(c, p)), { slot: 4 }), table: () => kvTable(x.paths, 'Page', 'Times', (p) => pageName(c, p)) })
+  card(g, { title: 'Browsers', span: 1, draw: (b) => barList(b, bars(x.browsers)), table: () => kvTable(x.browsers, 'Browser', 'Times') })
+  card(g, { title: 'Systems', span: 1, draw: (b) => barList(b, bars(x.os)), table: () => kvTable(x.os, 'System', 'Times') })
+  card(g, { title: 'Countries', span: 1, empty: !x.countries.length, draw: (b) => barList(b, bars(x.countries, country)), table: () => kvTable(x.countries, 'Country', 'Times', country) })
+  card(g, { title: 'Kind', span: 1, draw: (b) => barList(b, bars(x.kinds, (k) => ({ error: 'Thrown', promise: 'A promise rejected' })[k] ?? k)), table: () => kvTable(x.kinds, 'Kind', 'Times') })
+  card(g, { title: 'The latest', span: 4, tableOnly: true, table: () => ({ cols: ['When', 'Page', 'Browser', 'System', 'Device', 'Country', 'Line'], rows: x.recent.map((r: Any) => [new Date(r.ts).toLocaleString(), pageName(c, r.path), r.browser, r.os ?? '', r.device ?? '', country(r.country ?? ''), r.line ?? '']) }) })
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 export function health(root: HTMLElement, d: Any, c: Ctx) {
   const overall = d.vitals.filter((v: Any) => v.device === null)
@@ -414,9 +564,17 @@ export function health(root: HTMLElement, d: Any, c: Ctx) {
     table: () => ({ cols: ['Metric', ...devs], rows: Object.keys(VITALS).map((m) => [VITALS[m].name, ...devs.map((dv) => { const v = d.vitals.find((x: Any) => x.metric === m && x.device === dv); return v ? vitalValue(m, v.p75) : '–' })]) }) })
   card(g, { title: 'By page', sub: 'Slowest first, by largest paint', span: 2, tableOnly: true, empty: !d.pages.length,
     table: () => ({ cols: ['Page', 'Loads', 'LCP', 'INP', 'CLS', 'TTFB'], rows: [...d.pages].sort((a: Any, b: Any) => (b.lcp ?? 0) - (a.lcp ?? 0)).map((p: Any) => [pageName(c, p.path), p.n, p.lcp === null ? '–' : vitalValue('LCP', p.lcp), p.inp === null ? '–' : vitalValue('INP', p.inp), p.cls === null ? '–' : vitalValue('CLS', p.cls), p.ttfb === null ? '–' : vitalValue('TTFB', p.ttfb)]) }) })
-  card(g, { title: 'Script errors', sub: 'Grouped by message and file', span: 4, tableOnly: true, empty: !d.errors.length, emptyText: 'No errors in this period. Lovely.',
-    table: () => ({ cols: ['Message', 'File:line', 'Times', 'Visitors', 'Pages', 'Browsers', 'Last'], align: ['l', 'l', 'r', 'r', 'l', 'l', 'r'], rows: d.errors.map((e: Any) => [e.msg, `${e.src || '?'}:${e.line || '?'}`, e.n, e.visitors, e.paths, e.browsers, ago(e.last)]) }) })
+  const errTable = (): Table => ({ cols: ['Message', 'File:line', 'Times', 'Visitors', 'Pages', 'Browsers', 'Last'], align: ['l', 'l', 'r', 'r', 'l', 'l', 'r'], rows: d.errors.map((e: Any) => [e.msg, `${e.src || '?'}:${e.line || '?'}`, e.n, e.visitors, e.paths, e.browsers, ago(e.last)]) })
+  const errCard = card(g, { title: 'Script errors', sub: 'Grouped by message and file. Click one for everything known about it', span: 4, tableOnly: true, empty: !d.errors.length, emptyText: 'No errors in this period. Lovely.', table: errTable })
+  const detail = el('div', { class: 'ad-err-detail' })
+  if (d.errors.length) {
+    errCard.querySelector('.ad-card-body')!.replaceChildren(tableEl(errTable(), { onRow: (i) => void errorDetail(detail, d.errors[i], c) }))
+    g.append(detail)
+  }
   card(g, { title: 'Broken links', sub: 'Addresses that showed the 404 page', span: 2, empty: !d.missing.length, emptyText: 'No 404s in this period.', draw: (b) => barList(b, bars(d.missing)), table: () => kvTable(d.missing, 'Address', 'Times') })
   card(g, { title: 'The island’s frame rate', sub: 'By device', span: 2, tableOnly: true, empty: !d.fps.length,
     table: () => ({ cols: ['Device', 'Measured', 'Median fps', 'Slowest 10% at'], rows: d.fps.map((r: Any) => [r.k, r.n, Math.round(r.median), Math.round(r.low)]) }) })
+  const s = d.storage
+  if (s) card(g, { title: 'What is kept', sub: `Raw events for ${s.rawDays} days, then daily totals for good · ${fmtBytes(s.dbBytes)} in all${s.nightly ? ` · summaries last run ${ago(s.nightly.at)}` : ' · summaries not run yet'}`, span: 4, tableOnly: true,
+    table: () => ({ cols: ['Table', 'Rows', 'Size', 'Holds'], align: ['l', 'r', 'r', 'l'], rows: s.tables.map((t: Any) => [t.t, t.rows, fmtBytes(t.bytes), KEPT[t.t] ?? '']) }) })
 }

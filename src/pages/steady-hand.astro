@@ -412,6 +412,7 @@ import { SHAPES } from '../lib/steady-shapes'
     nudge()
   })
 
+  const abandoned = new Set<string>()
   function finishStroke() {
     if (!drawing) return
     drawing = false
@@ -424,6 +425,8 @@ import { SHAPES } from '../lib/steady-shapes'
         ? 'You have to come back to where you started. Try again.'
         : 'You have to finish on the last dot. Try again.'
       shell.shake($('board'))
+      // Once a shape a page: a missed ending can come many times over.
+      if (!abandoned.has(shape.id)) { abandoned.add(shape.id); shell.pick('Stroke abandoned', shape.name) }
       paintStrip()
       render()
       nudge()
@@ -479,6 +482,7 @@ import { SHAPES } from '../lib/steady-shapes'
   function redo() {
     if (!locked || idx >= SHAPES.length) return
     unlock(); sfx.whoosh()
+    shell.pick('Shape redrawn', shape.name)
     delete round[shape.id]
     place()
     paintRound()
@@ -489,6 +493,8 @@ import { SHAPES } from '../lib/steady-shapes'
   function next() {
     if (!locked || idx >= SHAPES.length) return
     unlock(); sfx.click()
+    // The score kept, not every attempt (recordPlay has those).
+    shell.pick('Score kept, per shape', Math.round(round[shape.id]), shape.name)
     idx++
     if (idx >= SHAPES.length) return finishRound()
     shape = SHAPES[idx]

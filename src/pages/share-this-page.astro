@@ -187,6 +187,10 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     if (!m || sent.has(id)) return
     sent.add(id)
     if (m.kind === 'real') realSent++
+    // Which ways, never the message: only whether one was written at all.
+    if (sent.size === 1) { shell.pick('First way tried', m.title); shell.pick('Wrote own message', msgInput.value.trim() !== '') }
+    shell.pick('Way shared', m.title)
+    shell.progress(sent.size)
     paintStrip()
     if (ended || sent.size < METHODS.length) return
     ended = true
@@ -537,6 +541,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text)
+      once('Way copied')
       const was = copyBtn.textContent
       copyBtn.textContent = 'Copied'
       sfx.good()
@@ -545,6 +550,14 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
       /* clipboard blocked — nothing useful to say */
     }
   }
+
+  // Once per way a visit, however often it is replayed or recopied.
+  const done = new Set<string>()
+  function once(what: string) {
+    const m = methodById(currentId)
+    if (m && !ended && !done.has(what + currentId)) { done.add(what + currentId); shell.pick(what, m.title) }
+  }
+  playBtn.addEventListener('click', () => once('Way played aloud'))
 
   grid.querySelectorAll<HTMLButtonElement>('.stp-tile').forEach((btn) => {
     btn.addEventListener('click', () => { unlock(); open(btn.dataset.id!) })

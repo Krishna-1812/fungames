@@ -690,6 +690,7 @@ const DRUM_CELLS = 30
     shell.setLevel(formatYear(at.y))
     shell.setMoves(`${met.size} / ${D.total}`)
     if (at.alive > 0) shell.considerBest(at.alive, String(at.alive))
+    shell.progress(met.size)
     // The tile only has room for the number; the year it was is said at the end.
     if (at.alive > crowd.alive) crowd = { ...at }
     if (!ended && met.size === D.total) metEveryone()
@@ -789,14 +790,21 @@ const DRUM_CELLS = 30
     }
     goErr.innerHTML = '&nbsp;'
     sfx.click()
+    // Typed, so only the decade.
+    shell.pick('Decade looked up', Math.floor(parsed / 10) * 10)
     setYear(parsed)
     document.querySelector('.wa-readout')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
 
+  let dobDecade = NaN, dobT = 0
   dob.addEventListener('change', () => {
     const v = dob.valueAsDate
     if (!v) return
     sfx.click()
+    // A birthday: the decade, never the year, once the box (which fires per digit) settles.
+    const dec = Math.floor(v.getUTCFullYear() / 10) * 10
+    clearTimeout(dobT)
+    dobT = window.setTimeout(() => { if (dec !== dobDecade) { dobDecade = dec; shell.pick('Birth decade', dec) } }, 1500)
     setYear(v.getUTCFullYear())
   })
 
@@ -808,7 +816,10 @@ const DRUM_CELLS = 30
   /* ---- the chart is a control too ------------------------------------------ */
 
   for (const b of bars) {
-    b.addEventListener('click', () => { unlock(); sfx.click(); setYear(Number(b.dataset.birth)) })
+    b.addEventListener('click', () => {
+      unlock(); sfx.click(); setYear(Number(b.dataset.birth))
+      shell.pick('Life clicked on the chart', b.dataset.name ?? '')
+    })
   }
 
   // One pair of listeners on the group rather than 89 pairs on each bar —
@@ -858,7 +869,7 @@ const DRUM_CELLS = 30
       sfx.click()
       const cat = btn.dataset.category!
       if (activeCats.has(cat)) activeCats.delete(cat)
-      else { activeCats.clear(); activeCats.add(cat) }
+      else { activeCats.clear(); activeCats.add(cat); shell.pick('Category isolated', btn.textContent!.trim()) }
       applyLegendFilter()
     })
   }

@@ -175,6 +175,7 @@ const first = DILEMMAS[0]
     void (side as HTMLElement).offsetWidth
     side.classList.add('is-turning')
     paintStrip()
+    shell.progress(i + 1)
     if (i === Math.floor(TOTAL / 2)) shell.levelUp('Halfway.')
     else if (i === TOTAL - 1) shell.levelUp('Last one.')
   }
@@ -196,6 +197,7 @@ const first = DILEMMAS[0]
     saved += Math.max(d.left.deaths, d.right.deaths) - opt.deaths
     if (opt.acts) pulls++
     picks[i] = side
+    shell.pick('Choice on each dilemma', opt.label, d.title)
 
     btn[side].classList.add('is-chosen')
     btn.left.disabled = true
@@ -276,6 +278,7 @@ const first = DILEMMAS[0]
     // The twenty-fifth problem is the first one again. Whether you answered it
     // the same way is the one thing this game can measure about you directly.
     const changed = picks[0] && picks[REPEAT_OF_FIRST] && picks[0] !== picks[REPEAT_OF_FIRST]
+    if (picks[0] && picks[REPEAT_OF_FIRST]) shell.pick('Same answer to problem 1 twice', !changed)
     const stat = recordPlay('trolley', { position: top.name, pulls, saved, deaths }, { saved: 'high' })
     const beat = shell.considerBest(top.pct, `${top.pct}%`)
 

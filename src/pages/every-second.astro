@@ -262,6 +262,8 @@ const restDps = perSecond(annualDeaths(REST))
   const deathCount = document.getElementById('deathCount')!
   const netCount = document.getElementById('netCount')!
 
+  let hoursTold = 0
+  shell.progress(0)
   function frame(now: number) {
     requestAnimationFrame(frame)
     // Clamped so a backgrounded tab does not resume with an enormous dt and
@@ -298,6 +300,9 @@ const restDps = perSecond(annualDeaths(REST))
     deathCount.textContent = fmt(shownDeaths)
     netCount.textContent = (net >= 0 ? '+' : '') + fmt(net)
     shown = { births: shownBirths, deaths: shownDeaths }
+    // Where people stop: whole simulated hours watched, told only as each one passes.
+    const hours = Math.min(24, Math.floor(simNow / 3600))
+    if (hours > hoursTold) shell.progress(hoursTold = hours)
     if (!ended && simNow >= DAY) oneDay()
   }
   requestAnimationFrame(frame)
@@ -306,6 +311,7 @@ const restDps = perSecond(annualDeaths(REST))
   const speedBtns = [...document.querySelectorAll<HTMLButtonElement>('.speed .opt')]
   for (const b of speedBtns) {
     b.addEventListener('click', () => {
+      if (Number(b.dataset.speed) !== speed) shell.pick('Speed chosen', b.textContent!)
       speed = Number(b.dataset.speed)
       for (const o of speedBtns) o.setAttribute('aria-checked', String(o === b))
       paintStrip()
@@ -330,8 +336,10 @@ const restDps = perSecond(annualDeaths(REST))
     return `every ${(seconds / 86400).toFixed(1)} days`
   }
 
+  const inspected = new Set<number>()
   function openInspector(i: number) {
     const d = simData[i]
+    if (!inspected.has(i)) { inspected.add(i); shell.pick('Country inspected', d.name) }
     inspectorName.textContent = d.name
     inspectorPop.textContent = fmt(d.population) + ' people'
     inspectorBirth.textContent = `${d.birthRate} per 1,000 people a year`

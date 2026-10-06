@@ -93,9 +93,18 @@ const total = RULES.length
     slug: 'rule-cascade',
     onRestart: restart,
     onPause: () => { pausedAt = Date.now() },
-    onResume: () => { started += Date.now() - pausedAt; input.focus() },
+    onResume: () => { started += Date.now() - pausedAt; ruleAt += Date.now() - pausedAt; input.focus() },
   })
   let pausedAt = 0
+
+  // For the crowd: how long each rule held people up, and how far they got.
+  let ruleAt = Date.now(), slowest = { id: 0, s: -1 }, reached = 0
+  function cleared(id: number) {
+    const s = Math.round((Date.now() - ruleAt) / 1000)
+    ruleAt = Date.now()
+    shell.pick('Seconds to clear each rule', s, `Rule ${id}`)
+    if (s > slowest.s) slowest = { id, s }
+  }
 
   /* Best: most rules met at once, or — once finished — a finish with fewer
      keystrokes. A finish always outranks a non-finish. */
@@ -120,6 +129,7 @@ const total = RULES.length
     const v = input.value
     const before = ctx.unlocked
     while (ctx.unlocked < TOTAL && RULES.slice(0, ctx.unlocked).every((r) => r.ok(v, ctx))) {
+      cleared(RULES[ctx.unlocked - 1].id)
       ctx.unlocked++
       maybeSacrifice()
     }
@@ -190,12 +200,15 @@ const total = RULES.length
     scoreEl.textContent = `${passing.size} / ${TOTAL} rules`
     shell.setScore(String(passing.size))
     shell.setLevel(String(ctx.unlocked))
+    if (ctx.unlocked !== reached) shell.progress(reached = ctx.unlocked)
     shell.setMoves(keystrokes.toLocaleString('en-GB'))
     shell.considerBest(liveBest(passing.size), `${passing.size} / ${TOTAL}`)
 
     const all = RULES.every((r) => r.ok(v, ctx))
     if (all && !won) {
       won = true
+      cleared(RULES[TOTAL - 1].id)
+      shell.pick('Rule that took longest', slowest.id)
       const secs = Math.round((Date.now() - started) / 1000)
       recordPlay('rule-cascade', { keystrokes, seconds: secs, length: n }, { keystrokes: 'low', seconds: 'low' })
       const beat = shell.considerBest(finishBest(keystrokes), `${keystrokes.toLocaleString('en-GB')} keys`)
@@ -256,6 +269,7 @@ const total = RULES.length
     won = false
     keystrokes = 0
     started = Date.now()
+    ruleAt = started; slowest = { id: 0, s: -1 }; reached = 0
     passedBefore = new Set()
     nodes.clear()
     list.innerHTML = ''

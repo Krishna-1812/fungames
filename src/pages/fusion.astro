@@ -371,6 +371,9 @@ const ART_BY_NAME = Object.fromEntries(
     }
     if (isNew) {
       state.items.push(res)
+      // For the crowd: every first discovery, and how far into the tree it leaves people.
+      shell.pick('Element discovered', res.text)
+      shell.progress(treeFound())
       show(`First time discovering ${res.text}`)
       made.classList.add('fresh')
     }
