@@ -374,10 +374,10 @@ the EU, EEA, UK and Switzerland). See README, "Analytics".
   (two funnels, a page-to-page flow, the commonest visits). Return visits by
   the week of a first visit. Errors with stack frames, each opening into
   detail. Raw events kept 90 days, rolled into daily summaries kept for good
-  by a nightly Vercel cron (`/api/cron/nightly/`, with the admin page as a
-  fallback). Life in Weeks' score (the player's age) is now cut from every
+  once a day by the first visit after a day has gone by (or the admin
+  page); no Vercel cron (the deploy that declared one failed). Life in Weeks' score (the player's age) is now cut from every
   event, server-side, and the nightly run cleaned the rows stored before.
-  Optional for the owner: a `CRON_SECRET` variable in Vercel.
+  Nothing to set up.
 
 ### Needs a decision from the owner
 

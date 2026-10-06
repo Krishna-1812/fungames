@@ -313,6 +313,8 @@ console.log('\nthe database')
   const sw = await Rp.series(d, wide)
   check(sw.reduce((a, s) => a + s.starts, 0) === kw.starts, 'the traffic chart’s starts add up to the headline, summaries included')
   check(!(await R0.due(d, new Date(NOW))) && await R0.due(d, new Date(NOW + 27 * 3600e3)), 'it is due again after a day')
+  const claims = await Promise.all([R0.claim(d, new Date(NOW)), R0.claim(d, new Date(NOW)), R0.claim(d, new Date(NOW))])
+  check(claims.filter(Boolean).length === 1 && !(await R0.claim(d, new Date(NOW + 3600e3))) && await R0.claim(d, new Date(NOW + 25 * 3600e3)), 'the day’s run is taken by exactly one of several visits arriving at once, and is free again a day later')
 
   // The daily hash: the same address and browser are one visitor today, and someone else tomorrow.
   const h1 = await DB.dailyHash(d, '1.2.3.4', 'ua', new Date(NOW))

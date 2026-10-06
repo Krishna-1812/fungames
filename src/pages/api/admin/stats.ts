@@ -11,7 +11,7 @@ import { isAdmin } from '../../../lib/analytics/auth'
 import { getDb, type Db } from '../../../lib/analytics/db'
 import * as R from '../../../lib/analytics/report'
 import { json } from '../../../lib/analytics/request'
-import { due, nightly } from '../../../lib/analytics/rollup'
+import { claim, nightly } from '../../../lib/analytics/rollup'
 
 export const prerender = false
 
@@ -26,8 +26,8 @@ export const GET: APIRoute = async ({ request, url }) => {
   const tab = url.searchParams.get('tab') ?? 'overview'
   try {
     const d = await getDb()
-    // The nightly summaries, if the cron has not run them in a day (or is not set up).
-    if (tab === 'overview' && (await due(d))) await nightly(d).catch((e) => console.error('nightly', (e as Error).message))
+    // The nightly summaries, if no visit has run them in a day (a quiet site still gets them).
+    if (tab === 'overview' && (await claim(d))) await nightly(d).catch((e) => console.error('nightly', (e as Error).message))
     if (tab === 'error') {
       const key = url.searchParams.get('key') ?? ''
       if (!/^[0-9a-f]{12}$/.test(key)) return json({ error: 'which error?' }, 400)

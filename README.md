@@ -1315,7 +1315,7 @@ site is static; only `src/pages/api/` runs on request, as Vercel functions
 | `src/lib/analytics/client.ts` | the tracker in every page: batches (one a moment after load, then every 15 s while anything waits, the rest as the page hides), engaged time (visible, and touched in the last two minutes), scroll depth, Web Vitals, script errors, links out, the consent bar, and what the privacy page needs |
 | `src/lib/analytics/db.ts` | Neon Postgres in production, PGlite in dev and in the checker; the tables (`views`, `events`, `visitors`, `daily_counts`, `daily_props`, `salts`, `meta`), and the daily hash that counts visitors with no ID |
 | `src/lib/analytics/ingest.ts` | writing a batch, Forget me, and pruning (thirteen months; test runs after two days) |
-| `src/lib/analytics/rollup.ts` | the nightly summaries (`daily_counts`, `daily_props`) and the 90-day trim of raw events, run by a Vercel cron (`/api/cron/nightly/`) or, failing that, by the admin page once a day; what the database holds, for the Health tab |
+| `src/lib/analytics/rollup.ts` | the nightly summaries (`daily_counts`, `daily_props`) and the 90-day trim of raw events, started once a day by the first visit (or the admin page) after a day has gone by, with no scheduler to set up (`/api/cron/nightly/` runs it on demand); what the database holds, for the Health tab |
 | `src/lib/analytics/report.ts` | every number the admin page shows, as SQL, through one filter (a period, a country, a kind of device, a game) |
 | `src/lib/analytics/csv.ts` | CSV a spreadsheet reads back as written, with formulas in visitors' words defused |
 | `src/lib/admin/` | the dashboard: `ui.ts` (cards with a table view and CSV, stat tiles, the tooltip), `charts.ts` (lines, bars, a world map, the week, a funnel, sparklines, split bars, spreads, a page-to-page flow, a return-visit grid and the island heat-maps, all in the theme's tokens), `tabs.ts` (what each tab shows) |
@@ -1395,9 +1395,9 @@ ask to be counted (`localStorage['funsite:analytics-test'] = '1'`); it is
 stored as test traffic, left out of every number unless `/admin/?test=1`, and
 deleted after two days.
 
-**What is kept, and for how long.** Raw events are kept 90 days. Every
-night (a Vercel cron at 03:17 UTC; the admin page runs it too if a day has
-gone by) each finished day is counted into `daily_counts` (every event per
+**What is kept, and for how long.** Raw events are kept 90 days. Once a
+day (started by the first visit after a day has gone by, or the admin page;
+a one-row claim in `meta` lets only one of them run it) each finished day is counted into `daily_counts` (every event per
 day, game, country and device) and `daily_props` (the crowd's choices, where
 runs stopped, levels, pokes, shares), and only then are events past 90 days
 deleted. Counting is idempotent, the last three days are counted again for
@@ -1411,15 +1411,17 @@ months; the summaries hold nothing about anyone and are kept for good.
 Storage → Create Database → Neon (free) → connect it; and Settings →
 Environment Variables → `ADMIN_PASSWORD`. Then redeploy. `/api/health/` says
 whether each is there (yes or no, never the values). Tables make themselves
-on the first request. Optional: a `CRON_SECRET` variable makes the nightly
-endpoint answer only Vercel's cron and the admin (without it, anyone may
-ask, but it runs at most once in twenty hours and does nothing harmful).
+on the first request. Optional: a `CRON_SECRET` variable makes `/api/cron/nightly/`
+answer only a request bearing it and the admin (without it, anyone may ask,
+but it runs at most once in twenty hours and does nothing harmful). There
+is no Vercel cron: the phase 3 deploy that declared one failed, and visits
+already come often enough.
 
 **Building with the adapter.** The static site is now in `dist/client`
 (`npm run preview` serves it, as `astro preview` has no Vercel mode), and
 the deployable output in `.vercel/output`. Vercel routes by that output's
-own table and ignores `vercel.json`'s headers and crons, so
-`scripts/vercel-headers.mjs` copies both in after every build. PGlite is a dev dependency, kept out of the
+own table and ignores `vercel.json`'s headers, so `scripts/vercel-headers.mjs`
+copies them in after every build (and any crons, should one be added). PGlite is a dev dependency, kept out of the
 function by `astro.config.mjs`.
 
 ## Sound

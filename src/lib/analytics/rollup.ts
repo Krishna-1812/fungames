@@ -18,10 +18,11 @@
  * every visitor count needs them), and visitor IDs' first and last visits as
  * long as the ID is seen within that time.
  *
- * `nightly()` runs once a day: a Vercel cron calls /api/cron/nightly/, and
- * the admin page runs it too if a day has gone by without it (a site with no
- * cron set up still gets its summaries). It is safe to run any number of
- * times: each day is counted afresh, and the last three days are counted
+ * `nightly()` runs once a day, started by the first visit after a day has
+ * gone by (api/collect, at most hourly per function) or by the admin page,
+ * whichever comes first; `claim()` makes sure only one of them runs it. No
+ * scheduler is needed (/api/cron/nightly/ is there if one is ever wanted).
+ * It is safe to run any number of times: each day is counted afresh, and the last three days are counted
  * again every night, for the stragglers a closing tab sends late.
  */
 import type { Db } from './db'
@@ -87,7 +88,20 @@ export async function rollupDay(d: Db, day: string): Promise<void> {
 
 export type NightlyReport = { rolled: string[]; trimmed: number; ms: number; ran: boolean }
 
-/** Whether a day has gone by since the last run (the admin page's fallback for a missing cron). */
+/**
+ * Take the day's run, if nobody has in the last `hours`: one statement, so
+ * two functions starting at once cannot both win. True for the one that did.
+ */
+export async function claim(d: Db, now = new Date(), hours = 24): Promise<boolean> {
+  const won = await d.query(
+    `insert into meta (k, v, at) values ('nightly_claim', '', $1)
+     on conflict (k) do update set at = excluded.at where meta.at < $2 returning k`,
+    [now, new Date(now.getTime() - hours * 3600e3)],
+  )
+  return won.length > 0
+}
+
+/** Whether a day has gone by since the last run. */
 export async function due(d: Db, now = new Date(), hours = 26): Promise<boolean> {
   const m = await getMeta(d, 'nightly')
   return !m || now.getTime() - m.at.getTime() > hours * 3600e3

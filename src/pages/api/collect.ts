@@ -10,6 +10,7 @@ import type { APIRoute } from 'astro'
 import { parseBatch, isBot, mustAsk } from '../../lib/analytics/shape'
 import { getDb } from '../../lib/analytics/db'
 import { ingest, prune } from '../../lib/analytics/ingest'
+import { claim, nightly } from '../../lib/analytics/rollup'
 import { isAdmin } from '../../lib/analytics/auth'
 import { clientIp, geo, json, foreign, limited, siteHost } from '../../lib/analytics/request'
 
@@ -38,7 +39,12 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   try {
     const d = await getDb()
     await ingest(d, batch, { ip, ua, host: siteHost(request), ...g }, now)
-    if (now.getTime() - pruned > 3600_000) { pruned = now.getTime(); await prune(d, now) }
+    if (now.getTime() - pruned > 3600_000) {
+      pruned = now.getTime()
+      await prune(d, now)
+      // The nightly summaries and the 90-day trim, once a day, by whichever visit comes first.
+      if (await claim(d, now)) await nightly(d, now)
+    }
   } catch (e) {
     // Analytics must never break the site: the page has already moved on.
     console.error('collect', (e as Error).message)
