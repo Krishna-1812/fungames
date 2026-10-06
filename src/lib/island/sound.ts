@@ -11,10 +11,23 @@
  * The time of day and the season change the mix the way they change the
  * picture: no birds at night, crickets instead; more wind in winter.
  *
+ * The surf is heard from the real coastline, from the side it is on, and
+ * breaks when the drawn waves do. Moving the camera moves air: a whoosh that
+ * follows how fast the view is travelling. Anything opened over the island
+ * (a game's card, the noticeboard, the passport) turns it down and muffles
+ * it, as a door does, rather than silencing it. And going into a game has a
+ * sound of its own, on both sides of the circle (lib/audio, portal).
+ *
  * It all goes through the site's one master (lib/audio), so the mute every
  * game has is the mute here too, and it is off until someone turns it on.
  */
-import { output, tone, hit } from '../audio'
+import { output, tone, hit, portal, portalNote } from '../audio'
+import { LAYERS } from './moves'
+import { P } from './kit'
+
+/** The drawn surf's roll: two lines of wave, the outer one first, each brightest 35% of the way through its loop. */
+const SURF = LAYERS.surfOut.loop.dur
+export const BREAKS = [0.35, 0.35 + (LAYERS.surfIn.loop.delay ?? 0) / SURF]
 
 type Pt = { x: number; y: number }
 export type Places = {
@@ -24,17 +37,66 @@ export type Places = {
   rain?: Pt
   /** The island's land, for telling the coast from the middle. */
   land: [number, number, number, number]
+  /** Points along the coastline, where land meets sea, in map units. */
+  coast?: Pt[]
 }
 export type Listener = {
   view(): { x: number; y: number; w: number; h: number }
   time(): string
   season(): string
-  /** False while the island is off screen or the tab is hidden. */
+  /** False while the island is off screen or the tab is hidden. A dialog over it does not count: it is still heard, through the door. */
   awake(): boolean
+  /** How much is open over the island: 1 nothing, down to 0.3 for the passport. Quieter and muffled to match. */
+  focus?(): number
+  /** Where the drawn surf is in its roll (0..1 of SURF_LOOP), if it can be read. */
+  surf?(): number | null
   /** The ferry's place in its trip, 0..1, if it can be read. */
   ferry?(): number | null
   /** A festival night (Friday's fireworks). */
   fest?(): boolean
+}
+
+/**
+ * Where the surf breaks: off the middle of every edge where a land tile meets
+ * the sea, as far out as the drawn surf lines (world.ts), at sea level, in map
+ * units. Out there rather than on the edge, so the sea is heard from the sea's
+ * side: on a headland, the surf is all round in front, not behind along the
+ * beach. `grid` is the island's ground, a letter a tile (world.ts): 0 sea,
+ * 1 land, b beach. Worked out at build time.
+ */
+export function coastline(grid: string, size: number): [number, number][] {
+  const ground = (i: number, j: number) => (i < 0 || j < 0 || i >= size || j >= size ? '0' : grid[i * size + j])
+  const out: [number, number][] = []
+  for (let i = 0; i < size; i++) for (let j = 0; j < size; j++) {
+    if (ground(i, j) === '0') continue
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (ground(i + a, j + b) === '0') {
+      const [x, y] = P(i + 0.5 + a * 1.3, j + 0.5 + b * 1.3, -12)
+      out.push([Math.round(x), Math.round(y)])
+    }
+  }
+  return out
+}
+
+/**
+ * The coast in earshot of a view: how much of it is near (0..1), how much is
+ * within a wider ring (for the sea's swell), and which side it is on. Every
+ * point of the coastline counts, as much as it is near, so a beach filling the
+ * view is loud, a headland at the edge of it is heard from that edge, and the
+ * middle of the island hears the sea only faintly, from all round.
+ */
+export function shoreOf(pts: Pt[], v: { x: number; y: number; w: number; h: number }) {
+  const near = Math.max(v.w, v.h) * 0.15 + 40, wide = near * 2.4
+  let n = 0, w = 0, side = 0
+  for (const c of pts) {
+    // Ground distance: the map is drawn at half height, so a step north or south counts double.
+    const d2 = (c.x - v.x) ** 2 + ((c.y - v.y) * 2) ** 2
+    const k = Math.exp(-d2 / (near * near))
+    n += k; w += Math.exp(-d2 / (wide * wide))
+    // Which way it lies (left -1, right 1), whatever its distance; right underfoot, nowhere in particular.
+    side += k * (c.x - v.x) / Math.max(Math.sqrt(d2), near * 0.25)
+  }
+  // A beach filling the view is about eight points: all the surf there is.
+  return { near: 1 - Math.exp(-n / 5), wide: 1 - Math.exp(-w / 14), pan: n > 1e-3 ? (side / n) * 0.8 : 0 }
 }
 
 type Bed = { level: GainNode; pan: StereoPannerNode; at: (p: Places) => Pt | null; base: number }
@@ -44,6 +106,13 @@ const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 export function islandSound(places: Places, ear: Listener) {
   let ctx: AudioContext | null = null
   let bus: GainNode | null = null
+  /** The door: everything placed on the island goes through it, so a dialog can muffle it all. */
+  let door: BiquadFilterNode | null = null
+  /** The surf's breaking, and the air the camera moves. */
+  let wash: GainNode | null = null, washTone: BiquadFilterNode | null = null
+  let air: GainNode | null = null, airTone: BiquadFilterNode | null = null, airPan: StereoPannerNode | null = null
+  /** Going into a game: the island fades out under the circle's own sound. */
+  let leaving = false
   let beds: Record<string, Bed> = {}
   let timer = 0
   let on = false
@@ -93,15 +162,22 @@ export function islandSound(places: Places, ear: Listener) {
     const o = output()!
     ctx = o.ctx
     bus = ctx.createGain(); bus.gain.value = 0
-    bus.connect(o.out)
+    door = filter('lowpass', 18000, 0.5)
+    bus.connect(door).connect(o.out)
     const D = (k: string) => (p: Places) => p.districts[k] ?? null
 
     // The sea: a low swell that comes in every nine seconds or so, and the
-    // hiss of the surf riding on top of it, a little out of step.
+    // hiss of the surf on top, breaking when the drawn waves do (tick) and
+    // heard from the coast that is near (mix: its level and side are the coastline's).
     { const swell = ctx.createGain(); swell.gain.value = 0.62; lfo(swell.gain, 0.11, 0.36)
       bed('sea', [loop('brown'), filter('lowpass', 480), swell], 0.55, () => null) }
-    { const swell = ctx.createGain(); swell.gain.value = 0.5; lfo(swell.gain, 0.137, 0.45)
-      bed('surf', [loop('white'), filter('bandpass', 1500, 0.6), filter('lowpass', 3800), swell], 0.07, () => null) }
+    { wash = ctx.createGain(); wash.gain.value = 0.3
+      washTone = filter('bandpass', 1100, 0.6)
+      bed('surf', [loop('white'), washTone, filter('lowpass', 3800), wash], 0.1, () => null) }
+    // The air the camera moves through: nothing at rest, a rush when flung.
+    { air = ctx.createGain(); air.gain.value = 0
+      airTone = filter('bandpass', 400, 0.9); airPan = ctx.createStereoPanner()
+      loop('pink').connect(airTone).connect(filter('lowpass', 2600)).connect(air).connect(airPan).connect(bus) }
     // Wind: noise through a resonance that wanders.
     { const f = filter('bandpass', 720, 1.6); lfo(f.frequency, 0.07, 320); const g = ctx.createGain(); lfo(g.gain, 0.05, 0.4); g.gain.value = 0.6
       bed('wind', [loop('pink'), f, g], 0.16, D('peaks')) }
@@ -136,17 +212,22 @@ export function islandSound(places: Places, ear: Listener) {
     const d = Math.hypot(p.x - v.x, (p.y - v.y) * 1.4)
     return { g: Math.exp(-((d / r) ** 2)), pan: clamp((p.x - v.x) / (v.w * 0.6 + 200), -1, 1) * 0.75 }
   }
+  const shore = () => (places.coast?.length ? shoreOf(places.coast, ear.view()) : null)
   function mix() {
     const v = ear.view(), t = ear.time(), season = ear.season()
     const [lx0, ly0, lx1, ly1] = places.land
     const far = clamp((v.w - 700) / 1900)
+    const sh = shore()
+    // Without the coastline, a guess from the island's box.
     const dn = Math.hypot((v.x - (lx0 + lx1) / 2) / ((lx1 - lx0) / 2), (v.y - (ly0 + ly1) / 2) / ((ly1 - ly0) / 2))
-    const coast = clamp((dn - 0.3) / 0.6)
+    const coast = sh ? sh.wide : clamp((dn - 0.3) / 0.6)
+    // Zoomed out, the whole coast is in view, and heard softly, as the rest is.
+    const surfAt = (sh ? sh.near : coast) * (1 - far * 0.6)
     const night = t === 'night' ? 1 : t === 'dusk' || t === 'dawn' ? 0.5 : 0
     const winter = season === 'winter' || season === 'newyear' ? 1 : 0
     const want: Record<string, number> = {
       sea: 0.3 + 0.7 * Math.max(far, coast),
-      surf: 0.3 + 0.7 * Math.max(far * 0.6, coast),
+      surf: 0.08 + 0.92 * Math.max(far * 0.45, surfAt),
       wind: 0.6 + winter * 0.9 + far * 0.3,
       dry: 1,
       market: 1 - night * 0.7,
@@ -158,11 +239,75 @@ export function islandSound(places: Places, ear: Listener) {
     }
     const now = ctx!.currentTime
     for (const [name, b] of Object.entries(beds)) {
-      const h = hear(b.at(places))
+      const h = name === 'surf' && sh ? { g: 1, pan: sh.pan } : hear(b.at(places))
       b.level.gain.setTargetAtTime(b.base * (want[name] ?? 1) * h.g, now, 0.6)
       b.pan.pan.setTargetAtTime(h.pan, now, 0.6)
     }
-    bus!.gain.setTargetAtTime(on && ear.awake() ? 0.55 : 0, now, on ? 0.5 : 0.15)
+    if (leaving) return
+    // Something open over the island: quieter, and through a door.
+    const f = clamp(ear.focus?.() ?? 1, 0.2, 1)
+    door!.frequency.setTargetAtTime(400 * Math.pow(45, f), now, 0.12)
+    bus!.gain.setTargetAtTime(on && ear.awake() ? 0.55 * (0.25 + 0.75 * f) : 0, now, !on ? 0.15 : f < 1 ? 0.12 : 0.5)
+  }
+
+  /* ---- the surf, breaking with the drawn waves -------------------------- */
+  // Each wave is scheduled a little ahead of its break: the hiss rises as the
+  // line comes in, peaks and brightens as it breaks, and drains away down the
+  // sand. The outer line is the smaller. Without the drawing's clock (no map
+  // yet, or nothing moving), the same roll keeps its own time.
+  let washNext = 0, washFree = 0
+  function surf() {
+    if (!ctx || !wash || !washTone) return
+    const now = ctx.currentTime, ph = ear.surf?.() ?? null
+    const due: [number, number][] = []
+    if (ph === null) {
+      if (washFree < now) washFree = now + 0.3
+      if (washFree < now + 0.8) { due.push([washFree, 0.7], [washFree + (BREAKS[1] - BREAKS[0]) * SURF, 1]); washFree += SURF }
+    } else {
+      BREAKS.forEach((b, k) => {
+        const t = now + (((b - ph) % 1 + 1) % 1) * SURF
+        if (t < now + 0.8 && t > washNext + 0.5) due.push([t, k ? 1 : 0.7])
+      })
+    }
+    for (const [t, size] of due) {
+      const rise = 1.1, g = wash.gain, hz = washTone.frequency
+      const from = Math.max(now, t - rise)
+      g.cancelScheduledValues(from); g.setValueAtTime(g.value, from)
+      g.linearRampToValueAtTime(0.35 + 0.65 * size, t)
+      g.setTargetAtTime(0.22, t + 0.05, 0.9)
+      hz.cancelScheduledValues(from); hz.setValueAtTime(hz.value, from)
+      hz.linearRampToValueAtTime(1000 + 900 * size, t)
+      hz.setTargetAtTime(800, t + 0.05, 1.1)
+      washNext = Math.max(washNext, t)
+    }
+  }
+
+  /* ---- the air the camera moves through ---------------------------------- */
+  // Read every frame while sound is on: how many views a second the camera is
+  // travelling (and zooming, which counts a little less). A drag at walking
+  // pace is silent; a fling, a flight across the island or a dive is heard,
+  // brighter the faster, from the side it is heading.
+  let airRaf = 0, airWas: { x: number; y: number; w: number; t: number } | null = null, airSpeed = 0
+  function airFrame(ms: number) {
+    airRaf = 0
+    if (!ctx || !air || !airTone || !airPan || !on) { airWas = null; return }
+    airRaf = requestAnimationFrame(airFrame)
+    const v = ear.view()
+    if (airWas && ms > airWas.t) {
+      const dt = Math.min(0.1, (ms - airWas.t) / 1000)
+      const across = Math.hypot((v.x - airWas.x) / v.w, (v.y - airWas.y) / v.h) / dt
+      const zoom = Math.abs(Math.log(v.w / airWas.w)) / dt
+      // A jump (the window resized, a phone turned) is not a flight.
+      const sp = across + zoom * 0.7 > 25 ? airSpeed : across + zoom * 0.7
+      // Smoothed, so one dropped frame is not a gust.
+      airSpeed += (sp - airSpeed) * Math.min(1, dt * 10)
+      const k = leaving ? 0 : clamp((airSpeed - 0.3) / 2.2) ** 1.3
+      const now = ctx.currentTime
+      air.gain.setTargetAtTime(0.11 * k, now, 0.07)
+      airTone.frequency.setTargetAtTime(380 + 1500 * clamp(airSpeed / 3), now, 0.1)
+      if (across > 0.05) airPan.pan.setTargetAtTime(clamp(((v.x - airWas.x) / v.w) / dt / 2, -0.6, 0.6), now, 0.15)
+    }
+    airWas = { x: v.x, y: v.y, w: v.w, t: ms }
   }
 
   /* ---- one voice, for the things that happen ------------------------------ */
@@ -255,6 +400,7 @@ export function islandSound(places: Places, ear: Listener) {
     mix()
     if (!ear.awake()) return
     musicBox()
+    surf()
     const t = ear.time(), season = ear.season(), D = places.districts
     const day = t === 'day' ? 1 : t === 'night' ? 0 : 0.5
     const roll = (p: number) => Math.random() < p
@@ -279,6 +425,7 @@ export function islandSound(places: Places, ear: Listener) {
     on = true
     clearInterval(timer); timer = window.setInterval(tick, 250)
     tick()
+    if (!airRaf) airRaf = requestAnimationFrame(airFrame)
   }
   function stop() {
     on = false
@@ -317,11 +464,32 @@ export function islandSound(places: Places, ear: Listener) {
   return {
     start, stop,
     get on() { return on },
+    /** What is sounding now, for scripts that test it (?perf). */
+    levels: () => ctx && bus ? {
+      state: ctx.state, bus: bus.gain.value, door: door!.frequency.value, wash: wash!.gain.value, washHz: washTone!.frequency.value,
+      air: air!.gain.value, airPan: airPan!.pan.value, airSpeed, shore: shore(), surf: beds.surf.level.gain.value, surfPan: beds.surf.pan.pan.value, sea: beds.sea.level.gain.value, leaving,
+    } : null,
     poke: (kind: string) => { if (on) POKES[kind]?.() },
     /** A new thing found: a little sparkle on top of its own sound. */
     found: () => { if (on) [0, 3, 5, 10].forEach((s, i) => tone({ freq: 1046 * Math.pow(2, s / 12), dur: 0.16, type: 'sine', gain: 0.05, delay: 0.25 + i * 0.05 })) },
-    /** Going into a game: the camera dives. */
-    dive: () => { if (on) hit({ dur: 0.7, gain: 0.12, freq: 300, sweepTo: 2600, q: 0.7 }) },
+    /**
+     * Going into a game (its address, for its note): the island fades out
+     * under the circle's sound, which the game's page finishes (lib/audio,
+     * portal; Paper.astro). Without motion there is no circle, and the page
+     * changes at once: nothing, rather than a sound cut off half-way.
+     */
+    dive: (href: string, circle = true) => {
+      if (!on || !circle) return
+      const path = new URL(href, location.href).pathname
+      leaving = true
+      // Still here a while later (the page never changed: offline, say): the island comes back.
+      setTimeout(() => { if (leaving && !document.hidden) { leaving = false; mix() } }, 4000)
+      // Held where it is (a cancelled ramp would fall back to the gain's starting value), then faded under the circle.
+      if (ctx && bus) { const g = bus.gain, now = ctx.currentTime, v = g.value; g.cancelScheduledValues(now); g.setValueAtTime(v, now); g.setTargetAtTime(0, now + 0.3, 0.18) }
+      portal.close(portalNote(path))
+    },
+    /** Back on the island from a game, by the browser's back button: the circle opens out of the building. */
+    back: () => { leaving = false; if (on) { portal.out(); mix() } },
     /** A stamp in the passport: a thump, and the ink. */
     stamp: (k = 0) => { if (!on) return; tone({ freq: 150, to: 60, dur: 0.16, gain: 0.25, delay: k }); hit({ dur: 0.08, gain: 0.16, freq: 900, type: 'lowpass', delay: k }) },
     /** The passport's cover opening. */

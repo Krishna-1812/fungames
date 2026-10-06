@@ -238,7 +238,7 @@ as a card, with the four filters and search.
 | `src/lib/island/lm-*.ts` | the 31 buildings, one file per district |
 | `src/lib/island/landmarks.ts` | the districts and where every building stands |
 | `src/lib/island/world.ts` | the map: land, heights, beaches, the river and its falls, the pond, a path search for the roads, the shallows, sea and surf, rocks at the waterline, a dry wash across the Badlands, cliffs drawn as continuous walls (ink only at their top, foot and outside corners, strata at fixed heights so each layer runs on, a ledge at every terrace), one sun for every shadow, trees, walkers, and the layers it is painted in |
-| `src/lib/island/sound.ts` | the island heard: beds that never stop (the sea's swell and surf, wind on the peaks, a dry wind over the Badlands, the market's and the funfair's crowds, rain under the forecast's cloud, crickets after dark, the funfair's music box) and things that happen now and then (gulls, birdsong, a bell buoy, an owl, a far-off sheep, fireworks at New Year, the ferry's horn read off its own animation), each placed on the map with the camera as the listener, and a sound for every one of the eighteen things you can poke |
+| `src/lib/island/sound.ts` | the island heard: beds that never stop (the sea's swell and surf, wind on the peaks, a dry wind over the Badlands, the market's and the funfair's crowds, rain under the forecast's cloud, crickets after dark, the funfair's music box) and things that happen now and then (gulls, birdsong, a bell buoy, an owl, a far-off sheep, fireworks at New Year, the ferry's horn read off its own animation), each placed on the map with the camera as the listener, and a sound for every one of the eighteen things you can poke; the surf from the coastline (`coastline`, `shoreOf`) in time with the drawn waves, a muffling "door" for whatever is open over the island, the air the camera moves through, and the dive into a game (`lib/audio.ts`'s `portal` finishes it on the game's page) |
 | `src/lib/island/camera.ts` | drag with a throw, wheel and pinch zoom (two fingers also carry the map), edges that give and spring back, held arrow keys that glide, resting on a painted size so the pixels land 1:1, keyboard (a link per building, out of sight), the hover card, names at close zoom, the mini-map, the dive into a game and the circle that carries you through, the view kept for the visit; the one loop that draws the canvas, eased by time rather than by frame |
 | `src/lib/island/postcard.ts` | the postcard: the view painted again at the card's size, "Greetings from" the district in big lettering, a perforated stamp with the nearest building on it, and a postmark with the day |
 | `src/lib/island/play.ts` | what answers back, drawn live in the painting's own order: the beach ball you can throw, the pigeons that go up as you come near, rings on the water where it is touched, and the day's parade |
@@ -550,8 +550,15 @@ fly to the Harbour and the gulls and the bell buoy come up on that side;
 the funfair has its crowd and a music box going round; there is rain under
 the Universe Forecast's cloud. Zoomed out, it is mostly the sea. At night
 the birds stop and the crickets start; in winter the wind is up. Everything
-you poke has its own noise (the castaway's is SOS in Morse). It is all made
-live, like every other sound on the site.
+you poke has its own noise (the castaway's is SOS in Morse). The surf is
+heard from the real coastline, from the side it is on, and breaks when the
+drawn waves do; open a game's card or the passport and the island goes
+quieter and muffled, as if through a door; fling the map and the air rushes
+past, from the way you are going. Going into a game has its own sound: air
+drawn in, a chord swelling as the circle shuts, and on the game's page the
+same chord ringing as it opens (where the browser allows a page to sound
+before it is touched). It is all made live, like every other sound on the
+site.
 
 **The seasons follow the visitor's date**: snow from December to Twelfth
 Night, fireworks on New Year's Eve and Day, blossom falling in April, and

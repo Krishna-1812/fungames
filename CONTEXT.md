@@ -21,7 +21,7 @@ neal.fun the site was modelled on).
 | **Live site** | <https://fungames-mu.vercel.app> (Vercel, deploys on every push to `main`) · dashboard at `/admin/` · privacy page at `/privacy/` |
 | **Repo** | <https://github.com/Krishna-1812/fungames> |
 | **Stack** | Astro 5 + TypeScript, every page prerendered; three.js (Orbit), Leaflet (Asteroid Launcher); resvg + sharp at build time. Only `src/pages/api/` runs on request, as Vercel functions (`@astrojs/vercel` adapter, Node 22), on Neon Postgres |
-| **Size** | 32 games (31 on the island + Powder, unlisted but routable), 207 commits, 61 check suites, all passing |
+| **Size** | 32 games (31 on the island + Powder, unlisted but routable), 209 commits, 62 check suites, all passing |
 | **Look** | "Paper & Ink" design system for the games; a cool palette only (mint, lagoon, navy, lilac, raspberry; **no orange or yellow**) |
 | **Sound** | Every sound is synthesised live in the browser. There is not one audio file on the site |
 | **Player data** | Progress lives in each visitor's `localStorage` (passport, scores, bottles, settings). Visits, game events and crowd choices are counted anonymously for `/admin/` (§6) |
@@ -60,6 +60,7 @@ set in Vercel, and `/api/health/` reports both as present.
 | 1–3 Oct | Cursor Camp study (neal.fun's multiplayer island) produced a 30-item list in sections A–H. Built since: **A** a canvas engine (drag 8–17 fps → 60), **B** camera feel, **C** the art pass, **F + G** bottles, postcards, signposts, welcome, phone taps, **D20–21** ball, pigeons, parade, noticeboard |
 | 3 Oct | This file (`CONTEXT.md`) |
 | 5–6 Oct | **Analytics**, in three phases (§6): collection, the consent bar and the privacy page; the full dashboard; then the crowd's choices in every game, island heat-maps, journeys, return-visit groups, error detail, and a 90-day retention policy with daily summaries. The site moved from purely static output to the Vercel adapter for its API |
+| 6 Oct | **E. Sound**: surf heard from the real coastline and breaking with the drawn waves; the island turned down and muffled under anything opened over it; a whoosh that follows the camera's speed; a sound for the circle into a game, on both sides of the page change |
 
 Recent commits:
 
@@ -215,7 +216,34 @@ Placement is in `src/lib/island/landmarks.ts` (`PLACES`); building art is in
   button that flies the camera there.
 - **Sound:** placed on the map with the camera as the listener: sea, wind,
   crowds, music box, crickets at night, gulls, the ferry horn, the bell, the
-  parade's drum, and a sound for everything you poke.
+  parade's drum, and a sound for everything you poke. Since section E:
+  - **Surf from the coastline (22):** 184 points where the surf breaks, just
+    off every land tile's sea edge (`coastline()`, worked out at build time
+    in `index.astro`). The surf's level is how much of them is near the
+    view (0.8 on a beach, 0.03 in the middle of the island), and it is panned
+    from the side they are on, so the harbour's inlet is heard on its side
+    too (`shoreOf()`). It **breaks when the drawn waves do**: the timing is
+    read from the engine's `isl-surf` loop (5.2 s; outer line, then the inner
+    one 1.6 s later), and keeps its own time when nothing moves.
+  - **Muffled under what is open (23):** a game's card, the noticeboard, the
+    passport or a postcard turn the island down (to 79%, 47% under the
+    passport) and close a low-pass "door" on it. Before, a dialog paused the
+    island and its sound went silent; now the camera's `heard()` (on screen,
+    tab in front) is separate from `awake()` (being drawn).
+  - **Air (24):** a whoosh read every frame from how many views a second the
+    camera travels (zooming counts a little less). Still or a slow drag:
+    silent. A fling or a flight across the island: heard, brighter the
+    faster, from the side it is heading. A jump (a resize) is ignored.
+  - **Through the circle (25):** each game has its own note, from its address
+    (`portalNote`), so both pages agree without being told. On the island:
+    air drawn in as the camera dives, a fifth swelling as the circle shuts,
+    and a soft thump at 1 s, as the page goes; the island fades out under it.
+    On the game's page (`Paper.astro`): the air let out and the same fifth,
+    ringing, if the browser lets a page sound before it is touched
+    (`mayPlay()`: Chrome does after a click on the page before; Safari and
+    Firefox stay quiet). Back with the Back button: the air the other way,
+    and the island again. Back by a link: the island starts at once where the
+    browser allows it. Without motion there is no circle and no sound for it.
 - **Surprise me** dives into a game you have not visited yet.
 - **Into a game and back:** the camera dives into the building, a circle in
   the game's colour opens over the window, and the game page opens the same
@@ -332,7 +360,9 @@ each game reports to the dashboard is in §6, "The crowd, game by game".
 Cross-cutting checks: `check-art` (tile art), `check-icons`, `check-paper`,
 `check-result-card`, `check-stats`, `check-passport`, `check-scene`,
 `check-clock`, `check-seven-segment`, `check-island`, `check-bottles`,
-`check-timetable`, `check-analytics` (§6).
+`check-timetable`, `check-analytics` (§6), `check-sound` (no audio files; the
+surf heard from the right coast and side, in time with the drawn waves; a note
+for every game).
 
 ---
 
@@ -603,7 +633,7 @@ npm run bench:island   # drag benchmark + canvas-call budgets
 npm run check          # test + build + bench (what CI runs)
 ```
 
-- **All 61 suites pass** at `ef48860`. `check-analytics` alone has 115
+- **All 62 suites pass** (section E). `check-analytics` alone has 115
   checks: what may be sent, Life in Weeks' scrub, stack frames, devices and
   bots, referrers, consent countries, that every event the code sends is
   known and every known one is sent, that no tracking call or pick reads
@@ -642,7 +672,7 @@ From the 1 October study of neal.fun's Cursor Camp. ✅ = built and live.
 | **D. Life and presence** | 19 live visitors | ⏸ **needs owner decision** |
 | | 20 things that react (ball, pigeons, ripples) | ✅ |
 | | 21 timetable noticeboard, parade, Friday fireworks | ✅ |
-| **E. Sound** | 22 surf measured from the coastline · 23 lower ambience while a card/passport is open · 24 a whoosh tied to pan speed · 25 sounds for entering a game and the wipe | ⬜ **not started** (not yet requested) |
+| **E. Sound** | 22 surf measured from the coastline · 23 lower ambience while a card/passport is open · 24 a whoosh tied to pan speed · 25 sounds for entering a game and the wipe | ✅ all (6 Oct) |
 | **F. Collecting and sharing** | 26 bottles + passport covers · 27 postcards | ✅ |
 | **G. Wayfinding and phones** | 28 signposts · 29 first-visit welcome · 30 wider phone tap areas | ✅ |
 | **H. Stay ahead** | accessibility, small download, free audio, time and weather | ✅ held throughout |
@@ -682,7 +712,8 @@ knowing as real traffic arrives:
 
 ### Ready to build when asked
 
-- **E. Sound** (items 22–25 above). Self-contained, no server, no decisions.
+- Nothing from the Cursor Camp list: A–H are built, and D19 waits on the
+  decision above.
 
 ### Launch checklist (owner accounts needed)
 

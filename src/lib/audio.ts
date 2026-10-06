@@ -200,6 +200,67 @@ export const sfx = {
   zap: () => { tone({ freq: 2200, to: 160, dur: 0.16, type: 'sawtooth', gain: 0.16, filter: 3000 }); hit({ dur: 0.1, gain: 0.14, freq: 3400, q: 2 }) },
 }
 
+/**
+ * Through the circle between the island and a game (lib/island/camera.ts
+ * closes it round a building; Paper.astro opens it on the game's page). Each
+ * game has its own note, worked out from its address, so both sides of the
+ * page change agree on it without being told.
+ */
+export function portalNote(path: string) {
+  let h = 0
+  for (const ch of path.replace(/\/+$/, '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return scaleFreq(h % 10, 330)
+}
+export const portal = {
+  /**
+   * The circle closing: air drawn in as the camera dives, a fifth swelling
+   * as the circle shuts (faster and faster, as it does), and a soft thump as
+   * it closes. Everything has ended by 1 s, when the page goes.
+   */
+  close(hz: number) {
+    hit({ dur: 0.9, gain: 0.1, freq: 260, sweepTo: 2200, q: 0.8 })
+    for (const [m, g] of [[1, 0.07], [1.5, 0.045], [2, 0.02]]) {
+      const c = ac()
+      if (!c || !master) return
+      const t = c.currentTime, o = c.createOscillator(), e = c.createGain()
+      o.type = 'sine'
+      o.frequency.setValueAtTime(hz * m * 0.94, t + 0.3)
+      o.frequency.exponentialRampToValueAtTime(hz * m, t + 0.9)
+      e.gain.setValueAtTime(0.0001, t + 0.3)
+      e.gain.exponentialRampToValueAtTime(g, t + 0.88)
+      e.gain.exponentialRampToValueAtTime(0.0001, t + 0.99)
+      o.connect(e).connect(master)
+      o.start(t + 0.3); o.stop(t + 1)
+    }
+    tone({ freq: 150, to: 70, dur: 0.12, gain: 0.16, delay: 0.86 })
+  },
+  /** The circle opening on the other side: the air let out, and the same fifth, ringing. */
+  open(hz: number) {
+    hit({ dur: 0.75, gain: 0.08, freq: 2400, sweepTo: 420, q: 0.6, delay: 0.04 })
+    tone({ freq: hz * 2, dur: 0.9, gain: 0.045, delay: 0.06 })
+    tone({ freq: hz * 3, dur: 0.7, gain: 0.025, delay: 0.12 })
+  },
+  /** Back out of a building onto the island: the air, the other way. */
+  out() {
+    hit({ dur: 0.7, gain: 0.08, freq: 2000, sweepTo: 300, q: 0.7 })
+  },
+}
+
+/**
+ * Whether this page may make sound before it has been touched: a browser lets
+ * it after a click on the page before, on the same site (Chrome), and not
+ * otherwise. Asked without creating anything, where the browser can say.
+ */
+export async function mayPlay(): Promise<boolean> {
+  if (muted) return false
+  const nav = navigator as Navigator & { getAutoplayPolicy?: (k: string) => string }
+  if (nav.getAutoplayPolicy) { try { if (nav.getAutoplayPolicy('audiocontext') !== 'allowed') return false } catch {} }
+  const c = ac()
+  if (!c) return false
+  if (c.state !== 'running') await Promise.race([c.resume().catch(() => {}), new Promise((r) => setTimeout(r, 200))])
+  return c.state === 'running'
+}
+
 // Drawn rather than an emoji: an emoji renders in its own colours, so it
 // cannot inherit the chrome's ink and cannot be checked for contrast.
 const SPEAKER = '<path d="M4 7h3l4-3.5v13L7 13H4z"/>'

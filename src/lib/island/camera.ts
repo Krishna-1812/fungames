@@ -76,6 +76,8 @@ export function initIsland(o: {
   /** One link per building, for the keyboard and for anything reading the page. */
   links: Map<string, HTMLAnchorElement>
   onEnter?: (slug: string) => void
+  /** Back from a game by the browser's back button: the circle opens out of the building again. */
+  onBack?: () => void
   /** A building's card came up (hovered, tapped or focused). */
   onCard?: (slug: string) => void
   /** Something that is not a building was poked (and which one of its kind, if they are counted: a bottle). */
@@ -701,6 +703,7 @@ export function initIsland(o: {
     entering = false; backIn = true
     zMax = Math.max(fitZ() * 7, 3.4)
     iris.classList.remove('is-closing'); iris.classList.add('is-opening')
+    o.onBack?.()
     setTimeout(() => iris.classList.remove('is-opening'), 700)
     const s = readSaved()
     if (s) Object.assign(goal, { x: s.x, y: s.y, z: s.n * fitZ() })
@@ -791,6 +794,8 @@ export function initIsland(o: {
       /** Put the camera somewhere at once (z as a share of the fitting zoom). */
       jump: (x: number, y: number, n: number) => { firstTouch(); Object.assign(goal, { x, y, z: n * fitZ() }); clampGoal(); Object.assign(cam, goal); wake(); return { ...cam } },
       view: () => ({ ...cam }),
+      /** Fly there, as the mini-map and the signposts do. */
+      fly: (x: number, y: number, n: number) => { firstTouch(); flyTo(x, y, n * fitZ()) },
       time: (t: string) => { box.dataset.time = t; wake() },
     }
   }
@@ -809,7 +814,11 @@ export function initIsland(o: {
     pause: (on: boolean) => { paused = on; if (!on) wake() },
     /** Whether the island is being drawn: on screen, the page in front, nothing over it. */
     awake: () => visible && !paused && !document.hidden,
+    /** Whether the island can be heard: on screen and the page in front. A dialog over it muffles it (sound.ts) rather than stopping it. */
+    heard: () => visible && !document.hidden,
     worldPoint: (slug: string) => anchors[slug],
+    /** The game this page was come back to from, by a link (not the back button), if any. */
+    cameFrom,
     /** What the camera is looking at, in map units: for the soundscape. */
     view: () => ({ x: cam.x, y: cam.y, w: W / cam.z, h: H / cam.z }),
   }

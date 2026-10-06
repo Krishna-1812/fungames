@@ -11,6 +11,8 @@ import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
 import { inkIcon } from '../lib/ink-icon'
 import { COVERS, BOTTLE_COUNT, glassOf } from '../lib/bottles'
+import { GRID } from '../lib/island/world'
+import { coastline } from '../lib/island/sound'
 
 /*
  * The homepage is Tiny Island: every game is a building on one illustrated
@@ -71,8 +73,10 @@ const pillBottle = `<svg viewBox="0 0 44 70" aria-hidden="true"><path d="M17 4h1
 
 const daily = dailyFor(new Date())
 const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug) }]))
+// The coastline, for the soundscape's surf (lib/island/sound.ts).
+const coast = coastline(island.grid, GRID)
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
-const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, play: island.play, grid: island.grid, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
+const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, play: island.play, grid: island.grid, coast, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
 
 // The passport: a page per district, in the order you would walk the island
 // from the middle, each game a stamp drawn here and inked by the page once
@@ -397,7 +401,7 @@ const book = BOOK.map((key) => {
   import { readPassport, withHistory, newStamps, markSeen, rankFor, stampDate, clearPassport, type Visit } from '../lib/passport'
   import { readAll } from '../lib/stats'
   import { islandSound } from '../lib/island/sound'
-  import { isMuted, setMuted, unlock } from '../lib/audio'
+  import { isMuted, setMuted, unlock, mayPlay } from '../lib/audio'
   import { track, onLeave } from '../lib/analytics/client'
   import { readBottles, findBottle, wearCover, count, NOTES, COVERS, BOTTLE_COUNT, type Cover } from '../lib/bottles'
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
@@ -434,6 +438,7 @@ const book = BOOK.map((key) => {
   const data = JSON.parse(document.getElementById('isl-data')!.textContent!) as {
     bounds: [number, number, number, number]
     land: [number, number, number, number]
+    coast: [number, number][]
     districts: { key: string; name: string; x: number; y: number }[]
     anchors: Record<string, { x0: number; y0: number; x1: number; y1: number; bx: number; by: number; district: string; slug: string }>
     games: Record<string, GameInfo>
@@ -566,7 +571,8 @@ const book = BOOK.map((key) => {
     state: () => ({ time: box.dataset.time ?? 'day', season: box.dataset.season ?? '', hour: Number(box.dataset.hour ?? new Date().getHours()), fest: fest() }),
     bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games,
     links: new Map([...box.querySelectorAll<HTMLAnchorElement>('.isl-lm')].map((a) => [a.dataset.slug!, a])),
-    onPoke, onEnter: (slug) => { sound?.dive(); track('isl_dive', { from: diveFrom }, slug); diveFrom = 'map' },
+    onPoke, onEnter: (slug) => { sound?.dive(data.games[slug].href, PLAY); track('isl_dive', { from: diveFrom }, slug); diveFrom = 'map' },
+    onBack: () => sound?.back(),
     onCard: (slug) => { if (!carded.has(slug)) { carded.add(slug); track('isl_card', {}, slug) } },
     grab: (x, y, z, touch) => {
       const h = play.grab(x, y, z, touch)
@@ -624,7 +630,7 @@ const book = BOOK.map((key) => {
     }, 8000)
   }
   // ?perf: the live things too, for scripts that test them.
-  if (ask0.has('perf')) (window as unknown as { __play: unknown }).__play = play
+  if (ask0.has('perf')) { Object.assign(window, { __play: play }); Object.defineProperty(window, '__sound', { get: () => sound }) }
   // The bottles found on earlier visits are not on the beaches any more.
   isle.withEngine((e) => e.setGone(Object.keys(readBottles().found).map(Number)))
   // The map is a window, not a scroller: focusing a building near the edge
@@ -812,12 +818,16 @@ const book = BOOK.map((key) => {
   const btnSound = document.getElementById('btnSound')!
   {
     // Where the ferry is along its crossing (0..1), to hear its horn from there.
-    let ferry = (): number | null => null
-    isle.withEngine((e) => { ferry = () => e.phase('isl-ferry') })
+    // And where the drawn surf is in its roll, so the sound breaks with it (only while the waves move).
+    let ferry = (): number | null => null, surf = (): number | null => null
+    isle.withEngine((e) => { ferry = () => e.phase('isl-ferry'); if (PLAY) surf = () => e.phase('isl-surf') })
     const uf = data.anchors['universe-forecast']
+    // Whatever is open over the island, from a game's card to the passport: the island heard through a door.
+    const card = box.querySelector('.isl-card')!, board = byId('islBoard'), books = [byId('pp'), byId('pc')] as HTMLDialogElement[]
+    const focus = () => books.some((d) => d.open) ? 0.3 : board.classList.contains('is-on') ? 0.5 : card.classList.contains('is-on') ? 0.72 : 1
     sound = islandSound(
-      { districts: Object.fromEntries(data.districts.map((d) => [d.key, { x: d.x, y: d.y }])), rain: uf ? { x: (uf.x0 + uf.x1) / 2, y: uf.y0 } : undefined, land: data.land },
-      { view: isle.view, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '', awake: isle.awake, ferry: () => ferry(), fest },
+      { districts: Object.fromEntries(data.districts.map((d) => [d.key, { x: d.x, y: d.y }])), rain: uf ? { x: (uf.x0 + uf.x1) / 2, y: uf.y0 } : undefined, land: data.land, coast: data.coast.map(([x, y]) => ({ x, y })) },
+      { view: isle.view, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '', awake: isle.heard, focus, surf: () => surf(), ferry: () => ferry(), fest },
     )
   }
   const paintSound = () => {
@@ -864,9 +874,13 @@ const book = BOOK.map((key) => {
   }
   // Sound left on from before: a browser will not play it until the page is
   // touched, so the island starts at the first touch.
+  // Back from a game, though, the browser may let it start at once (Chrome
+  // does, after a click on the page before): then the island is heard as the
+  // camera steps out of the building.
   if (!isMuted()) {
     const wake = () => { removeEventListener('pointerdown', wake, true); removeEventListener('keydown', wake, true); unlock(); sound!.start() }
     addEventListener('pointerdown', wake, true); addEventListener('keydown', wake, true)
+    if (isle.cameFrom) void mayPlay().then((ok) => { if (ok && !sound!.on) { wake(); sound!.back() } })
   }
 
   /* ---- the passport -------------------------------------------------------- */

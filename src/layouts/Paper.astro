@@ -116,6 +116,7 @@ const favicon = faviconHref(true)
               d.style.setProperty('--iris-y', y.toFixed(0) + 'px')
               d.style.setProperty('--iris-end', Math.ceil(Math.hypot(Math.max(x, w - x), Math.max(y, h - y)) * 1.12 + 8) + 'px')
               d.classList.add('iris-in')
+              d.dataset.irisIn = String(Date.now())
               addEventListener('pagereveal', function (e) {
                 var vt = e.viewTransition
                 if (!vt) return
@@ -167,6 +168,15 @@ const favicon = faviconHref(true)
       initMotion()
       // Visits, counted (lib/analytics/client.ts; what and how is on /privacy/).
       start()
+      // In through a building's circle (the first script above): the circle's
+      // sound, from the other side, if this browser lets a page sound before
+      // it is touched (lib/audio.ts, mayPlay).
+      const irisIn = Number(document.documentElement.dataset.irisIn)
+      if (irisIn && Date.now() - irisIn < 3000) {
+        import('../lib/audio').then(async ({ mayPlay, portal, portalNote }) => {
+          if (await mayPlay()) portal.open(portalNote(location.pathname))
+        })
+      }
     </script>
   </body>
 </html>
