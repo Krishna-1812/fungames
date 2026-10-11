@@ -38,7 +38,23 @@ namespace Island
     {
         public const int Plaster = 0, Brick = 1, Tiles = 2, Slate = 3, Timber = 4, Metal = 5, Glass = 6, Concrete = 7, Paint = 8, Cloth = 9;
         static Material mat;
-        public static Material Mat => mat ??= new Material(Shader.Find("Island/Building"));
+        public static Material Mat => mat != null ? mat : (mat = NewMat());
+
+        /** The material, dressed in the wall photographs (Photos.Walls): how many times each repeats in a world unit (about 5 m: a door is 2). */
+        static Material NewMat()
+        {
+            var m = new Material(Shader.Find("Island/Building"));
+            if (Photos.WallColour == null) Photos.LoadWalls();
+            m.SetTexture("_WallColour", Photos.WallColour);
+            m.SetTexture("_WallNormal", Photos.WallNormal);
+            m.SetVectorArray("_WallMean", Photos.WallMeans);
+            var rep = new float[16];
+            for (int i = 0; i < Photos.WallMetres.Length; i++) rep[i] = MetresPerUnit / Photos.WallMetres[i];
+            m.SetFloatArray("_WallRep", rep);
+            return m;
+        }
+        /** A world unit in metres: the site's doors are 16 px (0.41 of a unit) tall, a door is 2 m. */
+        public const float MetresPerUnit = 5f;
 
         /** A site point (tile i, j; height z) in the world. */
         static Vector3 W(float i, float j, float z) => new Vector3(j, z / IslandBuild.PxPerHeight, i);
@@ -61,7 +77,7 @@ namespace Island
                 int k = v.Count;
                 v.AddRange(new[] { a, b, cc, d });
                 uv.Add(new Vector2(0, 0)); uv.Add(new Vector2(lu, 0)); uv.Add(new Vector2(Vector3.Dot(cc - a, across), Vector3.Dot(cc - a, up.normalized))); uv.Add(new Vector2(Vector3.Dot(d - a, across), lv));
-                for (int q = 0; q < 4; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, 0)); }
+                float seed = Seed(a); for (int q = 0; q < 4; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, seed)); }
                 var cb = col; cb.a = aoBottom; var ct = col; ct.a = aoTop;
                 c.Add(cb); c.Add(cb); c.Add(ct); c.Add(ct);
                 t.AddRange(new[] { k, k + 2, k + 1, k, k + 3, k + 2 });
@@ -73,9 +89,11 @@ namespace Island
                 int k = v.Count;
                 v.AddRange(new[] { a, b, cc });
                 foreach (var p in new[] { a, b, cc }) uv.Add(new Vector2(Vector3.Dot(p - a, across), Vector3.Dot(p - a, up)));
-                for (int q = 0; q < 3; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, 0)); var cc2 = col; cc2.a = 1; c.Add(cc2); }
+                float seed = Seed(a); for (int q = 0; q < 3; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, seed)); var cc2 = col; cc2.a = 1; c.Add(cc2); }
                 t.AddRange(new[] { k, k + 2, k + 1 });
             }
+            /** Where in its photograph a face starts (0..1), so that no two walls show the same patch. */
+            static float Seed(Vector3 a) { float h = Mathf.Sin(a.x * 12.9898f + a.y * 78.233f + a.z * 37.719f) * 43758.5453f; return h - Mathf.Floor(h); }
             public Mesh Mesh(string name)
             {
                 var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };

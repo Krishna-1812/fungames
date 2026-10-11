@@ -11,7 +11,8 @@
  * leaf, needle and bark photographs of four of Poly Haven's trees (LEAVES; its
  * own tree models are hundreds of MB each, for film, where a tree here is a
  * hundred pixels). Rocks, shrubs and street things are Poly Haven's own models
- * (MODELS), into unity/Assets/Island/Models/, also out of git.
+ * (MODELS), into unity/Assets/Island/Models/, also out of git. The buildings'
+ * walls and roofs are ten more texture sets (WALLS), into Textures/buildings/.
  *
  *   node scripts/fetch-textures.mjs
  */
@@ -38,6 +39,19 @@ export const LEAVES = {
   jacaranda_tree: ['leaves_diff', 'leaves_alpha', 'leaves_nor_gl', 'trunk_diff', 'trunk_nor_gl'],
   tree_small_02: ['leaves_diff', 'leaves_alpha', 'leaves_nor_gl', 'branch_diff'],
   island_tree_01: ['leaves_diff', 'leaves_alpha', 'leaves_nor_gl', 'branches_diff'],
+}
+/** The buildings' materials (Buildings.cs, Building.shader): colour + normal, into Textures/buildings/. */
+export const WALLS = {
+  painted_plaster_wall: 'plaster',
+  white_plaster_02: 'plaster, clean',
+  painted_brick: 'painted brick (the old town)',
+  brick_wall_02: 'brick',
+  grey_roof_tiles: 'roof tiles',
+  roof_slates_02: 'slate',
+  weathered_planks: 'timber boards',
+  corrugated_iron_02: 'metal sheet',
+  metal_plate_02: 'metal panels and domes',
+  concrete_wall_008: 'concrete',
 }
 /** The models, as FBX with their textures. */
 export const MODELS = ['boulder_01', 'rock_07', 'namaqualand_boulder_02', 'shrub_02', 'shrub_04', 'street_lamp_01', 'painted_wooden_bench']
@@ -76,6 +90,14 @@ for (const [name, maps] of Object.entries(LEAVES)) {
     const f = files?.[map]?.[RES]?.jpg ?? files?.[map]?.[RES]?.png
     if (!f) { console.warn(`${name}: no ${map} at ${RES}, skipped`); continue }
     await take(f.url, f.md5, path.join(out, 'trees', `${name}_${map}.${f.url.split('.').pop()}`))
+  }
+}
+for (const name of Object.keys(WALLS)) {
+  const files = await (await fetch(`https://api.polyhaven.com/files/${name}`)).json()
+  for (const [map, tag] of [['Diffuse', 'diff'], ['nor_gl', 'nor']]) {
+    const f = files?.[map]?.[RES]?.jpg
+    if (!f) { console.warn(`${name}: no ${map} at ${RES}, skipped`); continue }
+    await take(f.url, f.md5, path.join(out, 'buildings', `${name}_${tag}.jpg`))
   }
 }
 const models = path.join(process.cwd(), 'unity', 'Assets', 'Island', 'Models')

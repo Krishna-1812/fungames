@@ -23,7 +23,7 @@ runs Unity.
 
 Unity 6 (6000.5.5f1), with a signed-in licence in Unity Hub. Close the project
 in the editor first: two Unitys cannot open it at once. The ground's photographs
-and models are not in git; fetch them once (about 57 MB, CC0, from Poly Haven):
+and models are not in git; fetch them once (about 70 MB, CC0, from Poly Haven):
 
 ```bash
 node scripts/fetch-textures.mjs
@@ -145,9 +145,13 @@ night still lights it (and still knows when something stands in front of it).
 The plate casts the real buildings' shadows.
 
 - **Materials** (`Building.shader`): plaster, brick, roof tiles, slate,
-  timber boards, standing-seam metal, glass, concrete, paint and awning cloth,
-  each patterned at its real size along the surface, on the site's colour
-  made real (less saturated, as paint in daylight is). Walls in the shade take
+  timber boards, metal sheet and panels, and concrete are Poly Haven
+  photographs (`Photos.Walls`, in `Textures/buildings/`), each at its real
+  size (a unit is about 5 m: the site's doors are 2 m) and started at a
+  different place on each face; as with the ground, only the photo's light
+  and shade is taken, on the site's colour made real (less saturated, as
+  paint in daylight is). Pale plaster is clean render, pale brick painted
+  brick. Glass, paint and awning cloth are drawn in the shader. Walls in the shade take
   light thrown back by the ground and sky.
 - **What it makes of each solid:** a pitched roof overhangs its walls, with
   fascia and barge boards and walled gable ends; windows have frames, glass
@@ -163,7 +167,7 @@ The plate casts the real buildings' shadows.
 3. Trees and rocks (done): every tree, shrub, cactus, reed bed, rock, hoodoo
    and butte, grown or modelled in 3D and drawn as Unity renders it.
 4. The buildings: (a, done) every building's solids built and rendered in
-   real materials; (b) what is still drawn by hand (the lighthouse, the
+   photographed materials; (b) what is still drawn by hand (the lighthouse, the
    windmill, the big wheel, signs...), modelled one by one.
 5. People, boats, birds and the parade, to match.
 6. Night: a night render, lit from the windows.

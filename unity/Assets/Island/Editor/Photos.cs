@@ -31,19 +31,51 @@ namespace Island
         };
         public const int Size = 1024;
 
-        public static Texture2DArray Colour, Normal;
+        /**
+         * The buildings' materials (Building.shader), from Textures/buildings/, and
+         * each one's width in metres (Poly Haven's own measure), so that a brick
+         * is a brick's size.
+         */
+        public static readonly string[] Walls =
+        {
+            "painted_plaster_wall", // 0 plaster
+            "white_plaster_02",     // 1 pale plaster
+            "painted_brick",        // 2 painted brick
+            "brick_wall_02",        // 3 brick
+            "grey_roof_tiles",      // 4 roof tiles
+            "roof_slates_02",       // 5 slate
+            "weathered_planks",     // 6 timber boards
+            "corrugated_iron_02",   // 7 metal sheet, on walls
+            "metal_plate_02",       // 8 metal panels: roofs and domes
+            "concrete_wall_008",    // 9 concrete and stone
+        };
+        public static readonly float[] WallMetres = { 2, 1, 1.8f, 2, 3, 3, 2, 2.7f, 2, 2.71f };
+
+        public static Texture2DArray Colour, Normal, WallColour, WallNormal;
         /** Each layer's average colour (linear), for taking the detail without the colour. */
-        public static Vector4[] Means;
+        public static Vector4[] Means, WallMeans;
 
         public static void Load(string dir = "Textures")
         {
-            Colour = new Texture2DArray(Size, Size, Layers.Length, TextureFormat.RGBA32, true, false) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
-            Normal = new Texture2DArray(Size, Size, Layers.Length, TextureFormat.RGBA32, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            LoadSet(dir, Layers, out Colour, out Normal, out Means);
+            Debug.Log($"[island] photos: {Layers.Length} layers at {Size}²");
+        }
+
+        public static void LoadWalls(string dir = "Textures/buildings")
+        {
+            LoadSet(dir, Walls, out WallColour, out WallNormal, out WallMeans);
+            Debug.Log($"[island] wall photos: {Walls.Length} layers");
+        }
+
+        static void LoadSet(string dir, string[] layers, out Texture2DArray Colour, out Texture2DArray Normal, out Vector4[] Means)
+        {
+            Colour = new Texture2DArray(Size, Size, layers.Length, TextureFormat.RGBA32, true, false) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            Normal = new Texture2DArray(Size, Size, layers.Length, TextureFormat.RGBA32, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
             Means = new Vector4[16];
-            for (int i = 0; i < Layers.Length; i++)
+            for (int i = 0; i < layers.Length; i++)
             {
-                var c = Read(Path.Combine(dir, Layers[i] + "_diff.jpg"), false);
-                var n = Read(Path.Combine(dir, Layers[i] + "_nor.jpg"), true);
+                var c = Read(Path.Combine(dir, layers[i] + "_diff.jpg"), false);
+                var n = Read(Path.Combine(dir, layers[i] + "_nor.jpg"), true);
                 var px = c.GetPixels32();
                 Colour.SetPixels32(px, i);
                 Normal.SetPixels32(n.GetPixels32(), i);
@@ -60,7 +92,6 @@ namespace Island
                 Object.DestroyImmediate(c); Object.DestroyImmediate(n);
             }
             Colour.Apply(true); Normal.Apply(true);
-            Debug.Log($"[island] photos: {Layers.Length} layers at {Size}²");
         }
 
         static Texture2D Read(string file, bool linear)
