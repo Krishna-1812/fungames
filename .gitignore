@@ -31,3 +31,5 @@ unity/Renders/
 unity/Textures/
 unity/*.csproj
 unity/*.sln
+unity/Assets/Island/Models/
+unity/Assets/Island/Models.meta

@@ -31,6 +31,9 @@ Shader "Island/Water"
             #include "IslandCommon.hlsl"
 
             TEXTURE2D(_Depth); SAMPLER(sampler_Depth);
+            // The rocks standing in the sea (IslandBuild.Scene): world x, z, and radius at the waterline.
+            float4 _Rocks[48];
+            float _RockCount;
             CBUFFER_START(UnityPerMaterial)
                 float4 _Map;
                 float4 _Depth_ST;
@@ -75,6 +78,17 @@ Shader "Island/Water"
                 alpha = saturate(alpha + spec);
                 // Foam where it meets the sand, broken up.
                 float foam = smoothstep(0.035, 0.0, d) * smoothstep(0.35, 0.65, vnoise(i.ws.xz * 26) * 0.7 + n1 * 0.3);
+                // Round the rocks: the water churned white against them, and paler where it is shallow over their skirts.
+                for (int r = 0; r < 48; r++)
+                {
+                    if (r >= (int)_RockCount) break;
+                    float2 dv = i.ws.xz - _Rocks[r].xy;
+                    float wob = vnoise(i.ws.xz * 14 + r * 7) * 0.08 + vnoise(i.ws.xz * 40) * 0.04;
+                    float dd = length(dv) / _Rocks[r].z + wob;
+                    float ring = smoothstep(1.45, 1.0, dd) * smoothstep(0.35, 0.65, vnoise(i.ws.xz * 30 + r) * 0.7 + n1 * 0.3);
+                    foam = max(foam, ring);
+                    lit = lerp(lit, float3(0.62, 0.9, 0.9), smoothstep(2.4, 1.0, dd) * 0.35);
+                }
                 lit = lerp(lit, float3(0.95, 0.97, 1.0), foam);
                 alpha = max(alpha, foam * 0.95);
                 return half4(lit, alpha);

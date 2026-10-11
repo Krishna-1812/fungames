@@ -23,7 +23,7 @@ runs Unity.
 
 Unity 6 (6000.5.5f1), with a signed-in licence in Unity Hub. Close the project
 in the editor first: two Unitys cannot open it at once. The ground's photographs
-are not in git; fetch them once (16 MB, CC0, from Poly Haven):
+and models are not in git; fetch them once (about 57 MB, CC0, from Poly Haven):
 
 ```bash
 node scripts/fetch-textures.mjs
@@ -100,13 +100,43 @@ Under the shallows, caustics. `Ground.shader` and `Water.shader` light them (one
 shadows, the sky, how shut in each point is); the deep water is exactly the
 site's sea colour in the sun, so the two meet without a seam.
 
+## The figures: what grows on it
+
+Every tree, rock and cactus the site draws has a name (`lib/island/props.ts`,
+`figure()`: "pine-teal0", "round-bloom2", "hoodoo-44-10", "rock1"), and the
+site writes down each one it draws, where, and how big (`model.plants`).
+`node scripts/unity-figures.mjs` grows each named one in Unity
+(`Editor/Plants.cs`) and renders it alone, lit and seen as the island is;
+the pictures and where each one's foot is go to `src/lib/island/figures/`,
+and the site draws a figure in place of its own drawing whenever the plate is
+on. The plate casts every one's shadow on the ground where it stands.
+
+- **Trees are grown, not downloaded.** Poly Haven's trees are film models,
+  hundreds of MB each, for something a hundred pixels high. Here: trunks and
+  limbs as tapered tubes in bark, and crowns of cards cut from Poly Haven's
+  leaf, needle and twig photographs, each card in its species' colour (the
+  photo gives only its light and shade). Broadleaf crowns are lumps of twig
+  cards; conifers are whorls of drooping branches carrying needle sprays (with
+  snow along their tops in the Peaks); cypresses are flames; palms are fronds
+  of leaflets. The site's colours become species: its leaf green a broadleaf,
+  its purple a jacaranda in flower (or a blue spruce), its teal a eucalyptus or
+  a fir.
+- **Rocks are Poly Haven's models**, in the island's cool grey; the Badlands'
+  hoodoos and buttes are lathed from banded soft rock under the cliff photo.
+- **The rocks in the sea and at the waterline** stand in the plate itself
+  (nothing on the site is ever in front of them), each in its own foam.
+- `Foliage.shader` lights a crown as a crown (its normals lean out from the
+  middle, the sun comes through leaves lit from behind, the inside is darker);
+  `Bark.shader` lays a photo's detail on a colour, for bark, cactus and rock.
+
 ## Phases
 
 1. Pipeline and registration (done): the ground from the site's tiles, blocks
    for buildings, one sun, proven to line up.
 2. The ground made real (done): the shape, the water, the light, and photo
    textures; baked into the site behind the `live` switch.
-3. Trees and rocks as 3D models.
+3. Trees and rocks (done): every tree, shrub, cactus, reed bed, rock, hoodoo
+   and butte, grown or modelled in 3D and drawn as Unity renders it.
 4. The buildings, modelled one by one, rendered as the bake's sprites.
 5. People, boats, birds and the parade, to match.
 6. Night: a night render, lit from the windows.

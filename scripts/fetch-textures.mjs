@@ -1,11 +1,17 @@
 /**
- * fetch-textures — the photographs the 3D island's ground is made of.
+ * fetch-textures — the photographs and models the 3D island is made of.
  *
  * Ten CC0 texture sets from Poly Haven (polyhaven.com, public domain): a
  * colour photo and a normal map each, at 1K (the island renders at about
  * 180 px a tile, and each texture spans several tiles, so 1K is all a pixel
  * ever sees). They go to unity/Textures/, which git ignores: anyone can fetch
  * them again with this, and each file is checked against Poly Haven's MD5.
+ *
+ * Its trees are built in Unity (Assets/Island/Editor/Trees.cs), dressed in the
+ * leaf, needle and bark photographs of four of Poly Haven's trees (LEAVES; its
+ * own tree models are hundreds of MB each, for film, where a tree here is a
+ * hundred pixels). Rocks, shrubs and street things are Poly Haven's own models
+ * (MODELS), into unity/Assets/Island/Models/, also out of git.
  *
  *   node scripts/fetch-textures.mjs
  */
@@ -26,6 +32,15 @@ export const SETS = {
   cobblestone_square: 'the old town',
   mud_cracked_dry_03: 'the badlands and the dry wash',
 }
+/** The tree photographs: Poly Haven asset → its maps. */
+export const LEAVES = {
+  pine_tree_01: ['twig_diff', 'twig_alpha', 'twig_nor_gl', 'bark_diff', 'bark_nor_gl'],
+  jacaranda_tree: ['leaves_diff', 'leaves_alpha', 'leaves_nor_gl', 'trunk_diff', 'trunk_nor_gl'],
+  tree_small_02: ['leaves_diff', 'leaves_alpha', 'leaves_nor_gl', 'branch_diff'],
+  island_tree_01: ['leaves_diff', 'leaves_alpha', 'leaves_nor_gl', 'branches_diff'],
+}
+/** The models, as FBX with their textures. */
+export const MODELS = ['boulder_01', 'rock_07', 'namaqualand_boulder_02', 'shrub_02', 'shrub_04', 'street_lamp_01', 'painted_wooden_bench']
 const RES = '1k'
 const out = path.join(process.cwd(), 'unity', 'Textures')
 fs.mkdirSync(out, { recursive: true })
@@ -45,4 +60,30 @@ for (const name of Object.keys(SETS)) {
     got++
   }
 }
-console.log(`textures: ${got} fetched, ${kept} already here, in unity/Textures/`)
+
+/** One file, unless it is already here and whole. */
+async function take(url, sum, file) {
+  if (fs.existsSync(file) && md5(fs.readFileSync(file)) === sum) { kept++; return }
+  const buf = Buffer.from(await (await fetch(url)).arrayBuffer())
+  if (md5(buf) !== sum) throw new Error(`${path.basename(file)}: checksum does not match`)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, buf)
+  got++
+}
+for (const [name, maps] of Object.entries(LEAVES)) {
+  const files = await (await fetch(`https://api.polyhaven.com/files/${name}`)).json()
+  for (const map of maps) {
+    const f = files?.[map]?.[RES]?.jpg ?? files?.[map]?.[RES]?.png
+    if (!f) { console.warn(`${name}: no ${map} at ${RES}, skipped`); continue }
+    await take(f.url, f.md5, path.join(out, 'trees', `${name}_${map}.${f.url.split('.').pop()}`))
+  }
+}
+const models = path.join(process.cwd(), 'unity', 'Assets', 'Island', 'Models')
+for (const name of MODELS) {
+  const f = (await (await fetch(`https://api.polyhaven.com/files/${name}`)).json())?.fbx?.[RES]?.fbx
+  if (!f) { console.warn(`${name}: no FBX at ${RES}, skipped`); continue }
+  const dir = path.join(models, name)
+  await take(f.url, f.md5, path.join(dir, `${name}.fbx`))
+  for (const [rel, t] of Object.entries(f.include ?? {})) await take(t.url, t.md5, path.join(dir, rel))
+}
+console.log(`textures and models: ${got} fetched, ${kept} already here`)

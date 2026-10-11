@@ -8,6 +8,9 @@
  * off screen or far from the middle (see cull() in camera.ts).
  */
 import { C, INK, OUT, N, Pen, shade, S, motionPath } from './kit'
+import { figure, colourKind } from './props'
+
+const pick = (x: number, y: number, n: number) => Math.floor(Math.abs(Math.sin(x * 12.99 + y * 78.23 + 1) * 437.5)) % n
 
 const f = (v: number) => Math.round(v * 10) / 10
 const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0)} ${f(x1)} ${f(y1)}`
@@ -19,6 +22,7 @@ const SHADOW = { fill: INK, opacity: 0.12 }
 
 /** A pine with snow lying on every tier. */
 export function snowPine(p: Pen, x: number, y: number, c = C.leaf, k = 1) {
+  if (figure(p, x, y, `snowpine-${colourKind(c)}${pick(x, y, 3)}`, k)) return
   const [bx, by] = p.at(x, y)
   p.el('ellipse', { cx: bx, cy: by + 1, rx: 12 * k, ry: 5 * k, ...SHADOW })
   p.path(`M${f(bx)} ${f(by)}L${f(bx)} ${f(by - 8 * k)}`, 'none', { sw: 3 * k, stroke: C.wood })
@@ -33,6 +37,7 @@ export function snowPine(p: Pen, x: number, y: number, c = C.leaf, k = 1) {
 
 /** A saguaro, arms up; sometimes in flower. */
 export function cactus(p: Pen, x: number, y: number, k = 1, flower = false) {
+  if (figure(p, x, y, `cactus${flower ? '-flower' : ''}${pick(x, y, 2)}`, k)) return
   const [bx, by] = p.at(x, y)
   const c = '#3fbf8f', hi = '#7fe0bb'
   p.el('ellipse', { cx: bx, cy: by + 1, rx: 9 * k, ry: 3.6 * k, ...SHADOW })
@@ -47,6 +52,7 @@ export function cactus(p: Pen, x: number, y: number, k = 1, flower = false) {
 
 /** A round barrel cactus, ribbed. */
 export function barrelCactus(p: Pen, x: number, y: number, k = 1) {
+  if (figure(p, x, y, `barrel${pick(x, y, 2)}`, k)) return
   const [bx, by] = p.at(x, y)
   p.el('ellipse', { cx: bx, cy: by + 1, rx: 8 * k, ry: 3 * k, ...SHADOW })
   p.path(blob(bx, by - 6 * k, 6.5 * k, 6.5 * k), '#46c99a', { sw: 1.4 })
@@ -56,6 +62,7 @@ export function barrelCactus(p: Pen, x: number, y: number, k = 1) {
 
 /** A cattail or three, for a bank. */
 export function reeds(p: Pen, x: number, y: number, k = 1) {
+  if (figure(p, x, y, `reeds${pick(x, y, 3)}`, k)) return
   const [bx, by] = p.at(x, y)
   let stems = '', heads = ''
   for (const [dx, h, lean] of [[-4, 18, -2], [0, 22, 0.5], [4, 16, 2.5], [-1.5, 13, -3]]) {
@@ -122,6 +129,8 @@ export function arch(p: Pen, x: number, y: number) {
 
 /** A tall, flat-topped butte: sloping sides, a band of strata every few metres, scree at its foot. */
 export function butte(p: Pen, x: number, y: number, h = 34) {
+  // Its height is in its name (a figure is drawn at one size): "butte-34".
+  if (figure(p, x, y, `butte-${Math.round(h)}`, 1)) return
   const r0 = 0.36, r1 = 0.24, fill = '#b5a6e4'
   const at = (t: number) => r0 + (r1 - r0) * t
   const [sx, sy] = p.at(x, y)
@@ -293,6 +302,8 @@ export function gullsCircling(cx: number, cy: number, rx: number, ry: number, na
  * off. Two or three stand together.
  */
 export function hoodoo(p: Pen, x: number, y: number, h = 40, k = 1) {
+  // Its height and girth in its name: "hoodoo-44-10" is 44 high at a girth of 1.0.
+  if (figure(p, x, y, `hoodoo-${Math.round(h)}-${Math.round(k * 10)}`, 1)) return
   const fill = '#bfaee6', band = '#a28fda', cap = '#9b8ad0'
   const [sx, sy] = p.at(x, y)
   p.el('ellipse', { cx: sx - 6 * k, cy: sy + 2, rx: 14 * k, ry: 5 * k, fill: INK, opacity: 0.12 })
@@ -316,6 +327,7 @@ export function hoodoo(p: Pen, x: number, y: number, h = 40, k = 1) {
 
 /** A heap of round boulders, the big one cracked, gravel at their feet. */
 export function boulders(p: Pen, x: number, y: number, k = 1) {
+  if (figure(p, x, y, `boulders${pick(x, y, 2)}`, k)) return
   const [sx, sy] = p.at(x, y)
   p.el('ellipse', { cx: sx - 6 * k, cy: sy + 2, rx: 20 * k, ry: 6 * k, fill: INK, opacity: 0.12 })
   for (const [dx, dy, r, c] of [[-8, -1, 7, '#b4a6e2'], [6, -3, 9.5, '#bfb2ea'], [-1, 3, 5.5, '#aa9bdc'], [14, 3, 4, '#b4a6e2']] as [number, number, number, string][]) {

@@ -10,7 +10,8 @@
  * over the top. Everything is painted back to front.
  */
 import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light } from './kit'
-import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind } from './props'
+import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
+import type { FigureSet } from './figures'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { beacon } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
@@ -110,6 +111,12 @@ export type IslandModel = {
   buttes: [number, number, number][]; hoodoos: [number, number][]; boulders: [number, number][]
   piers: [number, number][][]
   buildings: { slug: string; district: string; i: number; j: number; w: number; d: number; z: number; water: boolean }[]
+  /** Every tree, rock and cactus, by figure name (props.ts), where it stands. */
+  plants: Planted[]
+  /** The rocks standing in the sea: tile i, j, and size. */
+  seaRocks: [number, number, number][]
+  /** The stones at the waterline: tile x, y (not tile corners: where they stand), and size. */
+  shoreRocks: [number, number, number][]
   viewBox: [number, number, number, number]
 }
 export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
@@ -130,8 +137,9 @@ export type Raster = (svg: string, width: number) => { width: number; height: nu
  */
 export type PlateRef = { box: [number, number, number, number]; href: string; id: string }
 
-export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null } = {}): Island {
+export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; figures?: FigureSet | null } = {}): Island {
   const plate = opts.plate ?? null
+  setFigures(opts.figures ?? null)
   const R = rng(20260930)
   motionCss.length = 0
   glows.length = 0
@@ -274,6 +282,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // inherit (render() then leaves the attribute off each shape).
   const open = (kind: Layer['kind'], slug?: string) => { const node = joinRoot(new N('g', { class: `layer-${kind}`, 'stroke-linejoin': 'round' })); made.push({ kind, slug, node }); return node }
   let root = open('sea')
+  const first = root
   const lights: Light[] = []
 
   // The sea, its shallows, and the surf round the coast.
@@ -345,14 +354,15 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   for (const rk of seaRocks) {
     const [i, j, k] = rk
     const [x, y] = P(i + 0.5, j + 0.5, SEA)
-    root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(26 * k), ry: f(11 * k), fill: '#ffffff', opacity: 0.55 }))
-    root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(19 * k), ry: f(8 * k), fill: '#cdf1f4' }))
+    // With a plate, the rock and its foam are in its picture (Unity: IslandBuild.Scene); its ripple and its gull stay.
+    if (!plate) root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(26 * k), ry: f(11 * k), fill: '#ffffff', opacity: 0.55 }))
+    if (!plate) root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(19 * k), ry: f(8 * k), fill: '#cdf1f4' }))
     root.add(ripple(x + 2, y + 3, 24 * k, 10 * k, hz(i, j, 61) * 3.6))
-    root.add(new N('path', { d: `M${f(x - 12 * k)} ${f(y + 4)}L${f(x - 1 * k)} ${f(y + 16 * k)}L${f(x + 11 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.22 }))
-    root.add(new N('path', { d: `M${f(x - 14 * k)} ${f(y + 4)}L${f(x - 10 * k)} ${f(y - 8 * k)}L${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}Z`, fill: C.rock, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
-    root.add(new N('path', { d: `M${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}L${f(x + 1 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.55 }))
-    root.add(new N('path', { d: `M${f(x - 9 * k)} ${f(y - 8 * k)}l5 -3`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.7 }))
-    root.add(new N('path', { d: `M${f(x - 18 * k)} ${f(y + 5)}q${f(18 * k)} ${f(7 * k)} ${f(36 * k)} 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-linecap': 'round' }))
+    if (!plate) root.add(new N('path', { d: `M${f(x - 12 * k)} ${f(y + 4)}L${f(x - 1 * k)} ${f(y + 16 * k)}L${f(x + 11 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.22 }))
+    if (!plate) root.add(new N('path', { d: `M${f(x - 14 * k)} ${f(y + 4)}L${f(x - 10 * k)} ${f(y - 8 * k)}L${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}Z`, fill: C.rock, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
+    if (!plate) root.add(new N('path', { d: `M${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}L${f(x + 1 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.55 }))
+    if (!plate) root.add(new N('path', { d: `M${f(x - 9 * k)} ${f(y - 8 * k)}l5 -3`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.7 }))
+    if (!plate) root.add(new N('path', { d: `M${f(x - 18 * k)} ${f(y + 5)}q${f(18 * k)} ${f(7 * k)} ${f(36 * k)} 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-linecap': 'round' }))
     // A gull on every other rock.
     if (seaRocks.indexOf(rk) % 2 === 0) { const w = root.add(pokeN('gull', [x, y - 16 * k, 14])); w.add(gullStanding(x - 1 * k, y - 13.5 * k, seaRocks.indexOf(rk) % 4 === 0)); sayBubble(w, x, y - 26 * k, 'squawk!') }
   }
@@ -392,6 +402,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // few stones in a ring of their own foam, never in front of a pier or a
   // building that stands in the sea.
   const pierCells = new Set(PIERS.flatMap((pts) => pts.map(([u, v]) => key(Math.floor(u), Math.floor(v)))))
+  // (With a plate, they are in its picture: Unity stands them where these are.)
+  const shoreRocks: [number, number, number][] = []
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
     if (!isLand(i, j)) continue
     for (const [di, dj] of [[1, 0], [0, 1]]) {
@@ -400,6 +412,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const u = di ? i + 1.16 : i + 0.25 + hz(i, j, 1) * 0.5, v = dj ? j + 1.16 : j + 0.25 + hz(j, i, 2) * 0.5
       const [x, y] = P(u, v, SEA)
       const big = 0.55 + hz(i, j, 3) * 0.35
+      shoreRocks.push([u, v, Math.round(big * 100) / 100])
+      if (plate) continue
       root.add(new N('ellipse', { cx: f(x + 3), cy: f(y + 2), rx: f(19 * big), ry: f(7 * big), fill: '#ffffff', opacity: 0.6 }))
       for (const [dx, dy, k] of [[0, 0, big], [10 * big, 3, big * 0.6], [-9 * big, 3.5, big * 0.45]] as [number, number, number][]) {
         const X = x + dx, Y = y + dy
@@ -1537,6 +1551,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     g.add(birds())
   }
 
+  // The figures' pictures, once each, for every <use> of them.
+  const figDefs = figureDefs()
+  if (figDefs) first.add(figDefs)
   const layers: Layer[] = made.map((m) => ({ kind: m.kind, slug: m.slug, body: render(m.node) }))
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
@@ -1548,6 +1565,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     river, pond: [...pond].map((k) => k.split(',').map(Number) as [number, number]), road: [...road].map((k) => k.split(',').map(Number) as [number, number]), routes: routes.map((r) => r.map(([i, j]) => [i, j] as [number, number])),
     wash, fields: fields.map((f) => [...f]), mill, bales, arch: archAt, buttes, hoodoos, boulders: boulderAt, piers: PIERS,
     buildings: placed.map((b) => ({ slug: b.slug, district: b.district, i: b.i, j: b.j, w: b.w, d: b.d, z: b.z, water: !!b.lm.water })),
+    plants: planted.map((q) => ({ ...q })),
+    seaRocks, shoreRocks,
     viewBox,
   } }
 }

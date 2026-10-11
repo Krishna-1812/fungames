@@ -4,12 +4,61 @@
  * point (x, y) with the pen's own height as its floor.
  */
 import { C, INK, OUT, N, Pen, shade, S } from './kit'
+import type { FigureSet } from './figures'
 
 const f = (v: number) => Math.round(v * 10) / 10
 
 export type TreeKind = 'round' | 'pine' | 'palm' | 'cypress' | 'bush' | 'rock' | 'snag' | 'blossom'
 
+/* ---- figures: what grows, as Unity renders it ----------------------------
+ * Every tree, rock and cactus has a name: what it is, its colour's kind of
+ * tree (the leaf green, the purple of a jacaranda in flower, the blue-green
+ * of a eucalyptus) and one of a few of each, chosen by where it stands. Each
+ * one drawn is written down (`planted`, in the world's own units), so Unity
+ * can grow the same one in the same place (scripts/export-island.mjs) and
+ * cast its shadow on the ground. Given the figures (setFigures), each is
+ * drawn as Unity's picture of it in place of the drawing here. */
+export type Planted = { name: string; x: number; y: number; z: number; k: number }
+export const planted: Planted[] = []
+/** The figures drawn, for the island's definitions (world.ts). */
+export const figuresUsed = new Set<string>()
+let figs: FigureSet | null = null
+export function setFigures(set: FigureSet | null) { figs = set; planted.length = 0; figuresUsed.clear() }
+
+const pick = (x: number, y: number, seed: number, n: number) => Math.floor(Math.abs(Math.sin(x * 12.99 + y * 78.23 + seed) * 437.5)) % n
+export const colourKind = (c: string) => (c === C.bloom ? 'bloom' : c === '#35c9a6' ? 'teal' : 'leaf')
+
+/** A figure at a ground point: written down, and drawn if Unity has made it (true), or left to the drawing (false). */
+export function figure(p: Pen, x: number, y: number, name: string, k: number): boolean {
+  planted.push({ name, x: f(x + p.ox), y: f(y + p.oy), z: p.oz, k: Math.round(k * 100) / 100 })
+  const it = figs?.items[name]
+  if (!it) return false
+  const [bx, by] = p.at(x, y)
+  figuresUsed.add(name)
+  p.el('use', { href: `#fig-${name}`, transform: `translate(${f(bx)} ${f(by)}) scale(${Math.round(k * 1000) / 1000})` })
+  p.grow(bx - it.ax * k, by - it.ay * k, bx + (it.w - it.ax) * k, by + (it.h - it.ay) * k)
+  return true
+}
+/** The definitions the figures drawn refer to: one picture each, however many times it is drawn. */
+export function figureDefs(): N | null {
+  if (!figs || !figuresUsed.size) return null
+  const d = new N('defs')
+  for (const name of [...figuresUsed].sort()) {
+    const it = figs.items[name]
+    d.add(new N('image', { id: `fig-${name}`, href: it.href, x: -it.ax, y: -it.ay, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
+  }
+  return d
+}
+
+export function treeName(kind: TreeKind, c: string, x: number, y: number): string {
+  if (kind === 'rock') return `rock${pick(x, y, 0, 3)}`
+  if (kind === 'palm' || kind === 'blossom') return `${kind}${pick(x, y, 1, 3)}`
+  if (kind === 'snag') return `snag${pick(x, y, 1, 2)}`
+  return `${kind}-${colourKind(c)}${pick(x, y, 1, 3)}`
+}
+
 export function tree(p: Pen, x: number, y: number, kind: TreeKind, c = C.leaf, k = 1) {
+  if (figure(p, x, y, treeName(kind, c, x, y), k)) return
   const [bx, by] = p.at(x, y)
   if (kind === 'rock') {
     const v = Math.floor(Math.abs(Math.sin(x * 12.99 + y * 78.23) * 437.5)) % 3

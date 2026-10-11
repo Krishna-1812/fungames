@@ -272,6 +272,8 @@ export async function paint(b: Built, view: [number, number, number, number], ha
       case 'ellipse': local = [n('cx') - n('rx'), n('cy') - n('ry'), n('cx') + n('rx'), n('cy') + n('ry')]; break
       case 'rect': local = [n('x'), n('y'), n('x') + n('width'), n('y') + n('height')]; break
       case 'line': local = [Math.min(n('x1'), n('x2')), Math.min(n('y1'), n('y2')), Math.max(n('x1'), n('x2')), Math.max(n('y1'), n('y2'))]; break
+      // A figure's picture (props.ts). Not the plate's small copy: the plate is painted from its full-size pixels.
+      case 'image': if (e.attrs['data-plate'] === undefined) local = [n('x'), n('y'), n('x') + n('width'), n('y') + n('height')]; break
       case 'polygon': case 'polyline': { const v = (e.attrs.points ?? '').trim().split(/[\s,]+/).map(Number); const xs = v.filter((_, i) => i % 2 === 0), ys = v.filter((_, i) => i % 2 === 1); if (xs.length) local = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; break }
       case 'use': {
         const ref = b.defs.get((e.attrs.href ?? e.attrs['xlink:href'] ?? '').slice(1))

@@ -328,6 +328,54 @@ namespace Island
             var sr = sea.GetComponent<MeshRenderer>();
             sr.sharedMaterial = wm; sr.shadowCastingMode = ShadowCastingMode.Off;
 
+            // The rocks standing in the sea: in the plate whole (nothing on the site stands in
+            // front of them), their feet under the water, foam round each (Water.shader).
+            var rocks = new Vector4[48];
+            int nRocks = 0;
+            if (d.seaRocks != null)
+                for (int q = 0; q + 2 < d.seaRocks.Length && nRocks < 48; q += 3)
+                {
+                    float ri = d.seaRocks[q] + 0.5f, rj = d.seaRocks[q + 1] + 0.5f, rk = d.seaRocks[q + 2];
+                    var rock = Plants.Build("searock" + nRocks);
+                    rock.transform.position = new Vector3(rj, Y(d.sea) - 0.12f * rk, ri);
+                    rock.transform.localScale = Vector3.one * rk;
+                    rocks[nRocks++] = new Vector4(rj, ri, 0.27f * rk, 0);
+                }
+            // The stones at the waterline: three, a big one and two small, as the site draws them.
+            if (d.shoreRocks != null)
+                for (int q = 0; q + 2 < d.shoreRocks.Length; q += 3)
+                {
+                    float ri = d.shoreRocks[q], rj = d.shoreRocks[q + 1], big = d.shoreRocks[q + 2];
+                    int n = q / 3;
+                    foreach (var (dx, dy, k) in new[] { (0f, 0f, big), (10 * big, 3f, big * 0.6f), (-9 * big, 3.5f, big * 0.45f) })
+                    {
+                        float ti = (dx / 32 + dy / 16) / 2, tj = (dy / 16 - dx / 32) / 2;
+                        var rock = Plants.Build("rock" + ((n + (int)(k * 10)) % 3));
+                        rock.transform.position = new Vector3(rj + tj, Y(d.sea) - 0.06f, ri + ti);
+                        rock.transform.localScale = Vector3.one * k * 0.95f;
+                    }
+                    if (nRocks < 48) rocks[nRocks++] = new Vector4(rj, ri, 0.2f * big, 0);
+                }
+            wm.SetVectorArray("_Rocks", rocks);
+            wm.SetFloat("_RockCount", nRocks);
+
+            // What grows on the ground: in the plate, only its shadow (the site draws each
+            // figure itself, from IslandBuild.Figures, over the plate).
+            if (blocks != "none" && d.plants != null)
+            {
+                Plants.Load();
+                var holder = new GameObject("plants");
+                foreach (var pl in d.plants)
+                {
+                    var go = Plants.Build(pl.name);
+                    if (go == null) continue;
+                    go.transform.SetParent(holder.transform, false);
+                    go.transform.localPosition = new Vector3(pl.y, Y(pl.z), pl.x);
+                    go.transform.localScale = Vector3.one * pl.k;
+                    foreach (var mr in go.GetComponentsInChildren<MeshRenderer>())
+                        mr.shadowCastingMode = blocks == "shadow" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+                }
+            }
             if (blocks != "none")
             {
                 var bm = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -360,6 +408,80 @@ namespace Island
             var cam = Eye(vb[0], vb[1], vb[2], vb[3]);
             cam.backgroundColor = SiteSea;
             Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/realistic.png"), false, ss);
+        }
+
+        /**
+         * Every figure the island names (its plants: lib/island/props.ts), alone,
+         * lit and seen as the island is, on nothing: Renders/figures/NAME.png at
+         * `-scale` pixels a map unit (rendered `-ss` times larger and averaged
+         * down), each over the same map box round the origin, where the figure's
+         * foot is; scripts/unity-figures.mjs trims them for the site.
+         */
+        public static void Figures()
+        {
+            Pipeline();
+            var d = IslandData.Load(Data);
+            Light();
+            float scale = float.Parse(Arg("-scale", "5"), System.Globalization.CultureInfo.InvariantCulture);
+            int ss = int.Parse(Arg("-ss", "3"));
+            var only = Arg("-only", "");
+            var names = new SortedSet<string>();
+            foreach (var p in d.plants) names.Add(p.name);
+            Directory.CreateDirectory("Renders/figures");
+            if (only == "") foreach (var f in Directory.GetFiles("Renders/figures")) File.Delete(f);
+            // The box round the foot (P()'s units): wide enough for a palm's fronds, tall enough for a cypress.
+            float bx = -72, by = -136, bw = 144, bh = 156;
+            int made = 0;
+            foreach (var name in names)
+            {
+                if (only != "" && !name.StartsWith(only)) continue;
+                var go = Plants.Build(name);
+                if (go == null) continue;
+                var cam = Eye(bx, by, bw, bh);
+                cam.backgroundColor = new Color(0, 0, 0, 0);
+                ShootFigure(cam, Mathf.RoundToInt(bw * scale), Mathf.RoundToInt(bh * scale), $"Renders/figures/{name}.png", ss);
+                Object.DestroyImmediate(cam.gameObject);
+                Object.DestroyImmediate(go);
+                made++;
+            }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            File.WriteAllText("Renders/figures/figures.json", $"{{\"scale\":{scale.ToString(inv)},\"box\":[{bx.ToString(inv)},{by.ToString(inv)},{bw.ToString(inv)},{bh.ToString(inv)}]}}");
+            Debug.Log($"[island] figures: {made} at {scale} px a unit");
+        }
+
+        /** Render a figure on nothing: averaged down by its coverage, so its edges do not darken against the empty background. */
+        static void ShootFigure(Camera cam, int pw, int ph, string file, int ss)
+        {
+            int rw = pw * ss, rh = ph * ss;
+            var rt = new RenderTexture(rw, rh, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture.active = rt;
+            var big = new Texture2D(rw, rh, TextureFormat.RGBA32, false, false);
+            big.ReadPixels(new Rect(0, 0, rw, rh), 0, 0);
+            RenderTexture.active = null;
+            var src = big.GetPixels32();
+            var dst = new Color32[pw * ph];
+            for (int y = 0; y < ph; y++)
+                for (int x = 0; x < pw; x++)
+                {
+                    float r = 0, g = 0, b = 0, a = 0;
+                    for (int dy = 0; dy < ss; dy++)
+                        for (int dx = 0; dx < ss; dx++)
+                        {
+                            var c = src[(y * ss + dy) * rw + x * ss + dx];
+                            float w = c.a / 255f;
+                            r += c.r * w; g += c.g * w; b += c.b * w; a += w;
+                        }
+                    dst[y * pw + x] = a > 0 ? new Color32((byte)Mathf.Round(r / a), (byte)Mathf.Round(g / a), (byte)Mathf.Round(b / a), (byte)Mathf.Round(a / (ss * ss) * 255)) : new Color32(0, 0, 0, 0);
+                }
+            Object.DestroyImmediate(big);
+            var tex = new Texture2D(pw, ph, TextureFormat.RGBA32, false, false);
+            tex.SetPixels32(dst); tex.Apply();
+            cam.targetTexture = null;
+            Directory.CreateDirectory(Path.GetDirectoryName(file));
+            File.WriteAllBytes(file, tex.EncodeToPNG());
+            Object.DestroyImmediate(rt); Object.DestroyImmediate(tex);
         }
 
         /**

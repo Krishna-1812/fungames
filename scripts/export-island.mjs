@@ -35,11 +35,11 @@ const out = {
   wash: (m.wash ?? []).flat(),
   fields: m.fields.map(([i, j, w, d, kind]) => ({ i, j, w, d, kind })),
   mill: m.mill ?? [], bales: m.bales.flat(), arch: m.arch ?? [],
-  buttes: m.buttes.flat(), hoodoos: m.hoodoos.flat(), boulders: m.boulders.flat(),
+  buttes: m.buttes.flat(), hoodoos: m.hoodoos.flat(), boulders: m.boulders.flat(), seaRocks: m.seaRocks.flat(), shoreRocks: m.shoreRocks.flat(),
   piers: m.piers.map((p) => ({ from: p[0], to: p[1] })),
   buildings: m.buildings.map((b) => ({ ...b, anchor: (({ x0, y0, x1, y1, bx, by }) => ({ x0, y0, x1, y1, bx, by }))(island.anchors[b.slug]) })),
 }
 const file = fileURLToPath(new URL('../unity/Assets/Island/Data/island.json', import.meta.url))
 mkdirSync(dirname(file), { recursive: true })
 writeFileSync(file, JSON.stringify(out, null, 1))
-console.log(`island.json: ${m.grid}×${m.grid} tiles, ${m.buildings.length} buildings, ${m.road.length} road tiles → ${file}`)
+console.log(`island.json: ${m.grid}×${m.grid} tiles, ${m.buildings.length} buildings, ${m.road.length} road tiles, ${m.plants.length} plants → ${file}`)

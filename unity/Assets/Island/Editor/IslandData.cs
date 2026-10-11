@@ -13,6 +13,8 @@ namespace Island
     [Serializable] public class Pier { public float[] from, to; }
     [Serializable] public class Route { public float[] pts; }
     [Serializable] public class DistrictColours { public string key, a, b; }
+    /** A tree, rock or cactus (lib/island/props.ts, figure()): its figure's name, where it stands (tile x = i, y = j; height z), and its size. */
+    [Serializable] public class Plant { public string name; public float x, y, z, k; }
 
     [Serializable]
     public class IslandData
@@ -29,6 +31,11 @@ namespace Island
         public Building[] buildings;
         public Route[] routes;
         public DistrictColours[] districts;
+        public Plant[] plants;
+        /** The rocks standing in the sea: i, j, size, flattened. */
+        public float[] seaRocks;
+        /** The stones at the waterline: x (i), y (j), size, flattened. */
+        public float[] shoreRocks;
         public float[] viewBox;
 
         public static IslandData Load(string path) => JsonUtility.FromJson<IslandData>(System.IO.File.ReadAllText(path));
