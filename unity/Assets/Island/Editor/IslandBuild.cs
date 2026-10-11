@@ -49,9 +49,9 @@ namespace Island
                 urp = UniversalRenderPipelineAsset.Create(renderer);
                 AssetDatabase.CreateAsset(urp, path);
             }
-            urp.shadowDistance = 600;
+            urp.shadowDistance = 120;
             urp.shadowCascadeCount = 1;
-            urp.mainLightShadowmapResolution = 4096;
+            urp.mainLightShadowmapResolution = 8192;
             urp.supportsHDR = false;
             urp.msaaSampleCount = 1;
             // Materials made in code share one constant buffer under the SRP Batcher in a one-shot render: every object took the last one's colour.
@@ -121,15 +121,16 @@ namespace Island
             return b.Mesh("ground");
         }
 
+        /** A building's height in the site's units: its drawing's height above its footprint, less the footprint's own depth on screen. */
+        public static float BlockHeight(Building s) => Mathf.Max(16, (s.anchor.y1 - s.anchor.y0) - (s.w + s.d) * 16 - 8);
+
         /** A box for each building, as tall as its drawing: a stand-in until the buildings are modelled. */
         static Mesh Blocks(IslandData d)
         {
             var b = new Builder();
             foreach (var s in d.buildings)
             {
-                // The drawing's height above its footprint's front corner, less the footprint's own depth on screen.
-                float px = Mathf.Max(16, (s.anchor.y1 - s.anchor.y0) - (s.w + s.d) * 16 - 8);
-                float y0 = Y(s.z), y1 = y0 + px / PxPerHeight;
+                float y0 = Y(s.z), y1 = y0 + BlockHeight(s) / PxPerHeight;
                 float inset = 0.12f;
                 float x0 = s.j + inset, x1 = s.j + s.d - inset, z0 = s.i + inset, z1 = s.i + s.w - inset;
                 var col = new Color(0.93f, 0.91f, 0.87f);
@@ -171,8 +172,8 @@ namespace Island
             float cx = x + w / 2, cy = y + h / 2;
             float a = cx / 32, s = cy / 16;            // i - j, i + j
             float ti = (a + s) / 2, tj = (s - a) / 2;
-            go.transform.position = new Vector3(tj, 0, ti) - go.transform.forward * 300;
-            cam.nearClipPlane = 1; cam.farClipPlane = 700;
+            go.transform.position = new Vector3(tj, 0, ti) - go.transform.forward * 70;
+            cam.nearClipPlane = 20; cam.farClipPlane = 130;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.allowMSAA = false; cam.allowHDR = false;
             var extra = cam.GetUniversalAdditionalCameraData();
@@ -181,16 +182,31 @@ namespace Island
             return cam;
         }
 
-        static void Shoot(Camera cam, int pw, int ph, string file, bool linear)
+        /** Render to a file, ss times larger and averaged down, for smooth edges. */
+        static void Shoot(Camera cam, int pw, int ph, string file, bool linear, int ss = 1)
         {
-            var rt = new RenderTexture(pw, ph, 24, RenderTextureFormat.ARGB32, linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB);
+            int rw = pw * ss, rh = ph * ss;
+            var rt = new RenderTexture(rw, rh, 24, RenderTextureFormat.ARGB32, linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB);
             cam.targetTexture = rt;
             cam.Render();
             RenderTexture.active = rt;
-            var tex = new Texture2D(pw, ph, TextureFormat.RGBA32, false, linear);
-            tex.ReadPixels(new Rect(0, 0, pw, ph), 0, 0);
-            tex.Apply();
+            var big = new Texture2D(rw, rh, TextureFormat.RGBA32, false, linear);
+            big.ReadPixels(new Rect(0, 0, rw, rh), 0, 0);
             RenderTexture.active = null;
+            var src = big.GetPixels32();
+            var dst = new Color32[pw * ph];
+            for (int y = 0; y < ph; y++)
+                for (int x = 0; x < pw; x++)
+                {
+                    int r = 0, g = 0, b = 0, a = 0;
+                    for (int dy = 0; dy < ss; dy++)
+                        for (int dx = 0; dx < ss; dx++) { var c = src[(y * ss + dy) * rw + x * ss + dx]; r += c.r; g += c.g; b += c.b; a += c.a; }
+                    int n = ss * ss;
+                    dst[y * pw + x] = new Color32((byte)(r / n), (byte)(g / n), (byte)(b / n), (byte)(a / n));
+                }
+            Object.DestroyImmediate(big);
+            var tex = new Texture2D(pw, ph, TextureFormat.RGBA32, false, linear);
+            tex.SetPixels32(dst); tex.Apply();
             cam.targetTexture = null;
             Directory.CreateDirectory(Path.GetDirectoryName(file));
             File.WriteAllBytes(file, tex.EncodeToPNG());
@@ -260,6 +276,118 @@ namespace Island
             var cam = Eye(vb[0], vb[1], vb[2], vb[3]);
             cam.backgroundColor = new Color(0.36f, 0.66f, 0.80f);
             Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/preview.png"), false);
+        }
+
+        /** The sun and the sky, the same for every render: from behind on the right, as the site's shadows fall. */
+        static void Light()
+        {
+            var sun = new GameObject("sun").AddComponent<Light>();
+            sun.type = LightType.Directional;
+            sun.color = new Color(1.0f, 0.98f, 0.95f);
+            sun.intensity = 1.1f;
+            sun.shadows = LightShadows.Soft;
+            sun.shadowStrength = 0.85f;
+            sun.shadowBias = 0.02f; sun.shadowNormalBias = 0.2f;
+            sun.GetUniversalAdditionalLightData().softShadowQuality = SoftShadowQuality.High;
+            float e = 40 * Mathf.Deg2Rad;
+            sun.transform.rotation = Quaternion.LookRotation(new Vector3(0.707f * Mathf.Cos(e), -Mathf.Sin(e), -0.707f * Mathf.Cos(e)));
+            Shader.SetGlobalColor("_IslandSky", new Color(0.36f, 0.42f, 0.52f));
+            Shader.SetGlobalColor("_IslandGround", new Color(0.22f, 0.24f, 0.26f));
+        }
+
+        /**
+         * The ground's scene: its one surface with its colour map, the sea over
+         * it, the buildings as blocks (`blocks`: "show", "shadow" for only their
+         * shadows, or "none"), and the sun.
+         */
+        static void Scene(IslandData d, string blocks)
+        {
+            var t0 = System.DateTime.Now;
+            var ground = new Terrain3D(d);
+            var map = new Vector4(Terrain3D.Lo, Terrain3D.Lo, Terrain3D.Span, Terrain3D.Span);
+
+            var gm = new Material(Shader.Find("Island/Ground"));
+            var albedo = ground.AlbedoMap();
+            gm.SetTexture("_Albedo", albedo); gm.SetVector("_Map", map);
+            Debug.Log($"[island] colour map {albedo.width}² in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
+            if (Arg("-maps", "") == "1") File.WriteAllBytes("Renders/albedo.png", albedo.EncodeToPNG());
+            t0 = System.DateTime.Now;
+            Place(ground.Mesh(), gm, "ground");
+            Debug.Log($"[island] ground mesh in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
+
+            var wm = new Material(Shader.Find("Island/Water"));
+            wm.SetTexture("_Depth", ground.DepthMap()); wm.SetVector("_Map", map);
+            var sea = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            sea.transform.position = new Vector3(15, Y(d.sea), 15);
+            sea.transform.localScale = new Vector3(14, 1, 14);
+            var sr = sea.GetComponent<MeshRenderer>();
+            sr.sharedMaterial = wm; sr.shadowCastingMode = ShadowCastingMode.Off;
+
+            if (blocks != "none")
+            {
+                var bm = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                bm.SetColor("_BaseColor", new Color(0.92f, 0.92f, 0.94f)); bm.SetFloat("_Smoothness", 0.1f);
+                var go = Place(Blocks(d), bm, "blocks");
+                if (blocks == "shadow") go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+            }
+            Light();
+        }
+
+        /** The site's own sea colour (lib/island/kit.ts, C.water): behind everything, where the render shows no sea of its own. */
+        static readonly Color SiteSea = new Color(0x8c / 255f, 0xcb / 255f, 1f);
+
+        static float[] Floats(string s) => System.Array.ConvertAll(s.Split(','), x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture));
+
+        /**
+         * The ground made real (phase 2), to look at: the whole map box, or
+         * `-box x,y,w,h` (P()'s units), at `-scale` pixels a map unit.
+         * `-blocks show|shadow|none`; `-ss n` renders n times larger and averages down.
+         */
+        public static void Realistic()
+        {
+            Pipeline();
+            var d = IslandData.Load(Data);
+            Scene(d, Arg("-blocks", "show"));
+            float scale = float.Parse(Arg("-scale", "1"), System.Globalization.CultureInfo.InvariantCulture);
+            int ss = int.Parse(Arg("-ss", "2"));
+            var box = Arg("-box", "");
+            var vb = box != "" ? Floats(box) : d.viewBox;
+            var cam = Eye(vb[0], vb[1], vb[2], vb[3]);
+            cam.backgroundColor = SiteSea;
+            Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/realistic.png"), false, ss);
+        }
+
+        /**
+         * The plate the site bakes from (scripts/unity-plate.mjs): the ground and
+         * the sea round it, with the buildings' shadows but not the buildings
+         * (the site draws those), over the map box `-box x0,y0,x1,y1` at `-scale`
+         * pixels a map unit, in tiles of `-tile` pixels: Renders/plate/r_c.png,
+         * and plate.json to say where they go.
+         */
+        public static void Plate()
+        {
+            Pipeline();
+            var d = IslandData.Load(Data);
+            Scene(d, "shadow");
+            var b = Floats(Arg("-box", "-1216,-200,1216,1130"));
+            float scale = float.Parse(Arg("-scale", "4"), System.Globalization.CultureInfo.InvariantCulture);
+            int tile = int.Parse(Arg("-tile", "2048")), ss = int.Parse(Arg("-ss", "2"));
+            float step = tile / scale;
+            int cols = Mathf.CeilToInt((b[2] - b[0]) / step), rows = Mathf.CeilToInt((b[3] - b[1]) / step);
+            Directory.CreateDirectory("Renders/plate");
+            foreach (var f in Directory.GetFiles("Renders/plate")) File.Delete(f);
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                {
+                    var cam = Eye(b[0] + c * step, b[1] + r * step, step, step);
+                    cam.backgroundColor = SiteSea;
+                    Shoot(cam, tile, tile, $"Renders/plate/{r}_{c}.png", false, ss);
+                    Object.DestroyImmediate(cam.gameObject);
+                }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            File.WriteAllText("Renders/plate/plate.json",
+                $"{{\"box\":[{b[0].ToString(inv)},{b[1].ToString(inv)},{(b[0] + cols * step).ToString(inv)},{(b[1] + rows * step).ToString(inv)}],\"scale\":{scale.ToString(inv)},\"tile\":{tile},\"cols\":{cols},\"rows\":{rows}}}");
+            Debug.Log($"[island] plate: {cols}×{rows} tiles of {tile}px at {scale} px a unit");
         }
     }
 }

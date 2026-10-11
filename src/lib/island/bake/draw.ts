@@ -20,6 +20,7 @@ import type { Box, M, Node, Page, Scene, Sprite } from '../scene'
 import { Bounds, pathBounds } from '../kit'
 import { mul, ID, parseSvgTransform } from '../anim'
 import { xform } from './build'
+import type { PlatePixels } from '../plate'
 
 /** Pixels per map unit at each size the island is painted at: from the whole island on a phone to closer than the camera goes. */
 export const LEVELS = [0.5, 1, 2, 4, 8]
@@ -35,10 +36,12 @@ const PAGE = 2048
  * keeps the art as sharp as the SVG was, for under twice the bytes.
  */
 const WEBP = { nearLossless: true, quality: 60, effort: 4 }
+/** Cells with the Unity plate in them are photographs, not drawings: ordinary lossy WebP keeps them small. */
+const WEBP_PLATE = { quality: 84, alphaQuality: 90, effort: 4 }
 /** Pictures encoded at once (sharp works on threads of its own). */
 const ENCODE_AHEAD = 6
 
-type Frag = { run: number; x: number; y: number; w: number; h: number; px: Buffer }
+type Frag = { run: number; x: number; y: number; w: number; h: number; px: Buffer; plate?: boolean }
 
 /** A colour as the island writes them (#rgb, #rrggbb, rgb()), as 0..255 channels. */
 function rgb(c: string): [number, number, number] {
@@ -52,7 +55,7 @@ function rgb(c: string): [number, number, number] {
 
 export type Painted = { scene: Scene; files: Map<string, Buffer>; levels: unknown[]; stats: Record<string, number> }
 
-export async function paint(b: Built, view: [number, number, number, number], hash: string, log: (s: string) => void = () => {}): Promise<Painted> {
+export async function paint(b: Built, view: [number, number, number, number], hash: string, log: (s: string) => void = () => {}, plate: PlatePixels | null = null): Promise<Painted> {
   const [vx, vy, vw, vh] = view
   const files = new Map<string, Buffer>()
   const stats: Record<string, number> = {}
@@ -207,13 +210,43 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   }
   // Encoding runs alongside painting, a few pictures ahead.
   const pending = new Set<Promise<void>>()
-  const encodeLater = async (file: string, px: Buffer, w: number, h: number, done: (bytes: number) => void) => {
+  const encodeLater = async (file: string, px: Buffer, w: number, h: number, done: (bytes: number) => void, photo = false) => {
     while (pending.size >= ENCODE_AHEAD) await Promise.race(pending)
-    const p: Promise<void> = webp(px, w, h).then((buf) => { files.set(file, buf); done(buf.length) }).finally(() => pending.delete(p))
+    const p: Promise<void> = webp(px, w, h, photo).then((buf) => { files.set(file, buf); done(buf.length) }).finally(() => pending.delete(p))
     pending.add(p)
   }
   const encoded = () => Promise.all(pending)
-  const webp = (px: Buffer, w: number, h: number) => sharp(px, { raw: { width: w, height: h, channels: 4, premultiplied: true } }).webp(WEBP).toBuffer()
+  const webp = (px: Buffer, w: number, h: number, photo = false) => sharp(px, { raw: { width: w, height: h, channels: 4, premultiplied: true } }).webp(photo ? WEBP_PLATE : WEBP).toBuffer()
+
+  /**
+   * The Unity plate (lib/island/plate.ts) over a strip of the map, at L pixels
+   * a unit, w by h: cut from the full-size picture and scaled, premultiplied
+   * as everything here is. Clear wherever the plate does not reach.
+   */
+  const plateStrip = async (strip: Box, L: number, w: number, h: number): Promise<Buffer> => {
+    const out = Buffer.alloc(w * h * 4)
+    if (!plate) return out
+    const [bx0, by0, bx1, by1] = plate.box
+    const ix0 = Math.max(strip[0], bx0), iy0 = Math.max(strip[1], by0), ix1 = Math.min(strip[2], bx1), iy1 = Math.min(strip[3], by1)
+    if (ix1 <= ix0 || iy1 <= iy0) return out
+    const k = plate.scale
+    const left = Math.round((ix0 - bx0) * k), top = Math.round((iy0 - by0) * k)
+    const width = Math.min(plate.width - left, Math.round((ix1 - ix0) * k)), height = Math.min(plate.height - top, Math.round((iy1 - iy0) * k))
+    const dx = Math.round((ix0 - strip[0]) * L), dy = Math.round((iy0 - strip[1]) * L)
+    const tw = Math.min(w - dx, Math.round((ix1 - ix0) * L)), th = Math.min(h - dy, Math.round((iy1 - iy0) * L))
+    if (width <= 0 || height <= 0 || tw <= 0 || th <= 0) return out
+    const part = await sharp(plate.px, { raw: { width: plate.width, height: plate.height, channels: 4 }, limitInputPixels: false })
+      .extract({ left, top, width, height }).resize(tw, th, { kernel: 'lanczos3', fit: 'fill' }).raw().toBuffer()
+    for (let y = 0; y < th; y++) {
+      let si = y * tw * 4, di = ((dy + y) * w + dx) * 4
+      for (let x = 0; x < tw; x++, si += 4, di += 4) {
+        const a = part[si + 3]
+        out[di] = (part[si] * a + 127) / 255; out[di + 1] = (part[si + 1] * a + 127) / 255; out[di + 2] = (part[si + 2] * a + 127) / 255; out[di + 3] = a
+      }
+    }
+    return out
+  }
+  const isPlate = (e: El): boolean => e.attrs['data-plate'] !== undefined || e.kids.some((k) => typeof k !== 'string' && isPlate(k))
 
   /* ---- every still element's box in the world ----
    * resvg cannot paint a document in which something with an opacity of its
@@ -263,6 +296,8 @@ export async function paint(b: Built, view: [number, number, number, number], ha
 
   /* ---- where each still run is: a quick small painting of each ---- */
   const cellRuns = b.runs.filter((r) => r.cell && r.items.length)
+  // The runs the plate is in: painted from its picture rather than by resvg.
+  const plateRuns = new Set(plate ? cellRuns.filter((r) => r.items.some((it) => isPlate(it.el))).map((r) => r.id) : [])
   const PROBE = 0.5, wide: Box = [vx - vw * 0.6, vy - vh * 0.6, vx + vw * 1.6, vy + vh * 1.6]
   const runBox = new Map<number, Box>()
   for (const run of cellRuns) {
@@ -412,16 +447,27 @@ export async function paint(b: Built, view: [number, number, number, number], ha
         const strip: Box = [extent[0] + cx0 * S, y0, extent[0] + cx1 * S, y1]
         const body = runBody(run, (e) => reaches(e, strip))
         if (!PAINTS.test(body)) continue
-        const img = resvg(doc(body, refsOf(run), strip), L).render(), W = img.width, H = Math.min(CELL, img.height)
-        // (Reading .pixels copies the whole picture: once.)
-        const px = img.pixels
+        let px: Buffer, W: number, H: number
+        const onPlate = plateRuns.has(run.id)
+        if (onPlate) {
+          // The plate's picture, and anything else in the run painted over it.
+          W = (cx1 - cx0) * CELL; H = CELL
+          px = await plateStrip(strip, L, W, H)
+          const rest = runBody(run, (e) => reaches(e, strip) && !isPlate(e))
+          if (PAINTS.test(rest)) { const img = resvg(doc(rest, refsOf(run), strip), L).render(); over(px, W, img.pixels, img.width, Math.min(H, img.height), 0, 0) }
+        } else {
+          const img = resvg(doc(body, refsOf(run), strip), L).render()
+          W = img.width; H = Math.min(CELL, img.height)
+          // (Reading .pixels copies the whole picture: once.)
+          px = img.pixels
+        }
         const boxes = cellBoxes(px, W, H, cx1 - cx0)
         for (let cx = cx0; cx < cx1; cx++) {
           const ab = boxes[cx - cx0]
           if (!ab) continue
           const px0 = (cx - cx0) * CELL
           const w = ab[2] - ab[0], h = ab[3] - ab[1]
-          ;(frags.get(cx) ?? frags.set(cx, []).get(cx)!).push({ run: run.id, x: ab[0], y: ab[1], w, h, px: cut(px, W, px0 + ab[0], ab[1], w, h) })
+          ;(frags.get(cx) ?? frags.set(cx, []).get(cx)!).push({ run: run.id, x: ab[0], y: ab[1], w, h, px: cut(px, W, px0 + ab[0], ab[1], w, h), plate: onPlate })
         }
       }
       gc()
@@ -431,6 +477,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
         const has = new Map(list.map((f) => [f.run, f]))
         const touches = (bb: Box) => bb[0] < cellBox[2] && bb[2] > cellBox[0] && bb[1] < cellBox[3] && bb[3] > cellBox[1]
         const segs: { night: boolean; first: number; parts: Frag[] }[] = []
+        const photo = list.some((f) => f.plate)
         let cur: (typeof segs)[number] | null = null, curCtx = -1
         for (const st of steps) {
           if ('bar' in st) { if (st.bar && touches(st.bar)) cur = null; continue }
@@ -461,7 +508,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
           const px = Buffer.alloc(W * H * 4)
           mine.forEach((o, i) => { for (let yy = 0; yy < o.h; yy++) o.px.copy(px, ((at[i][1] + yy) * W + at[i][0]) * 4, yy * o.w * 4, (yy + 1) * o.w * 4) })
           const file = `c/${li}/${night ? 'n' : ''}${cx}_${cy}.webp`
-          await encodeLater(file, px, W, H, (n) => { cellFiles++; cellBytes += n })
+          await encodeLater(file, px, W, H, (n) => { cellFiles++; cellBytes += n }, photo && !night)
           const ci = cy * cols + cx
           const list2: number[] = []
           mine.forEach((o, i) => list2.push(o.first, at[i][0], at[i][1], o.w, o.h, o.x, o.y))

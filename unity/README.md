@@ -51,11 +51,43 @@ git ignores.
 - **Washed-out colour:** the project was in gamma colour; light only adds up
   properly in linear, which `Pipeline()` sets.
 
+## The plate: how the render reaches the site
+
+`node scripts/unity-plate.mjs` renders the ground (`IslandBuild.Plate`: the
+terrain, the sea round it, and the buildings' shadows but not the buildings,
+which the site draws) in 2048 px tiles at 4 px a map unit, stitches them,
+fades the edges into the site's own sea, and writes `src/lib/island/plate/`:
+WebP tiles, `low.png` (a small copy), and `plate.json`. About 1½ minutes.
+
+- The island's SVG (`world.ts`) draws `low.png` as one `<image>` at the
+  bottom of the sea layer, in place of its own ground and still shallows
+  (the falls, waves, glints, surf, rocks and everything else still draw).
+- The bake (`bake/draw.ts`) paints each map cell the plate is in from the
+  full-size tiles instead, as lossy WebP (a photograph, not a drawing).
+- `plate.json`'s `live` says whether the site uses it. Until the island is
+  real all through, it is off; `ISLAND_PLATE=1` turns it on locally.
+
+## The ground
+
+`Terrain3D.cs`: tile middles stay at the site's heights (so all it draws on
+the ground still stands on it); every height (the coast, the beach, each
+terrace, each plaza) has a smooth outline, so corners round off; a step falls
+just inside its outline, rocky where steep. The sea floor shelves with the
+true distance from the coast. A colour map at 64 texels a tile (grass in each
+district's colour, sand, rock in layers, roads, plazas, fields, the river,
+the pond, the dry wash), with what each spot is in its alpha for the shader's
+fine detail. `Ground.shader` and `Water.shader` light them (one sun with soft
+shadows, the sky, how shut in each point is); the deep water is exactly the
+site's sea colour in the sun, so the two meet without a seam.
+
 ## Phases
 
 1. Pipeline and registration (done): the ground from the site's tiles, blocks
    for buildings, one sun, proven to line up.
-2. The ground made real: materials, roads, river, fields, trees and rocks,
-   soft shadows and ambient occlusion, rendered into the bake's ground cells.
-3. The buildings, modelled one by one, rendered as the bake's sprites.
-4. Night: a night render, lit from the windows.
+2. The ground made real (in progress): the shape, the water and the lighting
+   are done, and baked into the site behind the `live` switch. Next: photo
+   textures (CC0, Poly Haven) for grass, sand, rock and paving.
+3. Trees and rocks as 3D models.
+4. The buildings, modelled one by one, rendered as the bake's sprites.
+5. People, boats, birds and the parade, to match.
+6. Night: a night render, lit from the windows.

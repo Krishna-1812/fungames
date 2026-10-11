@@ -330,13 +330,15 @@ console.log('\nthe database')
   check((await d.query('select count(*)::int as n from views'))[0].n === viewsBefore - 1 && (await d.query('select count(*)::int as n from visitors where vid = $1', [id('v')]))[0].n === 0, 'and nobody else’s, and its first visit is forgotten too')
 
   // Thirteen months.
-  await d.query("update views set ts = now() - interval '400 days' where pid = $1", [id('x')])
-  await d.query("update events set ts = now() - interval '400 days' where pid = $1", [id('x')])
-  await I.prune(d, new Date())
+  // Everything here runs on the test's own clock (NOW), as its rows were written: on today's, a test run
+  // from NOW would itself be days old, and go before it was meant to.
+  await d.query('update views set ts = $2 where pid = $1', [id('x'), new Date(NOW - 400 * 864e5)])
+  await d.query('update events set ts = $2 where pid = $1', [id('x'), new Date(NOW - 400 * 864e5)])
+  await I.prune(d, new Date(NOW))
   check((await d.query('select count(*)::int as n from views where pid = $1', [id('x')]))[0].n === 0, 'records older than thirteen months are deleted')
   const left = (await d.query('select count(*)::int as n from views'))[0].n
-  await d.query("update views set ts = now() - interval '3 days' where pid = $1", [id('t')])
-  await I.prune(d, new Date())
+  await d.query('update views set ts = $2 where pid = $1', [id('t'), new Date(NOW - 3 * 864e5)])
+  await I.prune(d, new Date(NOW))
   check((await d.query('select count(*)::int as n from views where pid = $1', [id('t')]))[0].n === 0 && (await d.query('select count(*)::int as n from views'))[0].n === left - 1, 'a test run older than two days is deleted, and nothing else is')
   await pg.close()
 }

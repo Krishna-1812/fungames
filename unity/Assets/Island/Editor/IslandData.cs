@@ -11,6 +11,8 @@ namespace Island
     [Serializable] public class Building { public string slug, district; public float i, j, w, d, z; public bool water; public Anchor anchor; }
     [Serializable] public class Field { public int i, j, w, d; public string kind; }
     [Serializable] public class Pier { public float[] from, to; }
+    [Serializable] public class Route { public float[] pts; }
+    [Serializable] public class DistrictColours { public string key, a, b; }
 
     [Serializable]
     public class IslandData
@@ -25,6 +27,8 @@ namespace Island
         public Field[] fields;
         public Pier[] piers;
         public Building[] buildings;
+        public Route[] routes;
+        public DistrictColours[] districts;
         public float[] viewBox;
 
         public static IslandData Load(string path) => JsonUtility.FromJson<IslandData>(System.IO.File.ReadAllText(path));

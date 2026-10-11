@@ -18,6 +18,7 @@ register('./resolve-ts.mjs', import.meta.url)
 const { listedGames } = await import('../src/data/games.ts')
 const { buildIsland } = await import('../src/lib/island/world.ts')
 const { resvgRaster } = await import('../src/lib/island/raster.ts')
+const { DISTRICTS } = await import('../src/lib/island/landmarks.ts')
 
 const games = listedGames()
 const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: `/${g.slug}/` })), { raster: resvgRaster })
@@ -28,6 +29,9 @@ const out = {
   height: m.height.flat(),
   district: m.district.flat(),
   river: m.river.flat(), pond: m.pond.flat(), road: m.road.flat(),
+  routes: m.routes.map((r) => ({ pts: r.flat() })),
+  // Each district's own ground colours (lib/island/landmarks.ts), so the 3D island keeps them.
+  districts: DISTRICTS.map((d) => ({ key: d.key, a: d.ground[0], b: d.ground[1] })),
   wash: (m.wash ?? []).flat(),
   fields: m.fields.map(([i, j, w, d, kind]) => ({ i, j, w, d, kind })),
   mill: m.mill ?? [], bales: m.bales.flat(), arch: m.arch ?? [],

@@ -23,12 +23,16 @@ const { sceneJson } = await import('../src/lib/island/scene.ts')
 const { SKIP_LAYERS } = await import('../src/lib/island/bake/index.ts')
 const { Resvg } = await import('@resvg/resvg-js')
 const sharp = (await import('sharp')).default
+const { platePixels } = await import('../src/lib/island/plate.ts')
 
 const t0 = Date.now()
 const island = JSON.parse(fs.readFileSync(input, 'utf8'))
 const b = build({ ...island, layers: island.layers.filter((l) => !SKIP_LAYERS.has(l.kind)) })
 for (const w of b.warnings) console.log(`  [island] warning: ${w}`)
-const p = await paint(b, island.viewBox, hash, (s) => console.log(`  [island] ${s}`))
+// The ground as Unity renders it, if the island was built with it (lib/island/plate.ts).
+const plate = island.layers.some((l) => l.body.includes('data-plate')) ? await platePixels() : null
+if (plate) console.log(`  [island] painting the ground from the Unity plate ${plate.id} (${plate.width}x${plate.height})`)
+const p = await paint(b, island.viewBox, hash, (s) => console.log(`  [island] ${s}`), plate)
 
 fs.rmSync(out, { recursive: true, force: true })
 const files = []

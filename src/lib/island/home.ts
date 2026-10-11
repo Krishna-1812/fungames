@@ -10,13 +10,14 @@ import { withBase } from '../base'
 import { buildIsland } from './world'
 import { resvgRaster } from './raster'
 import { bakedIsland } from './bake'
+import { plateRef } from './plate'
 
 /** The listed games, newest first, as the homepage shows them. */
 export const homeGames = () => listedGames().sort((a, b) => b.added.localeCompare(a.added))
 
 let built: ReturnType<typeof buildIsland> | null = null
 export function homeIsland() {
-  built ??= buildIsland(homeGames().map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`) })), { raster: resvgRaster })
+  built ??= buildIsland(homeGames().map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`) })), { raster: resvgRaster, plate: plateRef() })
   return built
 }
 

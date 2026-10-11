@@ -102,6 +102,8 @@ export type IslandModel = {
   height: number[][]
   district: string[][]
   river: [number, number][]; pond: [number, number][]; road: [number, number][]
+  /** The roads as drawn: lines through tile middles. */
+  routes: [number, number][][]
   wash: [number, number][] | null
   fields: [number, number, number, number, string][]
   mill: [number, number] | null; bales: [number, number][]; arch: [number, number] | null
@@ -120,7 +122,16 @@ export type GameLink = { slug: string; title: string; blurb: string; href: strin
  */
 export type Raster = (svg: string, width: number) => { width: number; height: number; pixels: Uint8Array }
 
-export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): Island {
+/**
+ * The ground as Unity renders it (unity/, scripts/unity-plate.mjs): where it
+ * lies on the map, a small copy to draw into the SVG, and an id. With one,
+ * the island draws that picture in place of its own ground and still
+ * shallows; the bake paints the map from the full-size picture (bake/draw.ts).
+ */
+export type PlateRef = { box: [number, number, number, number]; href: string; id: string }
+
+export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null } = {}): Island {
+  const plate = opts.plate ?? null
   const R = rng(20260930)
   motionCss.length = 0
   glows.length = 0
@@ -274,6 +285,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   grad.add(new N('stop', { offset: 0.3, 'stop-color': '#a3dbff' }))
   grad.add(new N('stop', { offset: 1, 'stop-color': C.water }))
   root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: 'url(#isl-sea)' }))
+  // The ground as Unity renders it, land and shallows together, over the open sea.
+  if (plate) {
+    const [x0, y0, x1, y1] = plate.box
+    root.add(new N('image', { 'data-plate': plate.id, href: plate.href, x: x0, y: y0, width: x1 - x0, height: y1 - y0, preserveAspectRatio: 'none' }))
+  }
 
   // The shallows: the whole coast's outline, stroked wider and wider with
   // round joins, which is the same as growing it outwards by that much. Drawn
@@ -284,9 +300,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   const flat = (cls?: string) => root.add(new N('g', { class: cls, transform: `translate(${f(sox)} ${f(soy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
   let landSq = ''
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (isLand(i, j)) landSq += `M${i} ${j}h1v1h-1z`
-  const sh = flat('shallows')
+  // (With a plate, the shallows and the foam are in its picture: drawn into nothing.)
+  const sh = plate ? new N('g') : flat('shallows')
   // One outline, drawn eight times: each band and its lighter edge.
-  sh.add(new N('defs')).add(new N('path', { id: 'isl-coast', d: landSq }))
+  // The coast's outline, kept in the SVG whatever happens to the shallows: the surf and the foam draw from it.
+  root.add(new N('defs')).add(new N('path', { id: 'isl-coast', d: landSq }))
   ;([[7.2, '#98d4fc'], [4.6, '#a7ddf9'], [2.6, '#b8e7f6'], [1.2, '#cdf1f4']] as [number, string][]).forEach(([w, c]) => {
     sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: mix(c, '#ffffff', 0.45), 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
     sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: c, 'stroke-width': f2(w - 0.09), 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
@@ -367,7 +385,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   // Foam where the water meets the land: the coast's outline once more,
   // stroked narrow and white, so it hugs every beach and cliff foot.
   const coastT = `translate(${f(sox)} ${f(soy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)`
-  const foamG = root.add(new N('g', { transform: coastT }))
+  const foamG = plate ? new N('g', { transform: coastT }) : root.add(new N('g', { transform: coastT }))
   foamG.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': 0.86, 'stroke-linejoin': 'round', opacity: 0.35 }))
   foamG.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': 0.42, 'stroke-linejoin': 'round', opacity: 0.9 }))
   // Rocks at the waterline, here and there along the sides we can see: a
@@ -821,6 +839,14 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   for (const [i, j, w, d, kind] of fields) cropField(new Pen(root), i, j, w, d, kind)
 
   // People walking the roads, there and back.
+  // With a plate, the ground is its picture: of all this, only the falls' moving water stays.
+  if (plate) {
+    const falls: N[] = []
+    const find = (n: N) => { for (const k of n.kids) if (typeof k !== 'string') { if (String(k.attrs.class ?? '').split(' ').includes('fall')) falls.push(k); else find(k) } }
+    find(root)
+    root.kids = falls.length ? [new N('g', { class: 'ground' })] : []
+    for (const f of falls) (root.kids[0] as N).add(f)
+  }
   root = open('walkers')
   const walkers = root.add(new N('g', { class: 'walkers' }))
   /** Everyone on the roads, and the road cells each one uses: drawn again in front of a building they pass (below). */
@@ -1519,7 +1545,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
     grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
     ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
     height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),
-    river, pond: [...pond].map((k) => k.split(',').map(Number) as [number, number]), road: [...road].map((k) => k.split(',').map(Number) as [number, number]),
+    river, pond: [...pond].map((k) => k.split(',').map(Number) as [number, number]), road: [...road].map((k) => k.split(',').map(Number) as [number, number]), routes: routes.map((r) => r.map(([i, j]) => [i, j] as [number, number])),
     wash, fields: fields.map((f) => [...f]), mill, bales, arch: archAt, buttes, hoodoos, boulders: boulderAt, piers: PIERS,
     buildings: placed.map((b) => ({ slug: b.slug, district: b.district, i: b.i, j: b.j, w: b.w, d: b.d, z: b.z, water: !!b.lm.water })),
     viewBox,
