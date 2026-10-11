@@ -88,7 +88,29 @@ export type Signpost = { i: number; j: number; at: [number, number]; boards: { d
  * to its door, for the day's parade. All in tiles.
  */
 export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]> }
-export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string }
+/**
+ * The island as facts rather than a picture, for anything that draws it
+ * another way (the Unity scene in unity/, which renders it in 3D): every
+ * tile's ground, height and district, the water, the roads, the fields, and
+ * where each building stands. Tiles are [i, j]; heights are in the same screen
+ * units as P()'s z.
+ */
+export type IslandModel = {
+  grid: number; tile: number; sea: number; beachZ: number
+  /** A letter a tile, i * grid + j: 0 sea, 1 land, b beach. */
+  ground: string
+  height: number[][]
+  district: string[][]
+  river: [number, number][]; pond: [number, number][]; road: [number, number][]
+  wash: [number, number][] | null
+  fields: [number, number, number, number, string][]
+  mill: [number, number] | null; bales: [number, number][]; arch: [number, number] | null
+  buttes: [number, number, number][]; hoodoos: [number, number][]; boulders: [number, number][]
+  piers: [number, number][][]
+  buildings: { slug: string; district: string; i: number; j: number; w: number; d: number; z: number; water: boolean }[]
+  viewBox: [number, number, number, number]
+}
+export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
 /**
@@ -1493,7 +1515,15 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster } = {}): 
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join('') }
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
+    grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
+    ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
+    height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),
+    river, pond: [...pond].map((k) => k.split(',').map(Number) as [number, number]), road: [...road].map((k) => k.split(',').map(Number) as [number, number]),
+    wash, fields: fields.map((f) => [...f]), mill, bales, arch: archAt, buttes, hoodoos, boulders: boulderAt, piers: PIERS,
+    buildings: placed.map((b) => ({ slug: b.slug, district: b.district, i: b.i, j: b.j, w: b.w, d: b.d, z: b.z, water: !!b.lm.water })),
+    viewBox,
+  } }
 }
 
 export { OUT, bench }

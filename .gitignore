@@ -19,3 +19,14 @@ dist/
 
 # the Vercel adapter's build output
 .vercel/
+
+# Unity's own working folders (unity/ is the 3D island; see unity/README.md)
+unity/Library/
+unity/Temp/
+unity/Logs/
+unity/UserSettings/
+unity/obj/
+unity/Build/
+unity/Renders/
+unity/*.csproj
+unity/*.sln
