@@ -19,7 +19,7 @@ namespace Island
     public class Terrain3D
     {
         public const int Lo = -6, Hi = 36, Span = Hi - Lo;
-        public const int PerTile = 12, TexPerTile = 64, DepthPerTile = 16;
+        public const int PerTile = 28, TexPerTile = 96, DepthPerTile = 16;
 
         readonly IslandData d;
         readonly float[,] seaFloor;
@@ -180,39 +180,33 @@ namespace Island
             float h = d.beachZ, prev = d.beachZ;
             foreach (var z in levels)
             {
-                float dk = Inside(u, v, z);
-                if (dk <= 0) break;
                 float w = z <= 0 ? 0.3f : 0.12f;
+                // A cliff's edge wanders a little in and out, as rock breaks, rather than running ruler-straight.
+                float dk = Inside(u, v, z) + (w < 0.2f ? Wander(u, v, z) : 0);
+                if (dk <= 0) break;
                 float s = Mathf.SmoothStep(0, 1, Mathf.Clamp01(dk / w));
                 float step = z - prev;
                 h += step * s;
-                if (w < 0.2f && s > 0 && s < 1)
-                {
-                    // Rock: an uneven face, not a ramp.
-                    float r = 1 - Mathf.Abs(2 * s - 1);
-                    h += (Noise.Fbm(u * 7.3f + v * 1.1f, v * 7.3f - u * 0.7f + z * 0.13f, 3, 11) - 0.5f) * Mathf.Min(3f, step * 0.3f) * r;
-                    rock = Mathf.Max(rock, r);
-                }
+                if (w < 0.2f && s > 0 && s < 1) rock = Mathf.Max(rock, 1 - Mathf.Abs(2 * s - 1));
                 prev = z;
                 if (s < 1) break;
             }
             // The coast: a beach runs gently into the sea, anything higher stands in it as a cliff.
-            float dc = Inside(u, v, float.NegativeInfinity);
             float wc = h <= d.beachZ + 1 ? 0.5f : 0.15f;
+            float dc = Inside(u, v, float.NegativeInfinity) + (wc < 0.2f ? Wander(u, v, -1) : 0);
             if (dc < wc)
             {
                 float s = Mathf.SmoothStep(0, 1, dc / wc);
                 float t = Mathf.Lerp(SeaH(u, v), h, s);
-                if (wc < 0.2f)
-                {
-                    float r = 1 - Mathf.Abs(2 * s - 1);
-                    t += (Noise.Fbm(u * 7.3f + v * 1.1f, v * 7.3f - u * 0.7f, 3, 12) - 0.5f) * 3f * r;
-                    rock = Mathf.Max(rock, r);
-                }
+                if (wc < 0.2f) rock = Mathf.Max(rock, 1 - Mathf.Abs(2 * s - 1));
                 h = Mathf.Min(h, t);
             }
             return h;
         }
+
+        /** How far a cliff's edge is pushed in or out here, in tiles: broad bays and headlands, and small notches. */
+        static float Wander(float u, float v, float z) =>
+            (Noise.Fbm(u * 1.7f, v * 1.7f + z * 0.07f, 3, 41) - 0.5f) * 0.1f + (Noise.Fbm(u * 6.1f, v * 6.1f, 2, 43) - 0.5f) * 0.035f;
 
         /**
          * How far inside the outline of the ground at least `z` high a point is,
@@ -312,9 +306,9 @@ namespace Island
         /* ---- the colour of the ground ---------------------------------------------- */
 
         static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
-        static readonly Color Deep = Hex("#3a6b52"), Sand = Hex("#d2d0c8"), Wet = Hex("#8f9a9e"), Floor0 = Hex("#9db3b4"),
-            Rock = Hex("#8d91a5"), RockHi = Hex("#a9adbf"), RockLo = Hex("#6f7389"), Paving = Hex("#b9bdc8"), Kerb = Hex("#9fa6ba"),
-            Plaza = Hex("#b3b8c6"), Soil = Hex("#5d6372"), Lavender = Hex("#8a78c4"), Sage = Hex("#a9c8b9"), Greens = Hex("#4f9c72"),
+        static readonly Color Deep = Hex("#3a6b52"), Sand = Hex("#d2d0c8"), Wet = Hex("#8f9a9e"), Floor0 = Hex("#c4d2cf"),
+            Rock = Hex("#8d91a5"), RockHi = Hex("#a9adbf"), RockLo = Hex("#6f7389"), Paving = Hex("#878c97"), Kerb = Hex("#b4b8c2"),
+            Plaza = Hex("#b3b8c6"), Soil = Hex("#5d6372"), Lavender = Hex("#7c6fa6"), Sage = Hex("#93a89c"), Greens = Hex("#3f6f55"),
             River = Hex("#5aa8d8"), RiverHi = Hex("#a6d8f2"), Foam = Hex("#eef5fa"), Pond = Hex("#3d8a9c"), Mud = Hex("#cbc7d9"), MudDark = Hex("#9d98b2");
 
         static float SegDist(Vector2 p, Vector2 a, Vector2 b)
@@ -355,25 +349,38 @@ namespace Island
             var site = Color.Lerp(Color.Lerp(Of(i0, j0), Of(i0, j0 + 1), fv), Color.Lerp(Of(i0 + 1, j0), Of(i0 + 1, j0 + 1), fv), fu);
             // Real grass is darker and less bright than a flat illustration's: the site's colour,
             // deepened, a little greyer, and a little less blue.
-            var g = Color.Lerp(site, Deep, 0.62f);
+            var g = Color.Lerp(site, Deep, 0.74f);
             float lum = g.r * 0.3f + g.g * 0.59f + g.b * 0.11f;
-            g = Color.Lerp(g, new Color(lum, lum, lum), 0.28f);
-            g.b *= 0.86f;
+            g = Color.Lerp(g, new Color(lum, lum, lum), 0.42f);
+            g.b *= 0.8f;
+            g *= 0.82f;
+            // Real turf: drier, paler stretches and lush dark hollows, worn lighter in places, never one flat green.
             float patch = Noise.Fbm(u * 0.9f, v * 0.9f, 4, 3);
             float tuft = Noise.Fbm(u * 6f, v * 6f, 3, 5);
-            g = Color.Lerp(g, Color.Lerp(g, site, 0.35f), Mathf.Clamp01((patch - 0.5f) * 2.5f));
             float mid = Noise.Fbm(u * 14f, v * 14f, 2, 7);
-            g *= 0.88f + 0.2f * patch + 0.14f * (tuft - 0.5f) + 0.1f * (mid - 0.5f);
+            var dry = Color.Lerp(g, new Color(0.47f, 0.52f, 0.47f), 0.45f);
+            var lush = new Color(g.r * 0.72f, g.g * 0.86f, g.b * 0.8f);
+            g = Color.Lerp(g, dry, Mathf.Clamp01((patch - 0.55f) * 3f));
+            g = Color.Lerp(g, lush, Mathf.Clamp01((0.45f - patch) * 3f));
+            g *= 0.86f + 0.18f * patch + 0.2f * (tuft - 0.5f) + 0.14f * (mid - 0.5f);
             return g;
         }
 
         /** What a spot is, in the colour map's alpha, for the shader's fine detail. */
         public const float IsWater = 0, IsPaving = 0.25f, IsRock = 0.5f, IsSand = 0.75f, IsGrass = 1;
         float kind;
+        /**
+         * Which photograph a spot is made of (Photos.Layers 0-7: grass, dry sand,
+         * wet sand, rock, road, plaza, cobbles, mud), as weights, for the splat
+         * maps; all nought where it is water, which has no photograph.
+         */
+        readonly float[] w = new float[8];
+        void Only(int k) { System.Array.Clear(w, 0, w.Length); if (k >= 0) w[k] = 1; }
 
         public Color Albedo(float u, float v)
         {
             kind = IsGrass;
+            Only(0);
             int ti = Mathf.FloorToInt(u), tj = Mathf.FloorToInt(v);
             float h = H(u, v, out float rock);
             float e = 0.02f;
@@ -384,7 +391,7 @@ namespace Island
             // Under the water: pale sand, darker as it deepens (the water's own colour comes from its shader).
             if (h < d.sea - 0.4f)
             {
-                kind = IsSand;
+                kind = IsSand; Only(2);
                 return Color.Lerp(Floor0, Hex("#6f949c"), Mathf.Clamp01((d.sea - h) / 22f)) * (0.95f + 0.1f * grain);
             }
 
@@ -397,7 +404,7 @@ namespace Island
                 float band = Mathf.Sin(h * 0.55f + Noise.Value(u * 3, v * 3, 2) * 2.5f);
                 c = Color.Lerp(RockLo, RockHi, 0.5f + 0.5f * band) * (0.9f + 0.2f * Noise.Fbm(u * 12, v * 12, 3, 4));
                 c = Color.Lerp(c, Rock, 0.35f);
-                kind = IsRock;
+                kind = IsRock; Only(3);
             }
             else if (beachish)
             {
@@ -405,25 +412,22 @@ namespace Island
                 // Wet sand down the last of the slope into the sea.
                 float wet = Mathf.Clamp01(1 - (h - d.sea) / 2.2f);
                 c = Color.Lerp(c, Wet, wet * 0.85f);
-                kind = IsSand;
+                kind = IsSand; Only(1); w[1] = 1 - wet; w[2] = wet;
             }
             else if (plaza.ContainsKey((ti, tj)))
             {
-                // Paving round a building, laid in quarter-tile flags.
-                float fu = Mathf.Repeat(u * 4, 1), fv = Mathf.Repeat(v * 4, 1);
-                float joint = Mathf.Min(Mathf.Min(fu, 1 - fu), Mathf.Min(fv, 1 - fv));
-                c = Plaza * (0.95f + 0.08f * Noise.Value(Mathf.Floor(u * 4) * 3.1f, Mathf.Floor(v * 4) * 1.7f, 6));
-                if (joint < 0.03f) c *= 0.86f;
-                kind = IsPaving;
+                // Paving round a building (its slabs or cobbles come from the photograph): cobbles in the old town.
+                c = Plaza * (0.95f + 0.08f * Noise.Value(u * 2.1f, v * 2.1f, 6));
+                kind = IsPaving; Only(d.District(ti, tj) == "oldtown" ? 6 : 5);
             }
             else if (districts.ContainsKey(d.District(ti, tj)) && d.District(ti, tj) == "badlands")
             {
                 // Dust, cracked into plates.
                 var site = districts["badlands"].a;
-                c = Color.Lerp(site, Hex("#8a84a6"), 0.38f) * (0.9f + 0.18f * Noise.Fbm(u * 1.5f, v * 1.5f, 4, 8));
+                c = Color.Lerp(site, Hex("#9b99a6"), 0.66f) * (0.9f + 0.18f * Noise.Fbm(u * 1.5f, v * 1.5f, 4, 8));
                 var cell = Noise.Cells(u * 5, v * 5, 21);
                 if (cell.y - cell.x < 0.05f) c *= 0.82f;
-                kind = IsSand;
+                kind = IsSand; Only(7);
             }
             else c = Grass(u, v);
 
@@ -435,7 +439,12 @@ namespace Island
                     {
                         float row = Mathf.Repeat(u * 5.5f, 1);
                         var crop = f.kind == "lavender" ? Lavender : f.kind == "wheat" ? Sage : Greens;
-                        c = row < 0.6f ? crop * (0.9f + 0.2f * Noise.Value(u * 30, v * 8, 12)) : Soil * (0.9f + 0.15f * grain);
+                        // Each row a rounded line of plants, lit on top and shaded at its sides, with a dark furrow between.
+                        float round = Mathf.Sin(Mathf.PI * Mathf.Clamp01(row / 0.68f));
+                        c = row < 0.68f
+                            ? crop * (0.62f + 0.48f * round) * (0.85f + 0.3f * Noise.Fbm(u * 30, v * 9, 2, 12))
+                            : Soil * (0.75f + 0.15f * grain);
+                        Only(row < 0.68f ? 0 : 7);
                     }
                 // The dry wash across the Badlands.
                 if (wash.Count > 0)
@@ -446,6 +455,7 @@ namespace Island
                         var cell = Noise.Cells(u * 9, v * 9, 14);
                         c = Mud * (0.95f + 0.08f * grain);
                         if (cell.y - cell.x < 0.06f) c = MudDark;
+                        Only(7);
                     }
                     else if (wd < 0.27f) c = Color.Lerp(c, MudDark, 0.6f);
                 }
@@ -456,9 +466,9 @@ namespace Island
                     var cell = Noise.Cells(u * 10, v * 10, 17);
                     c = Paving * (0.93f + 0.1f * Noise.Value(u * 25, v * 25, 18));
                     if (cell.y - cell.x < 0.045f) c *= 0.9f;
-                    kind = IsPaving;
+                    kind = IsPaving; Only(4);
                 }
-                else if (rd < 0.285f) { c = Kerb; kind = IsPaving; }
+                else if (rd < 0.285f) { c = Kerb; kind = IsPaving; Only(5); }
                 else if (rd < 0.42f) c = Color.Lerp(c, c * 0.8f + Soil * 0.08f, 1 - (rd - 0.285f) / 0.135f);
             }
 
@@ -469,10 +479,10 @@ namespace Island
                 if (across < 0.17f)
                 {
                     c = Color.Lerp(River, RiverHi, across / 0.17f * 0.7f);
-                    kind = IsWater;
+                    kind = IsWater; Only(-1);
                     if (slope > 25) c = Color.Lerp(c, Foam, 0.85f);
                 }
-                else if (across < 0.23f) c = Color.Lerp(RockLo, Rock, grain);
+                else if (across < 0.23f) { c = Color.Lerp(RockLo, Rock, grain); Only(3); }
             }
             // The pond: a sandy rim, deep middle, lily pads.
             if (pond.Count > 0 && pondBox.Contains(new Vector2(u, v)))
@@ -482,29 +492,41 @@ namespace Island
                 if (inside > 0.22f)
                 {
                     c = Color.Lerp(RiverHi, Pond, Mathf.Clamp01((inside - 0.22f) / 0.3f));
-                    kind = IsWater;
+                    kind = IsWater; Only(-1);
                     var pad = Noise.Cells(u * 3.2f, v * 3.2f, 31);
                     if (pad.x < 0.13f && Noise.Value(u * 1.3f, v * 1.3f, 32) > 0.45f) c = Hex("#3f8a5e");
                 }
-                else if (inside > 0.1f) c = Sand * 0.95f;
+                else if (inside > 0.1f) { c = Sand * 0.95f; Only(1); }
             }
             c.a = kind;
             return c;
         }
 
         /** The colour map: TexPerTile texels a tile over the whole ground. */
-        public Texture2D AlbedoMap()
+        public Texture2D AlbedoMap() => AlbedoMap(out _, out _);
+
+        /** The colour map, and the splat maps beside it: layers 0-3 in one's RGBA, 4-7 in the other's. */
+        public Texture2D AlbedoMap(out Texture2D splatA, out Texture2D splatB)
         {
             int n = Span * TexPerTile;
-            var tex = new Texture2D(n, n, TextureFormat.RGBA32, true, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            Texture2D Make(bool linear) => new Texture2D(n, n, TextureFormat.RGBA32, true, linear) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            var tex = Make(false);
+            splatA = Make(true); splatB = Make(true);
             var px = new Color32[n * n];
+            var pa = new Color32[n * n];
+            var pb = new Color32[n * n];
+            byte B(float x) => (byte)Mathf.RoundToInt(Mathf.Clamp01(x) * 255);
             for (int y = 0; y < n; y++)
                 for (int x = 0; x < n; x++)
                 {
                     float u = Lo + (y + 0.5f) / TexPerTile, v = Lo + (x + 0.5f) / TexPerTile;
                     px[y * n + x] = Albedo(u, v);
+                    pa[y * n + x] = new Color32(B(w[0]), B(w[1]), B(w[2]), B(w[3]));
+                    pb[y * n + x] = new Color32(B(w[4]), B(w[5]), B(w[6]), B(w[7]));
                 }
             tex.SetPixels32(px); tex.Apply(true);
+            splatA.SetPixels32(pa); splatA.Apply(true);
+            splatB.SetPixels32(pb); splatB.Apply(true);
             return tex;
         }
 

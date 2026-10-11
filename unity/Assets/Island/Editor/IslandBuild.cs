@@ -307,14 +307,19 @@ namespace Island
             var map = new Vector4(Terrain3D.Lo, Terrain3D.Lo, Terrain3D.Span, Terrain3D.Span);
 
             var gm = new Material(Shader.Find("Island/Ground"));
-            var albedo = ground.AlbedoMap();
+            var albedo = ground.AlbedoMap(out var splatA, out var splatB);
             gm.SetTexture("_Albedo", albedo); gm.SetVector("_Map", map);
+            gm.SetTexture("_SplatA", splatA); gm.SetTexture("_SplatB", splatB);
+            Photos.Load();
+            gm.SetTexture("_Photo", Photos.Colour); gm.SetTexture("_PhotoN", Photos.Normal);
+            gm.SetVectorArray("_PhotoMean", Photos.Means);
             Debug.Log($"[island] colour map {albedo.width}² in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
             if (Arg("-maps", "") == "1") File.WriteAllBytes("Renders/albedo.png", albedo.EncodeToPNG());
             t0 = System.DateTime.Now;
             Place(ground.Mesh(), gm, "ground");
             Debug.Log($"[island] ground mesh in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
 
+            Shader.SetGlobalFloat("_IslandSea", Y(d.sea));
             var wm = new Material(Shader.Find("Island/Water"));
             wm.SetTexture("_Depth", ground.DepthMap()); wm.SetVector("_Map", map);
             var sea = GameObject.CreatePrimitive(PrimitiveType.Plane);

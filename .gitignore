@@ -28,5 +28,6 @@ unity/UserSettings/
 unity/obj/
 unity/Build/
 unity/Renders/
+unity/Textures/
 unity/*.csproj
 unity/*.sln

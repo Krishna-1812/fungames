@@ -22,7 +22,12 @@ runs Unity.
 ## Running it
 
 Unity 6 (6000.5.5f1), with a signed-in licence in Unity Hub. Close the project
-in the editor first: two Unitys cannot open it at once.
+in the editor first: two Unitys cannot open it at once. The ground's photographs
+are not in git; fetch them once (16 MB, CC0, from Poly Haven):
+
+```bash
+node scripts/fetch-textures.mjs
+```
 
 ```bash
 node scripts/export-island.mjs
@@ -50,6 +55,11 @@ git ignores.
   material's colour. The batcher is off for these renders.
 - **Washed-out colour:** the project was in gamma colour; light only adds up
   properly in linear, which `Pipeline()` sets.
+- **A blank plate:** a shader that does not compile draws nothing, and Unity
+  still exits happily; `unity-plate.mjs` stops on any "Shader error" in the log.
+- **Streaks down every face:** anything laid on from above (the colour map,
+  the splat maps) smears down a steep face. Cliff faces take their colour in the
+  shader instead (rock in strata, by height) and their photo from the side.
 
 ## The plate: how the render reaches the site
 
@@ -76,7 +86,17 @@ just inside its outline, rocky where steep. The sea floor shelves with the
 true distance from the coast. A colour map at 64 texels a tile (grass in each
 district's colour, sand, rock in layers, roads, plazas, fields, the river,
 the pond, the dry wash), with what each spot is in its alpha for the shader's
-fine detail. `Ground.shader` and `Water.shader` light them (one sun with soft
+fine detail.
+
+Its detail is photographic (`Photos.cs`; `scripts/fetch-textures.mjs`):
+ten CC0 sets from Poly Haven, for grass (two, in patches), dry and wet sand,
+rock from above and cliff from the side, asphalt, paving, cobbles (the old
+town) and cracked mud (the Badlands, the wash, the fields' furrows). Which goes
+where is in two splat maps beside the colour map. The photos are warm and the
+island cool, so the shader takes from each only how it varies from its own
+average (its grain, cracks, stones and blades) and keeps the colour map's
+colour; each is sampled twice, turned and shifted, so its repeats don't show.
+Under the shallows, caustics. `Ground.shader` and `Water.shader` light them (one sun with soft
 shadows, the sky, how shut in each point is); the deep water is exactly the
 site's sea colour in the sun, so the two meet without a seam.
 
@@ -84,9 +104,8 @@ site's sea colour in the sun, so the two meet without a seam.
 
 1. Pipeline and registration (done): the ground from the site's tiles, blocks
    for buildings, one sun, proven to line up.
-2. The ground made real (in progress): the shape, the water and the lighting
-   are done, and baked into the site behind the `live` switch. Next: photo
-   textures (CC0, Poly Haven) for grass, sand, rock and paving.
+2. The ground made real (done): the shape, the water, the light, and photo
+   textures; baked into the site behind the `live` switch.
 3. Trees and rocks as 3D models.
 4. The buildings, modelled one by one, rendered as the bake's sprites.
 5. People, boats, birds and the parade, to match.

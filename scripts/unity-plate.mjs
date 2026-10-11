@@ -42,6 +42,9 @@ if (!process.argv.includes('--skip-unity')) {
   fs.mkdirSync(path.dirname(log), { recursive: true })
   run(UNITY, ['-batchmode', '-projectPath', path.join(root, 'unity'), '-executeMethod', 'Island.IslandBuild.Plate', '-scale', String(scale), '-quit', '-logFile', log], 'unity')
   const text = fs.readFileSync(log, 'utf8')
+  // A shader that does not compile renders nothing, and Unity still exits happily.
+  const broken = [...new Set(text.split('\n').filter((l) => /Shader error/.test(l)))]
+  if (broken.length) { console.error(broken.join('\n')); process.exit(1) }
   if (!/\[island\] plate:/.test(text)) { console.error(text.split('\n').filter((l) => /error|exception/i.test(l)).slice(0, 20).join('\n')); process.exit(1) }
 }
 
