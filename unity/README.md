@@ -129,6 +129,31 @@ on. The plate casts every one's shadow on the ground where it stands.
   middle, the sun comes through leaves lit from behind, the inside is darker);
   `Bark.shader` lays a photo's detail on a colour, for bark, cactus and rock.
 
+## The buildings
+
+The site draws its buildings with a pen whose solids (`lib/island/kit.ts`,
+`Solids`: boxes, pitched and pyramid roofs, cylinders, cones, domes, balls,
+platforms, windows, doors, awnings, bands and painted panels) are each written
+down in the world's units, in *runs*: the solids drawn one after another with
+nothing else between. `node scripts/unity-buildings.mjs` builds every run in
+Unity (`Editor/Buildings.cs`) as real geometry in real materials and renders
+it on its own, with the rest of its building casting shadows on it; the site
+draws each run's picture where the run began, so whatever it draws by hand
+between two runs (a sign, a wheel, someone at the door) stays between them,
+as before. A window drawn this way leaves its pane behind, unseen, so the
+night still lights it (and still knows when something stands in front of it).
+The plate casts the real buildings' shadows.
+
+- **Materials** (`Building.shader`): plaster, brick, roof tiles, slate,
+  timber boards, standing-seam metal, glass, concrete, paint and awning cloth,
+  each patterned at its real size along the surface, on the site's colour
+  made real (less saturated, as paint in daylight is). Walls in the shade take
+  light thrown back by the ground and sky.
+- **What it makes of each solid:** a pitched roof overhangs its walls, with
+  fascia and barge boards and walled gable ends; windows have frames, glass
+  set back, glazing bars and a stone sill; doors a panelled leaf, a fanlight
+  and a step; cornices stand proud of the wall.
+
 ## Phases
 
 1. Pipeline and registration (done): the ground from the site's tiles, blocks
@@ -137,6 +162,8 @@ on. The plate casts every one's shadow on the ground where it stands.
    textures; baked into the site behind the `live` switch.
 3. Trees and rocks (done): every tree, shrub, cactus, reed bed, rock, hoodoo
    and butte, grown or modelled in 3D and drawn as Unity renders it.
-4. The buildings, modelled one by one, rendered as the bake's sprites.
+4. The buildings: (a, done) every building's solids built and rendered in
+   real materials; (b) what is still drawn by hand (the lighthouse, the
+   windmill, the big wheel, signs...), modelled one by one.
 5. People, boats, birds and the parade, to match.
 6. Night: a night render, lit from the windows.

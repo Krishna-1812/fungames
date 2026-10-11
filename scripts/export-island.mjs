@@ -20,6 +20,9 @@ const { buildIsland } = await import('../src/lib/island/world.ts')
 const { resvgRaster } = await import('../src/lib/island/raster.ts')
 const { DISTRICTS } = await import('../src/lib/island/landmarks.ts')
 
+/** A solid as Unity reads it: no arrays of arrays (a polygon's points and a cylinder's bands, flattened). */
+const flatSolid = (x) => ({ ...x, ...(x.pts ? { pts: x.pts.flat() } : {}), ...(x.bands ? { bandZ: x.bands.flatMap(([a, b]) => [a, b]), bandC: x.bands.map((q) => q[2]), bands: undefined } : {}) })
+
 const games = listedGames()
 const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: `/${g.slug}/` })), { raster: resvgRaster })
 const m = island.model
@@ -36,6 +39,8 @@ const out = {
   fields: m.fields.map(([i, j, w, d, kind]) => ({ i, j, w, d, kind })),
   mill: m.mill ?? [], bales: m.bales.flat(), arch: m.arch ?? [],
   buttes: m.buttes.flat(), hoodoos: m.hoodoos.flat(), boulders: m.boulders.flat(), seaRocks: m.seaRocks.flat(), shoreRocks: m.shoreRocks.flat(),
+  // Each building's solids, for Unity: every run a list of records, written as JSON strings (JsonUtility reads no free-form objects).
+  solids: m.solids.map((b) => ({ slug: b.slug, runs: b.runs.map((r) => ({ items: r.map((x) => JSON.stringify(flatSolid(x))) })) })),
   piers: m.piers.map((p) => ({ from: p[0], to: p[1] })),
   buildings: m.buildings.map((b) => ({ ...b, anchor: (({ x0, y0, x1, y1, bx, by }) => ({ x0, y0, x1, y1, bx, by }))(island.anchors[b.slug]) })),
 }

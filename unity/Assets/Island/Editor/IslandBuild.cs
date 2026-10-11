@@ -376,7 +376,19 @@ namespace Island
                         mr.shadowCastingMode = blocks == "shadow" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
                 }
             }
-            if (blocks != "none")
+            if (blocks != "none" && d.solids != null && d.solids.Length > 0)
+            {
+                // The buildings themselves (Buildings.cs): in the plate, their shadows.
+                var holder = new GameObject("buildings");
+                foreach (var bs in d.solids)
+                    for (int r = 0; r < bs.runs.Length; r++)
+                    {
+                        var go = Buildings.Run(bs.runs[r], $"{bs.slug}/{r}");
+                        go.transform.SetParent(holder.transform, false);
+                        go.GetComponent<MeshRenderer>().shadowCastingMode = blocks == "shadow" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+                    }
+            }
+            else if (blocks != "none")
             {
                 var bm = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                 bm.SetColor("_BaseColor", new Color(0.92f, 0.92f, 0.94f)); bm.SetFloat("_Smoothness", 0.1f);
@@ -447,6 +459,54 @@ namespace Island
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             File.WriteAllText("Renders/figures/figures.json", $"{{\"scale\":{scale.ToString(inv)},\"box\":[{bx.ToString(inv)},{by.ToString(inv)},{bw.ToString(inv)},{bh.ToString(inv)}]}}");
             Debug.Log($"[island] figures: {made} at {scale} px a unit");
+        }
+
+        /**
+         * Every building's runs (Buildings.cs), each alone and lit as the island
+         * is, the rest of its building there only to cast shadows on it:
+         * Renders/buildings/SLUG_RUN.png at `-scale` pixels a map unit, and
+         * buildings.json, where each lies on the map. `-only slug` for one.
+         */
+        public static void BuildingShots()
+        {
+            Pipeline();
+            var d = IslandData.Load(Data);
+            Light();
+            float scale = float.Parse(Arg("-scale", "4"), System.Globalization.CultureInfo.InvariantCulture);
+            int ss = int.Parse(Arg("-ss", "3"));
+            var only = Arg("-only", "");
+            Directory.CreateDirectory("Renders/buildings");
+            if (only == "") foreach (var f in Directory.GetFiles("Renders/buildings")) File.Delete(f);
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var json = new System.Text.StringBuilder("{");
+            int made = 0;
+            foreach (var bs in d.solids)
+            {
+                if (only != "" && bs.slug != only) continue;
+                var runs = new List<GameObject>();
+                for (int r = 0; r < bs.runs.Length; r++) runs.Add(Buildings.Run(bs.runs[r], $"{bs.slug}/{r}"));
+                for (int r = 0; r < runs.Count; r++)
+                {
+                    for (int q = 0; q < runs.Count; q++) runs[q].GetComponent<MeshRenderer>().shadowCastingMode = q == r ? ShadowCastingMode.On : ShadowCastingMode.ShadowsOnly;
+                    var mesh = runs[r].GetComponent<MeshFilter>().sharedMesh;
+                    if (mesh.vertexCount == 0) continue;
+                    var box = Buildings.MapBox(mesh, runs[r].transform);
+                    // A little room round it, and whole pixels.
+                    float x0 = Mathf.Floor((box.xMin - 3) * scale) / scale, y0 = Mathf.Floor((box.yMin - 3) * scale) / scale;
+                    int pw = Mathf.CeilToInt((box.xMax + 3 - x0) * scale), ph = Mathf.CeilToInt((box.yMax + 3 - y0) * scale);
+                    var cam = Eye(x0, y0, pw / scale, ph / scale);
+                    cam.backgroundColor = new Color(0, 0, 0, 0);
+                    ShootFigure(cam, pw, ph, $"Renders/buildings/{bs.slug}_{r}.png", ss);
+                    Object.DestroyImmediate(cam.gameObject);
+                    if (made > 0) json.Append(',');
+                    json.Append($"\"{bs.slug}/{r}\":[{x0.ToString(inv)},{y0.ToString(inv)},{(pw / scale).ToString(inv)},{(ph / scale).ToString(inv)}]");
+                    made++;
+                }
+                foreach (var go in runs) Object.DestroyImmediate(go);
+            }
+            json.Append('}');
+            File.WriteAllText(only == "" ? "Renders/buildings/buildings.json" : $"Renders/buildings/{only}.json", $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
+            Debug.Log($"[island] buildings: {made} runs at {scale} px a unit");
         }
 
         /** Render a figure on nothing: averaged down by its coverage, so its edges do not darken against the empty background. */

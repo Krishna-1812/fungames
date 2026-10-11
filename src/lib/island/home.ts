@@ -11,7 +11,7 @@ import { buildIsland } from './world'
 import { resvgRaster } from './raster'
 import { bakedIsland } from './bake'
 import { plateRef } from './plate'
-import { figureSet } from './figures'
+import { figureSet, buildingSet } from './figures'
 
 /** The listed games, newest first, as the homepage shows them. */
 export const homeGames = () => listedGames().sort((a, b) => b.added.localeCompare(a.added))
@@ -19,7 +19,7 @@ export const homeGames = () => listedGames().sort((a, b) => b.added.localeCompar
 /** The Unity renders (unity/): the ground, and the trees and rocks on it, on or off together. */
 function realism() {
   const plate = plateRef()
-  return { plate, figures: plate ? figureSet() : null }
+  return { plate, figures: plate ? figureSet() : null, buildings: plate ? buildingSet() : null }
 }
 
 let built: ReturnType<typeof buildIsland> | null = null

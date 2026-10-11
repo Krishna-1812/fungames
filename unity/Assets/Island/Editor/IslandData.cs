@@ -36,6 +36,8 @@ namespace Island
         public float[] seaRocks;
         /** The stones at the waterline: x (i), y (j), size, flattened. */
         public float[] shoreRocks;
+        /** Each building's solids, in runs (Buildings.cs). */
+        public BuildingSolids[] solids;
         public float[] viewBox;
 
         public static IslandData Load(string path) => JsonUtility.FromJson<IslandData>(System.IO.File.ReadAllText(path));

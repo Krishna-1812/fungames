@@ -158,9 +158,53 @@ export type Light = [number, number] & { el?: N; glow?: string | null }
 export const glows: N[] = []
 export function glow<T extends N>(n: T): T { glows.push(n); return n }
 
+/**
+ * The solids a building is made of, for Unity (unity/Assets/Island/Editor/
+ * Buildings.cs): every box, roof, cylinder, dome, window and door its pen
+ * draws, in the world's own units (tiles, and the site's heights), in runs:
+ * a run is the solids drawn one after another with nothing else between, so
+ * a picture of a run, put where the run began, keeps the painting's order
+ * (anything drawn between two runs stays between their pictures). With
+ * `draw` off (the realistic island), the solids draw nothing themselves:
+ * `place` puts each run's picture in, and a window leaves an invisible pane
+ * behind for the night's lights to find.
+ */
+export type Solid = { k: string; [key: string]: unknown }
+export class Solids {
+  runs: Solid[][] = []
+  open = false
+  depth = 0
+  real: N | null = null
+  draw: boolean
+  place?: (g: N, run: number) => void
+  constructor(draw = true, place?: (g: N, run: number) => void) { this.draw = draw; this.place = place }
+}
+
 export class Pen {
-  g: N; ox: number; oy: number; oz: number; b: Bounds; lights: Light[]
-  constructor(g: N, ox = 0, oy = 0, oz = 0, b: Bounds = new Bounds(), lights: Light[] = []) { this.g = g; this.ox = ox; this.oy = oy; this.oz = oz; this.b = b; this.lights = lights }
+  g: N; ox: number; oy: number; oz: number; b: Bounds; lights: Light[]; sink?: Solids
+  constructor(g: N, ox = 0, oy = 0, oz = 0, b: Bounds = new Bounds(), lights: Light[] = [], sink?: Solids) { this.g = g; this.ox = ox; this.oy = oy; this.oz = oz; this.b = b; this.lights = lights; this.sink = sink }
+
+  /**
+   * Drawing a solid: written down (unless it is inside another, or moves:
+   * `rec` null), and drawn, or with the sink's `draw` off drawn into
+   * nothing (its bounds still count).
+   */
+  private solid<T>(rec: Solid | null, fn: () => T): T {
+    const s = this.sink
+    if (!s || !rec) return fn()
+    if (s.depth === 0) {
+      if (!s.open) { s.runs.push([]); s.open = true; s.place?.(this.g, s.runs.length - 1) }
+      s.runs[s.runs.length - 1].push(rec)
+    }
+    if (s.draw) { s.depth++; try { return fn() } finally { s.depth-- } }
+    const g = this.g
+    if (s.depth === 0) s.real = g
+    this.g = new N('g')
+    s.depth++
+    try { return fn() } finally { s.depth--; this.g = g; if (s.depth === 0) s.real = null }
+  }
+  /** A box in the world's units, for the record. */
+  private wb(b: Box) { return { x: b.x + this.ox, y: b.y + this.oy, w: b.w, d: b.d, z0: b.z0 + this.oz, h: b.h } }
 
   at(x: number, y: number, z = 0): [number, number] {
     const p = P(x + this.ox, y + this.oy, z + this.oz)
@@ -190,15 +234,22 @@ export class Pen {
   /** Grow the bounds round a screen-space shape drawn relative to a point. */
   grow(x0: number, y0: number, x1: number, y1: number) { this.b.add(x0, y0); this.b.add(x1, y1) }
 
-  el(tag: string, attrs: Attrs = {}, parent: N = this.g): N { return parent.add(new N(tag, attrs)) }
-  group(cls?: string, attrs: Attrs = {}): Pen { return new Pen(this.el('g', { class: cls, ...attrs }), this.ox, this.oy, this.oz, this.b, this.lights) }
+  el(tag: string, attrs: Attrs = {}, parent: N = this.g): N {
+    // Anything but a solid ends the solids' run.
+    if (this.sink && this.sink.depth === 0) this.sink.open = false
+    return parent.add(new N(tag, attrs))
+  }
+  group(cls?: string, attrs: Attrs = {}): Pen { return new Pen(this.el('g', { class: cls, ...attrs }), this.ox, this.oy, this.oz, this.b, this.lights, this.sink) }
   /** A pen moved to another spot, drawing into the same group. */
-  move(dx: number, dy: number, dz = 0): Pen { return new Pen(this.g, this.ox + dx, this.oy + dy, this.oz + dz, this.b, this.lights) }
+  move(dx: number, dy: number, dz = 0): Pen { return new Pen(this.g, this.ox + dx, this.oy + dy, this.oz + dz, this.b, this.lights, this.sink) }
 
   private sty(o: Draw, fill: string) {
     return { fill, stroke: o.stroke ?? INK, 'stroke-width': o.sw ?? OUT, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: o.op, class: o.cls, id: o.id, style: o.style }
   }
-  poly(pts: [number, number, number][], fill: string, o: Draw = {}) {
+  poly(pts: [number, number, number][], fill: string, o: Draw = {}): N {
+    return this.solid(o.cls || o.id ? null : { k: 'poly', pts: pts.map(([x, y, z]) => [x + this.ox, y + this.oy, z + this.oz]), fill }, () => this.polyDrawn(pts, fill, o))
+  }
+  private polyDrawn(pts: [number, number, number][], fill: string, o: Draw = {}) {
     // A polygon is closed, so it has no ends to cap: leaving the attribute
     // off changes nothing on screen and saves a few dozen kilobytes.
     const sty: Attrs = this.sty(o, fill)
@@ -223,6 +274,10 @@ export class Pen {
   /* ---- solids ---------------------------------------------------------- */
 
   box(x: number, y: number, w: number, d: number, h: number, o: Draw & { z0?: number; top?: string; left?: string; right?: string; trim?: string } = {}): Box {
+    const z0 = o.z0 ?? 0
+    return this.solid(o.cls ? null : { k: 'box', ...this.wb({ x, y, w, d, z0, h }), fill: o.fill ?? C.white, top: o.top, trim: o.trim }, () => this.boxDrawn(x, y, w, d, h, o))
+  }
+  private boxDrawn(x: number, y: number, w: number, d: number, h: number, o: Draw & { z0?: number; top?: string; left?: string; right?: string; trim?: string } = {}): Box {
     const z0 = o.z0 ?? 0, c = o.fill ?? C.white
     const top = o.top ?? c, right = o.right ?? shade(c, 0.93), left = o.left ?? shade(c, 0.8)
     const g = o.cls ? this.group(o.cls) : this
@@ -235,13 +290,19 @@ export class Pen {
     return b
   }
   /** A quad on a box face: face 'x' runs along y, face 'y' along x. u in 0..1. */
-  quad(b: Box, face: 'x' | 'y', u0: number, u1: number, z0: number, z1: number, fill: string, o: Draw = {}) {
+  quad(b: Box, face: 'x' | 'y', u0: number, u1: number, z0: number, z1: number, fill: string, o: Draw = {}): N {
+    return this.solid(o.cls || o.id ? null : { k: 'quad', b: this.wb(b), face, u0, u1, z0, z1, fill }, () => this.quadDrawn(b, face, u0, u1, z0, z1, fill, o))
+  }
+  private quadDrawn(b: Box, face: 'x' | 'y', u0: number, u1: number, z0: number, z1: number, fill: string, o: Draw = {}) {
     const Z0 = b.z0 + z0, Z1 = b.z0 + z1
     if (face === 'x') return this.poly([[b.x + b.w, b.y + u0 * b.d, Z0], [b.x + b.w, b.y + u1 * b.d, Z0], [b.x + b.w, b.y + u1 * b.d, Z1], [b.x + b.w, b.y + u0 * b.d, Z1]], fill, o)
     return this.poly([[b.x + u0 * b.w, b.y + b.d, Z0], [b.x + u1 * b.w, b.y + b.d, Z0], [b.x + u1 * b.w, b.y + b.d, Z1], [b.x + u0 * b.w, b.y + b.d, Z1]], fill, o)
   }
   /** A coloured band right round both visible faces. */
   band(b: Box, z0: number, z1: number, fill: string) {
+    this.solid({ k: 'band', b: this.wb(b), z0, z1, fill }, () => this.bandDrawn(b, z0, z1, fill))
+  }
+  private bandDrawn(b: Box, z0: number, z1: number, fill: string) {
     this.quad(b, 'x', 0, 1, z0, z1, shade(fill, 0.93), { sw: 1.1 })
     this.quad(b, 'y', 0, 1, z0, z1, shade(fill, 0.8), { sw: 1.1 })
   }
@@ -250,6 +311,10 @@ export class Pen {
    * sill. `lit` windows glow at night; their centres are kept for the lights.
    */
   windows(b: Box, face: 'x' | 'y', o: { rows?: number; cols?: number; z0?: number; h?: number; gap?: number; wide?: number; pane?: string; frame?: string; lit?: boolean; cls?: string } = {}) {
+    const rec = o.cls ? null : { k: 'win', b: this.wb(b), face, rows: o.rows ?? 1, cols: o.cols ?? 2, z0: o.z0 ?? 8, h: o.h ?? 10, gap: o.gap ?? 8, wide: o.wide ?? 0.5, pane: o.pane ?? C.glass, frame: o.frame ?? C.white }
+    this.solid(rec, () => this.windowsDrawn(b, face, o))
+  }
+  private windowsDrawn(b: Box, face: 'x' | 'y', o: { rows?: number; cols?: number; z0?: number; h?: number; gap?: number; wide?: number; pane?: string; frame?: string; lit?: boolean; cls?: string } = {}) {
     const rows = o.rows ?? 1, cols = o.cols ?? 2, h = o.h ?? 10, gap = o.gap ?? 8, wide = o.wide ?? 0.5
     const pane = o.pane ?? C.glass, frame = o.frame ?? C.white
     const len = face === 'x' ? b.d : b.w
@@ -265,10 +330,17 @@ export class Pen {
       if (o.lit !== false) {
         const Z = b.z0 + z + h / 2
         this.light(face === 'x' ? P(b.x + b.w + this.ox, b.y + u * b.d + this.oy, Z + this.oz) : P(b.x + u * b.w + this.ox, b.y + b.d + this.oy, Z + this.oz), glass)
+        // Drawn into nothing (the realistic island: Unity draws the window), its pane stays, unseen,
+        // where it was: for the night to light, and to find whether anything stands in front of it.
+        const real = this.sink?.real
+        if (real) real.add(new N(glass.tag, { ...glass.attrs, opacity: 0 }))
       }
     }
   }
   door(b: Box, face: 'x' | 'y', u: number, o: { w?: number; h?: number; fill?: string; step?: boolean } = {}) {
+    this.solid({ k: 'door', b: this.wb(b), face, u, w: o.w ?? 0.22, h: o.h ?? 16, fill: o.fill ?? C.cobalt }, () => this.doorDrawn(b, face, u, o))
+  }
+  private doorDrawn(b: Box, face: 'x' | 'y', u: number, o: { w?: number; h?: number; fill?: string; step?: boolean } = {}) {
     const len = face === 'x' ? b.d : b.w
     const w = (o.w ?? 0.22) / len, h = o.h ?? 16
     const fill = o.fill ?? C.cobalt
@@ -278,6 +350,9 @@ export class Pen {
   }
   /** A striped awning sticking out from a face. */
   awning(b: Box, face: 'x' | 'y', u0: number, u1: number, z: number, out: number, colours: string[]) {
+    this.solid({ k: 'awning', b: this.wb(b), face, u0, u1, z, out, colours }, () => this.awningDrawn(b, face, u0, u1, z, out, colours))
+  }
+  private awningDrawn(b: Box, face: 'x' | 'y', u0: number, u1: number, z: number, out: number, colours: string[]) {
     const n = colours.length * 2
     for (let k = 0; k < n; k++) {
       const a = u0 + ((u1 - u0) * k) / n, c = u0 + ((u1 - u0) * (k + 1)) / n, fill = colours[k % colours.length]
@@ -287,12 +362,18 @@ export class Pen {
     }
   }
   pyramid(x: number, y: number, w: number, d: number, z: number, h: number, fill: string, o: Draw = {}) {
+    this.solid(o.cls ? null : { k: 'pyramid', x: x + this.ox, y: y + this.oy, w, d, z: z + this.oz, h, fill }, () => this.pyramidDrawn(x, y, w, d, z, h, fill, o))
+  }
+  private pyramidDrawn(x: number, y: number, w: number, d: number, z: number, h: number, fill: string, o: Draw = {}) {
     const ax = x + w / 2, ay = y + d / 2
     this.poly([[x + w, y, z], [x + w, y + d, z], [ax, ay, z + h]], shade(fill, 0.95), o)
     this.poly([[x, y + d, z], [x + w, y + d, z], [ax, ay, z + h]], shade(fill, 0.8), o)
   }
   /** A pitched roof; ridge along x ('x') or y ('y'), with tile lines. */
   gable(x: number, y: number, w: number, d: number, z: number, h: number, fill: string, axis: 'x' | 'y' = 'x', o: Draw & { lines?: number; over?: number } = {}) {
+    this.solid(o.cls ? null : { k: 'gable', x: x + this.ox, y: y + this.oy, w, d, z: z + this.oz, h, fill, axis, over: o.over ?? 0.06 }, () => this.gableDrawn(x, y, w, d, z, h, fill, axis, o))
+  }
+  private gableDrawn(x: number, y: number, w: number, d: number, z: number, h: number, fill: string, axis: 'x' | 'y' = 'x', o: Draw & { lines?: number; over?: number } = {}) {
     const e = o.over ?? 0.06
     x -= e; y -= e; w += e * 2; d += e * 2
     const lines = o.lines ?? 3
@@ -315,7 +396,10 @@ export class Pen {
       this.line([mx, y, z + h], [mx, y + d, z + h], { sw: o.sw ?? OUT, stroke: o.stroke ?? INK })
     }
   }
-  cyl(cx: number, cy: number, r: number, z0: number, h: number, fill: string, o: Draw & { top?: string; side?: string; bands?: [number, number, string][] } = {}) {
+  cyl(cx: number, cy: number, r: number, z0: number, h: number, fill: string, o: Draw & { top?: string; side?: string; bands?: [number, number, string][] } = {}): Pen | this {
+    return this.solid(o.cls ? null : { k: 'cyl', cx: cx + this.ox, cy: cy + this.oy, r, z0: z0 + this.oz, h, fill, top: o.top, side: o.side, bands: o.bands }, () => this.cylDrawn(cx, cy, r, z0, h, fill, o))
+  }
+  private cylDrawn(cx: number, cy: number, r: number, z0: number, h: number, fill: string, o: Draw & { top?: string; side?: string; bands?: [number, number, string][] } = {}) {
     const [x, y] = this.at(cx, cy, z0), rx = r * S * 0.707, ry = r * S * 0.354
     this.grow(x - rx, y - h - ry, x + rx, y + ry)
     const g = o.cls ? this.group(o.cls) : this
@@ -326,12 +410,18 @@ export class Pen {
     g.el('ellipse', { cx: x, cy: y - h, rx, ry, fill: o.top ?? fill, stroke: o.stroke ?? INK, 'stroke-width': o.sw ?? OUT })
     return g
   }
-  disc(cx: number, cy: number, r: number, z: number, fill: string, o: Draw & { dash?: string } = {}) {
+  disc(cx: number, cy: number, r: number, z: number, fill: string, o: Draw & { dash?: string } = {}): N {
+    return this.solid(o.cls || o.dash || o.op !== undefined ? null : { k: 'disc', cx: cx + this.ox, cy: cy + this.oy, r, z: z + this.oz, fill }, () => this.discDrawn(cx, cy, r, z, fill, o))
+  }
+  private discDrawn(cx: number, cy: number, r: number, z: number, fill: string, o: Draw & { dash?: string } = {}) {
     const [x, y] = this.at(cx, cy, z), rx = r * S * 0.707, ry = r * S * 0.354
     this.grow(x - rx, y - ry, x + rx, y + ry)
     return this.el('ellipse', { cx: x, cy: y, rx, ry, fill, stroke: o.stroke ?? INK, 'stroke-width': o.sw ?? OUT, class: o.cls, opacity: o.op, 'stroke-dasharray': o.dash })
   }
-  sphere(cx: number, cy: number, z: number, r: number, fill: string, o: Draw = {}) {
+  sphere(cx: number, cy: number, z: number, r: number, fill: string, o: Draw = {}): Pen | this {
+    return this.solid(o.cls ? null : { k: 'sphere', cx: cx + this.ox, cy: cy + this.oy, z: z + this.oz, r, fill }, () => this.sphereDrawn(cx, cy, z, r, fill, o))
+  }
+  private sphereDrawn(cx: number, cy: number, z: number, r: number, fill: string, o: Draw = {}) {
     const [x, y] = this.at(cx, cy, z)
     this.grow(x - r, y - r, x + r, y + r)
     const g = o.cls ? this.group(o.cls) : this
@@ -341,12 +431,18 @@ export class Pen {
     return g
   }
   cone(cx: number, cy: number, r: number, z0: number, h: number, fill: string, o: Draw = {}) {
+    this.solid(o.cls ? null : { k: 'cone', cx: cx + this.ox, cy: cy + this.oy, r, z0: z0 + this.oz, h, fill }, () => this.coneDrawn(cx, cy, r, z0, h, fill, o))
+  }
+  private coneDrawn(cx: number, cy: number, r: number, z0: number, h: number, fill: string, o: Draw = {}) {
     const [x, y] = this.at(cx, cy, z0), rx = r * S * 0.707, ry = r * S * 0.354
     this.grow(x - rx, y - h, x + rx, y + ry)
     this.path(`M${f(x - rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x + rx)} ${f(y)}L${f(x)} ${f(y - h)}Z`, fill, o)
     this.path(`M${f(x)} ${f(y - h)}L${f(x + rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 1 ${f(x + rx * 0.2)} ${f(y + ry * 0.98)}Z`, shade(fill, 0.82), { sw: 0, op: 0.9 })
   }
-  dome(cx: number, cy: number, r: number, z0: number, fill: string, o: Draw = {}) {
+  dome(cx: number, cy: number, r: number, z0: number, fill: string, o: Draw = {}): Pen | this {
+    return this.solid(o.cls ? null : { k: 'dome', cx: cx + this.ox, cy: cy + this.oy, r, z0: z0 + this.oz, fill }, () => this.domeDrawn(cx, cy, r, z0, fill, o))
+  }
+  private domeDrawn(cx: number, cy: number, r: number, z0: number, fill: string, o: Draw = {}) {
     const [x, y] = this.at(cx, cy, z0), rx = r * S * 0.707, ry = r * S * 0.354
     this.grow(x - rx, y - rx, x + rx, y + ry)
     const g = o.cls ? this.group(o.cls) : this

@@ -9,9 +9,9 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light } from './kit'
+import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid } from './kit'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
-import type { FigureSet } from './figures'
+import type { FigureSet, BuildingSet } from './figures'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { beacon } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
@@ -117,6 +117,8 @@ export type IslandModel = {
   seaRocks: [number, number, number][]
   /** The stones at the waterline: tile x, y (not tile corners: where they stand), and size. */
   shoreRocks: [number, number, number][]
+  /** Each building's solids (kit.ts, Solids), in their runs, for Unity to build. */
+  solids: { slug: string; runs: Solid[][] }[]
   viewBox: [number, number, number, number]
 }
 export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
@@ -137,7 +139,7 @@ export type Raster = (svg: string, width: number) => { width: number; height: nu
  */
 export type PlateRef = { box: [number, number, number, number]; href: string; id: string }
 
-export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; figures?: FigureSet | null } = {}): Island {
+export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
   const plate = opts.plate ?? null
   setFigures(opts.figures ?? null)
   const R = rng(20260930)
@@ -271,7 +273,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     w.add(new N('circle', { cx: f(sx), cy: f(sy - 8), r: 15, fill: 'transparent' }))
     const inner = w.add(new N('g'))
     if (words) { const [bx, by] = p.at(x, y, z); sayBubble(w, bx, by, words) }
-    return new Pen(inner, p.ox, p.oy, p.oz, p.b, p.lights)
+    return new Pen(inner, p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
   }
   // A fixed hash, for choices that must line up from one tile to the next.
   const hz = (a: number, b: number, c: number) => { const v = Math.sin(a * 12.9898 + b * 78.233 + c * 3.71) * 43758.5453; return v - Math.floor(v) }
@@ -937,6 +939,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   type Thing = { depth: number; slug?: string; draw: (g: N) => void }
   const things: Thing[] = []
   const anchors: Record<string, Anchor> = {}
+  // Each building's solids, and with Unity's pictures of them (opts.buildings), those in their place.
+  const solids: { slug: string; runs: Solid[][] }[] = []
+  const shots = opts.buildings ?? null
   const link = new Map(games.map((g) => [g.slug, g]))
   const cx = GRID / 2
   for (const pl of placed) {
@@ -949,10 +954,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       void rx; void ry
       const art = a.add(joinRoot(new N('g', { class: 'lm-art', id: `lm-${pl.slug}`, 'stroke-linejoin': 'round' })))
       const b = new Bounds()
-      const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights)
+      const real = !!shots?.items[`${pl.slug}/0`]
+      const sink = new Solids(!real, real ? (g, run) => {
+        const it = shots!.items[`${pl.slug}/${run}`]
+        if (it) g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
+      } : undefined)
+      const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights, sink)
       pl.lm.draw(lp)
-      // The heavier line round its outside, under everything else in it.
-      art.kids.unshift(rim(art))
+      solids.push({ slug: pl.slug, runs: sink.runs })
+      // The heavier line round its outside, under everything else in it (not round a photograph).
+      if (!real) art.kids.unshift(rim(art))
       const [bx, by] = P(pl.i + pl.w / 2, pl.j + pl.d / 2, pl.z)
       anchors[pl.slug] = { slug: pl.slug, district: pl.district, x0: f(b.x0), y0: f(b.y0), x1: f(b.x1), y1: f(b.y1), bx: f(bx), by: f(by), foot: [P(pl.i, pl.j, pl.z), P(pl.i + pl.w, pl.j, pl.z), P(pl.i + pl.w, pl.j + pl.d, pl.z), P(pl.i, pl.j + pl.d, pl.z)].map((q) => q.map(f).join(',')).join(' ') }
       // People on the roads are painted below everything that stands up, which
@@ -1566,7 +1577,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     wash, fields: fields.map((f) => [...f]), mill, bales, arch: archAt, buttes, hoodoos, boulders: boulderAt, piers: PIERS,
     buildings: placed.map((b) => ({ slug: b.slug, district: b.district, i: b.i, j: b.j, w: b.w, d: b.d, z: b.z, water: !!b.lm.water })),
     plants: planted.map((q) => ({ ...q })),
-    seaRocks, shoreRocks,
+    seaRocks, shoreRocks, solids,
     viewBox,
   } }
 }
