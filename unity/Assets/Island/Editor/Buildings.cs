@@ -23,8 +23,8 @@ namespace Island
     [Serializable]
     public class SolidRec
     {
-        public string k, fill, top, side, trim, face, axis, pane, frame;
-        public float x, y, w, d, z0, h, z, cx, cy, r, u, u0, u1, z1, over, gap, wide;
+        public string k, fill, top, side, trim, face, axis, pane, frame, name;
+        public float x, y, w, d, z0, h, z, cx, cy, r, u, u0, u1, z1, over, gap, wide, dx, dy, half;
         public float @out;
         public int rows, cols;
         public SolidBox b;
@@ -34,7 +34,7 @@ namespace Island
     [Serializable] public class SolidRun { public string[] items; }
     [Serializable] public class BuildingSolids { public string slug; public SolidRun[] runs; }
 
-    public static class Buildings
+    public static partial class Buildings
     {
         public const int Plaster = 0, Brick = 1, Tiles = 2, Slate = 3, Timber = 4, Metal = 5, Glass = 6, Concrete = 7, Paint = 8, Cloth = 9;
         static Material mat;
@@ -150,6 +150,8 @@ namespace Island
                 case "sphere": Sphere(b, s); break;
                 case "disc": Disc(b, s); break;
                 case "poly": Poly(b, s); break;
+                case "rod": Rod(b, s); break;
+                case "model": Model(b, s); break;
             }
         }
 

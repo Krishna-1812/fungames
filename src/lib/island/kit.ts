@@ -161,7 +161,8 @@ export function glow<T extends N>(n: T): T { glows.push(n); return n }
 /**
  * The solids a building is made of, for Unity (unity/Assets/Island/Editor/
  * Buildings.cs): every box, roof, cylinder, dome, window and door its pen
- * draws, in the world's own units (tiles, and the site's heights), in runs:
+ * draws, every line between two points (a post, a mast, a cable: a rod), and
+ * the pieces modelled in Unity by name (Pen.model: a lighthouse, a wheel), in the world's own units (tiles, and the site's heights), in runs:
  * a run is the solids drawn one after another with nothing else between, so
  * a picture of a run, put where the run began, keeps the painting's order
  * (anything drawn between two runs stays between their pictures). With
@@ -189,10 +190,10 @@ export class Pen {
    * `rec` null), and drawn, or with the sink's `draw` off drawn into
    * nothing (its bounds still count).
    */
-  private solid<T>(rec: Solid | null, fn: () => T): T {
+  private solid<T>(rec: Solid | null, fn: () => T, push = true): T {
     const s = this.sink
     if (!s || !rec) return fn()
-    if (s.depth === 0) {
+    if (s.depth === 0 && push) {
       if (!s.open) { s.runs.push([]); s.open = true; s.place?.(this.g, s.runs.length - 1) }
       s.runs[s.runs.length - 1].push(rec)
     }
@@ -202,6 +203,20 @@ export class Pen {
     this.g = new N('g')
     s.depth++
     try { return fn() } finally { s.depth--; this.g = g; if (s.depth === 0) s.real = null }
+  }
+  /** Whether this pen's solids are Unity's pictures (the realistic island), not drawn. */
+  get real() { return !!this.sink && !this.sink.draw }
+  /** A point in the world's units, for the record. */
+  private w3(p: [number, number, number]): [number, number, number] { return [p[0] + this.ox, p[1] + this.oy, p[2] + this.oz] }
+  /**
+   * A piece modelled in Unity by name (Buildings.cs, Model), standing at a
+   * point, with what else it needs to know (`half`: rendered as a square
+   * that many pixels each way round the point, for a piece that turns about
+   * it); `fn` draws it on the flat island.
+   */
+  model<T>(name: string, at: [number, number, number], o: Record<string, unknown>, fn: () => T): T {
+    const [x, y, z] = this.w3(at)
+    return this.solid({ k: 'model', name, x, y, z, ...o }, fn)
   }
   /** A box in the world's units, for the record. */
   private wb(b: Box) { return { x: b.x + this.ox, y: b.y + this.oy, w: b.w, d: b.d, z0: b.z0 + this.oz, h: b.h } }
@@ -259,6 +274,20 @@ export class Pen {
   /** A path in screen space; its points grow the bounds. */
   path(d: string, fill: string, o: Draw = {}) { pathBounds(d, this.b); return this.el('path', { d, ...this.sty(o, fill) }) }
   line(a: [number, number, number], b: [number, number, number], o: Draw = {}) {
+    const dash = (o as { dash?: string }).dash
+    const rec = o.cls || o.id || dash || o.op !== undefined || o.stroke === 'none' ? null : { k: 'rod', pts: [this.w3(a), this.w3(b)], r: (o.sw ?? OUT) / 2, fill: o.stroke ?? INK }
+    // A line drawn twice, thick in ink and then thin in a colour, is one rod in that colour.
+    const s = this.sink
+    if (rec && s && s.depth === 0 && s.open) {
+      const run = s.runs[s.runs.length - 1], q = run[run.length - 1] as Solid & { pts?: number[][]; r?: number }
+      if (q?.k === 'rod' && JSON.stringify(q.pts) === JSON.stringify(rec.pts)) {
+        q.fill = rec.fill; q.r = Math.max(q.r ?? 0, rec.r)
+        return this.solid(rec, () => this.lineDrawn(a, b, o), false)
+      }
+    }
+    return this.solid(rec, () => this.lineDrawn(a, b, o))
+  }
+  private lineDrawn(a: [number, number, number], b: [number, number, number], o: Draw = {}) {
     const [x1, y1] = this.at(...a), [x2, y2] = this.at(...b)
     return this.el('line', { x1, y1, x2, y2, stroke: o.stroke ?? INK, 'stroke-width': o.sw ?? OUT, 'stroke-linecap': 'round', class: o.cls, opacity: o.op, 'stroke-dasharray': (o as { dash?: string }).dash })
   }

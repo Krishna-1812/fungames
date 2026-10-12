@@ -144,6 +144,15 @@ as before. A window drawn this way leaves its pane behind, unseen, so the
 night still lights it (and still knows when something stands in front of it).
 The plate casts the real buildings' shadows.
 
+Lines between two points are rods, as thick as the line was wide (a line
+drawn twice, thick in ink and thin in a colour, is one rod in that colour).
+The pieces that are neither boxes nor roofs are modelled by name
+(`Editor/Models.cs`, from `Pen.model` in kit.ts): the lighthouse, the
+windmill (which has a sink of its own, though it is not a landmark), and the
+big wheel. What turns in the picture (the sails, the wheel) is built facing
+the camera and rendered square round its hub, untrimmed, so turning its
+picture about its middle turns it.
+
 - **Materials** (`Building.shader`): plaster, brick, roof tiles, slate,
   timber boards, metal sheet and panels, and concrete are Poly Haven
   photographs (`Photos.Walls`, in `Textures/buildings/`), each at its real
@@ -167,7 +176,10 @@ The plate casts the real buildings' shadows.
 3. Trees and rocks (done): every tree, shrub, cactus, reed bed, rock, hoodoo
    and butte, grown or modelled in 3D and drawn as Unity renders it.
 4. The buildings: (a, done) every building's solids built and rendered in
-   photographed materials; (b) what is still drawn by hand (the lighthouse, the
-   windmill, the big wheel, signs...), modelled one by one.
+   photographed materials; (b, done) every line between two points a rod
+   (posts, masts, cranes, scaffolds, ladders, stays), and the lighthouse,
+   the windmill and its sails, and the big wheel and its cars modelled
+   (`Models.cs`). Signs, posters, painted faces and the small props stay
+   drawn: they are the island's lettering.
 5. People, boats, birds and the parade, to match.
 6. Night: a night render, lit from the windows.

@@ -89,18 +89,20 @@ export const harbour: Record<string, Landmark> = {
     p.gable(0.1, 0.2, 0.6, 0.55, 18, 12, C.cobalt, 'x', { lines: 2 })
     p.windows(h, 'x', { cols: 1, z0: 6, h: 6, wide: 0.4 })
     p.door(h, 'y', 0.5, { w: 0.16, h: 11, fill: C.rasp })
-    // The tower, tapering, in stripes.
+    // The tower, tapering, in stripes; its gallery, lantern and cap (modelled in Unity: Buildings.cs, Lighthouse).
     const [x, y] = p.at(1.1, 1.1, 2)
     const stripes: [number, number, string][] = [[0, 24, '#ffffff'], [24, 44, C.rasp], [44, 66, '#ffffff'], [66, 86, C.rasp]]
     const wAt = (z: number) => 17 - z * 0.075
-    for (const [z1, z2, c] of stripes) p.path(`M${f(x - wAt(z1))} ${f(y - z1)}L${f(x - wAt(z2))} ${f(y - z2)}L${f(x + wAt(z2))} ${f(y - z2)}L${f(x + wAt(z1))} ${f(y - z1)}Z`, c, { sw: 1.4 })
-    p.path(`M${f(x + 3)} ${f(y - 4)}L${f(x + 3)} ${f(y - 84)}`, 'none', { stroke: '#000', sw: 10, op: 0.06 })
-    p.path(`M${f(x - 4)} ${f(y)}v-12a4 4 0 0 1 8 0v12`, C.slate, { sw: 1.2 })
-    for (const z of [34, 56, 76]) p.path(`M${f(x - 2.5)} ${f(y - z)}h5v-6h-5z`, C.glass, { sw: 1 })
-    // Gallery, lantern, cap.
-    p.el('ellipse', { cx: x, cy: y - 88, rx: 19, ry: 6, fill: C.slate, stroke: INK, 'stroke-width': OUT })
-    for (let k = -3; k <= 3; k++) p.path(`M${f(x + k * 5.5)} ${f(y - 86 + Math.abs(k))}v-8`, 'none', { sw: 1.2 })
-    p.path(`M${f(x - 18)} ${f(y - 94)}a19 5 0 0 0 36 0`, 'none', { sw: 1.4 })
+    p.model('lighthouse', [1.1, 1.1, 2], { fill: C.rasp, top: C.slate }, () => {
+      for (const [z1, z2, c] of stripes) p.path(`M${f(x - wAt(z1))} ${f(y - z1)}L${f(x - wAt(z2))} ${f(y - z2)}L${f(x + wAt(z2))} ${f(y - z2)}L${f(x + wAt(z1))} ${f(y - z1)}Z`, c, { sw: 1.4 })
+      p.path(`M${f(x + 3)} ${f(y - 4)}L${f(x + 3)} ${f(y - 84)}`, 'none', { stroke: '#000', sw: 10, op: 0.06 })
+      p.path(`M${f(x - 4)} ${f(y)}v-12a4 4 0 0 1 8 0v12`, C.slate, { sw: 1.2 })
+      for (const z of [34, 56, 76]) p.path(`M${f(x - 2.5)} ${f(y - z)}h5v-6h-5z`, C.glass, { sw: 1 })
+      // Gallery, lantern, cap.
+      p.el('ellipse', { cx: x, cy: y - 88, rx: 19, ry: 6, fill: C.slate, stroke: INK, 'stroke-width': OUT })
+      for (let k = -3; k <= 3; k++) p.path(`M${f(x + k * 5.5)} ${f(y - 86 + Math.abs(k))}v-8`, 'none', { sw: 1.2 })
+      p.path(`M${f(x - 18)} ${f(y - 94)}a19 5 0 0 0 36 0`, 'none', { sw: 1.4 })
+    })
     // Each beam fades to nothing along its length rather than stopping dead.
     const fade = p.el('defs')
     for (const [id, x1, x2] of [['stp-fade-r', 0, 1], ['stp-fade-l', 1, 0]] as const) {
@@ -112,11 +114,14 @@ export const harbour: Record<string, Landmark> = {
     const beam = p.group('stp-beam')
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x + 190)} ${f(y - 140)}L${f(x + 190)} ${f(y - 72)}Z`, 'url(#stp-fade-r)', { sw: 0 })
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x - 190)} ${f(y - 140)}L${f(x - 190)} ${f(y - 72)}Z`, 'url(#stp-fade-l)', { sw: 0 })
-    p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp' }), '#fff8e0')
+    // The lamp: on the realistic island the model's lantern shows, and only the light is left here (unseen, for the night).
+    p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp', opacity: p.real ? 0 : undefined }), '#fff8e0')
     beacon[0] = x; beacon[1] = y - 102
-    p.path(`M${f(x - 4)} ${f(y - 108)}h8v12h-8z`, '#ffffff', { sw: 1, cls: 'stp-lamp' })
-    p.path(`M${f(x - 14)} ${f(y - 112)}Q${f(x)} ${f(y - 132)} ${f(x + 14)} ${f(y - 112)}Z`, C.slate)
-    p.path(`M${f(x)} ${f(y - 124)}v-10M${f(x - 6)} ${f(y - 130)}h12`, 'none', { sw: 1.4 })
+    if (!p.real) {
+      p.path(`M${f(x - 4)} ${f(y - 108)}h8v12h-8z`, '#ffffff', { sw: 1, cls: 'stp-lamp' })
+      p.path(`M${f(x - 14)} ${f(y - 112)}Q${f(x)} ${f(y - 132)} ${f(x + 14)} ${f(y - 112)}Z`, C.slate)
+      p.path(`M${f(x)} ${f(y - 124)}v-10M${f(x - 6)} ${f(y - 130)}h12`, 'none', { sw: 1.4 })
+    }
     for (let k = 0; k < 3; k++) p.path(`M${f(x + 22 + k * 8)} ${f(y - 118 - k * 5)}q9 11 0 22`, 'none', { stroke: C.cobalt, sw: 2.4, cls: 'stp-arc', style: `animation-delay:${k * 0.3}s` })
     p.grow(x - 40, y - 140, x + 60, y)
     person(p, 0.9, 1.9, C.mint, { pose: 'wave' })

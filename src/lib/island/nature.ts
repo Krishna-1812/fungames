@@ -180,25 +180,31 @@ export function bale(p: Pen, x: number, y: number) {
 /** A windmill whose sails turn. */
 export function windmill(p: Pen, x: number, y: number) {
   const [bx, by] = p.at(x, y)
-  p.el('ellipse', { cx: bx, cy: by + 2, rx: 22, ry: 9, ...SHADOW })
-  // The tower, narrowing, with a door and a window.
+  if (!p.real) p.el('ellipse', { cx: bx, cy: by + 2, rx: 22, ry: 9, ...SHADOW })
+  // The tower, narrowing, with a door and a window (in Unity: Buildings.cs, Windmill).
+  p.model('windmill', [x, y, 0], { fill: C.rasp, top: C.cobalt }, () => mill(p, bx, by))
+  // The sails, round a hub, turning: Unity's are rendered square round the hub.
+  const cx = bx, cy = by - 47
+  const sails = p.el('g', { class: 'mill-sails amb', 'data-b': box(cx - 36, cy - 36, cx + 36, cy + 36) })
+  const sp = new Pen(sails, p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
+  sp.model('sails', [x, y, 47], { half: 36 }, () => {
+    for (const a of [0, 90, 180, 270]) {
+      const sg = sp.el('g', { transform: `rotate(${a} ${f(cx)} ${f(cy)})` })
+      sg.add(new N('path', { d: `M${f(cx)} ${f(cy)}V${f(cy - 34)}`, stroke: INK, 'stroke-width': 1.8 }))
+      sg.add(new N('path', { d: `M${f(cx + 1)} ${f(cy - 8)}h8v-25h-8z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
+      sg.add(new N('path', { d: `M${f(cx + 1)} ${f(cy - 16)}h8M${f(cx + 1)} ${f(cy - 24)}h8M${f(cx + 5)} ${f(cy - 8)}v-25`, stroke: shade('#ffffff', 0.75), 'stroke-width': 0.8 }))
+    }
+    sp.el('circle', { cx: f(cx), cy: f(cy), r: 3, fill: C.slate, stroke: INK, 'stroke-width': 1 })
+  })
+  p.grow(cx - 36, cy - 36, cx + 36, by + 4)
+}
+function mill(p: Pen, bx: number, by: number) {
   p.path(`M${f(bx - 13)} ${f(by)}L${f(bx - 8)} ${f(by - 46)}H${f(bx + 8)}L${f(bx + 13)} ${f(by)}Z`, '#ffffff', { sw: OUT })
   p.path(`M${f(bx + 1)} ${f(by)}L${f(bx + 1)} ${f(by - 46)}H${f(bx + 8)}L${f(bx + 13)} ${f(by)}Z`, '#e6e9f6', { sw: 0 })
   p.path(`M${f(bx - 13)} ${f(by)}L${f(bx - 8)} ${f(by - 46)}H${f(bx + 8)}L${f(bx + 13)} ${f(by)}Z`, 'none', { sw: OUT })
   p.path(`M${f(bx - 4)} ${f(by)}v-10a4 4 0 0 1 8 0v10z`, C.cobalt, { sw: 1.2 })
   p.path(`M${f(bx - 2.5)} ${f(by - 30)}h5v6h-5z`, C.glass, { sw: 1 })
   p.path(`M${f(bx - 11)} ${f(by - 45)}L${f(bx)} ${f(by - 58)}L${f(bx + 11)} ${f(by - 45)}Z`, C.rasp, { sw: OUT })
-  // The sails, round a hub, turning.
-  const cx = bx, cy = by - 47
-  const sails = p.el('g', { class: 'mill-sails amb', 'data-b': box(cx - 36, cy - 36, cx + 36, cy + 36) })
-  for (const a of [0, 90, 180, 270]) {
-    const sg = sails.add(new N('g', { transform: `rotate(${a} ${f(cx)} ${f(cy)})` }))
-    sg.add(new N('path', { d: `M${f(cx)} ${f(cy)}V${f(cy - 34)}`, stroke: INK, 'stroke-width': 1.8 }))
-    sg.add(new N('path', { d: `M${f(cx + 1)} ${f(cy - 8)}h8v-25h-8z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
-    sg.add(new N('path', { d: `M${f(cx + 1)} ${f(cy - 16)}h8M${f(cx + 1)} ${f(cy - 24)}h8M${f(cx + 5)} ${f(cy - 8)}v-25`, stroke: shade('#ffffff', 0.75), 'stroke-width': 0.8 }))
-  }
-  sails.add(new N('circle', { cx: f(cx), cy: f(cy), r: 3, fill: C.slate, stroke: INK, 'stroke-width': 1 }))
-  p.grow(cx - 36, cy - 36, cx + 36, by + 4)
 }
 
 /* ---- animals --------------------------------------------------------------- */

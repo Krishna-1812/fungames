@@ -48,10 +48,18 @@ fs.mkdirSync(out, { recursive: true })
 const hash = createHash('sha256')
 const items = {}
 let bytes = 0
-for (const [key, [x, y]] of Object.entries(m.items).sort(([a], [b]) => a.localeCompare(b))) {
+for (const [key, [x, y, w, h, centred]] of Object.entries(m.items).sort(([a], [b]) => a.localeCompare(b))) {
   const file = key.replace('/', '_') + '.png'
   const src = path.join(renders, file)
   if (!fs.existsSync(src)) continue
+  // A piece that turns about its middle keeps its whole square.
+  if (centred) {
+    const png = await sharp(src).png({ compressionLevel: 9, effort: 10 }).toBuffer()
+    fs.writeFileSync(path.join(out, file), png)
+    hash.update(key).update(png); bytes += png.length
+    items[key] = { x, y, w, h }
+    continue
+  }
   const { data, info } = await sharp(src).trim({ threshold: 0 }).toBuffer({ resolveWithObject: true }).catch(() => ({ data: null, info: null }))
   if (!data) continue
   const png = await sharp(data).png({ compressionLevel: 9, effort: 10 }).toBuffer()

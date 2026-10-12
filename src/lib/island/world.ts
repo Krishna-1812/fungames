@@ -942,6 +942,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // Each building's solids, and with Unity's pictures of them (opts.buildings), those in their place.
   const solids: { slug: string; runs: Solid[][] }[] = []
   const shots = opts.buildings ?? null
+  /** Where a building's solids are written down, and with Unity's pictures of them, put in their place. */
+  const sinkFor = (slug: string) => {
+    const real = !!shots?.items[`${slug}/0`]
+    const sink = new Solids(!real, real ? (g, run) => {
+      const it = shots!.items[`${slug}/${run}`]
+      if (it) g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
+    } : undefined)
+    solids.push({ slug, runs: sink.runs })
+    return { sink, real }
+  }
   const link = new Map(games.map((g) => [g.slug, g]))
   const cx = GRID / 2
   for (const pl of placed) {
@@ -954,14 +964,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       void rx; void ry
       const art = a.add(joinRoot(new N('g', { class: 'lm-art', id: `lm-${pl.slug}`, 'stroke-linejoin': 'round' })))
       const b = new Bounds()
-      const real = !!shots?.items[`${pl.slug}/0`]
-      const sink = new Solids(!real, real ? (g, run) => {
-        const it = shots!.items[`${pl.slug}/${run}`]
-        if (it) g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
-      } : undefined)
+      const { sink, real } = sinkFor(pl.slug)
       const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights, sink)
       pl.lm.draw(lp)
-      solids.push({ slug: pl.slug, runs: sink.runs })
       // The heavier line round its outside, under everything else in it (not round a photograph).
       if (!real) art.kids.unshift(rim(art))
       const [bx, by] = P(pl.i + pl.w / 2, pl.j + pl.d / 2, pl.z)
@@ -990,7 +995,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   }
   /* ---- the wild things and the farm ---------------------------------------- */
   const at = (i: number, j: number, depth: number, fn: (p: Pen) => void, z = height[Math.floor(i)]?.[Math.floor(j)] ?? 0) => things.push({ depth, draw: (layer) => fn(new Pen(layer, 0, 0, z, new Bounds(), lights)) })
-  if (mill) at(mill[0] + 0.5, mill[1] + 0.5, mill[0] + mill[1] + 1, (p) => windmill(poke(p, 'windmill', mill[0] + 0.5, mill[1] + 0.5, 'whoosh!', 62), mill[0] + 0.5, mill[1] + 0.5))
+  if (mill) at(mill[0] + 0.5, mill[1] + 0.5, mill[0] + mill[1] + 1, (p) => { p.sink = sinkFor('windmill').sink; windmill(poke(p, 'windmill', mill[0] + 0.5, mill[1] + 0.5, 'whoosh!', 62), mill[0] + 0.5, mill[1] + 0.5) })
   for (const [i, j] of bales) for (const [u, v] of [[0.35, 0.4], [0.65, 0.62]]) at(i + u, j + v, i + j + u + v, (p) => bale(p, i + u, j + v))
   if (archAt) at(archAt[0] + 0.5, archAt[1] + 0.5, archAt[0] + archAt[1] + 1, (p) => arch(p, archAt[0] + 0.5, archAt[1] + 0.5))
   for (const [i, j, h] of buttes) at(i + 0.5, j + 0.5, i + j + 1, (p) => butte(p, i + 0.5, j + 0.5, h))

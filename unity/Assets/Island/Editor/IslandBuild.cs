@@ -490,16 +490,18 @@ namespace Island
                     for (int q = 0; q < runs.Count; q++) runs[q].GetComponent<MeshRenderer>().shadowCastingMode = q == r ? ShadowCastingMode.On : ShadowCastingMode.ShadowsOnly;
                     var mesh = runs[r].GetComponent<MeshFilter>().sharedMesh;
                     if (mesh.vertexCount == 0) continue;
-                    var box = Buildings.MapBox(mesh, runs[r].transform);
-                    // A little room round it, and whole pixels.
-                    float x0 = Mathf.Floor((box.xMin - 3) * scale) / scale, y0 = Mathf.Floor((box.yMin - 3) * scale) / scale;
-                    int pw = Mathf.CeilToInt((box.xMax + 3 - x0) * scale), ph = Mathf.CeilToInt((box.yMax + 3 - y0) * scale);
+                    // A piece that turns in the picture is shot square round its own point, and kept so (not trimmed).
+                    bool centred = Buildings.Centred(bs.runs[r], out var box);
+                    if (!centred) box = Buildings.MapBox(mesh, runs[r].transform);
+                    // Else a little room round it, and whole pixels.
+                    float x0 = centred ? box.xMin : Mathf.Floor((box.xMin - 3) * scale) / scale, y0 = centred ? box.yMin : Mathf.Floor((box.yMin - 3) * scale) / scale;
+                    int pw = centred ? Mathf.RoundToInt(box.width * scale) : Mathf.CeilToInt((box.xMax + 3 - x0) * scale), ph = centred ? Mathf.RoundToInt(box.height * scale) : Mathf.CeilToInt((box.yMax + 3 - y0) * scale);
                     var cam = Eye(x0, y0, pw / scale, ph / scale);
                     cam.backgroundColor = new Color(0, 0, 0, 0);
                     ShootFigure(cam, pw, ph, $"Renders/buildings/{bs.slug}_{r}.png", ss);
                     Object.DestroyImmediate(cam.gameObject);
                     if (made > 0) json.Append(',');
-                    json.Append($"\"{bs.slug}/{r}\":[{x0.ToString(inv)},{y0.ToString(inv)},{(pw / scale).ToString(inv)},{(ph / scale).ToString(inv)}]");
+                    json.Append($"\"{bs.slug}/{r}\":[{x0.ToString(inv)},{y0.ToString(inv)},{(pw / scale).ToString(inv)},{(ph / scale).ToString(inv)}{(centred ? ",1" : "")}]");
                     made++;
                 }
                 foreach (var go in runs) Object.DestroyImmediate(go);

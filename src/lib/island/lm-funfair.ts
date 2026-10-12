@@ -1,5 +1,5 @@
 /** The Funfair: the internet, the reviews, the progress bar, too many lights. */
-import { C, INK, N, OUT, shade, r1 as f, letter, glow, type Landmark, type Pen } from './kit'
+import { C, INK, N, OUT, shade, r1 as f, letter, glow, type Landmark, Pen } from './kit'
 import { person, tree, flag, lamp, flowers, bench } from './props'
 
 /** A five-point star at a point, in a group (painted on a sign). */
@@ -67,20 +67,26 @@ export const funfair: Record<string, Landmark> = {
     const [hx, hy] = p.at(0.9, 0.9, 80)
     p.line([0.55, 1.25, 0], [0.9, 0.9, 80], { sw: 4.5 }); p.line([1.25, 0.55, 0], [0.9, 0.9, 80], { sw: 4.5 })
     p.line([0.55, 1.25, 0], [0.9, 0.9, 80], { sw: 2, stroke: C.lilac }); p.line([1.25, 0.55, 0], [0.9, 0.9, 80], { sw: 2, stroke: C.lilac })
+    // The wheel turns about its hub, so Unity renders it (Buildings.cs, Wheel) square round the hub.
     const wheel = p.group('spin')
-    wheel.el('circle', { cx: hx, cy: hy, r: 58, fill: 'none', stroke: INK, 'stroke-width': 5 })
-    wheel.el('circle', { cx: hx, cy: hy, r: 58, fill: 'none', stroke: C.lilac, 'stroke-width': 2.5 })
-    wheel.el('circle', { cx: hx, cy: hy, r: 40, fill: 'none', stroke: INK, 'stroke-width': 1.5 })
+    wheel.model('wheel', [0.9, 0.9, 80], { half: 64, fill: C.lilac, top: C.rasp }, () => {
+      wheel.el('circle', { cx: hx, cy: hy, r: 58, fill: 'none', stroke: INK, 'stroke-width': 5 })
+      wheel.el('circle', { cx: hx, cy: hy, r: 58, fill: 'none', stroke: C.lilac, 'stroke-width': 2.5 })
+      wheel.el('circle', { cx: hx, cy: hy, r: 40, fill: 'none', stroke: INK, 'stroke-width': 1.5 })
+      for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; wheel.el('line', { x1: hx, y1: hy, x2: hx + Math.cos(a) * 58, y2: hy + Math.sin(a) * 58, stroke: INK, 'stroke-width': 1.4 }) }
+      wheel.el('circle', { cx: hx, cy: hy, r: 7, fill: C.rasp, stroke: INK, 'stroke-width': OUT })
+    })
     for (let k = 0; k < 10; k++) {
       const a = (k / 10) * Math.PI * 2, x = hx + Math.cos(a) * 58, y = hy + Math.sin(a) * 58
-      wheel.el('line', { x1: hx, y1: hy, x2: x, y2: y, stroke: INK, 'stroke-width': 1.4 })
       wheel.el('circle', { cx: hx + Math.cos(a + 0.31) * 58, cy: hy + Math.sin(a + 0.31) * 58, r: 2.4, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6, class: 'chase', style: `animation-delay:${k * 0.1}s` })
       // Each car hangs level while the wheel turns.
-      const car = wheel.g.add(new N('g', { class: 'spin-rev', style: `transform-origin:${f(x)}px ${f(y)}px` }))
-      car.add(new N('path', { d: `M${f(x - 7)} ${f(y)}h14v7a3 3 0 0 1 -3 3h-8a3 3 0 0 1 -3 -3z`, fill: [C.rasp, C.mint, C.sky, C.lilac, C.cobalt][k % 5], stroke: INK, 'stroke-width': 1.4 }))
-      car.add(new N('path', { d: `M${f(x - 6)} ${f(y)}q6 -6 12 0`, fill: 'none', stroke: INK, 'stroke-width': 1.2 }))
+      const car = new Pen(wheel.el('g', { class: 'spin-rev', style: `transform-origin:${f(x)}px ${f(y)}px` }), wheel.ox, wheel.oy, wheel.oz, wheel.b, wheel.lights, wheel.sink)
+      const fill = [C.rasp, C.mint, C.sky, C.lilac, C.cobalt][k % 5]
+      car.model('car', [0.9, 0.9, 80], { dx: f(x - hx), dy: f(y - hy), fill }, () => {
+        car.el('path', { d: `M${f(x - 7)} ${f(y)}h14v7a3 3 0 0 1 -3 3h-8a3 3 0 0 1 -3 -3z`, fill, stroke: INK, 'stroke-width': 1.4 })
+        car.el('path', { d: `M${f(x - 6)} ${f(y)}q6 -6 12 0`, fill: 'none', stroke: INK, 'stroke-width': 1.2 })
+      })
     }
-    wheel.el('circle', { cx: hx, cy: hy, r: 7, fill: C.rasp, stroke: INK, 'stroke-width': OUT })
     p.grow(hx - 70, hy - 70, hx + 70, hy + 70)
     // After dark the rim's bulbs shine through: a ring of them turning with the wheel.
     const ring = glow(new N('g', { class: 'spin' }))
