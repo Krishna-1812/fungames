@@ -349,11 +349,11 @@ namespace Island
             var site = Color.Lerp(Color.Lerp(Of(i0, j0), Of(i0, j0 + 1), fv), Color.Lerp(Of(i0 + 1, j0), Of(i0 + 1, j0 + 1), fv), fu);
             // Real grass is darker and less bright than a flat illustration's: the site's colour,
             // deepened, a little greyer, and a little less blue.
-            var g = Color.Lerp(site, Deep, 0.74f);
+            var g = Color.Lerp(site, Deep, 0.62f);
             float lum = g.r * 0.3f + g.g * 0.59f + g.b * 0.11f;
-            g = Color.Lerp(g, new Color(lum, lum, lum), 0.42f);
+            g = Color.Lerp(g, new Color(lum, lum, lum), 0.36f);
             g.b *= 0.8f;
-            g *= 0.82f;
+            g *= 0.97f;
             // Real turf: drier, paler stretches and lush dark hollows, worn lighter in places, never one flat green.
             float patch = Noise.Fbm(u * 0.9f, v * 0.9f, 4, 3);
             float tuft = Noise.Fbm(u * 6f, v * 6f, 3, 5);

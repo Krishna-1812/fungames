@@ -20,7 +20,7 @@ export const BAKE_VERSION = 1
 /** Layers the canvas does not draw (the page writes the district names itself); the still picture for a page without script has them. */
 export const SKIP_LAYERS = new Set(['banners'])
 
-type IslandLike = { layers: { kind: string; slug?: string; body: string }[]; css: string; viewBox: [number, number, number, number] }
+type IslandLike = { layers: { kind: string; slug?: string; body: string }[]; css: string; viewBox: [number, number, number, number]; play?: { sprites?: unknown } }
 
 // The project: builds (and the bake script) run from it. Not import.meta.url, which a bundled build moves.
 const root = process.cwd()
@@ -33,6 +33,8 @@ export function bakeHash(island: IslandLike): string {
   for (const l of island.layers) h.update(`${l.kind}:${l.slug ?? ''}:${l.body}`)
   h.update(island.css)
   h.update(JSON.stringify(island.viewBox))
+  // The canvas's own pictures (the pigeons, the parade), by name and the renders' id.
+  h.update(JSON.stringify(island.play?.sprites ?? null))
   h.update(JSON.stringify({ RULES, KEYFRAMES, LAYERS, POKES, LANDMARK }))
   for (const f of ['build.ts', 'draw.ts', 'xml.ts', '../anim.ts', '../keyframes.ts', '../scene.ts', '../../../../scripts/bake-island.mjs']) h.update(fs.readFileSync(path.join(root, 'src/lib/island/bake', f)))
   return h.digest('hex').slice(0, 12)
@@ -54,7 +56,7 @@ export function bakedIsland(island: IslandLike): Baked {
     // The island exactly as the page built it, for the bake to read.
     fs.mkdirSync(cacheDir, { recursive: true })
     const input = path.join(cacheDir, `${hash}.input.json`)
-    fs.writeFileSync(input, JSON.stringify({ layers: island.layers, css: island.css, viewBox: island.viewBox }))
+    fs.writeFileSync(input, JSON.stringify({ layers: island.layers, css: island.css, viewBox: island.viewBox, sprites: island.play?.sprites ?? null }))
     const r = spawnSync(process.execPath, ['--expose-gc', '--max-old-space-size=4096', path.join(root, 'scripts/bake-island.mjs'), input, dir, hash], { cwd: root, stdio: 'inherit', timeout: 20 * 60_000 })
     fs.rmSync(input, { force: true })
     if (r.status !== 0 || !fs.existsSync(done)) throw new Error(`[island] the bake failed (exit ${r.status}${r.error ? `, ${r.error.message}` : ''})`)

@@ -28,7 +28,8 @@ const tile = (x: number, y: number, z = 0): [number, number] => { const a = x / 
 const dTile = (dx: number, dy: number): [number, number] => { const a = dx / T, b = dy / H; return [(a + b) / 2, (b - a) / 2] }
 const SEA = -12, BEACH = -6, GRID = 30
 
-export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]> }
+export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null }
+import type { Sprites } from './actors'
 export type Sounds = { thump?: (k: number) => void; splash?: () => void; flutter?: () => void }
 
 /** The parade's timetable: once every this many seconds, by the clock. */
@@ -50,7 +51,32 @@ export function createPlay(o: {
   sound: () => Sounds | null
   /** The flock went up (`all`: every one of them, as the bell does). */
   onScare?: (all: boolean) => void
+  /** Where the baked files are (the sheet of Unity's pictures for the canvas: sprites.webp). */
+  base?: string
 }) {
+  /* ---- Unity's pictures, on the realistic island (lib/island/actors.ts, scripts/bake-island.mjs) ---- */
+  type SheetMeta = { rects: Record<string, [number, number, number, number]>; sizes: Record<string, { w: number; h: number; ax: number; ay: number }> }
+  let sheet: HTMLImageElement | null = null, meta: SheetMeta | null = null
+  const sp = o.data.sprites ?? null
+  if (sp && o.base && typeof Image !== 'undefined') {
+    fetch(o.base + 'sprites.json').then((r) => (r.ok ? r.json() : null)).then((m: SheetMeta | null) => {
+      if (!m) return
+      const im = new Image()
+      im.decoding = 'async'
+      im.onload = () => { meta = m; sheet = im }
+      im.src = o.base + 'sprites.webp'
+    }).catch(() => {})
+  }
+  /** One of Unity's pictures, its foot at (x, y), at k times its size; false if not loaded. */
+  const drawPic = (c: CanvasRenderingContext2D, name: string | undefined, x: number, y: number, k = 1): boolean => {
+    if (!sheet || !meta || !name) return false
+    const r = meta.rects[name], z = meta.sizes[name]
+    if (!r || !z) return false
+    c.drawImage(sheet, r[0], r[1], r[2], r[3], x - z.ax * k, y - z.ay * k, z.w * k, z.h * k)
+    return true
+  }
+  /** Which of the four ways a step on screen heads (se, sw, nw, ne). */
+  const way = (dx: number, dy: number) => (dx >= 0 ? (dy >= 0 ? 0 : 3) : dy >= 0 ? 1 : 2)
   const ground = (i: number, j: number) => { const a = Math.floor(i), b = Math.floor(j); return a < 0 || b < 0 || a >= GRID || b >= GRID ? '0' : o.grid[a * GRID + b] }
   const ballCells = new Set(o.data.ball.cells.map(([i, j]) => `${i},${j}`))
   const onSand = (i: number, j: number) => ballCells.has(`${Math.floor(i)},${Math.floor(j)}`)
@@ -257,6 +283,12 @@ export function createPlay(o: {
   const poses = new Map<string, HTMLCanvasElement>()
   const RES = 6, BOXW = 16, BOXH = 16, OX = 8, OY = 12
   function pigeon(c: CanvasRenderingContext2D, x0: number, y0: number, face: number, peck: number, flap: number, flying: boolean): number {
+    // Unity's: standing or pecking (facing either way), or on the wing, wings up or down.
+    if (sp && sheet) {
+      const i = face >= 0 ? 0 : 1
+      const name = flying ? (flap > 0 ? sp.pigeon.up[i] : sp.pigeon.down[i]) : peck > 0.3 ? sp.pigeon.peck[i] : sp.pigeon.stand[i]
+      if (drawPic(c, name, x0, y0, 0.8)) return 1
+    }
     const pk = peck > 1 ? 2 : peck > 0.3 ? 1 : 0, fl = flying ? (flap > 0.33 ? 2 : flap < -0.33 ? 0 : 1) : -1
     const key = `${face}|${pk}|${fl}`
     let img = poses.get(key)
@@ -315,15 +347,15 @@ export function createPlay(o: {
     return p
   }
   /** A point along the way there and back (u from 0 to twice its length), and which way it faces. */
-  const along = (p: Path, u: number): { x: number; y: number; dir: number } => {
+  const along = (p: Path, u: number): { x: number; y: number; dir: number; dx: number; dy: number } => {
     const back = u > p.total, d = back ? 2 * p.total - u : u
     let k = 1
     while (k < p.pts.length - 1 && p.len[k] < d) k++
     const a = p.pts[k - 1] ?? p.pts[0], b = p.pts[k] ?? p.pts[0]
     const seg = (p.len[k] ?? 0) - (p.len[k - 1] ?? 0) || 1
     const t = Math.min(1, Math.max(0, (d - (p.len[k - 1] ?? 0)) / seg))
-    const dx = (b[0] - a[0]) * (back ? -1 : 1)
-    return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, dir: dx >= 0 ? 1 : -1 }
+    const dx = (b[0] - a[0]) * (back ? -1 : 1), dy = (b[1] - a[1]) * (back ? -1 : 1)
+    return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, dir: dx >= 0 ? 1 : -1, dx, dy }
   }
   const MARCHERS = 7
   /** How long one parade takes: there and back, and the last marcher home. */
@@ -338,7 +370,7 @@ export function createPlay(o: {
     const nextAt = new Date(d.getTime() + (PARADE_EVERY - into) * 1000)
     return { path: p, on: !!p && o.play && into < dur, t: into, dur, next: nextAt, to: o.daily() }
   }
-  type Marcher = { x: number; y: number; dir: number; k: number; a: number }
+  type Marcher = { x: number; y: number; dir: number; k: number; a: number; w: number }
   function marchers(now: number): Marcher[] {
     const pr = parade()
     if (!pr.on || !pr.path) return []
@@ -350,7 +382,7 @@ export function createPlay(o: {
       // Out of the square and back into it, fading.
       const a = Math.min(1, u / 10, (pr.path.total * 2 - u) / 10)
       const q = along(pr.path, u)
-      out.push({ x: q.x, y: q.y, dir: q.dir, k, a })
+      out.push({ x: q.x, y: q.y, dir: q.dir, k, a, w: way(q.dx, q.dy) })
     }
     void now
     return out
@@ -359,6 +391,34 @@ export function createPlay(o: {
   function drawMarcher(c: CanvasRenderingContext2D, m: Marcher, now: number): number {
     const { x, y, dir: f, k } = m
     c.globalAlpha = m.a
+    // Unity's: each marcher in their stride, the way they are heading; the dog at a trot. What they carry is drawn over them.
+    if (sp && sheet) {
+      const stride = (now / 1000 / 0.5 + k * 0.37) % 1
+      const ok = k === MARCHERS - 1 ? drawPic(c, sp.dog[m.w]?.[Math.floor(((now / 1000 / 0.36 + k * 0.2) % 1) * 4)], x, y) : drawPic(c, sp.marchers[k]?.[m.w]?.[Math.floor(stride * 8)], x, y, k === 4 || k === 5 ? 0.82 : 1)
+      if (ok) {
+        const top = y - 2
+        c.lineCap = 'round'
+        if (k === 1) {
+          // The flag of today's game, on its pole.
+          c.strokeStyle = '#c9cde0'; c.lineWidth = 0.9
+          c.beginPath(); c.moveTo(x + f * 3, top - 8); c.lineTo(x + f * 3, top - 30); c.stroke()
+          const wave = Math.sin(now / 240) * 1.6
+          c.fillStyle = o.ink()
+          c.beginPath(); c.moveTo(x + f * 3, top - 30); c.quadraticCurveTo(x + f * 9, top - 32 + wave, x + f * 15, top - 29); c.lineTo(x + f * 15, top - 21); c.quadraticCurveTo(x + f * 9, top - 24 + wave, x + f * 3, top - 22); c.closePath(); c.fill()
+        }
+        if (k === 4 || k === 5) {
+          // A balloon on a string.
+          const bx = x - f * 3 + Math.sin(now / 500 + k) * 1.5, byy = top - 26
+          c.strokeStyle = '#eef0f7'; c.lineWidth = 0.4
+          c.beginPath(); c.moveTo(x + f * 2, top - 7); c.lineTo(bx, byy + 4); c.stroke()
+          c.fillStyle = k === 4 ? '#b8a1ff' : '#8ccbff'
+          c.beginPath(); c.ellipse(bx, byy, 3.2, 4, 0, 0, Math.PI * 2); c.fill()
+          c.fillStyle = '#ffffff'; c.globalAlpha = m.a * 0.6; c.beginPath(); c.arc(bx - 1, byy - 1.4, 0.8, 0, Math.PI * 2); c.fill(); c.globalAlpha = m.a
+        }
+        c.globalAlpha = 1
+        return 2
+      }
+    }
     const step = Math.sin(now / 150 + k * 1.3)
     let n = 0
     c.lineCap = 'round'; c.lineJoin = 'round'

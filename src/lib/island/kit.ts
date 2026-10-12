@@ -572,7 +572,9 @@ export function neon(g: N, x: number, y: number, s: string, c: string, o: { size
  * path there and back; `rotate` turns the mover to face along it.
  */
 export const motionCss: string[] = []
-export function motionPath(name: string, pts: [number, number][], o: { back?: boolean; rotate?: boolean; closed?: boolean } = {}) {
+/** A path's keyframes: when (%) it reaches each point, and where. Returned for whoever needs to know which way it is heading. */
+export type MotionFrame = [number, number, number, number]
+export function motionPath(name: string, pts: [number, number][], o: { back?: boolean; rotate?: boolean; closed?: boolean } = {}): MotionFrame[] {
   const P2 = o.closed ? [...pts, pts[0]] : pts
   const seg = P2.slice(1).map((p, i) => Math.hypot(p[0] - P2[i][0], p[1] - P2[i][1]))
   const total = seg.reduce((a, b) => a + b, 0) || 1
@@ -587,4 +589,5 @@ export function motionPath(name: string, pts: [number, number][], o: { back?: bo
   if (o.back) for (let i = frames.length - 2; i >= 0; i--) frames.push([100 - frames[i][0], frames[i][1], frames[i][2], frames[i][3]])
   const tr = (x: number, y: number, a: number) => `transform:translate(${r1(x)}px,${r1(y)}px)${o.rotate ? ` rotate(${Math.round(a)}deg)` : ''}`
   motionCss.push(`@keyframes ${name}{${frames.map(([t, x, y, a]) => `${Math.round(t * 100) / 100}%{${tr(x, y, a)}}`).join('')}}`)
+  return frames
 }

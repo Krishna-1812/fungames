@@ -38,6 +38,8 @@ namespace Island
         public float[] shoreRocks;
         /** Each building's solids, in runs (Buildings.cs). */
         public BuildingSolids[] solids;
+        /** The people (and the rest of what moves) the site draws, each one pose of one facing (Buildings.Actor). */
+        public ActorRec[] actors;
         public float[] viewBox;
 
         public static IslandData Load(string path) => JsonUtility.FromJson<IslandData>(System.IO.File.ReadAllText(path));

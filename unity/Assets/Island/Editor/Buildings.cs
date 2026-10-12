@@ -36,7 +36,7 @@ namespace Island
 
     public static partial class Buildings
     {
-        public const int Plaster = 0, Brick = 1, Tiles = 2, Slate = 3, Timber = 4, Metal = 5, Glass = 6, Concrete = 7, Paint = 8, Cloth = 9;
+        public const int Plaster = 0, Brick = 1, Tiles = 2, Slate = 3, Timber = 4, Metal = 5, Glass = 6, Concrete = 7, Paint = 8, Cloth = 9, Pane = 10;
         static Material mat;
         public static Material Mat => mat != null ? mat : (mat = NewMat());
 
@@ -69,33 +69,117 @@ namespace Island
             public readonly List<int> t = new();
 
             /** A quad a (bottom left), b (bottom right), cc (top right), d (top left), seen from its front; its pattern in world units from a. */
-            public void Quad(Vector3 a, Vector3 b, Vector3 cc, Vector3 d, Color col, int material, float aoBottom = 1, float aoTop = 1)
+            public void Quad(Vector3 a, Vector3 b, Vector3 cc, Vector3 d, Color col, int material, float aoBottom = 1, float aoTop = 1) => QuadAt(a, b, cc, d, col, material, aoBottom, aoTop, a);
+            /** The same, its pattern measured from o (a point in its plane): the pieces of one wall, cut round its windows, carry one pattern on. */
+            public void QuadAt(Vector3 a, Vector3 b, Vector3 cc, Vector3 d, Color col, int material, float aoBottom, float aoTop, Vector3 o)
             {
-                var nrm = Vector3.Cross(b - a, d - a).normalized;
-                var across = (b - a); float lu = across.magnitude; across /= Mathf.Max(lu, 1e-6f);
-                var up = (d - a); float lv = up.magnitude;
+                // From the diagonals: sound even where two corners meet (a quad at a sphere's pole is a triangle).
+                var nrm = Unit(Vector3.Cross(cc - a, d - b));
+                if (nrm.sqrMagnitude < 0.5f) nrm = Unit(Vector3.Cross(b - a, d - a));
+                var across = (b - a); float lu = across.magnitude;
+                // Where a and b meet (a quad at a sphere's pole), the top edge gives the direction instead: never a zero tangent.
+                if (lu < 1e-6f) { across = cc - d; lu = across.magnitude; }
+                if (lu < 1e-6f) { across = Vector3.Cross(nrm, Mathf.Abs(nrm.y) < 0.9f ? Vector3.up : Vector3.right); lu = across.magnitude; }
+                across /= Mathf.Max(lu, 1e-6f);
+                var upn = Unit(Vector3.Cross(nrm, across));
+                if (Vector3.Dot(upn, d - a) < 0) upn = -upn;
                 int k = v.Count;
                 v.AddRange(new[] { a, b, cc, d });
-                uv.Add(new Vector2(0, 0)); uv.Add(new Vector2(lu, 0)); uv.Add(new Vector2(Vector3.Dot(cc - a, across), Vector3.Dot(cc - a, up.normalized))); uv.Add(new Vector2(Vector3.Dot(d - a, across), lv));
-                float seed = Seed(a); for (int q = 0; q < 4; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, seed)); }
+                foreach (var p in new[] { a, b, cc, d }) uv.Add(new Vector2(Vector3.Dot(p - o, across), Vector3.Dot(p - o, upn)));
+                float seed = Seed(o); for (int q = 0; q < 4; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, seed)); }
                 var cb = col; cb.a = aoBottom; var ct = col; ct.a = aoTop;
                 c.Add(cb); c.Add(cb); c.Add(ct); c.Add(ct);
                 t.AddRange(new[] { k, k + 2, k + 1, k, k + 3, k + 2 });
             }
+            /** A quad whose pattern runs 0..1 across it and up it (a window's pane), with a seed of its own. */
+            public void QuadUnit(Vector3 a, Vector3 b, Vector3 cc, Vector3 d, Color col, int material, float seed)
+            {
+                // From the diagonals: sound even where two corners meet (a quad at a sphere's pole is a triangle).
+                var nrm = Unit(Vector3.Cross(cc - a, d - b));
+                if (nrm.sqrMagnitude < 0.5f) nrm = Unit(Vector3.Cross(b - a, d - a));
+                var across = Unit(b - a);
+                int k = v.Count;
+                v.AddRange(new[] { a, b, cc, d });
+                uv.Add(new Vector2(0, 0)); uv.Add(new Vector2(1, 0)); uv.Add(new Vector2(1, 1)); uv.Add(new Vector2(0, 1));
+                for (int q = 0; q < 4; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, seed)); }
+                var c1 = col; c1.a = 1;
+                c.Add(c1); c.Add(c1); c.Add(c1); c.Add(c1);
+                t.AddRange(new[] { k, k + 2, k + 1, k, k + 3, k + 2 });
+            }
             public void Tri(Vector3 a, Vector3 b, Vector3 cc, Color col, int material)
             {
-                var nrm = Vector3.Cross(b - a, cc - a).normalized;
-                var across = (b - a).normalized; var up = Vector3.Cross(nrm, across);
+                var nrm = Unit(Vector3.Cross(b - a, cc - a));
+                var across = Unit(b - a); var up = Vector3.Cross(nrm, across);
                 int k = v.Count;
                 v.AddRange(new[] { a, b, cc });
                 foreach (var p in new[] { a, b, cc }) uv.Add(new Vector2(Vector3.Dot(p - a, across), Vector3.Dot(p - a, up)));
                 float seed = Seed(a); for (int q = 0; q < 3; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, seed)); var cc2 = col; cc2.a = 1; c.Add(cc2); }
                 t.AddRange(new[] { k, k + 2, k + 1 });
             }
+            /**
+             * A direction of length one, however short the vector: Unity's .normalized gives
+             * zero below 1e-5, which is every face of a small thing (a flower, a lamp's globe,
+             * a person's ear), whose edges' cross product is far smaller than that.
+             */
+            public static Vector3 Unit(Vector3 v)
+            {
+                double x = v.x, y = v.y, z = v.z, m = System.Math.Sqrt(x * x + y * y + z * z);
+                return m > 1e-30 ? new Vector3((float)(x / m), (float)(y / m), (float)(z / m)) : Vector3.zero;
+            }
             /** Where in its photograph a face starts (0..1), so that no two walls show the same patch. */
             static float Seed(Vector3 a) { float h = Mathf.Sin(a.x * 12.9898f + a.y * 78.233f + a.z * 37.719f) * 43758.5453f; return h - Mathf.Floor(h); }
+            /**
+             * Auto-smooth: where faces meet at less than limit degrees (round a
+             * cylinder, over a dome), their shared corners take one normal, the
+             * average, so the surface reads as curved and not cut in facets; a sharper
+             * edge (a box's corner, a roof's ridge) stays crisp.
+             */
+            void Smooth(float limit = 35)
+            {
+                float cos = Mathf.Cos(limit * Mathf.Deg2Rad);
+                var at = new Dictionary<Vector3Int, List<int>>();
+                for (int i = 0; i < v.Count; i++)
+                {
+                    var key = Vector3Int.RoundToInt(v[i] * 2000);
+                    if (!at.TryGetValue(key, out var l)) at[key] = l = new List<int>();
+                    l.Add(i);
+                }
+                var outN = new Vector3[v.Count];
+                foreach (var l in at.Values)
+                    foreach (var i in l)
+                    {
+                        var sum = Vector3.zero;
+                        foreach (var j in l) if (Vector3.Dot(n[i], n[j]) >= cos) sum += n[j];
+                        outN[i] = sum.sqrMagnitude > 1e-24f ? Unit(sum) : n[i];
+                    }
+                for (int i = 0; i < v.Count; i++) n[i] = outN[i];
+            }
+            /** Everything another builder has, added to this one's. */
+            public void Append(Bm o)
+            {
+                int k0 = v.Count;
+                v.AddRange(o.v); n.AddRange(o.n); tan.AddRange(o.tan); c.AddRange(o.c); uv.AddRange(o.uv); m.AddRange(o.m);
+                foreach (var i in o.t) t.Add(i + k0);
+            }
+            /** Move, turn and scale everything built so far. */
+            public void Apply(Matrix4x4 mx)
+            {
+                for (int i = 0; i < v.Count; i++)
+                {
+                    v[i] = mx.MultiplyPoint3x4(v[i]);
+                    n[i] = Unit(mx.MultiplyVector(n[i]));
+                    var t3 = Unit(mx.MultiplyVector(new Vector3(tan[i].x, tan[i].y, tan[i].z)));
+                    tan[i] = new Vector4(t3.x, t3.y, t3.z, tan[i].w);
+                }
+            }
+            /** Flatten onto the ground along a direction (towards the sun): a shadow's shape. */
+            public void Flatten(Vector3 toSun)
+            {
+                for (int i = 0; i < v.Count; i++) { var p = v[i]; v[i] = new Vector3(p.x - toSun.x * p.y / toSun.y, 0.0005f, p.z - toSun.z * p.y / toSun.y); n[i] = Vector3.up; c[i] = Color.black; }
+            }
             public Mesh Mesh(string name)
             {
+                Smooth();
                 var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
                 mesh.SetVertices(v); mesh.SetNormals(n); mesh.SetTangents(tan); mesh.SetColors(c); mesh.SetUVs(0, uv); mesh.SetUVs(1, m); mesh.SetTriangles(t, 0);
                 mesh.RecalculateBounds();
@@ -136,14 +220,14 @@ namespace Island
         {
             switch (s.k)
             {
-                case "box": Box(b, s); break;
+                case "box": BoxDetailed(b, s); break;
                 case "band": Band(b, s.b, s.z0, s.z1, s.fill); break;
                 case "quad": Panel(b, s.b, s.face, s.u0, s.u1, s.z0, s.z1, Real(s.fill, PanelOf(s.fill)), PanelOf(s.fill), Off); break;
-                case "win": Windows(b, s); break;
-                case "door": Door(b, s); break;
+                case "win": if (HolesOf(s.b) != null) WindowsDetailed(b, s); else Windows(b, s); break;
+                case "door": if (HolesOf(s.b) != null) DoorDetailed(b, s); else Door(b, s); break;
                 case "awning": Awning(b, s); break;
-                case "gable": Gable(b, s); break;
-                case "pyramid": Pyramid(b, s); break;
+                case "gable": Gable(b, s); GableDetail(b, s); break;
+                case "pyramid": Pyramid(b, s); PyramidDetail(b, s); break;
                 case "cyl": Cyl(b, s); break;
                 case "cone": Cone(b, s); break;
                 case "dome": Dome(b, s); break;

@@ -45,6 +45,12 @@ export type Rule = {
 /** The keyframes, as CSS. Read at build time by keyframes.ts. */
 export const KEYFRAMES = `
 @keyframes isl-twinkle { 50% { transform: scale(0.5); opacity: 0.45; } }
+@keyframes isl-stride { 0%, 12.4% { opacity: 1; } 12.5%, 100% { opacity: 0; } }
+@keyframes nat-sheep-up { 0%, 49.9% { opacity: 0; } 50%, 87.9% { opacity: 1; } 88%, 100% { opacity: 0; } }
+@keyframes nat-sheep-down { 0%, 49.9% { opacity: 1; } 50%, 87.9% { opacity: 0; } 88%, 100% { opacity: 1; } }
+@keyframes nat-deer-up { 0%, 14.9% { opacity: 0; } 15%, 84.9% { opacity: 1; } 85%, 100% { opacity: 0; } }
+@keyframes nat-deer-down { 0%, 14.9% { opacity: 1; } 15%, 84.9% { opacity: 0; } 85%, 100% { opacity: 1; } }
+@keyframes isl-wing2 { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes isl-pulse { 50% { transform: scale(1.35); opacity: 0.2; } }
 @keyframes isl-spin { to { transform: rotate(360deg); } }
 @keyframes isl-bob { 50% { transform: translateY(-4px); } }
@@ -182,6 +188,14 @@ export const RULES: Rule[] = [
   { on: ['ripple'], loop: L('isl-ripple', 3.6, 'ease-out'), base: { opacity: 0 }, fillBox: true, origin: 'center' },
   { on: ['fall'], loop: L('isl-flow', 0.55, 'linear') },
   { on: ['fish'], loop: L('isl-fish', 7, 'ease-in-out'), base: { opacity: 0 } },
+  // A walker's stride (lib/island/actors.ts): its eight frames, each shown in turn.
+  { on: ['stride'], loop: L('isl-stride', 0.5, 'linear'), base: { opacity: 0 } },
+  // Unity's animals (lib/island/actors.ts): a sheep or a deer looking up now and then, a bird's wings up and down.
+  { on: ['sheep-up'], loop: L('nat-sheep-up', 6, 'linear'), base: { opacity: 0 } },
+  { on: ['sheep-down'], loop: L('nat-sheep-down', 6, 'linear') },
+  { on: ['deer-up'], loop: L('nat-deer-up', 8, 'linear'), base: { opacity: 0 } },
+  { on: ['deer-down'], loop: L('nat-deer-down', 8, 'linear') },
+  { on: ['wing2'], loop: L('isl-wing2', 0.42, 'linear') },
   { on: ['leg-a'], inside: 'walker', loop: L('isl-step', 0.5, 'ease-in-out', { dir: 'alternate' }) },
   { on: ['leg-b'], inside: 'walker', loop: L('isl-step', 0.5, 'ease-in-out', { dir: 'alternate-reverse' }) },
   { on: ['cloud'], loop: L('isl-cloud', 160, 'linear') },

@@ -124,6 +124,11 @@ namespace Island
                 case "sails": Sails(b, s); break;
                 case "wheel": Wheel(b, s); break;
                 case "car": Car(b, s); break;
+                case "lamp": Lamp(b, s); break;
+                case "umbrella": Umbrella(b, s); break;
+                case "surfboard": Surfboard(b, s); break;
+                case "kite": KiteModel(b, s); break;
+                case "flowers": Flowers(b, s); break;
                 default: Debug.LogWarning($"[island] no model called {s.name}"); break;
             }
         }
@@ -242,6 +247,119 @@ namespace Island
                 b.Quad(At(8.5f, 1.2f) + back, At(32.5f, 1.2f) + back, At(32.5f, 8.6f) + back, At(8.5f, 8.6f) + back, cloth, Cloth);
             }
             Tube(b, hub + CamF * 0.04f, hub - CamF * 0.05f, Px(3.2f), Real("#2c355e", Metal), Metal, 12);
+        }
+
+        /**
+         * A street lamp: a moulded cast-iron base, a fluted post tapering up,
+         * an arm curving out to the right (as the site draws it), and a lantern
+         * hanging from it, its glass under a shade. s.h: the post's height.
+         */
+        static void Lamp(Bm b, SolidRec s)
+        {
+            var iron = Real("#2f3542", Metal); var glass = Real("#eef0f6", Paint);
+            float x = s.x, y = s.y, z = s.z, h = s.h > 0 ? s.h : 26;
+            Lathe(b, x, y, z, new[] { (0f, Px(2.2f)), (1.2f, Px(2.2f)), (1.8f, Px(1.6f)), (3.4f, Px(1.4f)), (4f, Px(1.0f)), (h - 1.2f, Px(0.7f)), (h - 0.6f, Px(1.0f)), (h, Px(0.8f)) }, _ => iron, Metal, 12);
+            // The arm: a quarter turn out and over, towards the right of the picture.
+            var top = W(x, y, z + h); var right = CamR; right.y = 0; right.Normalize();
+            Vector3 prev = top;
+            for (int k = 1; k <= 6; k++)
+            {
+                float t = k / 6f * Mathf.PI / 2;
+                var p = top + right * Px(5) * (1 - Mathf.Cos(t)) + Vector3.up * Hy(3) * Mathf.Sin(t);
+                Tube(b, prev, p, Px(0.55f), iron, Metal, 6); prev = p;
+            }
+            // The lantern, hanging just past the arm's end: a shade, the glass, a finial.
+            var head = top + right * Px(5.5f) + Vector3.up * Hy(1.2f);
+            Tube(b, prev, head + Vector3.up * Hy(1.6f), Px(0.4f), iron, Metal, 5);
+            Ball(b, head, Px(2.1f), -1, glass, Paint);
+            Lathe(b, head.z, head.x, head.y * IslandBuild.PxPerHeight, new[] { (1.2f, Px(2.6f)), (1.9f, Px(2.4f)), (3.0f, Px(1.0f)), (3.4f, 0f) }, _ => iron, Metal, 14, false);
+        }
+
+        /** A beach umbrella: a pole leaning a little, and a canopy of panels in two colours, its ribs showing. s.fill: the colour. */
+        static void Umbrella(Bm b, SolidRec s)
+        {
+            var pole = Real("#e6e9f6", Paint); var c1 = Real(s.fill ?? "#ff4f6e", Cloth); var c2 = Real("#f7f8fc", Cloth);
+            var foot = W(s.x, s.y, s.z); var tip = W(s.x + 0.02f, s.y - 0.02f, s.z + 30);
+            Tube(b, foot, tip + Vector3.up * Hy(2), Px(0.7f), pole, Paint, 6);
+            int n = 8; float R = 0.24f, sag = Hy(4);
+            var up = (tip - foot).normalized;
+            var u = Vector3.Cross(up, Vector3.forward).normalized; var v = Vector3.Cross(up, u);
+            for (int k = 0; k < n; k++)
+            {
+                float a0 = k * Mathf.PI * 2 / n, a1 = (k + 1) * Mathf.PI * 2 / n;
+                var e0 = tip + (u * Mathf.Cos(a0) + v * Mathf.Sin(a0)) * R - up * sag; var e1 = tip + (u * Mathf.Cos(a1) + v * Mathf.Sin(a1)) * R - up * sag;
+                // Each panel bellies a little between its ribs.
+                var mid = tip + (u * Mathf.Cos((a0 + a1) / 2) + v * Mathf.Sin((a0 + a1) / 2)) * R * 0.98f - up * sag * 0.9f;
+                var col = k % 2 == 0 ? c1 : c2;
+                b.Tri(tip, e0, mid, col, Cloth); b.Tri(tip, mid, e1, col, Cloth);
+                Tube(b, tip, e0, Px(0.25f), pole, Paint, 4);
+            }
+        }
+
+        /** A bed of flowers: a low mound of leaves, and the flowers dotted over it in two colours and white. */
+        static void Flowers(Bm b, SolidRec s)
+        {
+            var leaf = Real("#3f7a5c", Paint); var c1 = Real(s.fill ?? "#ff9fb2", Paint); var c2 = Real(s.top ?? "#b8a1ff", Paint); var w = Real("#f7f8fc", Paint);
+            var c = W(s.x, s.y, s.z);
+            var rnd = new System.Random((int)(s.x * 1000 + s.y * 7));
+            float R() => (float)rnd.NextDouble();
+            // The leaves: overlapping clumps.
+            for (int k = 0; k < 9; k++)
+            {
+                var o = c + new Vector3((R() - 0.5f) * 0.28f, 0, (R() - 0.5f) * 0.2f);
+                float r = 0.04f + R() * 0.03f;
+                for (int y = 0; y < 5; y++) for (int x = 0; x < 10; x++)
+                {
+                    float t0 = Mathf.PI / 2 * y / 5, t1 = Mathf.PI / 2 * (y + 1) / 5, a0 = x * Mathf.PI * 2 / 10, a1 = (x + 1) * Mathf.PI * 2 / 10;
+                    Vector3 P(float t, float a) => o + new Vector3(Mathf.Cos(t) * Mathf.Sin(a) * r, Mathf.Sin(t) * r * 0.8f, Mathf.Cos(t) * Mathf.Cos(a) * r);
+                    b.Quad(P(t0, a0), P(t0, a1), P(t1, a1), P(t1, a0), leaf * (0.85f + R() * 0.3f), Paint);
+                }
+            }
+            // The flowers.
+            for (int k = 0; k < 34; k++)
+            {
+                var o = c + new Vector3((R() - 0.5f) * 0.3f, 0.035f + R() * 0.03f, (R() - 0.5f) * 0.22f);
+                var col = k % 3 == 0 ? c1 : k % 3 == 1 ? c2 : w;
+                Ball(b, o, 0.009f + R() * 0.005f, -1, col, Paint);
+            }
+        }
+
+        /** A surfboard stood on its tail in the sand. s.fill: its colour. */
+        static void Surfboard(Bm b, SolidRec s)
+        {
+            var col = Real(s.fill ?? "#5b82ff", Paint); var stripe = Real("#f7f8fc", Paint);
+            var foot = W(s.x, s.y, s.z);
+            var right = CamR; right.y = 0; right.Normalize();
+            var face = Facing;
+            int n = 12; float L = Hy(26), W0 = Px(3.4f);
+            for (int k = 0; k < n; k++)
+            {
+                float t0 = (float)k / n, t1 = (float)(k + 1) / n;
+                float w0 = W0 * Mathf.Sqrt(Mathf.Sin(Mathf.PI * Mathf.Lerp(0.04f, 0.97f, t0))), w1 = W0 * Mathf.Sqrt(Mathf.Sin(Mathf.PI * Mathf.Lerp(0.04f, 0.97f, t1)));
+                var p0 = foot + Vector3.up * L * t0 + face * 0.004f * Mathf.Sin(Mathf.PI * t0); var p1 = foot + Vector3.up * L * t1 + face * 0.004f * Mathf.Sin(Mathf.PI * t1);
+                b.Quad(p0 - right * w0, p0 + right * w0, p1 + right * w1, p1 - right * w1, col, Paint);
+                b.Quad(p0 - right * w0 - face * 0.01f, p0 + right * w0 - face * 0.01f, p1 + right * w1 - face * 0.01f, p1 - right * w1 - face * 0.01f, col, Paint);
+                b.Quad(p0 - right * w0 * 0.12f + face * 0.002f, p0 + right * w0 * 0.12f + face * 0.002f, p1 + right * w1 * 0.12f + face * 0.002f, p1 - right * w1 * 0.12f + face * 0.002f, stripe, Paint);
+            }
+        }
+
+        /** A kite: a diamond of sailcloth on two spars, flying, and its tail of ribbons. Drawn round its middle, facing the camera. */
+        static void KiteModel(Bm b, SolidRec s)
+        {
+            var c = W(s.x, s.y, s.z);
+            var cloth = Real(s.fill ?? "#b8a1ff", Cloth); var dark = cloth * 0.7f; dark.a = 1; var spar = Real("#9b8bd6", Timber);
+            Vector3 S(float dx, float dy) => Scr(c, dx, dy);
+            var top = S(0, -12); var bot = S(0, 12); var l = S(-9, 0); var r = S(9, 0); var mid = S(0, -0.5f) + CamF * -0.01f;
+            b.Tri(top, l, mid, cloth, Cloth); b.Tri(top, mid, r, dark, Cloth); b.Tri(l, bot, mid, dark, Cloth); b.Tri(mid, bot, r, cloth, Cloth);
+            Tube(b, top, bot, Px(0.35f), spar, Timber, 4); Tube(b, l, r, Px(0.35f), spar, Timber, 4);
+            // The tail: bows of ribbon down a line.
+            var red = Real("#ff4f6e", Cloth);
+            for (int k = 0; k < 3; k++)
+            {
+                var q = S(Mathf.Sin(k * 1.7f) * 2.5f, 15 + k * 6.5f);
+                b.Tri(q + (S(-2.4f, -1.4f) - c), q + (S(2.4f, 1.4f) - c), q + (S(2.4f, -1.4f) - c), red, Cloth);
+                b.Tri(q + (S(-2.4f, -1.4f) - c), q + (S(-2.4f, 1.4f) - c), q + (S(2.4f, 1.4f) - c), red, Cloth);
+            }
         }
 
         /**

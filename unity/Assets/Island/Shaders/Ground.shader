@@ -53,7 +53,7 @@ Shader "Island/Ground"
             static const float Rep[10] = { 2.5, 3.0, 2.0, 4.0, 3.0, 0.55, 0.5, 0.8, 1.1, 1.2 };
             static const float2x2 Turn = float2x2(0.8, -0.6, 0.6, 0.8);
             // How strongly each one's detail shows (over 1, more than the photo has).
-            static const float Strength[10] = { 1.7, 0.85, 0.9, 1.2, 1.3, 0.9, 1.0, 1.1, 1.5, 1.25 };
+            static const float Strength[10] = { 1.15, 0.85, 0.9, 1.2, 1.3, 0.9, 1.0, 1.1, 1.05, 1.25 };
             // The sea's surface, in world height (IslandBuild.Scene).
             float _IslandSea;
 

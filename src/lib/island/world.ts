@@ -9,8 +9,10 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid } from './kit'
-import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
+import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
+import { type Who } from './actors'
+import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
+import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
 import type { FigureSet, BuildingSet } from './figures'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { beacon } from './lm-harbour'
@@ -88,7 +90,7 @@ export type Signpost = { i: number; j: number; at: [number, number]; boards: { d
  * the ball can roll on, and for every building the roads from the town square
  * to its door, for the day's parade. All in tiles.
  */
-export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]> }
+export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null }
 /**
  * The island as facts rather than a picture, for anything that draws it
  * another way (the Unity scene in unity/, which renders it in 3D): every
@@ -113,6 +115,8 @@ export type IslandModel = {
   buildings: { slug: string; district: string; i: number; j: number; w: number; d: number; z: number; water: boolean }[]
   /** Every tree, rock and cactus, by figure name (props.ts), where it stands. */
   plants: Planted[]
+  /** Every picture of a person the island draws, for Unity (lib/island/actors.ts). */
+  actors: ActorRec[]
   /** The rocks standing in the sea: tile i, j, and size. */
   seaRocks: [number, number, number][]
   /** The stones at the waterline: tile x, y (not tile corners: where they stand), and size. */
@@ -142,6 +146,7 @@ export type PlateRef = { box: [number, number, number, number]; href: string; id
 export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
   const plate = opts.plate ?? null
   setFigures(opts.figures ?? null)
+  setActors(!!opts.figures)
   const R = rng(20260930)
   motionCss.length = 0
   glows.length = 0
@@ -449,9 +454,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const pts: [number, number][] = []
     for (let k = 0; k < 40; k++) { const a = (k / 40) * Math.PI * 2; pts.push(P(c + Math.cos(a) * rr, c + Math.sin(a) * rr * 0.96, SEA)) }
     const name = `boat${boats.kids.length}`
-    motionPath(name, pts, { closed: true })
+    const frames = motionPath(name, pts, { closed: true })
     const g = boats.add(new N('g', { class: 'mover', style: `animation:${name} ${dur}s linear infinite ${begin}s` }))
-    g.add(sailboat(hull as string, '#ffffff', 1.1))
+    // Unity's (lib/island/actors.ts): turning to each of its eight headings as it goes round.
+    g.add(onPath((h) => boatUse('sail', hull as string, h), name, frames, `${dur}s`, `${begin}s`) ?? sailboat(hull as string, '#ffffff', 1.1))
   })
   for (const [i, j, d] of [[27, 26, 0], [2, 26, 3.5], [29, 10, 6]]) {
     const [x, y] = P(i, j, SEA)
@@ -473,18 +479,30 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // A speedboat racing along the bottom of the map and back.
   {
     const a = P(33, 27, SEA), b = P(25, 37.5, SEA)
-    const pose = (q: [number, number], dir: number) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px) scaleX(${dir})`
+    const out = boatUse('speed', C.rasp, headingOf(b[0] - a[0], b[1] - a[1])), back = boatUse('speed', C.rasp, headingOf(a[0] - b[0], a[1] - b[1]))
+    const real = !!(out && back)
+    const pose = (q: [number, number], dir: number) => real ? `transform:translate(${r1(q[0])}px,${r1(q[1])}px)` : `transform:translate(${r1(q[0])}px,${r1(q[1])}px) scaleX(${dir})`
     motionCss.push(`@keyframes isl-speed{0%{${pose(a, 1)}}44%{${pose(b, 1)}}50%{${pose(b, -1)}}94%{${pose(a, -1)}}100%{${pose(a, 1)}}}`)
-    const g = root.add(new N('g', { class: 'mover amb', 'data-b': `${f(b[0] - 60)} ${f(a[1] - 30)} ${f(a[0] + 60)} ${f(b[1] + 20)}`, style: 'animation:isl-speed 22s ease-in-out infinite -4s' }))
-    g.add(speedboat(C.rasp))
+    const g = root.add(new N('g', { class: 'mover amb', 'data-b': `${f(b[0] - 70)} ${f(a[1] - 50)} ${f(a[0] + 70)} ${f(b[1] + 40)}`, style: 'animation:isl-speed 22s ease-in-out infinite -4s' }))
+    if (real) {
+      motionCss.push('@keyframes isl-speed-o{0%,46.9%{opacity:1}47%,96.9%{opacity:0}97%,100%{opacity:1}}', '@keyframes isl-speed-b{0%,46.9%{opacity:0}47%,96.9%{opacity:1}97%,100%{opacity:0}}')
+      g.add(new N('g', { style: 'animation:isl-speed-o 22s linear infinite -4s' })).add(out!)
+      g.add(new N('g', { style: 'animation:isl-speed-b 22s linear infinite -4s' })).add(back!)
+    } else g.add(speedboat(C.rasp))
   }
   // The ferry: in from the open sea, a while at the jetty, out again.
   {
     const a = P(FERRY.from[0], FERRY.from[1], SEA), b = P(FERRY.dock[0], FERRY.dock[1], SEA)
-    const pose = (q: [number, number], dir: number) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px) scaleX(${dir})`
+    const inb = boatUse('ferry', '#ffffff', headingOf(b[0] - a[0], b[1] - a[1])), outb = boatUse('ferry', '#ffffff', headingOf(a[0] - b[0], a[1] - b[1]))
+    const real = !!(inb && outb)
+    const pose = (q: [number, number], dir: number) => real ? `transform:translate(${r1(q[0])}px,${r1(q[1])}px)` : `transform:translate(${r1(q[0])}px,${r1(q[1])}px) scaleX(${dir})`
     motionCss.push(`@keyframes isl-ferry{0%{${pose(a, -1)};opacity:0}4%{opacity:1}32%,62%{${pose(b, -1)}}62.4%{${pose(b, 1)}}95%{opacity:1}100%{${pose(a, 1)};opacity:0}}`)
-    const g = root.add(pokeN('ferry')).add(new N('g', { class: 'mover amb', 'data-b': `${f(a[0] - 40)} ${f(b[1] - 40)} ${f(b[0] + 40)} ${f(a[1] + 20)}`, style: `animation:isl-ferry ${FERRY_DUR}s linear infinite` }))
-    g.add(ferry())
+    const g = root.add(pokeN('ferry')).add(new N('g', { class: 'mover amb', 'data-b': `${f(a[0] - 130)} ${f(b[1] - 90)} ${f(b[0] + 130)} ${f(a[1] + 60)}`, style: `animation:isl-ferry ${FERRY_DUR}s linear infinite` }))
+    if (real) {
+      motionCss.push('@keyframes isl-ferry-i{0%,62.2%{opacity:1}62.3%,100%{opacity:0}}', '@keyframes isl-ferry-o{0%,62.2%{opacity:0}62.3%,100%{opacity:1}}')
+      g.add(new N('g', { style: `animation:isl-ferry-i ${FERRY_DUR}s linear infinite` })).add(inb!)
+      g.add(new N('g', { style: `animation:isl-ferry-o ${FERRY_DUR}s linear infinite` })).add(outb!)
+    } else g.add(ferry())
   }
   // The islet with the secret, far out to the west.
   secretIslet(new Pen(root), -1.4, 26.2)
@@ -869,16 +887,21 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const goers: { cells: Set<string>; node: N }[] = []
   const cellsOf = (cells: [number, number][]) => new Set(cells.map((c) => key(...c)))
   const shirts = [C.rasp, C.cobalt, C.lilac, C.mint, C.sky, '#ffffff', C.slate]
+  /** Stops along a walk (when, in %; where), as motionPath's frames, so a walker knows which way it heads between them. */
+  const stopsOf = (stops: [number, [number, number]][]): MotionFrame[] => stops.map(([t, q]) => [t, q[0], q[1], 0])
+  // The town's walkers: a crowd of a dozen, each always the same person (lib/island/actors.ts), out on the roads by turns.
+  const crowd = Array.from({ length: 12 }, (_, m) => who(shirts[m % shirts.length], m * 13.7 + 2))
   routes.forEach((r, n) => {
     if (r.length < 4) return
     for (let k = 0; k < 2; k++) {
       const side = k ? 0.14 : -0.14
       const pts = r.map(([i, j]) => P(i + 0.5 + side, j + 0.5 - side))
       const name = `walk${walkers.kids.length}`
-      motionPath(name, k ? [...pts].reverse() : pts, { back: true })
+      const frames = motionPath(name, k ? [...pts].reverse() : pts, { back: true })
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
-      const g = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(...xs))} ${f(Math.min(...ys))} ${f(Math.max(...xs))} ${f(Math.max(...ys))}`, style: `animation:${name} ${f(r.length * 2.6 + R() * 8)}s linear infinite ${f(-R() * 30)}s` }))
-      g.add(walkerFigure(shirts[(n * 2 + k) % shirts.length]))
+      const dur = `${f(r.length * 2.6 + R() * 8)}s`, delay = `${f(-R() * 30)}s`
+      const g = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(...xs) - 30)} ${f(Math.min(...ys) - 24)} ${f(Math.max(...xs) + 12)} ${f(Math.max(...ys) + 8)}`, style: `animation:${name} ${dur} linear infinite ${delay}` }))
+      g.add(walker(crowd[(n * 2 + k) % crowd.length], name, frames, dur, delay) ?? walkerFigure(shirts[(n * 2 + k) % shirts.length]))
       goers.push({ cells: cellsOf(r), node: g })
     }
   })
@@ -918,7 +941,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
         motionCss.push(`@keyframes cross${n}{0%,${f(h1[0] + 1)}%{${tr(kA)}}${f(h1[1] - 1)}%,${f(h2[0] + 1)}%{${tr(kB)}}${f(h2[1] - 1)}%,100%{${tr(kA)}}}`)
         const pg = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(kA[0], kB[0]) - 8)} ${f(Math.min(kA[1], kB[1]) - 24)} ${f(Math.max(kA[0], kB[0]) + 8)} ${f(Math.max(kA[1], kB[1]) + 3)}`, style: `animation:cross${n} ${dur}s linear infinite ${f(-delay)}s` }))
-        pg.add(walkerFigure(shirts[(n + 2) % shirts.length]))
+        pg.add(walker(crowd[(n + 5) % crowd.length], `cross${n}`, stopsOf([[0, kA], [h1[0] + 1, kA], [h1[1] - 1, kB], [h2[0] + 1, kB], [h2[1] - 1, kA], [100, kA]]), `${dur}s`, `${f(-delay)}s`) ?? walkerFigure(shirts[(n + 2) % shirts.length]))
         walkers.add(sh)
         goers.push({ cells: cellsOf([mid]), node: pg }, { cells: cellsOf(r), node: sh })
         return
@@ -994,7 +1017,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     } })
   }
   /* ---- the wild things and the farm ---------------------------------------- */
-  const at = (i: number, j: number, depth: number, fn: (p: Pen) => void, z = height[Math.floor(i)]?.[Math.floor(j)] ?? 0) => things.push({ depth, draw: (layer) => fn(new Pen(layer, 0, 0, z, new Bounds(), lights)) })
+  // Each thing standing on the island has its solids written down too (a cottage's walls, a stall's awning), for Unity's pictures of them.
+  let atN = 0
+  const at = (i: number, j: number, depth: number, fn: (p: Pen) => void, z = height[Math.floor(i)]?.[Math.floor(j)] ?? 0) => { const slug = `at-${atN++}`; things.push({ depth, draw: (layer) => fn(new Pen(layer, 0, 0, z, new Bounds(), lights, sinkFor(slug).sink)) }) }
   if (mill) at(mill[0] + 0.5, mill[1] + 0.5, mill[0] + mill[1] + 1, (p) => { p.sink = sinkFor('windmill').sink; windmill(poke(p, 'windmill', mill[0] + 0.5, mill[1] + 0.5, 'whoosh!', 62), mill[0] + 0.5, mill[1] + 0.5) })
   for (const [i, j] of bales) for (const [u, v] of [[0.35, 0.4], [0.65, 0.62]]) at(i + u, j + v, i + j + u + v, (p) => bale(p, i + u, j + v))
   if (archAt) at(archAt[0] + 0.5, archAt[1] + 0.5, archAt[0] + archAt[1] + 1, (p) => arch(p, archAt[0] + 0.5, archAt[1] + 0.5))
@@ -1221,7 +1246,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     bottles.push({ n: BOTTLE_COUNT, i: -3, j: 27.4, district: 'market' })
   }
   // Piers out from the beaches, each with someone fishing off the end.
-  for (const [n, pts] of PIERS.entries()) things.push({ depth: pts[0][0] + pts[0][1] + 0.4, draw: (layer) => pier(new Pen(layer), pts, BEACH + 1, n === 2 ? null : C.rasp) })
+  for (const [n, pts] of PIERS.entries()) things.push({ depth: pts[0][0] + pts[0][1] + 0.4, draw: (layer) => pier(new Pen(layer, 0, 0, 0, new Bounds(), [], sinkFor(`pier-${n}`).sink), pts, BEACH + 1, n === 2 ? null : C.rasp) })
 
   /* ---- what the page brings to life: pigeons, a noticeboard, a ball, the parade ---- */
   // The pigeons' square and the noticeboard beside it: two free tiles side by
@@ -1304,13 +1329,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // Nothing grows in the river; the odd rock stands beside it.
     if (wet.has(key(i, j))) continue
     if (road.has(key(i, j))) {
-      if ((i * 7 + j * 3) % 5 === 0) things.push({ depth: i + j + 0.9, draw: (layer) => lamp(new Pen(layer, 0, 0, z, new Bounds(), lights), i + 0.12, j + 0.12, 24) })
+      if ((i * 7 + j * 3) % 5 === 0) things.push({ depth: i + j + 0.9, draw: (layer) => lamp(new Pen(layer, 0, 0, z, new Bounds(), lights, sinkFor(`lamp-${i}-${j}`).sink), i + 0.12, j + 0.12, 24) })
       continue
     }
     const density = { peaks: 0.55, badlands: 0.3, proving: 0.28, harbour: 0.16, funfair: 0.24, market: 0.2, oldtown: 0.22 }[d.key]
     const cluster = 0.5 + 0.5 * Math.sin(i * 0.9 + 1.3) * Math.cos(j * 0.8 - 0.4)
     if (R() > density * (0.5 + cluster)) {
-      if (R() < 0.04 && !coastal && z === 0) things.push({ depth: i + j + 1, draw: (layer) => flowers(new Pen(layer), i + 0.5, j + 0.5) })
+      if (R() < 0.04 && !coastal && z === 0) things.push({ depth: i + j + 1, draw: (layer) => flowers(new Pen(layer, 0, 0, 0, new Bounds(), [], sinkFor(`flowers-${i}-${j}`).sink), i + 0.5, j + 0.5) })
       else if (R() < 0.03 && !coastal && z === 0) things.push({ depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : 'stand' }) })
       continue
     }
@@ -1338,7 +1363,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
     motionCss.push(`@keyframes isl-off{0%,33%{${tr(end)};opacity:0}34%{opacity:1}52%{${tr(land)}}58%{${tr(shore)};opacity:1}60%,100%{${tr(shore)};opacity:0}}`)
     motionCss.push(`@keyframes isl-on{0%,40%{${tr(shore)};opacity:0}41%{opacity:1}46%{${tr(land)}}59%{${tr(end)};opacity:1}61%,100%{${tr(end)};opacity:0}}`)
-    for (const [name, shirt] of [['isl-off', C.rasp], ['isl-on', C.mint]] as const) things.push({ depth: 21.5 + 30.5, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(shore[0] - 10)} ${f(land[1] - 30)} ${f(end[0] + 10)} ${f(end[1] + 4)}`, style: `animation:${name} ${FERRY_DUR}s linear infinite` })); g.add(walkerFigure(shirt)) } })
+    const ways: Record<string, MotionFrame[]> = { 'isl-off': stopsOf([[0, end], [34, end], [52, land], [58, shore], [100, shore]]), 'isl-on': stopsOf([[0, shore], [41, shore], [46, land], [59, end], [100, end]]) }
+    for (const [name, shirt] of [['isl-off', C.rasp], ['isl-on', C.mint]] as const) things.push({ depth: 21.5 + 30.5, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(shore[0] - 30)} ${f(land[1] - 30)} ${f(end[0] + 12)} ${f(end[1] + 8)}`, style: `animation:${name} ${FERRY_DUR}s linear infinite` })); g.add(walker(who(shirt, name === 'isl-on' ? 31 : 47), name, ways[name], `${FERRY_DUR}s`, '0s') ?? walkerFigure(shirt)) } })
   }
   // Cause and effect, part two: people walking up to a building's door and
   // going in, and a while later coming out again and walking off.
@@ -1366,7 +1392,15 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       motionCss.push(`@keyframes ${name}{${fr}}`)
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]), m = made++
       const dur = f(total / 9 + 14)
-      things.push({ depth: pl.i + pl.j + (pl.w + pl.d) / 2 + 0.02, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb visitor', 'data-b': `${f(Math.min(...xs) - 8)} ${f(Math.min(...ys) - 24)} ${f(Math.max(...xs) + 8)} ${f(Math.max(...ys) + 3)}`, style: `animation:${name} ${dur}s linear infinite ${f(-m * 3.7)}s` })); g.add(walkerFigure(shirts[(m + 3) % shirts.length])) } })
+      // The same walk as times and points, for which way they face: up the road to the door, a while inside, and back.
+      const st: [number, [number, number]][] = [[0, pts[0]], [4, pts[0]]]
+      let acc = 0
+      pts.forEach((q, k) => { if (k) { acc += segs[k - 1]; st.push([4 + (36 * acc) / total, q]) } })
+      st.push([66, pts[pts.length - 1]])
+      acc = 0
+      ;[...pts].reverse().forEach((q, k, rv) => { if (k) { acc += Math.hypot(q[0] - rv[k - 1][0], q[1] - rv[k - 1][1]); st.push([67 + (29 * acc) / total, q]) } })
+      st.push([100, pts[0]])
+      things.push({ depth: pl.i + pl.j + (pl.w + pl.d) / 2 + 0.02, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb visitor', 'data-b': `${f(Math.min(...xs) - 30)} ${f(Math.min(...ys) - 24)} ${f(Math.max(...xs) + 12)} ${f(Math.max(...ys) + 8)}`, style: `animation:${name} ${dur}s linear infinite ${f(-m * 3.7)}s` })); g.add(walker(crowd[(m + 3) % crowd.length], name, stopsOf(st), `${dur}s`, `${f(-m * 3.7)}s`) ?? walkerFigure(shirts[(m + 3) % shirts.length])) } })
     }
   }
 
@@ -1551,7 +1585,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
     const g = sky.add(new N('g', { class: 'cloud', style: `animation-delay:${-n * 23}s;animation-duration:${150 + n * 20}s` }))
     g.add(new N('ellipse', { cx: f(x + 14), cy: f(y + 120), rx: f(56 * k), ry: f(17 * k), fill: INK, opacity: 0.06, class: 'cloud-shadow' }))
-    g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudShape(k))
+    g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudModel(n, k) ?? cloudShape(k))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
   ;([[9, 26, 230, C.rasp, '#ffffff', 0], [26, 10, 260, C.cobalt, C.mint, 40]] as [number, number, number, string, string, number][]).forEach(([i, j, z, a, b, d], n) => {
@@ -1564,17 +1598,46 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   { const [x, y] = P(5, 20, 130); sky.add(gullsCircling(x, y, 50, 20, 'gulls1', 11)) }
   for (const [n, d] of [[0, 0], [1, 18]]) {
     const g = sky.add(new N('g', { class: `flock flock${n}`, style: `animation-delay:${-d}s` }))
-    g.add(birds())
+    // Unity's gulls, flying the flock's way (up and to the right), wings beating out of step.
+    const three = [[0, 0], [16, 8], [-14, 10]].map(([dx, dy], m) => {
+      const up = creatureUse('gull', '#f4f5f8', 'up', 'ne', { class: 'wing2', style: `animation-delay:${f(-m * 0.13)}s` }), down = creatureUse('gull', '#f4f5f8', 'down', 'ne', { class: 'wing2', style: `animation-delay:${f(-m * 0.13 - 0.21)}s` })
+      if (!up || !down) return null
+      const b = new N('g', { transform: `translate(${dx} ${dy})` }); b.add(up); b.add(down); return b
+    })
+    if (three.every(Boolean)) three.forEach((b) => g.add(b!))
+    else g.add(birds())
   }
 
+  // What the page draws on its canvas, as Unity's pictures (the parade's marchers and dog, the pigeons): their names, for the bake's sheet of them.
+  const parade: Who[] = ['#2c355e', '#3f4a6b', '#ffffff', '#4fe3c1', '#5b82ff', '#b8a1ff'].map((sh, k) => who(sh, 91 + k * 17, { hat: k === 0 ? '#5b82ff' : null }))
+  const names = spriteNames(parade)
+  const sprites: (Sprites & { id: string }) | null = opts.figures ? { ...names, id: opts.figures.id } : null
   // The figures' pictures, once each, for every <use> of them.
   const figDefs = figureDefs()
   if (figDefs) first.add(figDefs)
+  // On the realistic island, whatever is still drawn loses the drawing's ink: an outline becomes the edge its own
+  // colour makes in the light (darker, finer), as paint on a board or cloth has. Words, bubbles and banners keep theirs.
+  if (opts.plate) {
+    const KEEP = new Set(['banners', 'night', 'beam'])
+    const deInk = (n: N | string) => {
+      if (typeof n === 'string') return
+      const a = n.attrs
+      if (typeof a.class === 'string' && /\b(pk-say|say|sign-words|lm-ring)\b/.test(a.class)) return
+      if (a.stroke === INK && n.tag !== 'text') {
+        const fill = typeof a.fill === 'string' && /^#[0-9a-f]{6}$/i.test(a.fill) ? a.fill : null
+        const w = Number(a['stroke-width'] ?? OUT)
+        if (fill) { a.stroke = shade(fill, 0.66); a['stroke-width'] = Math.max(0.35, Math.round(w * 0.5 * 100) / 100) }
+        else { a.stroke = '#3a3f4c'; a['stroke-width'] = Math.max(0.4, Math.round(w * 0.6 * 100) / 100); if (a.opacity === undefined) a.opacity = 0.85 }
+      }
+      for (const k of n.kids) deInk(k)
+    }
+    for (const m of made) if (!KEEP.has(m.kind)) deInk(m.node)
+  }
   const layers: Layer[] = made.map((m) => ({ kind: m.kind, slug: m.slug, body: render(m.node) }))
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
     grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
     ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
     height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),
@@ -1582,6 +1645,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     wash, fields: fields.map((f) => [...f]), mill, bales, arch: archAt, buttes, hoodoos, boulders: boulderAt, piers: PIERS,
     buildings: placed.map((b) => ({ slug: b.slug, district: b.district, i: b.i, j: b.j, w: b.w, d: b.d, z: b.z, water: !!b.lm.water })),
     plants: planted.map((q) => ({ ...q })),
+    actors: [...actorsWanted.values()].sort((a, b) => a.name.localeCompare(b.name)),
     seaRocks, shoreRocks, solids,
     viewBox,
   } }

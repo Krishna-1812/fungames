@@ -4,6 +4,7 @@
  * own group and moved by a CSS keyframe path (motionPath in kit.ts).
  */
 import { C, INK, OUT, N, shade, motionPath } from './kit'
+import { creatureUse } from './actors'
 
 const f = (v: number) => Math.round(v * 10) / 10
 
@@ -25,6 +26,9 @@ export function hotAirBalloon(x: number, y: number, a: string, b: string, name: 
   const bob = g.add(new N('g', { class: 'bob' }))
   // Its shadow is far below on the sea or the land; a soft one just under it reads better.
   const env = 'M-30 -56a30 32 0 1 1 60 0c0 17-12 26-19 33h-22c-7-7-19-16-19-33z'
+  // Unity's (Creatures.cs), dimmed at night by the same veil.
+  const real = creatureUse('balloon', a, 'stand', 'se', {}, b)
+  if (real) { bob.add(real); bob.add(nightDim(`${env}M-13 -23h26v25h-26z`)); return g }
   bob.add(new N('path', { d: env, fill: a, stroke: INK, 'stroke-width': 2.2, 'stroke-linejoin': 'round' }))
   // Gores: stripes down the envelope in the second colour.
   bob.add(new N('path', { d: 'M-10 -86q-12 30 -1 63h8q-8 -33 3 -63zM10 -86q12 30 1 63h-8q8 -33 -3 -63z', fill: b, opacity: 0.95 }))
@@ -52,7 +56,13 @@ export function plane(name: string): N {
   flag.add(new N('path', { d: 'M-62 -10h-86q6 8 0 16h86z', fill: '#ffffff', stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }))
   for (const [x0, c] of [[-80, C.rasp], [-104, C.mint], [-128, C.cobalt]] as [number, string][]) flag.add(new N('path', { d: `M${x0} -10h-10v16h10z`, fill: c }))
   flag.add(new N('path', { d: 'M-62 -10h-86q6 8 0 16h86z', fill: 'none', stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }))
-  // The plane.
+  // The plane: Unity's, nose to the right.
+  const real = creatureUse('plane', C.rasp, 'stand', 'e')
+  if (real) {
+    body.add(new N('g', { transform: 'translate(-4 -2)' })).add(real)
+    body.add(nightDim('M-62 -11h-87q6 9 0 18h87zM-36 -12h64v22h-64z'))
+    return g
+  }
   body.add(new N('path', { d: 'M-34 -4q0 -6 10 -6h32q10 0 14 6q-4 6 -14 6h-32q-10 0 -10 -6z', fill: '#ffffff', stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
   body.add(new N('path', { d: 'M-30 -9l-6 -10h6l8 9z', fill: C.rasp, stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
   body.add(new N('path', { d: 'M-8 -2l-10 14h7l13 -14z', fill: C.rasp, stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))

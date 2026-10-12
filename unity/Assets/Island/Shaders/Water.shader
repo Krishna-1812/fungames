@@ -91,6 +91,11 @@ Shader "Island/Water"
                 }
                 lit = lerp(lit, float3(0.95, 0.97, 1.0), foam);
                 alpha = max(alpha, foam * 0.95);
+                // The water is its own light (the sky in it): in the lit passes it is added once, with the sun,
+                // and put through the tone curve's inverse so that it comes out as the site's own sea. Over
+                // what lies under it, every pass covers the same share.
+                if (islandSkyPass()) return half4(0, 0, 0, alpha);
+                if (islandSunPass()) lit = islandUnknee(lit) * _IslandSelf;
                 return half4(lit, alpha);
             }
             ENDHLSL

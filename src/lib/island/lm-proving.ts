@@ -1,6 +1,7 @@
 /** The Proving Grounds: tests of the actual you. */
 import { C, INK, N, OUT, shade, r1 as f, motionPath, letter, type Landmark } from './kit'
 import { person, tree, lamp, fence, flag } from './props'
+import { actorUse, creatureUse, who } from './actors'
 
 
 export const proving: Record<string, Landmark> = {
@@ -69,6 +70,9 @@ export const proving: Record<string, Landmark> = {
     // The queue: a robot doing its best impression of a person, and a person.
     const [rx, ry] = p.at(1.4, 1.04)
     const r = p.group('robot')
+    const bot = creatureUse('robot', '#8ccbff', 'stand', 'se', { transform: `translate(${f(rx)} ${f(ry)})` })
+    if (bot) r.g.add(bot)
+    else {
     r.el('ellipse', { cx: rx, cy: ry + 0.5, rx: 6, ry: 2.2, fill: INK, opacity: 0.15 })
     r.path(`M${f(rx - 2.5)} ${f(ry)}v-5M${f(rx + 2.5)} ${f(ry)}v-5`, 'none', { sw: 2 })
     r.path(`M${f(rx - 6)} ${f(ry - 15)}h12v10h-12z`, C.sky, { sw: 1.3 })
@@ -79,6 +83,7 @@ export const proving: Record<string, Landmark> = {
     r.path(`M${f(rx - 5.6)} ${f(ry - 24.5)}a5.6 4 0 0 1 11.2 0z`, C.slate, { sw: 1 })
     r.path(`M${f(rx - 7.5)} ${f(ry - 24.5)}h15`, 'none', { sw: 1.4 })
     r.path(`M${f(rx + 6)} ${f(ry - 13)}l4 -4`, 'none', { sw: 1.6, cls: 'wave-arm' })
+    }
     p.grow(rx - 9, ry - 30, rx + 11, ry + 2)
     person(p, 1.8, 0.98, C.mint)
     // The front posts, then the canopy, its name painted round the fascia.
@@ -122,6 +127,13 @@ export const proving: Record<string, Landmark> = {
     // The walker, the same size as everyone watching, with a long pole.
     const [wx, wy] = p.at(1.5, 0.5, 78)
     const walker = p.group('sh-walk', { style: `transform-origin:${f(wx)}px ${f(wy)}px` })
+    const funambulist = actorUse(who(C.mint, 4.21, { hat: C.rasp }), 'balance', 'se', 0, { transform: `translate(${f(wx)} ${f(wy)})` })
+    if (funambulist) {
+      // Unity's walker, arms out, and the long pole across them, its weighted ends.
+      walker.el('path', { d: `M${f(wx - 26)} ${f(wy - 9)}q26 -5 52 0`, fill: 'none', stroke: '#5b5157', 'stroke-width': 0.8, 'stroke-linecap': 'round' })
+      walker.el('circle', { cx: wx - 26, cy: wy - 9, r: 1.4, fill: '#c64c66' }); walker.el('circle', { cx: wx + 26, cy: wy - 9, r: 1.4, fill: '#c64c66' })
+      walker.g.add(funambulist)
+    } else {
     walker.path(`M${f(wx - 26)} ${f(wy - 9)}q26 -5 52 0`, 'none', { sw: 1.6 })
     walker.el('circle', { cx: wx - 26, cy: wy - 9, r: 1.6, fill: C.rasp }); walker.el('circle', { cx: wx + 26, cy: wy - 9, r: 1.6, fill: C.rasp })
     walker.path(`M${f(wx - 1.8)} ${f(wy)}l0.6 -6M${f(wx + 1.8)} ${f(wy)}l-0.6 -6`, 'none', { sw: 2 })
@@ -129,6 +141,7 @@ export const proving: Record<string, Landmark> = {
     walker.path(`M${f(wx - 3)} ${f(wy - 12)}l-6 2.5M${f(wx + 3)} ${f(wy - 12)}l6 2.5`, 'none', { sw: 1.5 })
     walker.el('circle', { cx: wx, cy: wy - 17.5, r: 3.4, fill: '#f1d9c6', stroke: INK, 'stroke-width': 1.2 })
     walker.path(`M${f(wx - 3.6)} ${f(wy - 18.5)}a3.6 3.2 0 0 1 7.2 0z`, C.rasp, { sw: 1 })
+    }
     p.grow(wx - 50, wy - 30, wx + 50, wy)
     // A crowd holding its breath.
     for (let k = 0; k < 4; k++) person(p, 0.9 + k * 0.35, 0.98, [C.sky, C.lilac, C.rasp, C.cobalt][k], { pose: k === 1 ? 'wave' : 'look' })

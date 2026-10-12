@@ -53,6 +53,35 @@ fs.writeFileSync(path.join(out, 'scene.json'), sceneJson(p.scene)); files.push('
   const buf = await sharp(Buffer.from(img.pixels), { raw: { width: img.width, height: img.height, channels: 4, premultiplied: true } }).flatten({ background: '#8ccbff' }).webp({ quality: 80, effort: 5 }).toBuffer()
   fs.writeFileSync(path.join(out, 'still.webp'), buf); files.push('still.webp')
 }
+// The page's own canvas pictures (lib/island/play.ts: the pigeons, the parade), Unity's, on one sheet:
+// sprites.webp, and sprites.json for where each is and where its foot is in it.
+if (island.sprites) {
+  const sp = island.sprites
+  const names = [...new Set([...Object.values(sp.pigeon).flat(), ...sp.marchers.flat(2), ...sp.dog.flat()])]
+  const dir = path.join(process.cwd(), 'src/lib/island/actors')
+  const meta = JSON.parse(fs.readFileSync(path.join(dir, 'actors.json'), 'utf8'))
+  const kindOf = (n) => (n.startsWith('v-') || n.startsWith('a-') ? n.split('-')[1] : 'person')
+  const imgs = []
+  for (const n of names) { const fp = path.join(dir, n + '.png'); if (fs.existsSync(fp)) imgs.push({ n, ...(await sharp(fp).metadata()), fp }) }
+  // Shelf-packed, tallest first, two pixels apart.
+  imgs.sort((a, b) => b.height - a.height)
+  const W = 2048
+  let x = 0, y = 0, shelf = 0
+  const rects = {}
+  for (const im of imgs) {
+    if (x + im.width > W) { x = 0; y += shelf + 2; shelf = 0 }
+    rects[im.n] = [x, y, im.width, im.height]
+    x += im.width + 2; shelf = Math.max(shelf, im.height)
+  }
+  const H = y + shelf
+  if (imgs.length) {
+    const sheet = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(imgs.map((im) => ({ input: im.fp, left: rects[im.n][0], top: rects[im.n][1] }))).webp({ quality: 88, alphaQuality: 95, effort: 5 }).toBuffer()
+    fs.writeFileSync(path.join(out, 'sprites.webp'), sheet); files.push('sprites.webp')
+    const sizes = Object.fromEntries(names.filter((n) => rects[n]).map((n) => [n, meta.sizes[kindOf(n)]]))
+    fs.writeFileSync(path.join(out, 'sprites.json'), JSON.stringify({ rects, sizes, scale: 5 })); files.push('sprites.json')
+    console.log(`  [island] canvas sprites: ${imgs.length} on a ${W}x${H} sheet (${(sheet.length / 1e3).toFixed(0)} KB)`)
+  }
+}
 fs.writeFileSync(path.join(out, 'cards.json'), JSON.stringify(b.cards))
 let bytes = 0
 for (const f of files) bytes += fs.statSync(path.join(out, f)).size

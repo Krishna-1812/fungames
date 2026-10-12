@@ -9,6 +9,7 @@
  */
 import { C, INK, OUT, N, Pen, shade, S, motionCss, r1 } from './kit'
 import { person, tree } from './props'
+import { vehicleUse, boatUse, actorUse, who, type Facing } from './actors'
 
 const f = (v: number) => Math.round(v * 10) / 10
 const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0)} ${f(x1)} ${f(y1)}`
@@ -227,6 +228,10 @@ export function fountain(p: Pen, x: number, y: number) {
 /** Someone sitting on the ground: legs out, a hand back. */
 export function sitter(p: Pen, x: number, y: number, shirt: string, skin = SKIN[0], flip = false) {
   const [bx, by] = p.at(x, y)
+  {
+    const u = actorUse(who(shirt, (x + p.ox) * 3.1 + (y + p.oy) * 7.7, { skin }), 'ground', flip ? 'sw' : 'se', 0, { transform: `translate(${f(bx)} ${f(by)})` })
+    if (u) { p.el('g').add(u); p.grow(bx - 30, by - 20, bx + 12, by + 8); return }
+  }
   const s = flip ? -1 : 1
   p.el('path', { d: `M${f(bx)} ${f(by - 1)}h${f(s * 8)}`, stroke: INK, 'stroke-width': 2.2, 'stroke-linecap': 'round' })
   p.el('rect', { x: bx - 3.2, y: by - 10, width: 6.4, height: 9, rx: 2.6, fill: shirt, stroke: INK, 'stroke-width': 1.1 })
@@ -237,7 +242,7 @@ export function sitter(p: Pen, x: number, y: number, shirt: string, skin = SKIN[
 /** A picnic: a blanket laid flat, a basket, and two people on it. */
 export function picnic(p: Pen, x: number, y: number, shirts: [string, string], cloth = C.rasp) {
   const g = p.plane(x - 0.28, y - 0.22)
-  g.add(new N('rect', { x: 0, y: 0, width: 0.56, height: 0.44, fill: '#ffffff', stroke: INK, 'stroke-width': 0.03 }))
+  g.add(new N('rect', { x: 0, y: 0, width: 0.56, height: 0.44, fill: '#ffffff', stroke: p.real ? 'none' : INK, 'stroke-width': 0.03 }))
   let d = ''
   for (let k = 0; k < 4; k++) d += `M${f(k * 0.14)} 0h0.07v0.44h-0.07z`
   for (let k = 0; k < 3; k++) d += `M0 ${f(k * 0.15)}h0.56v0.075h-0.56z`
@@ -250,6 +255,28 @@ export function picnic(p: Pen, x: number, y: number, shirts: [string, string], c
 /** Someone flying a kite: the line runs up to a kite that sways in the wind. */
 export function kiteFlyer(p: Pen, x: number, y: number, shirt: string, kite: string, delay = 0) {
   const [bx, by] = p.at(x, y)
+  {
+    const u = actorUse(who(shirt, (x + p.ox) * 5.3 + (y + p.oy) * 2.9), 'kite', 'sw', 0, { transform: `translate(${f(bx)} ${f(by)})` })
+    // The kite is modelled whether or not it is drawn yet: the export lists it for Unity.
+    if (!u && p.sink) {
+      const kx = bx + 46, ky = by - 92, raise = 120, gi = (kx / 32 + (ky + raise + p.oz) / 16) / 2 - p.ox, gj = ((ky + raise + p.oz) / 16 - kx / 32) / 2 - p.oy
+      const kp = new Pen(new N('g'), p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
+      kp.model('kite', [gi, gj, raise], { fill: kite }, () => null)
+    }
+    if (u) {
+      p.el('g').add(u)
+      // The line, fine and pale against the sky, up to the kite, which sways.
+      const hx = bx - 5, hy = by - 19, kx = bx + 46, ky = by - 92
+      const g = p.el('g', { class: 'kite amb', 'data-b': box(hx, ky - 30, kx + 30, hy), style: `animation-delay:${f(-delay)}s` })
+      g.add(new N('path', { d: `M${f(hx)} ${f(hy)}Q${f(hx + 30)} ${f(hy - 34)} ${f(kx)} ${f(ky + 12)}`, fill: 'none', stroke: '#eef0f7', 'stroke-width': 0.6, opacity: 0.85 }))
+      const kp = new Pen(g, p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
+      // The kite itself is modelled where it flies: at the screen point (kx, ky), so a model at the ground point under it, raised.
+      const raise = 120, gi = (kx / 32 + (ky + raise + p.oz) / 16) / 2 - p.ox, gj = ((ky + raise + p.oz) / 16 - kx / 32) / 2 - p.oy
+      kp.model('kite', [gi, gj, raise], { fill: kite }, () => null)
+      p.grow(bx - 30, ky - 30, kx + 30, by + 8)
+      return
+    }
+  }
   p.el('ellipse', { cx: bx, cy: by + 0.5, rx: 4.5, ry: 1.8, fill: INK, opacity: 0.15 })
   p.el('path', { d: `M${f(bx - 1.8)} ${f(by)}v-6M${f(bx + 1.8)} ${f(by)}v-6`, stroke: INK, 'stroke-width': 2, 'stroke-linecap': 'round' })
   p.el('rect', { x: bx - 3.4, y: by - 14, width: 6.8, height: 9, rx: 2.6, fill: shirt, stroke: INK, 'stroke-width': 1.2 })
@@ -268,7 +295,7 @@ export function kiteFlyer(p: Pen, x: number, y: number, shirt: string, kite: str
 /** A swing set with one swing going, and a slide. */
 export function playground(p: Pen, x: number, y: number) {
   const g = p.plane(x - 0.42, y - 0.42)
-  g.add(new N('rect', { x: 0, y: 0, width: 0.84, height: 0.84, rx: 0.12, fill: '#ffd9c2', stroke: INK, 'stroke-width': 0.03, opacity: 0.85 }))
+  g.add(new N('rect', { x: 0, y: 0, width: 0.84, height: 0.84, rx: 0.12, fill: p.real ? '#c9bfd6' : '#ffd9c2', stroke: p.real ? 'none' : INK, 'stroke-width': 0.03, opacity: 0.85 }))
   // Swing frame: an A at each end and a bar across.
   const a0: [number, number] = [x - 0.25, y - 0.2], a1: [number, number] = [x + 0.25, y - 0.2]
   for (const [ax, ay] of [a0, a1]) {
@@ -276,11 +303,19 @@ export function playground(p: Pen, x: number, y: number) {
   }
   p.line([a0[0], a0[1], 26], [a1[0], a1[1], 26], { sw: 2.4, stroke: C.cobalt })
   const [hx, hy] = p.at(x, y - 0.2, 26)
-  const sw = p.el('g', { class: 'swing amb', 'data-b': box(hx - 20, hy - 4, hx + 20, hy + 26) })
+  const sw = p.el('g', { class: 'swing amb', 'data-b': box(hx - 30, hy - 4, hx + 20, hy + 30) })
+  const child = actorUse(who(C.mint, (x + p.ox) * 4.4 + (y + p.oy) * 1.3), 'sit', 'se', 0, { transform: `translate(${f(hx)} ${f(hy + 21)}) scale(0.72)` })
+  if (child) {
+    // Chains, a seat, and a child on it, swinging.
+    sw.add(new N('path', { d: `M${f(hx - 4)} ${f(hy)}v18M${f(hx + 4)} ${f(hy)}v18`, stroke: '#9aa3b8', 'stroke-width': 0.6 }))
+    sw.add(new N('rect', { x: f(hx - 5.5), y: f(hy + 17), width: 11, height: 1.8, rx: 0.6, fill: '#c64c66' }))
+    sw.add(child)
+  } else {
   sw.add(new N('path', { d: `M${f(hx - 4)} ${f(hy)}v18M${f(hx + 4)} ${f(hy)}v18`, stroke: INK, 'stroke-width': 0.9 }))
   sw.add(new N('rect', { x: f(hx - 5.5), y: f(hy + 17), width: 11, height: 2.4, rx: 1, fill: C.rasp, stroke: INK, 'stroke-width': 0.9 }))
   sw.add(new N('rect', { x: f(hx - 2.8), y: f(hy + 7.5), width: 5.6, height: 8, rx: 2.2, fill: C.mint, stroke: INK, 'stroke-width': 1 }))
   sw.add(new N('circle', { cx: f(hx), cy: f(hy + 4.6), r: 2.8, fill: SKIN[0], stroke: INK, 'stroke-width': 1 }))
+  }
   // The slide.
   p.box(x + 0.12, y + 0.08, 0.12, 0.12, 18, { fill: C.lilac, sw: 1.1 })
   p.poly([[x + 0.12, y + 0.2, 18], [x + 0.24, y + 0.2, 18], [x + 0.24, y + 0.5, 1], [x + 0.12, y + 0.5, 1]], C.sky, { sw: 1.1 })
@@ -291,6 +326,10 @@ export function playground(p: Pen, x: number, y: number) {
 
 export function umbrella(p: Pen, x: number, y: number, c: string) {
   const [bx, by] = p.at(x, y)
+  if (p.sink) { p.model('umbrella', [x, y, 0], { fill: c }, () => umbrellaDrawn(p, bx, by, c)); p.grow(bx - 20, by - 36, bx + 22, by + 4); return }
+  umbrellaDrawn(p, bx, by, c)
+}
+function umbrellaDrawn(p: Pen, bx: number, by: number, c: string) {
   p.el('ellipse', { cx: bx + 3, cy: by + 1, rx: 16, ry: 6, fill: INK, opacity: 0.12 })
   p.path(`M${f(bx)} ${f(by)}L${f(bx + 2)} ${f(by - 26)}`, 'none', { sw: 1.6 })
   const tx = bx + 2, ty = by - 30
@@ -310,7 +349,7 @@ export function umbrella(p: Pen, x: number, y: number, c: string) {
 export function towel(p: Pen, x: number, y: number, c: string, axis: 'x' | 'y' = 'x') {
   const w = axis === 'x' ? 0.34 : 0.16, d = axis === 'x' ? 0.16 : 0.34
   const g = p.plane(x - w / 2, y - d / 2)
-  g.add(new N('rect', { x: 0, y: 0, width: w, height: d, rx: 0.02, fill: '#ffffff', stroke: INK, 'stroke-width': 0.025 }))
+  g.add(new N('rect', { x: 0, y: 0, width: w, height: d, rx: 0.02, fill: '#ffffff', stroke: p.real ? 'none' : INK, 'stroke-width': 0.025 }))
   let s = ''
   for (let k = 0; k < 3; k++) s += axis === 'x' ? `M${f(0.04 + k * 0.11)} 0h0.05v${d}h-0.05z` : `M0 ${f(0.04 + k * 0.11)}h${w}v0.05h-${w}z`
   g.add(new N('path', { d: s, fill: c }))
@@ -340,6 +379,10 @@ export function lifeguard(p: Pen, x: number, y: number) {
 
 export function surfboard(p: Pen, x: number, y: number, c: string) {
   const [bx, by] = p.at(x, y)
+  if (p.sink) { p.model('surfboard', [x, y, 0], { fill: c }, () => surfDrawn(p, bx, by, c)); p.grow(bx - 6, by - 28, bx + 6, by + 2); return }
+  surfDrawn(p, bx, by, c)
+}
+function surfDrawn(p: Pen, bx: number, by: number, c: string) {
   p.path(`M${f(bx - 3)} ${f(by)}Q${f(bx - 5)} ${f(by - 14)} ${f(bx)} ${f(by - 26)}Q${f(bx + 5)} ${f(by - 14)} ${f(bx + 3)} ${f(by)}Z`, c, { sw: 1.2 })
   p.path(`M${f(bx)} ${f(by - 2)}V${f(by - 23)}`, 'none', { stroke: '#ffffff', sw: 1 })
 }
@@ -387,6 +430,9 @@ export function pier(p: Pen, pts: [number, number][], z: number, fisher: string 
 
 /** A rowing boat moored at a point on the water, bobbing on its rope. */
 export function rowboat(x: number, y: number, c: string): N {
+  // Unity's, bobbing at its painter (lib/island/actors.ts).
+  const real = boatUse('row', c, 'sw', { transform: `translate(${f(x)} ${f(y)})` })
+  if (real) { const g = new N('g', { class: 'moored amb', 'data-b': box(x - 40, y - 30, x + 20, y + 20) }); g.add(real); return g }
   const g = new N('g', { class: 'moored amb', 'data-b': box(x - 20, y - 12, x + 20, y + 8) })
   g.add(new N('path', { d: `M${f(x - 11)} ${f(y + 3)}Q${f(x)} ${f(y + 6)} ${f(x + 10)} ${f(y + 3)}L${f(x + 13)} ${f(y + 9)}Q${f(x)} ${f(y + 11)} ${f(x - 13)} ${f(y + 7)}Z`, fill: c, opacity: 0.18 }))
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 18, ry: 4.5, fill: '#ffffff', opacity: 0.5 }))
@@ -448,7 +494,12 @@ export function shuttle(kind: 'car' | 'bus' | 'bike', body: string, a: [number, 
   // Along x the road climbs to the right on screen; along y it climbs to the left.
   const skew = axis === 'x' ? 26.57 : -26.57
   const fwd = Math.sign(b[0] - a[0]) || 1
-  const pose = (x: number, y: number, dir: number) => `transform:translate(${r1(x)}px,${r1(y)}px) skewY(${skew}deg) scaleX(${dir * fwd})`
+  // Unity's (lib/island/actors.ts): the way it faces going out, and coming back.
+  const out: Facing = axis === 'x' ? (fwd > 0 ? 'se' : 'nw') : fwd > 0 ? 'ne' : 'sw'
+  const home: Facing = ({ se: 'nw', nw: 'se', ne: 'sw', sw: 'ne' } as const)[out]
+  const goOut = vehicleUse(kind, body, out), goHome = vehicleUse(kind, body, home)
+  const real = !!(goOut && goHome)
+  const pose = (x: number, y: number, dir: number) => real ? `transform:translate(${r1(x)}px,${r1(y)}px)` : `transform:translate(${r1(x)}px,${r1(y)}px) skewY(${skew}deg) scaleX(${dir * fwd})`
   let holds: [number, number][] | undefined
   if (!stops) motionCss.push(`@keyframes ${name}{0%{${pose(a[0], a[1], 1)}}46%{${pose(b[0], b[1], 1)}}50%{${pose(b[0], b[1], -1)}}96%{${pose(a[0], a[1], -1)}}100%{${pose(a[0], a[1], 1)}}}`)
   else {
@@ -458,7 +509,17 @@ export function shuttle(kind: 'car' | 'bus' | 'bike', body: string, a: [number, 
     holds = [[p2(t1), p2(t1 + 8)], [p2(t2), p2(t2 + 8)]]
     motionCss.push(`@keyframes ${name}{0%{${pose(a[0], a[1], 1)}}${p2(t1)}%,${p2(t1 + 8)}%{${pose(s1[0], s1[1], 1)}}50%{${pose(b[0], b[1], 1)}}50.2%{${pose(b[0], b[1], -1)}}${p2(t2)}%,${p2(t2 + 8)}%{${pose(s2[0], s2[1], -1)}}99.8%{${pose(a[0], a[1], -1)}}100%{${pose(a[0], a[1], 1)}}}`)
   }
-  const g = new N('g', { class: 'mover amb', 'data-b': box(Math.min(a[0], b[0]) - 26, Math.min(a[1], b[1]) - 24, Math.max(a[0], b[0]) + 26, Math.max(a[1], b[1]) + 8), style: `animation:${name} ${dur}s linear infinite ${f(-delay)}s` })
+  const reach = kind === 'bus' ? 84 : 40
+  const g = new N('g', { class: 'mover amb', 'data-b': box(Math.min(a[0], b[0]) - reach, Math.min(a[1], b[1]) - reach * 0.66, Math.max(a[0], b[0]) + reach * 0.62, Math.max(a[1], b[1]) + reach * 0.45), style: `animation:${name} ${dur}s linear infinite ${f(-delay)}s` })
+  if (real) {
+    // Out for the first half of the loop, back for the second: each facing shown for its half.
+    const turn = stops ? 50.1 : 48
+    motionCss.push(`@keyframes ${name}-o{0%,${turn - 0.1}%{opacity:1}${turn}%,99.9%{opacity:0}100%{opacity:1}}`)
+    motionCss.push(`@keyframes ${name}-h{0%,${turn - 0.1}%{opacity:0}${turn}%,99.9%{opacity:1}100%{opacity:0}}`)
+    g.add(new N('g', { style: `animation:${name}-o ${dur}s linear infinite ${f(-delay)}s` })).add(goOut!)
+    g.add(new N('g', { style: `animation:${name}-h ${dur}s linear infinite ${f(-delay)}s` })).add(goHome!)
+    return Object.assign(g, { holds })
+  }
   g.add(new N('ellipse', { cx: 0, cy: 1, rx: kind === 'bus' ? 20 : kind === 'bike' ? 7 : 13, ry: 3.5, fill: INK, opacity: 0.15 }))
   if (kind === 'car') {
     g.add(new N('path', { d: 'M-12 -2L-9 -8Q-7 -10 -4 -10H5Q8 -10 9 -8L12 -2V2H-12Z', fill: body, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
@@ -544,6 +605,9 @@ export function ferry(): string {
 
 /** A fishing boat at anchor: a wheelhouse, a mast with nets, gulls hoping. */
 export function fishingBoat(x: number, y: number, hull: string, delay: number): N {
+  // Unity's, riding at anchor.
+  const real = boatUse('fishing', hull, delay > 1 ? 'e' : 'w', { transform: `translate(${f(x)} ${f(y)})` })
+  if (real) { const g = new N('g', { class: 'moored amb', 'data-b': box(x - 90, y - 90, x + 70, y + 40), style: `animation-delay:${f(-delay)}s` }); g.add(real); return g }
   const g = new N('g', { class: 'moored amb', 'data-b': box(x - 30, y - 40, x + 30, y + 14), style: `animation-delay:${f(-delay)}s` })
   g.add(new N('path', { d: `M${f(x - 18)} ${f(y + 4)}L${f(x + 18)} ${f(y + 4)}L${f(x + 14)} ${f(y + 12)}L${f(x - 14)} ${f(y + 12)}Z`, fill: hull, opacity: 0.18 }))
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 24, ry: 4.5, fill: '#ffffff', opacity: 0.5 }))

@@ -39,6 +39,8 @@ namespace Island
             EditorSettings.asyncShaderCompilation = false;
             ShaderUtil.allowAsyncCompilation = false;
             if (PlayerSettings.colorSpace != ColorSpace.Linear) PlayerSettings.colorSpace = ColorSpace.Linear;
+            // A light's intensity in linear terms: the sky's many faint passes (Dome) must add up as light does, not be squared away.
+            GraphicsSettings.lightsUseLinearIntensity = true;
             var path = Settings + "/IslandURP.asset";
             var urp = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(path);
             if (urp == null)
@@ -52,7 +54,9 @@ namespace Island
             urp.shadowDistance = 120;
             urp.shadowCascadeCount = 1;
             urp.mainLightShadowmapResolution = 8192;
-            urp.supportsHDR = false;
+            // Floating point all the way: the lit passes (Dome) are small and many, and add up.
+            urp.supportsHDR = true;
+            urp.hdrColorBufferPrecision = HDRColorBufferPrecision._64Bits;
             urp.msaaSampleCount = 1;
             // Materials made in code share one constant buffer under the SRP Batcher in a one-shot render: every object took the last one's colour.
             urp.useSRPBatcher = false;
@@ -175,7 +179,7 @@ namespace Island
             go.transform.position = new Vector3(tj, 0, ti) - go.transform.forward * 70;
             cam.nearClipPlane = 20; cam.farClipPlane = 130;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.allowMSAA = false; cam.allowHDR = false;
+            cam.allowMSAA = false; cam.allowHDR = true;
             var extra = cam.GetUniversalAdditionalCameraData();
             extra.renderPostProcessing = false;
             extra.antialiasing = AntialiasingMode.None;
@@ -212,6 +216,15 @@ namespace Island
             File.WriteAllBytes(file, tex.EncodeToPNG());
             Object.DestroyImmediate(rt);
             Debug.Log($"[island] wrote {file} ({pw}×{ph})");
+        }
+
+        /** Lit by the sun and the whole sky (Dome), unless `-dome 0` asks for the quick look. */
+        static bool Lit => Arg("-dome", "1") != "0";
+        static void DomeArgs()
+        {
+            Dome.SkyN = int.Parse(Arg("-sky", "64"));
+            Dome.SunN = int.Parse(Arg("-sunn", "8"));
+            Dome.Only = Arg("-domeonly", "");
         }
 
         static string Arg(string name, string fallback)
@@ -293,6 +306,9 @@ namespace Island
             sun.transform.rotation = Quaternion.LookRotation(new Vector3(0.707f * Mathf.Cos(e), -Mathf.Sin(e), -0.707f * Mathf.Cos(e)));
             Shader.SetGlobalColor("_IslandSky", new Color(0.36f, 0.42f, 0.52f));
             Shader.SetGlobalColor("_IslandGround", new Color(0.22f, 0.24f, 0.26f));
+            Shader.SetGlobalFloat("_IslandPass", 0);
+            Dome.Use(sun);
+            DomeArgs();
         }
 
         /**
@@ -316,7 +332,9 @@ namespace Island
             Debug.Log($"[island] colour map {albedo.width}² in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
             if (Arg("-maps", "") == "1") File.WriteAllBytes("Renders/albedo.png", albedo.EncodeToPNG());
             t0 = System.DateTime.Now;
-            Place(ground.Mesh(), gm, "ground");
+            var groundGo = Place(ground.Mesh(), gm, "ground");
+            // For the buildings' own pictures: the ground there only to shut out the sky and the sun.
+            if (blocks == "occlude") groundGo.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
             Debug.Log($"[island] ground mesh in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
 
             Shader.SetGlobalFloat("_IslandSea", Y(d.sea));
@@ -327,6 +345,7 @@ namespace Island
             sea.transform.localScale = new Vector3(14, 1, 14);
             var sr = sea.GetComponent<MeshRenderer>();
             sr.sharedMaterial = wm; sr.shadowCastingMode = ShadowCastingMode.Off;
+            if (blocks == "occlude") sr.enabled = false;
 
             // The rocks standing in the sea: in the plate whole (nothing on the site stands in
             // front of them), their feet under the water, foam round each (Water.shader).
@@ -373,20 +392,24 @@ namespace Island
                     go.transform.localPosition = new Vector3(pl.y, Y(pl.z), pl.x);
                     go.transform.localScale = Vector3.one * pl.k;
                     foreach (var mr in go.GetComponentsInChildren<MeshRenderer>())
-                        mr.shadowCastingMode = blocks == "shadow" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+                        mr.shadowCastingMode = blocks == "shadow" || blocks == "occlude" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
                 }
             }
-            if (blocks != "none" && d.solids != null && d.solids.Length > 0)
+            if (blocks == "occlude") { }
+            else if (blocks != "none" && d.solids != null && d.solids.Length > 0)
             {
                 // The buildings themselves (Buildings.cs): in the plate, their shadows.
                 var holder = new GameObject("buildings");
                 foreach (var bs in d.solids)
+                {
+                    Buildings.Prepare(bs);
                     for (int r = 0; r < bs.runs.Length; r++)
                     {
                         var go = Buildings.Run(bs.runs[r], $"{bs.slug}/{r}");
                         go.transform.SetParent(holder.transform, false);
                         go.GetComponent<MeshRenderer>().shadowCastingMode = blocks == "shadow" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
                     }
+                }
             }
             else if (blocks != "none")
             {
@@ -415,11 +438,29 @@ namespace Island
             Scene(d, Arg("-blocks", "show"));
             float scale = float.Parse(Arg("-scale", "1"), System.Globalization.CultureInfo.InvariantCulture);
             int ss = int.Parse(Arg("-ss", "2"));
+            // Several boxes in one go ("-boxes x,y,w,h;x,y,w,h", written to -out with _0, _1...): the scene is built once.
+            var many = Arg("-boxes", "");
+            if (many != "")
+            {
+                var list = many.Split(';');
+                for (int k = 0; k < list.Length; k++)
+                {
+                    var bb = Floats(list[k]);
+                    var cm = Eye(bb[0], bb[1], bb[2], bb[3]);
+                    cm.backgroundColor = SiteSea;
+                    var o = Arg("-out", "Renders/realistic.png").Replace(".png", $"_{k}.png");
+                    if (Lit) Dome.Shoot(cm, Mathf.RoundToInt(bb[2] * scale), Mathf.RoundToInt(bb[3] * scale), o, ss, false);
+                    else Shoot(cm, Mathf.RoundToInt(bb[2] * scale), Mathf.RoundToInt(bb[3] * scale), o, false, ss);
+                    Object.DestroyImmediate(cm.gameObject);
+                }
+                return;
+            }
             var box = Arg("-box", "");
             var vb = box != "" ? Floats(box) : d.viewBox;
             var cam = Eye(vb[0], vb[1], vb[2], vb[3]);
             cam.backgroundColor = SiteSea;
-            Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/realistic.png"), false, ss);
+            if (Lit) Dome.Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/realistic.png"), ss, false);
+            else Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/realistic.png"), false, ss);
         }
 
         /**
@@ -451,7 +492,8 @@ namespace Island
                 if (go == null) continue;
                 var cam = Eye(bx, by, bw, bh);
                 cam.backgroundColor = new Color(0, 0, 0, 0);
-                ShootFigure(cam, Mathf.RoundToInt(bw * scale), Mathf.RoundToInt(bh * scale), $"Renders/figures/{name}.png", ss);
+                if (Lit) Dome.Shoot(cam, Mathf.RoundToInt(bw * scale), Mathf.RoundToInt(bh * scale), $"Renders/figures/{name}.png", ss, true);
+                else ShootFigure(cam, Mathf.RoundToInt(bw * scale), Mathf.RoundToInt(bh * scale), $"Renders/figures/{name}.png", ss);
                 Object.DestroyImmediate(cam.gameObject);
                 Object.DestroyImmediate(go);
                 made++;
@@ -471,7 +513,8 @@ namespace Island
         {
             Pipeline();
             var d = IslandData.Load(Data);
-            Light();
+            // What stands round each building (the ground, the cliffs, the trees) shuts out its sky and casts on it, unseen.
+            if (Lit && Arg("-occlude", "1") == "1") Scene(d, "occlude"); else Light();
             float scale = float.Parse(Arg("-scale", "4"), System.Globalization.CultureInfo.InvariantCulture);
             int ss = int.Parse(Arg("-ss", "3"));
             var only = Arg("-only", "");
@@ -484,6 +527,7 @@ namespace Island
             {
                 if (only != "" && bs.slug != only) continue;
                 var runs = new List<GameObject>();
+                Buildings.Prepare(bs);
                 for (int r = 0; r < bs.runs.Length; r++) runs.Add(Buildings.Run(bs.runs[r], $"{bs.slug}/{r}"));
                 for (int r = 0; r < runs.Count; r++)
                 {
@@ -498,7 +542,8 @@ namespace Island
                     int pw = centred ? Mathf.RoundToInt(box.width * scale) : Mathf.CeilToInt((box.xMax + 3 - x0) * scale), ph = centred ? Mathf.RoundToInt(box.height * scale) : Mathf.CeilToInt((box.yMax + 3 - y0) * scale);
                     var cam = Eye(x0, y0, pw / scale, ph / scale);
                     cam.backgroundColor = new Color(0, 0, 0, 0);
-                    ShootFigure(cam, pw, ph, $"Renders/buildings/{bs.slug}_{r}.png", ss);
+                    if (Lit) Dome.Shoot(cam, pw, ph, $"Renders/buildings/{bs.slug}_{r}.png", ss, true);
+                    else ShootFigure(cam, pw, ph, $"Renders/buildings/{bs.slug}_{r}.png", ss);
                     Object.DestroyImmediate(cam.gameObject);
                     if (made > 0) json.Append(',');
                     json.Append($"\"{bs.slug}/{r}\":[{x0.ToString(inv)},{y0.ToString(inv)},{(pw / scale).ToString(inv)},{(ph / scale).ToString(inv)}{(centred ? ",1" : "")}]");
@@ -509,6 +554,83 @@ namespace Island
             json.Append('}');
             File.WriteAllText(only == "" ? "Renders/buildings/buildings.json" : $"Renders/buildings/{only}.json", $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
             Debug.Log($"[island] buildings: {made} runs at {scale} px a unit");
+        }
+
+        /**
+         * Everyone the site draws (its actors: lib/island/actors.ts), each pose
+         * of each facing, alone, lit as the island is, over the same box round
+         * the foot: Renders/actors/NAME.png, and NAME.s.png, the shape of the
+         * shadow it casts on the ground (scripts/unity-actors.mjs lays one under
+         * the other). `-only prefix` for some.
+         */
+        public static void ActorShots()
+        {
+            Pipeline();
+            var d = IslandData.Load(Data);
+            Light();
+            float scale = float.Parse(Arg("-scale", "5"), System.Globalization.CultureInfo.InvariantCulture);
+            int ss = int.Parse(Arg("-ss", "3"));
+            var only = Arg("-only", "");
+            // Round the foot (P()'s units), for each kind: up for its height, out to the left for the shadow the sun casts.
+            var boxes = new Dictionary<string, float[]>
+            {
+                ["person"] = new float[] { -30, -24, 42, 32 },
+                ["car"] = new float[] { -40, -30, 64, 48 },
+                ["bus"] = new float[] { -84, -56, 136, 92 },
+                ["bike"] = new float[] { -34, -28, 48, 36 },
+                ["sail"] = new float[] { -84, -84, 168, 124 },
+                ["ferry"] = new float[] { -150, -80, 300, 160 },
+                ["fishing"] = new float[] { -80, -70, 160, 110 },
+                ["speed"] = new float[] { -90, -50, 180, 100 },
+                ["row"] = new float[] { -40, -28, 80, 52 },
+                ["sheep"] = new float[] { -30, -22, 44, 30 },
+                ["deer"] = new float[] { -36, -34, 52, 44 },
+                ["duck"] = new float[] { -16, -14, 28, 22 },
+                ["crab"] = new float[] { -14, -10, 24, 16 },
+                ["gull"] = new float[] { -22, -20, 40, 30 },
+                ["pigeon"] = new float[] { -14, -10, 22, 16 },
+                ["dolphin"] = new float[] { -34, -28, 64, 48 },
+                ["whale"] = new float[] { -130, -64, 260, 118 },
+                ["bfly"] = new float[] { -12, -12, 24, 24 },
+                ["cloud"] = new float[] { -96, -80, 192, 132 },
+                ["dog"] = new float[] { -24, -18, 34, 24 },
+                ["robot"] = new float[] { -30, -26, 42, 34 },
+                ["balloon"] = new float[] { -40, -100, 70, 112 },
+                ["plane"] = new float[] { -48, -30, 96, 54 },
+            };
+            Directory.CreateDirectory("Renders/actors");
+            if (only == "") foreach (var f in Directory.GetFiles("Renders/actors")) File.Delete(f);
+            var flat = new Material(Shader.Find("Island/VertexColorUnlit"));
+            int made = 0;
+            foreach (var a in d.actors ?? new ActorRec[0])
+            {
+                if (only != "" && !a.name.StartsWith(only)) continue;
+                var go = Buildings.Actor(a);
+                if (go == null) continue;
+                var bxy = boxes.TryGetValue(a.kind, out var q) ? q : boxes["person"];
+                float bx = bxy[0], by = bxy[1], bw = bxy[2], bh = bxy[3];
+                int pw = Mathf.RoundToInt(bw * scale), ph = Mathf.RoundToInt(bh * scale);
+                var cam = Eye(bx, by, bw, bh);
+                cam.backgroundColor = new Color(0, 0, 0, 0);
+                if (Lit) Dome.Shoot(cam, pw, ph, $"Renders/actors/{a.name}.png", ss, true);
+                else ShootFigure(cam, pw, ph, $"Renders/actors/{a.name}.png", ss);
+                Object.DestroyImmediate(go);
+                bool aloft = ((a.kind == "gull" || a.kind == "pigeon") && (a.pose == "up" || a.pose == "down")) || a.kind == "bfly" || a.kind == "cloud" || a.kind == "balloon" || a.kind == "plane";
+                if (!aloft)
+                {
+                    var sh = Buildings.ActorShadow(a, Dome.ToSun, flat);
+                    ShootFigure(cam, pw, ph, $"Renders/actors/{a.name}.s.png", ss);
+                    Object.DestroyImmediate(sh);
+                }
+                var wake = Buildings.ActorWake(a, flat);
+                if (wake != null) { ShootFigure(cam, pw, ph, $"Renders/actors/{a.name}.w.png", ss); Object.DestroyImmediate(wake); }
+                Object.DestroyImmediate(cam.gameObject);
+                made++;
+            }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var bj = string.Join(",", System.Linq.Enumerable.Select(boxes, kv => $"\"{kv.Key}\":[{string.Join(",", System.Linq.Enumerable.Select(kv.Value, x => x.ToString(inv)))}]"));
+            File.WriteAllText("Renders/actors/actors.json", $"{{\"scale\":{scale.ToString(inv)},\"boxes\":{{{bj}}}}}");
+            Debug.Log($"[island] actors: {made} at {scale} px a unit");
         }
 
         /** Render a figure on nothing: averaged down by its coverage, so its edges do not darken against the empty background. */
@@ -570,7 +692,8 @@ namespace Island
                 {
                     var cam = Eye(b[0] + c * step, b[1] + r * step, step, step);
                     cam.backgroundColor = SiteSea;
-                    Shoot(cam, tile, tile, $"Renders/plate/{r}_{c}.png", false, ss);
+                    if (Lit) Dome.Shoot(cam, tile, tile, $"Renders/plate/{r}_{c}.png", ss, false);
+                    else Shoot(cam, tile, tile, $"Renders/plate/{r}_{c}.png", false, ss);
                     Object.DestroyImmediate(cam.gameObject);
                 }
             var inv = System.Globalization.CultureInfo.InvariantCulture;

@@ -5,6 +5,7 @@
  */
 import { C, INK, OUT, N, Pen, shade, S } from './kit'
 import type { FigureSet } from './figures'
+import { who, actorUse, creatureUse } from './actors'
 
 const f = (v: number) => Math.round(v * 10) / 10
 
@@ -39,6 +40,8 @@ export function figure(p: Pen, x: number, y: number, name: string, k: number): b
   p.grow(bx - it.ax * k, by - it.ay * k, bx + (it.w - it.ax) * k, by + (it.h - it.ay) * k)
   return true
 }
+/** A figure's picture, if Unity has made it. */
+export function figureItem(name: string) { return figs?.items[name] }
 /** The definitions the figures drawn refer to: one picture each, however many times it is drawn. */
 export function figureDefs(): N | null {
   if (!figs || !figuresUsed.size) return null
@@ -132,6 +135,18 @@ export function tree(p: Pen, x: number, y: number, kind: TreeKind, c = C.leaf, k
 export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: string; hat?: string; pose?: 'stand' | 'wave' | 'look'; k?: number; cls?: string } = {}) {
   const [bx, by] = p.at(x, y)
   const k = o.k ?? 1, skin = o.skin ?? '#f1d9c6'
+  // Unity's, on the realistic island: turned towards us, one way or the other.
+  {
+    const seed = (x + p.ox) * 7.31 + (y + p.oy) * 3.17
+    const w = who(shirt, seed, { skin: o.skin, hat: o.hat ?? null })
+    const u = actorUse(w, o.pose ?? 'stand', pick(x + p.ox, y + p.oy, 5, 2) ? 'se' : 'sw', 0, { transform: `translate(${f(bx)} ${f(by)})${k !== 1 ? ` scale(${Math.round(k * 1000) / 1000})` : ''}` })
+    if (u) {
+      const g = p.group(o.cls)
+      g.g.add(u)
+      p.grow(bx - 30 * k, by - 24 * k, bx + 12 * k, by + 8 * k)
+      return g
+    }
+  }
   const g = p.group(o.cls)
   g.el('ellipse', { cx: bx - 2 * k, cy: by + 0.5, rx: 5 * k, ry: 1.8 * k, fill: INK, opacity: 0.15 })
   g.el('path', { d: `M${f(bx - 1.8 * k)} ${f(by)}v${f(-6 * k)}M${f(bx + 1.8 * k)} ${f(by)}v${f(-6 * k)}`, stroke: INK, 'stroke-width': 2 * k, 'stroke-linecap': 'round', fill: 'none' })
@@ -154,9 +169,13 @@ export function walkerFigure(shirt: string, k = 1): string {
 
 export function lamp(p: Pen, x: number, y: number, h = 26) {
   const [bx, by] = p.at(x, y)
-  p.path(`M${f(bx)} ${f(by)}L${f(bx)} ${f(by - h)}`, 'none', { sw: 2.2 })
-  p.path(`M${f(bx)} ${f(by - h)}q0 -4 5 -4`, 'none', { sw: 2 })
-  p.light([bx + 5.5, by - h - 2], p.el('circle', { cx: bx + 5.5, cy: by - h - 2, r: 3.2, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2, class: 'lamp-bulb' }), '#fff6dc')
+  // The post and its arm: Unity's on the realistic island (Models.cs, Lamp), else drawn.
+  p.model('lamp', [x, y, 0], { h }, () => {
+    p.path(`M${f(bx)} ${f(by)}L${f(bx)} ${f(by - h)}`, 'none', { sw: 2.2 })
+    p.path(`M${f(bx)} ${f(by - h)}q0 -4 5 -4`, 'none', { sw: 2 })
+  })
+  // The bulb, for the night's light to find: unseen by day on the realistic island (the lantern is the model's).
+  p.light([bx + 5.5, by - h - 2], p.el('circle', { cx: bx + 5.5, cy: by - h - 2, r: 3.2, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2, class: 'lamp-bulb', opacity: p.real ? 0 : undefined }), '#fff6dc')
   p.grow(bx - 3, by - h - 7, bx + 9, by)
 }
 
@@ -169,6 +188,10 @@ export function bench(p: Pen, x: number, y: number, axis: 'x' | 'y' = 'x') {
 
 export function flowers(p: Pen, x: number, y: number, cols: string[] = ['#ff9fb2', C.lilac, '#ffffff']) {
   const [bx, by] = p.at(x, y)
+  if (p.sink) { p.model('flowers', [x, y, 0], { fill: cols[0], top: cols[1] }, () => flowersDrawn(p, bx, by, cols)); p.grow(bx - 12, by - 8, bx + 12, by + 6); return }
+  flowersDrawn(p, bx, by, cols)
+}
+function flowersDrawn(p: Pen, bx: number, by: number, cols: string[]) {
   p.el('ellipse', { cx: bx, cy: by, rx: 11, ry: 5, fill: C.leaf, stroke: INK, 'stroke-width': 1.2 })
   ;[[-6, -1], [-1, -3], [4, -1], [7, 1], [0, 1.5], [-4, 2]].forEach(([dx, dy], i) => p.el('circle', { cx: bx + dx, cy: by + dy - 1, r: 1.8, fill: cols[i % cols.length], stroke: INK, 'stroke-width': 0.6 }))
   p.grow(bx - 11, by - 6, bx + 11, by + 5)
@@ -195,7 +218,16 @@ export function barrel(p: Pen, x: number, y: number, c = C.cobalt) {
 
 export function flag(p: Pen, x: number, y: number, z: number, c: string, h = 22, cls = 'flutter') {
   const [bx, by] = p.at(x, y, z)
-  p.path(`M${f(bx)} ${f(by)}L${f(bx)} ${f(by - h)}`, 'none', { sw: 1.8 })
+  // The pole: a line (a steel rod on the realistic island), the same either way, so its building's runs line up.
+  p.line([x, y, z], [x, y, z + h + 1], { sw: p.real ? 1.4 : 1.8, stroke: p.real ? '#c9cde0' : undefined })
+  if (p.real) {
+    // The cloth on it: lit on its near half, shadowed in the fold.
+    const fl = p.el('g', { class: cls })
+    fl.add(new N('path', { d: `M${f(bx)} ${f(by - h)}l14 4l-14 5z`, fill: c }))
+    fl.add(new N('path', { d: `M${f(bx)} ${f(by - h + 4.5)}l14 -0.5l-14 5z`, fill: shade(c, 0.78) }))
+    p.grow(bx - 2, by - h - 2, bx + 16, by)
+    return
+  }
   p.path(`M${f(bx)} ${f(by - h)}l14 4l-14 5z`, c, { sw: 1.2, cls })
   p.grow(bx - 2, by - h - 2, bx + 16, by)
 }
@@ -235,6 +267,11 @@ export function birds(): string {
  * outline, so it floats over the map rather than sitting on it. A shaded
  * base, then the lit puffs on top. Its shadow is drawn separately below it.
  */
+/** A cloud, Unity's (one of five cumulus), drawn at the origin; null if it has not been made. */
+export function cloudModel(n: number, k = 1): N | null {
+  return creatureUse('cloud', '#fbfcff', `c${n % 5}`, 'se', { transform: k !== 1 ? `scale(${Math.round(k * 100) / 100})` : undefined, opacity: 0.96 })
+}
+
 export function cloudShape(k = 1): string {
   const parts: [number, number, number][] = [[0, 0, 26], [30, 8, 20], [-28, 9, 18], [10, -16, 20], [-12, -12, 17]]
   return '<g class="cloud-body" opacity="0.9">' +

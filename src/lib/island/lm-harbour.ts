@@ -1,6 +1,6 @@
 /** The Harbour: the deep, the shore, the waves and the signals. */
 import { C, INK, N, OUT, shade, r1 as f, letter, type Landmark, type Pen } from './kit'
-import { person, crate, barrel, tree, flag, lamp } from './props'
+import { person, crate, barrel, tree, flag, lamp, cloudModel } from './props'
 
 const planks = (p: Pen, x: number, y: number, w: number, d: number, z: number, along: 'x' | 'y') => {
   const b = p.box(x, y, w, d, 4, { z0: z, fill: '#b3acd9', sw: 1.2 })
@@ -67,9 +67,16 @@ export const harbour: Record<string, Landmark> = {
     // Its own rain cloud.
     const [cx, cy] = p.at(1, 1, 130)
     const cloud = p.group('drift')
+    // Unity's cumulus, small and grey-bellied, its rain fine and pale.
+    const real = cloudModel(3, 0.42)
+    if (real) {
+      cloud.el('g', { transform: `translate(${f(cx)} ${f(cy + 14)})` }).add(real)
+      for (let k = 0; k < 14; k++) p.el('path', { d: `M${f(cx - 26 + k * 4)} ${f(cy + 18 + (k % 3) * 2)}l-2.4 9`, stroke: '#c9d6ee', 'stroke-width': 0.7, opacity: 0.8, 'stroke-linecap': 'round', class: 'rain', style: `animation-delay:${(k % 4) * 0.21}s` })
+    } else {
     for (const [dx, dy, r] of [[-16, 0, 14], [4, -7, 17], [22, 2, 12], [-2, 5, 12]]) cloud.el('circle', { cx: cx + dx, cy: cy + dy, r, fill: '#e3e8f5', stroke: INK, 'stroke-width': OUT })
     cloud.el('ellipse', { cx: cx + 2, cy: cy + 6, rx: 26, ry: 8, fill: '#e3e8f5' })
     for (let k = 0; k < 9; k++) p.el('path', { d: `M${f(cx - 24 + k * 6)} ${f(cy + 18)}l-3 8`, stroke: C.cobalt, 'stroke-width': 1.8, 'stroke-linecap': 'round', class: 'rain', style: `animation-delay:${(k % 3) * 0.27}s` })
+    }
     p.grow(cx - 34, cy - 26, cx + 36, cy + 30)
     // The beach: an umbrella, two deckchairs, a towel and a ball.
     p.line([1.8, 0.3, 0], [1.8, 0.3, 30], { sw: 2 })

@@ -324,10 +324,15 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   const spriteList: Sprite[] = []
   const spriteRun = new Map<number, number>()
   const spritePx: { level: number; w: number; h: number; px: Buffer; sprite: number }[] = []
+  // The same picture in its own units (every walker's frames, every gull's wings) is painted once and shared.
+  const seen = new Map<string, number>()
+  const shared = new Set<number>()
   for (const { run, scale } of b.sprites) {
     // Its pixels to its own unit, per level: the level's own, times how large its unit is.
     const u = Math.min(64, Math.max(1 / 64, scale))
     const body = runDoc(run)
+    const same = seen.get(body + '|' + u)
+    if (same !== undefined) { spriteRun.set(run.id, same); shared.add(same); continue }
     let gb: Box | null = null
     try { const r = resvg(body, 1); const bb = r.getBBox(); if (bb) gb = [bb.x, bb.y, bb.x + bb.width, bb.y + bb.height] } catch { /* empty */ }
     if (!gb) continue
@@ -353,10 +358,11 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     if (!out.length) continue
     const id = spriteList.length
     spriteRun.set(run.id, id)
+    seen.set(body + '|' + u, id)
     spriteList.push({ box, u, at: LEVELS.map(() => null) })
     for (const o of out) spritePx.push({ level: o.level, w: o.w, h: o.h, px: o.px, sprite: id })
   }
-  log(`sprites: ${spriteList.length} measured and painted (${Date.now() - t0}ms)`)
+  log(`sprites: ${spriteList.length} measured and painted, ${shared.size} of them shared (${Date.now() - t0}ms)`)
 
   /* ---- now every node's reach is known ---- */
   const spriteBoxOf = (runId: number) => { const s = spriteRun.get(runId); return s === undefined ? null : spriteList[s].box }
@@ -369,6 +375,8 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   const groupOf = new Map<number, number>()
   for (const { run, top } of b.sprites) {
     const s = spriteRun.get(run.id); if (s === undefined) continue
+    // A shared picture goes in the sheets every part of the island loads.
+    if (shared.has(s)) { groupOf.set(s, 0); continue }
     const bb = top.bb ?? extent
     const big = bb[2] - bb[0] > (extent[2] - extent[0]) * 0.4 || bb[3] - bb[1] > (extent[3] - extent[1]) * 0.4
     if (big) { groupOf.set(s, 0); continue }

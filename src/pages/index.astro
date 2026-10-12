@@ -552,7 +552,7 @@ const book = BOOK.map((key) => {
   let diveFrom = 'map'
   const carded = new Set<string>()
   const play = createPlay({
-    data: data.play, grid: data.grid, play: PLAY,
+    data: data.play, grid: data.grid, play: PLAY, base: data.base,
     daily: () => dailyFor(new Date()).slug,
     ink: () => data.inks[data.anchors[dailyFor(new Date()).slug]?.district] ?? '#5b82ff',
     sound: () => sound,

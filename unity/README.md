@@ -60,6 +60,70 @@ git ignores.
 - **Streaks down every face:** anything laid on from above (the colour map,
   the splat maps) smears down a steep face. Cliff faces take their colour in the
   shader instead (rock in strata, by height) and their photo from the side.
+- **Faces lit inside out:** on Direct3D a render into a texture is flipped, and
+  `SV_IsFrontFace` with it, so a two-sided surface's normal pointed in. Shaders
+  turn a normal to face the camera instead.
+- **The sky's light vanishing:** with Unity's default (gamma) light intensity,
+  a light of intensity 0.01 comes out as 0.01^2.2. `Pipeline()` sets
+  `lightsUseLinearIntensity`.
+- **A self-lit surface counted over:** glass and water light themselves; with
+  the sun sampled n times (Dome), they carry 1/n each (`_IslandSelf`).
+- **Small things black:** Unity's `Vector3.normalized` returns zero for a
+  vector shorter than 1e-5, so a small ball's normals vanished. Mesh code
+  normalizes with `Bm.Unit` (in doubles) instead.
+
+## The light: the sun and the whole sky (Dome.cs)
+
+Every picture that reaches the site (the plate, the trees, the buildings, the
+people) is lit the same way: rendered many times and added up in floating
+point. One pass per sample of the sun's disc (8, spread over about a degree,
+so every shadow has a soft edge), and one per patch of the sky (128 over the
+dome, each a light of the sky's colour from that direction times its share of
+the sky, with its own shadow). A point in a corner, under the eaves, at the
+foot of a wall, in a doorway or under a tree sees less of the sky, so fewer of
+those passes reach it: real ambient occlusion and soft shade from the geometry
+itself, painted nowhere. The sunlit ground's light thrown back up comes with
+the sun's pass. The sum goes through a tone curve (straight to 0.8, then rolling
+off to white) and a gentle S, and out as sRGB; the sea is put through the
+curve's inverse first, so it still meets the site's own sea exactly.
+Building shots include the terrain and the plants, unseen, so a wall by a
+cliff or under a tree is shaded by them. `-dome 0` is the old quick look;
+`-sky n`, `-sunn n` set the sampling.
+
+## The life: people, vehicles, boats, animals (Actors.cs, Vehicles.cs, Boats.cs, Creatures.cs)
+
+Everything that moves or stands about on the island is modelled and rendered
+alone at its foot (`IslandBuild.ActorShots`, `node scripts/unity-actors.mjs`),
+in every pose and facing the site asks for (`lib/island/actors.ts` writes each
+one down; `export-island` hands the list over):
+
+- **People** at about 2 m (16 px by the site's doors): a body in proportion,
+  jointed hips, knees, shoulders and elbows, clothes (shirt, trousers, shorts
+  or a skirt, shoes, now and then a hat), hair, ears and a nose; standing,
+  waving, looking up, sitting, on the ground, flying a kite, balancing, or one
+  of eight frames of a walk, in four facings. A walker on the site carries all
+  its facings, each shown while it heads that way, and its stride's frames
+  turning over.
+- **Vehicles**: a car (superellipsoid body, glass cabin, wheels, lights), the
+  bus, a bicycle with its rider pedalling. **Boats**: lofted hulls (a
+  sailboat with mainsail and jib, the ferry, fishing boats, the speedboat,
+  rowing boats), eight headings for those that sail round, and a foam wake laid
+  under each one that moves. **Animals**: sheep and deer (grazing or looking
+  up), ducks, crabs, gulls (standing, or wings up and down), pigeons, a dog,
+  dolphins, the whale, butterflies; and cumulus clouds, hot-air balloons, the
+  plane, a robot.
+- Each picture has its shadow on the ground laid under it (the model
+  flattened along the sun, softened); boats' are faint, and nothing aloft has
+  one.
+- The page's canvas (the parade, the pigeons) draws from a sheet of these
+  pictures the bake makes (`sprites.webp`).
+
+## Run by run: the check
+
+`node scripts/check-island-runs.mjs` (in the suite) builds the island plainly
+and realistically and compares every building's and thing's runs: pictures are
+placed by run number, so a solid drawn on only one of them would move every
+picture after it.
 
 ## The plate: how the render reaches the site
 
@@ -181,5 +245,9 @@ picture about its middle turns it.
    the windmill and its sails, and the big wheel and its cars modelled
    (`Models.cs`). Signs, posters, painted faces and the small props stay
    drawn: they are the island's lettering.
-5. People, boats, birds and the parade, to match.
+5. People, boats, birds and the parade (done): every person, vehicle, boat
+   and animal modelled and posed (`Actors.cs`, `Vehicles.cs`, `Boats.cs`,
+   `Creatures.cs`), the whole island lit by the dome (sun and sky), buildings
+   detailed (openings, cornices, gutters, chimneys), lamps, flowers, umbrellas
+   and surfboards modelled, and the drawn outlines softened to the fill.
 6. Night: a night render, lit from the windows.

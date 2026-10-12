@@ -68,7 +68,7 @@ Shader "Island/Bark"
                     n = normalize(tg * tn.x + bt * tn.y + n * max(tn.z, 0.2));
                 }
                 float3 col = islandLight(alb, n, i.ws, i.c.a);
-                if (_Spec > 0)
+                if (_Spec > 0 && !islandSkyPass())
                 {
                     Light sun = GetMainLight(TransformWorldToShadowCoord(i.ws));
                     float3 h = normalize(sun.direction + GetWorldSpaceNormalizeViewDir(i.ws));

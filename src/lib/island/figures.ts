@@ -31,7 +31,18 @@ export function figureSet(): FigureSet | null {
     const png = path.join(dir(), `${name}.png`)
     if (fs.existsSync(png)) items[name] = { ...it, href: `data:image/png;base64,${fs.readFileSync(png).toString('base64')}` }
   }
-  return { id: m.id, items }
+  // The people (lib/island/actors.ts), from scripts/unity-actors.mjs: each picture the same size, the foot at the same point.
+  let id = m.id
+  const ad = path.join(process.cwd(), 'src', 'lib', 'island', 'actors'), af = path.join(ad, 'actors.json')
+  if (fs.existsSync(af)) {
+    const a = JSON.parse(fs.readFileSync(af, 'utf8')) as { id: string; sizes: Record<string, FigureInfo>; names: string[] }
+    for (const name of a.names) {
+      const png = path.join(ad, `${name}.png`), kind = name.startsWith('v-') || name.startsWith('a-') ? name.split('-')[1] : 'person'
+      if (fs.existsSync(png) && a.sizes[kind]) items[name] = { ...a.sizes[kind], href: `data:image/png;base64,${fs.readFileSync(png).toString('base64')}` }
+    }
+    id += a.id
+  }
+  return { id, items }
 }
 
 /** The buildings, as Unity renders them (scripts/unity-buildings.mjs writes src/lib/island/buildings/). */

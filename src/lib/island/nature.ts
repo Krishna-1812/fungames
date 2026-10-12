@@ -9,6 +9,7 @@
  */
 import { C, INK, OUT, N, Pen, shade, S, motionPath } from './kit'
 import { figure, colourKind } from './props'
+import { creatureUse, onPath, headingOf, type Facing } from './actors'
 
 const pick = (x: number, y: number, n: number) => Math.floor(Math.abs(Math.sin(x * 12.99 + y * 78.23 + 1) * 437.5)) % n
 
@@ -212,6 +213,13 @@ function mill(p: Pen, bx: number, by: number) {
 /** A sheep, grazing; now and then its head comes up. */
 export function sheep(p: Pen, x: number, y: number, flip = false, delay = 0) {
   const [bx, by] = p.at(x, y)
+  {
+    // Unity's: grazing, and now and then looking up.
+    const at = { transform: `translate(${f(bx)} ${f(by)})` }, face: Facing = flip ? 'sw' : 'se'
+    const down = creatureUse('sheep', '#eceaf0', 'down', face, { ...at, class: 'sheep-down', style: `animation-delay:${f(-delay)}s` })
+    const up = creatureUse('sheep', '#eceaf0', 'up', face, { ...at, class: 'sheep-up', style: `animation-delay:${f(-delay)}s` })
+    if (down && up) { const g = p.el('g', { class: 'amb', 'data-b': box(bx - 30, by - 22, bx + 14, by + 8) }); g.add(down); g.add(up); p.grow(bx - 30, by - 22, bx + 14, by + 8); return }
+  }
   const s = flip ? -1 : 1
   const g = p.el('g', { class: 'sheep amb', 'data-b': box(bx - 10, by - 12, bx + 10, by + 2), transform: flip ? `translate(${f(bx * 2)} 0) scale(-1 1)` : undefined })
   g.add(new N('ellipse', { cx: f(bx), cy: f(by + 0.5), rx: 8, ry: 2.6, fill: INK, opacity: 0.13 }))
@@ -226,11 +234,14 @@ export function sheep(p: Pen, x: number, y: number, flip = false, delay = 0) {
 
 /** A duck going round the pond, along a closed path of screen points. */
 export function duck(pts: [number, number][], name: string, dur: number, delay: number, body = '#ffffff'): N {
-  motionPath(name, pts, { closed: true })
+  const frames = motionPath(name, pts, { closed: true })
   const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
-  const g = new N('g', { class: 'mover amb', 'data-b': box(Math.min(...xs) - 8, Math.min(...ys) - 10, Math.max(...xs) + 8, Math.max(...ys) + 4), style: `animation:${name} ${dur}s linear infinite ${f(-delay)}s` })
-  g.add(new N('ellipse', { cx: 0, cy: 1, rx: 7, ry: 2.2, fill: '#ffffff', opacity: 0.5 }))
+  const g = new N('g', { class: 'mover amb', 'data-b': box(Math.min(...xs) - 16, Math.min(...ys) - 14, Math.max(...xs) + 14, Math.max(...ys) + 8), style: `animation:${name} ${dur}s linear infinite ${f(-delay)}s` })
   g.add(new N('ellipse', { cx: 0, cy: 1, rx: 10, ry: 3.4, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.2, class: 'ripple', style: `animation-delay:${f(-delay * 0.7)}s` }))
+  // Unity's: turning to its heading as it paddles round.
+  const real = onPath((h) => creatureUse('duck', body, 'swim', h), name, frames, `${dur}s`, `${f(-delay)}s`)
+  if (real) { g.add(real); return g }
+  g.add(new N('ellipse', { cx: 0, cy: 1, rx: 7, ry: 2.2, fill: '#ffffff', opacity: 0.5 }))
   g.add(new N('path', { d: 'M-6 -1q0 4 6 4q7 0 7 -5q-3 1 -6 0q-5 -2 -7 1z', fill: body, stroke: INK, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }))
   g.add(new N('path', { d: 'M-3 -1.5q2 -1.5 5 0', fill: 'none', stroke: shade(body, 0.8), 'stroke-width': 1 }))
   g.add(new N('circle', { cx: 4.5, cy: -4.5, r: 2.6, fill: body === '#ffffff' ? '#ffffff' : '#2bb99a', stroke: INK, 'stroke-width': 1 }))
@@ -241,6 +252,10 @@ export function duck(pts: [number, number][], name: string, dur: number, delay: 
 /** A crab, scuttling sideways along a beach, there and back. */
 export function crab(p: Pen, x: number, y: number, delay = 0) {
   const [bx, by] = p.at(x, y)
+  {
+    const u = creatureUse('crab', '#d9506a', 'stand', 'se', { transform: `translate(${f(bx)} ${f(by)})` })
+    if (u) { const g = p.el('g', { class: 'crab amb', 'data-b': box(bx - 26, by - 16, bx + 22, by + 10), style: `animation-delay:${f(-delay)}s` }); g.add(u); p.grow(bx - 26, by - 16, bx + 22, by + 10); return }
+  }
   const g = p.el('g', { class: 'crab amb', 'data-b': box(bx - 16, by - 8, bx + 16, by + 3), style: `animation-delay:${f(-delay)}s` })
   g.add(new N('ellipse', { cx: f(bx), cy: f(by + 0.5), rx: 5, ry: 1.6, fill: INK, opacity: 0.15 }))
   g.add(new N('path', { d: `M${f(bx - 4)} ${f(by - 1)}l-2 2M${f(bx - 3)} ${f(by)}l-1 2M${f(bx + 4)} ${f(by - 1)}l2 2M${f(bx + 3)} ${f(by)}l1 2`, stroke: INK, 'stroke-width': 1, 'stroke-linecap': 'round' }))
@@ -256,6 +271,9 @@ export function dolphin(x: number, y: number, delay: number, flip = false): N {
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 2), rx: 18, ry: 4, fill: '#ffffff', class: 'dol-ring', opacity: 0, style: `animation-delay:${f(-delay)}s` }))
   const jump = g.add(new N('g', { class: 'dolphin', style: `animation-delay:${f(-delay)}s`, transform: flip ? `translate(${f(x * 2)} 0) scale(-1 1)` : undefined }))
   const inner = jump.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` }))
+  // Unity's, side on, as it leaps.
+  const real = creatureUse('dolphin', '#6f7f9e', 'stand', 'e')
+  if (real) { inner.add(real); return g }
   inner.add(new N('path', { d: 'M-16 2q4 -9 16 -9q9 0 14 5l4 -1l-3 3q-2 3 -8 3q-10 1 -15 3l-3 4l-1 -4q-3 -1 -4 -4z', fill: '#6e8de8', stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
   inner.add(new N('path', { d: 'M-2 -7l3 -5l3 5', fill: '#6e8de8', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
   inner.add(new N('path', { d: 'M-10 2q8 -1 20 -3', fill: 'none', stroke: '#d8e4ff', 'stroke-width': 2, 'stroke-linecap': 'round' }))
@@ -265,7 +283,18 @@ export function dolphin(x: number, y: number, delay: number, flip = false): N {
 
 /** A whale's back in the open sea, now and then blowing. */
 export function whale(x: number, y: number): N {
-  const g = new N('g', { class: 'amb', 'data-b': box(x - 60, y - 60, x + 60, y + 14) })
+  const g = new N('g', { class: 'amb', 'data-b': box(x - 130, y - 64, x + 130, y + 54) })
+  {
+    // Unity's back and flukes, and the blow as a soft cloud of spray.
+    const real = creatureUse('whale', '#4f5a74', 'stand', 'w', { transform: `translate(${f(x)} ${f(y)})` })
+    if (real) {
+      g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 70, ry: 13, fill: '#ffffff', opacity: 0.3 }))
+      g.add(real)
+      const spout = g.add(new N('g', { class: 'whale-spout' }))
+      for (const [dx, dy, r] of [[-30, -14, 7], [-38, -22, 9], [-26, -26, 8], [-33, -32, 10], [-29, -40, 7]]) spout.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r, fill: '#ffffff', opacity: 0.55 }))
+      return g
+    }
+  }
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 52, ry: 11, fill: '#ffffff', opacity: 0.45 }))
   g.add(new N('path', { d: `M${f(x - 44)} ${f(y + 3)}q14 -20 44 -20q30 0 40 20z`, fill: '#5a74c9', stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round', class: 'whale-back' }))
   g.add(new N('path', { d: `M${f(x - 30)} ${f(y - 4)}q20 -10 46 -4`, fill: 'none', stroke: '#8fa6ef', 'stroke-width': 2.4, 'stroke-linecap': 'round' }))
@@ -278,6 +307,8 @@ export function whale(x: number, y: number): N {
 
 /** A gull standing on something, drawn at a screen point. */
 export function gullStanding(x: number, y: number, flip = false): N {
+  const real = creatureUse('gull', '#f4f5f8', 'stand', flip ? 'sw' : 'se', { transform: `translate(${f(x)} ${f(y)})` })
+  if (real) return real
   const g = new N('g', { transform: flip ? `translate(${f(x * 2)} 0) scale(-1 1)` : undefined })
   g.add(new N('path', { d: `M${f(x - 1)} ${f(y)}v-3M${f(x + 1.5)} ${f(y)}v-3`, stroke: '#ff8f6b', 'stroke-width': 1, 'stroke-linecap': 'round' }))
   g.add(new N('path', { d: `M${f(x - 6)} ${f(y - 6)}q3 -4 9 -3q3 1 4 4q-5 3 -13 -1z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1, 'stroke-linejoin': 'round' }))
@@ -291,10 +322,18 @@ export function gullStanding(x: number, y: number, flip = false): N {
 export function gullsCircling(cx: number, cy: number, rx: number, ry: number, name: string, dur: number): N {
   const pts: [number, number][] = []
   for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]) }
-  motionPath(name, pts, { closed: true })
-  const g = new N('g', { class: 'amb', 'data-b': box(cx - rx - 12, cy - ry - 12, cx + rx + 12, cy + ry + 12) })
+  const frames = motionPath(name, pts, { closed: true })
+  const g = new N('g', { class: 'amb', 'data-b': box(cx - rx - 24, cy - ry - 22, cx + rx + 24, cy + ry + 22) })
   ;[0, -dur / 3, (-dur * 2) / 3].forEach((d, n) => {
     const m = g.add(new N('g', { class: 'mover', style: `animation:${name} ${dur}s linear infinite ${f(d + n * 0.7)}s` }))
+    // Unity's: wings beating up and down, turning to its heading as it wheels.
+    const wings = (h: Facing) => {
+      const up = creatureUse('gull', '#f4f5f8', 'up', h, { class: 'wing2' }), down = creatureUse('gull', '#f4f5f8', 'down', h, { class: 'wing2', style: 'animation-delay:-0.21s' })
+      if (!up || !down) return null
+      const w = new N('g'); w.add(up); w.add(down); return w
+    }
+    const real = onPath(wings, name, frames, `${dur}s`, `${f(d + n * 0.7)}s`)
+    if (real) { m.add(real); return }
     m.add(new N('path', { class: 'flap', d: 'M-8 0q4 -6 8 0q4 -6 8 0', fill: 'none', stroke: INK, 'stroke-width': 1.8, 'stroke-linecap': 'round' }))
     m.add(new N('path', { d: 'M-6 -0.5q3 -3.5 6 0q3 -3.5 6 0', fill: 'none', stroke: '#ffffff', 'stroke-width': 0.9, 'stroke-linecap': 'round' }))
   })
@@ -352,6 +391,10 @@ export function butterfly(p: Pen, x: number, y: number, z: number, c: string, de
   const g = p.el('g', { class: 'bfly amb', 'data-b': box(bx - 18, by - 16, bx + 18, by + 10), style: `animation-delay:${f(-delay)}s` })
   const w = g.add(new N('g', { transform: `translate(${f(bx)} ${f(by)})` }))
   const wings = w.add(new N('g', { class: 'bfly-wings' }))
+  {
+    const real = creatureUse('bfly', c, 'up', 'se')
+    if (real) { wings.add(real); p.grow(bx - 18, by - 16, bx + 18, by + 10); return }
+  }
   wings.add(new N('path', { d: 'M0 0q-6 -7 -7 -1q0 3 7 1zM0 0q6 -7 7 -1q0 3 -7 1zM0 0q-5 5 -2 6zM0 0q5 5 2 6z', fill: c, stroke: INK, 'stroke-width': 0.8, 'stroke-linejoin': 'round' }))
   w.add(new N('path', { d: 'M0 -2v5', stroke: INK, 'stroke-width': 1.2, 'stroke-linecap': 'round' }))
   p.grow(bx - 18, by - 16, bx + 18, by + 10)
@@ -360,6 +403,12 @@ export function butterfly(p: Pen, x: number, y: number, z: number, c: string, de
 /** A deer, grazing at the forest edge; it lifts its head to look about. */
 export function deer(p: Pen, x: number, y: number, flip = false, delay = 0) {
   const [bx, by] = p.at(x, y)
+  {
+    const at = { transform: `translate(${f(bx)} ${f(by)})` }, face: Facing = flip ? 'sw' : 'se'
+    const down = creatureUse('deer', '#8e817f', 'down', face, { ...at, class: 'deer-down', style: `animation-delay:${f(-delay)}s` })
+    const up = creatureUse('deer', '#8e817f', 'up', face, { ...at, class: 'deer-up', style: `animation-delay:${f(-delay)}s` })
+    if (down && up) { const g = p.el('g', { class: 'amb', 'data-b': box(bx - 36, by - 34, bx + 16, by + 10) }); g.add(down); g.add(up); p.grow(bx - 36, by - 34, bx + 16, by + 10); return }
+  }
   const g = p.el('g', { transform: flip ? `translate(${f(bx * 2)} 0) scale(-1 1)` : undefined })
   const c = '#b49be8', c2 = '#9b80dc'
   g.add(new N('ellipse', { cx: f(bx), cy: f(by + 0.5), rx: 9, ry: 2.6, fill: INK, opacity: 0.13 }))
