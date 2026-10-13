@@ -91,7 +91,31 @@ namespace Island
         float SeaCentre(int i, int j) => d.Land(i, j) ? d.sea - 1.5f : Floor(i, j);
 
         /** The sea's floor, smooth between tile middles (a land tile counts as just under the water). */
-        public float SeaH(float u, float v)
+        public float SeaH(float u, float v) => Isle(u, v, SeaFloorH(u, v));
+
+        /**
+         * The sea floor raised into a bank of sand out of the water, or let fall into a trench (world.ts, isles):
+         * a round top, a little uneven, sloping into the water and on down to the floor round it.
+         */
+        float Isle(float u, float v, float h)
+        {
+            if (d.isles == null) return h;
+            for (int q = 0; q + 3 < d.isles.Length; q += 4)
+            {
+                float ci = d.isles[q], cj = d.isles[q + 1], r = d.isles[q + 2], top = d.isles[q + 3];
+                float e = new Vector2(u - ci, v - cj).magnitude / r + (Noise.Fbm(u * 3.1f, v * 3.1f, 3, 77) - 0.5f) * 0.25f;
+                if (top >= d.sea)
+                {
+                    // Flat-ish on top, the beach falling to the waterline at the edge, then a shelf of shallows out to twice as far.
+                    float above = e < 1 ? d.sea + (top - d.sea) * Mathf.Pow(1 - e * e, 0.6f) : d.sea - 3.5f * Mathf.SmoothStep(0, 1, Mathf.Clamp01((e - 1) / 1.2f)) - 0.4f;
+                    h = Mathf.Max(h, Mathf.Lerp(above, h, Mathf.SmoothStep(0, 1, Mathf.Clamp01((e - 1.6f) / 0.8f))));
+                }
+                else h = Mathf.Min(h, Mathf.Lerp(top, h, Mathf.SmoothStep(0, 1, Mathf.Clamp01(e))));
+            }
+            return h;
+        }
+
+        float SeaFloorH(float u, float v)
         {
             // Shelving with the true distance from the coastline, a little uneven (sandbars, hollows):
             // just under the water at the shore, deep two or three tiles out.

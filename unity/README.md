@@ -153,6 +153,41 @@ drops in, and was black. The moon and its glints on the sea are made by
 `node scripts/make-night-sky.mjs` (the near side's seas where they are, the
 dust's flat light; the path in thousands of glints, two sets that shimmer).
 
+## Signs, posters and props: prints (Prints.cs)
+
+Lettering stays the page's (it draws it live, in its own fonts, over
+everything); what it is written on is Unity's. Artwork the site draws on a
+sign or a wall (a board's pinned papers, a poster, an emblem) is *printed*:
+`kit.ts, print` names it and keeps its SVG, `export-island` rasterises every
+print onto one sheet (`Data/prints.png`, `prints.json`), and a model lays
+its print on a face (`Buildings.Print`, `QuadUV`; Building.shader material
+11, cut out by its alpha, lit as everything is). Three ways in:
+
+- **`p.plaque`**: a board facing the viewer, a little thick, its art printed
+  on its face, on posts if it stands on the ground (`sign()` is one; so are
+  the Days Since board and the "32").
+- **`p.decal` + `p.printFace`**: what is drawn on a box's face (`p.face`)
+  printed there instead: `decal` first (the print lies under anything drawn
+  after), `printFace` after drawing, which prints everything but the words
+  and anything with a class (it moves or changes), and on the realistic
+  island leaves only those in the page's drawing.
+- **a named model** with `prints` (the noticeboard's papers, the finger-posts'
+  emblems).
+
+Props modelled by name (`Models.cs`): the noticeboard, plaques, decals, dish
+aerials, the observatory telescope, the orrery's rings, the globe's meridian,
+the scarecrow, a watering can, round signs, market goods and striped stall
+canvas, the campfire, bottles, the paper boat, finger-posts. The globe at How
+Fast turns in 24 frames (`Creatures.cs, Globe`; the site cross-fades them,
+`frame24`), and the space elevator's climber is a creature too.
+
+The sea's drawn marks are gone on the realistic island (the coast's contour
+lines, rings round the rocks, wave squiggles): its picture has its own
+ripples and foam. The sandbar and the castaway's islet are banks of sand the
+terrain raises out of the water (`Terrain3D.Isle`, `model.isles`), the Deep
+Sea a trench it lets fall away, so the water's own shallows and depth show
+them.
+
 ## Run by run: the check
 
 `node scripts/check-island-runs.mjs` (in the suite) builds the island plainly
@@ -288,3 +323,6 @@ picture about its middle turns it.
 6. Night (done): the island lit by its street lamps, lit rooms, bulbs and
    lighthouse (`Night.cs`), over the day multiplied down to moonlight; a
    real moon and its path on the sea; the beam a soft shaft of light.
+7. Signs and props (done): prints, plaques and decals for what the site
+   draws on things; the remaining props modelled; the sea's drawn marks gone,
+   its banks and trench in the terrain.

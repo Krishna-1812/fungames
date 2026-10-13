@@ -1,5 +1,5 @@
 /** The Harbour: the deep, the shore, the waves and the signals. */
-import { C, INK, N, OUT, shade, r1 as f, letter, type Landmark, type Pen } from './kit'
+import { ballShade, C, INK, N, OUT, shade, r1 as f, letter, type Landmark, type Pen } from './kit'
 import { person, crate, barrel, tree, flag, lamp, cloudModel } from './props'
 
 const planks = (p: Pen, x: number, y: number, w: number, d: number, z: number, along: 'x' | 'y') => {
@@ -19,9 +19,12 @@ export const beacon: [number, number] = [0, 0]
 export const harbour: Record<string, Landmark> = {
   'deep-sea': { size: [2, 2], water: true, draw(p) {
     // The trench: the one dark patch of sea on the map.
-    p.disc(1.35, 1.3, 0.78, -12, '#4d6fd6', { sw: 0, op: 0.6 })
-    p.disc(1.35, 1.3, 0.5, -12, '#2c3f9e', { sw: 0, op: 0.7 })
-    p.disc(1.35, 1.3, 0.24, -12, '#1b2a70', { sw: 0, op: 0.8 })
+    // (On the realistic island, Unity's sea floor falls away into a real trench here: world.ts, isles.)
+    p.model('trench', [1.35, 1.3, -12], {}, () => {
+      p.disc(1.35, 1.3, 0.78, -12, '#4d6fd6', { sw: 0, op: 0.6 })
+      p.disc(1.35, 1.3, 0.5, -12, '#2c3f9e', { sw: 0, op: 0.7 })
+      p.disc(1.35, 1.3, 0.24, -12, '#1b2a70', { sw: 0, op: 0.8 })
+    })
     for (const [x, y, d] of [[1.0, 1.6, 0], [1.7, 1.0, 1.8]] as const) {
       const [fx, fy] = p.at(x, y, -12)
       p.el('path', { d: `M${f(fx - 7)} ${f(fy)}q7 -5 14 0q-7 5 -14 0zM${f(fx + 7)} ${f(fy)}l5 -3v6z`, fill: '#8f9bd0', opacity: 0.8, class: 'swim', style: `animation-delay:${d}s` })
@@ -42,7 +45,7 @@ export const harbour: Record<string, Landmark> = {
     const [bx, by] = p.at(1.35, 1.3, 18)
     drop.el('circle', { cx: bx + 3, cy: by + 1, r: 5.5, fill: C.glass, stroke: INK, 'stroke-width': 1.6 })
     for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; drop.el('circle', { cx: bx + Math.cos(a) * 11, cy: by + Math.sin(a) * 11, r: 1, fill: INK }) }
-    for (let k = 0; k < 5; k++) { const [x, y] = p.at(1.35 + (k - 2) * 0.1, 1.3, -4); p.el('circle', { cx: x, cy: y, r: 2.5 + (k % 2), fill: 'none', stroke: '#ffffff', 'stroke-width': 1.4, class: 'bubble', style: `animation-delay:${k * 0.55}s` }) }
+    for (let k = 0; k < 5; k++) { const [x, y] = p.at(1.35 + (k - 2) * 0.1, 1.3, -4); p.el('circle', { cx: x, cy: y, r: (2.5 + (k % 2)) * (p.real ? 0.5 : 1), fill: 'none', stroke: '#ffffff', 'stroke-width': p.real ? 0.7 : 1.4, opacity: p.real ? 0.75 : undefined, class: 'bubble', style: `animation-delay:${k * 0.55}s` }) }
     // A buoy and a diving flag.
     const buoy = p.group('bob')
     buoy.cyl(1.85, 0.4, 0.08, -6, 12, C.rasp, { bands: [[3, 6, '#ffffff']] })
@@ -169,20 +172,25 @@ export const harbour: Record<string, Landmark> = {
     // A paper boat, a boat's size, tied up alongside.
     const b = p.group('bob')
     const [bx, by] = b.at(1.2, 1.12, -9)
-    b.el('ellipse', { cx: bx, cy: by + 3, rx: 14, ry: 3, fill: '#ffffff', opacity: 0.4 })
-    b.path(`M${f(bx - 13)} ${f(by - 5)}h26l-5 7h-16z`, '#ffffff', { sw: 1.1 })
-    b.path(`M${f(bx - 7)} ${f(by - 5)}l7 -16l7 16z`, '#f4f6fc', { sw: 1.1 })
-    b.path(`M${f(bx)} ${f(by - 21)}l7 16h-5z`, '#dfe4f5', { sw: 0 })
-    b.path(`M${f(bx - 13)} ${f(by - 5)}l13 4l13 -4`, 'none', { sw: 0.7, stroke: '#9aa3c0' })
+    b.el('ellipse', { cx: bx, cy: by + 3, rx: 14, ry: 3, fill: '#ffffff', opacity: b.real ? 0.25 : 0.4 })
+    // The boat: folded paper (Unity's: Models.cs, PaperBoat), else drawn.
+    b.model('paperboat', [1.2, 1.12, -9], {}, () => {
+      b.path(`M${f(bx - 13)} ${f(by - 5)}h26l-5 7h-16z`, '#ffffff', { sw: 1.1 })
+      b.path(`M${f(bx - 7)} ${f(by - 5)}l7 -16l7 16z`, '#f4f6fc', { sw: 1.1 })
+      b.path(`M${f(bx)} ${f(by - 21)}l7 16h-5z`, '#dfe4f5', { sw: 0 })
+      b.path(`M${f(bx - 13)} ${f(by - 5)}l13 4l13 -4`, 'none', { sw: 0.7, stroke: '#9aa3c0' })
+    })
     p.path(`M${f(bx + 10)} ${f(by - 4)}Q${f(bx + 22)} ${f(by - 2)} ${f(p.at(1.86, 0.82, 12)[0])} ${f(p.at(1.86, 0.82, 12)[1])}`, 'none', { sw: 0.8 })
     // The dotted line, forty-two folds up, to the moon.
     const [rx, ry] = p.at(x0 + (x1 - x0) / n, 0.44, hi + 24)
     const [mx, my] = p.at(1.7, 0.1, 170)
-    p.el('path', { d: `M${f(rx + 4)} ${f(ry)}Q${f(rx + 40)} ${f(ry - 50)} ${f(mx - 10)} ${f(my + 6)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-dasharray': '3 6' })
-    p.circle(1.7, 0.1, 170, 11, '#ffffff')
-    p.el('circle', { cx: mx + 3, cy: my - 2, r: 2.5, fill: '#dfe4f5' })
+    // (On the realistic island: a faint trail of light, and the moon a lit ball.)
+    p.el('path', { d: `M${f(rx + 4)} ${f(ry)}Q${f(rx + 40)} ${f(ry - 50)} ${f(mx - 10)} ${f(my + 6)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': p.real ? 1.1 : 2, opacity: p.real ? 0.6 : undefined, 'stroke-dasharray': p.real ? '1.5 5' : '3 6', 'stroke-linecap': p.real ? 'round' : undefined })
+    if (p.real) p.el('circle', { cx: mx, cy: my, r: 11, fill: ballShade(p.el('defs'), 'pf-moon', '#e8e9f2') })
+    else p.circle(1.7, 0.1, 170, 11, '#ffffff')
+    if (!p.real) p.el('circle', { cx: mx + 3, cy: my - 2, r: 2.5, fill: '#dfe4f5' })
     // Two paper cranes on the wind.
-    for (const [dx, dy, d] of [[-20, -70, 0], [-46, -48, 1.4]]) p.el('path', { d: `M${f(rx + dx)} ${f(ry + dy)}l8 -6l2 6l8 -2l-8 5z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.1, class: 'glide', style: `animation-delay:${d}s` })
+    for (const [dx, dy, d] of [[-20, -70, 0], [-46, -48, 1.4]]) p.el('path', { d: `M${f(rx + dx)} ${f(ry + dy)}l8 -6l2 6l8 -2l-8 5z`, fill: p.real ? '#f2f4fa' : '#ffffff', stroke: p.real ? '#c3c9da' : INK, 'stroke-width': p.real ? 0.5 : 1.1, class: 'glide', style: `animation-delay:${d}s` })
     p.grow(rx - 60, my - 14, mx + 14, by + 8)
   } },
 }

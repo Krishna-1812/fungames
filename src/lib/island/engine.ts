@@ -678,7 +678,7 @@ export function createEngine(o: {
     ctx.fillStyle = g
     ctx.fillRect(vis[0], vis[1] / n.sy, vis[2] - vis[0], (vis[3] - vis[1]) / n.sy)
     restore()
-    if (o.play) drawWaves(n, alpha)
+    if (o.play && !n.still) drawWaves(n, alpha)
   }
 
   /**

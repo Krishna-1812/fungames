@@ -9,7 +9,7 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
+import { printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
 import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
@@ -122,6 +122,8 @@ export type IslandModel = {
   seaRocks: [number, number, number][]
   /** The stones at the waterline: tile x, y (not tile corners: where they stand), and size. */
   shoreRocks: [number, number, number][]
+  /** Banks of sand out of the sea, and trenches in it: tile i, j, radius in tiles, the top's height. */
+  isles: [number, number, number, number][]
   /** Each building's solids (kit.ts, Solids), in their runs, for Unity to build. */
   solids: { slug: string; runs: Solid[][] }[]
   /**
@@ -130,6 +132,8 @@ export type IslandModel = {
    * its colour, and whether it is on tonight (about one window in five stays dark).
    */
   lights: { i: number; j: number; z: number; kind: 'win' | 'lamp' | 'bulb'; face?: 'x' | 'y'; col: string; lit: boolean }[]
+  /** Artwork printed on what Unity builds (kit.ts, print): its name, size in screen pixels, and its drawing. */
+  prints: { name: string; w: number; h: number; svg: string }[]
   viewBox: [number, number, number, number]
 }
 export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
@@ -307,7 +311,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: 1500, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
   grad.add(new N('stop', { offset: 0.3, 'stop-color': '#a3dbff' }))
   grad.add(new N('stop', { offset: 1, 'stop-color': C.water }))
-  root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: 'url(#isl-sea)' }))
+  // (data-still: on the realistic sea the page draws no wave marks of its own over it.)
+  root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: 'url(#isl-sea)', 'data-still': plate ? 1 : undefined }))
   // The ground as Unity renders it, land and shallows together, over the open sea.
   if (plate) {
     const [x0, y0, x1, y1] = plate.box
@@ -342,10 +347,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   sh.add(new N('path', { d: seabed, fill: '#ffffff', opacity: 0.45 }))
 
   /** A ring spreading out on the water round something sitting in it, now and then. */
-  const ripple = (x: number, y: number, rx: number, ry: number, delay: number) => new N('ellipse', { cx: f(x), cy: f(y), rx: f(rx), ry: f(ry), fill: 'none', stroke: '#ffffff', 'stroke-width': 1.4, class: 'ripple', style: `animation-delay:${f(-delay)}s` })
+  // (On the realistic sea, a fainter, finer ring: the swell round something afloat, not a drawn circle.)
+  const ripple = (x: number, y: number, rx: number, ry: number, delay: number) => new N('ellipse', { cx: f(x), cy: f(y), rx: f(rx), ry: f(ry), fill: 'none', stroke: '#ffffff', 'stroke-width': plate ? 0.8 : 1.4, 'stroke-opacity': plate ? 0.45 : undefined, class: 'ripple', style: `animation-delay:${f(-delay)}s` })
   const waves = root.add(new N('g', { class: 'waves' }))
   // Wave marks out in open water only, where they will not sit on the shallows.
   const nearLand = (u: number, v: number, r: number) => { for (let a = Math.floor(u - r); a <= u + r; a++) for (let b = Math.floor(v - r); b <= v + r; b++) if (isLand(a, b)) return true; return false }
+  // (Not on the realistic sea, whose picture has ripples of its own: drawn into nothing, the same dice thrown.)
   for (let g = 0; g < 4; g++) {
     let d = ''
     for (let k = 0; k < 45; k++) {
@@ -354,13 +361,18 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const [x, y] = P(u, v, SEA)
       d += `M${f(x)} ${f(y)}q7 -5 14 0q7 -5 14 0`
     }
-    waves.add(new N('path', { d, fill: 'none', stroke: '#ffffff', 'stroke-width': 2.2, 'stroke-linecap': 'round', class: `wave w${g}` }))
+    if (!plate) waves.add(new N('path', { d, fill: 'none', stroke: '#ffffff', 'stroke-width': 2.2, 'stroke-linecap': 'round', class: `wave w${g}` }))
   }
   // Rocks standing in the shallows, each with a ring of foam, and a little
   // sandbar off the harbour with one palm on it.
   const waterSlug = new Set(placed.filter((p) => p.lm.water).flatMap((p) => p.cells.map((c) => key(...c))))
   const clearOf = (i: number, j: number, r: number) => { for (let a = i - r; a <= i + r; a++) for (let b = j - r; b <= j + r; b++) if (isLand(a, b) || waterSlug.has(key(a, b))) return false; return true }
   const seaRocks: [number, number, number][] = []
+  /**
+   * Where the realistic sea floor rises out of the water or falls away (Unity: Terrain3D, Isle): tile i, j,
+   * radius in tiles, and the height of its top (above the sea, a bank of sand; far under it, a trench).
+   */
+  const isles: [number, number, number, number][] = []
   for (const [i, j, k] of [[-2, 12, 1], [12, 31, 1.2], [31, 6, 0.9], [29, 28, 1.1], [-2, 8, 0.8], [13, -2, 0.9], [18, -2, 1], [9, 30, 0.9]] as [number, number, number][]) {
     if (!clearOf(Math.floor(i), Math.floor(j), 1)) continue
     seaRocks.push([i, j, k])
@@ -371,7 +383,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // With a plate, the rock and its foam are in its picture (Unity: IslandBuild.Scene); its ripple and its gull stay.
     if (!plate) root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(26 * k), ry: f(11 * k), fill: '#ffffff', opacity: 0.55 }))
     if (!plate) root.add(new N('ellipse', { cx: f(x + 2), cy: f(y + 3), rx: f(19 * k), ry: f(8 * k), fill: '#cdf1f4' }))
-    root.add(ripple(x + 2, y + 3, 24 * k, 10 * k, hz(i, j, 61) * 3.6))
+    if (!plate) root.add(ripple(x + 2, y + 3, 24 * k, 10 * k, hz(i, j, 61) * 3.6))
     if (!plate) root.add(new N('path', { d: `M${f(x - 12 * k)} ${f(y + 4)}L${f(x - 1 * k)} ${f(y + 16 * k)}L${f(x + 11 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.22 }))
     if (!plate) root.add(new N('path', { d: `M${f(x - 14 * k)} ${f(y + 4)}L${f(x - 10 * k)} ${f(y - 8 * k)}L${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}Z`, fill: C.rock, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
     if (!plate) root.add(new N('path', { d: `M${f(x - 1 * k)} ${f(y - 14 * k)}L${f(x + 9 * k)} ${f(y - 7 * k)}L${f(x + 13 * k)} ${f(y + 4)}L${f(x + 1 * k)} ${f(y + 4)}Z`, fill: C.rockDark, opacity: 0.55 }))
@@ -382,6 +394,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   }
   const sandbar = [30.2, 24.4]
   if (clearOf(30, 24, 1)) {
+    const [x, y] = P(sandbar[0], sandbar[1], SEA)
+    isles.push([sandbar[0], sandbar[1], 0.72, SEA + 3])
+  }
+  if (clearOf(30, 24, 1) && !plate) {
     const [x, y] = P(sandbar[0], sandbar[1], SEA)
     root.add(new N('ellipse', { cx: f(x), cy: f(y + 4), rx: 54, ry: 21, fill: '#ffffff', opacity: 0.6 }))
     root.add(new N('ellipse', { cx: f(x), cy: f(y + 4), rx: 46, ry: 17, fill: '#cdf1f4' }))
@@ -395,15 +411,15 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   for (let k = 0; k < 40; k++) {
     const u = hz(k, 1, 21) * (GRID + 10) - 5, v = hz(k, 2, 22) * (GRID + 10) - 5
     if (nearLand(u, v, 0.8) || !nearLand(u, v, 4.5)) continue
-    const [x, y] = P(u, v, SEA), w = 6 + hz(k, 3, 23) * 10
-    shim.add(new N('path', { d: `M${f(x - w)} ${f(y)}h${f(w * 2)}M${f(x - w * 0.5)} ${f(y + 3)}h${f(w)}`, stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linecap': 'round', class: 'shim amb', 'data-b': `${f(x - w)} ${f(y - 2)} ${f(x + w)} ${f(y + 5)}`, style: `animation-delay:${f(-hz(k, 4, 24) * 6)}s` }))
+    const [x, y] = P(u, v, SEA), w = (6 + hz(k, 3, 23) * 10) * (plate ? 0.6 : 1)
+    shim.add(new N('path', { d: `M${f(x - w)} ${f(y)}h${f(w * 2)}M${f(x - w * 0.5)} ${f(y + 3)}h${f(w)}`, stroke: '#ffffff', 'stroke-width': plate ? 0.8 : 1.6, opacity: plate ? 0.45 : undefined, 'stroke-linecap': 'round', class: 'shim amb', 'data-b': `${f(x - w)} ${f(y - 2)} ${f(x + w)} ${f(y + 5)}`, style: `animation-delay:${f(-hz(k, 4, 24) * 6)}s` }))
   }
   // Glints of sun on the water, here and there.
   const glints = root.add(new N('g', { class: 'glints' }))
   for (let k = 0; k < 26; k++) {
     const u = R() * (GRID + 14) - 7, v = R() * (GRID + 14) - 7
     if (nearLand(u, v, 1.5)) continue
-    const [x, y] = P(u, v, SEA), r = 3 + R() * 3
+    const [x, y] = P(u, v, SEA), r = (3 + R() * 3) * (plate ? 0.45 : 1)
     glints.add(new N('path', { d: `M${f(x)} ${f(y - r)}Q${f(x)} ${f(y)} ${f(x + r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y + r)}Q${f(x)} ${f(y)} ${f(x - r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y - r)}Z`, fill: '#ffffff', class: 'glint amb', 'data-b': `${f(x - r)} ${f(y - r)} ${f(x + r)} ${f(y + r)}`, style: `animation-delay:${f(-R() * 4)}s` }))
   }
   // Foam where the water meets the land: the coast's outline once more,
@@ -444,6 +460,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // moving a line round the whole coast would cost it every frame.
   for (const [k, w0, w1] of [['out', 1.66, 1.82], ['in', 1.1, 1.24]] as [string, number, number][]) {
     root = open('surf', k)
+    if (plate) continue
     const id = `isl-surf-${k}`
     const m = root.add(new N('mask', { id, maskUnits: 'userSpaceOnUse', x: f(sx0 - 400), y: f(sy1 - 1400), width: f(sx1 - sx0 + 800), height: f(sy2 - sy1 + 2000) }))
     const mg = m.add(new N('g', { transform: coastT }))
@@ -511,8 +528,23 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       g.add(new N('g', { style: `animation:isl-ferry-o ${FERRY_DUR}s linear infinite` })).add(outb!)
     } else g.add(ferry())
   }
+  // Each building's solids, and with Unity's pictures of them (opts.buildings), those in their place.
+  const solids: { slug: string; runs: Solid[][] }[] = []
+  const shots = opts.buildings ?? null
+  /** Where a building's solids are written down, and with Unity's pictures of them, put in their place. */
+  const sinkFor = (slug: string) => {
+    const real = !!shots?.items[`${slug}/0`]
+    const sink = new Solids(!real, real ? (g, run) => {
+      const it = shots!.items[`${slug}/${run}`]
+      if (it) g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
+    } : undefined)
+    solids.push({ slug, runs: sink.runs })
+    return { sink, real }
+  }
   // The islet with the secret, far out to the west.
-  secretIslet(new Pen(root), -1.4, 26.2)
+  // The castaway's islet: on the realistic island, a bank of sand Unity raises out of the sea, the hut and chest built.
+  isles.push([-1.4, 26.2, 1.25, SEA + 5])
+  secretIslet(new Pen(root, 0, 0, 0, new Bounds(), lights, sinkFor('islet').sink), -1.4, 26.2)
 
   // The ground, a diagonal row at a time: tops merged by colour, then cliffs.
   root = open('ground')
@@ -969,19 +1001,6 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   type Thing = { depth: number; slug?: string; draw: (g: N) => void }
   const things: Thing[] = []
   const anchors: Record<string, Anchor> = {}
-  // Each building's solids, and with Unity's pictures of them (opts.buildings), those in their place.
-  const solids: { slug: string; runs: Solid[][] }[] = []
-  const shots = opts.buildings ?? null
-  /** Where a building's solids are written down, and with Unity's pictures of them, put in their place. */
-  const sinkFor = (slug: string) => {
-    const real = !!shots?.items[`${slug}/0`]
-    const sink = new Solids(!real, real ? (g, run) => {
-      const it = shots!.items[`${slug}/${run}`]
-      if (it) g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
-    } : undefined)
-    solids.push({ slug, runs: sink.runs })
-    return { sink, real }
-  }
   const link = new Map(games.map((g) => [g.slug, g]))
   const cx = GRID / 2
   for (const pl of placed) {
@@ -1630,7 +1649,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   ;[[-0.2, 0.1, 1.2], [0.25, 0.45, 1], [0.6, 0.2, 1.3], [0.05, 0.7, 0.9], [0.8, 0.6, 1.1]].forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
     const g = sky.add(new N('g', { class: 'cloud', style: `animation-delay:${-n * 23}s;animation-duration:${150 + n * 20}s` }))
-    g.add(new N('ellipse', { cx: f(x + 14), cy: f(y + 120), rx: f(56 * k), ry: f(17 * k), fill: INK, opacity: 0.06, class: 'cloud-shadow' }))
+    // Its shadow on the ground far below: on the realistic island, soft-edged, as a cloud's is.
+    g.add(new N('ellipse', { cx: f(x + 14), cy: f(y + 120), rx: f(56 * k * (plate ? 1.25 : 1)), ry: f(17 * k * (plate ? 1.25 : 1)), fill: plate ? puffShade(g, `cl-shadow${n}`, '#1b2340', 0.16) : INK, opacity: plate ? undefined : 0.06, class: 'cloud-shadow' }))
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudModel(n, k) ?? cloudShape(k))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
@@ -1699,6 +1719,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     plants: planted.map((q) => ({ ...q })),
     actors: [...actorsWanted.values()].sort((a, b) => a.name.localeCompare(b.name)),
     seaRocks, shoreRocks, solids,
+    prints: [...printsWanted].map(([name, p]) => ({ name, ...p })),
+    isles: [...isles, ...placed.filter((pl) => pl.slug === 'deep-sea').map((pl) => [pl.i + 1.35, pl.j + 1.3, 0.85, SEA - 60] as [number, number, number, number])],
     lights: lights.flatMap((l, n) => {
       if (!l.w) return []
       const kind = l.face ? 'win' : l.el?.attrs.class === 'lamp-bulb' ? 'lamp' : 'bulb'

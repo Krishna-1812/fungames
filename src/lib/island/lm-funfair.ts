@@ -1,5 +1,5 @@
 /** The Funfair: the internet, the reviews, the progress bar, too many lights. */
-import { C, INK, N, OUT, shade, r1 as f, letter, glow, type Landmark, Pen } from './kit'
+import { ballShade, C, INK, N, OUT, shade, r1 as f, letter, glow, type Landmark, Pen } from './kit'
 import { person, tree, flag, lamp, flowers, bench } from './props'
 
 /** A five-point star at a point, in a group (painted on a sign). */
@@ -37,6 +37,9 @@ export const funfair: Record<string, Landmark> = {
     for (let k = 0; k <= 7; k++) p.line([0.3 + k * 0.2, 0.98, 44.6], [0.3 + k * 0.2, 0.98, 49], { sw: 0.7 })
     p.line([0.3, 0.98, 49], [1.7, 0.98, 49], { sw: 0.9 })
     const bd = p.box(0.26, 0.76, 1.48, 0.07, 30, { z0: 45, fill: '#ffffff' })
+    // The poster: printed on the board by Unity (kit.ts, decal); its words and its twinkling stars the page's.
+    const posterAt: [number, number, number, number] = [-24, -30, 24, 0]
+    p.decal('earth-poster', bd, 'y', 0.5, 0, posterAt)
     const g = p.face(bd, 'y', 0.5, 0, { w: 48, h: 30 })
     g.add(new N('rect', { x: -22.5, y: -28, width: 45, height: 26, fill: '#eaf3ff' }))
     // Earth, giving itself a review.
@@ -47,6 +50,7 @@ export const funfair: Record<string, Landmark> = {
     letter(g, 7, -19, 'GRAVITY', { size: 6.4, ls: 0.3 })
     for (let k = 0; k < 5; k++) g.add(new N('path', { d: starPath(-3.5 + k * 5.2, -12, 2.3), fill: k < 2 ? C.rasp : '#d3d9ec', stroke: INK, 'stroke-width': 0.6, 'stroke-linejoin': 'round', class: k < 2 ? 'er-star' : undefined, style: `animation-delay:${k * 0.3}s` }))
     letter(g, 7, -5.5, '“keeps pulling me down”', { size: 3.4, weight: 500, fill: '#56607e' })
+    p.printFace(g, 'earth-poster', posterAt)
     // Gooseneck lamps along the top, lighting the poster at night.
     for (const x of [0.6, 1.4]) {
       const [lx, ly] = p.at(x, 0.8, 75)
@@ -116,7 +120,9 @@ export const funfair: Record<string, Landmark> = {
     const [kx, ky] = p.at(1.9, 1.5, 14)
     for (const [dx, dy, c] of [[6, -34, C.mint], [12, -28, C.lilac], [1, -26, C.sky]] as const) {
       p.path(`M${f(kx)} ${f(ky)}q${f(dx * 0.4)} ${f(dy * 0.5)} ${f(dx)} ${f(dy + 6)}`, 'none', { sw: 0.8 })
-      p.el('ellipse', { cx: kx + dx, cy: ky + dy, rx: 5, ry: 6.4, fill: c, stroke: INK, 'stroke-width': 1.1, class: 'bob' })
+      // A balloon: on the realistic island, lit, shiny, a knot at its foot.
+      if (p.real) { const bl = p.el('g', { class: 'bob' }); bl.add(new N('ellipse', { cx: kx + dx, cy: ky + dy, rx: 5, ry: 6.4, fill: ballShade(bl, `ff-bal${dx}`, c) })); bl.add(new N('path', { d: `M${f(kx + dx - 1)} ${f(ky + dy + 7.2)}l1 -1l1 1z`, fill: shade(c, 0.7) })) }
+      else p.el('ellipse', { cx: kx + dx, cy: ky + dy, rx: 5, ry: 6.4, fill: c, stroke: INK, 'stroke-width': 1.1, class: 'bob' })
     }
     p.grow(kx - 6, ky - 42, kx + 18, ky)
     person(p, 0.3, 1.8, C.mint, { pose: 'wave' }); person(p, 0.5, 1.9, C.sky)
@@ -164,9 +170,11 @@ export const funfair: Record<string, Landmark> = {
     fl.add(new N('rect', { x: -2, y: -5, width: 4, height: 4, fill: '#ffffff', stroke: INK, 'stroke-width': 0.4 }))
     // On the roof: a dish for the dial-up, and a pixel balloon on a string.
     const [dx, dy] = p.at(0.55, 0.45, 43)
-    p.path(`M${f(dx)} ${f(dy)}v-8`, 'none', { sw: 1.6 })
-    p.path(`M${f(dx - 9)} ${f(dy - 14)}q9 12 18 0z`, '#ffffff', { sw: 1.3 })
-    p.path(`M${f(dx)} ${f(dy - 8)}l4 -9`, 'none', { sw: 1 })
+    p.model('dish', [0.55, 0.45, 43], { r: 9 }, () => {
+      p.path(`M${f(dx)} ${f(dy)}v-8`, 'none', { sw: 1.6 })
+      p.path(`M${f(dx - 9)} ${f(dy - 14)}q9 12 18 0z`, '#ffffff', { sw: 1.3 })
+      p.path(`M${f(dx)} ${f(dy - 8)}l4 -9`, 'none', { sw: 1 })
+    })
     const [ax, ay] = p.at(1.2, 0.6, 43)
     const [bx, by] = p.at(1.5, 0.4, 78)
     p.path(`M${f(ax)} ${f(ay)}Q${f(ax + 16)} ${f(ay - 40)} ${f(bx - 4)} ${f(by + 16)}`, 'none', { sw: 0.9 })
@@ -222,12 +230,15 @@ export const funfair: Record<string, Landmark> = {
     person(p, 1.42, 0.62, C.lilac); hardHat(p, 1.42, 0.62)
     // The hoarding, and the count painted on it.
     const ho = p.box(0.06, 0.88, 1.84, 0.04, 13, { fill: '#ffffff', sw: 1.2 })
+    const hoardAt: [number, number, number, number] = [-29, -13, 29, 0]
+    p.decal('progress-hoarding', ho, 'y', 0.5, 0, hoardAt)
     const sg = p.face(ho, 'y', 0.5, 0, { w: 58, h: 13 })
     sg.add(new N('rect', { x: -28, y: -12.4, width: 56, height: 11.8, fill: '#eef0f8' }))
     letter(sg, -26, -7, `${new Date().getFullYear()} SO FAR`, { size: 4.4, anchor: 'start', cls: 'pg-year' })
     letter(sg, 26, -6.6, `${pct}%`, { size: 5.6, anchor: 'end', cls: 'pg-pct' })
     sg.add(new N('rect', { x: -26, y: -5, width: 52, height: 3, rx: 1, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6 }))
     sg.add(new N('rect', { x: -26, y: -5, width: f((52 * pct) / 100), height: 3, rx: 1, fill: C.mint, stroke: INK, 'stroke-width': 0.6, class: 'pg-bar', 'data-w': 52 }))
+    p.printFace(sg, 'progress-hoarding', hoardAt)
     // The crew, in hard hats, and a cone.
     const sc = p.move(0, 0, fh * 2)
     person(sc, 0.78, 0.78, C.cobalt); hardHat(sc, 0.78, 0.78)

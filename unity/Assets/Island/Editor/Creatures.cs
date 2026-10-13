@@ -313,6 +313,30 @@ namespace Island
                     }
                     break;
                 }
+                case "globe": Globe.Build(b, a); return b;
+                case "pod":
+                {
+                    // The space elevator's climber: a rounded capsule in its colour, a band of windows, a steel collar top and bottom round the cable.
+                    var body = Real("#" + a.shirt, Paint); var glass = Real("#7f92ad", Glass); var steel = Real("#5d6478", Metal);
+                    float h = 28 / IslandBuild.PxPerHeight, rr = Px(10);
+                    (float y, float r)[] prof = { (0, rr * 0.55f), (h * 0.08f, rr * 0.9f), (h * 0.2f, rr), (h * 0.8f, rr), (h * 0.92f, rr * 0.88f), (h, rr * 0.5f) };
+                    for (int q = 0; q + 1 < prof.Length; q++)
+                        for (int k = 0; k < 24; k++)
+                        {
+                            float a0 = k * Mathf.PI * 2 / 24, a1 = (k + 1) * Mathf.PI * 2 / 24;
+                            Vector3 P(int i, float t) => new Vector3(Mathf.Sin(t) * prof[i].r, prof[i].y, Mathf.Cos(t) * prof[i].r);
+                            b.Quad(P(q, a1), P(q, a0), P(q + 1, a0), P(q + 1, a1), body, Paint);
+                        }
+                    for (int k = 0; k < 24; k++)
+                    {
+                        float a0 = k * Mathf.PI * 2 / 24, a1 = (k + 1) * Mathf.PI * 2 / 24, R1 = rr * 1.01f, y0 = h * 0.52f, y1 = h * 0.74f;
+                        if (k % 4 == 3) continue;
+                        b.Quad(new Vector3(Mathf.Sin(a1) * R1, y0, Mathf.Cos(a1) * R1), new Vector3(Mathf.Sin(a0) * R1, y0, Mathf.Cos(a0) * R1), new Vector3(Mathf.Sin(a0) * R1, y1, Mathf.Cos(a0) * R1), new Vector3(Mathf.Sin(a1) * R1, y1, Mathf.Cos(a1) * R1), glass, Glass);
+                    }
+                    Round(b, new Vector3(0, -Px(1.5f), 0), new Vector3(rr * 0.6f, Px(2), rr * 0.6f), 0.5f, steel, Metal, 16, 6);
+                    Round(b, new Vector3(0, h + Px(1.5f), 0), new Vector3(rr * 0.6f, Px(2), rr * 0.6f), 0.5f, steel, Metal, 16, 6);
+                    break;
+                }
                 default: return null;
             }
             // The smallest creatures a little larger than life, to read at the island's size.
@@ -320,5 +344,88 @@ namespace Island
             b.Apply(Matrix4x4.TRS(Vector3.zero, Quaternion.Euler(0, Yaw(a.facing), 0), Vector3.one * big));
             return b;
         }
+    }
+}
+
+namespace Island
+{
+    public static partial class Buildings
+    {
+    /**
+     * The giant globe at How Fast (lm-peaks.ts), turning on its tilted axis:
+     * an Earth-like world (not this one's map: seas, continents green and
+     * dry, ice at the poles, clouds), drawn on the sphere in its vertices'
+     * colours and shot in 24 frames of a turn (pose f0..f23), which the site
+     * shows in turn.
+     */
+    static class Globe
+    {
+        /** Its axis: tilted over to the left on the picture, as the site draws it. */
+        public static Vector3 Axis => (Quaternion.Euler(30, 225, 0) * new Vector3(-Mathf.Sin(14 * Mathf.Deg2Rad), Mathf.Cos(14 * Mathf.Deg2Rad), 0)).normalized;
+
+        static float H3(int x, int y, int z) { float h = Mathf.Sin(x * 127.1f + y * 311.7f + z * 74.7f) * 43758.5453f; return h - Mathf.Floor(h); }
+        static float N3(Vector3 p)
+        {
+            int ix = Mathf.FloorToInt(p.x), iy = Mathf.FloorToInt(p.y), iz = Mathf.FloorToInt(p.z);
+            float fx = p.x - ix, fy = p.y - iy, fz = p.z - iz;
+            fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+            float L(float a, float b, float t) => a + (b - a) * t;
+            return L(L(L(H3(ix, iy, iz), H3(ix + 1, iy, iz), fx), L(H3(ix, iy + 1, iz), H3(ix + 1, iy + 1, iz), fx), fy),
+                     L(L(H3(ix, iy, iz + 1), H3(ix + 1, iy, iz + 1), fx), L(H3(ix, iy + 1, iz + 1), H3(ix + 1, iy + 1, iz + 1), fx), fy), fz);
+        }
+        static float Fbm(Vector3 p, int oct) { float a = 0, k = 1, n = 0; for (int i = 0; i < oct; i++) { a += N3(p * k) / k; n += 1 / k; k *= 2.03f; } return a / n; }
+
+        static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c.linear; }
+
+        /** The world's colour at a point on its unit sphere (in its own turning frame; y up its axis). */
+        static Color At(Vector3 q)
+        {
+            float lat = Mathf.Asin(Mathf.Clamp(q.y, -1, 1)) * Mathf.Rad2Deg;
+            float land = Fbm(q * 1.7f + new Vector3(3.1f, 0, 7.7f), 5) + 0.05f * (Fbm(q * 6, 3) - 0.5f);
+            float sea = 0.53f;
+            Color c;
+            if (land < sea)
+            {
+                float d = Mathf.Clamp01((sea - land) / 0.12f);
+                c = Color.Lerp(Hex("#1f6fd0"), Hex("#0a2c6e"), d);
+            }
+            else
+            {
+                float h = Mathf.Clamp01((land - sea) / 0.18f), dry = Fbm(q * 3.3f + new Vector3(9, 1, 2), 3);
+                var green = Color.Lerp(Hex("#3f9a35"), Hex("#2a6a2a"), Fbm(q * 9, 2));
+                var desert = Color.Lerp(Hex("#d8b46e"), Hex("#b38a52"), Fbm(q * 8, 2));
+                float arid = Mathf.SmoothStep(0, 1, Mathf.Clamp01((dry - 0.45f) / 0.15f)) * Mathf.Clamp01(1 - Mathf.Abs(Mathf.Abs(lat) - 24) / 20);
+                c = Color.Lerp(green, desert, arid);
+                c = Color.Lerp(c, Hex("#8c8573"), Mathf.SmoothStep(0.6f, 1, h) * 0.6f);
+            }
+            // Ice at the poles, ragged.
+            float ice = Mathf.SmoothStep(0, 1, Mathf.Clamp01((Mathf.Abs(lat) - 66 - 6 * (Fbm(q * 5, 3) - 0.5f) * 2) / 5));
+            c = Color.Lerp(c, Hex("#f2f5fa"), ice);
+            // Clouds: swirling bands, thinner over the subtropics.
+            float cl = Fbm(new Vector3(q.x * 2.6f, q.y * 5.2f, q.z * 2.6f) + new Vector3(0, 0, 4), 5);
+            float cover = Mathf.SmoothStep(0.64f, 0.8f, cl) * (0.7f + 0.3f * Mathf.Cos(lat * 3 * Mathf.Deg2Rad));
+            return Color.Lerp(c, Hex("#f4f6fa"), cover * 0.5f);
+        }
+
+        public static void Build(Bm b, ActorRec a)
+        {
+            int frame = a.pose.Length > 1 && int.TryParse(a.pose.Substring(1), out var k) ? k : 0;
+            float turn = frame * 360f / 24;
+            float R = 32 / IslandBuild.PxPerUnit;
+            var axis = Axis;
+            // Its own frame: y up the axis.
+            var spin = Quaternion.FromToRotation(Vector3.up, axis) * Quaternion.AngleAxis(-turn, Vector3.up);
+            int lon = 360, lat = 180;
+            var cols = new Color[lon + 1, lat + 1];
+            for (int j = 0; j <= lat; j++) for (int i = 0; i <= lon; i++) { float th0 = Mathf.PI * j / lat - Mathf.PI / 2, ph0 = Mathf.PI * 2 * i / lon; cols[i, j] = At(new Vector3(Mathf.Cos(th0) * Mathf.Cos(ph0), Mathf.Sin(th0), Mathf.Cos(th0) * Mathf.Sin(ph0))); }
+            Vector3 V(int i, int j) { float th = Mathf.PI * j / lat - Mathf.PI / 2, ph = Mathf.PI * 2 * i / lon; return new Vector3(Mathf.Cos(th) * Mathf.Cos(ph), Mathf.Sin(th), Mathf.Cos(th) * Mathf.Sin(ph)); }
+            for (int j = 0; j < lat; j++)
+                for (int i = 0; i < lon; i++)
+                {
+                    Vector3 q0 = V(i, j), q1 = V(i + 1, j), q2 = V(i + 1, j + 1), q3 = V(i, j + 1);
+                    b.QuadColours(spin * q0 * R, spin * q1 * R, spin * q2 * R, spin * q3 * R, cols[i, j], cols[i + 1, j], cols[i + 1, j + 1], cols[i, j + 1], Paint);
+                }
+        }
+    }
     }
 }

@@ -127,7 +127,7 @@ namespace Island
             switch (a.kind)
             {
                 case "person": return Person(a);
-                case "sheep": case "deer": case "duck": case "crab": case "gull": case "pigeon": case "dolphin": case "whale": case "bfly": case "cloud": case "balloon": case "plane": case "dog": case "robot": return Creature(a);
+                case "sheep": case "deer": case "duck": case "crab": case "gull": case "pigeon": case "dolphin": case "whale": case "bfly": case "cloud": case "balloon": case "plane": case "dog": case "robot": case "globe": case "pod": return Creature(a);
                 case "car": case "bus": case "bike": case "sail": case "ferry": case "fishing": case "speed": case "row":
                     var b = a.kind switch { "car" => Car(a), "bus" => Bus(a), "bike" => Bike(a), "sail" => Sailboat(a), "ferry" => Ferry(a), "fishing" => Fishing(a), "speed" => Speedboat(a), _ => Rowboat(a) };
                     b.Apply(Matrix4x4.Rotate(Quaternion.Euler(0, Yaw(a.facing), 0)));

@@ -591,7 +591,9 @@ export async function paint(b: Built, view: [number, number, number, number], ha
       for (let c = 0; c < 3; c++) px[di + c] = Math.round((posterPx[si + c] ?? 0) + (s0[c + 1] + (s1[c + 1] - s0[c + 1]) * k) * (1 - a))
     }
     files.set('poster.webp', await sharp(px, { raw: { width: pw, height: ph, channels: 3 } }).webp({ quality: 80, effort: 5, smartSubsample: true }).toBuffer())
-    posterOut = { file: 'poster.webp', w: pw, h: ph }
+    // And a tiny copy of it, inline in the page, for the moment before even the poster is in.
+    const tiny = await sharp(px, { raw: { width: pw, height: ph, channels: 3 } }).resize(Math.round(pw / 10), Math.round(ph / 10)).webp({ quality: 45, effort: 6 }).toBuffer()
+    posterOut = { file: 'poster.webp', w: pw, h: ph, tiny: `data:image/webp;base64,${tiny.toString('base64')}` }
   }
 
   /* ---- the scene ---- */

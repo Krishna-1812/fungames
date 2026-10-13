@@ -1,5 +1,5 @@
 {
- "id": "757f4913a5fd",
+ "id": "a476ac1d276e",
  "sizes": {
   "person": {
    "w": 42,
@@ -138,6 +138,18 @@
    "h": 54,
    "ax": 48,
    "ay": 30
+  },
+  "globe": {
+   "w": 76,
+   "h": 76,
+   "ax": 38,
+   "ay": 38
+  },
+  "pod": {
+   "w": 28,
+   "h": 40,
+   "ax": 14,
+   "ay": 34
   }
  },
  "names": [
@@ -191,6 +203,30 @@
   "a-duck-ffffff-swim-se",
   "a-duck-ffffff-swim-sw",
   "a-duck-ffffff-swim-w",
+  "a-globe-8ccbff-f0-se",
+  "a-globe-8ccbff-f1-se",
+  "a-globe-8ccbff-f10-se",
+  "a-globe-8ccbff-f11-se",
+  "a-globe-8ccbff-f12-se",
+  "a-globe-8ccbff-f13-se",
+  "a-globe-8ccbff-f14-se",
+  "a-globe-8ccbff-f15-se",
+  "a-globe-8ccbff-f16-se",
+  "a-globe-8ccbff-f17-se",
+  "a-globe-8ccbff-f18-se",
+  "a-globe-8ccbff-f19-se",
+  "a-globe-8ccbff-f2-se",
+  "a-globe-8ccbff-f20-se",
+  "a-globe-8ccbff-f21-se",
+  "a-globe-8ccbff-f22-se",
+  "a-globe-8ccbff-f23-se",
+  "a-globe-8ccbff-f3-se",
+  "a-globe-8ccbff-f4-se",
+  "a-globe-8ccbff-f5-se",
+  "a-globe-8ccbff-f6-se",
+  "a-globe-8ccbff-f7-se",
+  "a-globe-8ccbff-f8-se",
+  "a-globe-8ccbff-f9-se",
   "a-gull-f4f5f8-down-e",
   "a-gull-f4f5f8-down-n",
   "a-gull-f4f5f8-down-ne",
@@ -218,6 +254,7 @@
   "a-pigeon-8e93a6-up-e",
   "a-pigeon-8e93a6-up-w",
   "a-plane-ff4f6e-stand-e",
+  "a-pod-b8a1ff-stand-se",
   "a-robot-8ccbff-stand-se",
   "a-sheep-eceaf0-down-se",
   "a-sheep-eceaf0-down-sw",

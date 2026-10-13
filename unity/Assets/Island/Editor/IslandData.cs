@@ -36,6 +36,8 @@ namespace Island
         public float[] seaRocks;
         /** The stones at the waterline: x (i), y (j), size, flattened. */
         public float[] shoreRocks;
+        /** Banks of sand out of the sea and trenches in it: i, j, radius, the top's height (site units), flattened (Terrain3D). */
+        public float[] isles;
         /** Each building's solids, in runs (Buildings.cs). */
         public BuildingSolids[] solids;
         /** The people (and the rest of what moves) the site draws, each one pose of one facing (Buildings.Actor). */

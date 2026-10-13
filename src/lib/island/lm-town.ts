@@ -35,7 +35,12 @@ export const town: Record<string, Landmark> = {
     const g = p.plane(0.15, 0.15, 0)
     for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
       const k = r * 8 + c
-      g.add(new N('rect', { x: c * 0.21, y: r * 0.21, width: 0.17, height: 0.17, rx: 0.02, fill: k < 38 ? '#5fe0bf' : '#e8e1f5', stroke: INK, 'stroke-width': 0.031, class: 'liw-cell', 'data-k': k }))
+      g.add(new N('rect', p.real
+        // A raised bed: crops, or soil waiting (the page turns them over as the weeks pass: data-on, data-off).
+        ? { x: c * 0.21, y: r * 0.21, width: 0.17, height: 0.17, rx: 0.012, fill: k < 38 ? '#5d8f4a' : '#7a6e72', stroke: '#9c8f86', 'stroke-width': 0.016, class: 'liw-cell', 'data-k': k, 'data-on': '#5d8f4a', 'data-off': '#7a6e72' }
+        : { x: c * 0.21, y: r * 0.21, width: 0.17, height: 0.17, rx: 0.02, fill: k < 38 ? '#5fe0bf' : '#e8e1f5', stroke: INK, 'stroke-width': 0.031, class: 'liw-cell', 'data-k': k }))
+      // Its rows: furrows across it, darker, whatever grows there.
+      if (p.real) { let d = ''; for (let q = 1; q < 5; q++) d += `M${f(c * 0.21 + 0.015)} ${f(r * 0.21 + q * 0.034)}h0.14`; g.add(new N('path', { d, stroke: '#2f2a2c', 'stroke-width': 0.009, opacity: 0.35 })) }
     }
     // Sprouts on a few of the planted weeks.
     for (let k = 0; k < 14; k++) {
@@ -48,12 +53,14 @@ export const town: Record<string, Landmark> = {
     p.gable(1.55, 1.55, 0.4, 0.4, 16, 8, C.rasp, 'x', { lines: 1 })
     p.door(sh, 'y', 0.5, { w: 0.14, h: 11, fill: shade(C.wood, 0.7) })
     const [sx, sy] = p.at(1.05, 1.05)
-    p.path(`M${f(sx)} ${f(sy)}v-30M${f(sx - 11)} ${f(sy - 21)}h22`, 'none', { sw: 2.2, stroke: C.wood })
-    p.path(`M${f(sx - 5)} ${f(sy - 24)}h10v11h-10z`, C.cobalt, { sw: 1.2 })
-    p.el('circle', { cx: sx, cy: sy - 29, r: 4.5, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2 })
-    p.path(`M${f(sx - 8)} ${f(sy - 32)}h16l-3 -5h-10z`, C.lilac, { sw: 1.1 })
+    p.model('scarecrow', [1.05, 1.05, 0], { fill: C.cobalt, top: C.lilac }, () => {
+      p.path(`M${f(sx)} ${f(sy)}v-30M${f(sx - 11)} ${f(sy - 21)}h22`, 'none', { sw: 2.2, stroke: C.wood })
+      p.path(`M${f(sx - 5)} ${f(sy - 24)}h10v11h-10z`, C.cobalt, { sw: 1.2 })
+      p.el('circle', { cx: sx, cy: sy - 29, r: 4.5, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2 })
+      p.path(`M${f(sx - 8)} ${f(sy - 32)}h16l-3 -5h-10z`, C.lilac, { sw: 1.1 })
+    })
     const [wx, wy] = p.at(0.3, 1.8)
-    p.path(`M${f(wx - 5)} ${f(wy)}v-7h9v7zM${f(wx + 4)} ${f(wy - 5)}l7 -5`, C.sky, { sw: 1.2 })
+    p.model('can', [0.3, 1.8, 0], { fill: C.sky }, () => p.path(`M${f(wx - 5)} ${f(wy)}v-7h9v7zM${f(wx + 4)} ${f(wy - 5)}l7 -5`, C.sky, { sw: 1.2 }))
     person(p, 1.35, 1.85, C.mint, { hat: '#ffffff' })
   } },
 
@@ -139,6 +146,9 @@ export const town: Record<string, Landmark> = {
     const nb = p.box(0.34, 1.7, 1.12, 0.05, 19, { z0: 9, fill: C.wood, sw: 1.2 })
     p.quad(nb, 'y', 0.03, 0.97, 1.5, 17.5, '#dfe4f2', { sw: 0.9 })
     p.gable(0.3, 1.64, 1.2, 0.16, 29, 5, C.cobalt, 'x', { lines: 0 })
+    // The rules pinned up: printed on the board by Unity (kit.ts, decal), their words the page's.
+    const notesAt: [number, number, number, number] = [-18, -17, 18, 0]
+    p.decal('rules-notes', nb, 'y', 0.5, 1.5, notesAt)
     const g = p.face(nb, 'y', 0.5, 1.5, { w: 36, h: 17 })
     const notes: [number, number, number, number, number, string][] = [[-14, -15, 9, 11, -6, '#ffffff'], [-3, -15.5, 8, 7, 4, '#ffe1e8'], [6, -15, 9, 9, -3, '#d6f5ec'], [-5, -8, 7, 6, 7, '#e3e0ff'], [9, -5.5, 6, 5, -8, '#ffffff']]
     for (const [x, y, w, h, a, c] of notes) {
@@ -156,6 +166,7 @@ export const town: Record<string, Landmark> = {
       letter(top, 5.8, -8.6 + k * 2.6, k === 2 ? '✗' : '✓', { size: 2.8, fill: k === 2 ? C.rasp : '#11a887', cls: 'rc-tick' }).attrs.style = `animation-delay:${k * 0.5}s`
     }
     top.add(new N('circle', { cx: 2, cy: -15.1, r: 0.9, fill: C.cobalt }))
+    p.printFace(g, 'rules-notes', notesAt)
     // The lamp, and the moth that will not leave it.
     lamp(p, 1.85, 1.75, 34)
     const [lx, ly] = p.at(1.85, 1.75, 36)

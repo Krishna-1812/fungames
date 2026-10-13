@@ -107,7 +107,7 @@ const book = BOOK.map((key) => {
       <div class="isl-box" id="islBox" tabindex="0">
         <div class="isl-stage" id="islStage">
           <canvas class="isl-canvas" id="islCanvas" aria-hidden="true"></canvas>
-          {poster && <img class="isl-poster" id="islPoster" src={baked.base + poster.file} width={poster.w} height={poster.h} alt="" fetchpriority="high" decoding="async" />}
+          {poster && <img class="isl-poster" id="islPoster" src={baked.base + poster.file} width={poster.w} height={poster.h} alt="" fetchpriority="high" decoding="async" style={poster.tiny ? `background-image:url(${poster.tiny});background-size:100% 100%` : undefined} />}
           <noscript><img class="isl-still" src={baked.base + 'still.webp'} alt={`Tiny Island: ${count} games, each one a building`} /></noscript>
         </div>
         <nav class="isl-links" aria-label="The games on the island">
@@ -1248,7 +1248,7 @@ const book = BOOK.map((key) => {
     setInterval(() => { if (!isle.awake()) return; const y = String(1300 + Math.floor(Math.random() * 720)); e.setText('wwa-year', y); years.forEach((el) => { el.textContent = y }) }, 2400)
     // Life in Weeks fills in, a week at a time.
     let wk = 38
-    setInterval(() => { if (!isle.awake()) return; wk = wk >= 63 ? 38 : wk + 1; e.eachShape('liw-cell', (d, set) => set(Number(d.k) < wk ? '#5fe0bf' : '#e8e1f5')) }, 900)
+    setInterval(() => { if (!isle.awake()) return; wk = wk >= 63 ? 38 : wk + 1; e.eachShape('liw-cell', (d, set) => set(Number(d.k) < wk ? (d.on ?? '#5fe0bf') : (d.off ?? '#e8e1f5'))) }, 900)
     // Every Second's windows, a few lit at a time.
     const lit = RULES.find((r) => r.on.includes('es-win') && r.on.includes('lit'))?.base?.fill ?? '#ffe9a8'
     const wins: ((fill: string | null) => void)[] = []

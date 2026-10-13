@@ -463,7 +463,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     const sy = Number(tf.match(/scale\(1 ([\d.]+)\)/)?.[1] ?? 1)
     const stops = g.kids.filter((k): k is El => typeof k !== 'string').map((k) => [Number(k.attrs.offset), k.attrs['stop-color']] as [number, string])
     const x = Number(el.attrs.x), y = Number(el.attrs.y)
-    return { k: 'sea', cx: Number(g.attrs.cx), cy: Number(g.attrs.cy), r: Number(g.attrs.r), sy, stops, rect: [x, y, x + Number(el.attrs.width), y + Number(el.attrs.height)] }
+    return { k: 'sea', cx: Number(g.attrs.cx), cy: Number(g.attrs.cy), r: Number(g.attrs.r), sy, stops, rect: [x, y, x + Number(el.attrs.width), y + Number(el.attrs.height)], ...(el.attrs['data-still'] !== undefined ? { still: true } : {}) }
   }
 
   function clipPathData(ref: string): string {

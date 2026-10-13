@@ -93,6 +93,38 @@ export function minPath(d: string): string {
 
 /** Groups that set round joins for everything drawn inside them. */
 const joinRoots = new WeakSet<N>()
+/**
+ * Artwork printed on something Unity builds (a board's pinned papers, a
+ * poster, a painted emblem): drawn here in its own units, w by h screen
+ * pixels from its top left, and rasterised for Unity by
+ * scripts/export-island.mjs into one sheet (unity/Assets/Island/Data/prints.png),
+ * which Unity lays on the model's face (Buildings: Print). Never lettering:
+ * the page draws that itself, live, in its own font.
+ */
+export const printsWanted = new Map<string, { w: number; h: number; svg: string }>()
+export function print(name: string, w: number, h: number, art: N): string {
+  printsWanted.set(name, { w, h, svg: render(art) })
+  return name
+}
+
+/**
+ * Shading for what stays drawn on the realistic island because it moves (a
+ * planet going round, a puff of steam, a falling rock): a radial gradient put
+ * in `parent`, for fill="url(#id)". A ball is lit as Unity lights the island
+ * (from behind on the right: bright up on its right, falling to its shadowed
+ * left and its rim); a puff is its colour at its heart, fading to nothing.
+ */
+export function ballShade(parent: N, id: string, colour: string): string {
+  const g = parent.add(new N('radialGradient', { id, cx: 0.62, cy: 0.34, r: 0.78, fx: 0.66, fy: 0.28 }))
+  for (const [o, c] of [[0, mix(colour, '#ffffff', 0.55)], [0.18, mix(colour, '#ffffff', 0.18)], [0.55, colour], [0.85, shade(colour, 0.62)], [1, shade(colour, 0.48)]] as [number, string][]) g.add(new N('stop', { offset: o, 'stop-color': c }))
+  return `url(#${id})`
+}
+export function puffShade(parent: N, id: string, colour: string, core = 0.9): string {
+  const g = parent.add(new N('radialGradient', { id }))
+  for (const [o, op] of [[0, core], [0.45, core * 0.7], [0.8, core * 0.22], [1, 0]]) g.add(new N('stop', { offset: o, 'stop-color': colour, 'stop-opacity': op }))
+  return `url(#${id})`
+}
+
 export const joinRoot = <T extends N>(n: T) => { joinRoots.add(n); return n }
 
 export function render(n: N | string): string {
@@ -499,12 +531,59 @@ export class Pen {
     this.grow(sx - w / 2, sy - h - w / 4, sx + w / 2, sy + h + w / 4)
     return this.el('g', { transform: `translate(${f(sx)} ${f(sy)}) skewY(${face === 'x' ? -26.565 : 26.565})`, class: o.cls })
   }
+  /**
+   * A board facing the viewer, bottom-centred on (x, y, z), w by h screen
+   * pixels. Unity builds it (Models.cs, Plaque): a panel a little thick, edged
+   * in `edge`, with `art` (drawn in its own w by h from its top left) printed
+   * on its face, on two posts down to `foot` (the height they stand on) if
+   * given. `drawn` draws it on the flat island. Its lettering is the page's,
+   * drawn after it, over it.
+   */
+  plaque(name: string, x: number, y: number, z: number, w: number, h: number, art: N, o: { foot?: number; depth?: number; edge?: string }, drawn: () => void) {
+    this.model('plaque', [x, y, z], { w, h, d: o.depth, foot: o.foot === undefined ? undefined : o.foot + this.oz, side: o.edge, prints: [print(name, w, h, art)] }, drawn)
+  }
+  /**
+   * What is drawn on a box's face (with `face`, at u along it and z up it)
+   * printed there by Unity instead (Models.cs, Decal): call this before
+   * drawing on the face, so the print lies under anything the page draws over
+   * it, and `printFace` after. `r` is the drawing's extent in the face's own
+   * units, [x0, y0, x1, y1] (x across the face to the right, y down it).
+   */
+  decal(name: string, b: Box, face: 'x' | 'y', u: number, z: number, r: [number, number, number, number]) {
+    this.model('decal', [0, 0, 0], { b: this.wb(b), face, u, z, dx: r[0], dy: r[1], w: r[2] - r[0], h: r[3] - r[1], prints: [name] }, () => null)
+  }
+  /**
+   * The face's drawing given to its decal: everything in it but its words and
+   * what moves or changes (anything with a class) printed (kit.ts, print); on
+   * the realistic island, taken out of the page's drawing, those left where
+   * they were.
+   */
+  printFace(g: N, name: string, r: [number, number, number, number]) {
+    const art = new N('g', { transform: `translate(${f(-r[0])} ${f(-r[1])})` })
+    const live = (n: N) => n.tag === 'text' || !!n.attrs.class
+    const words = (n: N): boolean => live(n) || n.kids.some((k) => typeof k !== 'string' && words(k))
+    const copy = (n: N): N | null => {
+      if (live(n)) return null
+      const m = new N(n.tag, { ...n.attrs })
+      // Printed, not drawn: no ink outlines, only the paper's own edge.
+      if (m.attrs.stroke === INK) { m.attrs.stroke = '#aab2c8'; m.attrs['stroke-width'] = Math.round(Number(m.attrs['stroke-width'] ?? 1) * 50) / 100 }
+      for (const k of n.kids) { if (typeof k === 'string') m.kids.push(k); else { const q = copy(k); if (q) m.add(q) } }
+      return m
+    }
+    for (const k of g.kids) if (typeof k !== 'string') { const q = copy(k); if (q) art.add(q) }
+    print(name, r[2] - r[0], r[3] - r[1], art)
+    if (!this.real) return
+    // Keep only the words, and the groups that hold them.
+    const keep = (n: N) => { n.kids = n.kids.filter((k) => typeof k === 'string' || words(k)); for (const k of n.kids) if (typeof k !== 'string') keep(k) }
+    keep(g)
+  }
   /** A flat sign facing the viewer, bottom-centred on a point. */
   sign(x: number, y: number, z: number, w: number, h: number, fill: string, label?: string, o: { size?: number; ink?: string; rx?: number; cls?: string; font?: string } = {}) {
     const [sx, sy] = this.at(x, y, z)
     this.grow(sx - w / 2, sy - h, sx + w / 2, sy)
     const g = this.group(o.cls)
-    g.el('rect', { x: sx - w / 2, y: sy - h, width: w, height: h, rx: o.rx ?? 3, fill, stroke: INK, 'stroke-width': OUT })
+    const art = new N('rect', { x: 0, y: 0, width: w, height: h, rx: o.rx ?? 3, fill })
+    g.plaque(`sign-${fill.slice(1)}-${w}x${h}-${o.rx ?? 3}`, x, y, z, w, h, art, { edge: fill }, () => g.el('rect', { x: sx - w / 2, y: sy - h, width: w, height: h, rx: o.rx ?? 3, fill, stroke: INK, 'stroke-width': OUT }))
     if (label) g.el('text', { x: sx, y: sy - h / 2 + (o.size ?? 8) * 0.36, 'text-anchor': 'middle', 'font-family': o.font ?? 'Fredoka, system-ui, sans-serif', 'font-weight': 700, 'font-size': o.size ?? 8, fill: o.ink ?? INK }).text(label)
     return g
   }

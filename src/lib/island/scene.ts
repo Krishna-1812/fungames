@@ -106,7 +106,7 @@ export type Node =
   /** A line of lettering, drawn with the page's own fonts. */
   | { k: 'txt'; s: string; x: number; y: number; m?: M; font: string; fill: string | null; stroke?: string | null; sw?: number; op?: number; anchor: CanvasTextAlign; bl: CanvasTextBaseline; ls?: number; a?: Anim[]; tags?: string[]; bb?: Box }
   /** The open sea: a radial gradient as wide as the sky. */
-  | { k: 'sea'; cx: number; cy: number; r: number; sy: number; stops: [number, string][]; rect: Box }
+  | { k: 'sea'; cx: number; cy: number; r: number; sy: number; stops: [number, string][]; rect: Box; /** No wave marks drawn over it (the realistic sea). */ still?: boolean }
 
 /** A sprite: where it sits (in its group's coordinates) and where each size of it is. */
 export type Sprite = {
@@ -156,7 +156,7 @@ export type Scene = {
   /** Where each layer of the painting ends among the top-level nodes: its kind, and the index just after its last node. */
   ends?: [string, number][]
   /** The island's still painting by day, small, over the sea, covering the view: shown until the canvas can draw. */
-  poster: { file: string; w: number; h: number } | null
+  poster: { file: string; w: number; h: number; /** A tiny copy, inline: shown until the poster is in. */ tiny?: string } | null
 }
 
 /**

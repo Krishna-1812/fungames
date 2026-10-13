@@ -29,6 +29,10 @@ namespace Island
         public int rows, cols;
         public SolidBox b;
         public float[] pts, bandZ;
+        /** Artwork printed on a model (kit.ts, print), by name: Prints.cs. */
+        public string[] prints;
+        /** Where a plaque's posts stand (site height); not a number when it has none. */
+        public float foot = float.NaN;
         public string[] bandC, colours;
     }
     [Serializable] public class SolidRun { public string[] items; }
@@ -36,7 +40,7 @@ namespace Island
 
     public static partial class Buildings
     {
-        public const int Plaster = 0, Brick = 1, Tiles = 2, Slate = 3, Timber = 4, Metal = 5, Glass = 6, Concrete = 7, Paint = 8, Cloth = 9, Pane = 10;
+        public const int Plaster = 0, Brick = 1, Tiles = 2, Slate = 3, Timber = 4, Metal = 5, Glass = 6, Concrete = 7, Paint = 8, Cloth = 9, Pane = 10, Printed = 11;
         static Material mat;
         public static Material Mat => mat != null ? mat : (mat = NewMat());
 
@@ -51,6 +55,8 @@ namespace Island
             var rep = new float[16];
             for (int i = 0; i < Photos.WallMetres.Length; i++) rep[i] = MetresPerUnit / Photos.WallMetres[i];
             m.SetFloatArray("_WallRep", rep);
+            Prints.Load();
+            if (Prints.Sheet != null) m.SetTexture("_Prints", Prints.Sheet);
             return m;
         }
         /** A world unit in metres: the site's doors are 16 px (0.41 of a unit) tall, a door is 2 m. */
@@ -105,6 +111,26 @@ namespace Island
                 var c1 = col; c1.a = 1;
                 c.Add(c1); c.Add(c1); c.Add(c1); c.Add(c1);
                 t.AddRange(new[] { k, k + 2, k + 1, k, k + 3, k + 2 });
+            }
+            /** A quad with its texture coordinates given: from uv0 at a (bottom left) to uv1 at cc (top right). A print on a face. */
+            public void QuadUV(Vector3 a, Vector3 b, Vector3 cc, Vector3 d, Color col, int material, Vector2 uv0, Vector2 uv1)
+            {
+                var nrm = Unit(Vector3.Cross(cc - a, d - b));
+                if (nrm.sqrMagnitude < 0.5f) nrm = Unit(Vector3.Cross(b - a, d - a));
+                var across = Unit(b - a);
+                int k = v.Count;
+                v.AddRange(new[] { a, b, cc, d });
+                uv.Add(uv0); uv.Add(new Vector2(uv1.x, uv0.y)); uv.Add(uv1); uv.Add(new Vector2(uv0.x, uv1.y));
+                for (int q = 0; q < 4; q++) { n.Add(nrm); tan.Add(new Vector4(across.x, across.y, across.z, 1)); m.Add(new Vector2(material, 0.5f)); var c1 = col; c1.a = 1; c.Add(c1); }
+                t.AddRange(new[] { k, k + 2, k + 1, k, k + 3, k + 2 });
+            }
+            /** A quad with a colour at each corner (blended across it): a painted sphere. */
+            public void QuadColours(Vector3 a, Vector3 b, Vector3 cc, Vector3 d, Color ca, Color cb, Color ccol, Color cd, int material)
+            {
+                int k0 = v.Count;
+                Quad(a, b, cc, d, ca, material);
+                ca.a = 1; cb.a = 1; ccol.a = 1; cd.a = 1;
+                c[k0] = ca; c[k0 + 1] = cb; c[k0 + 2] = ccol; c[k0 + 3] = cd;
             }
             public void Tri(Vector3 a, Vector3 b, Vector3 cc, Color col, int material)
             {

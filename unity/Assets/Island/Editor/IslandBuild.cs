@@ -567,7 +567,7 @@ namespace Island
             int made = 0;
             foreach (var bs in d.solids)
             {
-                if (only != "" && bs.slug != only) continue;
+                if (only != "" && System.Array.IndexOf(only.Split(','), bs.slug) < 0) continue;
                 var runs = new List<GameObject>();
                 Buildings.Prepare(bs);
                 for (int r = 0; r < bs.runs.Length; r++) runs.Add(Buildings.Run(bs.runs[r], $"{bs.slug}/{r}"));
@@ -594,7 +594,7 @@ namespace Island
                 foreach (var go in runs) Object.DestroyImmediate(go);
             }
             json.Append('}');
-            File.WriteAllText(only == "" ? "Renders/buildings/buildings.json" : $"Renders/buildings/{only}.json", $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
+            File.WriteAllText(only == "" ? "Renders/buildings/buildings.json" : $"Renders/buildings/{only.Split(',')[0]}.json", $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
             Debug.Log($"[island] buildings: {made} runs at {scale} px a unit");
         }
 
@@ -639,6 +639,8 @@ namespace Island
                 ["robot"] = new float[] { -30, -26, 42, 34 },
                 ["balloon"] = new float[] { -40, -100, 70, 112 },
                 ["plane"] = new float[] { -48, -30, 96, 54 },
+                ["globe"] = new float[] { -38, -38, 76, 76 },
+                ["pod"] = new float[] { -14, -34, 28, 40 },
             };
             Directory.CreateDirectory("Renders/actors");
             if (only == "") foreach (var f in Directory.GetFiles("Renders/actors")) File.Delete(f);
@@ -646,7 +648,7 @@ namespace Island
             int made = 0;
             foreach (var a in d.actors ?? new ActorRec[0])
             {
-                if (only != "" && !a.name.StartsWith(only)) continue;
+                if (only != "" && !System.Array.Exists(only.Split(','), o => a.name.StartsWith(o))) continue;
                 var go = Buildings.Actor(a);
                 if (go == null) continue;
                 var bxy = boxes.TryGetValue(a.kind, out var q) ? q : boxes["person"];
@@ -657,7 +659,7 @@ namespace Island
                 if (Lit) Dome.Shoot(cam, pw, ph, $"Renders/actors/{a.name}.png", ss, true);
                 else ShootFigure(cam, pw, ph, $"Renders/actors/{a.name}.png", ss);
                 Object.DestroyImmediate(go);
-                bool aloft = ((a.kind == "gull" || a.kind == "pigeon") && (a.pose == "up" || a.pose == "down")) || a.kind == "bfly" || a.kind == "cloud" || a.kind == "balloon" || a.kind == "plane";
+                bool aloft = ((a.kind == "gull" || a.kind == "pigeon") && (a.pose == "up" || a.pose == "down")) || a.kind == "bfly" || a.kind == "cloud" || a.kind == "balloon" || a.kind == "plane" || a.kind == "globe" || a.kind == "pod";
                 if (!aloft)
                 {
                     var sh = Buildings.ActorShadow(a, Dome.ToSun, flat);

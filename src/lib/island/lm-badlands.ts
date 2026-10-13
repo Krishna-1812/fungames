@@ -1,5 +1,5 @@
 /** The Badlands: impacts, quakes, deep time and the elements. */
-import { C, INK, N, OUT, P, shade, r1 as f, type Landmark, type Pen } from './kit'
+import { C, INK, N, OUT, P, shade, mix, ballShade, puffShade, r1 as f, type Landmark, type Pen } from './kit'
 import { person, crate, barrel, tree, flag } from './props'
 
 export const badlands: Record<string, Landmark> = {
@@ -22,7 +22,7 @@ export const badlands: Record<string, Landmark> = {
     }
     m.path(`M${f(cx - 6)} ${f(cy - 5)}L${f(cx - 80)} ${f(cy - 100)}L${f(cx - 64)} ${f(cy - 108)}Z`, 'url(#ast-tail)', { sw: 0 })
     m.path(`M${f(cx - 4)} ${f(cy - 4)}L${f(cx - 50)} ${f(cy - 66)}L${f(cx - 42)} ${f(cy - 70)}Z`, 'url(#ast-core)', { sw: 0 })
-    m.path(`M${f(cx - 10)} ${f(cy - 2)}l3 -9l9 -3l8 5l1 9l-7 6l-10 -1z`, C.rockDark, { sw: 2 })
+    m.path(`M${f(cx - 10)} ${f(cy - 2)}l3 -9l9 -3l8 5l1 9l-7 6l-10 -1z`, m.real ? ballShade(trail, 'ast-rock', '#6d6a86') : C.rockDark, { sw: m.real ? 0 : 2 })
     // The launch rail and its control hut.
     const hut = p.box(0.05, 1.4, 0.45, 0.45, 16, { fill: C.white, trim: C.rasp })
     p.windows(hut, 'x', { cols: 1, z0: 6, h: 6, wide: 0.5 })
@@ -48,19 +48,30 @@ export const badlands: Record<string, Landmark> = {
     // The sign.
     const [sx, sy] = q.at(0.95, 1.65, 7)
     const g = q.group()
-    g.el('rect', { x: sx - 44, y: sy - 38, width: 88, height: 38, rx: 3, fill: '#ffffff', stroke: INK, 'stroke-width': 2.2 })
-    g.el('rect', { x: sx - 44, y: sy - 38, width: 88, height: 11, rx: 3, fill: C.rasp, stroke: INK, 'stroke-width': 1.8 })
+    // Unity's board (a plaque on short posts): white, a red band across its head, the dark display; the words the page's.
+    const art = new N('g')
+    art.add(new N('rect', { x: 0, y: 0, width: 88, height: 38, rx: 3, fill: '#ffffff' }))
+    art.add(new N('path', { d: 'M0 3a3 3 0 0 1 3 -3h82a3 3 0 0 1 3 3v8h-88z', fill: C.rasp }))
+    art.add(new N('rect', { x: 28, y: 14, width: 32, height: 20, rx: 2, fill: '#1b2340' }))
+    art.add(new N('rect', { x: 29.5, y: 15.5, width: 29, height: 17, rx: 1.2, fill: '#141a33' }))
+    g.plaque('dsi-board', 0.95, 1.65, 7, 88, 38, art, { foot: 0, edge: '#e3e8f7' }, () => {
+      g.el('rect', { x: sx - 44, y: sy - 38, width: 88, height: 38, rx: 3, fill: '#ffffff', stroke: INK, 'stroke-width': 2.2 })
+      g.el('rect', { x: sx - 44, y: sy - 38, width: 88, height: 11, rx: 3, fill: C.rasp, stroke: INK, 'stroke-width': 1.8 })
+    })
     g.el('text', { x: sx, y: sy - 30, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 6.6, fill: '#fff' }).text('DAYS SINCE LAST INCIDENT')
-    g.el('rect', { x: sx - 16, y: sy - 24, width: 32, height: 20, rx: 2, fill: '#1b2340', stroke: INK, 'stroke-width': 1.2 })
+    if (!g.real) g.el('rect', { x: sx - 16, y: sy - 24, width: 32, height: 20, rx: 2, fill: '#1b2340', stroke: INK, 'stroke-width': 1.2 })
     g.el('text', { x: sx, y: sy - 8, 'text-anchor': 'middle', 'font-family': 'Silkscreen, monospace', 'font-size': 16, fill: C.rasp, class: 'dsi-count' }).text('0')
     q.grow(sx - 46, sy - 40, sx + 46, sy)
     // The seismograph mast and dish.
     p.line([1.9, 0.3, 0], [1.9, 0.3, 90], { sw: 2.4 })
     for (let k = 0; k < 6; k++) p.line([1.84, 0.3, k * 15], [1.96, 0.3, k * 15 + 15], { sw: 1 })
     const [dx, dy] = p.at(1.9, 0.3, 90)
-    p.path(`M${f(dx - 16)} ${f(dy - 6)}q16 18 32 0z`, C.white)
-    p.path(`M${f(dx)} ${f(dy)}l0 -10`, 'none', { sw: 1.6 })
-    p.path(`M${f(dx + 2)} ${f(dy - 14)}q6 -6 12 0M${f(dx - 2)} ${f(dy - 20)}q11 -11 22 0`, 'none', { stroke: C.rasp, sw: 2, cls: 'blink' })
+    // The dish (Unity's: Models.cs, Dish), turned up to the sky, and what it hears, going out.
+    p.model('dish', [1.9, 0.3, 90], { r: 16 }, () => {
+      p.path(`M${f(dx - 16)} ${f(dy - 6)}q16 18 32 0z`, C.white)
+      p.path(`M${f(dx)} ${f(dy)}l0 -10`, 'none', { sw: 1.6 })
+    })
+    p.path(`M${f(dx + 2)} ${f(dy - 14)}q6 -6 12 0M${f(dx - 2)} ${f(dy - 20)}q11 -11 22 0`, 'none', { stroke: C.rasp, sw: p.real ? 1.3 : 2, cls: 'blink' })
     // Out front: the drum still scribbling.
     const tb = p.box(1.35, 1.75, 0.4, 0.2, 8, { fill: C.stone })
     const [px, py] = p.at(1.55, 1.85, 8)
@@ -78,13 +89,15 @@ export const badlands: Record<string, Landmark> = {
     // The dinosaur, in the front face, a third of the way down.
     const [fx, fy] = p.at(1, 1.95, 30)
     const b = p.group('dt-fossil')
-    b.path(`M${f(fx - 36)} ${f(fy + 4)}q14 -4 24 -14q14 -12 30 -6q10 4 18 -2`, 'none', { stroke: '#ffffff', sw: 3 })
-    for (let k = 0; k < 6; k++) b.path(`M${f(fx - 10 + k * 6)} ${f(fy - 12 + Math.abs(k - 2.5) * 1.5)}l-2 ${f(12 - Math.abs(k - 2.5) * 1.6)}`, 'none', { stroke: '#ffffff', sw: 2.2 })
-    b.path(`M${f(fx + 36)} ${f(fy - 12)}l8 -3l5 3l-2 5l-8 1z`, 'none', { stroke: '#ffffff', sw: 2.2 })
-    b.path(`M${f(fx - 4)} ${f(fy - 2)}l-4 12M${f(fx + 18)} ${f(fy - 4)}l2 12`, 'none', { stroke: '#ffffff', sw: 2.2 })
-    // An ammonite on the other face.
+    // On the realistic island, bone set in the rock: a pale fossil-grey, lit as the face it is in.
+    const bone = p.real ? '#d9d3e6' : '#ffffff', op = p.real ? 0.82 : undefined
+    b.path(`M${f(fx - 36)} ${f(fy + 4)}q14 -4 24 -14q14 -12 30 -6q10 4 18 -2`, 'none', { stroke: bone, sw: p.real ? 2.6 : 3, op })
+    for (let k = 0; k < 6; k++) b.path(`M${f(fx - 10 + k * 6)} ${f(fy - 12 + Math.abs(k - 2.5) * 1.5)}l-2 ${f(12 - Math.abs(k - 2.5) * 1.6)}`, 'none', { stroke: bone, sw: p.real ? 1.8 : 2.2, op })
+    b.path(`M${f(fx + 36)} ${f(fy - 12)}l8 -3l5 3l-2 5l-8 1z`, 'none', { stroke: bone, sw: p.real ? 1.8 : 2.2, op })
+    b.path(`M${f(fx - 4)} ${f(fy - 2)}l-4 12M${f(fx + 18)} ${f(fy - 4)}l2 12`, 'none', { stroke: bone, sw: p.real ? 1.8 : 2.2, op })
+    // An ammonite on the other face (in the shade: darker).
     const [ax, ay] = p.at(1.95, 0.9, 20)
-    p.path(`M${f(ax)} ${f(ay)}m-7 0a7 7 0 1 1 7 7a5 5 0 1 1 -5 -5a3 3 0 1 1 3 3`, 'none', { stroke: '#ffffff', sw: 1.8 })
+    p.path(`M${f(ax)} ${f(ay)}m-7 0a7 7 0 1 1 7 7a5 5 0 1 1 -5 -5a3 3 0 1 1 3 3`, 'none', { stroke: p.real ? '#c2bbd6' : '#ffffff', sw: p.real ? 1.5 : 1.8, op })
     // A ladder down the side, and someone at work up top.
     p.line([1.95, 1.45, 0], [1.95, 1.45, top], { sw: 1.6 })
     p.line([1.95, 1.6, 0], [1.95, 1.6, top], { sw: 1.6 })
@@ -98,11 +111,13 @@ export const badlands: Record<string, Landmark> = {
 
   fusion: { size: [2, 2], draw(p) {
     const orbs: [number, number, string, string][] = [[0.22, 0.22, C.sky, 'water'], [1.78, 0.22, '#ffffff', 'air'], [0.22, 1.78, '#a49dcf', 'earth'], [1.78, 1.78, C.rasp, 'fire']]
+    // Each orb's sign, painted on it (on the realistic island, paint on a lit ball: off-white, no outline).
+    const paint = p.real ? '#eef0f6' : '#ffffff', gsw = p.real ? 0 : 1, gop = p.real ? 0.9 : undefined
     const glyph = (x: number, y: number, kind: string) => {
-      if (kind === 'water') p.path(`M${f(x)} ${f(y - 5)}q5 6 0 9q-5 -3 0 -9z`, '#ffffff', { sw: 1 })
-      if (kind === 'fire') p.path(`M${f(x)} ${f(y - 6)}q6 5 2 10q-2 -3 -3 0q-5 -5 1 -10z`, '#ffffff', { sw: 1 })
-      if (kind === 'air') p.path(`M${f(x - 5)} ${f(y - 2)}h7a2.5 2.5 0 1 0 -2.5 -2.5M${f(x - 5)} ${f(y + 2)}h9`, 'none', { sw: 1.4 })
-      if (kind === 'earth') p.path(`M${f(x - 5)} ${f(y + 3)}l3 -6l3 3l2 -4l3 7z`, '#ffffff', { sw: 1 })
+      if (kind === 'water') p.path(`M${f(x)} ${f(y - 5)}q5 6 0 9q-5 -3 0 -9z`, paint, { sw: gsw, op: gop })
+      if (kind === 'fire') p.path(`M${f(x)} ${f(y - 6)}q6 5 2 10q-2 -3 -3 0q-5 -5 1 -10z`, paint, { sw: gsw, op: gop })
+      if (kind === 'air') p.path(`M${f(x - 5)} ${f(y - 2)}h7a2.5 2.5 0 1 0 -2.5 -2.5M${f(x - 5)} ${f(y + 2)}h9`, 'none', { sw: 1.4, stroke: p.real ? '#eef0f6' : undefined, op: gop })
+      if (kind === 'earth') p.path(`M${f(x - 5)} ${f(y + 3)}l3 -6l3 3l2 -4l3 7z`, paint, { sw: gsw, op: gop })
     }
     const orb = ([x, y, c, k]: [number, number, string, string]) => {
       p.cyl(x, y, 0.13, 0, 14, C.stone, { bands: [[10, 12, C.lilac]] })
@@ -119,7 +134,12 @@ export const badlands: Record<string, Landmark> = {
     for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; p.box(1 + Math.cos(a) * 0.36 - 0.05, 1 + Math.sin(a) * 0.36 - 0.05, 0.1, 0.1, 6, { z0: 62, fill: '#c9cde0', sw: 1 }) }
     p.cyl(1, 1, 0.26, 62, 12, C.slate, { top: C.mint })
     const [x, y] = p.at(1, 1, 76)
-    for (let k = 0; k < 5; k++) p.el('circle', { cx: x - 12 + k * 6, cy: y, r: 5, fill: [C.mint, C.lilac, C.sky, C.rasp, '#ffffff'][k], stroke: INK, 'stroke-width': 1, class: 'puff', style: `animation-delay:${k * 0.55}s` })
+    // Puffs of steam, each tinted: soft, without edges, on the realistic island.
+    const defs = p.real ? p.el('defs') : null
+    for (let k = 0; k < 5; k++) {
+      const col = [C.mint, C.lilac, C.sky, C.rasp, '#ffffff'][k]
+      p.el('circle', defs ? { cx: x - 12 + k * 6, cy: y, r: 7.5, fill: puffShade(defs, `fu-puff${k}`, mix(col, '#ffffff', 0.45), 0.85), class: 'puff', style: `animation-delay:${k * 0.55}s` } : { cx: x - 12 + k * 6, cy: y, r: 5, fill: col, stroke: INK, 'stroke-width': 1, class: 'puff', style: `animation-delay:${k * 0.55}s` })
+    }
     p.grow(x - 30, y - 60, x + 30, y)
     for (const o of orbs.slice(2)) { p.line([o[0], o[1], 22], [1, 1, 30], { sw: 4.5 }); p.line([o[0], o[1], 22], [1, 1, 30], { sw: 2, stroke: o[2] }) }
     orbs.slice(2).forEach(orb)

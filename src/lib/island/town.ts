@@ -7,7 +7,7 @@
  * height as its floor. Anything that moves on its own carries `amb` and its
  * screen box in `data-b`, so the camera can pause it (cull() in camera.ts).
  */
-import { C, INK, OUT, N, Pen, shade, S, motionCss, r1 } from './kit'
+import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade } from './kit'
 import { person, tree } from './props'
 import { vehicleUse, boatUse, actorUse, who, type Facing } from './actors'
 
@@ -78,7 +78,24 @@ export function noticeboard(p: Pen, x: number, y: number) {
   const [bx, by] = p.at(x, y)
   const w = p.el('g', { 'data-poke': 'notice', class: 'pk pk-notice' })
   w.add(new N('circle', { cx: f(bx), cy: f(by - 18), r: 22, fill: 'transparent' }))
-  const q = new Pen(w, p.ox, p.oy, p.oz, p.b, p.lights)
+  const q = new Pen(w, p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
+  // Unity's (Models.cs, Noticeboard): timber posts, the framed cork board with these papers printed on it,
+  // a little metal roof and the board for its name. The name itself is the page's, over it.
+  const board = new N('g', { transform: 'translate(15 11)' })
+  board.add(new N('rect', { x: -15, y: -11, width: 30, height: 19, fill: '#d9cdb8' }))
+  board.add(new N('rect', { x: -13.5, y: -9.5, width: 27, height: 16, fill: '#cbbd9f' }))
+  for (const [px, py, pw, ph, c, r] of [[-12, -8.6, 8.4, 9.6, '#ffffff', -4], [-2.6, -9, 7.6, 6.8, '#c9f7ea', 3], [5.6, -8.2, 6.6, 8.8, '#ffd1da', -2], [-3.2, -1, 8.6, 6.2, '#e3e9ff', 2]] as [number, number, number, number, string, number][]) {
+    const pg = board.add(new N('g', { transform: `rotate(${r} ${f(px + pw / 2)} ${f(py)})` }))
+    pg.add(new N('rect', { x: px + 0.3, y: py + 0.4, width: pw, height: ph, fill: '#000000', opacity: 0.12 }))
+    pg.add(new N('rect', { x: px, y: py, width: pw, height: ph, fill: c, stroke: shade(c, 0.86), 'stroke-width': 0.25 }))
+    for (let k = 1; k < Math.floor(ph / 2); k++) pg.add(new N('path', { d: `M${f(px + 1.2)} ${f(py + k * 2)}h${f((pw - 2.4) * (k % 3 === 2 ? 0.6 : 1))}`, stroke: '#7d88aa', 'stroke-width': 0.45, opacity: 0.8 }))
+    pg.add(new N('circle', { cx: f(px + pw / 2), cy: f(py + 0.9), r: 0.8, fill: C.rasp }))
+  }
+  q.model('noticeboard', [x, y, 0], { prints: [print('noticeboard', 30, 19, board)] }, () => noticeboardDrawn(q, bx, by))
+  if (q.real) q.el('text', { x: f(bx), y: f(by - 39.8), 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 4.6, fill: '#2c355e' }).text("WHAT'S ON")
+  p.grow(bx - 22, by - 47, bx + 22, by + 6)
+}
+function noticeboardDrawn(q: Pen, bx: number, by: number) {
   q.el('ellipse', { cx: f(bx - 3), cy: f(by + 1), rx: 17, ry: 5, fill: INK, opacity: 0.13 })
   // The posts.
   for (const dx of [-12, 12]) { q.el('path', { d: `M${f(bx + dx)} ${f(by + (dx < 0 ? -1 : 1) * 1.5)}v-30`, stroke: INK, 'stroke-width': 3.6, 'stroke-linecap': 'round' }); q.el('path', { d: `M${f(bx + dx)} ${f(by + (dx < 0 ? -1 : 1) * 1.5)}v-30`, stroke: C.wood, 'stroke-width': 1.8, 'stroke-linecap': 'round' }) }
@@ -98,7 +115,6 @@ export function noticeboard(p: Pen, x: number, y: number) {
   q.el('path', { d: `M${f(bx - 19)} ${f(by - 29.5)}L${f(bx)} ${f(by - 38)}L${f(bx + 19)} ${f(by - 33.5)}L${f(bx + 19)} ${f(by - 31)}L${f(bx)} ${f(by - 35.4)}L${f(bx - 19)} ${f(by - 27)}Z`, fill: C.cobalt, stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' })
   q.el('rect', { x: f(bx - 11), y: f(by - 45), width: 22, height: 7, rx: 1.5, fill: '#ffffff', stroke: INK, 'stroke-width': 1 })
   q.el('text', { x: f(bx), y: f(by - 39.8), 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 4.6, fill: INK }).text("WHAT'S ON")
-  p.grow(bx - 22, by - 47, bx + 22, by + 6)
 }
 
 /**
@@ -160,6 +176,20 @@ function emblem(g: N, shape: Emblem, ink: string) {
  * reads left to right, so a board pointing left has its arrow at its left.
  */
 export function signpost(p: Pen, x: number, y: number, arms: { dx: number; dy: number; ink: string; name: string; shape: Emblem }[]) {
+  const TOP = 36, L = 32
+  // Unity's (Models.cs, Fingerpost): the post and its arms, each painted with its district's emblem; the names the page's.
+  const emblems = arms.map((a) => { const art = new N('g', { transform: 'translate(3.5 3.5)' }); emblem(art, a.shape, a.ink); return print(`emblem-${a.shape}-${a.ink.slice(1)}`, 7, 7, art) })
+  p.model('fingerpost', [x, y, 0], { h: TOP, pts: arms.flatMap((a) => [a.dx, a.dy, 0]), colours: arms.map((a) => a.ink), prints: emblems }, () => signpostDrawn(p, x, y, arms))
+  arms.forEach((a, n) => {
+    const z = TOP - 5 - n * 8.2
+    const [ox, oy] = p.at(x, y, z), [tx, ty] = p.at(x + a.dx, y + a.dy, z)
+    const ex = tx - ox, ey = ty - oy
+    const s = ex >= 0 ? 1 : -1, skew = ex * ey > 0 ? 26.565 : -26.565
+    const g = p.el('g', { transform: `translate(${f(ox)} ${f(oy)}) skewY(${skew})` })
+    g.add(new N('g', { class: 'sign-words' })).add(new N('text', { x: f((s * (L + 7.6)) / 2), y: 1.6, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 4.5, 'letter-spacing': 0.15, fill: '#ffffff' })).text(a.name)
+  })
+}
+function signpostDrawn(p: Pen, x: number, y: number, arms: { dx: number; dy: number; ink: string; name: string; shape: Emblem }[]) {
   const [bx, by] = p.at(x, y)
   const TOP = 36, L = 32, HB = 3.7
   // The foot: its shadow, thrown back to the left.
@@ -178,7 +208,6 @@ export function signpost(p: Pen, x: number, y: number, arms: { dx: number; dy: n
     g.add(new N('path', { d: `M${f(x0 + s * 1.3)} ${-HB + 1.1}L${f(x1 - s * 0.6)} ${-HB + 1.1}`, stroke: '#ffffff', 'stroke-width': 0.9, 'stroke-linecap': 'round', opacity: 0.32 }))
     g.add(new N('circle', { cx: f(s * 2.8), cy: 0, r: 0.7, fill: INK, opacity: 0.55 }))
     emblem(g.add(new N('g', { transform: `translate(${f(s * 7.2)} 0) scale(0.82)` })), a.shape, a.ink)
-    g.add(new N('g', { class: 'sign-words' })).add(new N('text', { x: f((s * (L + 7.6)) / 2), y: 1.6, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 4.5, 'letter-spacing': 0.15, fill: '#ffffff' })).text(a.name)
   }
   // Boards pointing away from us are behind the post, the others in front.
   const all = arms.map((a, n) => ({ a, n }))
@@ -206,8 +235,10 @@ export function busStop(p: Pen, x: number, y: number) {
   p.box(x - 0.24, y - 0.1, 0.48, 0.2, 2, { z0: 16, fill: C.cobalt, top: shade(C.cobalt, 1.15), sw: 1.1 })
   void b
   const [sx, sy] = p.at(x + 0.28, y + 0.06)
-  p.path(`M${f(sx)} ${f(sy)}V${f(sy - 24)}`, 'none', { sw: 1.8 })
-  p.el('circle', { cx: sx, cy: sy - 26, r: 4.2, fill: C.mint, stroke: INK, 'stroke-width': 1.2 })
+  p.model('roundsign', [x + 0.28, y + 0.06, 0], { h: 26, r: 4.2, fill: C.mint }, () => {
+    p.path(`M${f(sx)} ${f(sy)}V${f(sy - 24)}`, 'none', { sw: 1.8 })
+    p.el('circle', { cx: sx, cy: sy - 26, r: 4.2, fill: C.mint, stroke: INK, 'stroke-width': 1.2 })
+  })
   p.text(x + 0.28, y + 0.06, 24.5, 'B', { size: 5.5, dy: 0 })
 }
 
@@ -467,15 +498,37 @@ export function tent(p: Pen, x: number, y: number, c: string) {
 /** A campfire: stones, logs, a flame that flickers and sparks that rise. */
 export function campfire(p: Pen, x: number, y: number) {
   const [bx, by] = p.at(x, y)
-  let st = ''
-  for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2; st += blob(bx + Math.cos(a) * 8, by + Math.sin(a) * 3.6, 2.4, 1.6) }
-  p.path(st, '#c3c8de', { sw: 0.9 })
-  p.path(`M${f(bx - 7)} ${f(by + 1)}l13 -4M${f(bx - 6)} ${f(by - 3)}l12 4`, 'none', { sw: 2.6, stroke: C.wood })
+  p.model('campfire', [x, y, 0], {}, () => {
+    let st = ''
+    for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2; st += blob(bx + Math.cos(a) * 8, by + Math.sin(a) * 3.6, 2.4, 1.6) }
+    p.path(st, '#c3c8de', { sw: 0.9 })
+    p.path(`M${f(bx - 7)} ${f(by + 1)}l13 -4M${f(bx - 6)} ${f(by - 3)}l12 4`, 'none', { sw: 2.6, stroke: C.wood })
+  })
   const g = p.el('g', { class: 'amb', 'data-b': box(bx - 10, by - 40, bx + 10, by + 2) })
   const fl = g.add(new N('g', { class: 'flame' }))
+  if (p.real) {
+    // Fire: hot and pale at its heart, deepening outwards, its tips ragged and fading into the air.
+    const defs = g.add(new N('defs'))
+    const lg = defs.add(new N('linearGradient', { id: `cf-fire${f(bx)}`, x1: 0, y1: 1, x2: 0, y2: 0 }))
+    for (const [o, col, op] of [[0, '#fff3c4', 1], [0.35, '#ffc56b', 0.95], [0.7, '#ff8a4c', 0.75], [1, '#ff6a3d', 0]] as [number, string, number][]) lg.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
+    fl.add(new N('path', { d: `M${f(bx - 5.5)} ${f(by - 1)}q-2.5 -8 3 -14q0 5 3 6.5q1 -4.5 -1 -8q7.5 5.5 4.5 15.5z`, fill: `url(#cf-fire${f(bx)})` }))
+    fl.add(new N('path', { d: `M${f(bx - 2.5)} ${f(by - 1)}q-1 -5 2.2 -8q1.2 4 2.4 8z`, fill: '#fffbe6', opacity: 0.9 }))
+    // Its light on the ground round it, and (at night, Night.cs) on everything near.
+    g.add(new N('ellipse', { cx: f(bx), cy: f(by), rx: 13, ry: 5, fill: puffDefs(defs, `cf-glow${f(bx)}`), opacity: 0.55 }))
+  } else {
   fl.add(new N('path', { d: `M${f(bx - 5)} ${f(by - 1)}q-2 -8 3 -13q0 5 3 6q1 -4 -1 -7q7 5 4 14z`, fill: '#ff8f6b', stroke: INK, 'stroke-width': 1, 'stroke-linejoin': 'round' }))
   fl.add(new N('path', { d: `M${f(bx - 2)} ${f(by - 1)}q-1 -5 2 -7q1 4 2 7z`, fill: '#ffe08a' }))
+  }
+  // Its light, for the night (on the realistic island, Night.cs lights the ground round it).
+  p.light([bx, by - 6], p.el('circle', { cx: f(bx), cy: f(by - 6), r: 2, fill: '#ffd8a0', opacity: 0 }), '#ffc890', 6)
   for (const dl of [0, 0.9, 1.7]) g.add(new N('circle', { cx: f(bx + (dl - 0.9) * 3), cy: f(by - 12), r: 1, fill: '#ffb36b', class: 'spark', style: `animation-delay:${dl}s` }))
+}
+
+/** A warm glow, fading out, for fill="url(#id)". */
+function puffDefs(defs: N, id: string): string {
+  const g = defs.add(new N('radialGradient', { id }))
+  for (const [o, op] of [[0, 0.7], [0.5, 0.3], [1, 0]]) g.add(new N('stop', { offset: o, 'stop-color': '#ffb87a', 'stop-opacity': op }))
+  return `url(#${id})`
 }
 
 /* ---- the traffic -------------------------------------------------------------------- */
@@ -553,15 +606,21 @@ export function stall(p: Pen, x: number, y: number, kind: 'fruit' | 'fish' | 'fl
   for (const [px, py] of [[x0 + 0.03, y0 + 0.03], [x0 + w - 0.03, y0 + 0.03]] as const) p.line([px, py, 0], [px, py, 25], { sw: 1.4 })
   const c = p.box(x0, y0 + 0.08, w, d - 0.08, 9, { fill: C.wood, top: shade(C.wood, 1.18), sw: 1.1 })
   p.quad(c, 'y', 0.06, 0.94, 2, 7, shade(C.wood, 0.7), { sw: 0.7 })
-  // The goods, along the top of the counter.
+  // The goods, along the top of the counter: Unity's (Models.cs, Goods), else drawn.
   const [gx, gy] = p.at(x, y0 + 0.08 + (d - 0.08) / 2, 9)
+  p.model('goods', [x, y0 + 0.08 + (d - 0.08) / 2, 9], { side: kind }, () => goodsDrawn(p, kind, x, y0, gx, gy))
+  // The front poles, then the awning over it all.
+  for (const [px, py] of [[x0 + 0.03, y0 + d], [x0 + w - 0.03, y0 + d]] as const) p.line([px, py, 0], [px, py, 25], { sw: 1.4 })
+  p.model('stallawning', [x0 - 0.04, y0 - 0.02, 29], { w: w + 0.08, d: d + 0.1, h: 6, fill: stripe }, () => awningDrawn(p, x0, y0, w, d, stripe))
+}
+function goodsDrawn(p: Pen, kind: string, x: number, y0: number, gx: number, gy: number) {
   if (kind === 'fruit') for (let k = 0; k < 7; k++) p.el('circle', { cx: gx - 9 + k * 3, cy: gy - 1 + (k % 2) * 1.5, r: 1.7, fill: [C.rasp, '#ffb3c2', C.mint, C.lilac][k % 4], stroke: INK, 'stroke-width': 0.5 })
   if (kind === 'fish') { p.el('path', { d: `M${f(gx - 10)} ${f(gy)}h20l-2 2h-16z`, fill: '#e6f4ff', stroke: INK, 'stroke-width': 0.6 }); for (let k = 0; k < 4; k++) p.el('path', { d: `M${f(gx - 8 + k * 5)} ${f(gy - 0.5)}q2 -2 4 0q-2 2 -4 0zm4 0l1.5 -1v2z`, fill: '#b9c6e8', stroke: INK, 'stroke-width': 0.5 }) }
   if (kind === 'flowers') for (let k = 0; k < 4; k++) { const bx = gx - 7.5 + k * 5; p.el('path', { d: `M${f(bx - 1.6)} ${f(gy + 1)}h3.2l-0.4 -3h-2.4z`, fill: C.cobalt, stroke: INK, 'stroke-width': 0.5 }); for (const [dx, dy] of [[-1.2, -4], [1, -4.6], [0, -5.6]]) p.el('circle', { cx: bx + dx, cy: gy + dy, r: 1.2, fill: ['#ff9fb2', '#ffffff', C.lilac, '#ffd1da'][k], stroke: INK, 'stroke-width': 0.4 }) }
   if (kind === 'ices') { p.cyl(x - 0.1, y0 + 0.2, 0.07, 9, 4, '#ffffff', { sw: 0.8 }); p.el('path', { d: `M${f(gx + 3)} ${f(gy - 1)}l2 6l2 -6z`, fill: '#e3c9a0', stroke: INK, 'stroke-width': 0.6 }); p.el('circle', { cx: gx + 5, cy: gy - 2.4, r: 2.2, fill: '#ffd1da', stroke: INK, 'stroke-width': 0.6 }) }
   if (kind === 'books') for (let k = 0; k < 6; k++) p.el('rect', { x: gx - 9 + k * 3, y: gy - 4 + (k % 3), width: 2.4, height: 4 - (k % 3), fill: [C.cobalt, C.rasp, C.mint, C.lilac][k % 4], stroke: INK, 'stroke-width': 0.4 })
-  // The front poles, then the awning over it all.
-  for (const [px, py] of [[x0 + 0.03, y0 + d], [x0 + w - 0.03, y0 + d]] as const) p.line([px, py, 0], [px, py, 25], { sw: 1.4 })
+}
+function awningDrawn(p: Pen, x0: number, y0: number, w: number, d: number, stripe: string) {
   const n = 6
   const aw = ['', '']
   for (let k = 0; k < n; k++) {
@@ -638,6 +697,8 @@ export function speedboat(hull: string): string {
  */
 export function secretIslet(p: Pen, x: number, y: number) {
   const [sx, sy] = p.at(x, y, -12)
+  // (On the realistic island the bank of sand is Unity's: world.ts, isles.)
+  if (!p.real) {
   p.el('ellipse', { cx: sx, cy: sy + 4, rx: 96, ry: 40, fill: '#cdf1f4', opacity: 0.8 })
   p.el('ellipse', { cx: sx, cy: sy + 4, rx: 96, ry: 40, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.6, opacity: 0.8 })
   p.el('ellipse', { cx: sx, cy: sy + 3, rx: 66, ry: 27, fill: '#ffffff', opacity: 0.75 })
@@ -648,6 +709,7 @@ export function secretIslet(p: Pen, x: number, y: number) {
   // A dune in the middle, so it is a mound of sand and not a plate.
   p.el('ellipse', { cx: sx - 4, cy: sy - 10, rx: 34, ry: 12, fill: '#fbf7ec' })
   p.el('path', { d: `M${f(sx - 36)} ${f(sy - 7)}q32 9 64 -2`, fill: 'none', stroke: '#e9dfc6', 'stroke-width': 2, 'stroke-linecap': 'round' })
+  }
   for (const [dx, dy, c] of [[-40, -2, '#ffffff'], [30, 4, '#ffc9d6'], [44, -4, '#ffffff'], [-22, 8, '#ffc9d6']] as [number, number, string][]) p.el('path', { d: `M${f(sx + dx - 2)} ${f(sy + dy)}q2 -3.5 4 0z`, fill: c, stroke: INK, 'stroke-width': 0.5 })
   // SOS in the sand, and an X with a chest beside it.
   const sand = p.plane(x - 0.05, y + 0.62, -7)
@@ -703,6 +765,15 @@ export function beachBottle(p: Pen, x: number, y: number, n: number, glass: stri
   w.add(new N('ellipse', { cx: f(sx), cy: f(sy + 1.4), rx: 12.5, ry: 4.4, fill: '#cdbf9c', opacity: 0.55 }))
   w.add(new N('ellipse', { cx: f(sx - 1.5), cy: f(sy + 1.6), rx: 9.5, ry: 2.6, fill: INK, opacity: 0.13 }))
   const k = flip ? -1 : 1
+  const q = new Pen(w, p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
+  q.model('bottle', [x, y, 0], { fill: glass, rows: flip ? 1 : 0 }, () => bottleDrawn(w, sx, sy, k, glass))
+  // The glint, a star of light that comes and goes.
+  const gx = sx + k * 3.2, gy = sy - 7.6
+  w.add(new N('path', { d: q.real ? `M${f(gx)} ${f(gy - 3)}l0.7 2.3l2.3 0.7l-2.3 0.7l-0.7 2.3l-0.7 -2.3l-2.3 -0.7l2.3 -0.7z` : `M${f(gx)} ${f(gy - 4.6)}l1.1 3.5l3.5 1.1l-3.5 1.1l-1.1 3.5l-1.1 -3.5l-3.5 -1.1l3.5 -1.1z`, fill: '#ffffff', stroke: q.real ? undefined : '#8fd3ff', 'stroke-width': q.real ? undefined : 0.6, class: 'twinkle', style: `animation-delay:${f(-((n * 0.77) % 2.4))}s` }))
+  p.grow(sx - 14, sy - 14, sx + 14, sy + 6)
+  return w
+}
+function bottleDrawn(w: N, sx: number, sy: number, k: number, glass: string) {
   const g = w.add(new N('g', { transform: `translate(${f(sx)} ${f(sy - 2.6)}) rotate(${k * -9}) scale(${k * 1.04} 1.04)` }))
   g.add(new N('path', { d: 'M-8 -3.3h9q2.6 0 3.7 1.85h3.3v-0.45h1.1v3.8h-1.1v-0.45h-3.3q-1.1 1.85-3.7 1.85h-9a3.3 3.3 0 0 1 0-6.6z', fill: glass, stroke: INK, 'stroke-width': 1, 'stroke-linejoin': 'round' }))
   // The note inside, rolled and tied.
@@ -713,11 +784,6 @@ export function beachBottle(p: Pen, x: number, y: number, n: number, glass: stri
   // Light on the glass.
   g.add(new N('path', { d: 'M-7 -2.15h6.4', stroke: '#ffffff', 'stroke-width': 1.1, 'stroke-linecap': 'round', opacity: 0.85 }))
   g.add(new N('path', { d: 'M5.2 -0.6h2.2', stroke: '#ffffff', 'stroke-width': 0.8, 'stroke-linecap': 'round', opacity: 0.7 }))
-  // The glint, a star of light that comes and goes.
-  const gx = sx + k * 3.2, gy = sy - 7.6
-  w.add(new N('path', { d: `M${f(gx)} ${f(gy - 4.6)}l1.1 3.5l3.5 1.1l-3.5 1.1l-1.1 3.5l-1.1 -3.5l-3.5 -1.1l3.5 -1.1z`, fill: '#ffffff', stroke: '#8fd3ff', 'stroke-width': 0.6, class: 'twinkle', style: `animation-delay:${f(-((n * 0.77) % 2.4))}s` }))
-  p.grow(sx - 14, sy - 14, sx + 14, sy + 6)
-  return w
 }
 
 /**
@@ -738,8 +804,10 @@ export function house32(p: Pen, x: number, y: number) {
   p.box(x - 0.12, y - 0.16, 0.08, 0.08, 9, { z0: 15, fill: C.stone2, sw: 1 })
   // The sign, on its post.
   const [px, py] = p.at(x + 0.42, y + 0.42)
-  p.el('path', { d: `M${f(px)} ${f(py)}v-13`, stroke: C.wood, 'stroke-width': 1.6 })
-  p.el('rect', { x: px - 6, y: py - 19, width: 12, height: 7, rx: 1.5, fill: '#ffffff', stroke: INK, 'stroke-width': 1 })
+  p.plaque('sign-32', x + 0.42, y + 0.42, 12, 12, 7, new N('rect', { width: 12, height: 7, rx: 1.5, fill: '#ffffff' }), { foot: 0, edge: '#ffffff' }, () => {
+    p.el('path', { d: `M${f(px)} ${f(py)}v-13`, stroke: C.wood, 'stroke-width': 1.6 })
+    p.el('rect', { x: px - 6, y: py - 19, width: 12, height: 7, rx: 1.5, fill: '#ffffff', stroke: INK, 'stroke-width': 1 })
+  })
   p.el('text', { x: px, y: py - 13.6, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 5.4, fill: INK }).text('32')
   p.grow(sx - 26, sy - 30, sx + 26, sy + 6)
 }

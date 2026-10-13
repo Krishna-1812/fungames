@@ -24,9 +24,9 @@ export type Facing = 'se' | 'sw' | 'nw' | 'ne' | 's' | 'w' | 'n' | 'e'
 export const HEADINGS: Facing[] = ['se', 's', 'sw', 'w', 'nw', 'n', 'ne', 'e']
 export type Pose = 'stand' | 'wave' | 'look' | 'walk' | 'ground' | 'kite' | 'sit' | 'balance'
 export type Who = { shirt: string; skin: string; hat: string | null; v: number }
-export type Creature = 'sheep' | 'deer' | 'duck' | 'crab' | 'gull' | 'pigeon' | 'dolphin' | 'whale' | 'bfly' | 'cloud' | 'balloon' | 'plane' | 'dog' | 'robot'
+export type Creature = 'sheep' | 'deer' | 'duck' | 'crab' | 'gull' | 'pigeon' | 'dolphin' | 'whale' | 'bfly' | 'cloud' | 'balloon' | 'plane' | 'dog' | 'robot' | 'globe' | 'pod'
 export type Kind = 'person' | 'car' | 'bus' | 'bike' | 'sail' | 'ferry' | 'fishing' | 'speed' | 'row' | Creature
-export type ActorRec = { name: string; kind: Kind; shirt: string; skin: string; hat: string; v: number; pose: Pose | 'drive' | 'up' | 'down' | 'swim' | 'peck' | `c${number}`; facing: Facing; frame: number }
+export type ActorRec = { name: string; kind: Kind; shirt: string; skin: string; hat: string; v: number; pose: Pose | 'drive' | 'up' | 'down' | 'swim' | 'peck' | `c${number}` | `f${number}`; facing: Facing; frame: number }
 
 /** The frames of a stride, and how long one stride takes (a step with each foot). */
 export const WALK_FRAMES = 8

@@ -45,6 +45,7 @@ export type Rule = {
 /** The keyframes, as CSS. Read at build time by keyframes.ts. */
 export const KEYFRAMES = `
 @keyframes isl-twinkle { 50% { transform: scale(0.5); opacity: 0.45; } }
+@keyframes isl-frame24 { 0%, 4.17% { opacity: 1; } 4.2%, 97.9% { opacity: 0; } 100% { opacity: 1; } }
 @keyframes isl-stride { 0%, 12.4% { opacity: 1; } 12.5%, 100% { opacity: 0; } }
 @keyframes nat-sheep-up { 0%, 49.9% { opacity: 0; } 50%, 87.9% { opacity: 1; } 88%, 100% { opacity: 0; } }
 @keyframes nat-sheep-down { 0%, 49.9% { opacity: 1; } 50%, 87.9% { opacity: 0; } 88%, 100% { opacity: 1; } }
@@ -190,6 +191,8 @@ export const RULES: Rule[] = [
   { on: ['fish'], loop: L('isl-fish', 7, 'ease-in-out'), base: { opacity: 0 } },
   // A walker's stride (lib/island/actors.ts): its eight frames, each shown in turn.
   { on: ['stride'], loop: L('isl-stride', 0.5, 'linear'), base: { opacity: 0 } },
+  // Something turning (the globe at How Fast): its 24 frames, each shown for half a second, the next fading in over it.
+  { on: ['frame24'], loop: L('isl-frame24', 12, 'linear'), base: { opacity: 0 } },
   // Unity's animals (lib/island/actors.ts): a sheep or a deer looking up now and then, a bird's wings up and down.
   { on: ['sheep-up'], loop: L('nat-sheep-up', 6, 'linear'), base: { opacity: 0 } },
   { on: ['sheep-down'], loop: L('nat-sheep-down', 6, 'linear') },

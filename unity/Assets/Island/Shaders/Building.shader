@@ -6,6 +6,7 @@
 // the face starts):
 //   0 plaster   1 brick   2 roof tiles   3 slate   4 timber boards
 //   5 metal     6 glass   7 concrete     8 paint   9 cloth
+//  11 printed artwork (Prints.cs): uv is where on the prints' sheet
 //  10 a window's pane: uv runs 0..1 across it and up it; TEXCOORD1.y over 2 says
 //     whether its room is lit at night, and in which light (Night.PaneLight)
 Shader "Island/Building"
@@ -46,6 +47,8 @@ Shader "Island/Building"
             TEXTURE2D_ARRAY(_WallColour); SAMPLER(sampler_WallColour);
             TEXTURE2D_ARRAY(_WallNormal); SAMPLER(sampler_WallNormal);
             float4 _WallMean[16];
+            // The prints' sheet (Prints.cs).
+            TEXTURE2D(_Prints); SAMPLER(sampler_Prints);
             // The light in a lit room at night, by kind (Night.Rooms), linear.
             float4 _IslandRooms[4];
             float _WallRep[16];
@@ -197,6 +200,14 @@ Shader "Island/Building"
                     float3 h = normalize(sun.direction + view);
                     float3 col = alb * (0.55 + 0.45 * sun.shadowAttenuation) + pow(saturate(dot(N, h)), 300) * 3 * sun.shadowAttenuation;
                     return half4(col * (islandSunPass() ? _IslandSelf : 1), 1);
+                }
+                else if (m == 11)
+                {
+                    // A print: the artwork's own colours (in the sheet, sRGB, read as light), its cut-out edge; a faint sheen of ink and paper.
+                    float4 t = SAMPLE_TEXTURE2D(_Prints, sampler_Prints, uv);
+                    clip(t.a - 0.5);
+                    alb = t.rgb * 0.94;
+                    spec = 0.05; rough = 20;
                 }
                 else if (m == 7)
                 {
