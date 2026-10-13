@@ -67,8 +67,30 @@ Shader "Island/Water"
                 float3 col = lerp(lerp(_Shallow.rgb, _Mid.rgb, t1), _Deep.rgb, t2);
                 float alpha = lerp(0.3, 1.0, smoothstep(0.0, 0.45, d));
 
-                Light sun = GetMainLight(TransformWorldToShadowCoord(i.ws));
                 float3 view = GetWorldSpaceNormalizeViewDir(i.ws);
+                if (islandNightPass())
+                {
+                    // At night: every light near the water given back by it, broken by the ripples into a streak
+                    // (under it on the picture, as a reflection is), and the lamps' light on the foam and the shallows.
+                    float3 refl = 0;
+                    int cnt = (int)_IslandLampN;
+                    [loop] for (int k = 0; k < cnt; k++)
+                    {
+                        float3 dl = _IslandLampP[k].xyz - i.ws; float dd = dot(dl, dl);
+                        if (dd > 12) continue;
+                        float3 l = dl * rsqrt(dd);
+                        float3 hh = normalize(l + view);
+                        float s1 = pow(saturate(dot(n, hh)), 90), s2 = pow(saturate(dot(n, hh)), 30) * 0.015;
+                        float kind = _IslandLampD[k].w;
+                        float boost = kind > 2.5 ? 0.6 : kind < 0.5 ? 1.0 : 3.0;
+                        refl += _IslandLampC[k].rgb * boost * (s1 + s2) / (dd + 0.3);
+                    }
+                    float3 core; float3 e = islandLamps(float3(0, 1, 0), i.ws, core);
+                    float foamN = smoothstep(0.035, 0.0, d) * smoothstep(0.35, 0.65, vnoise(i.ws.xz * 26) * 0.7 + n1 * 0.3);
+                    float3 glowN = refl * 0.9 + e * lerp(col * 0.4, float3(0.8, 0.85, 0.9), foamN);
+                    return half4(glowN, max(alpha, foamN));
+                }
+                Light sun = GetMainLight(TransformWorldToShadowCoord(i.ws));
                 // In the sun, the deep colour is exactly the site's own sea (#8ccbff), so the two meet without a seam.
                 float3 lit = col * lerp(0.62, 1.0, sun.shadowAttenuation);
                 // The sun on the ripples.

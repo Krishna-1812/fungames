@@ -181,6 +181,8 @@ Shader "Island/Ground"
                 float bz = vnoise(q + float2(0, 0.5)) - vnoise(q - float2(0, 0.5));
                 bend += float3(-bx, 0, -bz) * 0.35 * saturate(1 - sum);
                 float3 n = normalize(N + bend * 0.9);
+                // Under a building: lit as the open ground round it is, a little darker (it is never seen but as the building lifts).
+                if (!islandNightPass() && islandUnderFoot(i.ws)) return half4(islandLightOpen(alb * 0.85, n, i.ws, i.c.r), 1);
                 return half4(islandLight(alb, n, i.ws, i.c.r), 1);
             }
             ENDHLSL

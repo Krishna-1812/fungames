@@ -584,7 +584,7 @@ export function stringLights(p: Pen, a: [number, number], b: [number, number], z
   for (let k = 1; k < 8; k++) {
     const t = k / 8, x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * mx + t * t * bx, y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * my + t * t * by
     const c = ['#ffffff', '#ffd1da', '#d6ecff', '#d8f7ec'][k % 4]
-    p.light([x, y + 2], p.el('circle', { cx: x, cy: y + 2, r: 1.5, fill: c, stroke: INK, 'stroke-width': 0.5, class: 'bulb' }), c)
+    p.light([x, y + 2], p.el('circle', { cx: x, cy: y + 2, r: 1.5, fill: c, stroke: INK, 'stroke-width': 0.5, class: 'bulb' }), c, z - 2 - 18 * t * (1 - t))
   }
 }
 
@@ -734,7 +734,7 @@ export function house32(p: Pen, x: number, y: number) {
   p.el('circle', { cx: dx, cy: dy - 6, r: 1.2, fill: '#ffd98a', stroke: INK, 'stroke-width': 0.5 })
   const [wx, wy] = p.at(x + 0.32, y + 0.05, 7)
   p.el('circle', { cx: wx, cy: wy, r: 3.2, fill: C.glass, stroke: INK, 'stroke-width': 1 })
-  p.light([wx, wy], p.el('circle', { cx: wx, cy: wy, r: 2, fill: C.glassHi }), '#ffe6a1')
+  p.light([wx, wy], p.el('circle', { cx: wx, cy: wy, r: 2, fill: C.glassHi }), '#ffe6a1', 7)
   p.box(x - 0.12, y - 0.16, 0.08, 0.08, 9, { z0: 15, fill: C.stone2, sw: 1 })
   // The sign, on its post.
   const [px, py] = p.at(x + 0.42, y + 0.42)

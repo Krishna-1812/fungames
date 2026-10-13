@@ -359,6 +359,16 @@ export const LAYERS = {
     panes: { night: 1, dusk: 0.7 } as Record<string, number>,
     shine: { night: 1, dusk: 0.7 } as Record<string, number>,
     sky: { night: 1 } as Record<string, number>,
+    /**
+     * The realistic island's night (a Unity render under it): the day's picture multiplied down to
+     * moonlight, a little of its colour taken out (night vision sees less of it), and then the
+     * light of the island's own lamps and windows (Unity's, again) laid over it.
+     */
+    real: {
+      multiply: { night: ['#3c4a82', 1], dusk: ['#a993d4', 1], dawn: ['#e3c9ee', 1] } as Record<string, [string, number]>,
+      saturation: { night: ['#808080', 0.5], dusk: ['#808080', 0.18], dawn: ['#808080', 0.08] } as Record<string, [string, number]>,
+    },
+    glow: { night: 1, dusk: 0.55, dawn: 0.2 } as Record<string, number>,
   },
   /** Clouds: thinner and dusky at night, faint when you are close. */
   cloud: { night: 0.55, near: 0.18, fadeMs: 400, puff: { night: '#7f8fc4', dusk: '#e9defa' } as Record<string, string>, base: { night: '#6a79b0', dusk: '#cdbdf0' } as Record<string, string> },

@@ -276,6 +276,13 @@ namespace Island
 
         /* ---- windows and doors ------------------------------------------------- */
 
+        /** A pane's seed, and over it (in twos) whether its room is lit tonight and by which light (Night.PaneLight). */
+        static float PaneSeed(SolidRec s, float u, float z, float seed)
+        {
+            int room = Night.PaneLight(On(s.b, s.face, u, z + s.h / 2));
+            return Mathf.Clamp(seed, 0, 0.999f) + (room >= 0 ? 2 * (room + 1) : 0);
+        }
+
         /** Windows set into their openings: the glass back in the reveal, its frame and bars, a stone sill standing out under it, a lintel over it. */
         static void WindowsDetailed(Bm b, SolidRec s)
         {
@@ -294,7 +301,7 @@ namespace Island
                     float u0 = u - ww / 2, u1 = u + ww / 2, z1 = z + s.h;
                     // The glass (each pane its own room behind it), and the frame round it in the reveal.
                     float ua = s.face == "x" ? u0 : u1, ub = s.face == "x" ? u1 : u0;
-                    b.QuadUnit(On(s.b, s.face, ua, z, g), On(s.b, s.face, ub, z, g), On(s.b, s.face, ub, z1, g), On(s.b, s.face, ua, z1, g), glass, Pane, H(s.b.x + u * 7.3f, s.b.y + z * 0.37f, r * 3 + c));
+                    b.QuadUnit(On(s.b, s.face, ua, z, g), On(s.b, s.face, ub, z, g), On(s.b, s.face, ub, z1, g), On(s.b, s.face, ua, z1, g), glass, Pane, PaneSeed(s, u, z, H(s.b.x + u * 7.3f, s.b.y + z * 0.37f, r * 3 + c)));
                     Block(b, s.b, s.face, u0, u0 + fu, z, z1, g, g + 0.008f, frame, Paint);
                     Block(b, s.b, s.face, u1 - fu, u1, z, z1, g, g + 0.008f, frame, Paint);
                     Block(b, s.b, s.face, u0, u1, z1 - 1.1f, z1, g, g + 0.008f, frame, Paint);

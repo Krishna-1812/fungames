@@ -122,7 +122,7 @@ export const harbour: Record<string, Landmark> = {
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x + 190)} ${f(y - 140)}L${f(x + 190)} ${f(y - 72)}Z`, 'url(#stp-fade-r)', { sw: 0 })
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x - 190)} ${f(y - 140)}L${f(x - 190)} ${f(y - 72)}Z`, 'url(#stp-fade-l)', { sw: 0 })
     // The lamp: on the realistic island the model's lantern shows, and only the light is left here (unseen, for the night).
-    p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp', opacity: p.real ? 0 : undefined }), '#fff8e0')
+    p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp', opacity: p.real ? 0 : undefined }), '#fff8e0', 104)
     beacon[0] = x; beacon[1] = y - 102
     if (!p.real) {
       p.path(`M${f(x - 4)} ${f(y - 108)}h8v12h-8z`, '#ffffff', { sw: 1, cls: 'stp-lamp' })

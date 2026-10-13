@@ -60,9 +60,9 @@ const OUTLINED = new Set(['es-win', 'liw-cell', 'pg-bar', 'cloud-puff', 'cloud-b
  * CSS set it over the element's own opacity attribute, so the engine's value
  * replaces that attribute rather than multiplying it.
  */
-const TIMED_OPACITY = new Set(['night-veil', 'night-halos', 'night-cores', 'night-panes', 'night-shine', 'night-sky', 'cloud'])
+const TIMED_OPACITY = new Set(['night-veil', 'night-halos', 'night-cores', 'night-panes', 'night-shine', 'night-sky', 'night-glow', 'cloud'])
 /** Groups whose only change is how strongly they show (by the time of day): painted into cells like still painting. */
-const ALPHA = new Set(['night-halos', 'night-panes', 'night-shine', 'night-sky', 'night-cores', 'fireworks'])
+const ALPHA = new Set(['night-halos', 'night-panes', 'night-shine', 'night-sky', 'night-cores', 'night-glow', 'fireworks'])
 /** Groups that are only there at some times. */
 const WHEN: Record<string, When> = { ufo: LAYERS.ufo.when, 'dawn-whale': LAYERS.dawnWhale.when, 'night-dim': LAYERS.nightDim.when, fireworks: LAYERS.fireworks.when }
 
@@ -259,6 +259,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     const fo = n('fill-opacity'); if (fo !== undefined && fo !== 1) st.fo = fo
     const op = ownOpacity(el); if (op !== undefined && Number(op) !== 1) st.op = Number(op)
     if (g('fill-rule') === 'evenodd') st.rule = 'evenodd'
+    // How it lays over what is under it (the realistic night's veil multiplies).
+    const blend = el.attrs['data-blend']; if (blend) st.blend = blend as GlobalCompositeOperation
     return st
   }
 

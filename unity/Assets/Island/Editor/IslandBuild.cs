@@ -421,6 +421,48 @@ namespace Island
             Light();
         }
 
+        /**
+         * Where the buildings stand (their boxes and cylinders that reach down to the ground), for the
+         * ground's shader: the ground under them is lit as open ground (IslandCommon.hlsl, islandUnderFoot).
+         */
+        static void Footprints(IslandData d)
+        {
+            var list = new List<Vector4>();
+            if (d.solids != null)
+                foreach (var bs in d.solids)
+                    foreach (var run in bs.runs)
+                        foreach (var item in run.items)
+                        {
+                            var s = JsonUtility.FromJson<SolidRec>(item);
+                            if (s == null) continue;
+                            if (s.k == "box" && s.h >= 4)
+                            {
+                                float ground = d.Z(Mathf.Clamp(Mathf.FloorToInt(s.x + s.w / 2), 0, d.grid - 1), Mathf.Clamp(Mathf.FloorToInt(s.y + s.d / 2), 0, d.grid - 1));
+                                if (s.z0 > ground + 6) continue;
+                                list.Add(new Vector4(s.y, s.x, s.y + s.d, s.x + s.w));
+                            }
+                            else if (s.k == "model" && (s.name == "lighthouse" || s.name == "windmill"))
+                                list.Add(new Vector4(s.y, s.x, 0.46f, -1));
+                            else if (s.k == "dome" && s.r > 0)
+                            {
+                                float ground = d.Z(Mathf.Clamp(Mathf.FloorToInt(s.cx), 0, d.grid - 1), Mathf.Clamp(Mathf.FloorToInt(s.cy), 0, d.grid - 1));
+                                if (s.z0 <= ground + 6) list.Add(new Vector4(s.cy, s.cx, s.r, -1));
+                            }
+                            else if (s.k == "cyl" && s.r > 0)
+                            {
+                                float ground = d.Z(Mathf.Clamp(Mathf.FloorToInt(s.cx), 0, d.grid - 1), Mathf.Clamp(Mathf.FloorToInt(s.cy), 0, d.grid - 1));
+                                if (s.z0 > ground + 3) continue;
+                                list.Add(new Vector4(s.cy, s.cx, s.r, -1));
+                            }
+                            if (list.Count >= 256) break;
+                        }
+            var arr = new Vector4[256];
+            for (int k = 0; k < list.Count && k < 256; k++) arr[k] = list[k];
+            Shader.SetGlobalVectorArray("_IslandFoot", arr);
+            Shader.SetGlobalFloat("_IslandFootN", Mathf.Min(256, list.Count));
+            Debug.Log($"[island] footprints: {list.Count}");
+        }
+
         /** The site's own sea colour (lib/island/kit.ts, C.water): behind everything, where the render shows no sea of its own. */
         static readonly Color SiteSea = new Color(0x8c / 255f, 0xcb / 255f, 1f);
 
@@ -669,6 +711,42 @@ namespace Island
         }
 
         /**
+         * The night's light (Night.cs; scripts/unity-glow.mjs): the whole island in
+         * 3D (the ground, the sea, the buildings, the trees), lit by its lamps and
+         * lit windows alone, over the same box and in the same tiles as the plate:
+         * Renders/glow/r_c.png and glow.json. Each tile is rendered with a margin
+         * all round, so the glow round a light by a tile's edge comes out whole.
+         */
+        public static void Glow()
+        {
+            Pipeline();
+            var d = IslandData.Load(Data);
+            Night.Load(d);
+            Scene(d, "show");
+            Night.Upload(GameObject.Find("ground"), GameObject.Find("buildings"));
+            var b = Floats(Arg("-box", "-1216,-200,1216,1130"));
+            float scale = float.Parse(Arg("-scale", "4"), System.Globalization.CultureInfo.InvariantCulture);
+            int tile = int.Parse(Arg("-tile", "2048")), ss = int.Parse(Arg("-ss", "2")), m = 32;
+            float step = tile / scale, mu = m / scale;
+            int cols = Mathf.CeilToInt((b[2] - b[0]) / step), rows = Mathf.CeilToInt((b[3] - b[1]) / step);
+            var only = Arg("-tiles", "");
+            Directory.CreateDirectory("Renders/glow");
+            if (only == "") foreach (var f in Directory.GetFiles("Renders/glow")) File.Delete(f);
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                {
+                    if (only != "" && !System.Array.Exists(only.Split(';'), t => t == $"{r}_{c}")) continue;
+                    var cam = Eye(b[0] + c * step - mu, b[1] + r * step - mu, step + 2 * mu, step + 2 * mu);
+                    Night.Shoot(cam, tile, tile, m, $"Renders/glow/{r}_{c}.png", ss);
+                    Object.DestroyImmediate(cam.gameObject);
+                }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            File.WriteAllText("Renders/glow/glow.json",
+                $"{{\"box\":[{b[0].ToString(inv)},{b[1].ToString(inv)},{(b[0] + cols * step).ToString(inv)},{(b[1] + rows * step).ToString(inv)}],\"scale\":{scale.ToString(inv)},\"tile\":{tile},\"cols\":{cols},\"rows\":{rows}}}");
+            Debug.Log($"[island] glow: {cols}×{rows} tiles of {tile}px at {scale} px a unit");
+        }
+
+        /**
          * The plate the site bakes from (scripts/unity-plate.mjs): the ground and
          * the sea round it, with the buildings' shadows but not the buildings
          * (the site draws those), over the map box `-box x0,y0,x1,y1` at `-scale`
@@ -680,6 +758,7 @@ namespace Island
             Pipeline();
             var d = IslandData.Load(Data);
             Scene(d, "shadow");
+            Footprints(d);
             var b = Floats(Arg("-box", "-1216,-200,1216,1130"));
             float scale = float.Parse(Arg("-scale", "4"), System.Globalization.CultureInfo.InvariantCulture);
             int tile = int.Parse(Arg("-tile", "2048")), ss = int.Parse(Arg("-ss", "2"));

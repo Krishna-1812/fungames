@@ -91,15 +91,15 @@ export const market: Record<string, Landmark> = {
     // A glass front and a revolving door.
     p.quad(mall, 'y', 0.3, 0.78, 0, 20, '#6f7cb8', { sw: 1.2 })
     for (let k = 1; k < 4; k++) p.quad(mall, 'y', 0.3 + k * 0.12 - 0.003, 0.3 + k * 0.12 + 0.003, 0, 20, INK, { sw: 0 })
-    p.light(p.at(1, 1.65, 12), p.quad(mall, 'y', 0.31, 0.77, 10, 19, '#8592cc', { sw: 0 }))
+    p.light(p.at(1, 1.65, 12), p.quad(mall, 'y', 0.31, 0.77, 10, 19, '#8592cc', { sw: 0 }), '#ffe6a1', 12, 'y')
     // An LED ticker over the doors that never quite runs out.
-    p.light(p.at(1, 1.65, 27), p.quad(mall, 'y', 0.06, 0.94, 23, 31, '#11162e', { sw: 1.2 }), null)
+    p.light(p.at(1, 1.65, 27), p.quad(mall, 'y', 0.06, 0.94, 23, 31, '#11162e', { sw: 1.2 }), null, 27, 'y')
     const tk = glow(p.face(mall, 'y', 0.5, 24.8, { w: 54, h: 7 }))
     letter(tk, 0, 0, 'SALE ENDS 0:59', { size: 4.8, fill: C.rasp, font: 'Silkscreen, monospace', weight: 400, cls: 'blink' })
     // The rooftop sign: neon tubes on a dark board, on legs.
     for (const x of [0.5, 1.5]) { p.line([x, 0.88, 44], [x, 0.92, 52], { sw: 1.6 }); p.line([x, 0.8, 44], [x, 0.92, 52], { sw: 1 }) }
     const bd = p.box(0.28, 0.9, 1.44, 0.05, 11, { z0: 51, fill: '#3b4675', sw: 1.3 })
-    p.light(p.at(1, 0.95, 56), p.quad(bd, 'y', 0.03, 0.97, 1, 10, '#1b2140', { sw: 0.8 }), null)
+    p.light(p.at(1, 0.95, 56), p.quad(bd, 'y', 0.03, 0.97, 1, 10, '#1b2140', { sw: 0.8 }), null, 56, 'y')
     const ns = glow(p.face(bd, 'y', 0.5, 3.2, { w: 46, h: 11 }))
     neon(ns, 0, 0, 'ONLY 1 LEFT!', C.mint, { size: 6.6, cls: 'blink-slow' })
     // Round the side: an exit sign that points both ways, over a door that is painted on.

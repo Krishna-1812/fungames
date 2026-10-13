@@ -354,7 +354,9 @@ export function createEngine(o: {
     if (st.f || fill) {
       ctx.globalAlpha = a * (st.fo ?? 1)
       ctx.fillStyle = fill ?? st.f!
+      if (st.blend) ctx.globalCompositeOperation = st.blend
       ctx.fill(lv.path, st.rule ?? 'nonzero')
+      if (st.blend) ctx.globalCompositeOperation = 'source-over'
       cs.paths++
     }
     if (st.s) {
@@ -432,7 +434,12 @@ export function createEngine(o: {
       else if (t === 'night-panes') a *= timed('panes', N.panes[st.time] ?? 0, N.fadeMs)
       else if (t === 'night-shine') a *= timed('shine', N.shine[st.time] ?? 0, N.fadeMs)
       else if (t === 'night-sky') a *= timed('sky', N.sky[st.time] ?? 0, N.fadeMs)
-      else if (t === 'night-veil') a *= timed('veil', N.veil[st.time]?.[1] ?? 0, N.fadeMs)
+      else if (t === 'night-veil') {
+        const blend = n.k === 'v' ? (n as V).st.blend : undefined
+        const real = blend ? N.real[blend as 'multiply' | 'saturation'] : null
+        a *= real ? timed(`veil:${blend}`, real[st.time]?.[1] ?? 0, N.fadeMs) : timed('veil', N.veil[st.time]?.[1] ?? 0, N.fadeMs)
+      }
+      else if (t === 'night-glow') a *= timed('glow', N.glow[st.time] ?? 0, N.fadeMs)
       else if (t === 'layer-night') a *= timed('night', st.time === 'day' ? 0 : 1, N.fadeMs)
       else if (t === 'cloud') a *= timed('cloud', st.time === 'night' ? LAYERS.cloud.night : st.near ? LAYERS.cloud.near : 1, LAYERS.cloud.fadeMs)
       else if (t === 'layer-beam') a *= st.time === 'dusk' ? LAYERS.beam.dusk : 1
@@ -446,7 +453,17 @@ export function createEngine(o: {
   const tagFill = (n: V): string | undefined => {
     if (!n.tags) return undefined
     for (const t of n.tags) {
-      if (t === 'night-veil') return LAYERS.night.veil[st.time]?.[0]
+      if (t === 'night-veil') {
+        if (!n.st.blend) return LAYERS.night.veil[st.time]?.[0]
+        // The realistic veils' colours move from one time's to the next as their strength does (by day, they keep the last).
+        const real = LAYERS.night.real[n.st.blend as 'multiply' | 'saturation']
+        const hex = real?.[st.time]?.[0]
+        const ch = [16, 8, 0].map((sh, i) => {
+          const key = `veil-c:${n.st.blend}:${i}`
+          return Math.round(timed(key, hex ? (parseInt(hex.slice(1), 16) >> sh) & 255 : timers.get(key)?.to ?? 255, LAYERS.night.fadeMs))
+        })
+        return `rgb(${ch.join(',')})`
+      }
       if (t === 'cloud-puff') return LAYERS.cloud.puff[st.time]
       if (t === 'cloud-base') return LAYERS.cloud.base[st.time]
     }

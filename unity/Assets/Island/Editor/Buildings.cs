@@ -316,7 +316,9 @@ namespace Island
                     float u = slot * (c + 0.5f), z = s.z0 + r * (s.h + s.gap);
                     float fu = 1.6f / (64 * len);
                     Panel(b, s.b, s.face, u - ww / 2 - fu, u + ww / 2 + fu, z - 1.5f, z + s.h + 1.5f, frame, Paint, Off);
-                    Panel(b, s.b, s.face, u - ww / 2, u + ww / 2, z, z + s.h, glass, Glass, Off + 0.002f);
+                    // The pane: a room behind it, as in a window set in a wall (and lit at night).
+                    float ua = s.face == "x" ? u - ww / 2 : u + ww / 2, ub = s.face == "x" ? u + ww / 2 : u - ww / 2, o = Off + 0.002f;
+                    b.QuadUnit(On(s.b, s.face, ua, z, o), On(s.b, s.face, ub, z, o), On(s.b, s.face, ub, z + s.h, o), On(s.b, s.face, ua, z + s.h, o), glass, Pane, PaneSeed(s, u, z, H(s.b.x + u * 7.3f, s.b.y + z * 0.37f, r * 3 + c)));
                     // Glazing bars: one down the middle, one across a little above it.
                     Panel(b, s.b, s.face, u - bar, u + bar, z, z + s.h, frame, Paint, Off + 0.004f);
                     Panel(b, s.b, s.face, u - ww / 2, u + ww / 2, z + s.h * 0.58f - 0.5f, z + s.h * 0.58f + 0.5f, frame, Paint, Off + 0.004f);

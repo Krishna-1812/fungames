@@ -64,6 +64,8 @@ export type Style = {
   doff?: number
   op?: number
   rule?: CanvasFillRule
+  /** How it lays over what is under it, if not simply over (the canvas's composite operation). */
+  blend?: GlobalCompositeOperation
 }
 
 export type Node =

@@ -66,6 +66,8 @@ Shader "Island/Foliage"
                 // The side of the card we see (not SV_IsFrontFace: a render into a texture on Direct3D turns that inside out).
                 float3 cn = normalize(i.n); if (dot(cn, view) < 0) cn = -cn;
                 float3 n = normalize(lerp(cn, normalize(i.crown), _Round));
+                // At night, only the lamps near it.
+                if (islandNightPass()) { float3 core; float3 e = islandLamps(n, i.ws, core); return half4(alb * e * lerp(0.5, 1, i.c.a) + core, 1); }
                 Light sun = GetMainLight(TransformWorldToShadowCoord(i.ws));
                 float ao = i.c.a;
                 // Wrapped: a leaf turned a little from the sun still catches some of it.

@@ -51,7 +51,7 @@ export const funfair: Record<string, Landmark> = {
     for (const x of [0.6, 1.4]) {
       const [lx, ly] = p.at(x, 0.8, 75)
       p.path(`M${f(lx)} ${f(ly)}v-5q0 -4 5 -3`, 'none', { sw: 1.3 })
-      p.light([lx + 6, ly - 7], p.el('ellipse', { cx: lx + 6, cy: ly - 7.6, rx: 2.6, ry: 1.6, fill: '#f4f6fc', stroke: INK, 'stroke-width': 0.9 }))
+      p.light([lx + 6, ly - 7], p.el('ellipse', { cx: lx + 6, cy: ly - 7.6, rx: 2.6, ry: 1.6, fill: '#f4f6fc', stroke: INK, 'stroke-width': 0.9 }), '#ffe6a1', 82)
     }
     // A shopping trolley, and the returns queue.
     const [tx, ty] = p.at(1.9, 1.8)
@@ -133,7 +133,7 @@ export const funfair: Record<string, Landmark> = {
     // The display window: the exhibits behind the glass.
     p.quad(hall, 'y', 0.05, 0.63, 4, 23, '#ffffff', { sw: 1.2 })
     p.quad(hall, 'y', 0.07, 0.61, 5.5, 21.5, '#26346a', { sw: 1 })
-    p.light(p.at(0.2 + 1.52 * 0.34, 1.38, 18), p.quad(hall, 'y', 0.07, 0.61, 14, 21.5, '#33447e', { sw: 0 }))
+    p.light(p.at(0.2 + 1.52 * 0.34, 1.38, 18), p.quad(hall, 'y', 0.07, 0.61, 14, 21.5, '#33447e', { sw: 0 }), '#ffe6a1', 18, 'y')
     const ex = p.face(hall, 'y', 0.34, 5.5, { w: 26, h: 16 })
     // A beige-grey computer on a plinth: case, screen, green text, keyboard.
     ex.add(new N('rect', { x: -6, y: -3, width: 12, height: 3, fill: '#c9cde0', stroke: INK, 'stroke-width': 0.6 }))

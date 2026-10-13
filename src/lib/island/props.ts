@@ -175,7 +175,7 @@ export function lamp(p: Pen, x: number, y: number, h = 26) {
     p.path(`M${f(bx)} ${f(by - h)}q0 -4 5 -4`, 'none', { sw: 2 })
   })
   // The bulb, for the night's light to find: unseen by day on the realistic island (the lantern is the model's).
-  p.light([bx + 5.5, by - h - 2], p.el('circle', { cx: bx + 5.5, cy: by - h - 2, r: 3.2, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2, class: 'lamp-bulb', opacity: p.real ? 0 : undefined }), '#fff6dc')
+  p.light([bx + 5.5, by - h - 2], p.el('circle', { cx: bx + 5.5, cy: by - h - 2, r: 3.2, fill: '#f4f6fc', stroke: INK, 'stroke-width': 1.2, class: 'lamp-bulb', opacity: p.real ? 0 : undefined }), '#fff6dc', h + 2)
   p.grow(bx - 3, by - h - 7, bx + 9, by)
 }
 

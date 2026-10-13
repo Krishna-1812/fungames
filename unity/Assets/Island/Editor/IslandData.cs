@@ -40,6 +40,8 @@ namespace Island
         public BuildingSolids[] solids;
         /** The people (and the rest of what moves) the site draws, each one pose of one facing (Buildings.Actor). */
         public ActorRec[] actors;
+        /** The night's lights (Night.cs). */
+        public NightLight[] lights;
         public float[] viewBox;
 
         public static IslandData Load(string path) => JsonUtility.FromJson<IslandData>(System.IO.File.ReadAllText(path));

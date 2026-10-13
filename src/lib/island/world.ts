@@ -14,6 +14,7 @@ import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
 import type { FigureSet, BuildingSet } from './figures'
+import type { SkyArt } from './plate'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
 import { beacon } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
@@ -123,6 +124,12 @@ export type IslandModel = {
   shoreRocks: [number, number, number][]
   /** Each building's solids (kit.ts, Solids), in their runs, for Unity to build. */
   solids: { slug: string; runs: Solid[][] }[]
+  /**
+   * The night's lights, for Unity to light the island from: where each is (tile i, j, height z), what it is
+   * ('win' a window, with the face it looks out of; 'lamp' a street lamp; 'bulb' anything else that glows),
+   * its colour, and whether it is on tonight (about one window in five stays dark).
+   */
+  lights: { i: number; j: number; z: number; kind: 'win' | 'lamp' | 'bulb'; face?: 'x' | 'y'; col: string; lit: boolean }[]
   viewBox: [number, number, number, number]
 }
 export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
@@ -143,7 +150,7 @@ export type Raster = (svg: string, width: number) => { width: number; height: nu
  */
 export type PlateRef = { box: [number, number, number, number]; href: string; id: string }
 
-export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
+export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; glow?: PlateRef | null; sky?: SkyArt | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
   const plate = opts.plate ?? null
   setFigures(opts.figures ?? null)
   setActors(!!opts.figures)
@@ -1425,6 +1432,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // nothing in front. A light that keeps less than a fifth of itself glows
   // no more. (Things that move, such as clouds, are not in these pictures;
   // they pass over a glow, which is how light behaves anyway.)
+  /** Whether a light is on tonight: every lamp and bulb, and about four windows in five. */
+  function litTonight(l: Light, n: number) { return l.glow !== '#ffe6a1' || hz(n, 3, 9) > 0.2 }
   function occlusion(raster: Raster): boolean[] {
     const code = (n: number) => [(n + 1) & 255, (((n + 1) >> 8) & 15) * 16 + 3, 251]
     const hex = (c: number[]) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('')
@@ -1456,7 +1465,19 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // Hidden in the markup itself, so a still render (or a page whose styles
   // have not loaded) shows day; the engine shows it when the time asks.
   night.attrs.visibility = 'hidden'
-  night.add(new N('rect', { class: 'night-veil', x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: '#14205c', opacity: 0.5 }))
+  // The realistic island (Unity's night light to lay over it): the day multiplied down to moonlight and
+  // some of its colour taken out, rather than a blue laid over it (moves.ts, LAYERS.night.real).
+  const glowRef = opts.plate ? opts.glow ?? null : null
+  const veilBox = { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000 }
+  if (glowRef) {
+    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'multiply', ...veilBox, fill: '#3c4a82', style: 'mix-blend-mode:multiply' }))
+    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'saturation', ...veilBox, fill: '#808080', opacity: 0.5, style: 'mix-blend-mode:saturation' }))
+    // The light of the lamps and the lit windows: on the ground round them, on the walls and the trees,
+    // in the rooms, given back by the sea (Unity: Night.cs). Painted by the bake from its full-size render.
+    const [x0, y0, x1, y1] = glowRef.box
+    night.add(new N('g', { class: 'night-glow' })).add(new N('image', { 'data-plate': glowRef.id, href: glowRef.href, x: x0, y: y0, width: x1 - x0, height: y1 - y0, preserveAspectRatio: 'none' }))
+  }
+  else night.add(new N('rect', { class: 'night-veil', ...veilBox, fill: '#14205c', opacity: 0.5 }))
   {
     const nd = night.add(new N('defs'))
     const glow = nd.add(new N('radialGradient', { id: 'isl-glow' }))
@@ -1468,13 +1489,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const seen = opts.raster ? occlusion(opts.raster) : lights.map(() => true)
     hiddenLights = seen.filter((v) => !v).length
     // A town at night is not every window lit: about one in five stays dark.
-    const lit = lights.map((l, n) => seen[n] && (l.glow !== '#ffe6a1' || hz(n, 3, 9) > 0.2))
+    const lit = lights.map((l, n) => seen[n] && litTonight(l, n))
     const panes = night.add(new N('g', { class: 'night-panes' }))
     lights.forEach((l, n) => {
       if (!lit[n]) return
+      // With Unity's night light, the windows and the street lamps are in it, glowing as they really do;
+      // what is left (bulbs on strings, the hall's display) keeps a softer glow of its own.
+      if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb')) return
       const [x, y] = l
-      halos.add(new N('circle', { cx: f(x), cy: f(y), r: 13, fill: 'url(#isl-glow)' }))
-      cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
+      halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 13, fill: 'url(#isl-glow)', opacity: glowRef ? 0.55 : undefined }))
+      if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
       // The pane or bulb itself, in its glow colour, above the veil.
       if (l.el && l.glow) {
         const a: Record<string, string | number | undefined> = {}
@@ -1482,7 +1506,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         panes.add(new N(l.el.tag, { ...a, fill: l.glow, opacity: 0.92 }))
       }
     })
-    night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8, class: 'night-cores' }))
+    if (cores) night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8, class: 'night-cores' }))
     // Everything that shines by itself, as bright as by day.
     const shine = night.add(new N('g', { class: 'night-shine' }))
     for (const g of glows) shine.add(g)
@@ -1494,16 +1518,35 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     if (beacon[0] || beacon[1]) {
       const beam = open('beam')
       const bd = beam.add(new N('defs')).add(new N('linearGradient', { id: 'isl-beam' }))
-      for (const [o, op] of [[0, 0.75], [0.5, 0.22], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': '#fff8e0', 'stop-opacity': op }))
       const sweep = beam.add(new N('g', { transform: `translate(${f(beacon[0])} ${f(beacon[1])})` }))
-      for (const rot of [0, 180]) sweep.add(new N('path', { d: 'M0 -4L640 -60L640 60L0 4Z', fill: 'url(#isl-beam)', transform: rot ? 'rotate(180)' : undefined }))
+      if (glowRef) {
+        // A shaft of light in the night air: brightest down its middle, fading to nothing at its sides
+        // (wedges inside wedges, each faint) and along its length as the air takes it; a clean cool white.
+        for (const [o, op] of [[0, 0.5], [0.25, 0.26], [0.6, 0.08], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': '#eef3ff', 'stop-opacity': op }))
+        for (const rot of [0, 180]) for (const w of [1, 0.72, 0.48, 0.3, 0.16]) sweep.add(new N('path', { d: `M0 ${f(-2.5 * w)}L700 ${f(-58 * w)}L700 ${f(58 * w)}L0 ${f(2.5 * w)}Z`, fill: 'url(#isl-beam)', opacity: 0.3, transform: rot ? 'rotate(180)' : undefined }))
+      } else {
+        for (const [o, op] of [[0, 0.75], [0.5, 0.22], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': '#fff8e0', 'stop-opacity': op }))
+        for (const rot of [0, 180]) sweep.add(new N('path', { d: 'M0 -4L640 -60L640 60L0 4Z', fill: 'url(#isl-beam)', transform: rot ? 'rotate(180)' : undefined }))
+      }
       motionCss.push(`.isl-layer--beam{transform-origin:${f(beacon[0] - viewBox[0])}px ${f(beacon[1] - viewBox[1])}px}`)
-      night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 18, fill: 'url(#isl-glow)', class: 'night-shine' }))
+      // (On the realistic island, Unity's lantern glows by itself.)
+      if (!glowRef) night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 18, fill: 'url(#isl-glow)', class: 'night-shine' }))
     }
     // The moon, low over the sea to the north-east, and its path on the water.
     {
       const [vx, vy, vw] = viewBox, mx = vx + vw * 0.72, my = vy + 290
       const sky = night.add(new N('g', { class: 'night-sky' }))
+      const art = glowRef ? opts.sky ?? null : null
+      if (art) {
+        // The realistic moon: its light in the air round it, the moon itself (make-night-sky.mjs), and under it
+        // its path on the sea in glints on the ripples, two sets, one fading in and out over the other: shimmer.
+        const mg = nd.add(new N('radialGradient', { id: 'isl-moonglow' }))
+        for (const [o, col, op] of [[0, '#e6edff', 0.34], [0.28, '#cfdbff', 0.14], [0.6, '#b8c8f0', 0.04], [1, '#b8c8f0', 0]] as [number, string, number][]) mg.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
+        sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 120, fill: 'url(#isl-moonglow)' }))
+        sky.add(new N('image', { href: art.moon, x: f(mx - 30), y: f(my - 30), width: 60, height: 60 }))
+        sky.add(new N('image', { href: art.glintsB, x: f(mx - 150), y: f(my + 44), width: 300, height: 420, opacity: 0.75 }))
+        sky.add(new N('image', { href: art.glintsA, x: f(mx - 150), y: f(my + 44), width: 300, height: 420, class: 'moon-path', opacity: 0.85 }))
+      } else {
       sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 70, fill: 'url(#isl-glow)', opacity: 0.6 }))
       sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 30, fill: '#f6f4ff', stroke: INK, 'stroke-width': OUT }))
       sky.add(new N('path', { d: `M${f(mx + 6)} ${f(my - 29)}a30 30 0 0 1 0 58a24 30 0 0 0 0 -58z`, fill: '#d9dcf5' }))
@@ -1511,17 +1554,20 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       let path = ''
       for (let k = 0; k < 16; k++) { const y = my + 70 + k * 22, w = 10 + k * 3.5 + hz(k, 5, 1) * 10, x = mx + (hz(k, 6, 2) - 0.5) * 16; path += `M${f(x - w)} ${f(y)}h${f(w * 2)}` }
       sky.add(new N('path', { d: path, stroke: '#f6f4ff', 'stroke-width': 2.4, 'stroke-linecap': 'round', class: 'moon-path', opacity: 0.7 }))
+      }
       // Stars across the dark water, like the sky reflected in it.
       let st = '', st2 = ''
       for (let k = 0; k < 90; k++) {
         const x = vx + hz(k, 1, 31) * vw, y = vy + hz(k, 2, 32) * (viewBox[3] * 0.98)
         const u = (x / 32 + y / 16) / 2, v = (y / 16 - x / 32) / 2
         if (nearLand(u, v, 1.5)) continue
-        const r = 1 + hz(k, 3, 33) * 1.6
+        // (On the realistic sea, the stars in it are pinpricks, and a few of them twinkle.)
+        const r = art ? 0.45 + hz(k, 3, 33) * 0.7 : 1 + hz(k, 3, 33) * 1.6
+        if (art) { if (k % 4) st += `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(r * 2)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-r * 2)} 0`; else st2 += `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(r * 2)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-r * 2)} 0`; continue }
         if (k % 3) st += `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(r * 2)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-r * 2)} 0`
         else st2 += `M${f(x)} ${f(y - r * 2.6)}l${f(r * 0.5)} ${f(r * 2.1)}l${f(r * 2.1)} ${f(r * 0.5)}l${f(-r * 2.1)} ${f(r * 0.5)}l${f(-r * 0.5)} ${f(r * 2.1)}l${f(-r * 0.5)} ${f(-r * 2.1)}l${f(-r * 2.1)} ${f(-r * 0.5)}l${f(r * 2.1)} ${f(-r * 0.5)}z`
       }
-      sky.add(new N('path', { d: st, fill: '#eef0ff', opacity: 0.85 }))
+      sky.add(new N('path', { d: st, fill: '#eef0ff', opacity: art ? 0.6 : 0.85 }))
       sky.add(new N('path', { d: st2, fill: '#ffffff', class: 'star-twinkle' }))
     }
     // New Year: fireworks over the island (shown only on those two nights).
@@ -1633,6 +1679,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     }
     for (const m of made) if (!KEEP.has(m.kind)) deInk(m.node)
   }
+  // The realistic night falls on everything in the world, the clouds, the balloons and the birds as well:
+  // its layer (and the lighthouse's beam, which is light) goes over the sky's, under only the districts' names.
+  if (glowRef) {
+    const late = made.filter((m) => m.kind === 'night' || m.kind === 'beam' || m.kind === 'banners')
+    made.splice(0, made.length, ...made.filter((m) => !late.includes(m)), ...late)
+  }
   const layers: Layer[] = made.map((m) => ({ kind: m.kind, slug: m.slug, body: render(m.node) }))
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
@@ -1647,6 +1699,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     plants: planted.map((q) => ({ ...q })),
     actors: [...actorsWanted.values()].sort((a, b) => a.name.localeCompare(b.name)),
     seaRocks, shoreRocks, solids,
+    lights: lights.flatMap((l, n) => {
+      if (!l.w) return []
+      const kind = l.face ? 'win' : l.el?.attrs.class === 'lamp-bulb' ? 'lamp' : 'bulb'
+      const r = (v: number) => Math.round(v * 1000) / 1000
+      return [{ i: r(l.w[0]), j: r(l.w[1]), z: r(l.w[2]), kind, face: l.face, col: l.glow ?? '#ffffff', lit: litTonight(l, n) }]
+    }),
     viewBox,
   } }
 }

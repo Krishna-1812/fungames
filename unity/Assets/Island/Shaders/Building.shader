@@ -6,7 +6,8 @@
 // the face starts):
 //   0 plaster   1 brick   2 roof tiles   3 slate   4 timber boards
 //   5 metal     6 glass   7 concrete     8 paint   9 cloth
-//  10 a window's pane: uv runs 0..1 across it and up it
+//  10 a window's pane: uv runs 0..1 across it and up it; TEXCOORD1.y over 2 says
+//     whether its room is lit at night, and in which light (Night.PaneLight)
 Shader "Island/Building"
 {
     Properties { }
@@ -45,6 +46,8 @@ Shader "Island/Building"
             TEXTURE2D_ARRAY(_WallColour); SAMPLER(sampler_WallColour);
             TEXTURE2D_ARRAY(_WallNormal); SAMPLER(sampler_WallNormal);
             float4 _WallMean[16];
+            // The light in a lit room at night, by kind (Night.Rooms), linear.
+            float4 _IslandRooms[4];
             float _WallRep[16];
 
             // A photograph's detail, without its colour: how much lighter or darker than its average each point is
@@ -67,7 +70,8 @@ Shader "Island/Building"
             half4 frag(V i, bool front : SV_IsFrontFace) : SV_Target
             {
                 int m = (int)round(i.mat.x);
-                float seed = i.mat.y;
+                int litCode = (int)floor(i.mat.y * 0.5);
+                float seed = i.mat.y - litCode * 2;
                 float2 uv = i.uv;
                 float3 alb = i.c.rgb;
                 // Turned to face the camera: a two-sided surface is seen from the side it faces. (Not SV_IsFrontFace, which a
@@ -133,6 +137,31 @@ Shader "Island/Building"
                     float3 room = float3(0.022, 0.026, 0.034) * (1 + 0.8 * (1 - f.y)) * lerp(0.6, 2.0, h3);
                     float3 fabrics[4] = { float3(0.78, 0.8, 0.84), float3(0.52, 0.58, 0.7), float3(0.66, 0.68, 0.66), float3(0.45, 0.42, 0.55) };
                     float3 fabric = fabrics[(int)floor(h2 * 3.99)];
+                    if (islandNightPass())
+                    {
+                        // At night a lit room glows: brightest round its ceiling light, the far wall
+                        // fading down to the furniture's dark line; drawn curtains glow through, a blind's slats
+                        // let it out in stripes. A dark room shows only what the lamps outside throw in it.
+                        float3 core; float3 e = islandLamps(N, i.ws, core);
+                        if (litCode < 1) return half4(e * 0.03 + core, 1);
+                        float3 light = _IslandRooms[min(litCode - 1, 3)].rgb;
+                        float lamp = exp(-((f.x - lerp(0.35, 0.65, h2)) * (f.x - lerp(0.35, 0.65, h2)) * 5 + (f.y - 0.95) * (f.y - 0.95) * 3));
+                        float3 room = light * (0.32 + 0.68 * lamp) * lerp(0.75, 1.25, h3);
+                        room *= lerp(0.55, 1, smoothstep(0.12, 0.3, f.y + 0.06 * sin(f.x * 9 + h1 * 20)));
+                        if (h1 < 0.5)
+                        {
+                            float cw = lerp(0.14, 0.32, h2), side = min(f.x, 1 - f.x);
+                            float k = smoothstep(cw, cw - 0.03, side);
+                            float fold = 0.7 + 0.3 * sin(f.x * 70 + h3 * 6);
+                            room = lerp(room, light * lerp(float3(1, 1, 1), fabric, 0.6) * 0.62 * fold, k);
+                        }
+                        else if (h1 < 0.72)
+                        {
+                            float drop = lerp(0.25, 0.7, h2), slat = 0.55 + 0.45 * step(0.5, frac(f.y * 22));
+                            room = lerp(room, light * lerp(float3(1, 1, 1), fabric, 0.5) * 0.5 * slat, step(1 - drop, f.y));
+                        }
+                        return half4(room + e * 0.03 + core, 1);
+                    }
                     if (h1 < 0.5)
                     {
                         float cw = lerp(0.14, 0.32, h2), side = min(f.x, 1 - f.x);
@@ -163,6 +192,7 @@ Shader "Island/Building"
                     alb += sky * fres * 0.4;
                     // The sky in it is its own light: in the lit passes it comes with the sun's, once.
                     if (islandSkyPass()) return half4(0, 0, 0, 1);
+                    if (islandNightPass()) { float3 core; float3 e = islandLamps(N, i.ws, core); return half4(alb * e * 0.5 + core, 1); }
                     Light sun = GetMainLight(TransformWorldToShadowCoord(i.ws));
                     float3 h = normalize(sun.direction + view);
                     float3 col = alb * (0.55 + 0.45 * sun.shadowAttenuation) + pow(saturate(dot(N, h)), 300) * 3 * sun.shadowAttenuation;
@@ -198,7 +228,7 @@ Shader "Island/Building"
                 // (The lit passes find that for themselves.)
                 float wall = 1 - abs(n.y);
                 if (_IslandPass < 0.5) col += alb * (float3(0.2, 0.21, 0.2) * wall + float3(0.1, 0.12, 0.15)) * i.c.a;
-                if (spec > 0 && !islandSkyPass())
+                if (spec > 0 && !islandSkyPass() && !islandNightPass())
                 {
                     Light sun = GetMainLight(TransformWorldToShadowCoord(i.ws));
                     float3 h = normalize(sun.direction + view);

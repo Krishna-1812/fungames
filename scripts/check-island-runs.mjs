@@ -23,8 +23,9 @@ const shape = (isl) => new Map(isl.model.solids.map((s) => [s.slug, s.runs.map((
 const plain = shape(buildIsland(games, { raster: resvgRaster }))
 process.env.ISLAND_PLATE = '1'
 const plate = plateRef()
+const glow = plate ? plateRef('glow') : null
 if (!plate) { console.log('check-island-runs: no plate, nothing to compare'); process.exit(0) }
-const real = shape(buildIsland(games, { raster: resvgRaster, plate, figures: figureSet(), buildings: buildingSet() }))
+const real = shape(buildIsland(games, { raster: resvgRaster, plate, glow, figures: figureSet(), buildings: buildingSet() }))
 let bad = 0
 for (const [slug, runs] of plain) {
   const other = real.get(slug)

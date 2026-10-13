@@ -147,7 +147,12 @@ export type Draw = { fill?: string; stroke?: string; sw?: number; op?: number; c
  * the colour that shape glows when it is lit (null: a halo only, the shape
  * keeps its own colour, as a dark LED panel does).
  */
-export type Light = [number, number] & { el?: N; glow?: string | null }
+/**
+ * A light: where it is on screen, what gives it off, its glow; and where it is
+ * in the world (tile i, j and height z: Unity lights the island at night from
+ * there), and for a window, the face it looks out of.
+ */
+export type Light = [number, number] & { el?: N; glow?: string | null; w?: [number, number, number]; face?: 'x' | 'y' }
 
 /**
  * Things that give off light of their own (neon, a screen, a ring of bulbs),
@@ -232,7 +237,7 @@ export class Pen {
    * number, so the island can find out at build time whether anything drawn
    * in front of it hides it (see occlusion in world.ts).
    */
-  light(pt: [number, number], el: N, glowWith: string | null = '#ffe6a1') {
+  light(pt: [number, number], el: N, glowWith: string | null = '#ffe6a1', h = 0, face?: 'x' | 'y') {
     el.attrs['data-l'] = this.lights.length
     // Its area on screen, so the test can tell how much of it is hidden.
     const at = el.attrs
@@ -244,7 +249,9 @@ export class Pen {
     } else if (typeof at.r === 'number') area = Math.PI * at.r * at.r
     else if (typeof at.width === 'number' && typeof at.height === 'number') area = at.width * at.height
     el.attrs['data-la'] = Math.round(area * 10) / 10
-    this.lights.push(Object.assign([pt[0], pt[1]] as [number, number], { el, glow: glowWith }))
+    // Where it is in the world: on screen x = (i - j) * 32, y = (i + j) * 16 - z, at h above the pen's own height.
+    const z = this.oz + h, sum = (pt[1] + z) / 16, diff = pt[0] / 32
+    this.lights.push(Object.assign([pt[0], pt[1]] as [number, number], { el, glow: glowWith, w: [(sum + diff) / 2, (sum - diff) / 2, z] as [number, number, number], face }))
   }
   /** Grow the bounds round a screen-space shape drawn relative to a point. */
   grow(x0: number, y0: number, x1: number, y1: number) { this.b.add(x0, y0); this.b.add(x1, y1) }
@@ -358,7 +365,7 @@ export class Pen {
       this.quad(b, face, u - ww / 2 - fu * 2, u + ww / 2 + fu * 2, z - 2.5, z - 1, shade(frame, dark * 0.9), { sw: 0.8 })
       if (o.lit !== false) {
         const Z = b.z0 + z + h / 2
-        this.light(face === 'x' ? P(b.x + b.w + this.ox, b.y + u * b.d + this.oy, Z + this.oz) : P(b.x + u * b.w + this.ox, b.y + b.d + this.oy, Z + this.oz), glass)
+        this.light(face === 'x' ? P(b.x + b.w + this.ox, b.y + u * b.d + this.oy, Z + this.oz) : P(b.x + u * b.w + this.ox, b.y + b.d + this.oy, Z + this.oz), glass, '#ffe6a1', Z, face)
         // Drawn into nothing (the realistic island: Unity draws the window), its pane stays, unseen,
         // where it was: for the night to light, and to find whether anything stands in front of it.
         const real = this.sink?.real

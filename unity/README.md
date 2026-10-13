@@ -118,6 +118,41 @@ one down; `export-island` hands the list over):
 - The page's canvas (the parade, the pigeons) draws from a sheet of these
   pictures the bake makes (`sprites.webp`).
 
+## The night: the island lit by its own lights (Night.cs)
+
+The site's realistic night is the day's picture multiplied down to moonlight
+(a deep blue) with some of its colour taken out, and over that the light the
+island gives off, rendered here: `node scripts/unity-glow.mjs`
+(`IslandBuild.Glow`), over the plate's box and in its tiles, into
+`src/lib/island/glow/`. The whole island in 3D (ground, sea, buildings,
+trees) lit by nothing but its lights, each where the site says it is
+(`model.lights`, from `Pen.light`, now with its place in the world):
+
+- **Street lamps**: a light under the lantern, shaded above, a pool on the
+  ground round the foot, light on the walls and trees near it, the glass
+  glowing; their shadows found on a map of the tallest thing over every point
+  (`Night.Height`, from the ground's and the buildings' meshes, the small
+  things left out) and marched along in the shader (`islandLampShadow`).
+- **Lit windows** (about four in five; the site's choice): the room behind the
+  pane lit (Building.shader: a ceiling light, the far wall, the furniture's
+  dark line; drawn curtains glowing through, blinds in stripes; warm, plain,
+  cool or a television's blue), and a little light out on to the pavement.
+  Panes are matched to their lights by place (`Night.PaneLight`) and carry it
+  in their seed (TEXCOORD1.y over 2).
+- **The sea** gives each light back as a streak broken by the ripples.
+- Bright things bloom (two blurs of what is brighter than white).
+- Each tile is rendered with a margin, so a glow by an edge is whole; it comes
+  out as colour and strength (alpha), to lay straight over the site's night.
+
+On the site the night layer then goes over the sky's (clouds, balloons and
+birds darken with everything else), under only the districts' names.
+
+The ground under a building is lit as open ground in the plate
+(`Footprints`, `islandUnderFoot`): it is only seen as the building lifts or
+drops in, and was black. The moon and its glints on the sea are made by
+`node scripts/make-night-sky.mjs` (the near side's seas where they are, the
+dust's flat light; the path in thousands of glints, two sets that shimmer).
+
 ## Run by run: the check
 
 `node scripts/check-island-runs.mjs` (in the suite) builds the island plainly
@@ -250,4 +285,6 @@ picture about its middle turns it.
    `Creatures.cs`), the whole island lit by the dome (sun and sky), buildings
    detailed (openings, cornices, gutters, chimneys), lamps, flowers, umbrellas
    and surfboards modelled, and the drawn outlines softened to the fill.
-6. Night: a night render, lit from the windows.
+6. Night (done): the island lit by its street lamps, lit rooms, bulbs and
+   lighthouse (`Night.cs`), over the day multiplied down to moonlight; a
+   real moon and its path on the sea; the beam a soft shaft of light.

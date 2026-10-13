@@ -30,9 +30,15 @@ const island = JSON.parse(fs.readFileSync(input, 'utf8'))
 const b = build({ ...island, layers: island.layers.filter((l) => !SKIP_LAYERS.has(l.kind)) })
 for (const w of b.warnings) console.log(`  [island] warning: ${w}`)
 // The ground as Unity renders it, if the island was built with it (lib/island/plate.ts).
-const plate = island.layers.some((l) => l.body.includes('data-plate')) ? await platePixels() : null
-if (plate) console.log(`  [island] painting the ground from the Unity plate ${plate.id} (${plate.width}x${plate.height})`)
-const p = await paint(b, island.viewBox, hash, (s) => console.log(`  [island] ${s}`), plate)
+// And the night's light, the same way (lib/island/plate.ts, 'glow').
+const plates = []
+for (const name of ['plate', 'glow']) {
+  const info = island.layers.some((l) => l.body.includes('data-plate')) ? await platePixels(name) : null
+  if (!info || !island.layers.some((l) => l.body.includes(`data-plate="${info.id}"`))) continue
+  console.log(`  [island] painting from the Unity ${name} ${info.id} (${info.width}x${info.height})`)
+  plates.push(info)
+}
+const p = await paint(b, island.viewBox, hash, (s) => console.log(`  [island] ${s}`), plates)
 
 fs.rmSync(out, { recursive: true, force: true })
 const files = []
