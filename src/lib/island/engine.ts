@@ -314,6 +314,12 @@ export function createEngine(o: {
     const m = deviceM
     const dx0 = Math.round(m[0] * wx0 + m[4]), dy0 = Math.round(m[3] * wy0 + m[5]), dx1 = Math.round(m[0] * wx1 + m[4]), dy1 = Math.round(m[3] * wy1 + m[5])
     if (dx1 <= dx0 || dy1 <= dy0) return
+    // Read half a pixel inside the piece's own edges in its sheet: scaled with smoothing, the edge would
+    // take in a sliver of whatever lies next to it there, and every cell would show a hairline.
+    if (sw > 2 && sh > 2) {
+      const l = sx === f.sx ? 0.5 : 0, t = sy === f.sy ? 0.5 : 0, r = sx + sw === f.sx + f.w ? 0.5 : 0, b = sy + sh === f.sy + f.h ? 0.5 : 0
+      sx += l; sy += t; sw -= l + r; sh -= t + b
+    }
     ctx.drawImage(bm, sx, sy, sw, sh, dx0, dy0, dx1 - dx0, dy1 - dy0)
     cs.images++; cs.frags++
   }
@@ -903,7 +909,7 @@ export function createEngine(o: {
       ident = false; textCtx = null
       cam.x = view.x; cam.y = view.y; cam.z = view.z; W = w; H = h; dpr = 1
       // The sea's colour under everything, as the page's own background is under its canvas.
-      under = '#8ccbff'
+      under = getComputedStyle(document.body).backgroundColor || '#8ccbff'
       try { frame(performance.now()) } finally { under = null }
       const out = { drawable: lastGaps === 0, sharp: lastGaps === 0 && lastBlurry === 0 }
       canvas = was.canvas; ctx = was.ctx; Object.assign(cam, was.cam); W = was.W; H = was.H; dpr = was.dpr

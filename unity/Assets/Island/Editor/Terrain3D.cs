@@ -330,10 +330,11 @@ namespace Island
         /* ---- the colour of the ground ---------------------------------------------- */
 
         static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
-        static readonly Color Deep = Hex("#3a6b52"), Sand = Hex("#d2d0c8"), Wet = Hex("#8f9a9e"), Floor0 = Hex("#c4d2cf"),
-            Rock = Hex("#8d91a5"), RockHi = Hex("#a9adbf"), RockLo = Hex("#6f7389"), Paving = Hex("#878c97"), Kerb = Hex("#b4b8c2"),
-            Plaza = Hex("#b3b8c6"), Soil = Hex("#5d6372"), Lavender = Hex("#7c6fa6"), Sage = Hex("#93a89c"), Greens = Hex("#3f6f55"),
-            River = Hex("#5aa8d8"), RiverHi = Hex("#a6d8f2"), Foam = Hex("#eef5fa"), Pond = Hex("#3d8a9c"), Mud = Hex("#cbc7d9"), MudDark = Hex("#9d98b2");
+        // Real ground in its real colours: pale coral sand, stone that is stone, worn asphalt and dry earth.
+        static readonly Color Deep = Hex("#3a6b52"), Sand = Hex("#e4d8bf"), Wet = Hex("#a99d86"), Floor0 = Hex("#e2d9c2"),
+            Rock = Hex("#8f8b84"), RockHi = Hex("#aca79e"), RockLo = Hex("#67645f"), Paving = Hex("#6e7073"), Kerb = Hex("#c2beb5"),
+            Plaza = Hex("#bdb7ab"), Soil = Hex("#5f5547"), Lavender = Hex("#7c6fa6"), Sage = Hex("#93a89c"), Greens = Hex("#3f6f55"),
+            River = Hex("#5aa8d8"), RiverHi = Hex("#a6d8f2"), Foam = Hex("#eef5fa"), Pond = Hex("#2f7f8c"), Mud = Hex("#cdbda3"), MudDark = Hex("#a28f76");
 
         static float SegDist(Vector2 p, Vector2 a, Vector2 b)
         {
@@ -416,7 +417,7 @@ namespace Island
             if (h < d.sea - 0.4f)
             {
                 kind = IsSand; Only(2);
-                return Color.Lerp(Floor0, Hex("#6f949c"), Mathf.Clamp01((d.sea - h) / 22f)) * (0.95f + 0.1f * grain);
+                return Color.Lerp(Floor0, Hex("#4f8a8c"), Mathf.Clamp01((d.sea - h) / 22f)) * (0.95f + 0.1f * grain);
             }
 
             Color c;
@@ -448,7 +449,7 @@ namespace Island
             {
                 // Dust, cracked into plates.
                 var site = districts["badlands"].a;
-                c = Color.Lerp(site, Hex("#9b99a6"), 0.66f) * (0.9f + 0.18f * Noise.Fbm(u * 1.5f, v * 1.5f, 4, 8));
+                c = Color.Lerp(site, Hex("#b09d82"), 0.8f) * (0.9f + 0.18f * Noise.Fbm(u * 1.5f, v * 1.5f, 4, 8));
                 var cell = Noise.Cells(u * 5, v * 5, 21);
                 if (cell.y - cell.x < 0.05f) c *= 0.82f;
                 kind = IsSand; Only(7);

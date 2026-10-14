@@ -9,6 +9,7 @@
  "tile": 2048,
  "cols": 5,
  "rows": 3,
- "id": "96b19911d352",
+ "id": "3eef6790b029",
+ "sea": "#1c5bb3",
  "live": false
 }

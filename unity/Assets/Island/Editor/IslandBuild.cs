@@ -273,7 +273,7 @@ namespace Island
 
             var sun = new GameObject("sun").AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.intensity = 1.1f;
+            sun.intensity = 1.27f;
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.7f;
             // Behind and to the right, as the site's shadows have it: they fall towards -i, +j.
@@ -296,8 +296,9 @@ namespace Island
         {
             var sun = new GameObject("sun").AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(1.0f, 0.98f, 0.95f);
-            sun.intensity = 1.1f;
+            // Clear midday sun: a touch warmer than white, against the sky's blue in the shade.
+            sun.color = new Color(1.0f, 0.955f, 0.87f);
+            sun.intensity = 1.27f;
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.85f;
             sun.shadowBias = 0.02f; sun.shadowNormalBias = 0.2f;
@@ -493,7 +494,15 @@ namespace Island
                     var cm = Eye(bb[0], bb[1], bb[2], bb[3]);
                     cm.backgroundColor = SiteSea;
                     var o = Arg("-out", "Renders/realistic.png").Replace(".png", $"_{k}.png");
-                    if (Lit) Dome.Shoot(cm, Mathf.RoundToInt(bb[2] * scale), Mathf.RoundToInt(bb[3] * scale), o, ss, false);
+                    if (Lit && Arg("-split", "0") == "1")
+                    {
+                        Dome.Raw = true;
+                        Dome.Shoot(cm, Mathf.RoundToInt(bb[2] * scale), Mathf.RoundToInt(bb[3] * scale), o, ss, false);
+                        Dome.Only = "sun";
+                        Dome.Shoot(cm, Mathf.RoundToInt(bb[2] * scale), Mathf.RoundToInt(bb[3] * scale), o.Replace(".png", "_sun.png"), ss, false);
+                        Dome.Only = ""; Dome.Raw = false;
+                    }
+                    else if (Lit) Dome.Shoot(cm, Mathf.RoundToInt(bb[2] * scale), Mathf.RoundToInt(bb[3] * scale), o, ss, false);
                     else Shoot(cm, Mathf.RoundToInt(bb[2] * scale), Mathf.RoundToInt(bb[3] * scale), o, false, ss);
                     Object.DestroyImmediate(cm.gameObject);
                 }
@@ -503,6 +512,17 @@ namespace Island
             var vb = box != "" ? Floats(box) : d.viewBox;
             var cam = Eye(vb[0], vb[1], vb[2], vb[3]);
             cam.backgroundColor = SiteSea;
+            // `-split 1`: the light as well, before the tone curve, all of it and the sun's share alone (Dome.Raw).
+            if (Lit && Arg("-split", "0") == "1")
+            {
+                Dome.Raw = true;
+                var o = Arg("-out", "Renders/realistic.png");
+                Dome.Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), o, ss, false);
+                Dome.Only = "sun";
+                Dome.Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), o.Replace(".png", "_sun.png"), ss, false);
+                Dome.Only = ""; Dome.Raw = false;
+                return;
+            }
             if (Lit) Dome.Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/realistic.png"), ss, false);
             else Shoot(cam, Mathf.RoundToInt(vb[2] * scale), Mathf.RoundToInt(vb[3] * scale), Arg("-out", "Renders/realistic.png"), false, ss);
         }

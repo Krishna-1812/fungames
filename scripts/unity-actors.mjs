@@ -70,7 +70,7 @@ for (const name of names) {
   const wk = path.join(renders, `${name}.w.png`)
   if (fs.existsSync(wk)) under.push({ input: await layer(wk, { r: 246, g: 250, b: 255 }, 0.62, 2.2) })
   if (fs.existsSync(sh)) under.push({ input: await layer(sh, { r: SHADOW.r, g: SHADOW.g, b: SHADOW.b }, boat ? 0.16 : SHADOW.a, boat ? 2 : 1.1) })
-  const png = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([...under, { input: kindOf(name) === 'cloud' ? await sharp(fig).blur(1.2).toBuffer() : fig }]).png({ compressionLevel: 9, effort: 10, palette: false }).toBuffer()
+  const png = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([...under, { input: fig }]).png({ compressionLevel: 9, effort: 10, palette: false }).toBuffer()
   fs.writeFileSync(path.join(out, `${name}.png`), png)
   hash.update(name).update(png); bytes += png.length
 }

@@ -18,7 +18,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { PlateRef } from './world'
 
-export type PlateInfo = { box: [number, number, number, number]; scale: number; tile: number; cols: number; rows: number; id: string; live?: boolean }
+export type PlateInfo = { box: [number, number, number, number]; scale: number; tile: number; cols: number; rows: number; id: string; sea?: string; live?: boolean }
 export type PlatePixels = PlateInfo & { width: number; height: number; px: Buffer }
 
 export type PlateName = 'plate' | 'glow'
@@ -36,7 +36,7 @@ export function plateRef(name: PlateName = 'plate', force = false): PlateRef | n
   const p = plateInfo(name)
   if (!p || !live || !(force || live.live || process.env.ISLAND_PLATE === '1')) return null
   const low = fs.readFileSync(path.join(dir(name), 'low.png')).toString('base64')
-  return { box: p.box, id: p.id, href: `data:image/png;base64,${low}` }
+  return { box: p.box, id: p.id, href: `data:image/png;base64,${low}`, sea: live.sea }
 }
 
 /** The whole picture at full size, straight (not premultiplied: sharp scales it right), for the bake to cut cells from. */

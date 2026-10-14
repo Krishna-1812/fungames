@@ -368,7 +368,7 @@ export const LAYERS = {
      * light of the island's own lamps and windows (Unity's, again) laid over it.
      */
     real: {
-      multiply: { night: ['#3c4a82', 1], dusk: ['#a993d4', 1], dawn: ['#e3c9ee', 1] } as Record<string, [string, number]>,
+      multiply: { night: ['#4a5c9c', 1], dusk: ['#a993d4', 1], dawn: ['#e3c9ee', 1] } as Record<string, [string, number]>,
       saturation: { night: ['#808080', 0.5], dusk: ['#808080', 0.18], dawn: ['#808080', 0.08] } as Record<string, [string, number]>,
     },
     glow: { night: 1, dusk: 0.55, dawn: 0.2 } as Record<string, number>,

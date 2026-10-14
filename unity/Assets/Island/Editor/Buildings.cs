@@ -217,14 +217,62 @@ namespace Island
 
         static Color Hex(string h) { if (string.IsNullOrEmpty(h) || !ColorUtility.TryParseHtmlString(h, out var c)) c = Color.white; return c; }
         /** The site's colour as a real surface's: less saturated, never quite white or black; linear. */
-        static Color Real(string hex, int material)
+        /**
+         * The site's colour for a thing, as what it is made of really looks. The site paints in a
+         * cartoon's pastels; a real town is whitewash and limestone, terracotta and slate, timber,
+         * copper gone green, and paint. So walls and roofs are read for what they stand for (a pale
+         * wall is render or stone, a pink roof terracotta, a lilac one slate, the lilac "wood" timber),
+         * and paint and cloth keep their colour, as strong as real paint is.
+         */
+        static Color Real(string hex, int material) => RealSrgb(hex, material).linear;
+        static Color RealSrgb(string hex, int material)
         {
             var c = Hex(hex);
             Color.RGBToHSV(c, out var hh, out var s, out var v);
-            float sat = material == Glass ? 0.5f : material == Tiles || material == Slate ? 0.55f : 0.62f;
-            float val = material == Tiles || material == Slate ? 0.8f : material == Metal ? 0.85f : 0.93f;
-            var o = Color.HSVToRGB(hh, s * sat, Mathf.Clamp(v * val, 0.08f, 0.9f));
-            return o.linear;
+            float deg = hh * 360;
+            Color H(float d, float sat, float val) => Color.HSVToRGB(((d % 360) + 360) % 360 / 360f, Mathf.Clamp01(sat), Mathf.Clamp(val, 0.04f, 0.92f));
+            // A steady pick for each colour, so the same paint is the same stone everywhere.
+            int pick = 0; foreach (var ch in hex.ToLowerInvariant()) pick = pick * 31 + ch; pick &= 0x7fffffff;
+            switch (material)
+            {
+                case Plaster: case Concrete: case Brick:
+                {
+                    if (s < 0.12f && v > 0.9f)
+                        // White: lime-washed render, or pale limestone.
+                        return material == Concrete ? H(38, 0.07f, 0.84f) : (pick % 3 == 0 ? H(40, 0.1f, 0.9f) : H(36, 0.06f, 0.92f));
+                    if (s < 0.32f && v > 0.6f)
+                    {
+                        // Pale tinted greys: dressed stone and render in their quiet colours.
+                        var stones = new[] { H(38, 0.16f, 0.8f), H(30, 0.12f, 0.74f), H(210, 0.08f, 0.76f), H(45, 0.2f, 0.84f), H(200, 0.06f, 0.82f) };
+                        var st = stones[pick % stones.Length];
+                        return Color.Lerp(st, H(deg, s * 0.5f, v * 0.85f), 0.25f);
+                    }
+                    if (v < 0.35f) return H(deg, s * 0.35f, v * 0.85f);
+                    // A coloured wall: painted render, the colour kept but weathered.
+                    return H(deg, s * 0.55f, Mathf.Min(v * 0.8f, 0.78f));
+                }
+                case Timber:
+                    // The site's lilac wood is wood; other colours are painted boards.
+                    if (deg > 225 && deg < 290 && s < 0.5f) return H(26 + (pick % 7), 0.42f, 0.42f + 0.12f * v);
+                    return H(deg, s * 0.6f, v * 0.72f);
+                case Tiles: case Slate:
+                {
+                    float shade = 0.85f + 0.15f * v;
+                    if (s < 0.15f) return H(215, 0.08f, 0.5f * shade);                                     // lead and grey slate
+                    if (deg >= 320 || deg < 25) return H(6 + (pick % 5), 0.5f, 0.52f * shade);             // terracotta
+                    if (deg >= 25 && deg < 70) return H(30, 0.45f, 0.62f * shade);                          // old clay
+                    if (deg >= 140 && deg < 200) return H(166, 0.36f, 0.56f * shade);                      // copper gone green
+                    if (deg >= 200 && deg < 235 && s > 0.45f) return H(214, 0.3f, 0.44f * shade);          // blue-black slate
+                    return H(222 + (pick % 9), 0.2f, 0.5f * shade);                                         // slate
+                }
+                case Metal:
+                    return H(deg, s * 0.4f, Mathf.Clamp(v * 0.82f, 0.1f, 0.8f));
+                case Glass:
+                    return H(deg, s * 0.5f, Mathf.Clamp(v * 0.93f, 0.08f, 0.9f));
+                default:
+                    // Paint, cloth, skin: the colour as paint and dye really give it.
+                    return H(deg, s * 0.82f, Mathf.Clamp(v * 0.9f, 0.06f, 0.88f));
+            }
         }
         static bool Is(string hex, params string[] any) { foreach (var a in any) if (string.Equals(hex, a, StringComparison.OrdinalIgnoreCase)) return true; return false; }
         /** What a wall of this colour is made of. */

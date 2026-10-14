@@ -236,8 +236,16 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     const dx = Math.round((ix0 - strip[0]) * L), dy = Math.round((iy0 - strip[1]) * L)
     const tw = Math.min(w - dx, Math.round((ix1 - ix0) * L)), th = Math.min(h - dy, Math.round((iy1 - iy0) * L))
     if (width <= 0 || height <= 0 || tw <= 0 || th <= 0) return out
+    // Cut with a margin of the picture round it, scaled, and the margin trimmed off again: scaled alone, a
+    // piece's filter would meet a hard edge at its border, and every cell would show a hairline seam.
+    const M = 8
+    const ml = Math.min(M, left), mt = Math.min(M, top), mr = Math.min(M, plate.width - left - width), mb = Math.min(M, plate.height - top - height)
+    const fx = tw / width, fy = th / height
+    const bw = Math.round((width + ml + mr) * fx), bh = Math.round((height + mt + mb) * fy)
+    const ox = Math.min(bw - tw, Math.round(ml * fx)), oy = Math.min(bh - th, Math.round(mt * fy))
     const part = await sharp(plate.px, { raw: { width: plate.width, height: plate.height, channels: 4 }, limitInputPixels: false })
-      .extract({ left, top, width, height }).resize(tw, th, { kernel: 'lanczos3', fit: 'fill' }).raw().toBuffer()
+      .extract({ left: left - ml, top: top - mt, width: width + ml + mr, height: height + mt + mb }).resize(bw, bh, { kernel: 'lanczos3', fit: 'fill' })
+      .extract({ left: ox, top: oy, width: tw, height: th }).raw().toBuffer()
     for (let y = 0; y < th; y++) {
       let si = y * tw * 4, di = ((dy + y) * w + dx) * 4
       for (let x = 0; x < tw; x++, si += 4, di += 4) {

@@ -58,6 +58,21 @@ const px = await sharp({ create: { width: W, height: H, channels: 4, background:
 
 // Fade the edges into the site's own sea.
 const F = FADE * m.scale
+// The open sea's own colour, as it comes out round the edges (a band just inside the fade): the site's
+// sea is painted in it, so the picture fades into the same water (plate.json's `sea`).
+const sea = (() => {
+  let r = 0, g = 0, b = 0, n = 0
+  for (let y = 0; y < H; y += 3) for (let x = 0; x < W; x += 3) {
+    const e = Math.min(y, H - 1 - y, x, W - 1 - x)
+    if (e < F || e > 2 * F) continue
+    const k = (y * W + x) * 4
+    if (px[k + 3] < 250) continue
+    r += px[k]; g += px[k + 1]; b += px[k + 2]; n++
+  }
+  const h = (v) => Math.round(v / Math.max(1, n)).toString(16).padStart(2, '0')
+  return '#' + h(r) + h(g) + h(b)
+})()
+console.log('open sea', sea)
 for (let y = 0; y < H; y++) {
   const ey = Math.min(y, H - 1 - y)
   for (let x = 0; x < W; x++) {
@@ -86,5 +101,5 @@ for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols; c++) {
 const low = await big().resize(Math.round((W / m.scale) * 0.5), Math.round((H / m.scale) * 0.5)).png({ palette: true, colours: 256, dither: 0.6, effort: 8 }).toBuffer()
 fs.writeFileSync(path.join(out, 'low.png'), low)
 const id = hash.digest('hex').slice(0, 12)
-fs.writeFileSync(path.join(out, 'plate.json'), JSON.stringify({ ...m, id, live }, null, 1) + '\n')
+fs.writeFileSync(path.join(out, 'plate.json'), JSON.stringify({ ...m, id, sea, live }, null, 1) + '\n')
 console.log(`plate ${id}: ${m.cols * m.rows} tiles, ${(bytes / 1e6).toFixed(1)} MB; small copy ${(low.length / 1e3).toFixed(0)} KB`)

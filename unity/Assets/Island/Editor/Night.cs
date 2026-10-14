@@ -212,6 +212,8 @@ namespace Island
             }
         }
 
+        /** All the island's light at night together, against the moonlit day (phase 9: the graded day is deeper, so its lights must carry). */
+        public static float Exposure = 1.7f;
         /** How strongly the brightest things bloom: a tight glow and a wide one. */
         public static float BloomNear = 0.3f, BloomFar = 0.22f;
 
@@ -254,6 +256,7 @@ namespace Island
                         for (int dx = 0; dx < ss; dx++) { var c = src[(y * ss + dy) * rw + x * ss + dx]; r += Mathf.Max(0, c.r); g += Mathf.Max(0, c.g); b += Mathf.Max(0, c.b); }
                     int k = y * W + x; R[k] = r * inv; G[k] = g * inv; B[k] = b * inv;
                 }
+            for (int k = 0; k < R.Length; k++) { R[k] *= Exposure; G[k] *= Exposure; B[k] *= Exposure; }
             // The bloom: what is brighter than white spreads a little round itself.
             foreach (var (radius, amount) in new[] { (2, BloomNear), (7, BloomFar) })
             {

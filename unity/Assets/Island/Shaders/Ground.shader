@@ -135,7 +135,7 @@ Shader "Island/Ground"
                     float y = i.ws.y + (vnoise(p * 2.2) - 0.5) * 0.12;
                     float band = sin(y * 14.0) * 0.5 + 0.5;
                     float fine = vnoise(float2(dot(p, float2(0.7, 0.7)) * 3.0, y * 40.0));
-                    float3 lo = SRGBToLinear(float3(0.435, 0.451, 0.537)), hi = SRGBToLinear(float3(0.663, 0.678, 0.749));
+                    float3 lo = SRGBToLinear(float3(0.40, 0.385, 0.36)), hi = SRGBToLinear(float3(0.68, 0.645, 0.585));
                     float3 strata = lerp(lo, hi, saturate(band * 0.7 + fine * 0.3));
                     alb = lerp(alb, strata, faceness);
                 }

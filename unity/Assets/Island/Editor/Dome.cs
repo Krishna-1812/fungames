@@ -12,9 +12,8 @@
 // the sun's pass (_IslandBounce).
 //
 // The passes are added up in floating point on the GPU (Accumulate.shader),
-// read back once, put through the tone curve (Knee: straight up to 0.8, then
-// rolling off towards white), averaged down from the supersampled render,
-// and written as an sRGB PNG.
+// read back once, averaged down from the supersampled render, graded (Tone:
+// exposure, colour, a filmic curve, a gentle S) and written as an sRGB PNG.
 using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -29,13 +28,17 @@ namespace Island
         /** How far across the sun's samples spread (degrees): a soft edge to every shadow, as daylight gives, and no stair-steps from the shadow map. */
         public static float SunSpread = 1.1f;
         /** The sky's light on open level ground, against the sun's (about 0.71 there, at 40° up). */
-        public static float SkyLevel = 0.42f;
+        public static float SkyLevel = 0.25f;
         /** The light the sunlit ground throws back up. */
         public static Color Bounce = new Color(0.17f, 0.2f, 0.19f);
         /** A little more contrast in the midtones, after the tone curve. */
-        public static float Contrast = 0.08f;
+        public static float Contrast = 0.1f;
+        /** The grade: exposure into the filmic curve, and colour as strong as a good photograph's (more where it is weak). */
+        public static float Exposure = 1.05f, Saturation = 1.06f, Vibrance = 0.2f;
         /** For looking at one light alone: "sun" or "sky" (else both). */
         public static string Only = "";
+        /** Also write the light before the tone curve (linear, float32 RGB, row by row from the top), beside the PNG as .f32: for trying out the light's balance and the grade offline. */
+        public static bool Raw = false;
 
         static Material add;
         static Light sun;
@@ -64,7 +67,8 @@ namespace Island
                 float u = (k + 0.5f) / n, sy = lo + u * (1 - lo), cy = Mathf.Sqrt(1 - sy * sy), az = k * golden;
                 var dir = new Vector3(cy * Mathf.Cos(az), sy, cy * Mathf.Sin(az));
                 // Paler and brighter towards the horizon, deeper blue overhead, and brighter round the sun.
-                var zenith = new Color(0.36f, 0.5f, 0.78f); var horizon = new Color(0.78f, 0.84f, 0.92f);
+                // (A clear, deep sky: its light in the shade is blue.)
+                var zenith = new Color(0.29f, 0.47f, 0.88f); var horizon = new Color(0.68f, 0.8f, 0.98f);
                 var c = Color.Lerp(horizon, zenith, Mathf.Sqrt(sy));
                 float glow = Mathf.Pow(Mathf.Max(0, Vector3.Dot(dir, toSun)), 6);
                 c += new Color(0.9f, 0.92f, 0.95f) * glow * 0.9f;
@@ -82,6 +86,24 @@ namespace Island
         {
             const float k = 0.8f;
             return x < k ? Mathf.Max(0, x) : k + (1 - k) * (1 - Mathf.Exp(-(x - k) / (1 - k)));
+        }
+
+        /** Filmic tone curve (ACES, fitted): a toe that keeps shadows rich, a shoulder that keeps whites. */
+        public static float Aces(float x)
+        {
+            x = Mathf.Max(0, x);
+            return Mathf.Clamp01(x * (2.51f * x + 0.03f) / (x * (2.43f * x + 0.59f) + 0.14f));
+        }
+
+        /** Linear light to the picture's sRGB: exposed, its colour graded, through the filmic curve, and a gentle S. */
+        public static Color Tone(float r, float g, float b)
+        {
+            r *= Exposure; g *= Exposure; b *= Exposure;
+            float l = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            float mx = Mathf.Max(r, Mathf.Max(g, b)), mn = Mathf.Min(r, Mathf.Min(g, b));
+            float k = Saturation + Vibrance * (1 - (mx > 0 ? (mx - mn) / mx : 0));
+            r = Mathf.Max(0, l + (r - l) * k); g = Mathf.Max(0, l + (g - l) * k); b = Mathf.Max(0, l + (b - l) * k);
+            return new Color(Grade(Mathf.LinearToGammaSpace(Aces(r))), Grade(Mathf.LinearToGammaSpace(Aces(g))), Grade(Mathf.LinearToGammaSpace(Aces(b))));
         }
 
         static float Grade(float v)
@@ -154,7 +176,8 @@ namespace Island
             Object.DestroyImmediate(big); Object.DestroyImmediate(rt); Object.DestroyImmediate(acc);
 
             var dst = new Color32[pw * ph];
-            byte B(float lin) => (byte)Mathf.Round(Grade(Mathf.LinearToGammaSpace(Knee(lin))) * 255);
+            var raw = Raw ? new float[pw * ph * 3] : null;
+            byte B(float v) => (byte)Mathf.Round(Mathf.Clamp01(v) * 255);
             for (int y = 0; y < ph; y++)
                 for (int x = 0; x < pw; x++)
                 {
@@ -168,12 +191,20 @@ namespace Island
                         }
                     if (a <= 0) { dst[y * pw + x] = new Color32(0, 0, 0, 0); continue; }
                     // Averaged in linear light, then toned.
-                    dst[y * pw + x] = new Color32(B(r / a), B(g / a), B(b / a), figure ? (byte)Mathf.Round(a / (ss * ss) * 255) : (byte)255);
+                    if (raw != null) { int ri = ((ph - 1 - y) * pw + x) * 3; raw[ri] = r / a; raw[ri + 1] = g / a; raw[ri + 2] = b / a; }
+                    var t = Tone(r / a, g / a, b / a);
+                    dst[y * pw + x] = new Color32(B(t.r), B(t.g), B(t.b), figure ? (byte)Mathf.Round(a / (ss * ss) * 255) : (byte)255);
                 }
             var tex = new Texture2D(pw, ph, TextureFormat.RGBA32, false, false);
             tex.SetPixels32(dst); tex.Apply();
             Directory.CreateDirectory(Path.GetDirectoryName(file));
             File.WriteAllBytes(file, tex.EncodeToPNG());
+            if (raw != null)
+            {
+                var bytes = new byte[raw.Length * 4];
+                System.Buffer.BlockCopy(raw, 0, bytes, 0, bytes.Length);
+                File.WriteAllBytes(Path.ChangeExtension(file, ".f32"), bytes);
+            }
             Object.DestroyImmediate(tex);
             Debug.Log($"[island] lit {file} ({pw}×{ph}, {1 + SkyN} passes) in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
         }

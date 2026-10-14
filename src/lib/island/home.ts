@@ -28,7 +28,7 @@ export const WORLDS: World[] = ['cartoon', 'real']
 /** The Unity renders: the ground, and the trees and rocks on it, on or off together. */
 function realism(world: World) {
   const plate = world === 'real' ? plateRef('plate', true) : null
-  return { plate, glow: plate ? plateRef('glow') : null, sky: plate ? skyArt() : null, figures: plate ? figureSet() : null, buildings: plate ? buildingSet() : null }
+  return { plate, glow: plate ? plateRef('glow', true) : null, sky: plate ? skyArt() : null, figures: plate ? figureSet() : null, buildings: plate ? buildingSet() : null }
 }
 
 const built = new Map<World, ReturnType<typeof buildIsland>>()

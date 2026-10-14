@@ -37,6 +37,8 @@ const f2 = (v: number) => Math.round(v * 100) / 100
 /** Sand: two tones for the tops, the wet edge, and the two faces of a step. */
 const SAND = ['#f6f0e1', '#efe7d3', '#d9ccad', '#e3d7ba', '#cbbb98']
 const key = (i: number, j: number) => `${i},${j}`
+/** A colour (#rrggbb) darkened by k. */
+const deepen = (hex: string, k: number) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('')
 
 /** A node and everything in it, again. */
 const copyOf = (n: N): N => { const c = new N(n.tag, { ...n.attrs }); for (const k of n.kids) c.kids.push(typeof k === 'string' ? k : copyOf(k)); return c }
@@ -152,7 +154,7 @@ export type Raster = (svg: string, width: number) => { width: number; height: nu
  * the island draws that picture in place of its own ground and still
  * shallows; the bake paints the map from the full-size picture (bake/draw.ts).
  */
-export type PlateRef = { box: [number, number, number, number]; href: string; id: string }
+export type PlateRef = { box: [number, number, number, number]; href: string; id: string; /** The open sea's colour round the picture's edges (scripts/unity-plate.mjs). */ sea?: string }
 
 export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; glow?: PlateRef | null; sky?: SkyArt | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
   const plate = opts.plate ?? null
@@ -310,8 +312,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const [mx, my] = P(GRID / 2, GRID / 2, SEA)
   const defs = root.add(new N('defs'))
   const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: 1500, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
-  grad.add(new N('stop', { offset: 0.3, 'stop-color': '#a3dbff' }))
-  grad.add(new N('stop', { offset: 1, 'stop-color': C.water }))
+  // On the realistic island, the ocean the plate fades into: its own colour, deepening further out.
+  grad.add(new N('stop', { offset: 0.3, 'stop-color': plate?.sea ?? '#a3dbff' }))
+  grad.add(new N('stop', { offset: 1, 'stop-color': plate?.sea ? deepen(plate.sea, 0.82) : C.water }))
   // (data-still: on the realistic sea the page draws no wave marks of its own over it.)
   root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: 'url(#isl-sea)', 'data-still': plate ? 1 : undefined }))
   // The ground as Unity renders it, land and shallows together, over the open sea.
@@ -349,7 +352,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
 
   /** A ring spreading out on the water round something sitting in it, now and then. */
   // (On the realistic sea, a fainter, finer ring: the swell round something afloat, not a drawn circle.)
-  const ripple = (x: number, y: number, rx: number, ry: number, delay: number) => new N('ellipse', { cx: f(x), cy: f(y), rx: f(rx), ry: f(ry), fill: 'none', stroke: '#ffffff', 'stroke-width': plate ? 0.8 : 1.4, 'stroke-opacity': plate ? 0.45 : undefined, class: 'ripple', style: `animation-delay:${f(-delay)}s` })
+  const ripple = (x: number, y: number, rx: number, ry: number, delay: number) => new N('ellipse', { cx: f(x), cy: f(y), rx: f(rx), ry: f(ry), fill: 'none', stroke: '#ffffff', 'stroke-width': plate ? 0.6 : 1.4, 'stroke-opacity': plate ? 0.16 : undefined, class: 'ripple', style: `animation-delay:${f(-delay)}s` })
   const waves = root.add(new N('g', { class: 'waves' }))
   // Wave marks out in open water only, where they will not sit on the shallows.
   const nearLand = (u: number, v: number, r: number) => { for (let a = Math.floor(u - r); a <= u + r; a++) for (let b = Math.floor(v - r); b <= v + r; b++) if (isLand(a, b)) return true; return false }
@@ -407,8 +410,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     for (const [dx, dy] of [[-14, 1], [10, 4], [20, 0]]) root.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r: 1.3, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6 }))
   }
   // Shimmer: short streaks of light lying flat on the water, a few at a
-  // time catching the sun, thickest just off the shore.
-  const shim = root.add(new N('g', { class: 'shimmer' }))
+  // time catching the sun, thickest just off the shore. (On the realistic
+  // island the sea's own picture glitters: these, and the glints, are kept out.)
+  const shim = plate ? new N('g') : root.add(new N('g', { class: 'shimmer' }))
   for (let k = 0; k < 40; k++) {
     const u = hz(k, 1, 21) * (GRID + 10) - 5, v = hz(k, 2, 22) * (GRID + 10) - 5
     if (nearLand(u, v, 0.8) || !nearLand(u, v, 4.5)) continue
@@ -416,7 +420,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     shim.add(new N('path', { d: `M${f(x - w)} ${f(y)}h${f(w * 2)}M${f(x - w * 0.5)} ${f(y + 3)}h${f(w)}`, stroke: '#ffffff', 'stroke-width': plate ? 0.8 : 1.6, opacity: plate ? 0.45 : undefined, 'stroke-linecap': 'round', class: 'shim amb', 'data-b': `${f(x - w)} ${f(y - 2)} ${f(x + w)} ${f(y + 5)}`, style: `animation-delay:${f(-hz(k, 4, 24) * 6)}s` }))
   }
   // Glints of sun on the water, here and there.
-  const glints = root.add(new N('g', { class: 'glints' }))
+  const glints = plate ? new N('g') : root.add(new N('g', { class: 'glints' }))
   for (let k = 0; k < 26; k++) {
     const u = R() * (GRID + 14) - 7, v = R() * (GRID + 14) - 7
     if (nearLand(u, v, 1.5)) continue

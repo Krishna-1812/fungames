@@ -83,9 +83,8 @@ the sky, with its own shadow). A point in a corner, under the eaves, at the
 foot of a wall, in a doorway or under a tree sees less of the sky, so fewer of
 those passes reach it: real ambient occlusion and soft shade from the geometry
 itself, painted nowhere. The sunlit ground's light thrown back up comes with
-the sun's pass. The sum goes through a tone curve (straight to 0.8, then rolling
-off to white) and a gentle S, and out as sRGB; the sea is put through the
-curve's inverse first, so it still meets the site's own sea exactly.
+the sun's pass. The sum is graded (Dome.Tone: exposure, saturation and
+vibrance, a filmic curve, a gentle S) and goes out as sRGB.
 Building shots include the terrain and the plants, unseen, so a wall by a
 cliff or under a tree is shaded by them. `-dome 0` is the old quick look;
 `-sky n`, `-sunn n` set the sampling.
@@ -253,8 +252,9 @@ island cool, so the shader takes from each only how it varies from its own
 average (its grain, cracks, stones and blades) and keeps the colour map's
 colour; each is sampled twice, turned and shifted, so its repeats don't show.
 Under the shallows, caustics. `Ground.shader` and `Water.shader` light them (one sun with soft
-shadows, the sky, how shut in each point is); the deep water is exactly the
-site's sea colour in the sun, so the two meet without a seam.
+shadows, the sky, how shut in each point is); the open sea's colour is
+measured round the plate's edges and the site paints its own sea in it
+(plate.json `sea`), so the two meet without a seam.
 
 ## The figures: what grows on it
 
@@ -352,3 +352,24 @@ picture about its middle turns it.
    rendered (Props8.cs, Creatures8.cs), the river's falls made water
    (Falls.cs), the globe a real Earth; what the page draws over the plate is
    now only words, lights, moving glints and the interface.
+9. The look (done): the island graded and coloured as a photograph is.
+   The light: a clear, slightly warm sun against a deep blue sky that fills
+   the shade less (Dome.SkyLevel), so there is real contrast between sun
+   and shadow. The grade (Dome.Tone): exposure, colour as strong as a good
+   photograph's (vibrance lifts what is weak), a filmic curve (ACES) that
+   keeps whites and rich shadows, and a gentle S; every picture Unity makes
+   goes through it, so they all match. The materials (Buildings.RealSrgb):
+   the site's pastels read for what they stand for (white walls lime-wash
+   and limestone, pale greys dressed stone, pink roofs terracotta, lilac
+   ones slate, mint ones copper gone green, the lilac "wood" timber, paint
+   kept as strong as real paint). The ground in real colours (coral sand,
+   stone cliffs, asphalt, dry earth). The sea (Water.shader): clear aqua over
+   the sand, turquoise over the shelf, deep ocean blue beyond and deeper
+   still far out, in broad patches, with a swell under the ripples, the sky
+   in it, glitter, and lines of surf; the site paints its own sea in the
+   colour the plate measures at its edges (plate.json `sea`). The clouds are
+   volumes, not balls (scripts/make-clouds.mjs: a density field ray-marched
+   along the island's view, lit by the same sun, toned the same; run it after
+   unity-actors and again with --skip-unity). `-split 1` on Realistic writes
+   the light before the curve (all, and the sun alone) for trying the balance
+   and the grade offline.

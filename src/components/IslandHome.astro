@@ -32,6 +32,8 @@ const worlds = hasRealWorld()
 const worldHref = { cartoon: withBase('/'), real: withBase('/realistic/') }
 // Until the realistic island is the one everyone gets (plate.json's `live`), it is the one you ask for.
 const worldDefault: World = plateInfo('plate')?.live ? 'real' : 'cartoon'
+// The realistic island's open sea (scripts/unity-plate.mjs measures it), behind the canvas and in the browser's bar.
+const seaColour = world === 'real' ? plateInfo('plate')?.sea ?? '#8ccbff' : '#8ccbff'
 const games = homeGames()
 const count = games.length
 const island = homeIsland(world)
@@ -106,7 +108,7 @@ const book = BOOK.map((key) => {
   bodyClass="home-isle"
   masthead={false}
   colophon={false}
-  themeColor="#8ccbff"
+  themeColor={seaColour}
   fonts={['Fredoka:wght@400..700', 'Silkscreen']}
   paperFonts={false}
   noindex={world !== 'cartoon'}
@@ -130,9 +132,10 @@ const book = BOOK.map((key) => {
       } catch {}
     </script>
   )}
+  {world === 'real' && <style is:inline set:html={`body.home-isle, .isl-box { background: ${seaColour} !important; }`} />}
   <main id="main">
     <section class="isl" aria-label={`Tiny Island: ${count} games, each one a building`}>
-      <div class="isl-box" id="islBox" tabindex="0">
+      <div class="isl-box" id="islBox" tabindex="0" data-world={world}>
         <div class="isl-stage" id="islStage">
           <canvas class="isl-canvas" id="islCanvas" aria-hidden="true"></canvas>
           {poster && <img class="isl-poster" id="islPoster" src={baked.base + poster.file} width={poster.w} height={poster.h} alt="" fetchpriority="high" decoding="async" style={poster.tiny ? `background-image:url(${poster.tiny});background-size:100% 100%` : undefined} />}
@@ -1326,6 +1329,11 @@ const book = BOOK.map((key) => {
   .isl-box.is-grabbing { cursor: grabbing; }
   .isl-box:focus-visible { box-shadow: inset 0 0 0 4px #1b2340; }
   .isl-stage { position: absolute; inset: 0; }
+  /* The realistic island seen as through a lens: the corners a little deeper, the eye drawn in. */
+  .isl-box[data-world='real'] .isl-stage::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 75% 70% at 50% 46%, transparent 58%, rgba(3, 22, 52, 0.16) 82%, rgba(2, 16, 40, 0.34) 100%);
+  }
   /* The island: one canvas, under the page's own names and cards. Until it
      can draw, the poster stands in, placed by the camera (and without
      script, the whole still picture, fitted to the box). */
