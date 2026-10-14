@@ -1,14 +1,18 @@
 /** The Proving Grounds: tests of the actual you. */
 import { C, INK, N, OUT, shade, r1 as f, motionPath, letter, type Landmark } from './kit'
 import { person, tree, lamp, fence, flag } from './props'
-import { actorUse, creatureUse, who } from './actors'
+import { actorUse, creatureUse, onPath, who } from './actors'
 
 
 export const proving: Record<string, Landmark> = {
   trolley: { size: [3, 2], draw(p) {
+    // The railway: Unity's (Props8.cs, Track), ballast, sleepers and steel rails; the fork a cubic, sampled.
+    const fork: number[] = []
+    for (let q = 0; q <= 16; q++) { const t = q / 16, u = 1 - t; fork.push(u ** 3 * 1.2 + 3 * u * u * t * 1.8 + 3 * u * t * t * 2.1 + t ** 3 * 3, u ** 3 * 1.5 + 3 * u * u * t * 1.5 + 3 * u * t * t * 0.6 + t ** 3 * 0.55) }
+    for (const pts of [[0, 1.5, 1.2, 1.5], fork, [1.2, 1.5, 3, 1.5]]) p.model('track', [0, 0, 0], { pts }, () => null)
     const g = p.plane(0, 0, 0)
     const main = 'M0 1.5L1.2 1.5', up = 'M1.2 1.5C1.8 1.5 2.1 0.6 3 0.55', down = 'M1.2 1.5L3 1.5'
-    for (const d of [main, up, down]) {
+    if (!p.real) for (const d of [main, up, down]) {
       g.add(new N('path', { d, fill: 'none', stroke: '#b3acd9', 'stroke-width': 0.34, 'stroke-linecap': 'round' }))
       g.add(new N('path', { d, fill: 'none', stroke: shade('#b3acd9', 0.75), 'stroke-width': 0.344, 'stroke-dasharray': '0.06 0.16' }))
       g.add(new N('path', { d, fill: 'none', stroke: '#e3e8f7', 'stroke-width': 0.05, transform: 'translate(0 -0.05)' }))
@@ -23,6 +27,12 @@ export const proving: Record<string, Landmark> = {
     for (let q = 1; q <= 10; q++) { const t = q / 10, u = 1 - t; pts.push([u ** 3 * 1.2 + 3 * u * u * t * 1.8 + 3 * u * t * t * 2.1 + t ** 3 * 3, u ** 3 * 1.5 + 3 * u * u * t * 1.5 + 3 * u * t * t * 0.6 + t ** 3 * 0.55]) }
     motionPath('tr-cart', pts, { rotate: true })
     cart.attrs.class = 'mover'; cart.attrs.style = 'animation:tr-cart 6s ease-in infinite'
+    // On the realistic island: Unity's cart (Creatures8.cs), on the rails, turning to each heading it takes.
+    const scr = pts.map(([i, j]) => p.at(i, j, 3))
+    const frames = motionPath('tr-cart3', scr)
+    // (Asked for on both islands, so the export writes its pictures down for Unity.)
+    const real = onPath((h) => creatureUse('cart', C.rasp, 'stand', h), 'tr-cart3', frames, '6s', '0s')
+    if (p.real && real) { cart.attrs.opacity = 0; p.el('g', { class: 'mover', style: 'animation:tr-cart3 6s linear infinite' }).add(real) }
     // The lever house at the fork, and its lever.
     const lh = p.box(1.05, 0.75, 0.32, 0.32, 16, { fill: C.white, trim: C.rasp })
     p.windows(lh, 'x', { cols: 1, z0: 6, h: 6, wide: 0.5 })
@@ -44,7 +54,7 @@ export const proving: Record<string, Landmark> = {
     // and at the front of the queue a robot in a hat and a stuck-on moustache.
     tree(p, 1.85, 0.22, 'round', C.leaf, 0.85)
     const lane = p.plane(0, 0.75, 0)
-    lane.add(new N('rect', { width: 2, height: 0.62, fill: '#cfd3e6', stroke: INK, 'stroke-width': 0.031 }))
+    lane.add(new N('rect', { width: 2, height: 0.62, fill: p.real ? '#80838f' : '#cfd3e6', stroke: p.real ? 'none' : INK, 'stroke-width': 0.031, opacity: p.real ? 0.92 : undefined }))
     lane.add(new N('path', { d: 'M0.08 0.04H1.92M0.08 0.58H1.92', stroke: '#ffffff', 'stroke-width': 0.03 }))
     lane.add(new N('rect', { x: 1.12, y: 0.06, width: 0.06, height: 0.5, fill: '#ffffff' }))
     lane.add(new N('text', { x: 1.32, y: 0.31, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 0.16, fill: '#ffffff', transform: 'rotate(-90 1.32 0.31)' })).text('STOP')
@@ -107,9 +117,11 @@ export const proving: Record<string, Landmark> = {
   'steady-hand': { size: [3, 1], draw(p) {
     // A safety net that nobody trusts.
     const net = p.plane(0.3, 0.3, 14)
-    net.add(new N('rect', { width: 2.4, height: 0.4, fill: '#ffffff', 'fill-opacity': 0.4, stroke: INK, 'stroke-width': 0.038 }))
-    for (let k = 1; k < 12; k++) net.add(new N('line', { x1: k * 0.2, y1: 0, x2: k * 0.2, y2: 0.4, stroke: INK, 'stroke-width': 0.02, opacity: 0.5 }))
-    for (let k = 1; k < 4; k++) net.add(new N('line', { x1: 0, y1: k * 0.1, x2: 2.4, y2: k * 0.1, stroke: INK, 'stroke-width': 0.02, opacity: 0.5 }))
+    // On the realistic island, rope: pale cord in a mesh, its edge a thicker rope, the ground showing through.
+    const rope = p.real ? '#e4dccb' : INK
+    net.add(new N('rect', { width: 2.4, height: 0.4, fill: '#ffffff', 'fill-opacity': p.real ? 0.08 : 0.4, stroke: p.real ? '#cfc4ad' : INK, 'stroke-width': p.real ? 0.024 : 0.038 }))
+    for (let k = 1; k < (p.real ? 24 : 12); k++) net.add(new N('line', { x1: k * (p.real ? 0.1 : 0.2), y1: 0, x2: k * (p.real ? 0.1 : 0.2), y2: 0.4, stroke: rope, 'stroke-width': p.real ? 0.008 : 0.02, opacity: p.real ? 0.8 : 0.5 }))
+    for (let k = 1; k < (p.real ? 8 : 4); k++) net.add(new N('line', { x1: 0, y1: k * (p.real ? 0.05 : 0.1), x2: 2.4, y2: k * (p.real ? 0.05 : 0.1), stroke: rope, 'stroke-width': p.real ? 0.008 : 0.02, opacity: p.real ? 0.8 : 0.5 }))
     p.grow(...p.at(0.3, 0.3, 14), ...p.at(2.7, 0.7, 14))
     for (const [x, y] of [[0.3, 0.3], [2.7, 0.3], [0.3, 0.7], [2.7, 0.7]] as const) p.line([x, y, 0], [x, y, 14], { sw: 1.2 })
     // Two towers: striped masts, a platform and rail on each, a ladder up.

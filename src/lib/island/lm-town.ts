@@ -1,5 +1,6 @@
 /** Old Town: people and time — lives, weeks, days, births and rules. */
 import { C, INK, N, OUT, shade, r1 as f, letter, type Landmark } from './kit'
+import { creatureUse } from './actors'
 import { person, tree, flag, lamp, flowers, bench, fence } from './props'
 
 export const town: Record<string, Landmark> = {
@@ -11,9 +12,24 @@ export const town: Record<string, Landmark> = {
       const u = (k + 0.5) / 4
       p.quad(hall, 'y', u - 0.08, u + 0.08, 8, 24, '#fff7ea', { sw: 1.4 })
       p.quad(hall, 'y', u - 0.065, u + 0.065, 10, 22, ['#b8a1ff', '#8ccbff', '#4fe3c1', '#ffb3c2'][k], { sw: 0.8 })
-      const [fx, fy] = p.at(0.1 + 1.8 * u, 1.8, 17)
-      p.el('circle', { cx: fx, cy: fy - 1, r: 2.6, fill: '#f1d9c6', stroke: INK, 'stroke-width': 0.8 })
-      p.el('path', { d: `M${f(fx - 4)} ${f(fy + 5)}q4 -5 8 0`, fill: INK, opacity: 0.7 })
+      // A portrait in each: painted, and printed on the canvas by Unity (kit.ts, decal).
+      const at: [number, number, number, number] = [-3.9, -12, 3.9, 0]
+      p.decal(`portrait-${k}`, hall, 'y', u, 10, at)
+      const pf = p.face(hall, 'y', u, 10, { w: 8, h: 12 })
+      // (On the flat island the painting stays as it was drawn, a face at the window; this, unseen, is only for the print.)
+      if (!p.real) pf.attrs.opacity = 0
+      const bg = ['#8f84b8', '#7d9cc0', '#6aa894', '#c98f9c'][k], skin = ['#f1d9c6', '#d3a27f', '#e8c4a8', '#a8714e'][k], hair = ['#3a2a22', '#1f1a18', '#a8774a', '#2a2020'][k], coat = ['#2c3350', '#5b4a3c', '#3d4a3a', '#4a3346'][k]
+      pf.add(new N('rect', { x: -3.9, y: -12, width: 7.8, height: 12, fill: bg }))
+      pf.add(new N('path', { d: 'M-3.9 0v-2.6q0.8 -2.6 3.9 -3q3.1 0.4 3.9 3v2.6z', fill: coat }))
+      pf.add(new N('ellipse', { cx: 0, cy: -7.4, rx: 1.75, ry: 2.2, fill: skin }))
+      pf.add(new N('path', { d: k % 2 ? 'M-1.9 -7.6q-0.2 -3 1.9 -3q2.1 0 1.9 3q-0.6 -1.6 -1.9 -1.7q-1.3 0.1 -1.9 1.7z' : 'M-2 -6.4q-0.6 -4.2 2 -4.3q2.6 0.1 2 4.3q-0.4 -2.6 -2 -2.7q-1.6 0.1 -2 2.7z', fill: hair }))
+      pf.add(new N('rect', { x: -3.9, y: -12, width: 7.8, height: 12, fill: 'none', stroke: '#6b5034', 'stroke-width': 0.5 }))
+      p.printFace(pf, `portrait-${k}`, at)
+      if (!p.real) {
+        const [fx, fy] = p.at(0.1 + 1.8 * u, 1.8, 17)
+        p.el('circle', { cx: fx, cy: fy - 1, r: 2.6, fill: '#f1d9c6', stroke: INK, 'stroke-width': 0.8 })
+        p.el('path', { d: `M${f(fx - 4)} ${f(fy + 5)}q4 -5 8 0`, fill: INK, opacity: 0.7 })
+      }
     }
     p.door(hall, 'x', 0.5, { w: 0.3, h: 18, fill: C.lilac })
     // The clock tower, whose face is a year.
@@ -65,16 +81,19 @@ export const town: Record<string, Landmark> = {
   } },
 
   'day-go': { size: [2, 2], draw(p) {
-    const g = p.plane(1, 1, 0)
     const slices: [number, number, string][] = [[0, 8, C.lilac], [8, 17, C.cobalt], [17, 20, C.sky], [20, 24, C.mint]]
-    for (const [a0, a1, c] of slices) {
+    // A sundial plaza: Unity's (Props8.cs, Sundial), the day's parts inlaid in coloured stone, a bronze ring of hours.
+    p.model('sundial', [1, 1, 0], { r: 0.95, pts: slices.flatMap(([a0, a1]) => [a0, a1, 0]), colours: ['#8f86bf', '#5f74b5', '#86aed6', '#6cb59f'] }, () => null)
+    const g = p.plane(1, 1, 0)
+    if (!p.real) for (const [a0, a1, c] of slices) {
       const t0 = (a0 / 24) * Math.PI * 2 - Math.PI / 2, t1 = (a1 / 24) * Math.PI * 2 - Math.PI / 2, r = 0.88
       g.add(new N('path', { d: `M0 0L${f(Math.cos(t0) * r * 100) / 100} ${f(Math.sin(t0) * r * 100) / 100}A${r} ${r} 0 ${a1 - a0 > 12 ? 1 : 0} 1 ${f(Math.cos(t1) * r * 100) / 100} ${f(Math.sin(t1) * r * 100) / 100}Z`, fill: c, stroke: INK, 'stroke-width': 0.044 }))
     }
-    g.add(new N('circle', { r: 0.95, fill: 'none', stroke: INK, 'stroke-width': 0.063 }))
-    g.add(new N('circle', { r: 0.92, fill: 'none', stroke: '#ffffff', 'stroke-width': 0.05, 'stroke-dasharray': '0.03 0.25' }))
+    if (!p.real) g.add(new N('circle', { r: 0.95, fill: 'none', stroke: INK, 'stroke-width': 0.063 }))
+    if (!p.real) g.add(new N('circle', { r: 0.92, fill: 'none', stroke: '#ffffff', 'stroke-width': 0.05, 'stroke-dasharray': '0.03 0.25' }))
     const sh = g.add(new N('g', { class: 'dg-shadow' }))
-    sh.add(new N('path', { d: 'M0 0L0.1 -0.82L-0.1 -0.82Z', fill: INK, opacity: 0.5 }))
+    // The gnomon's shadow, going round with the hour: on the realistic island, soft-edged and the sky's blue.
+    sh.add(new N('path', { d: p.real ? 'M0 0L0.06 -0.84L0 -0.86L-0.06 -0.84Z' : 'M0 0L0.1 -0.82L-0.1 -0.82Z', fill: p.real ? '#1d2848' : INK, opacity: p.real ? 0.42 : 0.5 }))
     p.grow(...p.at(0, 0), ...p.at(2, 2))
     p.cyl(1, 1, 0.1, 0, 4, C.stone)
     p.poly([[1, 0.88, 4], [1, 1.12, 4], [1, 1, 34]], '#ffffff')
@@ -103,24 +122,34 @@ export const town: Record<string, Landmark> = {
     })
     // The stork's nest on the tallest chimney, and the stork coming home.
     const [nx, ny] = p.at(1.11, 0.4, 56)
-    p.el('ellipse', { cx: nx, cy: ny, rx: 7, ry: 3, fill: C.wood, stroke: INK, 'stroke-width': 1.1 })
-    p.path(`M${f(nx - 3)} ${f(ny - 2)}q3 -5 7 -1q-2 3 -7 1zM${f(nx + 3)} ${f(ny - 4)}l2 -7l4 1`, '#ffffff', { sw: 1 })
+    // Unity's nest of sticks, the stork standing in it (Props8.cs, Nest).
+    p.model('nest', [1.105, 0.405, 56], {}, () => {
+      p.el('ellipse', { cx: nx, cy: ny, rx: 7, ry: 3, fill: C.wood, stroke: INK, 'stroke-width': 1.1 })
+      p.path(`M${f(nx - 3)} ${f(ny - 2)}q3 -5 7 -1q-2 3 -7 1zM${f(nx + 3)} ${f(ny - 4)}l2 -7l4 1`, '#ffffff', { sw: 1 })
+    })
     const [sx, sy] = p.at(1.7, 0.1, 104)
     const st = p.group('glide')
+    // Its mate coming home with another: Unity's (Creatures8.cs), wings spread.
+    const flier = creatureUse('stork', '#ffffff', 'stand', 'w', { transform: `translate(${f(sx)} ${f(sy)})` })
+    if (flier) st.g.add(flier)
+    else {
     st.path(`M${f(sx - 14)} ${f(sy - 6)}q7 -2 14 4q7 -6 14 -4q-8 3 -12 8h-4q-4 -5 -12 -8z`, '#ffffff', { sw: 1.1 })
     st.path(`M${f(sx + 2)} ${f(sy + 1)}l9 -3l3 1`, 'none', { sw: 1, stroke: C.rasp })
     st.path(`M${f(sx - 1)} ${f(sy + 2)}v6`, 'none', { sw: 0.8 })
     st.path(`M${f(sx - 5)} ${f(sy + 8)}q4 -3 8 0q1 5 -4 6q-5 -1 -4 -6z`, '#ffe1e8', { sw: 1 })
+    }
     p.grow(sx - 16, sy - 12, sx + 16, sy + 16)
     // Front gardens behind a picket fence, gaps for the gates.
     for (const [a, b] of [[0.14, 0.32], [0.52, 0.88], [1.08, 1.44], [1.64, 1.82]] as const) fence(p, [[a, 1.6], [b, 1.6]], 6, '#ffffff')
     flowers(p, 0.3, 1.3); flowers(p, 1.62, 1.32, [C.sky, '#ffffff', C.lilac])
     // A pram, parked.
     const [qx, qy] = p.at(1.0, 1.36)
+    p.model('pram', [1.0, 1.36, 0], { fill: C.sky }, () => {
     p.path(`M${f(qx - 6)} ${f(qy - 6)}h11a6 6 0 0 1 -11 -6z`, C.sky, { sw: 1.1 })
     p.path(`M${f(qx - 6)} ${f(qy - 12)}a6 6 0 0 1 6 6h-6z`, shade(C.sky, 0.8), { sw: 1 })
     p.el('circle', { cx: qx - 4, cy: qy - 1.5, r: 1.6, fill: INK }); p.el('circle', { cx: qx + 3, cy: qy - 1.5, r: 1.6, fill: INK })
     p.path(`M${f(qx + 5)} ${f(qy - 6)}l3 -4`, 'none', { sw: 1 })
+    })
     person(p, 1.25, 1.85, C.lilac, { pose: 'wave' })
     tree(p, 1.88, 1.85, 'blossom', C.leaf, 0.85)
   } },
@@ -193,15 +222,23 @@ export const town: Record<string, Landmark> = {
     letter(m, 0, -1, 'FROM MEMORY', { size: 3.6, fill: C.rasp, ls: 0.4 })
     // A painter at an easel out front, the easel and canvas painter-sized.
     const [ex, ey] = p.at(1.46, 1.86)
-    p.path(`M${f(ex - 7)} ${f(ey)}L${f(ex)} ${f(ey - 27)}L${f(ex + 7)} ${f(ey)}M${f(ex)} ${f(ey - 27)}L${f(ex + 2)} ${f(ey + 2)}`, 'none', { sw: 1.5, stroke: C.wood })
-    p.path(`M${f(ex - 10)} ${f(ey - 25)}h20v14h-20z`, '#ffffff', { sw: 1.2 })
-    p.path(`M${f(ex - 6)} ${f(ey - 14.5)}a2.6 2.6 0 1 1 0.1 0M${f(ex + 5)} ${f(ey - 14.5)}a2.6 2.6 0 1 0 -0.1 0M${f(ex - 6)} ${f(ey - 14.5)}l4 -5h4l2 5`, 'none', { sw: 0.9, stroke: C.cobalt })
-    p.path(`M${f(ex - 9)} ${f(ey - 11)}h18`, 'none', { sw: 1.3, stroke: C.wood })
+    // Unity's easel (Props8.cs, Easel), and on it the canvas: a board with the sketch printed on it (a plaque).
+    p.model('easel', [1.46, 1.86, 0], {}, () => p.path(`M${f(ex - 7)} ${f(ey)}L${f(ex)} ${f(ey - 27)}L${f(ex + 7)} ${f(ey)}M${f(ex)} ${f(ey - 27)}L${f(ex + 2)} ${f(ey + 2)}`, 'none', { sw: 1.5, stroke: C.wood }))
+    const sketch = new N('g')
+    sketch.add(new N('rect', { width: 20, height: 14, fill: '#fbfaf6' }))
+    sketch.add(new N('path', { d: 'M4 10.5a2.6 2.6 0 1 1 0.1 0M15 10.5a2.6 2.6 0 1 0 -0.1 0M4 10.5l4 -5h4l2 5', fill: 'none', stroke: C.cobalt, 'stroke-width': 0.9, 'stroke-linecap': 'round' }))
+    p.plaque('fm-canvas', 1.46, 1.86, 11, 20, 14, sketch, { depth: 0.6 }, () => {
+      p.path(`M${f(ex - 10)} ${f(ey - 25)}h20v14h-20z`, '#ffffff', { sw: 1.2 })
+      p.path(`M${f(ex - 6)} ${f(ey - 14.5)}a2.6 2.6 0 1 1 0.1 0M${f(ex + 5)} ${f(ey - 14.5)}a2.6 2.6 0 1 0 -0.1 0M${f(ex - 6)} ${f(ey - 14.5)}l4 -5h4l2 5`, 'none', { sw: 0.9, stroke: C.cobalt })
+      p.path(`M${f(ex - 9)} ${f(ey - 11)}h18`, 'none', { sw: 1.3, stroke: C.wood })
+    })
     person(p, 1.78, 1.82, C.lilac, { hat: C.rasp, pose: 'look' })
     // The real bicycle, parked by the door, the size a bicycle is.
     const [cx, cy] = p.at(0.62, 1.72)
-    p.path(`M${f(cx - 8)} ${f(cy - 4.5)}a4.5 4.5 0 1 0 0.1 0M${f(cx + 8)} ${f(cy - 4.5)}a4.5 4.5 0 1 0 0.1 0`, 'none', { sw: 1.4 })
-    p.path(`M${f(cx - 8)} ${f(cy - 4.5)}l4 -7h8l4 7M${f(cx - 4)} ${f(cy - 11.5)}l4 7l4 -7M${f(cx + 4)} ${f(cy - 11.5)}l-1 -3h3M${f(cx - 5)} ${f(cy - 13)}h3`, 'none', { sw: 1.4, stroke: C.rasp })
+    p.model('bicycle', [0.62, 1.72, 0], { fill: C.rasp }, () => {
+      p.path(`M${f(cx - 8)} ${f(cy - 4.5)}a4.5 4.5 0 1 0 0.1 0M${f(cx + 8)} ${f(cy - 4.5)}a4.5 4.5 0 1 0 0.1 0`, 'none', { sw: 1.4 })
+      p.path(`M${f(cx - 8)} ${f(cy - 4.5)}l4 -7h8l4 7M${f(cx - 4)} ${f(cy - 11.5)}l4 7l4 -7M${f(cx + 4)} ${f(cy - 11.5)}l-1 -3h3M${f(cx - 5)} ${f(cy - 13)}h3`, 'none', { sw: 1.4, stroke: C.rasp })
+    })
     p.grow(cx - 14, cy - 16, cx + 14, cy)
     // Paint pots.
     for (const [x, c] of [[1.25, C.rasp], [1.33, C.mint], [1.41, C.cobalt]] as const) p.cyl(x, 1.6, 0.04, 0, 5, c, { sw: 0.9 })

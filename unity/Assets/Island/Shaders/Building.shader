@@ -209,6 +209,29 @@ Shader "Island/Building"
                     alb = t.rgb * 0.94;
                     spec = 0.05; rough = 20;
                 }
+                else if (m == 12)
+                {
+                    // Falling water (Falls.cs): uv.x across the sheet, uv.y down it, 0 at the lip. Streaks running down,
+                    // clear green-blue at the lip, breaking white as it falls, its sides ragged. Past 1, the foam where it lands:
+                    // patches on the water, thinning out to the edge.
+                    float2 w2 = i.ws.xz;
+                    if (uv.y > 1)
+                    {
+                        float r = uv.y - 1;
+                        float fo = vnoise(w2 * 55) * 0.55 + vnoise(w2 * 150 + 3.1) * 0.45;
+                        clip(fo - 0.2 - r * 0.75);
+                        alb = float3(0.84, 0.88, 0.91) * (0.88 + 0.14 * fo);
+                        spec = 0.12; rough = 40;
+                    }
+                    else
+                    {
+                        float st = vnoise(float2(uv.x * 24 + w2.y * 9, uv.y * 1.7 + w2.x * 3)) * 0.6 + vnoise(float2(uv.x * 70 + w2.y * 5, uv.y * 5)) * 0.4;
+                        clip(min(uv.x, 1 - uv.x) * 9 + st * 0.7 - 0.45);
+                        float white = saturate(0.42 + uv.y * 0.75 + (st - 0.5) * 1.5);
+                        alb = lerp(float3(0.24, 0.48, 0.56), float3(0.95, 0.97, 0.99), white);
+                        spec = 0.4; rough = 50;
+                    }
+                }
                 else if (m == 7)
                 {
                     // Concrete or stone.

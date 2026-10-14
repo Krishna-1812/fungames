@@ -15,6 +15,8 @@ const planks = (p: Pen, x: number, y: number, w: number, d: number, z: number, a
 
 /** Where the lighthouse's lamp is on screen, for the beam that sweeps at night. */
 export const beacon: [number, number] = [0, 0]
+/** The night sky's moon (plate.ts, skyArt), for the one Paper Folds points to by day: set by the island before it draws. */
+export const harbourArt: { moon: string | null } = { moon: null }
 
 export const harbour: Record<string, Landmark> = {
   'deep-sea': { size: [2, 2], water: true, draw(p) {
@@ -27,7 +29,8 @@ export const harbour: Record<string, Landmark> = {
     })
     for (const [x, y, d] of [[1.0, 1.6, 0], [1.7, 1.0, 1.8]] as const) {
       const [fx, fy] = p.at(x, y, -12)
-      p.el('path', { d: `M${f(fx - 7)} ${f(fy)}q7 -5 14 0q-7 5 -14 0zM${f(fx + 7)} ${f(fy)}l5 -3v6z`, fill: '#8f9bd0', opacity: 0.8, class: 'swim', style: `animation-delay:${d}s` })
+      // On the realistic island, only their dark shapes under the water.
+      p.el('path', { d: `M${f(fx - 7)} ${f(fy)}q7 -5 14 0q-7 5 -14 0zM${f(fx + 7)} ${f(fy)}l5 -3v6z`, fill: p.real ? '#1d2c5c' : '#8f9bd0', opacity: p.real ? 0.28 : 0.8, class: 'swim', style: `animation-delay:${d}s` })
     }
     for (const [x, y] of [[0.08, 0.45], [0.08, 0.95], [1.12, 0.45], [1.12, 0.95], [0.6, 0.45], [0.6, 0.95]] as const) p.line([x, y, -14], [x, y, 6], { sw: 3.5, stroke: C.wood })
     planks(p, 0, 0.4, 1.25, 0.6, 4, 'x')
@@ -43,8 +46,9 @@ export const harbour: Record<string, Landmark> = {
     drop.line([1.35, 1.3, 84], [1.35, 1.3, 26], { sw: 1.3 })
     drop.sphere(1.35, 1.3, 18, 14, '#ffffff')
     const [bx, by] = p.at(1.35, 1.3, 18)
-    drop.el('circle', { cx: bx + 3, cy: by + 1, r: 5.5, fill: C.glass, stroke: INK, 'stroke-width': 1.6 })
-    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; drop.el('circle', { cx: bx + Math.cos(a) * 11, cy: by + Math.sin(a) * 11, r: 1, fill: INK }) }
+    // The bell's porthole, a thick brass rim, and the bolts round its middle.
+    drop.el('circle', { cx: bx + 3, cy: by + 1, r: 5.5, fill: p.real ? '#3c5a78' : C.glass, stroke: p.real ? '#b98d5a' : INK, 'stroke-width': p.real ? 1.3 : 1.6 })
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; drop.el('circle', { cx: bx + Math.cos(a) * 11, cy: by + Math.sin(a) * 11, r: p.real ? 0.7 : 1, fill: p.real ? '#9aa0ad' : INK }) }
     for (let k = 0; k < 5; k++) { const [x, y] = p.at(1.35 + (k - 2) * 0.1, 1.3, -4); p.el('circle', { cx: x, cy: y, r: (2.5 + (k % 2)) * (p.real ? 0.5 : 1), fill: 'none', stroke: '#ffffff', 'stroke-width': p.real ? 0.7 : 1.4, opacity: p.real ? 0.75 : undefined, class: 'bubble', style: `animation-delay:${k * 0.55}s` }) }
     // A buoy and a diving flag.
     const buoy = p.group('bob')
@@ -62,7 +66,7 @@ export const harbour: Record<string, Landmark> = {
     p.box(0.86, 0.86, 0.28, 0.28, 16, { z0: 5, fill: C.slate })
     const [sx, sy] = p.at(1, 1.14, 13)
     p.el('circle', { cx: sx - 3, cy: sy, r: 3.5, fill: '#1b2340', stroke: '#8f9bd0', 'stroke-width': 1 })
-    for (let k = 0; k < 3; k++) p.el('circle', { cx: sx, cy: sy, r: 10, fill: 'none', stroke: C.lilac, 'stroke-width': 2, class: 'am-ring', style: `animation-delay:${k * 0.8}s` })
+    for (let k = 0; k < 3; k++) p.el('circle', { cx: sx, cy: sy, r: 10, fill: 'none', stroke: p.real ? '#dcd6f5' : C.lilac, 'stroke-width': p.real ? 0.7 : 2, opacity: p.real ? 0.55 : undefined, class: 'am-ring', style: `animation-delay:${k * 0.8}s` })
     for (const [x, y] of front) p.line([x, y, 5], [x, y, 38], { sw: 3.2 })
     p.cone(1, 1, 0.78, 38, 24, C.lilac)
     p.line([1, 1, 62], [1, 1, 72], { sw: 1.5 })
@@ -85,9 +89,9 @@ export const harbour: Record<string, Landmark> = {
     p.line([1.8, 0.3, 0], [1.8, 0.3, 30], { sw: 2 })
     p.cone(1.8, 0.3, 0.34, 26, 12, C.mint)
     const [ux, uy] = p.at(1.8, 0.3, 26)
-    for (const a of [-0.6, 0.2]) p.path(`M${f(ux)} ${f(uy - 12)}L${f(ux + Math.cos(a) * 22)} ${f(uy + Math.sin(a) * 6)}`, 'none', { stroke: '#ffffff', sw: 3 })
+    for (const a of [-0.6, 0.2]) p.path(`M${f(ux)} ${f(uy - 12)}L${f(ux + Math.cos(a) * 22)} ${f(uy + Math.sin(a) * 6)}`, 'none', { stroke: '#ffffff', sw: 3, op: p.real ? 0 : undefined })
     for (const x of [1.45, 1.75]) { p.poly([[x, 0.62, 3], [x + 0.18, 0.62, 3], [x + 0.18, 0.92, 3], [x, 0.92, 3]], C.rasp, { sw: 1 }); p.poly([[x, 0.92, 3], [x + 0.18, 0.92, 3], [x + 0.18, 0.98, 12], [x, 0.98, 12]], shade(C.rasp, 0.85), { sw: 1 }) }
-    p.plane(0.2, 1.4, 0.5).add(new N('rect', { width: 0.34, height: 0.5, fill: C.sky, stroke: INK, 'stroke-width': 0.038 }))
+    p.model('towel', [0.37, 1.65, 0.5], { w: 0.34, d: 0.5, fill: C.sky }, () => p.plane(0.2, 1.4, 0.5).add(new N('rect', { width: 0.34, height: 0.5, fill: C.sky, stroke: INK, 'stroke-width': 0.038 })))
     p.sphere(0.6, 1.85, 5, 5, C.rasp)
     person(p, 0.3, 0.5, C.cobalt, { pose: 'wave' })
   } },
@@ -132,7 +136,7 @@ export const harbour: Record<string, Landmark> = {
       p.path(`M${f(x - 14)} ${f(y - 112)}Q${f(x)} ${f(y - 132)} ${f(x + 14)} ${f(y - 112)}Z`, C.slate)
       p.path(`M${f(x)} ${f(y - 124)}v-10M${f(x - 6)} ${f(y - 130)}h12`, 'none', { sw: 1.4 })
     }
-    for (let k = 0; k < 3; k++) p.path(`M${f(x + 22 + k * 8)} ${f(y - 118 - k * 5)}q9 11 0 22`, 'none', { stroke: C.cobalt, sw: 2.4, cls: 'stp-arc', style: `animation-delay:${k * 0.3}s` })
+    for (let k = 0; k < 3; k++) p.path(`M${f(x + 22 + k * 8)} ${f(y - 118 - k * 5)}q9 11 0 22`, 'none', { stroke: p.real ? '#f2f6ff' : C.cobalt, sw: p.real ? 0.9 : 2.4, op: p.real ? 0.55 : undefined, cls: 'stp-arc', style: `animation-delay:${k * 0.3}s` })
     p.grow(x - 40, y - 140, x + 60, y)
     person(p, 0.9, 1.9, C.mint, { pose: 'wave' })
     lamp(p, 0.2, 1.0, 22)
@@ -186,7 +190,9 @@ export const harbour: Record<string, Landmark> = {
     const [mx, my] = p.at(1.7, 0.1, 170)
     // (On the realistic island: a faint trail of light, and the moon a lit ball.)
     p.el('path', { d: `M${f(rx + 4)} ${f(ry)}Q${f(rx + 40)} ${f(ry - 50)} ${f(mx - 10)} ${f(my + 6)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': p.real ? 1.1 : 2, opacity: p.real ? 0.6 : undefined, 'stroke-dasharray': p.real ? '1.5 5' : '3 6', 'stroke-linecap': p.real ? 'round' : undefined })
-    if (p.real) p.el('circle', { cx: mx, cy: my, r: 11, fill: ballShade(p.el('defs'), 'pf-moon', '#e8e9f2') })
+    // By day, the real moon is pale and half lost in the blue: its picture, faint.
+    if (p.real && harbourArt.moon) p.el('image', { href: harbourArt.moon, x: mx - 11, y: my - 11, width: 22, height: 22, opacity: 0.5 })
+    else if (p.real) p.el('circle', { cx: mx, cy: my, r: 11, fill: ballShade(p.el('defs'), 'pf-moon', '#e8e9f2') })
     else p.circle(1.7, 0.1, 170, 11, '#ffffff')
     if (!p.real) p.el('circle', { cx: mx + 3, cy: my - 2, r: 2.5, fill: '#dfe4f5' })
     // Two paper cranes on the wind.

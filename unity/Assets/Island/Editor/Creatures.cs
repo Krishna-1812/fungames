@@ -167,6 +167,29 @@ namespace Island
                 case "whale":
                 {
                     var back = Real("#4f5a74", Paint);
+                    if (a.pose == "breach")
+                    {
+                        // A humpback breaching at dawn: the body out of the sea to its flippers, arching back, the pale grooved
+                        // throat towards us, one long white flipper flung out. Its spine an arc from the water to the snout.
+                        var belly = Real("#e4e8f0", Paint); var groove = Real("#b8c0d2", Paint); var eye = Real("#1b1d24", Paint);
+                        Vector3 S(float t) => new Vector3(0, 1.7f * t, -0.25f + 0.95f * t - 0.8f * t * t);
+                        float Rad(float t) => 0.1f + 0.3f * Mathf.Sin(Mathf.PI * (0.28f + 0.62f * t)) * (1 - 0.45f * t * t);
+                        const int n = 14;
+                        for (int k = 0; k < n; k++)
+                        {
+                            float t0 = (float)k / n, t1 = (float)(k + 1) / n;
+                            r.Limb(S(t0), S(t1), Rad(t0), Rad(t1), back, Paint, 18);
+                            // The throat: a paler band down its front, grooved.
+                            var fwd0 = Vector3.Cross(Vector3.right, S(t1) - S(t0)).normalized;
+                            r.Limb(S(t0) + fwd0 * Rad(t0) * 0.42f, S(t1) + fwd0 * Rad(t1) * 0.42f, Rad(t0) * 0.66f, Rad(t1) * 0.66f, t0 > 0.45f ? belly : groove, Paint, 14);
+                        }
+                        r.Blob(S(1) + new Vector3(0, 0.02f, 0.02f), new Vector3(0.08f, 0.11f, 0.08f), back, Paint, 12, 8);
+                        foreach (var sd in new[] { -1f, 1f }) r.Blob(S(0.78f) + new Vector3(sd * Rad(0.78f) * 0.88f, 0, 0.05f), new Vector3(0.012f, 0.014f, 0.012f), eye, Paint, 6, 4);
+                        // The flippers: long, pale, one flung out wide, the other close along its side.
+                        r.Limb(S(0.42f) + new Vector3(Rad(0.42f) * 0.8f, 0, 0.05f), S(0.42f) + new Vector3(0.95f, -0.1f, 0.25f), 0.07f, 0.025f, belly, Paint, 10);
+                        r.Limb(S(0.42f) + new Vector3(-Rad(0.42f) * 0.8f, 0, 0.05f), S(0.42f) + new Vector3(-0.45f, -0.45f, 0.18f), 0.07f, 0.03f, groove, Paint, 10);
+                        break;
+                    }
                     // Its back, only what breaks the surface, and the flukes of its tail lifting.
                     r.Blob(Vector3.zero, new Vector3(0.36f, 0.16f, 1.25f), back, Paint, 24, 14, d => d.y > 0.25f);
                     r.Blob(new Vector3(0, 0.12f, -0.5f), new Vector3(0.02f, 0.06f, 0.08f), back, Paint, 8, 6);
@@ -337,7 +360,7 @@ namespace Island
                     Round(b, new Vector3(0, h + Px(1.5f), 0), new Vector3(rr * 0.6f, Px(2), rr * 0.6f), 0.5f, steel, Metal, 16, 6);
                     break;
                 }
-                default: return null;
+                default: if (!MoreCreatures(b, a)) return null; break;
             }
             // The smallest creatures a little larger than life, to read at the island's size.
             float big = a.kind switch { "duck" => 1.5f, "crab" => 1.8f, "gull" => 1.4f, "pigeon" => 1.6f, "bfly" => 2.4f, _ => 1f };
@@ -363,48 +386,79 @@ namespace Island
         /** Its axis: tilted over to the left on the picture, as the site draws it. */
         public static Vector3 Axis => (Quaternion.Euler(30, 225, 0) * new Vector3(-Mathf.Sin(14 * Mathf.Deg2Rad), Mathf.Cos(14 * Mathf.Deg2Rad), 0)).normalized;
 
-        static float H3(int x, int y, int z) { float h = Mathf.Sin(x * 127.1f + y * 311.7f + z * 74.7f) * 43758.5453f; return h - Mathf.Floor(h); }
-        static float N3(Vector3 p)
+        // An integer hash (a sine hash goes blocky at these scales: its float runs out of digits).
+        static float H3(int x, int y, int z)
         {
-            int ix = Mathf.FloorToInt(p.x), iy = Mathf.FloorToInt(p.y), iz = Mathf.FloorToInt(p.z);
-            float fx = p.x - ix, fy = p.y - iy, fz = p.z - iz;
-            fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+            unchecked
+            {
+                uint h = (uint)x * 0x8da6b343u ^ (uint)y * 0xd8163841u ^ (uint)z * 0xcb1ab31fu;
+                h = (h ^ (h >> 15)) * 0x2c1b3c6du; h = (h ^ (h >> 12)) * 0x297a2d39u; h ^= h >> 15;
+                return h / 4294967296f;
+            }
+        }
+        static float N3(float x, float y, float z)
+        {
+            int ix = Mathf.FloorToInt(x), iy = Mathf.FloorToInt(y), iz = Mathf.FloorToInt(z);
+            float fx = x - ix, fy = y - iy, fz = z - iz;
+            fx = fx * fx * fx * (fx * (fx * 6 - 15) + 10); fy = fy * fy * fy * (fy * (fy * 6 - 15) + 10); fz = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
             float L(float a, float b, float t) => a + (b - a) * t;
             return L(L(L(H3(ix, iy, iz), H3(ix + 1, iy, iz), fx), L(H3(ix, iy + 1, iz), H3(ix + 1, iy + 1, iz), fx), fy),
                      L(L(H3(ix, iy, iz + 1), H3(ix + 1, iy, iz + 1), fx), L(H3(ix, iy + 1, iz + 1), H3(ix + 1, iy + 1, iz + 1), fx), fy), fz);
         }
-        static float Fbm(Vector3 p, int oct) { float a = 0, k = 1, n = 0; for (int i = 0; i < oct; i++) { a += N3(p * k) / k; n += 1 / k; k *= 2.03f; } return a / n; }
+        static float Fbm(float x, float y, float z, int oct) { float a = 0, k = 1, n = 0, w = 1; for (int i = 0; i < oct; i++) { a += N3(x * k + i * 17.3f, y * k, z * k) * w; n += w; k *= 2.03f; w *= 0.5f; } return a / n; }
+        static float Ss(float a, float b, float x) { float t = Mathf.Clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); }
 
-        static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c.linear; }
+        static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
+        static readonly Color Deep = Hex("#0a2350"), Ocean = Hex("#123f86"), Shelf = Hex("#1f6ea8"), Lagoon = Hex("#3aa0b8"),
+            Forest = Hex("#24561f"), Green = Hex("#3d7a2c"), Grass = Hex("#7f8a3e"), Savanna = Hex("#a99a58"), Desert = Hex("#d6b27a"), Dune = Hex("#e2c48e"),
+            Rock = Hex("#7a6a55"), Tundra = Hex("#8e8d74"), Ice = Hex("#f2f6fb"), Cloud = Hex("#fbfcfe");
 
-        /** The world's colour at a point on its unit sphere (in its own turning frame; y up its axis). */
+        /**
+         * The world's colour at a point on its unit sphere (in its own turning frame; y up its axis), in sRGB:
+         * continents from warped noise (so the coasts wander and the land comes in a few big masses, under a
+         * third of it), shallow seas at their coasts and the deep ocean beyond, forest in the tropics, deserts
+         * under the subtropical highs, rock and snow on the ranges, tundra and ice towards the poles, and
+         * cloud in streaks along the latitudes, thick at the equator and in the storm belts.
+         * (Prototyped in JS to judge it: the same numbers.)
+         */
         static Color At(Vector3 q)
         {
-            float lat = Mathf.Asin(Mathf.Clamp(q.y, -1, 1)) * Mathf.Rad2Deg;
-            float land = Fbm(q * 1.7f + new Vector3(3.1f, 0, 7.7f), 5) + 0.05f * (Fbm(q * 6, 3) - 0.5f);
-            float sea = 0.53f;
+            float x = q.x, y = q.y, z = q.z;
+            float lat = Mathf.Asin(Mathf.Clamp(y, -1, 1)) * Mathf.Rad2Deg, al = Mathf.Abs(lat);
+            float wx = Fbm(x * 1.3f + 5.2f, y * 1.3f, z * 1.3f, 4) - 0.5f, wy = Fbm(x * 1.3f, y * 1.3f + 9.1f, z * 1.3f, 4) - 0.5f, wz = Fbm(x * 1.3f, y * 1.3f, z * 1.3f + 2.7f, 4) - 0.5f;
+            float px = x + wx * 1.1f, py = y + wy * 1.1f, pz = z + wz * 1.1f;
+            float land = Fbm(px * 1.25f + 3.1f, py * 1.25f, pz * 1.25f + 7.7f, 7);
+            const float sea = 0.565f;
             Color c;
             if (land < sea)
             {
-                float d = Mathf.Clamp01((sea - land) / 0.12f);
-                c = Color.Lerp(Hex("#1f6fd0"), Hex("#0a2c6e"), d);
+                float d = sea - land;
+                c = Color.Lerp(Lagoon, Shelf, Ss(0, 0.012f, d));
+                c = Color.Lerp(c, Ocean, Ss(0.008f, 0.03f, d));
+                c = Color.Lerp(c, Deep, Ss(0.03f, 0.09f, d) * 0.85f);
             }
             else
             {
-                float h = Mathf.Clamp01((land - sea) / 0.18f), dry = Fbm(q * 3.3f + new Vector3(9, 1, 2), 3);
-                var green = Color.Lerp(Hex("#3f9a35"), Hex("#2a6a2a"), Fbm(q * 9, 2));
-                var desert = Color.Lerp(Hex("#d8b46e"), Hex("#b38a52"), Fbm(q * 8, 2));
-                float arid = Mathf.SmoothStep(0, 1, Mathf.Clamp01((dry - 0.45f) / 0.15f)) * Mathf.Clamp01(1 - Mathf.Abs(Mathf.Abs(lat) - 24) / 20);
-                c = Color.Lerp(green, desert, arid);
-                c = Color.Lerp(c, Hex("#8c8573"), Mathf.SmoothStep(0.6f, 1, h) * 0.6f);
+                float h = land - sea;
+                float wet = Fbm(x * 3.1f + 11, y * 3.1f, z * 3.1f, 4);
+                float belt = Mathf.Exp(-Mathf.Pow((al - 24) / 12, 2));
+                float arid = Ss(0.5f, 0.7f, wet * 0.6f + belt * 0.45f + Ss(0, 0.08f, h) * 0.12f - 0.05f);
+                float tropic = 1 - Ss(12, 30, al);
+                var veg = Color.Lerp(Green, Forest, tropic * 0.8f + 0.2f * Fbm(x * 9, y * 9, z * 9, 2));
+                veg = Color.Lerp(veg, Grass, Ss(0.3f, 0.6f, arid) * 0.8f);
+                var dry = Color.Lerp(Savanna, Color.Lerp(Desert, Dune, Fbm(x * 14, y * 14, z * 14, 3)), Ss(0.6f, 0.9f, arid));
+                c = Color.Lerp(veg, dry, Ss(0.45f, 0.8f, arid));
+                float ridge = 1 - Mathf.Abs(Fbm(x * 6 + 1, y * 6, z * 6, 4) * 2 - 1);
+                c = Color.Lerp(c, Rock, Ss(0.05f, 0.16f, h) * Ss(0.55f, 0.85f, ridge) * 0.85f);
+                c = Color.Lerp(c, Tundra, Ss(50, 64, al + 6 * (wet - 0.5f)));
+                c = Color.Lerp(c, Ice, Ss(0.13f, 0.2f, h) * Ss(0.7f, 0.9f, ridge) * 0.7f);
             }
-            // Ice at the poles, ragged.
-            float ice = Mathf.SmoothStep(0, 1, Mathf.Clamp01((Mathf.Abs(lat) - 66 - 6 * (Fbm(q * 5, 3) - 0.5f) * 2) / 5));
-            c = Color.Lerp(c, Hex("#f2f5fa"), ice);
-            // Clouds: swirling bands, thinner over the subtropics.
-            float cl = Fbm(new Vector3(q.x * 2.6f, q.y * 5.2f, q.z * 2.6f) + new Vector3(0, 0, 4), 5);
-            float cover = Mathf.SmoothStep(0.64f, 0.8f, cl) * (0.7f + 0.3f * Mathf.Cos(lat * 3 * Mathf.Deg2Rad));
-            return Color.Lerp(c, Hex("#f4f6fa"), cover * 0.5f);
+            c = Color.Lerp(c, Ice, Ss(68, 74, al + 10 * (Fbm(x * 5, y * 5, z * 5, 3) - 0.5f)));
+            float cw = Fbm(x * 3, y * 3 + 4, z * 3, 3) - 0.5f;
+            float cl = Fbm(x * 3.2f + cw * 1.5f, y * 8 + cw * 2.5f, z * 3.2f + cw * 1.5f + 4, 6);
+            float zone = 0.55f + 0.25f * Mathf.Exp(-Mathf.Pow(lat / 8, 2)) + 0.3f * Mathf.Exp(-Mathf.Pow((al - 55) / 10, 2)) - 0.25f * Mathf.Exp(-Mathf.Pow((al - 25) / 8, 2));
+            float cover = Ss(0.52f, 0.72f, cl * zone + 0.22f) * 0.92f;
+            return Color.Lerp(c, Cloud, cover).linear;
         }
 
         public static void Build(Bm b, ActorRec a)

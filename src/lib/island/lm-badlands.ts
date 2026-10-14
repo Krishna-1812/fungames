@@ -10,7 +10,7 @@ export const badlands: Record<string, Landmark> = {
     p.disc(1.1, 1.05, 0.58, 0, '#7d74b8')
     p.disc(1.1, 1.05, 0.36, 0, '#5b528f', { sw: 1.2 })
     p.disc(1.1, 1.05, 0.14, 0, C.rasp, { sw: 1, cls: 'pulse' })
-    const ring = p.plane(1.1, 1.05, 0); ring.add(new N('circle', { r: 0.55, fill: 'none', stroke: C.rasp, 'stroke-width': 0.094, class: 'ast-ring' }))
+    const ring = p.plane(1.1, 1.05, 0); ring.add(new N('circle', { r: 0.55, fill: 'none', stroke: p.real ? '#d9535f' : C.rasp, 'stroke-width': p.real ? 0.045 : 0.094, opacity: p.real ? 0.75 : undefined, class: 'ast-ring' }))
     for (const [x, y] of [[0.3, 0.4], [1.9, 0.5], [1.8, 1.8], [0.5, 1.85]] as const) tree(p, x, y, 'rock', C.rock, 0.7)
     const [cx, cy] = p.at(1.1, 1.05)
     const m = p.group('ast-meteor')
@@ -71,7 +71,7 @@ export const badlands: Record<string, Landmark> = {
       p.path(`M${f(dx - 16)} ${f(dy - 6)}q16 18 32 0z`, C.white)
       p.path(`M${f(dx)} ${f(dy)}l0 -10`, 'none', { sw: 1.6 })
     })
-    p.path(`M${f(dx + 2)} ${f(dy - 14)}q6 -6 12 0M${f(dx - 2)} ${f(dy - 20)}q11 -11 22 0`, 'none', { stroke: C.rasp, sw: p.real ? 1.3 : 2, cls: 'blink' })
+    p.path(`M${f(dx + 2)} ${f(dy - 14)}q6 -6 12 0M${f(dx - 2)} ${f(dy - 20)}q11 -11 22 0`, 'none', { stroke: p.real ? '#ffb8c3' : C.rasp, sw: p.real ? 0.8 : 2, op: p.real ? 0.6 : undefined, cls: 'blink' })
     // Out front: the drum still scribbling.
     const tb = p.box(1.35, 1.75, 0.4, 0.2, 8, { fill: C.stone })
     const [px, py] = p.at(1.55, 1.85, 8)
@@ -128,8 +128,8 @@ export const badlands: Record<string, Landmark> = {
     orbs.slice(0, 2).forEach(orb)
     p.cyl(1, 1, 0.44, 0, 62, '#c9cde0', { bands: [[20, 23, C.lilac], [44, 47, C.lilac]] })
     const [wx, wy] = p.at(1, 1, 0)
-    for (const z of [14, 34]) p.path(`M${f(wx - 3)} ${f(wy + 10 - z)}v-9h6v9z`, '#2c355e', { sw: 1 })
-    p.path(`M${f(wx - 6)} ${f(wy + 20)}v-12a6 6 0 0 1 12 0v12`, C.slate, { sw: 1.2 })
+    for (const z of [14, 34]) p.path(p.real ? `M${f(wx - 1.2)} ${f(wy + 10 - z)}v-9h2.4v9z` : `M${f(wx - 3)} ${f(wy + 10 - z)}v-9h6v9z`, p.real ? '#1d2230' : '#2c355e', { sw: p.real ? 0 : 1 })
+    p.path(`M${f(wx - 6)} ${f(wy + 20)}v-12a6 6 0 0 1 12 0v12`, p.real ? '#5a4a40' : C.slate, { sw: p.real ? 0 : 1.2 })
     // Battlements, then the cauldron.
     for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; p.box(1 + Math.cos(a) * 0.36 - 0.05, 1 + Math.sin(a) * 0.36 - 0.05, 0.1, 0.1, 6, { z0: 62, fill: '#c9cde0', sw: 1 }) }
     p.cyl(1, 1, 0.26, 62, 12, C.slate, { top: C.mint })

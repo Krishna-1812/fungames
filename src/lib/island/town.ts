@@ -7,9 +7,9 @@
  * height as its floor. Anything that moves on its own carries `amb` and its
  * screen box in `data-b`, so the camera can pause it (cull() in camera.ts).
  */
-import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade } from './kit'
+import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, puffShade } from './kit'
 import { person, tree } from './props'
-import { vehicleUse, boatUse, actorUse, who, type Facing } from './actors'
+import { vehicleUse, boatUse, actorUse, creatureUse, who, type Facing } from './actors'
 
 const f = (v: number) => Math.round(v * 10) / 10
 const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0)} ${f(x1)} ${f(y1)}`
@@ -36,7 +36,8 @@ export function cottage(p: Pen, x: number, y: number, o: { wall?: string; roof?:
   const wall = o.wall ?? '#ffffff', roof = o.roof ?? C.rasp
   const x0 = x - w / 2, y0 = y - d / 2
   const [sx, sy] = p.at(x, y)
-  p.el('ellipse', { cx: sx, cy: sy + 4, rx: 24, ry: 9, fill: INK, opacity: 0.1 })
+  // (On the realistic island its shadow is in the picture.)
+  p.el('ellipse', { cx: sx, cy: sy + 4, rx: 24, ry: 9, fill: INK, opacity: p.real ? 0 : 0.1 })
   const b = p.box(x0, y0, w, d, h, { fill: wall })
   p.band(b, 0, 2.5, shade(wall, 0.8))
   p.door(b, o.door, 0.5, { w: 0.13, h: 9, fill: o.door === 'x' ? C.cobalt : C.mint })
@@ -46,9 +47,13 @@ export function cottage(p: Pen, x: number, y: number, o: { wall?: string; roof?:
   // Window boxes of flowers on the side without the door.
   const [fx1, fy1] = o.door === 'x' ? p.at(x0 + w * 0.25, y0 + d + 0.01, 3.6) : p.at(x0 + w + 0.01, y0 + d * 0.25, 3.6)
   const [fx2, fy2] = o.door === 'x' ? p.at(x0 + w * 0.75, y0 + d + 0.01, 3.6) : p.at(x0 + w + 0.01, y0 + d * 0.75, 3.6)
-  for (const [fx, fy] of [[fx1, fy1], [fx2, fy2]]) {
-    p.el('rect', { x: fx - 4, y: fy - 1.5, width: 8, height: 3, rx: 1, fill: C.wood, stroke: INK, 'stroke-width': 0.8 })
-    p.path(blob(fx - 2, fy - 2, 1.4, 1.2) + blob(fx + 1.5, fy - 2.2, 1.4, 1.2), '#ff9fb2', { sw: 0.6 })
+  // Unity's (Props8.cs, WindowBox): a timber trough on the wall, flowers spilling over it.
+  const boxAt = (u: number): [number, number, number] => o.door === 'x' ? [x0 + w * u, y0 + d + 0.01, 3.6] : [x0 + w + 0.01, y0 + d * u, 3.6]
+  for (const [fx, fy, u] of [[fx1, fy1, 0.25], [fx2, fy2, 0.75]]) {
+    p.model('windowbox', boxAt(u), { face: o.door === 'x' ? 'y' : 'x', fill: '#ff9fb2' }, () => {
+      p.el('rect', { x: fx - 4, y: fy - 1.5, width: 8, height: 3, rx: 1, fill: C.wood, stroke: INK, 'stroke-width': 0.8 })
+      p.path(blob(fx - 2, fy - 2, 1.4, 1.2) + blob(fx + 1.5, fy - 2.2, 1.4, 1.2), '#ff9fb2', { sw: 0.6 })
+    })
   }
   // The roof, ridge across the face without the door so the gable shows.
   p.gable(x0, y0, w, d, h, 11, roof, o.door === 'x' ? 'y' : 'x', { lines: 2, over: 0.05 })
@@ -58,7 +63,9 @@ export function cottage(p: Pen, x: number, y: number, o: { wall?: string; roof?:
   if (o.smoke) {
     const [mx, my] = p.at(cx, cy, h + 14)
     const g = p.el('g', { class: 'amb', 'data-b': box(mx - 14, my - 50, mx + 20, my) })
-    for (const dl of [0, 1, 2]) g.add(new N('circle', { cx: f(mx), cy: f(my - 2), r: 3.4, fill: '#ffffff', stroke: INK, 'stroke-width': 0.8, class: 'puff', style: `animation-delay:${dl}s` }))
+    // On the realistic island, wood smoke: soft grey-white wisps, no edge to them.
+    const soft = p.real ? puffShade(g, `smoke${f(mx)}_${f(my)}`, '#eef0f4', 0.75) : null
+    for (const dl of [0, 1, 2]) g.add(new N('circle', { cx: f(mx), cy: f(my - 2), r: soft ? 5.2 : 3.4, fill: soft ?? '#ffffff', stroke: soft ? undefined : INK, 'stroke-width': soft ? undefined : 0.8, class: 'puff', style: `animation-delay:${dl}s` }))
   }
 }
 
@@ -379,6 +386,11 @@ function umbrellaDrawn(p: Pen, bx: number, by: number, c: string) {
 /** A towel laid flat, striped. */
 export function towel(p: Pen, x: number, y: number, c: string, axis: 'x' | 'y' = 'x') {
   const w = axis === 'x' ? 0.34 : 0.16, d = axis === 'x' ? 0.16 : 0.34
+  // Unity's (Props8.cs, Towel): cloth, rucked a little, on the sand.
+  if (p.sink) { p.model('towel', [x, y, 0], { w, d, fill: c }, () => towelDrawn(p, x, y, c, w, d, axis)); p.grow(...p.at(x - w / 2, y - d / 2), ...p.at(x + w / 2, y + d / 2)); return }
+  towelDrawn(p, x, y, c, w, d, axis)
+}
+function towelDrawn(p: Pen, x: number, y: number, c: string, w: number, d: number, axis: 'x' | 'y') {
   const g = p.plane(x - w / 2, y - d / 2)
   g.add(new N('rect', { x: 0, y: 0, width: w, height: d, rx: 0.02, fill: '#ffffff', stroke: p.real ? 'none' : INK, 'stroke-width': 0.025 }))
   let s = ''
@@ -476,6 +488,9 @@ export function rowboat(x: number, y: number, c: string): N {
 /** A buoy, red and white, bobbing. */
 export function buoy(x: number, y: number, delay: number): N {
   const g = new N('g', { class: 'moored amb', 'data-b': box(x - 10, y - 20, x + 10, y + 5), style: `animation-delay:${f(-delay)}s` })
+  // Unity's buoy (Creatures8.cs), riding the swell; a little white water round it.
+  const real = creatureUse('buoy', C.rasp, 'stand', 'se', { transform: `translate(${f(x)} ${f(y)})` })
+  if (real) { g.add(new N('ellipse', { cx: f(x), cy: f(y + 1), rx: 7, ry: 2.4, fill: '#ffffff', opacity: 0.35 })); g.add(real); return g }
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 2), rx: 9, ry: 3, fill: '#ffffff', opacity: 0.55 }))
   g.add(new N('path', { d: `M${f(x - 5)} ${f(y)}L${f(x - 3)} ${f(y - 12)}h6L${f(x + 5)} ${f(y)}Z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
   g.add(new N('path', { d: `M${f(x - 4.2)} ${f(y - 5)}h8.4l0.5 -3.5h-9.4z`, fill: C.rasp }))
@@ -710,7 +725,7 @@ export function secretIslet(p: Pen, x: number, y: number) {
   p.el('ellipse', { cx: sx - 4, cy: sy - 10, rx: 34, ry: 12, fill: '#fbf7ec' })
   p.el('path', { d: `M${f(sx - 36)} ${f(sy - 7)}q32 9 64 -2`, fill: 'none', stroke: '#e9dfc6', 'stroke-width': 2, 'stroke-linecap': 'round' })
   }
-  for (const [dx, dy, c] of [[-40, -2, '#ffffff'], [30, 4, '#ffc9d6'], [44, -4, '#ffffff'], [-22, 8, '#ffc9d6']] as [number, number, string][]) p.el('path', { d: `M${f(sx + dx - 2)} ${f(sy + dy)}q2 -3.5 4 0z`, fill: c, stroke: INK, 'stroke-width': 0.5 })
+  for (const [dx, dy, c] of [[-40, -2, '#ffffff'], [30, 4, '#ffc9d6'], [44, -4, '#ffffff'], [-22, 8, '#ffc9d6']] as [number, number, string][]) p.el('path', { d: `M${f(sx + dx - 2)} ${f(sy + dy)}q2 -3.5 4 0z`, fill: c, stroke: p.real ? shade(c, 0.8) : INK, 'stroke-width': p.real ? 0.3 : 0.5 })
   // SOS in the sand, and an X with a chest beside it.
   const sand = p.plane(x - 0.05, y + 0.62, -7)
   sand.add(new N('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 0.32, fill: '#d2c39f', 'letter-spacing': 0.04 })).text('SOS')
@@ -720,7 +735,7 @@ export function secretIslet(p: Pen, x: number, y: number) {
   const tr = p.el('g', { 'data-poke': 'treasure', class: 'pk pk-treasure' })
   const [hx, hy] = p.at(x + 0.74, y + 0.11, z)
   tr.add(new N('circle', { cx: f(hx), cy: f(hy - 4), r: 13, fill: 'transparent' }))
-  const tp = new Pen(tr, p.ox, p.oy, p.oz, p.b, p.lights)
+  const tp = new Pen(tr, p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
   const ch = tp.box(x + 0.66, y + 0.05, 0.16, 0.11, 5, { z0: z, fill: C.wood, sw: 1 })
   tp.band(ch, 1.5, 2.6, '#ffd98a')
   tp.poly([[x + 0.66, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 5], [x + 0.82, y + 0.05, z + 10], [x + 0.66, y + 0.05, z + 10]], shade(C.wood, 1.1), { sw: 1 })
@@ -743,7 +758,10 @@ export function secretIslet(p: Pen, x: number, y: number) {
   const bw = p.el('g', { 'data-poke': 'bottle', 'data-n': 12, class: 'pk pk-bottle' })
   bw.add(new N('circle', { cx: f(bx), cy: f(by - 2), r: 12, fill: 'transparent' }))
   const b = bw.add(new N('g', { class: 'bob' }))
-  b.add(new N('ellipse', { cx: f(bx), cy: f(by + 1), rx: 7, ry: 2, fill: '#ffffff', opacity: 0.6 }))
+  // Unity's bottle (Creatures8.cs), afloat, a ring of white water round it.
+  const afloat = creatureUse('bottle', '#bdf0da', 'stand', 'se', { transform: `translate(${f(bx)} ${f(by)})` })
+  b.add(new N('ellipse', { cx: f(bx), cy: f(by + 1), rx: 7, ry: 2, fill: '#ffffff', opacity: afloat ? 0.35 : 0.6 }))
+  if (afloat) { b.add(afloat); p.grow(sx - 100, sy - 60, sx + 100, sy + 46); return }
   b.add(new N('path', { d: `M${f(bx - 6)} ${f(by - 1)}q0 -4 4 -4h5l2 -1.6v4.2l-2 -1h-5q-4 0 -4 -4z`, fill: '#bdf0da', stroke: INK, 'stroke-width': 0.9, opacity: 0.95 }))
   b.add(new N('path', { d: `M${f(bx - 3)} ${f(by - 3)}h4`, stroke: '#ffffff', 'stroke-width': 1.4 }))
   p.grow(sx - 100, sy - 60, sx + 100, sy + 46)
@@ -766,7 +784,8 @@ export function beachBottle(p: Pen, x: number, y: number, n: number, glass: stri
   w.add(new N('ellipse', { cx: f(sx - 1.5), cy: f(sy + 1.6), rx: 9.5, ry: 2.6, fill: INK, opacity: 0.13 }))
   const k = flip ? -1 : 1
   const q = new Pen(w, p.ox, p.oy, p.oz, p.b, p.lights, p.sink)
-  q.model('bottle', [x, y, 0], { fill: glass, rows: flip ? 1 : 0 }, () => bottleDrawn(w, sx, sy, k, glass))
+  // (Drawn straight into the poke's group, so only when Unity's is not there.)
+  q.model('bottle', [x, y, 0], { fill: glass, rows: flip ? 1 : 0 }, () => { if (!q.real) bottleDrawn(w, sx, sy, k, glass) })
   // The glint, a star of light that comes and goes.
   const gx = sx + k * 3.2, gy = sy - 7.6
   w.add(new N('path', { d: q.real ? `M${f(gx)} ${f(gy - 3)}l0.7 2.3l2.3 0.7l-2.3 0.7l-0.7 2.3l-0.7 -2.3l-2.3 -0.7l2.3 -0.7z` : `M${f(gx)} ${f(gy - 4.6)}l1.1 3.5l3.5 1.1l-3.5 1.1l-1.1 3.5l-1.1 -3.5l-3.5 -1.1l3.5 -1.1z`, fill: '#ffffff', stroke: q.real ? undefined : '#8fd3ff', 'stroke-width': q.real ? undefined : 0.6, class: 'twinkle', style: `animation-delay:${f(-((n * 0.77) % 2.4))}s` }))

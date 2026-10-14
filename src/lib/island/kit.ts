@@ -379,7 +379,8 @@ export class Pen {
    * sill. `lit` windows glow at night; their centres are kept for the lights.
    */
   windows(b: Box, face: 'x' | 'y', o: { rows?: number; cols?: number; z0?: number; h?: number; gap?: number; wide?: number; pane?: string; frame?: string; lit?: boolean; cls?: string } = {}) {
-    const rec = o.cls ? null : { k: 'win', b: this.wb(b), face, rows: o.rows ?? 1, cols: o.cols ?? 2, z0: o.z0 ?? 8, h: o.h ?? 10, gap: o.gap ?? 8, wide: o.wide ?? 0.5, pane: o.pane ?? C.glass, frame: o.frame ?? C.white }
+    // (Windows the page lights itself, by a class, are Unity's too: only their panes are the page's.)
+    const rec = { k: 'win', b: this.wb(b), face, rows: o.rows ?? 1, cols: o.cols ?? 2, z0: o.z0 ?? 8, h: o.h ?? 10, gap: o.gap ?? 8, wide: o.wide ?? 0.5, pane: o.pane ?? C.glass, frame: o.frame ?? C.white }
     this.solid(rec, () => this.windowsDrawn(b, face, o))
   }
   private windowsDrawn(b: Box, face: 'x' | 'y', o: { rows?: number; cols?: number; z0?: number; h?: number; gap?: number; wide?: number; pane?: string; frame?: string; lit?: boolean; cls?: string } = {}) {
@@ -401,7 +402,8 @@ export class Pen {
         // Drawn into nothing (the realistic island: Unity draws the window), its pane stays, unseen,
         // where it was: for the night to light, and to find whether anything stands in front of it.
         const real = this.sink?.real
-        if (real) real.add(new N(glass.tag, { ...glass.attrs, opacity: 0 }))
+        // One the page lights (a class) is there unfilled, for the page to fill with light and empty again.
+        if (real) real.add(new N(glass.tag, o.cls ? { ...glass.attrs, fill: 'none', stroke: 'none' } : { ...glass.attrs, opacity: 0 }))
       }
     }
   }

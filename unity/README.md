@@ -188,6 +188,25 @@ terrain raises out of the water (`Terrain3D.Isle`, `model.isles`), the Deep
 Sea a trench it lets fall away, so the water's own shallows and depth show
 them.
 
+The last of the small things (`Props8.cs`): towels on the sand, the cottages'
+window boxes, topiary in pots, toadstools, a pram, an easel (its canvas a
+plaque, the sketch printed), a parked bicycle, the stork's nest, the trolley
+problem's railway (ballast, sleepers, rails, along `s.pts`), the Mint's
+conveyor, the sundial at Where Does The Day Go (the day's parts inlaid in
+stone; the gnomon's shadow is the page's), a telescope on a tripod. The
+moving ones are rendered alone like the animals (`Creatures8.cs`): the
+superyacht at Spend It, the atom over the Tower of Scales (24 frames, as the
+globe), the harbour buoys, the Internet Museum's foil balloon, the stork in
+flight, the trolley's cart (a picture for each heading it takes), the drifting
+bottle, and the humpback breaching at dawn (the whale's `breach` pose).
+Windows the page lights itself (Every Second's) are Unity's too: only their
+panes are the page's, unfilled until lit.
+
+The river's falls are water, not a smear of the ground's colour (`Falls.cs`):
+a sheet leaving each lip and curving out as it drops, streaked and breaking
+white (Building.shader, material 12), and ragged foam where it lands; the
+page keeps only a few glints running down them.
+
 ## Run by run: the check
 
 `node scripts/check-island-runs.mjs` (in the suite) builds the island plainly
@@ -326,3 +345,7 @@ picture about its middle turns it.
 7. Signs and props (done): prints, plaques and decals for what the site
    draws on things; the remaining props modelled; the sea's drawn marks gone,
    its banks and trench in the terrain.
+8. The last drawn things (done): every prop the site still drew modelled or
+   rendered (Props8.cs, Creatures8.cs), the river's falls made water
+   (Falls.cs), the globe a real Earth; what the page draws over the plate is
+   now only words, lights, moving glints and the interface.

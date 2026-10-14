@@ -1,6 +1,7 @@
 /** Market Street: where the money goes. */
-import { C, INK, N, OUT, shade, r1 as f, letter, neon, glow, type Landmark } from './kit'
+import { C, INK, N, OUT, shade, r1 as f, letter, neon, glow, puffShade, type Landmark } from './kit'
 import { person, crate, tree, flag, lamp, fence } from './props'
+import { creatureUse } from './actors'
 
 export const market: Record<string, Landmark> = {
   auction: { size: [2, 2], draw(p) {
@@ -25,20 +26,24 @@ export const market: Record<string, Landmark> = {
     const [gx, gy] = p.at(0.98, 0.98, 78)
     p.path(`M${f(gx - 5)} ${f(gy)}h10v-4h-10z`, '#e3e8f7', { sw: 1.1 })
     const gav = p.group('au-gavel')
-    gav.path(`M${f(gx - 1.6)} ${f(gy - 4)}v-14h3.2v14z`, C.wood, { sw: 1.1 })
-    gav.path(`M${f(gx - 8)} ${f(gy - 23)}h16a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2z`, '#ffd98a', { sw: 1.2 })
-    gav.path(`M${f(gx - 4)} ${f(gy - 23)}v7M${f(gx + 4)} ${f(gy - 23)}v7`, 'none', { sw: 0.9 })
+    const gilt = p.real ? '#d6ad57' : '#ffd98a', giltEdge = p.real ? { sw: 0.6, stroke: '#94712f' } : { sw: 1.2 }
+    gav.path(`M${f(gx - 1.6)} ${f(gy - 4)}v-14h3.2v14z`, p.real ? '#b48a45' : C.wood, p.real ? { sw: 0.5, stroke: '#7d5f2c' } : { sw: 1.1 })
+    gav.path(`M${f(gx - 8)} ${f(gy - 23)}h16a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2z`, gilt, giltEdge)
+    gav.path(`M${f(gx - 4)} ${f(gy - 23)}v7M${f(gx + 4)} ${f(gy - 23)}v7`, 'none', p.real ? { sw: 0.6, stroke: '#94712f' } : { sw: 0.9 })
     p.grow(gx - 12, gy - 28, gx + 12, gy)
     flag(p.move(0, 0, 56), 0.25, 0.25, 0, C.rasp, 18); flag(p.move(0, 0, 56), 1.7, 0.25, 0, C.mint, 18)
     // Bidders with their paddles.
     for (const [x, y, c] of [[1.3, 1.95, C.mint], [0.5, 1.95, C.sky], [1.95, 1.2, C.lilac]] as const) {
       person(p, x, y, c)
-      const [px, py] = p.at(x, y); p.path(`M${f(px + 4)} ${f(py - 12)}l3 -8`, 'none', { sw: 1.4 }); p.el('circle', { cx: px + 7.5, cy: py - 22, r: 3.5, fill: '#ffffff', stroke: INK, 'stroke-width': 1.2 })
+      const [px, py] = p.at(x, y); p.path(`M${f(px + 4)} ${f(py - 12)}l3 -8`, 'none', { sw: 1.4 }); p.el('circle', { cx: px + 7.5, cy: py - 22, r: p.real ? 2.4 : 3.5, fill: p.real ? '#ece7dc' : '#ffffff', stroke: p.real ? '#8f2f3c' : INK, 'stroke-width': p.real ? 0.7 : 1.2 })
     }
     // An estate agent's board on the lawn, its SOLD rider flipping up.
     const [sx, sy] = p.at(1.9, 1.85)
-    p.path(`M${f(sx - 9)} ${f(sy)}v-26M${f(sx + 9)} ${f(sy)}v-26`, 'none', { sw: 1.8, stroke: C.wood })
-    p.path(`M${f(sx - 12)} ${f(sy - 28)}h24v11h-24z`, '#ffffff', { sw: 1.3 })
+    const lot = new N('g'); lot.add(new N('rect', { width: 24, height: 11, fill: '#ffffff' }))
+    p.plaque('lot-board', 1.9, 1.85, 17, 24, 11, lot, { foot: 0, depth: 0.8 }, () => {
+      p.path(`M${f(sx - 9)} ${f(sy)}v-26M${f(sx + 9)} ${f(sy)}v-26`, 'none', { sw: 1.8, stroke: C.wood })
+      p.path(`M${f(sx - 12)} ${f(sy - 28)}h24v11h-24z`, '#ffffff', { sw: 1.3 })
+    })
     p.el('text', { x: sx, y: sy - 20.4, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 4.6, fill: INK }).text('LOT 42')
     const sold = p.group('au-sold')
     sold.path(`M${f(sx - 12)} ${f(sy - 38)}h24v9h-24z`, C.rasp, { sw: 1.3 })
@@ -48,9 +53,11 @@ export const market: Record<string, Landmark> = {
 
   'printing-money': { size: [3, 2], draw(p) {
     // The conveyor, then the bills riding on it.
+    // The belt: Unity's (Props8.cs, Conveyor); the bills riding it the page's.
+    p.model('conveyor', [1.35, 0.72, 2], { w: 1.6, d: 0.5 }, () => null)
     const belt = p.plane(1.35, 0.72, 2)
-    belt.add(new N('rect', { x: 0, y: 0, width: 1.6, height: 0.5, fill: '#2c355e', stroke: INK, 'stroke-width': 0.05 }))
-    for (let k = 0; k < 9; k++) belt.add(new N('line', { x1: k * 0.2, y1: 0, x2: k * 0.2, y2: 0.5, stroke: '#4a5690', 'stroke-width': 0.031 }))
+    if (!p.real) belt.add(new N('rect', { x: 0, y: 0, width: 1.6, height: 0.5, fill: '#2c355e', stroke: INK, 'stroke-width': 0.05 }))
+    if (!p.real) for (let k = 0; k < 9; k++) belt.add(new N('line', { x1: k * 0.2, y1: 0, x2: k * 0.2, y2: 0.5, stroke: '#4a5690', 'stroke-width': 0.031 }))
     const bills = belt.add(new N('g', { class: 'pm-bills' }))
     for (let k = 0; k < 8; k++) {
       bills.add(new N('rect', { x: k * 0.3 - 0.3, y: 0.08, width: 0.24, height: 0.34, rx: 0.02, fill: C.bill, stroke: INK, 'stroke-width': 0.031 }))
@@ -74,7 +81,9 @@ export const market: Record<string, Landmark> = {
     }
     p.cyl(0.3, 0.4, 0.12, 30, 46, '#c9cde0', { bands: [[36, 40, C.rasp]] })
     const [cx, cy] = p.at(0.3, 0.4, 78)
-    for (let k = 0; k < 3; k++) p.el('circle', { cx, cy, r: 7, fill: '#ffffff', stroke: INK, 'stroke-width': 1.2, class: 'puff', style: `animation-delay:${k}s` })
+    // On the realistic island, smoke: soft, no edge to it.
+    const smoke = p.real ? puffShade(p.el('defs'), 'pm-smoke', '#eceef3', 0.75) : null
+    for (let k = 0; k < 3; k++) p.el('circle', { cx, cy, r: smoke ? 9 : 7, fill: smoke ?? '#ffffff', stroke: smoke ? undefined : INK, 'stroke-width': smoke ? undefined : 1.2, class: 'puff', style: `animation-delay:${k}s` })
     p.grow(cx - 20, cy - 50, cx + 20, cy)
     p.sign(0.7, 1.82, 30, 60, 15, C.bill, 'THE MINT', { size: 8 })
     p.door(m, 'x', 0.62, { w: 0.4, h: 18, fill: C.slate })
@@ -121,6 +130,13 @@ export const market: Record<string, Landmark> = {
     p.path(`M${f(hx - 12)} ${f(hy - 12)}q12 12 24 0`, 'none', { sw: 1.6, stroke: C.rasp })
     const b = p.group('bob')
     const [x, y] = b.at(0.85, 1.25, -8)
+    // Unity's superyacht (Creatures8.cs), at anchor, a little white water along its hull.
+    const yacht = creatureUse('yacht', C.cobalt, 'stand', 'e', { transform: `translate(${f(x)} ${f(y + 4)})` })
+    if (yacht) {
+      b.el('ellipse', { cx: x - 4, cy: y + 4, rx: 70, ry: 9, fill: '#ffffff', opacity: 0.22 })
+      b.g.add(yacht)
+      p.grow(x - 90, y - 90, x + 90, y + 20)
+    } else {
     b.el('ellipse', { cx: x, cy: y + 8, rx: 74, ry: 11, fill: '#ffffff', opacity: 0.4 })
     b.path(`M${f(x - 70)} ${f(y - 14)}L${f(x + 62)} ${f(y - 30)}L${f(x + 50)} ${f(y + 2)}L${f(x - 56)} ${f(y + 10)}Z`, '#ffffff')
     b.path(`M${f(x - 64)} ${f(y - 5)}L${f(x + 56)} ${f(y - 19)}`, 'none', { stroke: C.cobalt, sw: 3.5 })
@@ -139,11 +155,14 @@ export const market: Record<string, Landmark> = {
     b.path(`M${f(x + 8)} ${f(y - 78)}h14l-3 4l3 4h-14z`, C.bill, { sw: 1.1, cls: 'flutter' })
     b.el('text', { x: x + 14, y: y - 71.6, 'text-anchor': 'middle', 'font-family': 'Fredoka, sans-serif', 'font-weight': 700, 'font-size': 6, fill: '#2c8f68' }).text('$')
     p.grow(x - 80, y - 90, x + 70, y + 20)
+    }
     // A jet ski doing laps.
     const js = p.group('jetski')
     const [jx, jy] = p.at(0.2, 1.9, -8)
-    js.path(`M${f(jx - 10)} ${f(jy)}l18 -3l4 4l-20 3z`, C.rasp, { sw: 1.2 })
-    js.el('path', { d: `M${f(jx - 12)} ${f(jy + 3)}q-12 3 -22 0`, stroke: '#ffffff', 'stroke-width': 2, fill: 'none' })
+    const ski = creatureUse('jetski', C.rasp, 'stand', 'e', { transform: `translate(${f(jx)} ${f(jy + 1)})` })
+    if (ski) js.g.add(ski)
+    else js.path(`M${f(jx - 10)} ${f(jy)}l18 -3l4 4l-20 3z`, C.rasp, { sw: 1.2 })
+    js.el('path', { d: `M${f(jx - 12)} ${f(jy + 3)}q-12 3 -22 0`, stroke: '#ffffff', 'stroke-width': p.real ? 1.6 : 2, opacity: p.real ? 0.7 : undefined, fill: 'none', 'stroke-linecap': 'round' })
     void crate; void lamp; void flag; void person
   } },
 }

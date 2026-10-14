@@ -48,7 +48,7 @@ fs.rmSync(out, { recursive: true, force: true })
 fs.mkdirSync(out, { recursive: true })
 const hash = createHash('sha256')
 const names = fs.readdirSync(renders).filter((f) => f.endsWith('.png') && !f.endsWith('.s.png') && !f.endsWith('.w.png')).map((f) => f.slice(0, -4)).sort()
-const BOATS = new Set(['sail', 'ferry', 'fishing', 'speed', 'row', 'duck', 'dolphin', 'whale'])
+const BOATS = new Set(['sail', 'ferry', 'fishing', 'speed', 'row', 'duck', 'dolphin', 'whale', 'yacht', 'buoy', 'bottle', 'jetski'])
 let bytes = 0
 // The shadow on the ground: the sky's blue in it, soft at the edge, as dark as the buildings' are on the plate.
 const SHADOW = { r: 22, g: 30, b: 52, a: 0.46 }

@@ -336,6 +336,8 @@ namespace Island
             // For the buildings' own pictures: the ground there only to shut out the sky and the sun.
             if (blocks == "occlude") groundGo.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
             Debug.Log($"[island] ground mesh in {(System.DateTime.Now - t0).TotalSeconds:0.0}s");
+            // The river's falls: water over the rock (Falls.cs).
+            if (blocks != "occlude") { var falls = Buildings.Falls(d, ground); if (falls != null) Place(falls, Buildings.Mat, "falls").GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off; }
 
             Shader.SetGlobalFloat("_IslandSea", Y(d.sea));
             var wm = new Material(Shader.Find("Island/Water"));
@@ -632,7 +634,7 @@ namespace Island
                 ["gull"] = new float[] { -22, -20, 40, 30 },
                 ["pigeon"] = new float[] { -14, -10, 22, 16 },
                 ["dolphin"] = new float[] { -34, -28, 64, 48 },
-                ["whale"] = new float[] { -130, -64, 260, 118 },
+                ["whale"] = new float[] { -130, -96, 260, 150 },
                 ["bfly"] = new float[] { -12, -12, 24, 24 },
                 ["cloud"] = new float[] { -96, -80, 192, 132 },
                 ["dog"] = new float[] { -24, -18, 34, 24 },
@@ -641,6 +643,14 @@ namespace Island
                 ["plane"] = new float[] { -48, -30, 96, 54 },
                 ["globe"] = new float[] { -38, -38, 76, 76 },
                 ["pod"] = new float[] { -14, -34, 28, 40 },
+                ["yacht"] = new float[] { -92, -86, 184, 104 },
+                ["atom"] = new float[] { -20, -20, 40, 40 },
+                ["buoy"] = new float[] { -10, -22, 20, 27 },
+                ["pixelballoon"] = new float[] { -48, -18, 62, 34 },
+                ["stork"] = new float[] { -26, -16, 52, 30 },
+                ["cart"] = new float[] { -20, -18, 40, 26 },
+                ["bottle"] = new float[] { -16, -14, 32, 20 },
+                ["jetski"] = new float[] { -20, -24, 40, 30 },
             };
             Directory.CreateDirectory("Renders/actors");
             if (only == "") foreach (var f in Directory.GetFiles("Renders/actors")) File.Delete(f);
@@ -659,7 +669,7 @@ namespace Island
                 if (Lit) Dome.Shoot(cam, pw, ph, $"Renders/actors/{a.name}.png", ss, true);
                 else ShootFigure(cam, pw, ph, $"Renders/actors/{a.name}.png", ss);
                 Object.DestroyImmediate(go);
-                bool aloft = ((a.kind == "gull" || a.kind == "pigeon") && (a.pose == "up" || a.pose == "down")) || a.kind == "bfly" || a.kind == "cloud" || a.kind == "balloon" || a.kind == "plane" || a.kind == "globe" || a.kind == "pod";
+                bool aloft = ((a.kind == "gull" || a.kind == "pigeon") && (a.pose == "up" || a.pose == "down")) || a.kind == "bfly" || a.kind == "cloud" || a.kind == "balloon" || a.kind == "plane" || a.kind == "globe" || a.kind == "pod" || a.kind == "atom" || a.kind == "pixelballoon" || a.kind == "stork";
                 if (!aloft)
                 {
                     var sh = Buildings.ActorShadow(a, Dome.ToSun, flat);

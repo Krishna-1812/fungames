@@ -78,8 +78,9 @@ export const peaks: Record<string, Landmark> = {
   } },
 
   'universe-forecast': { size: [2, 2], draw(p) {
-    p.disc(1, 1, 0.98, 0, '#62e8c9')
-    p.disc(1, 1, 0.78, 1, '#8aeed6', { sw: 1, dash: '4 4' })
+    // On the realistic island the circle stands on turf, worn to the chalk in a ring.
+    p.disc(1, 1, 0.98, 0, p.real ? '#7d946d' : '#62e8c9')
+    p.disc(1, 1, 0.78, 1, '#8aeed6', { sw: 1, dash: '4 4', op: p.real ? 0 : undefined })
     p.disc(1, 1, 0.18, 1, C.stone2)
     const ring = Array.from({ length: 10 }, (_, k) => { const a = (k / 10) * Math.PI * 2; return [1 + Math.cos(a) * 0.72, 1 + Math.sin(a) * 0.72, 20 + (k % 3) * 3] as const })
       .sort((a, b) => a[0] + a[1] - (b[0] + b[1]))
@@ -116,13 +117,16 @@ export const peaks: Record<string, Landmark> = {
     person(p, 1.85, 1.35, C.lilac, { pose: 'look' })
     person(p, 1.35, 1.9, C.rasp)
     const [sx, sy] = p.at(0.2, 1.7)
-    p.path(`M${f(sx)} ${f(sy)}l-6 12M${f(sx)} ${f(sy)}l6 12M${f(sx)} ${f(sy)}l0 12`, 'none', { sw: 1.4 })
-    p.path(`M${f(sx - 8)} ${f(sy - 3)}l16 -9`, 'none', { sw: 4.5 })
+    // A telescope on its tripod: Unity's (Props8.cs, TripodScope).
+    p.model('tripodscope', [0.2, 1.7, -12], {}, () => {
+      p.path(`M${f(sx)} ${f(sy)}l-6 12M${f(sx)} ${f(sy)}l6 12M${f(sx)} ${f(sy)}l0 12`, 'none', { sw: 1.4 })
+      p.path(`M${f(sx - 8)} ${f(sy - 3)}l16 -9`, 'none', { sw: 4.5 })
+    })
   } },
 
   orbit: { size: [2, 2], draw(p) {
     p.disc(1, 1, 0.95, 0, '#eef0f8')
-    p.disc(1, 1, 0.82, 0.5, 'none', { sw: 1, dash: '2 5' })
+    p.disc(1, 1, 0.82, 0.5, 'none', { sw: 1, dash: '2 5', op: p.real ? 0 : undefined })
     p.cyl(1, 1, 0.42, 0, 10, C.stone, { bands: [[4, 6, C.lilac]] })
     p.cyl(1, 1, 0.18, 10, 8, C.stone2)
     p.line([1, 1, 18], [1, 1, 48], { sw: 3.5 })
@@ -223,10 +227,13 @@ export const peaks: Record<string, Landmark> = {
     const [vx, vy] = p.at(1, 1, z + 48)
     p.path(`M${f(vx - 14)} ${f(vy + 10)}h28M${f(vx)} ${f(vy + 4)}v12`, 'none', { sw: 1.3 })
     p.path(`M${f(vx - 14)} ${f(vy + 10)}l-4 -3v6zM${f(vx + 14)} ${f(vy + 10)}l5 0l-3 -3`, C.rasp, { sw: 1 })
-    const atom = p.group('spin-slow')
-    for (const [ang, c] of [[0, C.cobalt], [60, C.rasp], [-60, C.mint]] as const) atom.el('ellipse', { cx: vx, cy: vy, rx: 13, ry: 4.6, fill: 'none', stroke: c, 'stroke-width': 1.8, transform: `rotate(${ang} ${f(vx)} ${f(vy)})` })
-    atom.el('circle', { cx: vx, cy: vy, r: 3.2, fill: C.rasp, stroke: INK, 'stroke-width': 1.1 })
-    for (const ang of [0, 120, 240]) { const r = (ang * Math.PI) / 180; atom.el('circle', { cx: vx + Math.cos(r) * 13, cy: vy + Math.sin(r) * 4.6, r: 1.7, fill: '#fff', stroke: INK, 'stroke-width': 0.8, transform: `rotate(${ang / 2} ${f(vx)} ${f(vy)})` }) }
+    // The atom: Unity's, turning (24 frames, Creatures8.cs), as the globe at How Fast does.
+    const turns = Array.from({ length: 24 }, (_, k) => creatureUse('atom', C.cobalt, `f${k}`, 'se', { class: 'frame24', style: `animation-delay:${f(k * 0.5 - 12)}s`, transform: `translate(${f(vx)} ${f(vy)})` }))
+    const atom = p.group(p.real && turns.every(Boolean) ? 'atom' : 'spin-slow')
+    if (p.real && turns.every(Boolean)) turns.forEach((u) => atom.g.add(u!))
+    else for (const [ang, c] of [[0, C.cobalt], [60, C.rasp], [-60, C.mint]] as const) atom.el('ellipse', { cx: vx, cy: vy, rx: 13, ry: 4.6, fill: 'none', stroke: c, 'stroke-width': 1.8, transform: `rotate(${ang} ${f(vx)} ${f(vy)})` })
+    if (!(p.real && turns.every(Boolean))) atom.el('circle', { cx: vx, cy: vy, r: 3.2, fill: C.rasp, stroke: INK, 'stroke-width': 1.1 })
+    if (!(p.real && turns.every(Boolean))) for (const ang of [0, 120, 240]) { const r = (ang * Math.PI) / 180; atom.el('circle', { cx: vx + Math.cos(r) * 13, cy: vy + Math.sin(r) * 4.6, r: 1.7, fill: '#fff', stroke: INK, 'stroke-width': 0.8, transform: `rotate(${ang / 2} ${f(vx)} ${f(vy)})` }) }
     p.grow(vx - 18, vy - 16, vx + 18, vy + 20)
     // Visitors: one looking a long way up, one with a magnifying glass at the flowers.
     person(p, 1.75, 1.92, C.lilac, { pose: 'look', hat: C.mint })

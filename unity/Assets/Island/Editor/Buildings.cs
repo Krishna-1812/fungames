@@ -503,7 +503,7 @@ namespace Island
         /** A round platform: a low drum of stone. */
         static void Disc(Bm b, SolidRec s)
         {
-            var col = Real(s.fill, Concrete);
+            var col = Is(s.fill, "#62e8c9", "#8aeed6") ? Real("#87987a", Concrete) : Real(s.fill, Concrete);
             int sides = 48; float z0 = s.z - 1.5f;
             for (int k = 0; k < sides; k++)
             {

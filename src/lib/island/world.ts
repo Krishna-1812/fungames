@@ -16,7 +16,7 @@ import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, clou
 import type { FigureSet, BuildingSet } from './figures'
 import type { SkyArt } from './plate'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
-import { beacon } from './lm-harbour'
+import { beacon, harbourArt } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
 import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
 import { STAMP } from '../passport-art'
@@ -156,6 +156,7 @@ export type PlateRef = { box: [number, number, number, number]; href: string; id
 
 export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; glow?: PlateRef | null; sky?: SkyArt | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
   const plate = opts.plate ?? null
+  harbourArt.moon = plate ? opts.sky?.moon ?? null : null
   setFigures(opts.figures ?? null)
   setActors(!!opts.figures)
   const R = rng(20260930)
@@ -485,7 +486,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   })
   for (const [i, j, d] of [[27, 26, 0], [2, 26, 3.5], [29, 10, 6]]) {
     const [x, y] = P(i, j, SEA)
-    root.add(new N('path', { d: `M${f(x - 7)} ${f(y)}q7 -5 14 0q-7 5 -14 0zM${f(x + 7)} ${f(y)}l5 -3v6z`, fill: C.sky, stroke: INK, 'stroke-width': 1.2, class: 'fish', style: `animation-delay:${d}s` }))
+    root.add(new N('path', { d: `M${f(x - 7)} ${f(y)}q7 -5 14 0q-7 5 -14 0zM${f(x + 7)} ${f(y)}l5 -3v6z`, fill: plate ? '#c3cedb' : C.sky, stroke: plate ? '#7d8aa0' : INK, 'stroke-width': plate ? 0.5 : 1.2, class: 'fish', style: `animation-delay:${d}s` }))
   }
   // Dolphins leaping, and a whale further out, now and then blowing.
   ;[[33, 13, 0, false], [16, 34, 2.6, true], [-3, 16, 5.1, false]].forEach(([i, j, d, flip]) => {
@@ -533,7 +534,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const shots = opts.buildings ?? null
   /** Where a building's solids are written down, and with Unity's pictures of them, put in their place. */
   const sinkFor = (slug: string) => {
-    const real = !!shots?.items[`${slug}/0`]
+    // (Any of its runs: a first run of nothing, a trench, has no picture.)
+    const real = !!shots && Object.keys(shots.items).some((k) => k.startsWith(`${slug}/`))
     const sink = new Solids(!real, real ? (g, run) => {
       const it = shots!.items[`${slug}/${run}`]
       if (it) g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
@@ -682,7 +684,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // Where each fall lands, after the step below it is down.
   ground.add(new N('path', { d: splash, fill: '#ffffff', stroke: INK, 'stroke-width': 1 }))
   // The falls' white water, running down: only these few strokes move.
-  for (const st of fallStreaks) ground.add(new N('path', { d: st.d, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-dasharray': '4 5', class: 'fall amb', 'data-b': st.b }))
+  // On the realistic island the water is Unity's (Falls.cs): these only the light glinting as it runs down it.
+  for (const st of fallStreaks) ground.add(new N('path', { d: st.d, fill: 'none', stroke: '#ffffff', 'stroke-width': plate ? 0.9 : 1.8, 'stroke-linecap': 'round', 'stroke-dasharray': plate ? '1.5 7' : '4 5', opacity: plate ? 0.55 : undefined, class: 'fall amb', 'data-b': st.b }))
   // Dapple: soft patches of lighter and darker ground across the open land,
   // following the same slow field the tones once stepped through tile by
   // tile, so a meadow falls into sunlit and shaded stretches with no edges.
@@ -1514,7 +1517,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if (!lit[n]) return
       // With Unity's night light, the windows and the street lamps are in it, glowing as they really do;
       // what is left (bulbs on strings, the hall's display) keeps a softer glow of its own.
-      if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb')) return
+      // (The lighthouse's lantern too: Unity's glow has it, a bright core in its glass.)
+      if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb' || l.el?.attrs.class === 'stp-lamp')) return
       const [x, y] = l
       halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 13, fill: 'url(#isl-glow)', opacity: glowRef ? 0.55 : undefined }))
       if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`

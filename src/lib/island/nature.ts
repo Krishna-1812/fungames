@@ -95,6 +95,11 @@ export function hedge(p: Pen, x0: number, y0: number, x1: number, y1: number, h 
 /** A topiary ball in a pot. */
 export function topiary(p: Pen, x: number, y: number, k = 1) {
   const [bx, by] = p.at(x, y)
+  // Unity's (Props8.cs, Topiary): a clipped ball of box in a terracotta pot.
+  if (p.sink) { p.model('topiary', [x, y, 0], { r: k }, () => topiaryDrawn(p, bx, by, k)); p.grow(bx - 7 * k, by - 24 * k, bx + 7 * k, by + 2); return }
+  topiaryDrawn(p, bx, by, k)
+}
+function topiaryDrawn(p: Pen, bx: number, by: number, k: number) {
   p.el('ellipse', { cx: bx, cy: by + 1, rx: 7 * k, ry: 3 * k, ...SHADOW })
   p.path(`M${f(bx - 4.5 * k)} ${f(by - 6 * k)}h${f(9 * k)}l${f(-1.2 * k)} ${f(6 * k)}h${f(-6.6 * k)}z`, C.lilac, { sw: 1.2 })
   p.path(`M${f(bx)} ${f(by - 6 * k)}v${f(-6 * k)}`, 'none', { stroke: C.wood, sw: 1.6 })
@@ -106,6 +111,10 @@ export function topiary(p: Pen, x: number, y: number, k = 1) {
 /** A ring of toadstools on the forest floor. */
 export function toadstools(p: Pen, x: number, y: number) {
   const [bx, by] = p.at(x, y)
+  if (p.sink) { p.model('toadstools', [x, y, 0], {}, () => toadstoolsDrawn(p, bx, by)); p.grow(bx - 9, by - 8, bx + 9, by + 4); return }
+  toadstoolsDrawn(p, bx, by)
+}
+function toadstoolsDrawn(p: Pen, bx: number, by: number) {
   let stems = '', caps = '', dots = ''
   for (const [dx, dy, s] of [[-5, 0, 1], [1, -2, 0.8], [5, 1, 1.1], [-1, 3, 0.7]]) {
     const cx = bx + dx, cy = by + dy
@@ -432,9 +441,25 @@ export function tumbleweed(p: Pen, x: number, y: number, delay = 0) {
   p.grow(bx - 50, by - 16, bx + 50, by + 4)
 }
 
+/** A soft white puff: spray, foam. */
+function puffWhite(defs: N, id: string, core: number) {
+  const gr = defs.add(new N('radialGradient', { id }))
+  for (const [o, op] of [[0, core], [0.5, core * 0.6], [1, 0]] as [number, number][]) gr.add(new N('stop', { offset: o, 'stop-color': '#ffffff', 'stop-opacity': op }))
+  return `url(#${id})`
+}
+
 /** A big whale breaching, arched out of the sea in a burst of spray. Only at dawn. */
 export function dawnWhale(x: number, y: number): N {
   const g = new N('g', { class: 'dawn-whale' })
+  // Unity's humpback (Creatures.cs, its breach), out of a burst of white water, spray hanging soft round it.
+  const real = creatureUse('whale', '#4f5a74', 'breach', 'e', { transform: `translate(${f(x)} ${f(y + 6)})` })
+  if (real) {
+    const defs = g.add(new N('defs'))
+    g.add(new N('ellipse', { cx: f(x), cy: f(y + 4), rx: 56, ry: 12, fill: puffWhite(defs, 'dw-foam', 0.8) }))
+    g.add(new N('g', { class: 'breach' })).add(real)
+    for (const [dx, dy, r] of [[-40, -8, 12], [30, -6, 14], [-14, 0, 10], [12, 2, 10], [44, -2, 8]]) g.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r, fill: puffWhite(defs, `dw-spray${dx}`, 0.7) }))
+    return g
+  }
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 4), rx: 60, ry: 13, fill: '#ffffff', opacity: 0.55 }))
   const b = g.add(new N('g', { class: 'breach' }))
   // The body, rising out of the water and arching back, snout to the sky.

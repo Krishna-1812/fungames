@@ -42,6 +42,16 @@ if (!process.argv.includes('--skip-unity')) {
 }
 
 const m = JSON.parse(fs.readFileSync(path.join(renders, 'buildings.json'), 'utf8'))
+// A render of a few (Unity's `-only a,b`) writes where they lie to a file of its own, named for the
+// first: folded into the whole list here (theirs replacing what the list had), and the list kept so.
+for (const f of fs.readdirSync(renders).filter((f) => f.endsWith('.json') && f !== 'buildings.json')) {
+  const part = JSON.parse(fs.readFileSync(path.join(renders, f), 'utf8'))
+  const slugs = new Set(Object.keys(part.items).map((key) => key.split('/')[0]))
+  for (const key of Object.keys(m.items)) if (slugs.has(key.split('/')[0])) delete m.items[key]
+  Object.assign(m.items, part.items)
+  fs.rmSync(path.join(renders, f))
+}
+fs.writeFileSync(path.join(renders, 'buildings.json'), JSON.stringify(m))
 const k = m.scale
 fs.rmSync(out, { recursive: true, force: true })
 fs.mkdirSync(out, { recursive: true })

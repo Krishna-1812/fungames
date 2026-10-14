@@ -1,5 +1,6 @@
 /** The Funfair: the internet, the reviews, the progress bar, too many lights. */
 import { ballShade, C, INK, N, OUT, shade, r1 as f, letter, glow, type Landmark, Pen } from './kit'
+import { creatureUse } from './actors'
 import { person, tree, flag, lamp, flowers, bench } from './props'
 
 /** A five-point star at a point, in a group (painted on a sign). */
@@ -140,6 +141,9 @@ export const funfair: Record<string, Landmark> = {
     p.quad(hall, 'y', 0.05, 0.63, 4, 23, '#ffffff', { sw: 1.2 })
     p.quad(hall, 'y', 0.07, 0.61, 5.5, 21.5, '#26346a', { sw: 1 })
     p.light(p.at(0.2 + 1.52 * 0.34, 1.38, 18), p.quad(hall, 'y', 0.07, 0.61, 14, 21.5, '#33447e', { sw: 0 }), '#ffe6a1', 18, 'y')
+    // The exhibits printed behind the glass by Unity (kit.ts, decal); the screen's text the page's.
+    const exAt: [number, number, number, number] = [-13, -16, 13, 0]
+    p.decal('ia-exhibits', hall, 'y', 0.34, 5.5, exAt)
     const ex = p.face(hall, 'y', 0.34, 5.5, { w: 26, h: 16 })
     // A beige-grey computer on a plinth: case, screen, green text, keyboard.
     ex.add(new N('rect', { x: -6, y: -3, width: 12, height: 3, fill: '#c9cde0', stroke: INK, 'stroke-width': 0.6 }))
@@ -153,6 +157,7 @@ export const funfair: Record<string, Landmark> = {
     ex.add(new N('rect', { x: 8, y: -4, width: 3, height: 4, fill: '#c9cde0', stroke: INK, 'stroke-width': 0.5 }))
     ex.add(new N('path', { d: 'M-12 -12v7l1.6 -1.6l1.2 2.6l1.2 -0.6l-1.2 -2.4h2.2z', fill: '#ffffff', stroke: INK, 'stroke-width': 0.6, 'stroke-linejoin': 'round' }))
     ex.add(new N('rect', { x: -11.6, y: -4, width: 2.4, height: 4, fill: '#c9cde0', stroke: INK, 'stroke-width': 0.5 }))
+    p.printFace(ex, 'ia-exhibits', exAt)
     // Glass doors, and the name round the top.
     p.quad(hall, 'y', 0.71, 0.93, 0, 21, '#ffffff', { sw: 1.1 })
     p.quad(hall, 'y', 0.73, 0.91, 0, 19, shade(C.glass, 0.84), { sw: 0.9 })
@@ -165,9 +170,12 @@ export const funfair: Record<string, Landmark> = {
     // A blade sign, a floppy disk, sticking out from the corner.
     p.line([1.72, 1.24, 30], [1.92, 1.24, 30], { sw: 1.3 })
     const bl = p.box(1.78, 1.22, 0.16, 0.03, 11, { z0: 18, fill: C.cobalt, sw: 1 })
+    const flAt: [number, number, number, number] = [-2.4, -10.4, 2.4, -0.6]
+    p.decal('ia-floppy', bl, 'y', 0.5, 0.5, flAt)
     const fl = p.face(bl, 'y', 0.5, 0.5, { w: 6, h: 11 })
     fl.add(new N('rect', { x: -1.8, y: -10, width: 3.6, height: 3, fill: '#e3e8f7', stroke: INK, 'stroke-width': 0.4 }))
     fl.add(new N('rect', { x: -2, y: -5, width: 4, height: 4, fill: '#ffffff', stroke: INK, 'stroke-width': 0.4 }))
+    p.printFace(fl, 'ia-floppy', flAt)
     // On the roof: a dish for the dial-up, and a pixel balloon on a string.
     const [dx, dy] = p.at(0.55, 0.45, 43)
     p.model('dish', [0.55, 0.45, 43], { r: 9 }, () => {
@@ -179,12 +187,17 @@ export const funfair: Record<string, Landmark> = {
     const [bx, by] = p.at(1.5, 0.4, 78)
     p.path(`M${f(ax)} ${f(ay)}Q${f(ax + 16)} ${f(ay - 40)} ${f(bx - 4)} ${f(by + 16)}`, 'none', { sw: 0.9 })
     const fly = p.group('bob')
+    // Unity's foil balloon with its rainbow streamer (Creatures8.cs).
+    const foil = creatureUse('pixelballoon', '#e4e8f0', 'stand', 'se', { transform: `translate(${f(bx - 2)} ${f(by - 2)})` })
+    if (foil) fly.g.add(foil)
+    else {
     ;[C.rasp, '#ffffff', C.mint, C.sky, C.cobalt, C.lilac].forEach((c, k) => fly.el('rect', { x: bx - 40, y: by - 8 + k * 2.8, width: 30, height: 2.8, fill: c }))
     fly.path(`M${f(bx - 12)} ${f(by - 12)}h20v20h-20z`, '#eceff8', { sw: 1.4 })
     fly.path(`M${f(bx - 9)} ${f(by - 9)}h14v11h-14z`, '#12202e', { sw: 0.9 })
     fly.el('rect', { x: bx - 6, y: by - 6, width: 2.4, height: 2.4, fill: C.mint })
     fly.el('rect', { x: bx - 1, y: by - 6, width: 2.4, height: 2.4, fill: C.mint })
     fly.el('rect', { x: bx - 6, y: by - 2, width: 7.4, height: 1.4, fill: C.mint })
+    }
     p.grow(bx - 44, by - 16, bx + 12, ay)
     // Visitors.
     person(p, 1.9, 1.62, C.rasp, { pose: 'look' }); person(p, 0.3, 1.82, C.mint); person(p, 1.45, 1.88, C.lilac)

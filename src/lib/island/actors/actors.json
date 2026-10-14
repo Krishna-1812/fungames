@@ -1,5 +1,5 @@
 {
- "id": "a476ac1d276e",
+ "id": "a606585e6ccd",
  "sizes": {
   "person": {
    "w": 42,
@@ -99,9 +99,9 @@
   },
   "whale": {
    "w": 260,
-   "h": 118,
+   "h": 150,
    "ax": 130,
-   "ay": 64
+   "ay": 96
   },
   "bfly": {
    "w": 24,
@@ -150,9 +150,81 @@
    "h": 40,
    "ax": 14,
    "ay": 34
+  },
+  "yacht": {
+   "w": 184,
+   "h": 104,
+   "ax": 92,
+   "ay": 86
+  },
+  "atom": {
+   "w": 40,
+   "h": 40,
+   "ax": 20,
+   "ay": 20
+  },
+  "buoy": {
+   "w": 20,
+   "h": 27,
+   "ax": 10,
+   "ay": 22
+  },
+  "pixelballoon": {
+   "w": 62,
+   "h": 34,
+   "ax": 48,
+   "ay": 18
+  },
+  "stork": {
+   "w": 52,
+   "h": 30,
+   "ax": 26,
+   "ay": 16
+  },
+  "cart": {
+   "w": 40,
+   "h": 26,
+   "ax": 20,
+   "ay": 18
+  },
+  "bottle": {
+   "w": 32,
+   "h": 20,
+   "ax": 16,
+   "ay": 14
+  },
+  "jetski": {
+   "w": 40,
+   "h": 30,
+   "ax": 20,
+   "ay": 24
   }
  },
  "names": [
+  "a-atom-5b82ff-f0-se",
+  "a-atom-5b82ff-f1-se",
+  "a-atom-5b82ff-f10-se",
+  "a-atom-5b82ff-f11-se",
+  "a-atom-5b82ff-f12-se",
+  "a-atom-5b82ff-f13-se",
+  "a-atom-5b82ff-f14-se",
+  "a-atom-5b82ff-f15-se",
+  "a-atom-5b82ff-f16-se",
+  "a-atom-5b82ff-f17-se",
+  "a-atom-5b82ff-f18-se",
+  "a-atom-5b82ff-f19-se",
+  "a-atom-5b82ff-f2-se",
+  "a-atom-5b82ff-f20-se",
+  "a-atom-5b82ff-f21-se",
+  "a-atom-5b82ff-f22-se",
+  "a-atom-5b82ff-f23-se",
+  "a-atom-5b82ff-f3-se",
+  "a-atom-5b82ff-f4-se",
+  "a-atom-5b82ff-f5-se",
+  "a-atom-5b82ff-f6-se",
+  "a-atom-5b82ff-f7-se",
+  "a-atom-5b82ff-f8-se",
+  "a-atom-5b82ff-f9-se",
   "a-balloon-5b82ff_4fe3c1-stand-se",
   "a-balloon-ff4f6e_ffffff-stand-se",
   "a-bfly-8ccbff-up-se",
@@ -160,6 +232,10 @@
   "a-bfly-ff9fb2-up-se",
   "a-bfly-ffd1da-up-se",
   "a-bfly-ffffff-up-se",
+  "a-bottle-bdf0da-stand-se",
+  "a-buoy-ff4f6e-stand-se",
+  "a-cart-ff4f6e-stand-e",
+  "a-cart-ff4f6e-stand-se",
   "a-cloud-fbfcff-c0-se",
   "a-cloud-fbfcff-c1-se",
   "a-cloud-fbfcff-c2-se",
@@ -245,6 +321,7 @@
   "a-gull-f4f5f8-up-se",
   "a-gull-f4f5f8-up-sw",
   "a-gull-f4f5f8-up-w",
+  "a-jetski-ff4f6e-stand-e",
   "a-pigeon-8e93a6-down-e",
   "a-pigeon-8e93a6-down-w",
   "a-pigeon-8e93a6-peck-se",
@@ -253,6 +330,7 @@
   "a-pigeon-8e93a6-stand-sw",
   "a-pigeon-8e93a6-up-e",
   "a-pigeon-8e93a6-up-w",
+  "a-pixelballoon-e4e8f0-stand-se",
   "a-plane-ff4f6e-stand-e",
   "a-pod-b8a1ff-stand-se",
   "a-robot-8ccbff-stand-se",
@@ -260,7 +338,11 @@
   "a-sheep-eceaf0-down-sw",
   "a-sheep-eceaf0-up-se",
   "a-sheep-eceaf0-up-sw",
+  "a-stork-ffffff-stand-w",
+  "a-whale-4f5a74-breach-e",
+  "a-whale-4f5a74-breach-s",
   "a-whale-4f5a74-stand-w",
+  "a-yacht-5b82ff-stand-e",
   "p-2c355e-e8c4a8-2c355e-25-stand-se",
   "p-2c355e-e8c4a8-5b82ff-49-walk-ne-0",
   "p-2c355e-e8c4a8-5b82ff-49-walk-ne-1",

@@ -593,6 +593,18 @@ namespace Island
                 case "surfboard": Surfboard(b, s); break;
                 case "kite": KiteModel(b, s); break;
                 case "flowers": Flowers(b, s); break;
+                case "towel": Towel(b, s); break;
+                case "windowbox": WindowBox(b, s); break;
+                case "topiary": Topiary(b, s); break;
+                case "toadstools": Toadstools(b, s); break;
+                case "pram": Pram(b, s); break;
+                case "easel": Easel(b, s); break;
+                case "bicycle": Bicycle(b, s); break;
+                case "nest": Nest(b, s); break;
+                case "track": Track(b, s); break;
+                case "conveyor": Conveyor(b, s); break;
+                case "sundial": Sundial(b, s); break;
+                case "tripodscope": TripodScope(b, s); break;
                 default: Debug.LogWarning($"[island] no model called {s.name}"); break;
             }
         }

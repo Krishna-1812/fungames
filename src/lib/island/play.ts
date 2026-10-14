@@ -176,8 +176,15 @@ export function createPlay(o: {
     // The water line, when it floats.
     if (ball.wet) { c.fillStyle = 'rgba(140, 203, 255, 0.75)'; c.fillRect(x - R - 1, cy + R * 0.35, R * 2 + 2, R); n++ }
     c.restore()
+    if (sp) {
+      // Lit as a ball is: bright towards the sun, falling off to shadow, no outline.
+      const g = c.createRadialGradient(x - R * 0.35, cy - R * 0.45, R * 0.1, x, cy, R * 1.05)
+      g.addColorStop(0, 'rgba(255,255,255,0.35)'); g.addColorStop(0.45, 'rgba(255,255,255,0)'); g.addColorStop(0.8, 'rgba(20,28,50,0.18)'); g.addColorStop(1, 'rgba(20,28,50,0.42)')
+      c.fillStyle = g; c.beginPath(); c.arc(x, cy, R, 0, Math.PI * 2); c.fill(); n++
+    } else {
     c.strokeStyle = INK; c.lineWidth = 1.05
     c.beginPath(); c.arc(x, cy, R, 0, Math.PI * 2); c.stroke(); n++
+    }
     c.fillStyle = '#ffffff'; c.globalAlpha = 0.85
     c.beginPath(); c.ellipse(x - 1.8, cy - 2.2, 1.6, 1, -0.6, 0, Math.PI * 2); c.fill(); n++
     c.globalAlpha = 1
