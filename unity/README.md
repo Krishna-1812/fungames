@@ -227,8 +227,11 @@ WebP tiles, `low.png` (a small copy), and `plate.json`. About 1½ minutes.
   (the falls, waves, glints, surf, rocks and everything else still draw).
 - The bake (`bake/draw.ts`) paints each map cell the plate is in from the
   full-size tiles instead, as lossy WebP (a photograph, not a drawing).
-- `plate.json`'s `live` says whether the site uses it. Until the island is
-  real all through, it is off; `ISLAND_PLATE=1` turns it on locally.
+- The realistic island is a page of its own, `/realistic/` (`pages/realistic.astro`;
+  `/` is the cartoon one), and a switch in the island's header goes between
+  them, remembered in `localStorage` (`isl-world`) with the camera and the hour
+  kept. `plate.json`'s `live` makes the realistic one the default for
+  visitors who have not picked; until then it is the one you ask for.
 
 ## The ground
 

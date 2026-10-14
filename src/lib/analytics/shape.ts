@@ -61,6 +61,7 @@ export const EVENTS = {
   isl_passport: 'the passport was opened, or a page in it turned',
   isl_cover: 'a passport cover was put on',
   isl_time: 'day or night was picked by hand',
+  isl_world: 'the cartoon island or the realistic one was picked',
   isl_welcome: 'the first-visit welcome was answered or closed',
   isl_minimap: 'the mini-map was used to move',
   isl_ball: 'the beach ball was thrown or kicked',

@@ -30,11 +30,11 @@ export function plateInfo(name: PlateName = 'plate'): PlateInfo | null {
   return fs.existsSync(f) ? (JSON.parse(fs.readFileSync(f, 'utf8')) as PlateInfo) : null
 }
 
-/** What the island's SVG draws: the small copy, inline. (The glow only with the plate, which says whether either is live.) */
-export function plateRef(name: PlateName = 'plate'): PlateRef | null {
+/** What the island's SVG draws: the small copy, inline. (The glow only with the plate, which says whether either is live; `force` asks for it regardless, for the realistic island's own page.) */
+export function plateRef(name: PlateName = 'plate', force = false): PlateRef | null {
   const live = plateInfo('plate')
   const p = plateInfo(name)
-  if (!p || !live || !(live.live || process.env.ISLAND_PLATE === '1')) return null
+  if (!p || !live || !(force || live.live || process.env.ISLAND_PLATE === '1')) return null
   const low = fs.readFileSync(path.join(dir(name), 'low.png')).toString('base64')
   return { box: p.box, id: p.id, href: `data:image/png;base64,${low}` }
 }

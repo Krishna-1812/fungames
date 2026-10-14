@@ -749,7 +749,11 @@ export function initIsland(o: {
   /** The game this page was come back to from, if any: the camera steps out of its building. */
   const cameFrom = (() => {
     try {
-      const r = document.referrer && new URL(document.referrer)
+      // Sent on from the other island's page, if it handed this visit straight here (IslandHome.astro).
+      let ref = document.referrer
+      const handed = sessionStorage.getItem('isl-ref')
+      if (handed !== null) { sessionStorage.removeItem('isl-ref'); ref = handed }
+      const r = ref && new URL(ref)
       if (!r || r.origin !== location.origin) return null
       return Object.keys(anchors).find((s) => games[s] && new URL(games[s].href, location.href).pathname === r.pathname) ?? null
     } catch { return null }
