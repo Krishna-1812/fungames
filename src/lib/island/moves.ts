@@ -99,6 +99,7 @@ export const KEYFRAMES = `
 @keyframes sky-prop { to { transform: scaleY(0.2); } }
 @keyframes isl-beam { from { transform: scaleY(0.5) rotate(0deg); } to { transform: scaleY(0.5) rotate(360deg); } }
 @keyframes isl-sift { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes isl-rise { from { transform: translateY(0); } to { transform: translateY(-100%); } }
 @keyframes isl-moonpath { 50% { opacity: 0.35; } }
 @keyframes isl-fw { 0% { transform: scale(0.15); opacity: 0; } 8% { opacity: 1; } 55% { transform: scale(1); opacity: 0.9; } 80%, 100% { transform: scale(1.12) translateY(6px); opacity: 0; } }
 @keyframes sky-firefly { 0%, 100% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 50% { opacity: 0.3; transform: translate(9px, -7px); } 70% { opacity: 1; } 85% { transform: translate(-4px, 4px); } }
@@ -348,8 +349,14 @@ export const LAYERS = {
   beam: { loop: L('isl-beam', 10, 'linear'), when: { time: ['night', 'dusk'] } as When, dusk: 0.5 },
   snow: { loop: L('isl-sift', 40, 'linear'), when: { season: ['winter', 'newyear'] } as When },
   petals: { loop: L('isl-sift', 70, 'linear'), when: { season: ['spring'] } as When },
-  // New Year, and Friday nights from eight to ten (the page says when: see 'fest' in the engine).
-  fireworks: { when: { season: ['newyear', 'fest'], time: ['night', 'dusk'] } as When },
+  // The rest of the island's calendar (lib/island/seasons.ts says when each one is).
+  rain: { loop: L('isl-sift', 5, 'linear'), when: { season: ['monsoon'] } as When },
+  leaves: { loop: L('isl-sift', 55, 'linear'), when: { season: ['autumn'] } as When },
+  powder: { loop: L('isl-sift', 95, 'linear'), when: { season: ['holi'] } as When },
+  // Sky lanterns go up, not down, and only once it is dark enough to see them glow.
+  lanterns: { loop: L('isl-rise', 80, 'linear'), when: { season: ['diwali'], time: ['night', 'dusk'] } as When },
+  // New Year, Diwali, and Friday nights from eight to ten (the page says when: see 'fest' in the engine).
+  fireworks: { when: { season: ['newyear', 'diwali', 'fest'], time: ['night', 'dusk'] } as When },
   ufo: { when: { hour: [3] } as When },
   dawnWhale: { when: { time: ['dawn'] } as When },
   nightDim: { when: NIGHT_ONLY },

@@ -410,7 +410,7 @@ export function islandSound(places: Places, ear: Listener) {
     if (roll(0.007)) bell(D.harbour ?? null)
     if (roll(0.012 * (1 - day))) owl([D.peaks, D.oldtown][Math.floor(Math.random() * 2)] ?? null)
     if (roll(0.008 * day)) baa(D.peaks ?? null)
-    if ((season === 'newyear' || ear.fest?.()) && t === 'night' && roll(0.07)) boom(D.oldtown ?? null)
+    if ((season === 'newyear' || season === 'diwali' || ear.fest?.()) && t === 'night' && roll(0.07)) boom(D.oldtown ?? null)
     // The ferry blows its horn as it comes in to the jetty and as it leaves.
     const ph = ear.ferry?.() ?? null
     if (ph !== null && ferryWas !== null) for (const at of [0.28, 0.625]) if (ferryWas < at && ph >= at) horn(D.harbour ?? null)

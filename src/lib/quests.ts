@@ -19,6 +19,7 @@ import { localDay, readPassport, withHistory } from './passport'
 import { readDaily, streakOf, utcDay } from './daily'
 import { readBottles, count as bottleCount } from './bottles'
 import { bestKey } from '../data/game-meta'
+import { seasonsSeen } from './island/seasons'
 
 export const QUESTS_KEY = 'funsite:quests'
 export const QUESTS_VERSION = 1
@@ -39,6 +40,8 @@ export type QuestState = {
   streak: number
   bottles: number
   sightings: number
+  /** Different seasons of the island's calendar seen here (lib/island/seasons.ts). */
+  seasons: number
   sent: number
   won: number
 }
@@ -66,6 +69,7 @@ export const QUESTS: Quest[] = [
   { id: 'ambassador', name: 'Ambassador', line: 'Send a friend a challenge from the end of a game.', of: (s) => [s.sent, 1] },
   { id: 'champion', name: 'Champion', line: 'Beat a friend’s challenge.', of: (s) => [s.won, 1], cover: 'glacier' },
   { id: 'beachcomber', name: 'Beachcomber', line: 'Find six messages in bottles along the shore.', of: (s) => [s.bottles, 6] },
+  { id: 'through-the-year', name: 'Through the year', line: 'See the island in four of its seasons: snow, blossom, rain, leaves or a festival.', of: (s) => [s.seasons, 4] },
   { id: 'keen-eye', name: 'Keen eye', line: 'Spot ten things on the island that do something when you poke them.', of: (s) => [s.sightings, 10] },
   { id: 'a-whole-week', name: 'A whole week', line: 'Finish the daily challenge seven days running.', of: (s) => [s.streak, 7], cover: 'midnight' },
   { id: 'keeper', name: 'Keeper of the island', line: 'Get a stamp from every game on the island.', of: (s) => [s.visited.size, s.games.length], cover: 'opal' },
@@ -174,6 +178,7 @@ export function gather(games: QuestState['games']): QuestState {
     streak: Math.max(daily.best, streakOf(daily.days, utcDay(), daily.best).n),
     bottles: bottleCount(readBottles()),
     sightings,
+    seasons: seasonsSeen(s).length,
     sent: f.sent,
     won: f.won,
   }

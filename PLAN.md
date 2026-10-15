@@ -588,6 +588,20 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   finished quests it has not shown yet. A quest once done stays done, even
   through "Start a new passport". `quest_done`. `check-quests.mjs`.
 
+- ~~**The island's seasons**~~ **done** (2026-10-16). The island had snow in
+  December, blossom in April and fireworks at New Year; it now keeps a whole
+  calendar (`lib/island/seasons.ts`): a monsoon in July and August (rain, and
+  a grey, soft light), autumn from mid October (leaves blowing over), Diwali
+  (sky lanterns rising after dark, and fireworks), Holi (clouds of coloured
+  powder), as well as winter, New Year and spring. Diwali and Holi are listed
+  by year from the published calendars, and a year without an entry simply has
+  no festival look. Each is a weather layer like the snow (one transform each,
+  so the canvas never redraws for it) and shows on both islands. The
+  noticeboard says what season it is and until when, or what is coming next;
+  the passport's new quest "Through the year" counts four seasons seen, so it
+  takes months, which is the point. `?season=` still shows any of them out of
+  season. `check-seasons.mjs`.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

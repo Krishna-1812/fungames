@@ -15,7 +15,7 @@
  */
 
 export type Row = {
-  key: 'today' | 'parade' | 'ferry' | 'bells' | 'lighthouse' | 'fireworks' | 'whale' | 'three'
+  key: 'today' | 'season' | 'parade' | 'ferry' | 'bells' | 'lighthouse' | 'fireworks' | 'whale' | 'three'
   title: string
   /** What it is, in a line. */
   line: string
@@ -72,12 +72,18 @@ export function timetable(now: Date, o: {
   shown: string
   /** Whether the three o'clock visitor has been seen in this browser. */
   seenThree: boolean
+  /** The island's season now (lib/island/seasons.ts), or the next one coming. */
+  season?: { name: string; line: string; until: Date } | null
+  next?: { name: string; line: string; from: Date } | null
 }): Row[] {
   const rows: Row[] = []
   const t = now.getTime()
   // A new challenge at UTC midnight (data/game-meta.ts dailyFor), said on the visitor's own clock.
   const fresh = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
   rows.push({ key: 'today', title: 'Today’s challenge', line: `${o.daily.title}: ${o.daily.goal}`, when: `A new one at ${hhmm(fresh)} · ${until(fresh.getTime() - t)}`, now: true })
+  // The season: what the island is wearing now, and until when; or what is coming next.
+  if (o.season) rows.push({ key: 'season', title: `${o.season.name} on the island`, line: o.season.line, when: `Until the end of ${dayWord(now, new Date(o.season.until.getTime() - 1))}`, now: true })
+  else if (o.next) rows.push({ key: 'season', title: `Coming up: ${o.next.name}`, line: o.next.line, when: `From ${dayWord(now, o.next.from)}`, now: false })
   rows.push(o.parade.on
     ? { key: 'parade', title: 'The parade', line: `From the town square to ${o.parade.to} and back, band and all`, when: 'Marching now!', now: true }
     : { key: 'parade', title: 'The parade', line: `From the town square to ${o.parade.to}, every five minutes`, when: `Next at ${hhmm(o.parade.next)} · ${until(o.parade.next.getTime() - t)}`, now: false })

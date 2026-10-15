@@ -448,7 +448,9 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
       const o: [number, number] = beamOrg ? [vx + Number(beamOrg[1]), vy + Number(beamOrg[2])] : [0, 0]
       node.a = [{ ...animFor(el, LAYERS.beam.loop, { base: {} }), org: o }]
     } else if (lay === 'weather') {
-      const W = el.attrs['data-slug'] === 'petals' ? LAYERS.petals : LAYERS.snow
+      // Each kind of weather moves by its own rule (moves.ts LAYERS): snow, petals, rain, leaves, powder, lanterns.
+      const kind = el.attrs['data-slug'] as 'snow' | 'petals' | 'rain' | 'leaves' | 'powder' | 'lanterns'
+      const W = kind in LAYERS ? LAYERS[kind] : LAYERS.snow
       node.when = W.when
       node.a = [animFor(el, W.loop, { base: {} }, [vw, vh])]
     } else if (r.loop) node.a = [animFor(el, r.loop, r)]

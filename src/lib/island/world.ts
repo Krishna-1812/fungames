@@ -1626,8 +1626,67 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // the same fall twice, one copy above the other; the page slides the whole
   // layer down by one copy's height and round again, which is a transform
   // of one element, so the browser does it without redrawing a thing.
+  // (The island's calendar, lib/island/seasons.ts, says which is out when.)
   {
     const [vx, vy, vw, vh] = viewBox
+    const circ = (x: number, y: number, r: number) => `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(r * 2)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-r * 2)} 0`
+    /** One fall drawn twice, the second copy a whole height away (above for falling, below for rising). */
+    const twice = (w: N, attrs: Record<string, string | number>, dy: number) => {
+      w.add(new N('path', attrs))
+      w.add(new N('path', { ...attrs, transform: `translate(0 ${f(dy)})` }))
+    }
+    // The monsoon: long, thin, slanting streaks, many of them, fast.
+    {
+      const w = open('weather', 'rain')
+      let d = '', d2 = ''
+      for (let k = 0; k < 520; k++) {
+        const x = vx + hz(k, 17, 61) * vw, y = vy + hz(k, 19, 62) * vh, len = 30 + hz(k, 5, 63) * 34
+        const seg = `M${f(x)} ${f(y)}l${f(-len * 0.18)} ${f(len)}`
+        if (k % 3) d += seg; else d2 += seg
+      }
+      twice(w, { d, fill: 'none', stroke: '#4d6894', 'stroke-width': 1.7, 'stroke-linecap': 'round', opacity: 0.5 }, -vh)
+      twice(w, { d: d2, fill: 'none', stroke: '#f2f7ff', 'stroke-width': 2.2, 'stroke-linecap': 'round', opacity: 0.75 }, -vh)
+    }
+    // Autumn: leaves in three of the woods' own colours, each lying its own way.
+    {
+      const w = open('weather', 'leaves')
+      const tones = ['#9c4a2f', '#7d5a36', '#6f7d3a']
+      const ds = ['', '', '']
+      for (let k = 0; k < 120; k++) {
+        const x = vx + hz(k, 23, 71) * vw, y = vy + hz(k, 29, 72) * vh, r = 8 + hz(k, 4, 73) * 5, a = hz(k, 6, 74) * Math.PI
+        const c = Math.cos(a) * r, s = Math.sin(a) * r
+        ds[k % 3] += `M${f(x - c)} ${f(y - s)}Q${f(x - s * 0.9)} ${f(y + c * 0.9)} ${f(x + c)} ${f(y + s)}Q${f(x + s * 0.9)} ${f(y - c * 0.9)} ${f(x - c)} ${f(y - s)}z`
+      }
+      ds.forEach((d, i) => twice(w, { d, fill: tones[i], stroke: INK, 'stroke-width': 0.9 }, -vh))
+    }
+    // Holi: soft clouds of coloured powder, each a bright core in a paler haze.
+    {
+      const w = open('weather', 'powder')
+      const tones = ['#ff6fae', '#b48cff', '#4fe3c1', '#6fb8ff']
+      for (const [i, c] of tones.entries()) {
+        let haze = '', core = ''
+        for (let k = i; k < 84; k += tones.length) {
+          const x = vx + hz(k, 31, 81) * vw, y = vy + hz(k, 37, 82) * vh, r = 26 + hz(k, 5, 83) * 30
+          haze += circ(x, y, r); core += circ(x + r * 0.15, y - r * 0.1, r * 0.48)
+        }
+        twice(w, { d: haze, fill: c, opacity: 0.3 }, -vh)
+        twice(w, { d: core, fill: c, opacity: 0.55 }, -vh)
+      }
+    }
+    // Diwali: paper sky lanterns, a warm glow round each, going up.
+    {
+      const w = open('weather', 'lanterns')
+      let glow = '', body = '', flame = ''
+      for (let k = 0; k < 64; k++) {
+        const x = vx + hz(k, 41, 91) * vw, y = vy + hz(k, 43, 92) * vh, s = 0.8 + hz(k, 4, 93) * 0.7
+        glow += circ(x, y, 15 * s)
+        body += `M${f(x - 5 * s)} ${f(y - 7 * s)}h${f(10 * s)}l${f(-1.6 * s)} ${f(13 * s)}h${f(-6.8 * s)}z`
+        flame += circ(x, y + 4.5 * s, 1.7 * s)
+      }
+      twice(w, { d: glow, fill: '#ffb36b', opacity: 0.34 }, vh)
+      twice(w, { d: body, fill: '#ffe2b0', stroke: '#b5532a', 'stroke-width': 0.8, 'stroke-linejoin': 'round' }, vh)
+      twice(w, { d: flame, fill: '#fff4d6' }, vh)
+    }
     for (const kind of ['snow', 'petals'] as const) {
       const w = open('weather', kind)
       let d = ''

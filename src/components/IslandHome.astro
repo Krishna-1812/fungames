@@ -457,6 +457,7 @@ const book = BOOK.map((key) => {
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
   import { createPlay, type PlayData } from '../lib/island/play'
   import { timetable, isFest, type Row } from '../lib/island/timetable'
+  import { seasonOn, nextSeason, seeSeason, SEASONS as SEASON_NAMES, type SeasonKey } from '../lib/island/seasons'
 
   // The lighthouse in the tab says hello: once when the page opens, and again
   // each time you switch away to another tab, it flashes the island's Morse
@@ -714,9 +715,11 @@ const book = BOOK.map((key) => {
   // ask for one (?season=winter, spring or newyear) and for a time of day
   // (?time=night), to see it out of season.
   const ask = new URLSearchParams(location.search)
-  const bySeason = (d = new Date()) => { const m = d.getMonth(), day = d.getDate(); if ((m === 11 && day === 31) || (m === 0 && day === 1)) return 'newyear'; if (m === 11 || (m === 0 && day <= 6)) return 'winter'; if (m === 3) return 'spring'; return '' }
+  const bySeason = (d = new Date()) => seasonOn(d)?.key ?? ''
   const season = ask.get('season') ?? bySeason()
   if (season) box.dataset.season = season
+  // A season really here (not one asked for) goes in the passport's count of seasons seen.
+  if (!ask.get('season') && season) { try { seeSeason(season as SeasonKey, localStorage) } catch { /* storage blocked */ } }
   // The hour, for the secrets that keep their own (?hour=3 asks for one).
   const showHour = () => { box.dataset.hour = ask.get('hour') ?? String(new Date().getHours()); isle.redraw() }
   showHour(); setInterval(showHour, 60 * 1000)
@@ -806,10 +809,19 @@ const book = BOOK.map((key) => {
     fireworks: ['Look', () => { closeBoard(); isle.home() }],
     whale: ['Show me', () => { const [x, y] = P(36, 21, -12); go(x, y, 2.2) }],
   }
+  /** The season as the page shows it (one asked for with ?season= included), or the next one coming. */
+  const seasonRow = (now: Date) => {
+    const asked = ask.get('season') as SeasonKey | null, real = seasonOn(now)
+    if (asked && real?.key !== asked) return SEASON_NAMES[asked] ? { season: { ...SEASON_NAMES[asked], until: new Date(now.getTime() + 864e5) } } : {}
+    if (real) return { season: real }
+    const n = nextSeason(now)
+    return n ? { next: { name: n.season.name, line: n.season.line, from: n.from } } : {}
+  }
   const rowsNow = () => timetable(new Date(), {
     daily: { title: data.games[today.slug]?.title ?? today.slug, goal: today.goal },
     parade: (() => { const p = play.parade(); return { on: p.on, next: p.next, to: data.games[p.to]?.title ?? p.to } })(),
     ferry: ferryPhase(), shown: box.dataset.time ?? 'day', seenThree: found.has('ufo'),
+    ...seasonRow(new Date()),
   })
   function paintBoard(first = false) {
     const rows = rowsNow()
@@ -1410,6 +1422,11 @@ const book = BOOK.map((key) => {
   .isl-box:focus-visible { box-shadow: inset 0 0 0 4px #1b2340; }
   .isl-stage { position: absolute; inset: 0; }
   /* The realistic island seen as through a lens: the corners a little deeper, the eye drawn in. */
+  /* The monsoon's light: a soft grey over everything, as under heavy cloud. */
+  .isl-box[data-season='monsoon'] .isl-stage::before {
+    content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: rgba(70, 92, 130, 0.36); mix-blend-mode: multiply;
+  }
   .isl-box[data-world='real'] .isl-stage::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
     background: radial-gradient(ellipse 75% 70% at 50% 46%, transparent 58%, rgba(3, 22, 52, 0.16) 82%, rgba(2, 16, 40, 0.34) 100%);
