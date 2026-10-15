@@ -58,6 +58,7 @@ const nextData: NextData = {
     slug: g.slug, title: g.title, blurb: g.blurb, cat: g.category, added: g.added,
     kind: META[g.slug]?.difficulty === 'Explore' ? 'explore' : 'play',
     tint: DISTRICTS.find((d) => d.key === districtOf[g.slug])?.tint ?? '#e3e9ff',
+    district: districtOf[g.slug] ?? '',
   })),
   worlds: hasRealWorld() ? ['cartoon', 'real'] : ['cartoon'],
   world: plateInfo('plate')?.live ? 'real' : 'cartoon',
@@ -140,6 +141,11 @@ const structuredData = [
         </li>
       </ul>
       <p class="sr-only" aria-live="polite" data-announce></p>
+
+      <div class="vs-banner" data-vs-banner hidden>
+        <span class="dly-badge">A friend’s challenge</span>
+        <p class="vs-banner-line" data-vs-line></p>
+      </div>
 
       <div class="dly-banner" data-daily-banner hidden>
         <span class="dly-badge">Today’s challenge</span>

@@ -59,6 +59,19 @@ export const COVERS: Cover[] = [
   { key: 'pearl', name: 'Pearl', need: 12, board: ['#d9e4fb', '#b9c6ec'], face: ['#fbfdff', '#e3ebff', '#efe3ff'], ink: '#2b3a7c' },
 ]
 
+/**
+ * Four more covers, earned by quests rather than bottles (lib/quests.ts says
+ * which). `need` is never reached by bottles alone; `quest` names the quest.
+ */
+export const QUEST_COVERS: (Cover & { quest: string })[] = [
+  { key: 'aurora', name: 'Aurora', need: Infinity, quest: 'grand-tour', board: ['#0f5e6e', '#0a414d'], face: ['#2fb5a8', '#3a6fd0', '#5a3fb0'], ink: '#eafffb' },
+  { key: 'glacier', name: 'Glacier', need: Infinity, quest: 'champion', board: ['#6fa6cc', '#4f86ad'], face: ['#eef8ff', '#c4e6f8', '#a3d1ec'], ink: '#1d4a6b' },
+  { key: 'midnight', name: 'Midnight', need: Infinity, quest: 'a-whole-week', board: ['#151a33', '#0b0f22'], face: ['#283063', '#181e40', '#0f1430'], ink: '#9fe9ff' },
+  { key: 'opal', name: 'Opal', need: Infinity, quest: 'keeper', board: ['#a99be0', '#8574c7'], face: ['#f2f0ff', '#d9f3ef', '#e3dcff'], ink: '#3b2f7a' },
+]
+/** Every cover there is. */
+export const ALL_COVERS: Cover[] = [...COVERS, ...QUEST_COVERS]
+
 export type BottlesFile = {
   v: number
   /** Each bottle found, by number, and the day it was found (YYYY-MM-DD). */
@@ -78,7 +91,8 @@ export function readBottles(): BottlesFile {
   const file = fromStore()
   // A browser that refused to write still remembers for the visit.
   if (mem) { for (const [k, v] of Object.entries(mem.found)) if (!(k in file.found)) file.found[Number(k)] = v; if (mem.cover !== 'navy') file.cover = mem.cover }
-  if (!unlocked(count(file)).some((c) => c.key === file.cover)) file.cover = 'navy'
+  // A quest cover was checked when it was put on (wearCover); the quests are not this file's to read.
+  if (!unlocked(count(file)).some((c) => c.key === file.cover) && !QUEST_COVERS.some((c) => c.key === file.cover)) file.cover = 'navy'
   return file
 }
 
@@ -98,7 +112,7 @@ function fromStore(): BottlesFile {
       if (Number.isInteger(n) && n >= 1 && n <= BOTTLE_COUNT) found[n] = typeof v === 'string' && DAY.test(v) ? v : ''
     }
   // A cover is only worn if it is one there is (and, in readBottles, one that has been earned).
-  return { v: BOTTLES_VERSION, found, cover: typeof o.cover === 'string' && COVERS.some((c) => c.key === o.cover) ? o.cover : 'navy' }
+  return { v: BOTTLES_VERSION, found, cover: typeof o.cover === 'string' && ALL_COVERS.some((c) => c.key === o.cover) ? o.cover : 'navy' }
 }
 
 /** Kept for the visit when the browser will not keep anything: a bottle found is found until the page goes. */
@@ -132,10 +146,10 @@ export function findBottle(n: number, day = localDay()): { first: boolean; total
   return { first: true, total, cover, file }
 }
 
-/** Put a cover on the passport, if it has been earned. */
-export function wearCover(key: string): boolean {
+/** Put a cover on the passport, if it has been earned: by bottles, or by a quest in `byQuest` (lib/quests.ts questCovers). */
+export function wearCover(key: string, byQuest: Set<string> = new Set()): boolean {
   const file = readBottles()
-  if (!unlocked(count(file)).some((c) => c.key === key)) return false
+  if (!unlocked(count(file)).some((c) => c.key === key) && !(byQuest.has(key) && QUEST_COVERS.some((c) => c.key === key))) return false
   file.cover = key
   return write(file)
 }

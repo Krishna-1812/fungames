@@ -34,6 +34,8 @@ export type NextGame = {
   added: string
   /** Its district's colour on the island, behind its building. */
   tint: string
+  /** Its district, for the passport's quests (lib/quests.ts). */
+  district?: string
 }
 
 export type Why = 'daily' | 'like' | 'different' | 'new' | 'fresh' | 'again'

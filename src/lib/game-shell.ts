@@ -11,6 +11,8 @@ import { recordVisit, readPassport, localDay } from './passport'
 import { mountNext } from './next-up'
 import { mountDaily } from './daily-ui'
 import { readDaily, utcDay } from './daily'
+import { mountChallenge, type Vs } from './challenge'
+import { questsAfterRun } from './quests-ui'
 import { track, onLeave } from './analytics/client'
 
 export type ShellOptions = {
@@ -36,6 +38,13 @@ export type Ending = {
    * finished, not celebrated.
    */
   celebrate?: boolean
+  /**
+   * What a challenge to a friend carries from this run (lib/challenge.ts).
+   * By default the best this run offered `considerBest`; a game whose
+   * challenge is not a score (Trolley's: what kind of reasoner you were)
+   * says what it is.
+   */
+  vs?: Vs
   /**
    * Leave the page where it is rather than bringing the card into view — for
    * an ending the player is still scrolling toward, like the top of a climb
@@ -84,6 +93,10 @@ export function createShell(opts: ShellOptions) {
   const next = mountNext(opts.slug, { visits: readPassport().visits, today: localDay(), daily: readDaily().days[utcDay()]?.g === todays ? null : todays, track: (n, p, g) => track(n, p, g) })
   // The daily challenge's banner and streak, when this is today's game.
   const daily = mountDaily(opts.slug, (n, p, g) => track(n, p, g))
+  // A friend's challenge, if the page was opened from one, and the button to send one on.
+  const challenge = mountChallenge(opts.slug, document.title, (n, p, g) => track(n, p, g))
+  /** The best this run has offered considerBest: what a challenge sends. */
+  let runTop: Vs | null = null
 
   // Analytics: every game reports the same things through here (see
   // lib/analytics/shape.ts for the list). The game starts at the first touch,
@@ -157,6 +170,7 @@ export function createShell(opts: ShellOptions) {
    */
   function considerBest(value: number, text: string): 'first' | 'beaten' | false {
     if (value <= 0) return false
+    if (!runTop || value > runTop.value) runTop = { value, text }
     if (best && value <= best.value) return false
     best = { value, text }
     writeBest(opts.slug, best)
@@ -219,6 +233,12 @@ export function createShell(opts: ShellOptions) {
     }
     $(result, '[data-again-label]').textContent = e.againLabel ?? (kind === 'win' ? 'Play again' : 'Try again')
     next.ended()
+    challenge.ended(e.vs ?? runTop)
+    // A quest this round finished (the passport keeps them).
+    try {
+      const nd = JSON.parse(document.getElementById('next-data')?.textContent ?? '{}')
+      questsAfterRun((nd.games ?? []).map((g: { slug: string; cat: string; district?: string }) => ({ slug: g.slug, cat: g.cat, district: g.district ?? '' })), nd.home?.[nd.world] ?? '/', (n, p) => track(n, p, slug))
+    } catch { /* the quests are a bonus; the ending is not */ }
     result.hidden = false
     result.classList.remove('is-in')
     void result.offsetWidth
@@ -246,6 +266,9 @@ export function createShell(opts: ShellOptions) {
     result.hidden = true
     next.reset()
     daily.reset()
+    challenge.reset()
+    const qn = document.querySelector<HTMLElement>('[data-quest]'); if (qn) qn.hidden = true
+    runTop = null
     stage.classList.remove('is-lost')
     beatenThisRun = false
     runStartBest = best

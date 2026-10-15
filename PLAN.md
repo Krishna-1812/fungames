@@ -557,6 +557,37 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   midnight). Up next stops offering a challenge already done today.
   `daily_done` counts rounds. `check-daily.mjs`.
 
+- ~~**Challenge a friend**~~ **done** (2026-10-15). "Check this out" is the
+  weakest thing a share can say; "beat my 87.3%" is the strongest. Eight games
+  where beating somebody means something (Steady Hand, From Memory,
+  Constellation Draw, Dark Patterns, I'm Not a Robot, Rule Cascade, the
+  Auction, and Trolley as a comparison rather than a contest) end with
+  *Challenge a friend*, which sends the game's address with
+  `?ref=challenge&vs=<value>~<text>` and a line in the game's own voice ("My
+  hand was rated 87.3% steady on Steady Hand. Think yours is steadier?"). The
+  value is the one the game already ranks runs by (`considerBest`), so no game
+  had to learn a new score. Whoever opens it sees "A friend's round was rated
+  87.3%. Draw a steadier one." over the game, and at the end whether they won,
+  with *Challenge them back*. Nothing typed and no name travels; the text is
+  held to what the games write, so a doctored link can only claim a different
+  score. If the browser refuses the clipboard the link is put in a box to copy
+  by hand rather than lost. `challenge_open`, `challenge_done`.
+  `check-challenge.mjs`.
+
+- ~~**Quests in the passport**~~ **done** (2026-10-16). Thirteen things to do
+  on the island, on a Quests page in the passport, each with a bar that fills
+  as you go: open three games, come back on three days, finish the three games
+  that measure you, six science games, five personal bests, a three-day and
+  a seven-day daily streak, a stamp in every district, send a challenge, win
+  one, six bottles, ten sightings, every game. Four of them earn new passport
+  covers (Aurora, Glacier, Midnight, Opal) beside the bottle ones. Every quest
+  is worked out from what the browser already keeps, so anything done before
+  quests existed is simply done; the only new counts are challenges sent and
+  won. A round that finishes a quest says so in its result card, linking to
+  the book open at its quests (`/#quests`), and the passport's +N counts
+  finished quests it has not shown yet. A quest once done stays done, even
+  through "Start a new passport". `quest_done`. `check-quests.mjs`.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

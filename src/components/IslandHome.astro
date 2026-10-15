@@ -12,7 +12,8 @@ import { cardFrame } from '../lib/island/card-art'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
 import { inkIcon } from '../lib/ink-icon'
-import { COVERS, BOTTLE_COUNT, glassOf } from '../lib/bottles'
+import { COVERS, QUEST_COVERS, BOTTLE_COUNT, glassOf } from '../lib/bottles'
+import { QUESTS } from '../lib/quests'
 import { GRID } from '../lib/island/world'
 import { coastline } from '../lib/island/sound'
 
@@ -70,7 +71,7 @@ const bottleGhost = `<svg class="pp-bottle-svg" viewBox="0 0 44 70" aria-hidden=
 const pillBottle = `<svg viewBox="0 0 44 70" aria-hidden="true"><path d="M17 4h10v4h-1v9c0 3 9 7 9 17v26a6 6 0 0 1-6 6H15a6 6 0 0 1-6-6V34c0-10 9-14 9-17V8h-1z" fill="#bdf0da" stroke="#1b2340" stroke-width="4" stroke-linejoin="round"/><rect x="14" y="34" width="16" height="22" rx="3" fill="#fffdf7"/></svg>`
 
 const daily = dailyFor(new Date())
-const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug) }]))
+const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug), cat: g.category }]))
 // The coastline, for the soundscape's surf (lib/island/sound.ts).
 const coast = coastline(island.grid, GRID)
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
@@ -264,6 +265,7 @@ const book = BOOK.map((key) => {
             <li><b id="ppFinished">0</b><span>finished</span></li>
             <li><b id="ppDistricts">0</b><span>of {book.length} districts complete</span></li>
             <li><b id="ppSecrets">0</b><span>secrets seen</span></li>
+            <li><b id="ppQuestsDone">0</b><span>of {QUESTS.length} quests complete</span></li>
             <li class="pp-tally-bottles"><b id="ppBottles">0</b><span>of {BOTTLE_COUNT} bottles found</span><span class="pp-bpips" id="ppBPips" aria-hidden="true">{bottles.map((b) => <i data-pip={b.n} style={`--glass:${glassOf(b.n)}`} />)}</span></li>
           </ul>
           <div class="pp-ticks" id="ppTicks" aria-hidden="true">{games.map((g) => <i data-tick={g.slug} style={`--ink:${STAMP[districtOf[g.slug]]?.ink ?? '#4637a6'}`} />)}</div>
@@ -276,6 +278,7 @@ const book = BOOK.map((key) => {
             {book.map((p) => <button type="button" role="tab" class="pp-tab" data-tab={p.key} aria-selected="false" style={`--ink:${p.ink}`}>{p.name.replace(/^The /, '')}<i data-tab-n={p.key}></i></button>)}
             <button type="button" role="tab" class="pp-tab" data-tab="bottles" aria-selected="false" style="--ink:#1f7fa8">Bottles<i id="ppBTab"></i></button>
             <button type="button" role="tab" class="pp-tab" data-tab="sightings" aria-selected="false" style="--ink:#2a6f8f">Sightings</button>
+            <button type="button" role="tab" class="pp-tab" data-tab="quests" aria-selected="false" style="--ink:#4a3fa8">Quests<i id="ppQTab"></i></button>
           </div>
           {book.map((p) => (
             <div class="pp-sheet" role="tabpanel" data-sheet={p.key} aria-label={p.name} hidden style={`--ink:${p.ink}`}>
@@ -329,7 +332,22 @@ const book = BOOK.map((key) => {
                   <span class="pp-cneed">{c.need ? `${c.need} bottles` : 'As issued'}</span>
                 </button>
               ))}
+              {QUEST_COVERS.map((c) => (
+                <button type="button" role="radio" class="pp-coverbtn" data-cover={c.key} data-quest={c.quest} aria-checked="false" style={`--a:${c.face[0]};--b:${c.face[1]};--c:${c.face[2]};--t:${c.ink}`}>
+                  <span class="pp-swatch" aria-hidden="true"><span>P</span></span>
+                  <span class="pp-cname">{c.name}</span>
+                  <span class="pp-cneed">Quest: {QUESTS.find((q) => q.id === c.quest)?.name}</span>
+                </button>
+              ))}
             </div>
+          </div>
+          <div class="pp-sheet" role="tabpanel" data-sheet="quests" aria-label="Quests" hidden style="--ink:#4a3fa8">
+            <header class="pp-sheet-head">
+              <h3>Quests</h3>
+              <p><b id="ppQN">0</b> of {QUESTS.length} complete</p>
+            </header>
+            <p class="pp-note">Things to do on the island, kept here as you do them. A few earn your passport a new cover.</p>
+            <ul class="pp-quests" id="ppQuests" role="list"></ul>
           </div>
           <div class="pp-sheet" role="tabpanel" data-sheet="sightings" aria-label="Sightings" hidden style="--ink:#2a6f8f">
             <header class="pp-sheet-head">
@@ -434,7 +452,8 @@ const book = BOOK.map((key) => {
   import { islandSound } from '../lib/island/sound'
   import { isMuted, setMuted, unlock, mayPlay } from '../lib/audio'
   import { track, onLeave } from '../lib/analytics/client'
-  import { readBottles, findBottle, wearCover, count, NOTES, COVERS, BOTTLE_COUNT, type Cover } from '../lib/bottles'
+  import { readBottles, findBottle, wearCover, count, NOTES, COVERS, ALL_COVERS, BOTTLE_COUNT, type Cover } from '../lib/bottles'
+  import { gather, sync, progress, readQuests, unseen, markQuestsSeen, questCovers } from '../lib/quests'
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
   import { createPlay, type PlayData } from '../lib/island/play'
   import { timetable, isFest, type Row } from '../lib/island/timetable'
@@ -988,7 +1007,7 @@ const book = BOOK.map((key) => {
     let complete = 0
     for (const sh of ppSheets) {
       const key = sh.dataset.sheet!
-      if (key === 'sightings' || key === 'bottles') continue
+      if (key === 'sightings' || key === 'bottles' || key === 'quests') continue
       const mine = [...sh.querySelectorAll('.pp-slot')], got = mine.filter((b) => b.classList.contains('is-stamped')).length
       const done = got === mine.length
       if (done) complete++
@@ -1032,19 +1051,61 @@ const book = BOOK.map((key) => {
       return li
     }))
     renderBottles()
+    const newQuests = renderQuests()
     ppCountEl.textContent = `${n}/${total}`; ppCountEl.hidden = n === 0
-    ppNewEl.textContent = `+${fresh.size}`; ppNewEl.hidden = fresh.size === 0
+    ppNewEl.textContent = `+${fresh.size + newQuests}`; ppNewEl.hidden = fresh.size + newQuests === 0
     btnPassport.setAttribute('aria-label', `Passport: ${n} of ${total} games visited${fresh.size ? `, ${fresh.size} new stamp${fresh.size > 1 ? 's' : ''}` : ''}`)
     return fresh
   }
 
+  /* ---- the passport's quests (lib/quests.ts) ---- */
+  const questGames = () => data.slugs.map((s) => ({ slug: s, cat: data.games[s].cat, district: data.anchors[s]?.district ?? '' }))
+  const QUEST_COVERS_BY = new Map(ALL_COVERS.map((c) => [c.key, c]))
+  // Quests done before this page (or before quests existed) are dated today, quietly.
+  sync(gather(questGames()))
+  const tick = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10.5l3.4 3.4L15 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  /** Paint the quests page; returns how many finished quests the book has not shown yet. */
+  function renderQuests(): number {
+    const f = readQuests(), all = progress(gather(questGames()), f), fresh = new Set(unseen(f))
+    const worn = readBottles().cover
+    const done = all.filter((p) => p.done).length
+    $pp('ppQN').textContent = String(done); $pp('ppQuestsDone').textContent = String(done); $pp('ppQTab').textContent = `${done}/${all.length}`
+    // Done ones last, so what is left to do is what the page opens on.
+    const order = [...all].sort((a, b) => Number(a.done) - Number(b.done) || b.n / b.goal - a.n / a.goal)
+    $pp('ppQuests').replaceChildren(...order.map((p) => {
+      const li = document.createElement('li')
+      li.className = `pp-quest${p.done ? ' is-done' : ''}${fresh.has(p.q.id) ? ' is-fresh' : ''}`
+      const cover = QUEST_COVERS_BY.get(p.q.cover ?? '')
+      li.innerHTML = `<span class="pp-q-seal" aria-hidden="true">${p.done ? tick : `${p.n}<small>/${p.goal}</small>`}</span><span class="pp-q-body"><span class="pp-q-name"></span><span class="pp-q-line"></span><span class="pp-q-bar" aria-hidden="true"><i style="--w:${p.goal ? p.n / p.goal : 0}"></i></span><span class="pp-q-meta"></span></span>`
+      li.querySelector('.pp-q-name')!.textContent = p.q.name
+      li.querySelector('.pp-q-line')!.textContent = p.q.line
+      li.querySelector('.pp-q-meta')!.textContent = p.done ? `Done${p.day ? ` ${pretty(p.day)}` : ''}` : `${p.n} of ${p.goal}`
+      if (cover) {
+        const r = document.createElement(p.done ? 'button' : 'span')
+        r.className = 'pp-q-reward'
+        r.setAttribute('style', `--a:${cover.face[0]};--b:${cover.face[1]};--c:${cover.face[2]}`)
+        r.innerHTML = '<i aria-hidden="true"></i><span></span>'
+        r.querySelector('span')!.textContent = !p.done ? `Earns the ${cover.name} cover` : worn === cover.key ? `Wearing the ${cover.name} cover` : `Put on the ${cover.name} cover`
+        if (p.done && r instanceof HTMLButtonElement) {
+          r.type = 'button'
+          r.disabled = worn === cover.key
+          r.addEventListener('click', () => { if (!wearCover(cover.key, questCovers())) return; track('isl_cover', { cover: cover.key }); sound?.stamp(); renderBottles(); renderQuests(); if (PLAY) { ppBook.classList.remove('is-recovered'); void ppBook.offsetWidth; ppBook.classList.add('is-recovered') } })
+        }
+        li.querySelector('.pp-q-body')!.append(r)
+      }
+      li.setAttribute('aria-label', `${p.q.name}: ${p.done ? 'done' : `${p.n} of ${p.goal}`}. ${p.q.line}`)
+      return li
+    }))
+    byId('ppQTab').parentElement!.classList.toggle('has-new', fresh.size > 0)
+    return fresh.size
+  }
   /* ---- the passport's bottles, and its cover ---- */
   const ppBottleBtns = [...pp.querySelectorAll<HTMLButtonElement>('.pp-bottle')]
   const ppPips = [...pp.querySelectorAll<HTMLElement>('[data-pip]')]
   const ppCovers = [...pp.querySelectorAll<HTMLButtonElement>('.pp-coverbtn')]
   /** Put a cover on the book: its board round the pages, and the face it opens from. */
   function applyCover(key: string) {
-    const c = COVERS.find((x) => x.key === key) ?? COVERS[0]
+    const c = ALL_COVERS.find((x) => x.key === key) ?? COVERS[0]
     ppBook.dataset.cover = c.key
     const set = (k: string, v: string) => ppBook.style.setProperty(k, v)
     set('--cv-a', c.board[0]); set('--cv-b', c.board[1]); set('--cf-1', c.face[0]); set('--cf-2', c.face[1]); set('--cf-3', c.face[2]); set('--cf-ink', c.ink)
@@ -1058,8 +1119,9 @@ const book = BOOK.map((key) => {
     }
     for (const p of ppPips) p.classList.toggle('is-on', Number(p.dataset.pip) in file.found)
     $pp('ppBottles').textContent = String(n); $pp('ppBN').textContent = String(n); $pp('ppBTab').textContent = `${n}/${BOTTLE_COUNT}`
+    const earned = questCovers()
     for (const c of ppCovers) {
-      const open = n >= Number(c.dataset.need)
+      const open = c.dataset.quest ? earned.has(c.dataset.cover!) : n >= Number(c.dataset.need)
       c.disabled = !open
       c.classList.toggle('is-locked', !open)
       c.setAttribute('aria-checked', String(c.dataset.cover === file.cover))
@@ -1083,7 +1145,7 @@ const book = BOOK.map((key) => {
     if (PLAY) { letter.classList.remove('is-turning'); void letter.offsetWidth; letter.classList.add('is-turning') }
   })
   for (const c of ppCovers) c.addEventListener('click', () => {
-    if (!wearCover(c.dataset.cover!)) return
+    if (!wearCover(c.dataset.cover!, questCovers())) return
     track('isl_cover', { cover: c.dataset.cover! })
     sound?.stamp()
     renderBottles()
@@ -1115,6 +1177,8 @@ const book = BOOK.map((key) => {
       setTimeout(() => b.classList.remove('is-landing'), (d + 1.2) * 1000)
     })
     landDelay = 0
+    // Finished quests are new until their page has been looked at.
+    if (tab === 'quests' && unseen().length) { markQuestsSeen(); const left = newStamps(visits(), readPassport().seen).length; ppNewEl.textContent = `+${left}`; ppNewEl.hidden = left === 0; byId('ppQTab').parentElement!.classList.remove('has-new') }
     if (landing.length) { markSeen(landing.map((b) => b.dataset.slug!)); const left = newStamps(visits(), readPassport().seen).length; ppNewEl.textContent = `+${left}`; ppNewEl.hidden = left === 0 }
   }
   for (const t of ppTabs) t.addEventListener('click', () => { track('isl_passport', { tab: t.dataset.tab! }); showSheet(t.dataset.tab!) })
@@ -1144,6 +1208,8 @@ const book = BOOK.map((key) => {
     showSheet(firstNew ? sheetOf(firstNew) ?? 'you' : 'you', false)
   }
   btnPassport.addEventListener('click', openPassport)
+  // A game's "Quest complete" note links here: the book, open at its quests.
+  if (location.hash === '#quests') { history.replaceState(null, '', location.pathname + location.search); setTimeout(() => { openPassport(); showSheet('quests', false) }, 400) }
   $pp('ppClose').addEventListener('click', () => pp.close())
   // A click on the dimmed page around the book closes it.
   pp.addEventListener('click', (e) => { if (e.target === pp) pp.close() })
@@ -2138,6 +2204,42 @@ const book = BOOK.map((key) => {
   .pp-sight.is-seen .pp-sight-mark { color: #fff; background: var(--ink); border-color: #1b2340; }
   .pp-sight.is-secret:not(.is-seen) { font-style: italic; }
   .pp-sight.is-secret.is-seen .pp-sight-mark { background: #c4306f; }
+
+  /* ---- quests ---- */
+  .pp-quests { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .pp-quest {
+    display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px 11px;
+    background: #fff; border: 2px solid #1b2340; border-radius: 14px; box-shadow: 0 3px 0 #1b2340;
+  }
+  .pp-quest.is-done { background: #f1fcf8; }
+  .pp-quest.is-fresh { animation: pp-quest-new 1.6s ease-in-out 2; }
+  @keyframes pp-quest-new { 50% { box-shadow: 0 3px 0 #1b2340, 0 0 0 5px rgba(79, 227, 193, 0.55); } }
+  .pp-q-seal {
+    flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-top: 1px;
+    font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1; letter-spacing: -0.02em; white-space: nowrap;
+    border: 2.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); border-radius: 50%;
+  }
+  .pp-q-seal small { font-size: 11px; font-weight: 600; color: var(--pmute); }
+  .pp-quest.is-done .pp-q-seal { border: 2.5px solid #1b2340; background: #4fe3c1; color: #1b2340; }
+  .pp-q-seal svg { width: 24px; height: 24px; }
+  .pp-q-body { flex: 1; min-width: 0; display: grid; gap: 3px; }
+  .pp-q-name { font-size: 16.5px; font-weight: 700; color: #1b2340; line-height: 1.15; }
+  .pp-q-line { font-size: 13.5px; font-weight: 500; line-height: 1.35; color: #4a5578; }
+  .pp-q-bar { display: block; height: 7px; margin-top: 4px; border-radius: 4px; background: #e3e7f3; overflow: hidden; }
+  .pp-q-bar i { display: block; height: 100%; width: calc(var(--w, 0) * 100%); border-radius: 4px; background: var(--ink); }
+  .pp-quest.is-done .pp-q-bar { display: none; }
+  .pp-q-meta { font-size: 12.5px; font-weight: 700; color: var(--pmute); }
+  .pp-quest.is-done .pp-q-meta { color: #0f7f66; }
+  .pp-q-reward {
+    justify-self: start; display: inline-flex; align-items: center; gap: 7px; margin-top: 4px; padding: 4px 10px 4px 5px;
+    font: 700 12.5px 'Fredoka', system-ui, sans-serif; color: #1b2340;
+    background: #f3f1ff; border: 2px solid #c9c1f0; border-radius: 999px;
+  }
+  .pp-q-reward i { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg, var(--a), var(--b) 55%, var(--c)); border: 1.5px solid #1b2340; }
+  button.pp-q-reward { cursor: pointer; border-color: #1b2340; background: #fff; box-shadow: 0 2px 0 #1b2340; }
+  button.pp-q-reward:hover:not([disabled]) { background: #e3f3ff; }
+  button.pp-q-reward[disabled] { cursor: default; box-shadow: none; background: #f1fcf8; border-color: #0f7f66; }
+  .pp-tab.has-new::after { content: ''; width: 8px; height: 8px; margin-left: 2px; border-radius: 50%; background: #ff4f6e; border: 1.5px solid #1b2340; }
 
   /* ---- the cover, which opens on the way in ---- */
   .pp-cover { position: absolute; top: 10px; bottom: 10px; left: 50%; right: 10px; z-index: 6; display: none; transform-origin: 0 50%; transform-style: preserve-3d; pointer-events: none; }

@@ -340,6 +340,8 @@ const first = DILEMMAS[0]
       from: '0%',
       lines,
       againLabel: 'Start again',
+      // A challenge here is not a score to beat: it is which kind of reasoner you turned out to be.
+      vs: { value: top.pct, text: tie ? 'split' : top.name },
     })
   }
 
