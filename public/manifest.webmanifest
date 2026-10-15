@@ -1,0 +1,14 @@
+{
+  "name": "Tiny Island",
+  "short_name": "Tiny Island",
+  "description": "An island of small games and toys, with a new daily challenge every day.",
+  "start_url": "/?ref=app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#bfe6ff",
+  "theme_color": "#7cc2fb",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

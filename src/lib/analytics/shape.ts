@@ -52,6 +52,8 @@ export const EVENTS = {
   challenge_done: 'a run against a friend’s challenge ended: won, tied or lost',
   daily_done: 'a round of the daily challenge was finished: beaten or not, and the streak it made',
   next_go: 'an Up next game (or the island) was picked: why it was offered, and which',
+  save_code: 'a save code was made, brought to another device, or let go (never the code itself)',
+  remind: 'the daily reminder was turned on or off, or put in a calendar instead',
   // the island
   isl_dive: 'a game was entered from the island',
   isl_card: 'a building’s card was opened',

@@ -12,12 +12,15 @@ import { getDb } from '../../lib/analytics/db'
 import { ingest, prune } from '../../lib/analytics/ingest'
 import { claim, nightly } from '../../lib/analytics/rollup'
 import { isAdmin } from '../../lib/analytics/auth'
+import { claimHour, remindAll, vapidKeys } from '../../lib/push'
 import { clientIp, geo, json, foreign, limited, siteHost } from '../../lib/analytics/request'
 
 export const prerender = false
 
 /** When this instance last cleared out old records: once an hour is plenty. */
 let pruned = 0
+/** The hour this instance last offered to send the daily reminders (the hourly workflow's understudy). */
+let reminded = ''
 
 export const POST: APIRoute = async ({ request, clientAddress }) => {
   const g = geo(request)
@@ -44,6 +47,12 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       await prune(d, now)
       // The nightly summaries and the 90-day trim, once a day, by whichever visit comes first.
       if (await claim(d, now)) await nightly(d, now)
+    }
+    // The daily reminders, if the hourly run has not been this hour (src/lib/push.ts).
+    const hour = now.toISOString().slice(0, 13)
+    if (hour !== reminded) {
+      reminded = hour
+      if (vapidKeys() && (await claimHour(d, now))) await remindAll(d, now)
     }
   } catch (e) {
     // Analytics must never break the site: the page has already moved on.

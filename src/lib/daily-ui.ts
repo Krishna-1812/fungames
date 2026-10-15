@@ -6,8 +6,10 @@
  */
 import { dailyFor } from '../data/game-meta'
 import { readDaily, streakOf, recordDaily, calendar, utcDay, msToNext, inWords, shareText, type Streak, type CalDay } from './daily'
+import { state as remindState, turnOn, reportDone, downloadCalendar, hourWords } from './remind'
+import { readLink } from './sync'
 
-type Track = (n: 'daily_done' | 'share', p: Record<string, string | number | boolean>, g: string) => void
+type Track = (n: 'daily_done' | 'share' | 'remind', p: Record<string, string | number | boolean>, g: string) => void
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => `&#${ch.charCodeAt(0)};`)
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
@@ -73,6 +75,38 @@ export function mountDaily(slug: string, track: Track): { finish: (ok: boolean, 
     }
   })
 
+  /* ---- tomorrow: a reminder, and the streak kept safe on other devices ---- */
+  const keep = block.querySelector<HTMLElement>('[data-daily-keep]')
+  const remindBtn = keep?.querySelector<HTMLButtonElement>('[data-daily-remind]')
+  const kept = keep?.querySelector<HTMLElement>('[data-daily-kept]')
+  const saveLink = keep?.querySelector<HTMLElement>('[data-daily-save]')
+  // Remind at the hour this round was played: the time of day that suits them is the one they chose.
+  const hour = new Date().getHours()
+  let calendarOnly = false
+  const paintKeep = async (streak: Streak) => {
+    if (!keep || !remindBtn || !kept || !saveLink) return
+    const r = await remindState()
+    const at = hourWords(r.hour ?? hour)
+    calendarOnly = r.state !== 'off'
+    remindBtn.hidden = r.state === 'on'
+    remindBtn.querySelector('span')!.textContent = r.state === 'off' ? `Remind me tomorrow at ${hourWords(hour)}` : 'Add a daily reminder to my calendar'
+    kept.textContent = r.state === 'on' ? `✓ A reminder comes at ${at} each day, unless you have played.`
+      : r.state === 'blocked' ? 'Notifications are blocked for this site, so a calendar reminder is the way.'
+      : r.state === 'home' ? 'On an iPhone, add the island to your Home Screen for notifications. Or:' : ''
+    saveLink.hidden = !!readLink() || streak.n < 2
+    keep.hidden = false
+  }
+  remindBtn?.addEventListener('click', async () => {
+    if (calendarOnly) { downloadCalendar(hour); track('remind', { action: 'calendar', via: 'daily' }, slug); kept!.textContent = '✓ Open the file to add it to your calendar.'; return }
+    remindBtn.disabled = true
+    const out = await turnOn(hour)
+    remindBtn.disabled = false
+    track('remind', { action: out, via: 'daily' }, slug)
+    if (last) paintKeep(last.streak)
+    if (out === 'failed') kept!.textContent = 'That did not work just now. A calendar reminder works anywhere:'
+    if (out === 'failed') { calendarOnly = true; remindBtn.querySelector('span')!.textContent = 'Add a daily reminder to my calendar' }
+  })
+
   return {
     finish(ok, note) {
       const { streak, first, beatenNow } = recordDaily(slug, ok)
@@ -98,6 +132,9 @@ export function mountDaily(slug: string, track: Track): { finish: (ok: boolean, 
       tick = window.setInterval(paintNext, 30_000)
       block.hidden = false
       paintBanner()
+      paintKeep(streak)
+      // A reminder is not needed for a day already played.
+      reportDone()
     },
     reset() { block.hidden = true; clearInterval(tick) },
   }

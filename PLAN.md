@@ -602,6 +602,32 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   takes months, which is the point. `?season=` still shows any of them out of
   season. `check-seasons.mjs`.
 
+- ~~**Progress on every device, and a daily reminder**~~ **done** (2026-10-16).
+  No accounts and no email (no domain or sender is decided yet, and neither
+  is needed): the passport's new Save page makes a save code, 16 random
+  characters made on the server, and any device given the code (typed, or as
+  a `/#save=` link) brings the progress over (`lib/sync.ts`,
+  `lib/sync-client.ts`, `lib/saves.ts`, `api/save`). Records are merged, never
+  replaced: every stamp, the earliest first visit, the better best, the longest
+  streak, everything found; preferences and anything typed stay on the device.
+  Each page checks in when it opens and saves when it is left; a write on a
+  stale revision is refused and merged again, so two devices at once both keep
+  everything. The server holds only a hash of the code; a save unopened for 400
+  days is dropped nightly.
+
+  The daily reminder is a web push notification at an hour the player picks
+  (from the daily challenge's result card, "Remind me tomorrow at 6:00 PM",
+  defaulting to the hour they played, or the Save page), never twice a day and
+  never once that day's challenge is played (`lib/push.ts`, `lib/remind.ts`,
+  `public/sw.js`, `api/remind`). The encryption and signing are written out
+  with WebCrypto, no dependency; checked end to end through Google's push
+  service. An hourly GitHub Actions run calls `api/cron/remind`, and site
+  visits are its understudy. Where notifications cannot come (iPhone Safari
+  until the site is on the Home Screen, hence the new web manifest) a calendar
+  file does the job. Needs VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in Vercel
+  (`node scripts/make-vapid-keys.mjs`); without them the reminder offers only
+  the calendar. `save_code`, `remind`. `check-sync.mjs`.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

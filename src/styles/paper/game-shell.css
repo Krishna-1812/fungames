@@ -370,6 +370,14 @@ html.play .crowd-note { animation: crowd-in 520ms var(--ease) both; }
 .dly-why { font-size: 14px; line-height: 1.45; opacity: 0.85; max-width: 60ch; }
 .dly-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding-top: 4px; }
 .dly-next { font-size: 15px; font-weight: 600; }
+/* A reminder for tomorrow, and the way to the save code: a quiet second row. */
+.dly-keep { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-top: 12px; border-top: 1.5px dashed color-mix(in srgb, currentColor 30%, transparent); }
+.dly-keep[hidden], .dly-keep [hidden] { display: none; }
+.dly-kept { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.dly-kept:empty { display: none; }
+.dly-save { margin-left: auto; font-size: 14px; font-weight: 700; color: inherit; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.dly-save:hover { text-decoration-thickness: 2.5px; }
+@media (max-width: 520px) { .dly-save { margin-left: 0; } }
 .dly.is-won .pill--line-paper { --pill-flood: var(--ink); --pill-flood-ink: var(--ink-paper); color: var(--ink); border-color: var(--ink); }
 .dly.is-won .pill--line-paper:not([disabled]):hover { background: var(--ink); color: var(--ink-paper); }
 @media (max-width: 520px) { .dly-cal { gap: 3px; } .dly-dot i { font-size: 9px; } }

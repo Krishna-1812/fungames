@@ -89,6 +89,7 @@ const favicon = faviconHref(true)
     <link rel="icon" href={withBase('/favicon-96.png')} sizes="96x96" type="image/png" />
     <link rel="icon" href={favicon} type="image/svg+xml" id="favicon" />
     <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
+    <link rel="manifest" href={withBase('/manifest.webmanifest')} />
 
     {/* Before first paint: `js` arms anything a script finishes, `play` arms
         every animated starting state. Reduced motion never gets `play`, so it
@@ -165,9 +166,12 @@ const favicon = faviconHref(true)
     <script>
       import { initMotion } from '../lib/motion'
       import { start } from '../lib/analytics/client'
+      import { startSync } from '../lib/sync-client'
       initMotion()
       // Visits, counted (lib/analytics/client.ts; what and how is on /privacy/).
       start()
+      // A save code's progress, kept level with the other devices (lib/sync-client.ts).
+      startSync()
       // In through a building's circle (the first script above): the circle's
       // sound, from the other side, if this browser lets a page sound before
       // it is touched (lib/audio.ts, mayPlay).

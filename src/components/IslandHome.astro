@@ -279,6 +279,7 @@ const book = BOOK.map((key) => {
             <button type="button" role="tab" class="pp-tab" data-tab="bottles" aria-selected="false" style="--ink:#1f7fa8">Bottles<i id="ppBTab"></i></button>
             <button type="button" role="tab" class="pp-tab" data-tab="sightings" aria-selected="false" style="--ink:#2a6f8f">Sightings</button>
             <button type="button" role="tab" class="pp-tab" data-tab="quests" aria-selected="false" style="--ink:#4a3fa8">Quests<i id="ppQTab"></i></button>
+            <button type="button" role="tab" class="pp-tab" data-tab="save" aria-selected="false" style="--ink:#1d6f8c">Save</button>
           </div>
           {book.map((p) => (
             <div class="pp-sheet" role="tabpanel" data-sheet={p.key} aria-label={p.name} hidden style={`--ink:${p.ink}`}>
@@ -356,6 +357,50 @@ const book = BOOK.map((key) => {
             </header>
             <p class="pp-note">Everything on the island that does something when you poke it. Some only come out at certain hours.</p>
             <ul class="pp-sights" id="ppSights" role="list"></ul>
+          </div>
+          <div class="pp-sheet" role="tabpanel" data-sheet="save" aria-label="Save and reminders" hidden style="--ink:#1d6f8c">
+            <header class="pp-sheet-head">
+              <h3>Keep it safe</h3>
+              <p id="ppSaveState">On this device only</p>
+            </header>
+            <p class="pp-note">Your stamps, scores, streak and quests live in this browser. A save code carries them to your phone or another computer, and brings them back if this browser is ever cleared. No account, no email.</p>
+            <div class="pp-save" id="ppSaveOff">
+              <button type="button" class="pp-btn pp-btn--main" id="ppSaveMake">Make a save code</button>
+              <form class="pp-save-use" id="ppSaveUse">
+                <label for="ppSaveIn">Have a code from another device?</label>
+                <div class="pp-save-row">
+                  <input id="ppSaveIn" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="80" />
+                  <button type="submit" class="pp-btn">Bring it here</button>
+                </div>
+              </form>
+            </div>
+            <div class="pp-save" id="ppSaveOn" hidden>
+              <p class="pp-code-label">Your save code</p>
+              <p class="pp-code" id="ppSaveCode"></p>
+              <div class="pp-save-row">
+                <button type="button" class="pp-btn pp-btn--main" id="ppSaveCopy">Copy the link</button>
+                <button type="button" class="pp-btn" id="ppSaveShare" hidden>Send it to yourself</button>
+              </div>
+              <p class="pp-save-how">Open the link on your other device, or type the code into its passport. From then on both stay level by themselves. Keep it to yourself: anyone with the code can see and add to your progress.</p>
+              <p class="pp-save-meta" id="ppSaveMeta"></p>
+              <div class="pp-save-row pp-save-small">
+                <button type="button" class="pp-link" id="ppSaveLeave">Stop saving on this device</button>
+                <button type="button" class="pp-link pp-link--warn" id="ppSaveDrop">Delete this save</button>
+              </div>
+            </div>
+            <p class="pp-save-msg" id="ppSaveMsg" role="status" aria-live="polite"></p>
+            <h4 class="pp-sub">Daily reminder</h4>
+            <div class="pp-remind" id="ppRemind">
+              <p class="pp-remind-line" id="ppRemindLine">A nudge when there is a new daily challenge, at an hour that suits you. Never more than one a day, and none on a day you have already played.</p>
+              <div class="pp-save-row" id="ppRemindRow">
+                <label for="ppRemindHour">At</label>
+                <select id="ppRemindHour"></select>
+                <button type="button" class="pp-btn pp-btn--main" id="ppRemindOn">Turn on</button>
+                <button type="button" class="pp-btn" id="ppRemindOff" hidden>Turn off</button>
+                <button type="button" class="pp-btn pp-btn--main" id="ppRemindCalMain" hidden>Put it in my calendar</button>
+              </div>
+              <button type="button" class="pp-link" id="ppRemindCal">Or put it in your calendar instead</button>
+            </div>
           </div>
         </section>
         <div class="pp-cover" aria-hidden="true">
@@ -458,6 +503,9 @@ const book = BOOK.map((key) => {
   import { createPlay, type PlayData } from '../lib/island/play'
   import { timetable, isFest, type Row } from '../lib/island/timetable'
   import { seasonOn, nextSeason, seeSeason, SEASONS as SEASON_NAMES, type SeasonKey } from '../lib/island/seasons'
+  import { readLink, cleanCode, showCode } from '../lib/sync'
+  import { makeCode, useCode, forgetCode, deleteSave } from '../lib/sync-client'
+  import { state as remindState, turnOn, turnOff, downloadCalendar, hourWords, readPref } from '../lib/remind'
 
   // The lighthouse in the tab says hello: once when the page opens, and again
   // each time you switch away to another tab, it flashes the island's Morse
@@ -1019,7 +1067,8 @@ const book = BOOK.map((key) => {
     let complete = 0
     for (const sh of ppSheets) {
       const key = sh.dataset.sheet!
-      if (key === 'sightings' || key === 'bottles' || key === 'quests') continue
+      // Only the district pages have stamps to count.
+      if (!sh.querySelector('.pp-slot')) continue
       const mine = [...sh.querySelectorAll('.pp-slot')], got = mine.filter((b) => b.classList.contains('is-stamped')).length
       const done = got === mine.length
       if (done) complete++
@@ -1237,6 +1286,113 @@ const book = BOOK.map((key) => {
     renderPassport()
   })
   renderPassport()
+
+  /* ---- the passport's Save page: a save code (lib/sync-client.ts), and the daily reminder (lib/remind.ts) ---- */
+  const saveMsg = $pp('ppSaveMsg')
+  const say = (s: string) => { saveMsg.textContent = s }
+  const linkFor = (code: string) => `${location.origin}/#save=${code}`
+  const ago = (iso: string) => {
+    const s = (Date.now() - Date.parse(iso)) / 1000
+    return !iso || !Number.isFinite(s) ? '' : s < 90 ? 'just now' : s < 5400 ? `${Math.round(s / 60)} minutes ago` : s < 129600 ? `${Math.round(s / 3600)} hours ago` : `${Math.round(s / 86400)} days ago`
+  }
+  function renderSave() {
+    const l = readLink()
+    $pp('ppSaveOff').hidden = !!l
+    $pp('ppSaveOn').hidden = !l
+    $pp('ppSaveState').textContent = l ? 'Saved under a code' : 'On this device only'
+    if (!l) return
+    $pp('ppSaveCode').textContent = showCode(l.code)
+    $pp('ppSaveMeta').textContent = l.at ? `Last saved ${ago(l.at)}. A save nobody opens for 400 days is let go.` : ''
+    $pp('ppSaveShare').hidden = !navigator.share
+  }
+  const why = { unknown: 'There is no save with that code. Check it against the other device.', offline: 'Could not reach the island just now. Try again in a moment.', busy: 'Too many tries just now. Wait a few minutes and try again.' }
+  async function bringHere(code: string) {
+    say('Bringing your progress over…')
+    const out = await useCode(code)
+    if (!out.ok) { say(why[out.why]); return }
+    track('save_code', { action: 'used' })
+    renderPassport(); renderSave()
+    const n = Object.keys(readPassport().visits).length
+    say(out.changed.length ? `Done. Your progress is here, merged with this device’s: ${n} ${n === 1 ? 'stamp' : 'stamps'} in the book now.` : 'Done. This device was already up to date.')
+  }
+  $pp('ppSaveMake').addEventListener('click', async (e) => {
+    const b = e.currentTarget as HTMLButtonElement
+    b.disabled = true; say('Making your code…')
+    const out = await makeCode()
+    b.disabled = false
+    if (!out.ok) { say(why[out.why]); return }
+    track('save_code', { action: 'made' })
+    renderSave(); say('Saved. Now open the link on your other device.')
+  })
+  $pp('ppSaveUse').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const code = cleanCode(($pp('ppSaveIn') as HTMLInputElement).value)
+    if (!code) { say('A save code is 16 letters and numbers, like ABCD-EFGH-JKMN-PQRS.'); return }
+    bringHere(code)
+  })
+  $pp('ppSaveCopy').addEventListener('click', async () => {
+    const l = readLink(); if (!l) return
+    try { await navigator.clipboard.writeText(linkFor(l.code)); say('Link copied. Open it on your other device.') } catch { say(`Copy this link: ${linkFor(l.code)}`) }
+    track('share', { outcome: 'copied', what: 'save' })
+  })
+  $pp('ppSaveShare').addEventListener('click', async () => {
+    const l = readLink(); if (!l) return
+    try { await navigator.share({ title: 'My Tiny Island save', text: 'My Tiny Island progress. Open this on my other device:', url: linkFor(l.code) }); track('share', { outcome: 'shared', what: 'save' }) } catch { /* closed */ }
+  })
+  $pp('ppSaveLeave').addEventListener('click', () => {
+    if (!confirm('Stop saving on this device? Your progress here stays, and the save stays for your other devices.')) return
+    forgetCode(); track('save_code', { action: 'left' }); renderSave(); say('This device no longer saves under the code.')
+  })
+  $pp('ppSaveDrop').addEventListener('click', async () => {
+    if (!confirm('Delete this save for every device? Each device keeps the progress it has, but the code stops working.')) return
+    if (!(await deleteSave())) { say(why.offline); return }
+    track('save_code', { action: 'deleted' }); renderSave(); say('Deleted. The code no longer works anywhere.')
+  })
+  // Another device's progress arrived while this page was open (lib/sync-client.ts startSync).
+  document.addEventListener('funsite:synced', () => { renderPassport(); renderSave() })
+
+  const hourSel = $pp('ppRemindHour') as HTMLSelectElement
+  hourSel.replaceChildren(...Array.from({ length: 24 }, (_, h) => new Option(hourWords(h), String(h))))
+  hourSel.value = String(readPref()?.hour ?? 18)
+  async function renderRemind() {
+    const r = await remindState()
+    const on = r.state === 'on', canPush = on || r.state === 'off'
+    $pp('ppRemindOn').hidden = on || !canPush
+    $pp('ppRemindOff').hidden = !on
+    // Where notifications cannot come, the calendar is the main way, not the aside.
+    $pp('ppRemindCalMain').hidden = canPush
+    $pp('ppRemindCal').hidden = !canPush
+    $pp('ppRemindLine').textContent = on ? `On: a reminder at ${hourWords(r.hour ?? 18)} each day, unless you have already played.`
+      : r.state === 'blocked' ? 'Notifications from this site are blocked in your browser’s settings. A calendar reminder works instead.'
+      : r.state === 'home' ? 'On an iPhone or iPad, notifications only come to sites on the Home Screen: tap Share, then Add to Home Screen, and open the island from there. Or use your calendar.'
+      : r.state === 'calendar' ? 'A reminder in your calendar when there is a new daily challenge, every day at the hour you pick.'
+      : 'A nudge when there is a new daily challenge, at an hour that suits you. Never more than one a day, and none on a day you have already played.'
+  }
+  $pp('ppRemindOn').addEventListener('click', async (e) => {
+    const b = e.currentTarget as HTMLButtonElement
+    b.disabled = true
+    const out = await turnOn(Number(hourSel.value))
+    b.disabled = false
+    track('remind', { action: out, via: 'passport' })
+    await renderRemind()
+    if (out === 'failed') $pp('ppRemindLine').textContent = 'That did not work just now. Try again, or use your calendar.'
+  })
+  $pp('ppRemindOff').addEventListener('click', async () => { await turnOff(); track('remind', { action: 'off', via: 'passport' }); renderRemind() })
+  hourSel.addEventListener('change', async () => { if (readPref()?.on) { await turnOn(Number(hourSel.value)); renderRemind() } })
+  const toCalendar = () => {
+    downloadCalendar(Number(hourSel.value))
+    track('remind', { action: 'calendar', via: 'passport' })
+    $pp('ppRemindLine').textContent = 'Open the downloaded file to add the reminder to your calendar.' }
+  $pp('ppRemindCal').addEventListener('click', toCalendar)
+  $pp('ppRemindCalMain').addEventListener('click', toCalendar)
+  for (const t of ppTabs) if (t.dataset.tab === 'save') t.addEventListener('click', () => { renderSave(); renderRemind() })
+
+  // A save link (#save=CODE) brings that progress here; #save opens the page.
+  if (location.hash.startsWith('#save')) {
+    const code = cleanCode(location.hash.slice(6))
+    history.replaceState(null, '', location.pathname + location.search)
+    setTimeout(() => { openPassport(); showSheet('save', false); renderSave(); renderRemind(); if (code) bringHere(code) }, 400)
+  }
 
   /* ---- postcards: the view, framed, to keep or send ------------------------ */
   // The camera button takes whatever is on the screen: the engine paints it
@@ -2256,6 +2412,47 @@ const book = BOOK.map((key) => {
   button.pp-q-reward { cursor: pointer; border-color: #1b2340; background: #fff; box-shadow: 0 2px 0 #1b2340; }
   button.pp-q-reward:hover:not([disabled]) { background: #e3f3ff; }
   button.pp-q-reward[disabled] { cursor: default; box-shadow: none; background: #f1fcf8; border-color: #0f7f66; }
+  /* ---- the Save page ---- */
+  .pp-save { display: grid; gap: 12px; justify-items: start; margin: 4px 0 2px; }
+  .pp-save[hidden], .pp-save [hidden], .pp-remind [hidden] { display: none; }
+  .pp-save-use { display: grid; gap: 6px; width: 100%; margin-top: 6px; }
+  .pp-save-use label, .pp-code-label, .pp-remind label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--pmute); }
+  .pp-code-label { margin: 0; }
+  .pp-save-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .pp-save-use .pp-save-row { width: 100%; }
+  .pp-save-use input, .pp-remind select {
+    min-width: 0; flex: 1 1 210px; padding: 9px 12px; font: 600 16px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.06em; color: #1b2340;
+    background: #fff; border: 2px solid #1b2340; border-radius: 12px;
+  }
+  .pp-remind select { flex: 0 1 auto; font: 600 16px 'Fredoka', system-ui, sans-serif; letter-spacing: 0; padding: 8px 10px; }
+  .pp-save-use input:focus-visible, .pp-remind select:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .pp-btn {
+    padding: 8px 15px; cursor: pointer; font: 700 14.5px 'Fredoka', system-ui, sans-serif; color: #1b2340;
+    background: #fff; border: 2px solid #1b2340; border-radius: 999px; box-shadow: 0 3px 0 #1b2340;
+  }
+  .pp-btn:hover:not([disabled]) { background: #e3f3ff; }
+  .pp-btn:active:not([disabled]) { transform: translateY(3px); box-shadow: 0 0 0 #1b2340; }
+  .pp-btn[disabled] { opacity: 0.6; cursor: progress; }
+  .pp-btn--main { background: #4fe3c1; }
+  .pp-btn--main:hover:not([disabled]) { background: #7befd4; }
+  .pp-btn:focus-visible, .pp-link:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .pp-code {
+    margin: -6px 0 0; padding: 10px 14px; font: 700 clamp(17px, 2.4vw, 22px) ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.08em; color: #1b2340;
+    background: #fff; border: 2px dashed var(--ink); border-radius: 12px; user-select: all; overflow-wrap: anywhere;
+  }
+  .pp-save-how, .pp-save-meta, .pp-remind-line { margin: 0; font-size: 13.5px; font-weight: 500; line-height: 1.4; color: #4a5578; }
+  .pp-save-meta { font-size: 12.5px; color: var(--pmute); }
+  .pp-link {
+    padding: 0; background: none; border: 0; cursor: pointer;
+    font: 600 13px 'Fredoka', system-ui, sans-serif; color: var(--pmute); text-decoration: underline; text-underline-offset: 3px;
+  }
+  .pp-link:hover { color: var(--ink); }
+  .pp-link--warn:hover { color: #c4306f; }
+  .pp-save-small { gap: 6px 18px; }
+  .pp-save-msg { margin: 10px 0 0; font-size: 14px; font-weight: 700; color: #0f7f66; line-height: 1.4; }
+  .pp-save-msg:empty { display: none; }
+  .pp-remind { display: grid; gap: 10px; justify-items: start; }
+  .pp-remind label { letter-spacing: 0.06em; }
   .pp-tab.has-new::after { content: ''; width: 8px; height: 8px; margin-left: 2px; border-radius: 50%; background: #ff4f6e; border: 1.5px solid #1b2340; }
 
   /* ---- the cover, which opens on the way in ---- */

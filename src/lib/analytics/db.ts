@@ -113,6 +113,15 @@ export const SCHEMA = [
     n integer not null, primary key (day, name, game, k, of, v)
   )`,
   `create table if not exists meta (k text primary key, v text not null, at timestamptz not null default now())`,
+  // Save codes (src/lib/saves.ts): a browser's progress, under a hash of its
+  // code, so the table alone cannot be used to open anyone's save.
+  `create table if not exists saves (id text primary key, rev integer not null default 1, data jsonb not null, made timestamptz not null default now(), at timestamptz not null default now())`,
+  // Daily reminders (src/lib/push.ts): where to send them, and when.
+  `create table if not exists push_subs (
+    endpoint text primary key, p256dh text not null, auth text not null,
+    tz text not null, hour smallint not null, streak smallint not null default 0, through date,
+    done date, sent date, made timestamptz not null default now()
+  )`,
 ]
 
 /** The database, with its tables made if they are not there yet (once per process). */

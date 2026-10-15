@@ -1,0 +1,15 @@
+# The daily reminders' clock: once an hour, ask the site to send whichever are
+# due (src/pages/api/cron/remind.ts). Each run is one request; the site does
+# the rest, and a run that comes twice in an hour sends nothing the second time.
+name: Reminders
+on:
+  schedule:
+    - cron: '2 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: curl -fsS --max-time 120 https://fungames-mu.vercel.app/api/cron/remind/

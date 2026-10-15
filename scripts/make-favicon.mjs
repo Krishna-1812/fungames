@@ -1,7 +1,8 @@
 /**
  * make-favicon — rasterises the tab icon in src/lib/favicon.ts.
  *
- *   node scripts/make-favicon.mjs            write public/favicon.ico, favicon-96.png and apple-touch-icon.png
+ *   node scripts/make-favicon.mjs            write public/favicon.ico, favicon-96.png, apple-touch-icon.png,
+ *                                            and the installed site's icons (icon-192/512.png, badge-72.png)
  *   node scripts/make-favicon.mjs --sheet    also write public/_mockups/favicon-sheet.html, every size side by side
  */
 import fs from 'node:fs'
@@ -30,7 +31,13 @@ sizes.forEach((w, i) => {
   head.writeUInt32LE(imgs[i].length, e + 8); head.writeUInt32LE(off, e + 12); off += imgs[i].length
 })
 fs.writeFileSync('public/favicon.ico', Buffer.concat([head, ...imgs]))
-console.log('wrote public/favicon.ico, favicon-96.png and apple-touch-icon.png')
+// The site added to a home screen (public/manifest.webmanifest), full bleed: Android masks it to its own shape.
+fs.writeFileSync('public/icon-192.png', png(bleed, 192))
+fs.writeFileSync('public/icon-512.png', png(bleed, 512))
+// The reminder's badge in Android's status bar: only the shape counts (the system paints it white), so the lighthouse alone.
+const badge = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="#fff"><path d="M12 1.6 16.4 6H7.6z"/><rect x="8.6" y="6.8" width="6.8" height="4.4" rx=".8"/><path d="M8.8 12.4h6.4L17 22H7z"/><path d="M15.6 4.6 22 2v6.4zM8.4 4.6 2 2.6v5.4z" opacity=".7"/></g></svg>'
+fs.writeFileSync('public/badge-72.png', png(badge, 72))
+console.log('wrote public/favicon.ico, favicon-96.png, apple-touch-icon.png, icon-192.png, icon-512.png and badge-72.png')
 
 if (process.argv.includes('--sheet')) {
   fs.mkdirSync('public/_mockups', { recursive: true })

@@ -42,6 +42,7 @@ export const rawFrom = (now = new Date()) => new Date(midnight(now).getTime() - 
 const KEPT: [string, string][] = [
   ['game_level', 'text'], ['share', 'outcome'], ['isl_poke', 'kind'], ['isl_postcard', 'action'],
   ['isl_board_go', 'row'], ['isl_filter', 'filter'], ['isl_cover', 'cover'], ['isl_time', 'mode'], ['next_go', 'why'], ['daily_done', 'ok'], ['challenge_done', 'won'], ['quest_done', 'quest'],
+  ['save_code', 'action'], ['remind', 'action'],
 ]
 
 export async function getMeta(d: Db, k: string): Promise<{ v: string; at: Date } | null> {
@@ -143,6 +144,8 @@ export async function nightly(d: Db, now = new Date(), maxDays = 60): Promise<Ni
     trimmed = Number(r?.n ?? 0)
   }
   await prune(d, now)
+  // Save codes nobody has opened in 400 days (src/lib/saves.ts).
+  await d.query('delete from saves where at < $1', [new Date(now.getTime() - 400 * DAY)])
 
   // Visitor IDs seen before the visitors table existed, and any the page's own upserts missed.
   const back = await getMeta(d, 'visitors_from_views')

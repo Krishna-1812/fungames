@@ -33,6 +33,11 @@ import { withBase } from '../../lib/base'
       <p class="dly-next" data-daily-next></p>
       <button type="button" class="pill pill--line pill--line-paper pill--sm" data-daily-share><span>Share today’s result</span></button>
     </div>
+    <div class="dly-keep" data-daily-keep hidden>
+      <button type="button" class="pill pill--line pill--line-paper pill--sm" data-daily-remind hidden><span>Remind me tomorrow</span></button>
+      <p class="dly-kept" data-daily-kept role="status"></p>
+      <a class="dly-save" data-daily-save href="/#save" hidden>Keep your streak on all your devices <span aria-hidden="true">→</span></a>
+    </div>
   </div>
   <div class="result-extra" data-result-extra></div>
   <div class="result-actions">
