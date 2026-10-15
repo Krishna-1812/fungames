@@ -75,6 +75,7 @@ const total = RULES.length
   import { RULES, chars } from '../lib/cascade-rules'
   import { recordPlay } from '../lib/stats'
   import { dailyFor } from '../data/game-meta'
+  import { loadCrowd, fillCrowd, standing, median, people } from '../lib/crowd'
 
   const TOTAL = RULES.length
   const input = document.getElementById('input') as HTMLTextAreaElement
@@ -96,6 +97,7 @@ const total = RULES.length
     onResume: () => { started += Date.now() - pausedAt; ruleAt += Date.now() - pausedAt; input.focus() },
   })
   let pausedAt = 0
+  loadCrowd('rule-cascade')
 
   // For the crowd: how long each rule held people up, and how far they got.
   let ruleAt = Date.now(), slowest = { id: 0, s: -1 }, reached = 0
@@ -222,6 +224,19 @@ const total = RULES.length
       ]
       if (daily.slug === 'rule-cascade' && cap)
         lines.push(keystrokes < cap ? `✓ Daily challenge beaten: under ${cap} keystrokes.` : `✗ Daily challenge: under ${cap} keystrokes to beat it.`)
+      // The crowd: how your slowest rule compares, and which rule holds everyone up.
+      const hold = slowest
+      const crowdEl = document.createElement('div')
+      shell.resultExtra.replaceChildren(crowdEl)
+      fillCrowd(crowdEl, 'rule-cascade', (c) => {
+        const st = standing(c, 'Seconds to clear each rule', `Rule ${hold.id}`, hold.s, 'low')
+        const meds = RULES.map((r) => ({ id: r.id, m: median(c, 'Seconds to clear each rule', `Rule ${r.id}`) })).filter((x) => x.m && x.m.n >= 10)
+        const worst = meds.sort((a, b) => b.m!.v - a.m!.v)[0]
+        const parts: string[] = []
+        if (st) parts.push(`Your slowest was Rule ${hold.id}, at ${hold.s} s: quicker than <b>${st.pct}%</b> of ${people(st.n)} players who reached it.`)
+        if (worst) parts.push(worst.id === hold.id ? 'It holds up everyone else longest too.' : `The rule that holds everyone up longest is Rule ${worst.id}: a typical player needs ${worst.m!.v} s for it.`)
+        return parts.length ? parts.join(' ') : null
+      }, 'crowd-note--block')
       shell.win({
         kicker: '✓ Username accepted',
         title: 'Fine. That is a username.',

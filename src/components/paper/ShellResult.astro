@@ -20,4 +20,11 @@ import { withBase } from '../../lib/base'
     </button>
     <a class="pill pill--line pill--line-paper" href={withBase('/')}><span>Back to games</span></a>
   </div>
+  <div class="nx nx--end" data-next-end hidden>
+    <div class="nx-head">
+      <p class="label">Up next</p>
+      <a class="nx-home" data-next-home href={withBase('/')}><span>Or wander the island</span><span aria-hidden="true">→</span></a>
+    </div>
+    <div class="nx-row" data-next-row></div>
+  </div>
 </section>

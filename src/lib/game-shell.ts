@@ -6,8 +6,9 @@
  */
 import { roll, confetti, PLAY } from './motion'
 import { isMuted, setMuted, unlock, sfx } from './audio'
-import { bestKey } from '../data/game-meta'
-import { recordVisit } from './passport'
+import { bestKey, dailyFor } from '../data/game-meta'
+import { recordVisit, readPassport, localDay } from './passport'
+import { mountNext } from './next-up'
 import { track, onLeave } from './analytics/client'
 
 export type ShellOptions = {
@@ -75,6 +76,8 @@ export function createShell(opts: ShellOptions) {
 
   // A stamp in the island's passport: once a day, however often the page loads.
   recordVisit(opts.slug)
+  // Three more games: at the foot of the page, and in the result card once there is one.
+  const next = mountNext(opts.slug, { visits: readPassport().visits, today: localDay(), daily: dailyFor(new Date()).slug, track: (n, p, g) => track(n, p, g) })
 
   // Analytics: every game reports the same things through here (see
   // lib/analytics/shape.ts for the list). The game starts at the first touch,
@@ -209,6 +212,7 @@ export function createShell(opts: ShellOptions) {
       lines.append(p)
     }
     $(result, '[data-again-label]').textContent = e.againLabel ?? (kind === 'win' ? 'Play again' : 'Try again')
+    next.ended()
     result.hidden = false
     result.classList.remove('is-in')
     void result.offsetWidth
@@ -234,6 +238,7 @@ export function createShell(opts: ShellOptions) {
   const lose = (e: Ending) => end('lose', e)
   function reset() {
     result.hidden = true
+    next.reset()
     stage.classList.remove('is-lost')
     beatenThisRun = false
     runStartBest = best

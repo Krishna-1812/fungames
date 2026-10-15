@@ -46,6 +46,8 @@ export const EVENTS = {
   game_quit: 'a page was left while a game was going: where it stopped',
   sound: 'sound was switched on or off',
   share: 'a result was shared, saved or copied',
+  next_show: 'the Up next games were seen, at an ending or at the foot of a game',
+  next_go: 'an Up next game (or the island) was picked: why it was offered, and which',
   // the island
   isl_dive: 'a game was entered from the island',
   isl_card: 'a building’s card was opened',

@@ -88,6 +88,7 @@ const total = PATTERNS.length
         <p class="dp-v-note" id="vNote"></p>
         <p class="dp-v-reveal" id="vReveal"></p>
         <p class="dp-v-cite" id="vCite"></p>
+        <div class="dp-v-crowd" id="vCrowd" aria-live="polite"></div>
         <button type="button" class="pill pill--ink" id="next">
           <span id="nextLbl">Next site</span><span aria-hidden="true">→</span>
         </button>
@@ -137,6 +138,7 @@ const total = PATTERNS.length
   import { sfx, unlock } from '../lib/audio'
   import { recordPlay } from '../lib/stats'
   import { dailyFor, dailyTarget } from '../data/game-meta'
+  import { loadCrowd, fillCrowd, share, people, FEW } from '../lib/crowd'
 
   type Pattern = { id: string; title: string; site: string; real: string; lede: string; reveal: string }
   const PATTERNS = JSON.parse(document.getElementById('game-data')!.textContent!) as Pattern[]
@@ -187,6 +189,7 @@ const total = PATTERNS.length
   const clearTimers = () => { timers.forEach(clearInterval); timers = [] }
 
   const shell = createShell({ slug: 'dark-patterns', onRestart: restart })
+  loadCrowd('dark-patterns')
 
   /* ---------------------------------------------------------------------- */
   /* The eleven sites                                                        */
@@ -546,6 +549,14 @@ const total = PATTERNS.length
       $('vNote').textContent = note
       $('vReveal').textContent = p.reveal
       $('vCite').textContent = `Catalogued in ${p.real}`
+      // Everyone else on this same site: how many of them it caught.
+      fillCrowd($('vCrowd'), 'dark-patterns', (c) => {
+        const s = share(c, 'Fell for each pattern', p.title, true)
+        if (!s) return FEW
+        const fellPct = s.pct, n = people(s.n)
+        if (good) return fellPct >= 50 ? `<b>${fellPct}%</b> of ${n} players fell for this one. You didn’t.` : `<b>${100 - fellPct}%</b> of ${n} players spotted it too.`
+        return fellPct >= 50 ? `You’re in good company: <b>${fellPct}%</b> of ${n} players fell for it too.` : `Only <b>${fellPct}%</b> of ${n} players fell for this one.`
+      })
       $('nextLbl').textContent = idx + 1 >= TOTAL ? 'See how you did' : 'Next site'
       verdict.hidden = false
       if (good) { sfx.good(); shell.pop(verdict) }

@@ -4,6 +4,11 @@ import ShellResult from '../components/paper/ShellResult.astro'
 import { SITE } from '../site.config'
 import { gameBySlug } from '../data/games'
 import { withBase } from '../lib/base'
+import { META } from '../data/game-meta'
+import { homeGames, hasRealWorld } from '../lib/island/home'
+import { plateInfo } from '../lib/island/plate'
+import { DISTRICTS, PLACES } from '../lib/island/landmarks'
+import type { NextData } from '../lib/next-up'
 import '../styles/paper/game-shell.css'
 
 /**
@@ -44,6 +49,21 @@ const L = {
 }
 
 const howto = Astro.slots.has('howto') ? await Astro.slots.render('howto') : ''
+
+// What "Up next" chooses from (lib/next-up.ts): every listed game, with the
+// colour of its district behind its building, as on the homepage's cards.
+const districtOf = Object.fromEntries(PLACES.map(([s, d]) => [s, d]))
+const nextData: NextData = {
+  games: homeGames().map((g) => ({
+    slug: g.slug, title: g.title, blurb: g.blurb, cat: g.category, added: g.added,
+    kind: META[g.slug]?.difficulty === 'Explore' ? 'explore' : 'play',
+    tint: DISTRICTS.find((d) => d.key === districtOf[g.slug])?.tint ?? '#e3e9ff',
+  })),
+  worlds: hasRealWorld() ? ['cartoon', 'real'] : ['cartoon'],
+  world: plateInfo('plate')?.live ? 'real' : 'cartoon',
+  home: { cartoon: withBase('/'), real: withBase('/realistic/') },
+  base: withBase('/').replace(/\/$/, ''),
+}
 
 const gameUrl = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
 const homeUrl = new URL(withBase('/'), Astro.site ?? SITE.url).href
@@ -140,7 +160,16 @@ const structuredData = [
 
       <slot name="after" />
     </main>
+
+    <section class="nx nx--foot wrap" data-next-foot hidden aria-labelledby="nx-foot-title">
+      <div class="nx-head">
+        <h2 class="nx-title-h" id="nx-foot-title" data-next-title>Keep exploring</h2>
+        <a class="nx-home" data-next-home href={withBase('/')}><span>All the games on Tiny Island</span><span aria-hidden="true">→</span></a>
+      </div>
+      <div class="nx-row" data-next-row></div>
+    </section>
   </div>
+  <script type="application/json" id="next-data" set:html={JSON.stringify(nextData)} />
 
   <dialog class="panel" data-panel="pause" aria-labelledby="pause-title">
     <p class="label meta">Paused</p>

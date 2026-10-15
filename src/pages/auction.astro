@@ -53,6 +53,7 @@ import GameShell from '../layouts/GameShell.astro'
       </div>
 
       <div class="au-open" id="openActs">
+        <div class="au-crowd" id="lotCrowd" aria-live="polite"></div>
         <button class="pill pill--hero" type="button" id="start">
           <span id="startLbl">Start the sale</span><span class="arrow" aria-hidden="true">→</span>
         </button>
@@ -122,6 +123,7 @@ import GameShell from '../layouts/GameShell.astro'
   import { bidderPortrait } from '../lib/auction-bidders'
   import { recordPlay } from '../lib/stats'
   import { dailyFor } from '../data/game-meta'
+  import { loadCrowd, fillCrowd, clearCrowd, share, people, FEW } from '../lib/crowd'
 
   const $ = (id: string) => document.getElementById(id)!
   const money = (n: number) => '£' + Math.round(n).toLocaleString('en-GB')
@@ -156,6 +158,7 @@ import GameShell from '../layouts/GameShell.astro'
   })
 
   $('lotArt').innerHTML = lotArt('fox')
+  loadCrowd('auction')
 
   /* ---- the room ---------------------------------------------------- */
 
@@ -224,6 +227,7 @@ import GameShell from '../layouts/GameShell.astro'
     idx++
     if (idx >= lots.length) return finish()
     const lot = lots[idx]
+    clearCrowd($('lotCrowd'))
     $('card').classList.remove('is-intro')
     showCard(lot)
     $('log').innerHTML = ''
@@ -324,7 +328,19 @@ import GameShell from '../layouts/GameShell.astro'
     outcomes.push(out)
     // For the crowd: what people did on each lot, and how far over value the buyers went.
     const lot = lots[idx]
-    shell.pick('What people did on each lot', wasYours ? 'Bought it' : bids > bidsAtLot ? 'Bid, then lost it' : 'Never bid', lot.title)
+    const did = wasYours ? 'Bought it' : bids > bidsAtLot ? 'Bid, then lost it' : 'Never bid'
+    shell.pick('What people did on each lot', did, lot.title)
+    // What everyone else did when this same lot came up.
+    fillCrowd($('lotCrowd'), 'auction', (c) => {
+      const mine = share(c, 'What people did on each lot', lot.title, did)
+      if (!mine) return FEW
+      const bought = share(c, 'What people did on each lot', lot.title, 'Bought it')!.pct
+      const n = people(mine.n)
+      const head = `<b>${bought}%</b> of ${n} players bought this lot.`
+      if (did === 'Bought it') return `${head} You were one of them.`
+      if (did === 'Never bid') return `${head} <b>${mine.pct}%</b> never bid on it at all, like you.`
+      return `${head} <b>${mine.pct}%</b> bid and lost it, like you.`
+    })
     if (wasYours) shell.pick('Paid vs worth on each lot (%)', Math.round((withPremium(out.hammer) / lot.value - 1) * 100), lot.title)
     if (!out.sold) {
       say('Not sold. It did not reach the reserve.', 'auctioneer')
@@ -526,6 +542,7 @@ import GameShell from '../layouts/GameShell.astro'
     border: 1.5px solid currentColor; font: 700 12px/1.5 var(--sans); text-align: center;
   }
   .au-open .au-keys { margin-top: 12px; }
+  .au-crowd:not(:empty) { margin-bottom: 14px; }
 
   .au-log { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 2px; max-height: 230px; overflow-y: auto; }
   .au-log li { padding: 8px 12px; border-radius: 10px; background: var(--paper2); font-size: 14px; }

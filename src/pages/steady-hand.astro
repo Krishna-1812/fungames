@@ -53,6 +53,7 @@ import { SHAPES } from '../lib/steady-shapes'
         <p class="sh-big num" id="bigScore">0.0%</p>
         <p class="sh-verdict" id="verdict"></p>
         <ul class="sh-factors" id="factors"></ul>
+        <div class="sh-crowd" id="shCrowd" aria-live="polite"></div>
         <div class="sh-acts">
           <button type="button" class="pill pill--ink" id="next"><span id="nextLbl">Next shape</span><span aria-hidden="true">→</span></button>
           <button type="button" class="pill pill--line pill--sm" id="redo"><span>Redo</span></button>
@@ -90,6 +91,7 @@ import { SHAPES } from '../lib/steady-shapes'
   import type { Score } from '../lib/steady-shapes'
   import { recordPlay } from '../lib/stats'
   import { dailyFor, dailyTarget } from '../data/game-meta'
+  import { loadCrowd, fillCrowd, clearCrowd, standing, people, FEW } from '../lib/crowd'
 
   type P = { x: number; y: number; t?: number }
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -118,6 +120,7 @@ import { SHAPES } from '../lib/steady-shapes'
   let round: Record<string, number> = {}
 
   const shell = createShell({ slug: 'steady-hand', onRestart: restart })
+  loadCrowd('steady-hand')
 
   /* Bests are per shape, and the old single number was the line. Reading it
      back rather than dropping it means nobody loses a score they earned. */
@@ -181,6 +184,7 @@ import { SHAPES } from '../lib/steady-shapes'
     locked = false
     lastScore = null
     result.hidden = true
+    clearCrowd($('shCrowd'))
     hint.textContent = shape.brief
     render()
   }
@@ -466,6 +470,15 @@ import { SHAPES } from '../lib/steady-shapes'
     result.hidden = false
     // Measurable only once it is laid out, so this has to follow the unhide.
     placeResult()
+    // Where this stroke stands among everyone else's kept score on the same shape.
+    const kept = Math.round(s.score), drawn = shape
+    fillCrowd($('shCrowd'), 'steady-hand', (c) => {
+      const st = standing(c, 'Score kept, per shape', drawn.name, kept)
+      if (!st) return FEW
+      return st.pct >= 50
+        ? `Steadier than <b>${st.pct}%</b> of ${people(st.n)} players on this shape.`
+        : `${100 - st.pct}% of ${people(st.n)} players drew this shape better. Redraw it?`
+    }).then(() => { if (!result.hidden) placeResult() })
     hint.textContent = ''
     shell.announce(`${shape.name}: ${txt}. ${verdictFor(s.score)}`)
     paintRound()
@@ -629,6 +642,7 @@ import { SHAPES } from '../lib/steady-shapes'
   html.play .sh-card { transition: left 260ms var(--ease), top 260ms var(--ease); }
   .sh-big { font-size: 52px; }
   .sh-verdict { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: 22px; line-height: 1.1; letter-spacing: -0.02em; }
+  .sh-crowd:not(:empty) { margin-top: 12px; }
   .sh-factors { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; width: 100%; }
   .sh-factors li { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: baseline; font-size: 13px; }
   .sh-factors span { color: var(--ink2); font-weight: 600; }

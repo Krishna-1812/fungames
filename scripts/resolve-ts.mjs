@@ -19,6 +19,10 @@ export async function resolve(specifier, context, nextResolve) {
     for (const ext of EXTS) {
       if (existsSync(fileURLToPath(base + ext))) return nextResolve(base + ext, context)
     }
+    // A folder, as Vite reads it: its index.
+    for (const ext of EXTS) {
+      if (existsSync(fileURLToPath(base + '/index' + ext))) return nextResolve(base + '/index' + ext, context)
+    }
   }
   return nextResolve(specifier, context)
 }

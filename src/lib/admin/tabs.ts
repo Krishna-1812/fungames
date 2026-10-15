@@ -137,7 +137,7 @@ export const EV: Record<string, string> = {
   isl_surprise: 'surprise me', isl_today: 'today', isl_board: 'noticeboard', isl_board_go: 'noticeboard', isl_poke: 'poked', isl_bottle: 'bottle',
   isl_postcard: 'postcard', isl_passport: 'passport', isl_cover: 'cover', isl_time: 'day/night', isl_welcome: 'welcome', isl_minimap: 'mini-map',
   isl_ball: 'ball', isl_pigeons: 'pigeons', isl_session: 'explored', isl_fps: 'island fps',
-  game_pick: 'picked', game_quit: 'left mid-game', isl_tap: 'tapped the map',
+  game_pick: 'picked', game_quit: 'left mid-game', isl_tap: 'tapped the map', next_show: 'saw up next', next_go: 'went on to',
 }
 const propsText = (p: Record<string, unknown>) => Object.entries(p ?? {}).slice(0, 5).map(([k, v]) => `${k}: ${v}`).join(' · ')
 function feed(c: Ctx, events: Any[]) {

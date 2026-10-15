@@ -5,10 +5,11 @@ import { DILEMMAS } from '../data/dilemmas'
 /**
  * Trolley — the moral-dilemma archetype.
  *
- * The reference game shows "what % of players chose this", which needs a
- * backend collecting votes. Rather than invent plausible-looking percentages,
- * this version scores your own answers against four named ethical positions and
- * tells you which one you actually argued for. No fabricated statistics.
+ * Two kinds of number, never mixed up. After each choice, what share of the
+ * other players chose the same (lib/crowd.ts): real answers, counted by the
+ * site's own analytics, shown only once enough people have answered. And at
+ * the end, your own answers scored against four named ethical positions, to
+ * say which one you actually argued for.
  *
  * The problems and the scoring live in data/dilemmas.ts, where every case
  * records what each position says about it. scripts/check-trolley.mjs plays the
@@ -55,6 +56,7 @@ const first = DILEMMAS[0]
       <div class="tr-outcome" id="outcome" hidden>
         <p class="label tr-toll" id="toll">1 death</p>
         <p class="tr-outcome-text" id="outcomeText"></p>
+        <div class="tr-crowd" id="crowd" aria-live="polite"></div>
         <button type="button" class="pill pill--ink" id="nextBtn">
           <span id="nextLbl">Next problem</span><span aria-hidden="true">→</span>
         </button>
@@ -71,19 +73,23 @@ const first = DILEMMAS[0]
     <ul>
       <li>There is no right answer, and no way to lose.</li>
       <li>At the end your choices are compared against four ethical positions, and you are told which one you actually argued for — and how consistently.</li>
-      <li>Nothing here is a crowd statistic. Every percentage is about your own answers.</li>
+      <li>After each choice you see what share of other players chose the same. The verdict at the end is about your answers alone.</li>
     </ul>
     <p>Keys: <kbd>←</kbd> or <kbd>1</kbd> for the left choice, <kbd>→</kbd> or <kbd>2</kbd> for the right, <kbd>N</kbd> for the next problem.</p>
   </Fragment>
 
   <details class="tr-real" slot="after">
-    <summary class="label">Why there are no crowd percentages</summary>
+    <summary class="label">Where the numbers come from</summary>
     <p>
-      The famous version of this game tells you what percentage of other
-      players chose the same as you. That needs a server counting votes, and
-      this site has none — so rather than invent plausible-looking numbers,
-      every problem records what four named ethical positions say about it,
-      and the ending measures you against those.
+      The share of players who chose the same as you is real: every choice
+      made here is counted, anonymously, and a problem shows its share only
+      once enough people have answered it. Your own answer is not in the
+      figure you see; it joins the count a little later.
+    </p>
+    <p>
+      The verdict at the end is about you alone. Every problem records what
+      four named ethical positions say about it, and the ending measures your
+      answers against those.
     </p>
     <p>
       A position that genuinely has nothing to say about a case is left out
@@ -103,6 +109,7 @@ const first = DILEMMAS[0]
   import { DILEMMAS, POSITIONS, scoreAnswers, REPEAT_OF_FIRST } from '../data/dilemmas'
   import type { Side } from '../data/dilemmas'
   import { dailyFor, dailyTarget } from '../data/game-meta'
+  import { loadCrowd, fillCrowd, share, people, esc, pct, FEW } from '../lib/crowd'
 
   const TOTAL = DILEMMAS.length
   const $ = (id: string) => document.getElementById(id)!
@@ -120,6 +127,7 @@ const first = DILEMMAS[0]
   let picks: Side[] = []
 
   const shell = createShell({ slug: 'trolley', onRestart: restart })
+  loadCrowd('trolley')
 
   /* ---- the scene ------------------------------------------------------ */
 
@@ -198,6 +206,16 @@ const first = DILEMMAS[0]
     if (opt.acts) pulls++
     picks[i] = side
     shell.pick('Choice on each dilemma', opt.label, d.title)
+    // Everyone else's answer to this same problem, under the outcome.
+    const other = d[side === 'left' ? 'right' : 'left'].label
+    fillCrowd($('crowd'), 'trolley', (c) => {
+      const s = share(c, 'Choice on each dilemma', d.title, opt.label)
+      if (!s) return FEW
+      const n = people(s.n)
+      if (s.pct >= 70) return `<b>${s.pct}%</b> of ${n} players made the same choice.`
+      if (s.pct >= 40) return `<b>${s.pct}%</b> of ${n} players made the same choice. The rest chose “${esc(other)}”.`
+      return `Only <b>${s.pct}%</b> of ${n} players chose this. Most went for “${esc(other)}”.`
+    })
 
     btn[side].classList.add('is-chosen')
     btn.left.disabled = true
@@ -250,10 +268,11 @@ const first = DILEMMAS[0]
   /* ---- the verdict ---------------------------------------------------- */
 
   function finish() {
-    /* Every percentage below is your own agreement rate with a position, over
-       the problems that position actually takes a side on. Nothing here is a
-       crowd statistic, because there is no crowd. */
+    /* Every percentage in the positions below is your own agreement rate with
+       a position, over the problems that position actually takes a side on.
+       The crowd's figures are kept apart, in their own block under them. */
     const scored = scoreAnswers(picks)
+    const answered = picks.map((side, k) => ({ k, d: DILEMMAS[k], label: DILEMMAS[k][side].label }))
     const [top, runner] = scored
     const tie = top.pct === runner.pct
 
@@ -273,7 +292,18 @@ const first = DILEMMAS[0]
             <small>You agreed with it on ${s.agreed} of the ${s.of} problems it has a view about.</small>
           </li>`).join('')}
         </ul>
+        <div class="tr-crowdsum" id="crowdSum" aria-live="polite"></div>
       </div>`
+    // Beside the four positions, the crowd: how often you chose with the
+    // majority, and the problems where you stood furthest from it.
+    fillCrowd($('crowdSum'), 'trolley', (c) => {
+      const seen = answered.map((a) => ({ ...a, s: share(c, 'Choice on each dilemma', a.d.title, a.label) })).filter((a) => a.s)
+      if (seen.length < 5) return null
+      const withMost = seen.filter((a) => a.s!.pct >= 50).length
+      const apart = seen.filter((a) => a.s!.pct < 50).sort((a, b) => a.s!.pct - b.s!.pct).slice(0, 3)
+      return `<span class="tr-cs-head">You sided with the majority on <b>${withMost} of ${seen.length}</b> problems (${pct(withMost, seen.length)}%).</span>`
+        + (apart.length ? `<span class="tr-cs-list">Where you stood furthest from everyone else:</span><ul>${apart.map((a) => `<li><b>${esc(a.d.title)}</b>: only ${a.s!.pct}% of ${people(a.s!.n)} chose “${esc(a.label)}”</li>`).join('')}</ul>` : '<span class="tr-cs-list">Not once did you take the minority side.</span>')
+    }, 'crowd-note--block')
 
     // The twenty-fifth problem is the first one again. Whether you answered it
     // the same way is the one thing this game can measure about you directly.
@@ -385,6 +415,11 @@ const first = DILEMMAS[0]
   .tr-toll { font-size: 13px; }
   .tr-outcome-text { font-size: 17px; line-height: 1.45; font-weight: 500; max-width: 46ch; text-wrap: pretty; }
   .tr-keys { font-size: 13px; }
+  .tr-crowd:empty, .tr-crowdsum:empty { display: none; }
+  .tr-crowdsum { padding-top: 14px; border-top: 1px solid rgba(246, 244, 240, 0.22); max-width: 70ch; }
+  .tr-crowdsum ul { margin: 8px 0 0; padding-left: 1.1em; display: grid; gap: 4px; }
+  .tr-cs-head, .tr-cs-list { display: block; }
+  .tr-cs-list { margin-top: 8px; opacity: 0.86; }
   .tr-keys kbd, .tr-real kbd {
     display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 6px;
     border: 1.5px solid currentColor; font: 700 12px/1.5 var(--sans); text-align: center;

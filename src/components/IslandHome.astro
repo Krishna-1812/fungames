@@ -8,6 +8,7 @@ import { faviconSvg } from '../lib/favicon'
 import { homeGames, homeIsland, homeBake, hasRealWorld, type World } from '../lib/island/home'
 import { plateInfo } from '../lib/island/plate'
 import { cardCss } from '../lib/island/moves'
+import { cardFrame } from '../lib/island/card-art'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
 import { inkIcon } from '../lib/ink-icon'
@@ -58,21 +59,8 @@ const districtOf = Object.fromEntries(PLACES.map(([s, d]) => [s, d]))
 const tintOf = (slug: string) => DISTRICTS.find((d) => d.key === districtOf[slug])?.tint ?? '#e3e9ff'
 const CHIP: Record<string, string> = { science: 'Real science', you: 'Measures you', money: 'Money', fun: 'Just because' }
 
-// Each card frames its building by its footprint and its body, not by
-// everything it draws: a lighthouse beam or a space elevator's cable would
-// shrink the building to a speck.
-const frame = (slug: string) => {
-  const a = island.anchors[slug]
-  const pts = a.foot.split(' ').map((p) => p.split(',').map(Number))
-  const fx0 = Math.min(...pts.map((p) => p[0])), fx1 = Math.max(...pts.map((p) => p[0])), fy1 = Math.max(...pts.map((p) => p[1]))
-  const footW = fx1 - fx0
-  const top = Math.max(a.y0, fy1 - footW * 1.25)
-  let h = Math.max(footW * 0.95, (fy1 - top) * 1.16)
-  let w = (h * 4) / 3
-  if (w < footW * 1.2) { w = footW * 1.2; h = (w * 3) / 4 }
-  const cx = (fx0 + fx1) / 2, bottom = fy1 + h * 0.08
-  return `${(cx - w / 2).toFixed(1)} ${(bottom - h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`
-}
+// Each card frames its building by its footprint and its body (lib/island/card-art.ts).
+const frame = (slug: string) => cardFrame(island, slug).join(' ')
 
 // Messages in bottles: where each lies (for the passport's hint), and how a bottle is drawn in the book.
 const DNAME = Object.fromEntries(DISTRICTS.map((d) => [d.key, d.name]))

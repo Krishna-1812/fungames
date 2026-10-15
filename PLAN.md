@@ -513,6 +513,34 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   was not: the empty channel was click rhythm, genuinely empty because the run
   was driven with synthetic clicks.
 
+- ~~**No dead ends: Up next**~~ **done** (2026-10-15). Every game's page
+  now offers three more games: in the result card once a game ends, and at
+  the foot of the page for everyone else (the explore pages, and anyone who
+  scrolls). `lib/next-up.ts` picks them for three different reasons, so they
+  are never three of a kind: today's challenge (when it is another game and
+  not played today), *more like this* (same category) and *something
+  different* (the other kind of play, another category), with a game not yet
+  in the passport always first and the order shuffled by the day. Each card is
+  the game's own building from the island, rendered at build time from the
+  homepage card's art with every definition it borrows written in
+  (`lib/island/card-art.ts`, `pages/next/[world]/[slug].webp.ts`), in whichever
+  island the visitor last chose. A visitor who has only ever opened this one
+  game (a shared link) is told how many more there are. `next_show` and
+  `next_go` count whether any of it works. `check-next-up.mjs`.
+
+- ~~**The crowd percentages**~~ **done** (2026-10-15). Trolley used to
+  explain that it had no crowd figures because there was no server. There is
+  one now (the analytics), and every game already sent its choices to it, so
+  seven games show them back: Trolley after each problem and in the verdict
+  (where you parted from the majority), Dark Patterns per site, the Auction
+  per lot, Steady Hand, From Memory and Constellation Draw as a standing
+  ("steadier than 64%"), Rule Cascade and Spend It at the end.
+  `api/crowd` answers with counts only, for an allow-list of questions,
+  drops any group under ten answers, and is cached at the edge for ten
+  minutes; the page says "too few answers yet" rather than a percentage of
+  nine people, and every figure is worded as *other* players, because your own
+  answer is still on its way. `check-crowd.mjs` runs the real SQL.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

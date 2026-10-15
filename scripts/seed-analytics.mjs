@@ -190,6 +190,31 @@ for (let v = 0; v < 420; v++) {
     }
   }
 }
+// A crowd for every game that shows its players one (lib/analytics/crowd.ts),
+// big enough to pass its minimum, with the games' own names and answers.
+{
+  const Dl = await import('../src/data/dilemmas.ts'), DP = await import('../src/lib/dark-patterns.ts'), Lt = await import('../src/data/lots.ts'), Me = await import('../src/data/memory.ts'), CT = await import('../src/lib/constellation-trace.ts'), SC = await import('../src/lib/star-catalog.ts')
+  const figs = SC.CONSTELLATIONS.slice(0, 12).map((c) => CT.figureName(c.id ?? c.abbr ?? c))
+  const lean = DP.PATTERNS.map(() => 0.2 + rnd() * 0.6)
+  const CROWD = {
+    trolley: () => Dl.DILEMMAS.map((x) => { const p = 0.15 + (Math.sin(x.title.length * 7.1) + 1) * 0.35; return ['Choice on each dilemma', rnd() < p ? x.left.label : x.right.label, x.title] }),
+    'dark-patterns': () => DP.PATTERNS.map((p, i) => ['Fell for each pattern', rnd() < lean[i], p.title]),
+    auction: () => Lt.CATALOGUE.slice(0, 8).map((lot) => ['What people did on each lot', wpick([['Bought it', 3], ['Bid, then lost it', 4], ['Never bid', 3]]), lot.title]),
+    'steady-hand': () => ['Line', 'Circle', 'Square', 'Spiral'].map((sh) => ['Score kept, per shape', Math.max(5, Math.min(99, Math.round({ Line: 82, Circle: 70, Square: 64, Spiral: 48 }[sh] + (rnd() - 0.5) * 40))), sh]),
+    'from-memory': () => Me.ITEMS.map((it) => ['Likeness for each thing (%)', Math.round(15 + rnd() * rnd() * 80), it.reveal]),
+    'constellation-draw': () => figs.map((n) => ['Accuracy, per figure', Math.round(20 + rnd() * 75), n]),
+    'rule-cascade': () => Array.from({ length: 31 }, (_, i) => ['Seconds to clear each rule', Math.round(3 + rnd() * (8 + (i % 7) * 9)), 'Rule ' + (i + 1)]),
+    'spend-it': () => { const p = Math.round(rnd() < 0.12 ? 100 : rnd() * 99); return [['Spent it all', p === 100], ['Fortune spent (%)', p]] },
+  }
+  for (const [game, make] of Object.entries(CROWD)) for (let k = 0; k < 140; k++) {
+    const t = NOW - rnd() * 20 * 864e5
+    const e = make().map(([what, v, of]) => ({ n: 'game_pick', t: t + 4000, p: of ? { what, v, of } : { what, v } }))
+    const b = S.parseBatch(JSON.stringify({ v: 1, pid: id(), c: 'na', view: { path: '/' + game + '/' }, e: [{ n: 'game_start', t: t + 3000 }, ...e] }), t + 864e5 - 1000)
+    if (!b) throw new Error('bad crowd batch ' + game)
+    await I.ingest(d, b, { ip: '10.9.' + (k % 250) + '.1', ua: UAS[0][0][1], host: 'localhost:4321', country: 'IN', region: null, city: null, lat: null, lon: null }, new Date(t))
+    views++; evs += b.events.length
+  }
+}
 // A few broken links.
 for (const p of ['/powdr/', '/orbit/x/', '/old-page/']) {
   const b = S.parseBatch(JSON.stringify({ v: 1, pid: id(), view: { path: p, status: 404 }, e: [{ n: 'notfound', t: NOW - 3600e3, p: { path: p } }] }), NOW)

@@ -70,6 +70,7 @@ const ROUND = TIERS.length
       <div class="cd-verdict" id="verdict" hidden tabindex="-1">
         <span class="num cd-big" id="vScore">0%</span>
         <ul class="cd-facts" id="vFacts"></ul>
+        <div class="cd-crowd" id="cdCrowd" aria-live="polite"></div>
         <button type="button" class="pill pill--ink" id="nextBtn"><span id="nextLbl">Next figure</span><span aria-hidden="true">→</span></button>
       </div>
     </div>
@@ -163,6 +164,7 @@ const ROUND = TIERS.length
   import { PLAY } from '../lib/motion'
   import { sfx } from '../lib/audio'
   import { recordPlay } from '../lib/stats'
+  import { loadCrowd, fillCrowd, standing, people, FEW } from '../lib/crowd'
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
   const root = $('cd')
@@ -235,6 +237,7 @@ const ROUND = TIERS.length
     onResume: resumeMemo,
   })
 
+  loadCrowd('constellation-draw')
   const railEls = [...$('rail').children] as HTMLLIElement[]
   const avg = () => (results.length ? Math.round(results.reduce((a, r) => a + r.score, 0) / results.length) : 0)
 
@@ -367,6 +370,14 @@ const ROUND = TIERS.length
     ]
     if (peeks) facts.push(`<li><b>${peeks}</b> peek${peeks === 1 ? '' : 's'}, −${PEEK_COST * peeks}</li>`)
     $('vFacts').innerHTML = facts.join('')
+    // Everyone else who traced this same figure from memory.
+    fillCrowd($('cdCrowd'), 'constellation-draw', (c) => {
+      const st = standing(c, 'Accuracy, per figure', figureName(id), score)
+      if (!st) return FEW
+      return st.pct >= 50
+        ? `More accurate than <b>${st.pct}%</b> of ${people(st.n)} players on ${figureName(id)}.`
+        : `<b>${100 - st.pct}%</b> of ${people(st.n)} players traced ${figureName(id)} more closely.`
+    })
     $('briefKicker').textContent = `Figure ${idx + 1} of ${figures.length} · ${verdictFor(score).name.replace(/\.$/, '')}`
     $('briefSub').textContent = trace.missed.length || trace.extra.length
       ? 'Mint you got, red is not in it, dashed you missed.'
@@ -1003,6 +1014,8 @@ const ROUND = TIERS.length
   .cd-big { font-size: clamp(40px, 5vw, 56px); line-height: 1; }
   .cd-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 14px; color: var(--ink2); }
   .cd-facts b { color: var(--ink); }
+  .cd-crowd { flex-basis: 100%; }
+  .cd-crowd:empty { display: none; }
 
   /* The free sky's bar: search and whatever constellation you just flew to. */
   .cd-search { position: relative; flex: 0 1 320px; min-width: 220px; }

@@ -215,3 +215,106 @@ html.play .panel[open] { animation: panel-in 420ms var(--spring) both; }
 html.play .panel[open]::backdrop { animation: veil-in 260ms var(--ease) both; }
 @keyframes panel-in { from { opacity: 0; transform: scale(0.9); } }
 @keyframes veil-in { from { opacity: 0; } }
+
+/* ---- the crowd: what everyone else did (lib/crowd.ts) ------------------ */
+/* Built at runtime and set inside every kind of block a game has (a sky
+   verdict, a red one, the ink result card, a white panel), so it takes its
+   colour from wherever it lands and only tints its own ground. */
+.crowd-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--r);
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+  max-width: 60ch;
+}
+.crowd-note svg { flex: none; width: 20px; height: 20px; margin-top: 1px; opacity: 0.75; }
+.crowd-note b { font-weight: 800; }
+.crowd-note--block { display: block; padding: 16px 18px; }
+.crowd-note--block > svg { display: none; }
+.crowd-note--block ul { margin: 8px 0 0; padding-left: 1.1em; display: grid; gap: 4px; }
+html.play .crowd-note { animation: crowd-in 520ms var(--ease) both; }
+@keyframes crowd-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---- up next: three more games (lib/next-up.ts) ------------------------- */
+/* Twice on every game's page: in the ink result card when a game ends, and
+   at the foot of the page for everyone else (and every game with no ending).
+   Each card is its building from the island, on its district's colour. */
+.nx-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+.nx-title-h { font-size: var(--fs-h3); }
+.nx-home {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: inherit; font-size: 15px; font-weight: 600;
+  text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  transition: text-decoration-color var(--t-fast) var(--ease);
+}
+.nx-home:hover { text-decoration-color: currentColor; }
+.nx-home span[aria-hidden] { text-decoration: none; transition: transform var(--t-fast) var(--ease); }
+.nx-home:hover span[aria-hidden] { transform: translateX(3px); }
+
+.nx--end { margin-top: 40px; padding-top: 28px; border-top: 1px solid rgba(246, 244, 240, 0.2); }
+.nx--foot { margin-top: clamp(40px, 6vw, 72px); padding-bottom: clamp(48px, 7vw, 96px); }
+
+.nx-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); margin-top: 18px; }
+
+.nx-card {
+  --lift: 0px;
+  display: grid; grid-template-rows: auto 1fr;
+  overflow: hidden; border-radius: var(--r-lg);
+  background: var(--card); color: var(--ink); text-decoration: none;
+  box-shadow: var(--shadow-block);
+  transform: translateY(calc(-1 * var(--lift)));
+  transition: transform 300ms var(--spring), box-shadow 300ms var(--ease);
+}
+.nx-card:hover { --lift: 4px; box-shadow: 0 26px 48px rgba(0, 0, 0, 0.14); }
+.nx-card:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+.nx-art {
+  position: relative; display: block; aspect-ratio: 4 / 3; overflow: hidden;
+  background: var(--tint);
+}
+.nx-art img { position: absolute; inset: 7% 4% 0; width: 92%; height: 93%; object-fit: contain; transition: transform 420ms var(--spring); }
+.nx-card:hover .nx-art img { transform: scale(1.06) translateY(-2px); }
+.nx-body { display: grid; align-content: start; gap: 6px; padding: 14px 16px 18px; }
+.nx-why {
+  justify-self: start; padding: 4px 10px; border-radius: var(--r-pill);
+  background: var(--paper2); color: var(--ink);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.2;
+  white-space: nowrap;
+}
+.nx-why--daily { background: var(--mint); }
+.nx-why--like { background: var(--sky); }
+.nx-why--different { background: var(--lilac); }
+.nx-why--new { background: var(--cobalt); }
+.nx-title {
+  margin-top: 4px;
+  font-family: var(--display); font-variation-settings: var(--display-axes);
+  font-size: 22px; font-weight: 600; line-height: 1.05; letter-spacing: -0.01em;
+}
+.nx-blurb {
+  font-size: 14px; line-height: 1.4; color: var(--ink2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.nx-stamp { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--t-teal); }
+.nx-stamp::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 2px color-mix(in oklab, var(--mint) 35%, transparent); }
+
+/* A phone: one game a row, its building beside its name. */
+@media (max-width: 720px) {
+  .nx-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .nx-card { grid-template-rows: none; grid-template-columns: 116px minmax(0, 1fr); border-radius: var(--r); }
+  .nx-art { aspect-ratio: auto; min-height: 100%; }
+  .nx-body { padding: 12px 14px 14px; gap: 4px; }
+  .nx-title { font-size: 19px; }
+  .nx-blurb { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-card, .nx-art img { transition: none; }
+  .nx-card:hover { --lift: 0px; }
+  .nx-card:hover .nx-art img { transform: none; }
+}

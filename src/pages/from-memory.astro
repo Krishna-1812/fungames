@@ -60,6 +60,7 @@ import { ROUND_SIZE } from '../data/memory'
       <p class="label">Likeness</p>
       <p class="fm-score"><span class="num" id="vScore">0%</span><span class="fm-word" id="vWord">Close</span></p>
       <p class="fm-why" id="vWhy"></p>
+      <div class="fm-crowd" id="fmCrowd" aria-live="polite"></div>
       <p class="fm-fact" id="fact"></p>
       <div class="fm-actions">
         <button type="button" class="pill pill--ink" id="nextBtn"><span id="nextLbl">Next drawing</span><span aria-hidden="true">→</span></button>
@@ -127,6 +128,7 @@ import { ROUND_SIZE } from '../data/memory'
   import { download } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
   import { dailyFor, dailyTarget } from '../data/game-meta'
+  import { loadCrowd, fillCrowd, standing, people, FEW } from '../lib/crowd'
 
   /* Ten of the sixteen, freshly drawn each visit, with the bicycle always
      first. A pool bigger than the sitting is the difference between a thing you
@@ -153,6 +155,7 @@ import { ROUND_SIZE } from '../data/memory'
   let scores: Likeness[] = []
 
   const shell = createShell({ slug: 'from-memory', onRestart: restart })
+  loadCrowd('from-memory')
   const ink = new InkSurface(pad)
   const reveal = new Reveal(ref)
 
@@ -327,6 +330,15 @@ import { ROUND_SIZE } from '../data/memory'
       : `You drew ${Math.round(s.coverage * 100)}% of the real shape, and ${Math.round(s.precision * 100)}% of your ink was on it` +
         (s.aligned ? ', once your drawing was lined up with it.' : '.')
     el('fact').textContent = it.fact
+    // Everyone else who drew this same thing from memory.
+    if (strokes.length) fillCrowd(el('fmCrowd'), 'from-memory', (c) => {
+      const st = standing(c, 'Likeness for each thing (%)', it.reveal, s.score)
+      if (!st) return FEW
+      return st.pct >= 50
+        ? `A better likeness than <b>${st.pct}%</b> of ${people(st.n)} players managed.`
+        : `<b>${100 - st.pct}%</b> of ${people(st.n)} players drew it closer. It is harder than it looks.`
+    })
+    else el('fmCrowd').replaceChildren()
     el('nextLbl').textContent = i + 1 >= ROUND.length ? 'See all ten' : 'Next drawing'
     el('tools').hidden = true
     verdict.hidden = false
@@ -523,6 +535,7 @@ import { ROUND_SIZE } from '../data/memory'
   .fm-score .num { font-size: clamp(56px, 7vw, 88px); }
   .fm-word { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-style: italic; font-size: var(--fs-h3); letter-spacing: -0.02em; }
   .fm-why { font-weight: 600; max-width: 42ch; }
+  .fm-crowd:empty { display: none; }
   .fm-fact { font-size: 15px; line-height: 1.5; max-width: 46ch; }
   .fm-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
   .fm-status { font-size: 13px; font-weight: 600; }

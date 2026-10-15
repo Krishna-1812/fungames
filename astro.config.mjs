@@ -70,7 +70,8 @@ function islandFilesInDev() {
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
-        if (req.url && /\/island\/[0-9a-f]+\/[^?]+\.(?:webp|json)(?:\?|$)/.test(req.url)) req.url = req.url.replace(/\.(webp|json)(\?|$)/, (_, ext, q) => `.${ext}/${q}`)
+        // And the Up next cards' building pictures (src/pages/next/[world]/[slug].webp.ts).
+        if (req.url && /\/(?:island\/[0-9a-f]+|next\/[a-z]+)\/[^?]+\.(?:webp|json)(?:\?|$)/.test(req.url)) req.url = req.url.replace(/\.(webp|json)(\?|$)/, (_, ext, q) => `.${ext}/${q}`)
         next()
       })
     },

@@ -63,6 +63,7 @@ import { productSvg } from '../lib/spend-art'
       <ul class="sp-lines" id="lines"></ul>
       <div class="sp-totals"><span>Total spent</span><b id="spent">$0</b></div>
       <div class="sp-totals"><span>Left over</span><b id="left">$100,000,000,000</b></div>
+      <div class="sp-crowd" id="sheetCrowd" aria-live="polite"></div>
     </div>
     <div class="panel-actions">
       <button type="button" class="pill pill--hero" id="closeSheet"><span>Keep spending</span><span class="arrow" aria-hidden="true">→</span></button>
@@ -97,6 +98,7 @@ import { productSvg } from '../lib/spend-art'
   import { createShell } from '../lib/game-shell'
   import { recordPlay } from '../lib/stats'
   import { onLeave } from '../lib/analytics/client'
+  import { loadCrowd, fillCrowd, share, standing, people } from '../lib/crowd'
     const { BUDGET, ICONS } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const money = document.getElementById('money')
@@ -340,6 +342,15 @@ import { productSvg } from '../lib/spend-art'
     spentEl.textContent = usd(BUDGET - left)
     leftEl.textContent = usd(left)
     buildShareCard(bought, left)
+    // How far everyone else got before they left.
+    const spentPct = Math.round((1 - left / BUDGET) * 100)
+    fillCrowd(document.getElementById('sheetCrowd'), 'spend-it', (c) => {
+      const st = standing(c, 'Fortune spent (%)', '', spentPct)
+      const all = share(c, 'Spent it all', '', true)
+      if (!st || spentPct === 0) return null
+      const head = st.pct >= 50 ? `You’ve spent more of it than <b>${st.pct}%</b> of ${people(st.n)} players did.` : `<b>${100 - st.pct}%</b> of ${people(st.n)} players spent more of it than you have so far.`
+      return all ? `${head} Only ${all.pct}% ever spend every last dollar.` : head
+    })
     sheet.showModal()
   })
   document.getElementById('closeSheet').addEventListener('click', () => sheet.close())
@@ -368,7 +379,12 @@ import { productSvg } from '../lib/spend-art'
     const acts = document.createElement('div')
     acts.className = 'sp-report-acts'
     acts.innerHTML = '<button type="button" class="pill pill--line pill--line-paper" id="shareBtn"><span>Share the receipt</span></button>'
-    shell.resultExtra.replaceChildren(ul, acts)
+    const crowdEl = document.createElement('div')
+    shell.resultExtra.replaceChildren(crowdEl, ul, acts)
+    fillCrowd(crowdEl, 'spend-it', (c) => {
+      const all = share(c, 'Spent it all', '', true)
+      return all ? `Only <b>${all.pct}%</b> of ${people(all.n)} players ever get it to zero. You did.` : null
+    })
     document.getElementById('shareBtn').addEventListener('click', async (e) => {
       if (!shareCard) return
       const label = e.currentTarget.querySelector('span')
@@ -397,6 +413,7 @@ import { productSvg } from '../lib/spend-art'
     shell.pick('Fortune spent (%)', Math.round((1 - left / BUDGET) * 100))
   }
 
+  loadCrowd('spend-it')
   load()
   told = items.map((i) => i.n)
   render()
@@ -407,6 +424,8 @@ import { productSvg } from '../lib/spend-art'
      Everything is prefixed. */
   .sp { display: grid; gap: 18px; }
   .sp [hidden] { display: none !important; }
+  .sp-crowd:not(:empty) { margin-top: 14px; }
+  .result-extra > div:has(> .crowd-note) { margin-bottom: 18px; }
 
   /* The balance: sticky, so it stays in view while the shop scrolls under it. */
   .sp-bar {
