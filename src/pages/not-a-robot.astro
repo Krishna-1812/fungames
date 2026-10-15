@@ -1304,7 +1304,7 @@ const sceneDefs = HAND_DEFS
     const now = new Date()
     if (dailyFor(now).slug === 'not-a-robot') {
       const need = dailyTarget.humanity(now)
-      lines.push(r.humanity >= need ? `✓ Daily challenge beaten: ${need}% human or more.` : `✗ Daily challenge: look at least ${need}% human.`)
+      shell.daily(r.humanity >= need, `The target: get through all twelve checks looking at least ${need}% human. You looked ${r.humanity}% human.`)
     }
 
     rc.hidden = true

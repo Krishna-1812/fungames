@@ -676,7 +676,7 @@ const total = PATTERNS.length
     const now = new Date()
     if (dailyFor(now).slug === 'dark-patterns') {
       const need = dailyTarget.dodges(now)
-      lines.push(dodged >= need ? `✓ Daily challenge beaten: ${need} or more dodged.` : `✗ Daily challenge: dodge ${need} or more.`)
+      shell.daily(dodged >= need, `The target: get through ${need} or more of the ${TOTAL} sites without falling for the trick. You got through ${dodged}.`)
     }
     const ending = { kicker: `Site ${TOTAL} of ${TOTAL} · the verdict`, score: `${dodged} / ${TOTAL}`, from: `0 / ${TOTAL}`, lines, againLabel: 'Run it again' }
     if (dodged === TOTAL) shell.win({ ...ending, title: 'You saw through every one.' })

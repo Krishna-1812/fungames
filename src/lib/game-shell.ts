@@ -9,6 +9,8 @@ import { isMuted, setMuted, unlock, sfx } from './audio'
 import { bestKey, dailyFor } from '../data/game-meta'
 import { recordVisit, readPassport, localDay } from './passport'
 import { mountNext } from './next-up'
+import { mountDaily } from './daily-ui'
+import { readDaily, utcDay } from './daily'
 import { track, onLeave } from './analytics/client'
 
 export type ShellOptions = {
@@ -77,7 +79,11 @@ export function createShell(opts: ShellOptions) {
   // A stamp in the island's passport: once a day, however often the page loads.
   recordVisit(opts.slug)
   // Three more games: at the foot of the page, and in the result card once there is one.
-  const next = mountNext(opts.slug, { visits: readPassport().visits, today: localDay(), daily: dailyFor(new Date()).slug, track: (n, p, g) => track(n, p, g) })
+  // Today's challenge, unless it is already done today.
+  const todays = dailyFor(new Date()).slug
+  const next = mountNext(opts.slug, { visits: readPassport().visits, today: localDay(), daily: readDaily().days[utcDay()]?.g === todays ? null : todays, track: (n, p, g) => track(n, p, g) })
+  // The daily challenge's banner and streak, when this is today's game.
+  const daily = mountDaily(opts.slug, (n, p, g) => track(n, p, g))
 
   // Analytics: every game reports the same things through here (see
   // lib/analytics/shape.ts for the list). The game starts at the first touch,
@@ -239,6 +245,7 @@ export function createShell(opts: ShellOptions) {
   function reset() {
     result.hidden = true
     next.reset()
+    daily.reset()
     stage.classList.remove('is-lost')
     beatenThisRun = false
     runStartBest = best
@@ -352,6 +359,12 @@ export function createShell(opts: ShellOptions) {
     lose,
     reset,
     openHowTo: () => openPanel(howtoPanel),
+    /**
+     * A round of today's challenge has ended (call it before win or lose):
+     * `ok` is whether its target was beaten, `note` says what the target was.
+     * Does nothing on any other day's game.
+     */
+    daily: (ok: boolean, note: string) => { if (dailyFor(new Date()).slug === opts.slug) daily.finish(ok, note) },
     /**
      * A choice, a discovery or a step inside the game, for the crowd's
      * statistics on the admin page: `what` names the question ("Choice on

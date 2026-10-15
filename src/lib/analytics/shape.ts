@@ -47,6 +47,7 @@ export const EVENTS = {
   sound: 'sound was switched on or off',
   share: 'a result was shared, saved or copied',
   next_show: 'the Up next games were seen, at an ending or at the foot of a game',
+  daily_done: 'a round of the daily challenge was finished: beaten or not, and the streak it made',
   next_go: 'an Up next game (or the island) was picked: why it was offered, and which',
   // the island
   isl_dive: 'a game was entered from the island',

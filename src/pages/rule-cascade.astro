@@ -223,7 +223,7 @@ const total = RULES.length
           : `Your best is still ${shell.best?.text}.`,
       ]
       if (daily.slug === 'rule-cascade' && cap)
-        lines.push(keystrokes < cap ? `✓ Daily challenge beaten: under ${cap} keystrokes.` : `✗ Daily challenge: under ${cap} keystrokes to beat it.`)
+        shell.daily(keystrokes < cap, `The target: all ${TOTAL} rules in fewer than ${cap} keystrokes. You took ${keystrokes.toLocaleString('en-GB')}.`)
       // The crowd: how your slowest rule compares, and which rule holds everyone up.
       const hold = slowest
       const crowdEl = document.createElement('div')

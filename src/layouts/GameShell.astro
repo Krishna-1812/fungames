@@ -141,6 +141,12 @@ const structuredData = [
       </ul>
       <p class="sr-only" aria-live="polite" data-announce></p>
 
+      <div class="dly-banner" data-daily-banner hidden>
+        <span class="dly-badge">Today’s challenge</span>
+        <p class="dly-goal" data-daily-goal></p>
+        <p class="dly-meta" data-daily-meta></p>
+      </div>
+
       {resultFirst && <ShellResult />}
 
       <section class="stage" data-stage aria-label={`${game.title} — play area`}>

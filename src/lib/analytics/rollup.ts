@@ -41,7 +41,7 @@ export const rawFrom = (now = new Date()) => new Date(midnight(now).getTime() - 
 /** The props kept per event: [event, prop]. game_pick and game_quit have rules of their own. */
 const KEPT: [string, string][] = [
   ['game_level', 'text'], ['share', 'outcome'], ['isl_poke', 'kind'], ['isl_postcard', 'action'],
-  ['isl_board_go', 'row'], ['isl_filter', 'filter'], ['isl_cover', 'cover'], ['isl_time', 'mode'], ['next_go', 'why'],
+  ['isl_board_go', 'row'], ['isl_filter', 'filter'], ['isl_cover', 'cover'], ['isl_time', 'mode'], ['next_go', 'why'], ['daily_done', 'ok'],
 ]
 
 export async function getMeta(d: Db, k: string): Promise<{ v: string; at: Date } | null> {

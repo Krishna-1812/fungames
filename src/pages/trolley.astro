@@ -329,7 +329,7 @@ const first = DILEMMAS[0]
     const now = new Date()
     if (dailyFor(now).slug === 'trolley') {
       const need = dailyTarget.consistency(now)
-      lines.push(top.pct >= need ? `✓ Daily challenge beaten: ${need}% or more for one position.` : `✗ Daily challenge: argue for one position ${need}% of the time.`)
+      shell.daily(top.pct >= need, `The target: argue for one position at least ${need}% of the time. You managed ${top.pct}%.`)
     }
 
     const article = (name: string) => (/^[aeio]/i.test(name) ? 'an' : 'a')

@@ -13,6 +13,22 @@ import { withBase } from '../../lib/base'
   <h2 id="result-title" data-result-title>Well played</h2>
   <span class="num result-score" data-result-score>0</span>
   <div class="result-lines" data-result-lines></div>
+  <div class="dly" data-daily hidden>
+    <div class="dly-head">
+      <p class="label">Today’s challenge</p>
+      <p class="dly-state" data-daily-state>✓ Beaten</p>
+    </div>
+    <p class="dly-note" data-daily-note></p>
+    <div class="dly-row">
+      <p class="dly-streak"><span class="num dly-n" data-daily-n>1</span><span class="dly-unit">day streak</span><span class="dly-best" data-daily-best hidden></span></p>
+      <ol class="dly-cal" data-daily-cal aria-label="The last two weeks"></ol>
+    </div>
+    <p class="dly-why" data-daily-why></p>
+    <div class="dly-foot">
+      <p class="dly-next" data-daily-next></p>
+      <button type="button" class="pill pill--line pill--line-paper pill--sm" data-daily-share><span>Share today’s result</span></button>
+    </div>
+  </div>
   <div class="result-extra" data-result-extra></div>
   <div class="result-actions">
     <button type="button" class="pill pill--hero" data-act="again">

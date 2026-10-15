@@ -553,7 +553,7 @@ import { SHAPES } from '../lib/steady-shapes'
     const now = new Date()
     if (dailyFor(now).slug === 'steady-hand') {
       const need = dailyTarget.steadiness(now)
-      lines.push(r >= need ? `✓ Daily challenge beaten: a round of ${need}% or more.` : `✗ Daily challenge: a round of ${need}% or more.`)
+      shell.daily(r >= need, `The target: a round rated ${need}% or better. Yours was ${Math.round(r * 10) / 10}%.`)
     }
     shell.win({
       kicker: `${SHAPES.length} shapes · ${strokes} strokes`,

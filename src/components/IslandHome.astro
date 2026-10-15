@@ -155,7 +155,7 @@ const book = BOOK.map((key) => {
             <button type="button" class="isl-btn isl-btn--round" id="btnTime" aria-label="Switch to night" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-sun"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></g><path class="ic-moon" d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg></button>
             <button type="button" class="isl-btn isl-btn--round" id="btnSound" aria-label="Turn sound on" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-waves" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></button>
             <button type="button" class="isl-btn" id="btnPassport" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.5" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="10.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M8.6 10.5h6.8M12 7.1c-1.6 2-1.6 4.8 0 6.8M12 7.1c1.6 2 1.6 4.8 0 6.8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg><span>Passport</span><b class="isl-pp-n" id="ppCount" hidden></b><i class="isl-pp-new" id="ppNew" hidden></i></button>
-            <button type="button" class="isl-btn" id="btnToday"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="6.5" fill="currentColor" opacity=".25" /><path d="M5.5 10a6.5 6.5 0 0 1 13 0c0 3-2.4 5-4 6.5h-5C7.9 15 5.5 13 5.5 10zM9.5 16.5 10.5 20h3l1-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Today</span></button>
+            <button type="button" class="isl-btn" id="btnToday"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="6.5" fill="currentColor" opacity=".25" /><path d="M5.5 10a6.5 6.5 0 0 1 13 0c0 3-2.4 5-4 6.5h-5C7.9 15 5.5 13 5.5 10zM9.5 16.5 10.5 20h3l1-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Today</span><b class="isl-streak-n" id="islStreakN" hidden></b></button>
             <button type="button" class="isl-btn isl-btn--hot" id="btnSurprise"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="9" r="1.6" fill="currentColor" /><circle cx="15" cy="15" r="1.6" fill="currentColor" /><circle cx="15" cy="9" r="1.6" fill="currentColor" /><circle cx="9" cy="15" r="1.6" fill="currentColor" /></svg><span>Surprise me</span></button>
           </nav>
         </header>
@@ -189,6 +189,11 @@ const book = BOOK.map((key) => {
             <h2 class="isl-board-h" id="islBoardH">What’s on today</h2>
             <p class="isl-board-date" id="islBoardDate"></p>
           </header>
+          <div class="isl-board-streak" id="islStreak">
+            <p class="isl-bs-n" id="islStreakBig" hidden><b id="islStreakNum">0</b><span>day streak</span></p>
+            <ol class="isl-bs-cal" id="islStreakCal" aria-label="The daily challenge, the last two weeks" hidden></ol>
+            <p class="isl-bs-line" id="islStreakLine"></p>
+          </div>
           <ul class="isl-board-list" id="islBoardList" role="list"></ul>
           <p class="isl-board-foot">Everything here runs by your own clock.</p>
           <button type="button" class="isl-board-x" id="islBoardX" aria-label="Close the noticeboard"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
@@ -422,6 +427,7 @@ const book = BOOK.map((key) => {
   import type { Node } from '../lib/island/scene'
   import { flip, PLAY } from '../lib/motion'
   import { bestKey, dailyFor } from '../data/game-meta'
+  import { readDaily, streakOf, calendar, utcDay } from '../lib/daily'
   import { faviconHref } from '../lib/favicon'
   import { readPassport, withHistory, newStamps, markSeen, rankFor, stampDate, clearPassport, type Visit } from '../lib/passport'
   import { readAll } from '../lib/stats'
@@ -735,6 +741,26 @@ const book = BOOK.map((key) => {
     if (ta) nodes.push(...balloonNodes((ta.x0 + ta.x1) / 2, ta.y0))
     e.add(nodes)
   })
+  // The daily challenge's streak: a number on the Today button, and the noticeboard's top row.
+  const paintStreak = () => {
+    const f = readDaily(), day = utcDay(), st = streakOf(f.days, day, f.best)
+    const title = data.games[today.slug]?.title ?? today.title
+    const badge = byId('islStreakN')
+    badge.textContent = String(st.n); badge.hidden = st.n < 1
+    byId('btnToday').setAttribute('aria-label', st.n ? `Today: ${st.n}-day streak` : 'Today')
+    byId('islStreakNum').textContent = String(st.n)
+    byId('islStreakBig').hidden = st.n < 1
+    const cal = byId('islStreakCal')
+    cal.hidden = !Object.keys(f.days).length
+    cal.innerHTML = calendar(f.days, day, st.forgiven).map((c) => `<li class="isl-bs-dot is-${c.state}" title="${c.day}"></li>`).join('')
+    byId('islStreakLine').textContent = st.today
+      ? `${st.today.ok ? '✓ Today’s challenge beaten.' : '✓ Today’s challenge played.'} Come back for the next one.`
+      : st.n
+        ? `Finish ${title} today to keep your streak. One missed day a week is forgiven.`
+        : `Finish today’s challenge (${title}) to start a streak. One missed day a week is forgiven.`
+  }
+  paintStreak()
+  addEventListener('pageshow', (e) => { if ((e as PageTransitionEvent).persisted) paintStreak() })
   const goToday = () => {
     box.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
     isle.flyToSlug(today.slug, 2.2)
@@ -1566,6 +1592,30 @@ const book = BOOK.map((key) => {
   .isl-board-kicker { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6a5bb0; }
   .isl-board-h { margin: 2px 0 0; font: 700 26px/1.1 'Fredoka', system-ui, sans-serif; letter-spacing: -0.01em; }
   .isl-board-date { margin: 3px 0 0; font-size: 14px; font-weight: 600; color: #4a5372; }
+  .isl-streak-n {
+    position: absolute; top: -9px; right: -9px; min-width: 24px; height: 24px; padding: 0 6px;
+    display: grid; place-items: center; border-radius: 12px;
+    background: #4fe3c1; color: #1b2340; border: 2.5px solid #1b2340;
+    font: 700 13px/1 'Fredoka', system-ui, sans-serif;
+  }
+  .isl-streak-n[hidden] { display: none; }
+  #btnToday { position: relative; }
+  .isl-board-streak {
+    display: grid; justify-items: center; gap: 8px; margin: 0 4px 14px; padding: 12px 14px;
+    background: #fdfeff; border: 2px solid #1b2340; border-radius: 12px; box-shadow: 0 3px 0 rgba(27, 35, 64, 0.85);
+    text-align: center;
+  }
+  .isl-bs-n { margin: 0; display: flex; align-items: baseline; gap: 7px; }
+  .isl-bs-n[hidden], .isl-bs-cal[hidden] { display: none; }
+  .isl-bs-n b { font-size: 34px; line-height: 1; color: #1b2340; }
+  .isl-bs-n span { font-size: 16px; font-weight: 700; }
+  .isl-bs-cal { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(14, 15px); gap: 5px; }
+  :global(.isl-bs-dot) { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #c5cde4; }
+  :global(.isl-bs-dot.is-won) { background: #5b82ff; border-color: #1b2340; }
+  :global(.isl-bs-dot.is-played) { background: #b8a1ff; border-color: #1b2340; }
+  :global(.isl-bs-dot.is-forgiven) { border-style: dashed; border-color: #8a93b2; }
+  :global(.isl-bs-dot.is-open) { border-color: #1b2340; }
+  .isl-bs-line { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.35; color: #4a5372; max-width: 42ch; }
   .isl-board-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
   :global(.isl-row) {
     position: relative; display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center;

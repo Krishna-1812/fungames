@@ -432,7 +432,7 @@ import { ROUND_SIZE } from '../data/memory'
     const now = new Date()
     if (dailyFor(now).slug === 'from-memory') {
       const need = dailyTarget.likeness(now)
-      lines.push(avg >= need ? `✓ Daily challenge beaten: ${need}% average or better.` : `✗ Daily challenge: average ${need}% or better.`)
+      shell.daily(avg >= need, `The target: an average likeness of ${need}% or better. Yours was ${avg}%.`)
     }
     const titles: Record<string, string> = {
       Uncanny: 'A photographic memory.',

@@ -541,6 +541,22 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   nine people, and every figure is worded as *other* players, because your own
   answer is still on its way. `check-crowd.mjs` runs the real SQL.
 
+- ~~**The daily challenge, with a streak**~~ **done** (2026-10-15). The
+  challenge already existed (`dailyFor`: one game and target per UTC day) but
+  forgot you the moment the page closed. `lib/daily.ts` remembers each day
+  played, beaten or not, and counts a streak: days in a row the challenge was
+  finished, because a streak one bad round could end punishes exactly the
+  people who come back. One missed day a week is forgiven, so a weekend away
+  does not end a month's run, and today not played yet never ends it. Today's
+  game shows a mint banner with the target and the streak; its result card a
+  block with the verdict, the streak, the last two weeks as dots and
+  tomorrow's game with a countdown, and a share text in squares with no
+  spoilers. On the island, the Today button carries the streak and the
+  noticeboard opens on it; its "today" row now says when the next challenge
+  comes on the visitor's own clock (it said midnight, and it is UTC
+  midnight). Up next stops offering a challenge already done today.
+  `daily_done` counts rounds. `check-daily.mjs`.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

@@ -75,7 +75,9 @@ export function timetable(now: Date, o: {
 }): Row[] {
   const rows: Row[] = []
   const t = now.getTime()
-  rows.push({ key: 'today', title: 'Today’s challenge', line: `${o.daily.title}: ${o.daily.goal}`, when: 'All day, new at midnight', now: true })
+  // A new challenge at UTC midnight (data/game-meta.ts dailyFor), said on the visitor's own clock.
+  const fresh = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+  rows.push({ key: 'today', title: 'Today’s challenge', line: `${o.daily.title}: ${o.daily.goal}`, when: `A new one at ${hhmm(fresh)} · ${until(fresh.getTime() - t)}`, now: true })
   rows.push(o.parade.on
     ? { key: 'parade', title: 'The parade', line: `From the town square to ${o.parade.to} and back, band and all`, when: 'Marching now!', now: true }
     : { key: 'parade', title: 'The parade', line: `From the town square to ${o.parade.to}, every five minutes`, when: `Next at ${hhmm(o.parade.next)} · ${until(o.parade.next.getTime() - t)}`, now: false })
