@@ -13,10 +13,10 @@
  * rather than a wrong one. scripts/check-seasons.mjs walks a whole year.
  *
  * When two overlap, the one that comes round less often wins: New Year over
- * winter, Diwali over autumn.
+ * winter.
  */
 
-export type SeasonKey = 'newyear' | 'diwali' | 'holi' | 'winter' | 'monsoon' | 'autumn' | 'spring'
+export type SeasonKey = 'newyear' | 'diwali' | 'holi' | 'winter' | 'monsoon' | 'spring'
 
 export type Season = {
   key: SeasonKey
@@ -32,7 +32,6 @@ export const SEASONS: Record<SeasonKey, Season> = {
   holi: { key: 'holi', name: 'Holi', line: 'Clouds of coloured powder drifting across the whole island.' },
   winter: { key: 'winter', name: 'Winter', line: 'Snow falling on every district, from the peaks to the harbour.' },
   monsoon: { key: 'monsoon', name: 'Monsoon', line: 'Rain over the island, and a grey, soft light on everything.' },
-  autumn: { key: 'autumn', name: 'Autumn', line: 'Leaves blowing across the island from the woods on the peaks.' },
   spring: { key: 'spring', name: 'Spring', line: 'Blossom drifting down over the island all month.' },
 }
 
@@ -71,8 +70,6 @@ export function seasonOn(d: Date = new Date()): Now | null {
   if (m === 0 && day <= 6) return at('winter', new Date(y, 0, 7))
   // Monsoon: July and August.
   if (m === 6 || m === 7) return at('monsoon', new Date(y, 8, 1))
-  // Autumn: the middle of October to the end of November.
-  if ((m === 9 && day >= 15) || m === 10) return at('autumn', new Date(y, 11, 1))
   // Spring: April.
   if (m === 3) return at('spring', new Date(y, 4, 1))
   return null

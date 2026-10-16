@@ -1647,18 +1647,6 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       twice(w, { d, fill: 'none', stroke: '#4d6894', 'stroke-width': 1.7, 'stroke-linecap': 'round', opacity: 0.5 }, -vh)
       twice(w, { d: d2, fill: 'none', stroke: '#f2f7ff', 'stroke-width': 2.2, 'stroke-linecap': 'round', opacity: 0.75 }, -vh)
     }
-    // Autumn: leaves in three of the woods' own colours, each lying its own way.
-    {
-      const w = open('weather', 'leaves')
-      const tones = ['#9c4a2f', '#7d5a36', '#6f7d3a']
-      const ds = ['', '', '']
-      for (let k = 0; k < 120; k++) {
-        const x = vx + hz(k, 23, 71) * vw, y = vy + hz(k, 29, 72) * vh, r = 8 + hz(k, 4, 73) * 5, a = hz(k, 6, 74) * Math.PI
-        const c = Math.cos(a) * r, s = Math.sin(a) * r
-        ds[k % 3] += `M${f(x - c)} ${f(y - s)}Q${f(x - s * 0.9)} ${f(y + c * 0.9)} ${f(x + c)} ${f(y + s)}Q${f(x + s * 0.9)} ${f(y - c * 0.9)} ${f(x - c)} ${f(y - s)}z`
-      }
-      ds.forEach((d, i) => twice(w, { d, fill: tones[i], stroke: INK, 'stroke-width': 0.9 }, -vh))
-    }
     // Holi: soft clouds of coloured powder, each a bright core in a paler haze.
     {
       const w = open('weather', 'powder')

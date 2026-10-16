@@ -351,7 +351,6 @@ export const LAYERS = {
   petals: { loop: L('isl-sift', 70, 'linear'), when: { season: ['spring'] } as When },
   // The rest of the island's calendar (lib/island/seasons.ts says when each one is).
   rain: { loop: L('isl-sift', 5, 'linear'), when: { season: ['monsoon'] } as When },
-  leaves: { loop: L('isl-sift', 55, 'linear'), when: { season: ['autumn'] } as When },
   powder: { loop: L('isl-sift', 95, 'linear'), when: { season: ['holi'] } as When },
   // Sky lanterns go up, not down, and only once it is dark enough to see them glow.
   lanterns: { loop: L('isl-rise', 80, 'linear'), when: { season: ['diwali'], time: ['night', 'dusk'] } as When },

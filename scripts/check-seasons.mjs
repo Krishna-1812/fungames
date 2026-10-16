@@ -3,7 +3,7 @@
  * give every day of the year the right look?
  *
  * - each season starts and ends on the day it says, by the visitor's clock;
- * - the rarer one wins an overlap (New Year over winter, Diwali over autumn);
+ * - the rarer one wins an overlap (New Year over winter);
  * - Diwali and Holi land on their published dates, every year listed;
  * - "until" is always the first day after the season, and "next" always a
  *   different season;
@@ -31,7 +31,7 @@ console.log('\nthe calendar')
 check(on(2026, 12, 1) === 'winter' && on(2027, 1, 6) === 'winter' && on(2027, 1, 7) === null, 'winter: the first of December to Twelfth Night')
 check(on(2026, 12, 31) === 'newyear' && on(2027, 1, 1) === 'newyear' && on(2026, 12, 30) === 'winter', 'New Year’s Eve and Day win over winter')
 check(on(2027, 7, 1) === 'monsoon' && on(2027, 8, 31) === 'monsoon' && on(2027, 6, 30) === null && on(2027, 9, 1) === null, 'monsoon: July and August')
-check(on(2027, 10, 15) === 'autumn' && on(2027, 10, 14) === null && on(2027, 11, 30) === 'autumn' && on(2027, 12, 1) === 'winter', 'autumn: mid October to the end of November, then winter')
+check(on(2027, 10, 15) === null && on(2027, 11, 30) === null && on(2027, 12, 1) === 'winter', 'no autumn: October and November are plain (but for Diwali)')
 check(on(2027, 4, 1) === 'spring' && on(2027, 4, 30) === 'spring' && on(2027, 5, 1) === null, 'spring: April')
 for (const [y, md] of Object.entries(S.DIWALI)) {
   const [m, d] = md.split('-').map(Number)
@@ -62,7 +62,7 @@ console.log('\na whole year, day by day')
   check(morning, 'and always midnight on the visitor’s clock')
   check(nextOk, '"coming up" is always a different season, and it really starts then')
   const keys = new Set(Array.from({ length: 366 }, (_, k) => S.seasonOn(new Date(2027, 0, 1 + k, 12))?.key).filter(Boolean))
-  check(keys.size === 7, `all seven seasons come round in 2027 (${[...keys].join(', ')})`)
+  check(keys.size === Object.keys(S.SEASONS).length, `every season comes round in 2027 (${[...keys].join(', ')})`)
 }
 
 console.log('\nthe looks')
@@ -70,7 +70,7 @@ console.log('\nthe looks')
   const world = readFileSync('src/lib/island/world.ts', 'utf8')
   const shown = (k) => Object.values(M.LAYERS).some((L) => L?.when?.season?.includes(k))
   for (const k of Object.keys(S.SEASONS)) check(shown(k), `${k} switches a layer on (moves.ts LAYERS)`)
-  check(['rain', 'leaves', 'lanterns', 'powder', 'snow', 'petals'].every((k) => world.includes(`'${k}'`)), 'world.ts draws every kind of weather')
+  check(['rain', 'lanterns', 'powder', 'snow', 'petals'].every((k) => world.includes(`'${k}'`)), 'world.ts draws every kind of weather')
   check(Object.values(S.SEASONS).every((s) => /^[A-Z].*\.$/.test(s.line) && s.line.length < 90), 'every season has a one-sentence line for the noticeboard')
 }
 

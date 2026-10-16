@@ -591,7 +591,7 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
 - ~~**The island's seasons**~~ **done** (2026-10-16). The island had snow in
   December, blossom in April and fireworks at New Year; it now keeps a whole
   calendar (`lib/island/seasons.ts`): a monsoon in July and August (rain, and
-  a grey, soft light), autumn from mid October (leaves blowing over), Diwali
+  a grey, soft light), Diwali
   (sky lanterns rising after dark, and fireworks), Holi (clouds of coloured
   powder), as well as winter, New Year and spring. Diwali and Holi are listed
   by year from the published calendars, and a year without an entry simply has
