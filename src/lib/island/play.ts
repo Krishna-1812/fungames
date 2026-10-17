@@ -28,7 +28,9 @@ const tile = (x: number, y: number, z = 0): [number, number] => { const a = x / 
 const dTile = (dx: number, dy: number): [number, number] => { const a = dx / T, b = dy / H; return [(a + b) / 2, (b - a) / 2] }
 const SEA = -12, BEACH = -6, GRID = 30
 
-export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null }
+/** A marcher of the parade as a picture (folk.ts): their body without legs, for the canvas to march; the colour of their legs, and how big they are. */
+export type FolkPic = { svg: string; legs: string; k: number }
+export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: FolkPic[] }
 import type { Sprites } from './actors'
 export type Sounds = { thump?: (k: number) => void; splash?: () => void; flutter?: () => void }
 
@@ -395,6 +397,13 @@ export function createPlay(o: {
     return out
   }
   const SHIRT = ['#ffffff', '', '#ff4f6e', '#4fe3c1', '#5b82ff', '#b8a1ff', '']
+  // The cartoon island's marchers (folk.ts): each one's body as a picture, made once; the canvas marches their legs.
+  const folkPics = (o.data.folk ?? []).map((fp) => {
+    if (typeof Image === 'undefined') return null
+    const im = new Image()
+    im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(fp.svg)
+    return { im, legs: fp.legs, k: fp.k }
+  })
   function drawMarcher(c: CanvasRenderingContext2D, m: Marcher, now: number): number {
     const { x, y, dir: f, k } = m
     c.globalAlpha = m.a
@@ -444,9 +453,19 @@ export function createPlay(o: {
     c.fillStyle = INK; c.globalAlpha = m.a * 0.15
     c.beginPath(); c.ellipse(x - 2, y + 0.5, 5, 1.8, 0, 0, Math.PI * 2); c.fill(); n++
     c.globalAlpha = m.a
+    // Someone of their own (folk.ts), once their picture is in.
+    const fp = folkPics[k], pic = fp && fp.im.complete && fp.im.naturalWidth > 0 ? fp : null
     // Legs, marching.
-    c.strokeStyle = INK; c.lineWidth = 2
-    c.beginPath(); c.moveTo(x - 1.8, y); c.lineTo(x - 1.8 + step * 1.4, y - 6); c.moveTo(x + 1.8, y); c.lineTo(x + 1.8 - step * 1.4, y - 6); c.stroke(); n++
+    if (pic) {
+      const q = pic.k
+      c.strokeStyle = pic.legs; c.lineWidth = 2.5 * q
+      c.beginPath(); c.moveTo(x - 1.7 * q, y - 0.6); c.lineTo(x - 1.7 * q + step * 1.4, y - 7.6 * q); c.moveTo(x + 1.7 * q, y - 0.6); c.lineTo(x + 1.7 * q - step * 1.4, y - 7.6 * q); c.stroke()
+      c.fillStyle = '#2a2730'
+      c.beginPath(); c.ellipse(x - 1.7 * q + 0.4, y - 0.2, 1.5, 0.85, 0, 0, Math.PI * 2); c.ellipse(x + 1.7 * q + 0.4, y - 0.2, 1.5, 0.85, 0, 0, Math.PI * 2); c.fill(); n += 2
+    } else {
+      c.strokeStyle = INK; c.lineWidth = 2
+      c.beginPath(); c.moveTo(x - 1.8, y); c.lineTo(x - 1.8 + step * 1.4, y - 6); c.moveTo(x + 1.8, y); c.lineTo(x + 1.8 - step * 1.4, y - 6); c.stroke(); n++
+    }
     const top = y - bob
     // The flag goes behind the one carrying it.
     if (k === 1) {
@@ -470,14 +489,20 @@ export function createPlay(o: {
     }
     // The body, and the head (a child is a little smaller).
     const small = k === 4 || k === 5 ? 0.82 : 1
-    c.fillStyle = k === 1 ? o.ink() : SHIRT[k]; c.strokeStyle = INK; c.lineWidth = 1.2
-    rr(c, x - 3.4 * small, top - 14 * small, 6.8 * small, 9 * small, 2.6 * small); c.fill(); c.stroke(); n++
-    c.fillStyle = k % 2 ? '#e0b899' : '#f1d9c6'
-    c.beginPath(); c.arc(x, top - 17.5 * small, 3.4 * small, 0, Math.PI * 2); c.fill(); c.stroke(); n++
+    if (pic) { c.drawImage(pic.im, x - 12, top - 32, 24, 34); n++ }
+    else {
+      c.fillStyle = k === 1 ? o.ink() : SHIRT[k]; c.strokeStyle = INK; c.lineWidth = 1.2
+      rr(c, x - 3.4 * small, top - 14 * small, 6.8 * small, 9 * small, 2.6 * small); c.fill(); c.stroke(); n++
+      c.fillStyle = k % 2 ? '#e0b899' : '#f1d9c6'
+      c.beginPath(); c.arc(x, top - 17.5 * small, 3.4 * small, 0, Math.PI * 2); c.fill(); c.stroke(); n++
+    }
+    // (Someone of their own stands a little taller: what sits on their head sits higher.)
+    const lift = pic ? 4.6 : 0
+    c.strokeStyle = INK; c.lineWidth = 1.2
     // What each carries: the drum major's tall hat and baton, a drum, a trumpet.
     if (k === 0) {
-      c.fillStyle = '#5b82ff'; rr(c, x - 3, top - 26, 6, 6.6, 1.4); c.fill(); c.stroke()
-      c.fillStyle = '#ff4f6e'; c.beginPath(); c.arc(x, top - 27, 1.4, 0, Math.PI * 2); c.fill()
+      c.fillStyle = '#5b82ff'; rr(c, x - 3, top - 26 - lift, 6, 6.6, 1.4); c.fill(); c.stroke()
+      c.fillStyle = '#ff4f6e'; c.beginPath(); c.arc(x, top - 27 - lift, 1.4, 0, Math.PI * 2); c.fill()
       const sw = Math.sin(now / 260) * 0.9
       c.strokeStyle = INK; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x + f * 3, top - 11); c.lineTo(x + f * (5 + sw * 3), top - 21 + Math.abs(sw) * 3); c.stroke()
       c.fillStyle = '#ffffff'; c.beginPath(); c.arc(x + f * (5 + sw * 3), top - 21 + Math.abs(sw) * 3, 1.5, 0, Math.PI * 2); c.fill(); c.stroke()
@@ -491,9 +516,10 @@ export function createPlay(o: {
       n += 5
     } else if (k === 3) {
       c.strokeStyle = '#9fb5f2'; c.lineWidth = 1.6
-      c.beginPath(); c.moveTo(x + f * 2, top - 16); c.lineTo(x + f * 8, top - 15); c.stroke()
+      const m = pic ? 2.6 : 0
+      c.beginPath(); c.moveTo(x + f * 2, top - 16 - m); c.lineTo(x + f * 8, top - 15 - m); c.stroke()
       c.fillStyle = '#d8eeff'; c.strokeStyle = INK; c.lineWidth = 0.8
-      c.beginPath(); c.moveTo(x + f * 8, top - 15); c.lineTo(x + f * 11, top - 18); c.lineTo(x + f * 11, top - 12); c.closePath(); c.fill(); c.stroke()
+      c.beginPath(); c.moveTo(x + f * 8, top - 15 - m); c.lineTo(x + f * 11, top - 18 - m); c.lineTo(x + f * 11, top - 12 - m); c.closePath(); c.fill(); c.stroke()
       n += 2
     }
     c.globalAlpha = 1

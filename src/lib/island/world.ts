@@ -12,6 +12,7 @@
 import { look, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
 import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
+import { folkPic } from './folk'
 import { figFeet, tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
 import type { FigureSet, BuildingSet } from './figures'
 import type { SkyArt } from './plate'
@@ -119,7 +120,7 @@ export type Signpost = { i: number; j: number; at: [number, number]; boards: { d
  * the ball can roll on, and for every building the roads from the town square
  * to its door, for the day's parade. All in tiles.
  */
-export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null }
+export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: import('./play').FolkPic[] }
 /**
  * The island as facts rather than a picture, for anything that draws it
  * another way (the Unity scene in unity/, which renders it in 3D): every
@@ -164,6 +165,8 @@ export type IslandModel = {
   prints: { name: string; w: number; h: number; svg: string }[]
   viewBox: [number, number, number, number]
 }
+/** The parade's marchers as the cartoon island draws them (play.ts): the drum major, the flag, a drum, a trumpet, two children. */
+const PARADE: [number, string, number][] = [[61.3, '#5b82ff', 1.04], [72.9, '#2c355e', 1.04], [84.1, '#ffffff', 1.04], [95.7, '#4fe3c1', 1.04], [17.2, '#ff4f6e', 0.85], [23.8, '#b8a1ff', 0.85]]
 export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
@@ -2006,7 +2009,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
     grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
     ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
     height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),

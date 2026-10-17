@@ -13,7 +13,7 @@
  * The realistic island's people are Unity's (actors.ts); this is only ever
  * the drawing.
  */
-import { INK, N, shade, mix } from './kit'
+import { INK, N, shade, mix, render } from './kit'
 
 const f = (v: number) => Math.round(v * 100) / 100
 const hash = (a: number, b: number) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v) }
@@ -161,6 +161,22 @@ function drawHead(g: N, p: Folk, shirt: string) {
     if (p.hair === 1) el(g, 'path', { d: `M-3.6 -20.2q2.2 -3.2 6.4 -2.4q-2.4 0.4 -3.6 2.2z`, fill: p.hairC })
     if (p.hair === 3) el(g, 'circle', { cx: 0.8, cy: -23.9, r: 1.9, fill: p.hairC, ...line(p.hairC) })
   } else el(g, 'path', { d: `M0.6 -22.2q1.3 -0.3 2.1 0.5`, stroke: '#ffffff', 'stroke-width': 0.7, opacity: 0.6, 'stroke-linecap': 'round', fill: 'none' })
+}
+
+/**
+ * Someone as a picture for a canvas to draw (the parade, play.ts): SVG
+ * markup of everything but their shadow and legs, which the canvas draws
+ * itself as they march, at k times their size, in a box from (-12, -32)
+ * 24 wide and 34 tall, four pixels to the unit. Their feet are 32 down it.
+ */
+export function folkPic(seed: number, shirt: string, k: number): { svg: string; legs: string; k: number } {
+  const p = folk(seed)
+  const g = new N('g', { transform: `scale(${f(k)})`, 'stroke-linejoin': 'round' })
+  drawFolk(g, p, shirt, 'stand', true)
+  // The shadow and the legs are the canvas's.
+  g.kids = g.kids.filter((c) => typeof c === 'string' || !(c.tag === 'ellipse' || c.attrs.class === 'legs'))
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -32 24 34" width="96" height="136">${render(g)}</svg>`
+  return { svg, legs: p.skirt ? shade(p.skin, 0.9) : p.legs, k }
 }
 
 /**
