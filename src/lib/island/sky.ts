@@ -5,6 +5,7 @@
  */
 import { C, INK, OUT, N, shade, motionPath } from './kit'
 import { creatureUse } from './actors'
+import { folk, drawBust } from './folk'
 
 const f = (v: number) => Math.round(v * 10) / 10
 
@@ -37,9 +38,9 @@ export function hotAirBalloon(x: number, y: number, a: string, b: string, name: 
   bob.add(new N('path', { d: 'M-10 -23l-2 13M10 -23l2 13M-1 -23v13', stroke: INK, 'stroke-width': 1.1 }))
   bob.add(new N('path', { d: 'M-12 -10h24l-2 11h-20z', fill: C.wood, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
   bob.add(new N('path', { d: 'M-11 -6h22', stroke: shade(C.wood, 0.75), 'stroke-width': 1 }))
-  for (const [px, c] of [[-5, C.sky], [5, C.rasp]] as [number, string][]) {
-    bob.add(new N('rect', { x: px - 2.6, y: -16, width: 5.2, height: 6, rx: 2, fill: c, stroke: INK, 'stroke-width': 1 }))
-    bob.add(new N('circle', { cx: px, cy: -18.5, r: 2.6, fill: '#f1d9c6', stroke: INK, 'stroke-width': 1 }))
+  // Two passengers (folk.ts), heads and shoulders over the rim: drawn before it, so it hides the rest of them.
+  for (const [px, c, seed] of [[-5, C.sky, 31.7], [5, C.rasp, 47.3]] as [number, string, number][]) {
+    drawBust(bob.add(new N('g', { transform: `translate(${px} -5) scale(0.7)` })), folk(seed), c)
   }
   bob.add(nightDim(`${env}M-13 -23h26v25h-26z`))
   return g
