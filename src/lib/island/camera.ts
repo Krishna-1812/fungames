@@ -266,12 +266,29 @@ export function initIsland(o: {
   }
 
   const perf = new URLSearchParams(location.search).has('perf') ? perfMeter(box) : null
+  /**
+   * Left alone, the island's own life (walkers, waves, birds) is drawn thirty
+   * times a second, not sixty, and never takes more than about three fifths
+   * of the main thread: the rest is the page's, so scrolling and taps answer
+   * at once, and a phone stays cool. Anything the hands do, a flight or the
+   * pictures still coming in is drawn every frame.
+   */
+  const AMBIENT = 1000 / 30
+  let drawnAt = 0, cost = 0
+  /** Until when it is drawn every frame anyway: while the buildings drop in, and while a picked one lifts or settles. */
+  let livelyUntil = 0, liftFor: string | null = null
   function frame(t: number) {
     raf = 0
     const dt = lastT ? Math.min(64, Math.max(1, t - lastT)) : FRAME
     lastT = t
     const moving = step(dt)
+    if (hot !== liftFor) { liftFor = hot; livelyUntil = Math.max(livelyUntil, t + 800) }
+    const busy = moving || dragging || hover.dirty || held.size > 0 || stage0 !== 'gone' || t < livelyUntil || !engine?.sharp()
+    if (engine && PLAY && !busy && t - drawnAt < Math.max(AMBIENT, cost * 1.6) - 3) { wake(); return }
+    drawnAt = t
+    const c0 = performance.now()
     if (engine) { engine.setView(cam, W, H, ratio()); engine.frame(t) }
+    cost = performance.now() - c0
     perf?.tick(t, engine ? engine.stats() : null)
     after()
     // With motion there is always something moving on the island; without, draw only while something changes.
@@ -320,6 +337,7 @@ export function initIsland(o: {
     box.classList.add('is-live')
     // The buildings drop in (the first time this visit), unless the map is already being used; then the camera settles.
     if (PLAY && !interacted) { if (opening.intro) engine!.intro(); settle() }
+    livelyUntil = performance.now() + 4000
     const gone = () => { stage0 = 'gone'; if (poster) poster.hidden = true }
     if (PLAY && poster) setTimeout(gone, 450)
     else gone()
