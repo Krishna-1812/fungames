@@ -217,6 +217,9 @@ export type Light = [number, number] & { el?: N; glow?: string | null; w?: [numb
 export const glows: N[] = []
 export function glow<T extends N>(n: T): T { glows.push(n); return n }
 
+/** Where each sign drawn stands on screen (x0, y0, x1, y1), so nothing is put up in front of one (world.ts, a set piece's lamps). */
+export const signBoxes: [number, number, number, number][] = []
+
 /**
  * The solids a building is made of, for Unity (unity/Assets/Island/Editor/
  * Buildings.cs): every box, roof, cylinder, dome, window and door its pen
@@ -640,6 +643,7 @@ export class Pen {
   sign(x: number, y: number, z: number, w: number, h: number, fill: string, label?: string, o: { size?: number; ink?: string; rx?: number; cls?: string; font?: string } = {}) {
     const [sx, sy] = this.at(x, y, z)
     this.grow(sx - w / 2, sy - h, sx + w / 2, sy)
+    signBoxes.push([sx - w / 2, sy - h, sx + w / 2, sy])
     const g = this.group(o.cls)
     const art = new N('rect', { x: 0, y: 0, width: w, height: h, rx: o.rx ?? 3, fill })
     g.plaque(`sign-${fill.slice(1)}-${w}x${h}-${o.rx ?? 3}`, x, y, z, w, h, art, { edge: fill }, () => g.el('rect', { x: sx - w / 2, y: sy - h, width: w, height: h, rx: o.rx ?? 3, fill, stroke: INK, 'stroke-width': OUT }))

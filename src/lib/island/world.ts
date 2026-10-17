@@ -9,7 +9,7 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { look, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
+import { look, signBoxes, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
 import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
 import { folkPic } from './folk'
@@ -1182,7 +1182,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const b = new Bounds()
       const { sink, real } = sinkFor(pl.slug)
       const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights, sink)
-      const l0 = lights.length, g0 = glows.length, beacon0 = [beacon[0], beacon[1]], p0 = planted.length
+      const l0 = lights.length, g0 = glows.length, beacon0 = [beacon[0], beacon[1]], p0 = planted.length, s0 = signBoxes.length
       // (The lamp of a lighthouse is set afresh: the drawing for its shadow, earlier, set it already.)
       beacon[0] = 0; beacon[1] = 0
       pl.lm.draw(lp)
@@ -1263,7 +1263,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
             sp.box(px - 0.11, py - 0.11, 0.22, 0.22, 7, { z0: 5, fill: '#b7b2a6', sw: 1.1 })
             tree(sp.move(0, 0, 12), px, py, 'bush', C.leaf, 0.55)
           }
-          if (!road.has(key(Math.floor(lx + 0.12), Math.floor(ly + 0.12)))) lamp(sp.move(0, 0, 5), lx, ly, 26)
+          // (Nor where it would stand in front of its building's own sign, now grown with it.)
+          const [qx, qy] = P(lx, ly, pl.z + 5)
+          const [ax, ay] = P(pl.i + pl.w, pl.j + pl.d, pl.z), T = (x: number, y: number) => [ax + (x - ax) * hp.k, ay + (y - ay) * hp.k]
+          const hides = signBoxes.slice(s0).some(([a0, b0, a1, b1]) => { const [x0, y0] = T(a0, b0), [x1, y1] = T(a1, b1); return qx > x0 - 5 && qx < x1 + 5 && qy - 30 < y1 && qy > y0 })
+          if (!hides && !road.has(key(Math.floor(lx + 0.12), Math.floor(ly + 0.12)))) lamp(sp.move(0, 0, 5), lx, ly, 26)
         }
       }
       const [bx, by] = P(pl.i + pl.w / 2, pl.j + pl.d / 2, pl.z)
