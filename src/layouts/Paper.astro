@@ -90,6 +90,9 @@ const favicon = faviconHref(true)
     <link rel="icon" href={favicon} type="image/svg+xml" id="favicon" />
     <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
     <link rel="manifest" href={withBase('/manifest.webmanifest')} />
+    {/* A page is fetched as soon as a pointer rests on its link (or a finger lands on it), so
+        it is usually here by the click. Fetched only, never run: a game's clock or sound must not start unseen. */}
+    <script type="speculationrules" is:inline set:html={JSON.stringify({ prefetch: [{ where: { and: [{ href_matches: withBase('/*') }, { not: { href_matches: ['/api/*', '/admin/*', '/island/*', '/next/*', '/og/*'].map((p) => withBase(p)) } }] }, eagerness: 'moderate' }] })} />
 
     {/* Before first paint: `js` arms anything a script finishes, `play` arms
         every animated starting state. Reduced motion never gets `play`, so it
