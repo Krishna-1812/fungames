@@ -441,6 +441,21 @@ export function createPlay(o: {
     // The dog at the back, trotting.
     if (k === MARCHERS - 1) {
       c.fillStyle = INK; c.globalAlpha = m.a * 0.14; c.beginPath(); c.ellipse(x, y + 0.3, 5, 1.6, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = m.a
+      if (folkPics.length) {
+        // The cartoon island's dogs (folk.ts, drawDog): a brown coat, a darker line, an ear and an eye.
+        const coat = '#a77b5a', dark = '#6e5040'
+        c.strokeStyle = dark; c.lineWidth = 1.3
+        c.beginPath(); c.moveTo(x - 2.6, y); c.lineTo(x - 2.6 + step, y - 3); c.moveTo(x + 2.6, y); c.lineTo(x + 2.6 - step, y - 3); c.stroke()
+        c.strokeStyle = coat; c.lineWidth = 1.2
+        c.beginPath(); c.moveTo(x - f * 3.4, y - 4.6); c.quadraticCurveTo(x - f * 5.4, y - 6.6 + step, x - f * 4.6, y - 8.2 + step); c.stroke()
+        c.fillStyle = coat; c.strokeStyle = dark; c.lineWidth = 0.9
+        rr(c, x - 3.6, y - 5.8, 7.2, 3.4, 1.7); c.fill(); c.stroke()
+        c.beginPath(); c.arc(x + f * 3.8, y - 6.6, 2, 0, Math.PI * 2); c.fill(); c.stroke()
+        c.beginPath(); c.ellipse(x + f * 5.4, y - 6.1, 1.1, 0.8, 0, 0, Math.PI * 2); c.fill(); c.stroke()
+        c.beginPath(); c.moveTo(x + f * 2.6, y - 7.8); c.quadraticCurveTo(x + f * 2, y - 6.2, x + f * 3, y - 5.2); c.stroke()
+        c.fillStyle = '#1e1c26'; c.beginPath(); c.arc(x + f * 6.2, y - 6.2, 0.45, 0, Math.PI * 2); c.fill()
+        return 8
+      }
       c.strokeStyle = INK; c.lineWidth = 1.4
       c.beginPath(); c.moveTo(x - 3, y); c.lineTo(x - 3 + step, y - 3.5); c.moveTo(x + 3, y); c.lineTo(x + 3 - step, y - 3.5); c.stroke()
       c.fillStyle = '#efe2c8'; c.lineWidth = 0.9
