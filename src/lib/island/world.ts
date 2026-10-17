@@ -1183,7 +1183,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const { sink, real } = sinkFor(pl.slug)
       const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights, sink)
       const l0 = lights.length, g0 = glows.length, beacon0 = [beacon[0], beacon[1]], p0 = planted.length
+      // (The lamp of a lighthouse is set afresh: the drawing for its shadow, earlier, set it already.)
+      beacon[0] = 0; beacon[1] = 0
       pl.lm.draw(lp)
+      const ownBeacon = !!(beacon[0] || beacon[1])
+      if (!ownBeacon) { beacon[0] = beacon0[0]; beacon[1] = beacon0[1] }
       // A set piece's people stay their own size, where they stood (before its rim is drawn round them).
       const inv = hp.k !== 1 ? ` scale(${Math.round((1 / hp.k) * 1000) / 1000}) ` : ''
       if (inv) {
@@ -1232,7 +1236,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
           unscale(art)
         }
         for (let n = g0; n < glows.length; n++) { const w = new N('g', { transform: tf }); w.add(glows[n]); glows[n] = w }
-        if (beacon[0] !== beacon0[0] || beacon[1] !== beacon0[1]) { const [x, y] = T(beacon[0], beacon[1]); beacon[0] = x; beacon[1] = y }
+        if (ownBeacon) { const [x, y] = T(beacon[0], beacon[1]); beacon[0] = x; beacon[1] = y }
       }
       if (hp.k !== 1 && !pl.lm.water) {
         // Its plinth, under it: low dressed stone a little wider than the plot, with steps up the
