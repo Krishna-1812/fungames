@@ -200,8 +200,11 @@ export function folkPic(seed: number, shirt: string, k: number): { svg: string; 
  * A dog, at the origin (its feet), facing right: a body, a head, ears, legs
  * and a tail, in one of a few coats; on a lead to a hand at (hx, hy), if given.
  */
+/** The coat of the dog someone walks, by their seed (the same on both islands). */
+export const dogCoat = (seed: number) => pickOf(['#8c6e5a', '#2f2b2e', '#d9d1c4', '#a77b5a', '#6b6670'], seed, 11)
+
 export function drawDog(g: N, seed: number, lead?: [number, number]) {
-  const coat = pickOf(['#8c6e5a', '#2f2b2e', '#d9d1c4', '#a77b5a', '#6b6670'], seed, 11)
+  const coat = dogCoat(seed)
   const dark = shade(coat, 0.72)
   el(g, 'ellipse', { cx: -0.6, cy: 0.4, rx: 4.6, ry: 1.3, fill: INK, opacity: 0.14 })
   for (const x of [-2.6, -1.2, 1.4, 2.6]) el(g, 'path', { d: `M${x} -0.2v-2.6`, stroke: x < 0 ? dark : coat, 'stroke-width': 1.2, 'stroke-linecap': 'round', fill: 'none' })

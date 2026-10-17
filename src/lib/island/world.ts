@@ -1609,7 +1609,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const cluster = 0.5 + 0.5 * Math.sin(i * 0.9 + 1.3) * Math.cos(j * 0.8 - 0.4)
     if (R() > density * (0.5 + cluster)) {
       if (R() < 0.04 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => flowers(new Pen(layer, 0, 0, 0, new Bounds(), [], sinkFor(`flowers-${i}-${j}`).sink), i + 0.5, j + 0.5) })
-      else if (R() < 0.03 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : hz(i, j, 71) < 0.3 ? 'phone' : 'stand', dog: !plate && hz(i, j, 72) < 0.35 }) })
+      else if (R() < 0.03 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : hz(i, j, 71) < 0.3 ? 'phone' : 'stand', dog: hz(i, j, 72) < 0.35 }) })
       continue
     }
     // The Badlands grow cacti as often as anything.

@@ -22,7 +22,7 @@ import { figureItem, figuresUsed } from './props'
 export type Facing = 'se' | 'sw' | 'nw' | 'ne' | 's' | 'w' | 'n' | 'e'
 /** The eight headings, round from +i (the site's se) through +j (sw): for boats, which turn as they go. */
 export const HEADINGS: Facing[] = ['se', 's', 'sw', 'w', 'nw', 'n', 'ne', 'e']
-export type Pose = 'stand' | 'wave' | 'look' | 'walk' | 'ground' | 'kite' | 'sit' | 'balance'
+export type Pose = 'stand' | 'wave' | 'look' | 'phone' | 'walk' | 'ground' | 'kite' | 'sit' | 'balance'
 export type Who = { shirt: string; skin: string; hat: string | null; v: number }
 export type Creature = 'sheep' | 'deer' | 'duck' | 'crab' | 'gull' | 'pigeon' | 'dolphin' | 'whale' | 'bfly' | 'cloud' | 'balloon' | 'plane' | 'dog' | 'robot' | 'globe' | 'pod' | 'yacht' | 'atom' | 'buoy' | 'pixelballoon' | 'stork' | 'cart' | 'bottle' | 'jetski'
 export type Kind = 'person' | 'car' | 'bus' | 'bike' | 'sail' | 'ferry' | 'fishing' | 'speed' | 'row' | Creature

@@ -6,7 +6,7 @@
 import { C, INK, OUT, N, Pen, shade, mix, S } from './kit'
 import type { FigureSet } from './figures'
 import { who, actorUse, creatureUse } from './actors'
-import { folk, drawFolk, drawDog, FOLK, type FolkPose } from './folk'
+import { folk, drawFolk, drawDog, dogCoat, FOLK, type FolkPose } from './folk'
 
 const f = (v: number) => Math.round(v * 10) / 10
 
@@ -165,11 +165,21 @@ export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: 
   {
     const seed = (x + p.ox) * 7.31 + (y + p.oy) * 3.17
     const w = who(shirt, seed, { skin: o.skin, hat: o.hat ?? null })
-    const u = actorUse(w, o.pose === 'phone' ? 'look' : o.pose ?? 'stand', pick(x + p.ox, y + p.oy, 5, 2) ? 'se' : 'sw', 0, { transform: `translate(${f(bx)} ${f(by)})${k !== 1 ? ` scale(${Math.round(k * 1000) / 1000})` : ''}` })
+    const facing = pick(x + p.ox, y + p.oy, 5, 2) ? 'se' : 'sw'
+    const u = actorUse(w, o.pose ?? 'stand', facing, 0, { transform: `translate(${f(bx)} ${f(by)})${k !== 1 ? ` scale(${Math.round(k * 1000) / 1000})` : ''}` })
+    // Their dog, standing by them on its lead, facing the way they do (written down either way, for Unity).
+    const dx = (facing === 'se' ? 8 : -8) * k, dy = 3 * k
+    const dog = o.dog ? creatureUse('dog', dogCoat(seed), 'stand', facing, { transform: `translate(${f(bx + dx)} ${f(by + dy)})${k !== 1 ? ` scale(${Math.round(k * 1000) / 1000})` : ''}` }) : null
     if (u) {
       const g = p.group(o.cls)
       figFeet.set(g.g, [bx, by])
       g.g.add(u)
+      if (dog) {
+        // (In front of them: it stands a little nearer.) Its lead, from their hand to its collar.
+        g.g.add(dog)
+        const s = facing === 'se' ? 1 : -1
+        g.el('path', { d: `M${f(bx + s * 2.6 * k)} ${f(by - 7 * k)}Q${f(bx + s * 5.5 * k)} ${f(by - 2 * k)} ${f(bx + dx + s * 2.2 * k)} ${f(by + dy - 3.6 * k)}`, stroke: '#7d3f4a', 'stroke-width': 0.5, fill: 'none' })
+      }
       p.grow(bx - 30 * k, by - 24 * k, bx + 12 * k, by + 8 * k)
       return g
     }
