@@ -15,6 +15,8 @@ const planks = (p: Pen, x: number, y: number, w: number, d: number, z: number, a
 
 /** Where the lighthouse's lamp is on screen, for the beam that sweeps at night. */
 export const beacon: [number, number] = [0, 0]
+/** Where Paper Folds' moon hangs, from its plot: forty-two folds up. */
+const MOON: [number, number, number] = [3.1, -0.5, 150]
 /** The night sky's moon (plate.ts, skyArt), for the one Paper Folds points to by day: set by the island before it draws. */
 export const harbourArt: { moon: string | null } = { moon: null }
 
@@ -187,13 +189,14 @@ export const harbour: Record<string, Landmark> = {
     p.path(`M${f(bx + 10)} ${f(by - 4)}Q${f(bx + 22)} ${f(by - 2)} ${f(p.at(1.86, 0.82, 12)[0])} ${f(p.at(1.86, 0.82, 12)[1])}`, 'none', { sw: 0.8 })
     // The dotted line, forty-two folds up, to the moon.
     const [rx, ry] = p.at(x0 + (x1 - x0) / n, 0.44, hi + 24)
-    const [mx, my] = p.at(1.7, 0.1, 170)
+    // (Off to the right, clear of the lighthouse behind, which stands bigger: world.ts, HERO.)
+    const [mx, my] = p.at(MOON[0], MOON[1], MOON[2])
     // (On the realistic island: a faint trail of light, and the moon a lit ball.)
     p.el('path', { d: `M${f(rx + 4)} ${f(ry)}Q${f(rx + 40)} ${f(ry - 50)} ${f(mx - 10)} ${f(my + 6)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': p.real ? 1.1 : 2, opacity: p.real ? 0.6 : undefined, 'stroke-dasharray': p.real ? '1.5 5' : '3 6', 'stroke-linecap': p.real ? 'round' : undefined })
     // By day, the real moon is pale and half lost in the blue: its picture, faint.
     if (p.real && harbourArt.moon) p.el('image', { href: harbourArt.moon, x: mx - 11, y: my - 11, width: 22, height: 22, opacity: 0.5 })
     else if (p.real) p.el('circle', { cx: mx, cy: my, r: 11, fill: ballShade(p.el('defs'), 'pf-moon', '#e8e9f2') })
-    else p.circle(1.7, 0.1, 170, 11, '#ffffff')
+    else p.circle(MOON[0], MOON[1], MOON[2], 11, '#ffffff')
     if (!p.real) p.el('circle', { cx: mx + 3, cy: my - 2, r: 2.5, fill: '#dfe4f5' })
     // Two paper cranes on the wind.
     for (const [dx, dy, d] of [[-20, -70, 0], [-46, -48, 1.4]]) p.el('path', { d: `M${f(rx + dx)} ${f(ry + dy)}l8 -6l2 6l8 -2l-8 5z`, fill: p.real ? '#f2f4fa' : '#ffffff', stroke: p.real ? '#c3c9da' : INK, 'stroke-width': p.real ? 0.5 : 1.1, class: 'glide', style: `animation-delay:${d}s` })
