@@ -662,6 +662,21 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   - folds the mini-map behind a map button, and remembers if a visitor
     opens it (`isl-map`).
 
+- ~~**Buildings inked like a painting (Cursor Camp study, part 3)**~~ **done** (2026-10-17).
+  The cartoon island only (`look.soft` in kit.ts, set by buildIsland when
+  there is no plate); the realistic island's drawn bits keep plain ink.
+  - Every ink outline on a coloured shape is drawn in a deep shade of that
+    colour (`lineFor`, at render time), and each building's rim is a deep
+    shade of what it rims, finer than before (`rimFor` in world.ts).
+  - One sun from the right for everything: drums, cones and boxes are lit
+    on the right and shaded on the left; the shade side is cooled a little.
+  - Boxes standing on the ground throw a soft shadow, darken towards the
+    foot of their walls, catch the sun along their top edge, and big walls
+    show faint courses. Window panes have a shadow along the top.
+  - Buildings and things are graded towards paint (`paintGrade`): candy
+    saturation pulled in, pure white down to soft stone. Words and banners
+    keep their colours.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

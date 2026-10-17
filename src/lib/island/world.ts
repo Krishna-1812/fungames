@@ -9,7 +9,7 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
+import { look, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
 import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
 import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
@@ -57,6 +57,29 @@ const RIM = 1.6
  * behind it), and whatever is faint or not drawn round in ink (shading,
  * glints, glass, lettering).
  */
+/**
+ * A colour towards paint: saturation above a little over half is pulled in by
+ * half, the very lightest whites come down to a soft cool stone, and the
+ * hue is kept, so a cobalt is still a cobalt, only a painted one.
+ */
+function paintGrade(hex: string): string {
+  const v = hex.slice(1), r = parseInt(v.slice(0, 2), 16) / 255, g = parseInt(v.slice(2, 4), 16) / 255, b = parseInt(v.slice(4, 6), 16) / 255
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn
+  let h = 0, s = 0
+  if (d > 0) {
+    s = d / (1 - Math.abs(2 * l - 1))
+    h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4
+    h *= 60
+  }
+  const S2 = s > 0.5 ? 0.5 + (s - 0.5) * 0.45 : s, L2 = l > 0.94 ? 0.94 + (l - 0.94) * 0.4 : l
+  const C2 = (1 - Math.abs(2 * L2 - 1)) * S2, X = C2 * (1 - Math.abs(((h / 60) % 2 + 2) % 2 - 1)), m = L2 - C2 / 2
+  const hh = ((h % 360) + 360) % 360
+  const [R, G, B] = hh < 60 ? [C2, X, 0] : hh < 120 ? [X, C2, 0] : hh < 180 ? [0, C2, X] : hh < 240 ? [0, X, C2] : hh < 300 ? [X, 0, C2] : [C2, 0, X]
+  return '#' + [R, G, B].map((c) => Math.max(0, Math.min(255, Math.round((c + m) * 255))).toString(16).padStart(2, '0')).join('')
+}
+
+const rims = new Map<string, string>()
+const rimFor = (fill: string) => { let r = rims.get(fill); if (!r) { r = mix(shade(fill, 0.34), INK, 0.55); rims.set(fill, r) } return r }
 function rim(art: N): N {
   const out = new N('g', { class: 'lm-rim' })
   const copy = (from: N, into: N) => {
@@ -75,7 +98,9 @@ function rim(art: N): N {
       const sw = Number(a['stroke-width'] ?? OUT)
       if (a.stroke !== INK || !a.fill || a.fill === 'none' || a.fill === 'transparent' || !(sw >= 1)) continue
       const { class: _c, id: _i, style: _s, opacity: _o, 'data-l': _l, 'data-la': _la, 'stroke-linecap': _cap, ...shape } = a
-      into.add(new N(k.tag, { ...shape, fill: INK, stroke: INK, 'stroke-width': sw + RIM * 2 }))
+      // The cartoon island's rim is a deep shade of what it rims (a red roof in deep red), and finer.
+      const ink = look.soft && typeof a.fill === 'string' && /^#[0-9a-f]{6}$/i.test(a.fill) ? rimFor(a.fill) : INK
+      into.add(new N(k.tag, { ...shape, fill: ink, stroke: ink, 'stroke-width': sw + (look.soft ? RIM * 1.25 : RIM * 2) }))
     }
   }
   copy(art, out)
@@ -159,6 +184,8 @@ export type PlateRef = { box: [number, number, number, number]; href: string; id
 
 export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; glow?: PlateRef | null; sky?: SkyArt | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
   const plate = opts.plate ?? null
+  // The cartoon island is inked in colour, with contact shadows; the realistic one's drawn bits keep plain ink.
+  look.soft = !plate
   harbourArt.moon = plate ? opts.sky?.moon ?? null : null
   setFigures(opts.figures ?? null)
   setActors(!!opts.figures)
@@ -1868,6 +1895,27 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       for (const k of n.kids) deInk(k)
     }
     for (const m of made) if (!KEEP.has(m.kind)) deInk(m.node)
+  }
+  // The cartoon island's buildings and things, graded towards paint: the candy-bright colours (a full cobalt, a hot
+  // raspberry) lose some of their saturation, and pure white goes to a soft stone, so the ground's natural greens lead
+  // and the buildings sit in them. The ground was painted in its own colours already; words and banners keep theirs.
+  if (!opts.plate) {
+    const graded = new Map<string, string>()
+    const grade = (c: unknown) => {
+      if (typeof c !== 'string' || !/^#[0-9a-f]{6}$/i.test(c)) return c
+      let g = graded.get(c)
+      if (!g) { g = paintGrade(c); graded.set(c, g) }
+      return g
+    }
+    const walk = (n: N | string) => {
+      if (typeof n === 'string') return
+      const a = n.attrs
+      if (typeof a.class === 'string' && /\b(pk-say|say|sign-words|lm-ring)\b/.test(a.class)) return
+      if (n.tag !== 'text') { a.fill = grade(a.fill) as string; if (a.stroke !== INK) a.stroke = grade(a.stroke) as string }
+      if (n.tag === 'stop') a['stop-color'] = grade(a['stop-color']) as string
+      for (const k of n.kids) walk(k)
+    }
+    for (const m of made) if (m.kind === 'landmark' || m.kind === 'things') walk(m.node)
   }
   // The realistic night falls on everything in the world, the clouds, the balloons and the birds as well:
   // its layer (and the lighthouse's beam, which is light) goes over the sky's, under only the districts' names.

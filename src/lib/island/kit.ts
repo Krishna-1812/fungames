@@ -91,6 +91,27 @@ export function minPath(d: string): string {
   return s
 }
 
+/**
+ * How the cartoon island is inked (set by buildIsland; off for the realistic
+ * island, whose drawn bits keep their plain ink). Soft: every shape outlined
+ * in ink takes a line in a deep shade of its own colour instead, as an
+ * illustrator inks a painting, and the solids get their contact shadows and
+ * the soft dark at the foot of their walls.
+ */
+export const look = { soft: false }
+const HEX6 = /^#[0-9a-f]{6}$/i
+const lines = new Map<string, string>()
+/** The line a colour is inked with: its own deep shade, a little towards the ink, darker for pale colours. */
+export function lineFor(fill: string): string {
+  let l = lines.get(fill)
+  if (!l) {
+    const [r, g, b] = rgb(fill), lum = (0.3 * r + 0.59 * g + 0.11 * b) / 255
+    l = mix(shade(fill, 0.6 - lum * 0.1), INK, 0.12 + lum * 0.06)
+    lines.set(fill, l)
+  }
+  return l
+}
+
 /** Groups that set round joins for everything drawn inside them. */
 const joinRoots = new WeakSet<N>()
 /**
@@ -136,6 +157,7 @@ export function render(n: N | string): string {
     const { points, ...rest } = attrs
     tag = 'path'; attrs = { d: 'M' + (points as string).split(' ').map((q) => q.replace(',', ' ')).join('L') + 'Z', ...rest }
   }
+  if (look.soft && attrs.stroke === INK && typeof attrs.fill === 'string' && HEX6.test(attrs.fill)) attrs = { ...attrs, stroke: lineFor(attrs.fill) }
   let a = ''
   for (const k in attrs) {
     const v = attrs[k]
@@ -347,11 +369,40 @@ export class Pen {
   }
   private boxDrawn(x: number, y: number, w: number, d: number, h: number, o: Draw & { z0?: number; top?: string; left?: string; right?: string; trim?: string } = {}): Box {
     const z0 = o.z0 ?? 0, c = o.fill ?? C.white
-    const top = o.top ?? c, right = o.right ?? shade(c, 0.93), left = o.left ?? shade(c, 0.8)
+    const soft = look.soft
+    // Three tones: the top in the sun, the right face lit, and the left in a shade cooled by the sky.
+    const top = o.top ?? (soft ? mix(c, '#ffffff', 0.06) : c), right = o.right ?? shade(c, 0.93), left = o.left ?? (soft ? mix(shade(c, 0.8), '#41508f', 0.1) : shade(c, 0.8))
     const g = o.cls ? this.group(o.cls) : this
     const s = { sw: o.sw, stroke: o.stroke }
+    // Standing on the ground and big enough to matter: its shadow, thrown away from the sun (towards +y).
+    if (soft && z0 === 0 && h >= 8 && w >= 0.25 && d >= 0.25 && !o.cls) {
+      const len = Math.min(1.3, (h / S) * 0.62), a = len * 0.18
+      for (const [k, op] of [[1, 0.1], [0.62, 0.1], [0.3, 0.08]] as [number, number][]) {
+        const L = len * k, A = a * k
+        this.el('polygon', { points: [[x, y], [x + w, y], [x + w + A, y + L], [x + w + A, y + d + L], [x + A, y + d + L], [x, y + d]].map(([u, v]) => this.at(u, v, 0).map(f).join(',')).join(' '), fill: '#1c2a52', opacity: op })
+      }
+    }
     g.poly([[x + w, y, z0], [x + w, y + d, z0], [x + w, y + d, z0 + h], [x + w, y, z0 + h]], right, s)
     g.poly([[x, y + d, z0], [x + w, y + d, z0], [x + w, y + d, z0 + h], [x, y + d, z0 + h]], left, s)
+    // The foot of each wall darkens where the light cannot reach (two soft steps), and its top edge catches the sun.
+    if (soft && h >= 8 && !o.cls) {
+      for (const [k, op] of [[0.42, 0.05], [0.26, 0.06], [0.12, 0.08]] as [number, number][]) {
+        const t = Math.min(18, h * k)
+        g.el('polygon', { points: [[x + w, y, z0], [x + w, y + d, z0], [x + w, y + d, z0 + t], [x + w, y, z0 + t]].map((p) => this.at(...(p as [number, number, number])).map(f).join(',')).join(' '), fill: '#1c2a52', opacity: op })
+        g.el('polygon', { points: [[x, y + d, z0], [x + w, y + d, z0], [x + w, y + d, z0 + t], [x, y + d, z0 + t]].map((p) => this.at(...(p as [number, number, number])).map(f).join(',')).join(' '), fill: '#1c2a52', opacity: op })
+      }
+      // A wall of any size shows what it is made of: faint courses, every few pixels up it, in its own deeper colour.
+      if (h >= 22 && w >= 0.45 && d >= 0.45) {
+        let cs = ''
+        for (let z = z0 + 6; z < z0 + h - 3; z += 6) {
+          const [a1, a2, a3] = [this.at(x + w, y, z), this.at(x + w, y + d, z), this.at(x, y + d, z)]
+          cs += `M${f(a1[0])} ${f(a1[1])}L${f(a2[0])} ${f(a2[1])}L${f(a3[0])} ${f(a3[1])}`
+        }
+        if (cs) g.el('path', { d: cs, fill: 'none', stroke: shade(c, 0.6), 'stroke-width': 0.6, opacity: 0.22, 'stroke-linecap': 'round' })
+      }
+      const [p1, p2, p3] = [this.at(x + w, y, z0 + h - 1.2), this.at(x + w, y + d, z0 + h - 1.2), this.at(x, y + d, z0 + h - 1.2)]
+      g.el('path', { d: `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}L${f(p3[0])} ${f(p3[1])}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.35, 'stroke-linecap': 'round' })
+    }
     g.poly([[x, y, z0 + h], [x + w, y, z0 + h], [x + w, y + d, z0 + h], [x, y + d, z0 + h]], top, s)
     const b = { x, y, w, d, z0, h }
     if (o.trim) this.band(b, h - 3, h, o.trim)
@@ -395,6 +446,7 @@ export class Pen {
       this.quad(b, face, u - ww / 2 - fu, u + ww / 2 + fu, z - 1.5, z + h + 1.5, shade(frame, dark), { sw: 1 })
       const glass = this.quad(b, face, u - ww / 2, u + ww / 2, z, z + h, shade(pane, dark), { sw: 0.8, cls: o.cls ?? 'win' })
       this.quad(b, face, u - ww / 2, u - ww / 2 + ww * 0.35, z + h * 0.45, z + h, shade(C.glassHi, dark), { sw: 0, op: 0.7 })
+      if (look.soft) this.quad(b, face, u - ww / 2, u + ww / 2, z + h - Math.min(3, h * 0.28), z + h, '#1c2a52', { sw: 0, op: 0.22 })
       this.quad(b, face, u - ww / 2 - fu * 2, u + ww / 2 + fu * 2, z - 2.5, z - 1, shade(frame, dark * 0.9), { sw: 0.8 })
       if (o.lit !== false) {
         const Z = b.z0 + z + h / 2
@@ -476,7 +528,11 @@ export class Pen {
     g.path(`M${f(x - rx)} ${f(y - h)}L${f(x - rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x + rx)} ${f(y)}L${f(x + rx)} ${f(y - h)}Z`, o.side ?? shade(fill, 0.86), { sw: o.sw })
     for (const [z1, z2, c] of o.bands ?? []) g.path(`M${f(x - rx)} ${f(y - z2)}L${f(x - rx)} ${f(y - z1)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x + rx)} ${f(y - z1)}L${f(x + rx)} ${f(y - z2)}A${f(rx)} ${f(ry)} 0 0 1 ${f(x - rx)} ${f(y - z2)}Z`, c, { sw: 1 })
     // A soft vertical highlight down the lit side.
-    g.path(`M${f(x - rx * 0.55)} ${f(y - h + ry * 0.9)}L${f(x - rx * 0.55)} ${f(y + ry * 0.7)}`, 'none', { stroke: '#ffffff', sw: 2.5, op: 0.35 })
+    if (look.soft) {
+      // The left of the drum in shade, a highlight down its lit right.
+      g.path(`M${f(x - rx)} ${f(y - h)}L${f(x - rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x - rx * 0.25)} ${f(y + ry * 0.97)}L${f(x - rx * 0.25)} ${f(y - h + ry * 0.97)}Z`, '#1c2a52', { sw: 0, op: 0.16 })
+      g.path(`M${f(x + rx * 0.5)} ${f(y - h + ry * 0.9)}L${f(x + rx * 0.5)} ${f(y + ry * 0.7)}`, 'none', { stroke: '#ffffff', sw: 2.5, op: 0.35 })
+    } else g.path(`M${f(x - rx * 0.55)} ${f(y - h + ry * 0.9)}L${f(x - rx * 0.55)} ${f(y + ry * 0.7)}`, 'none', { stroke: '#ffffff', sw: 2.5, op: 0.35 })
     g.el('ellipse', { cx: x, cy: y - h, rx, ry, fill: o.top ?? fill, stroke: o.stroke ?? INK, 'stroke-width': o.sw ?? OUT })
     return g
   }
@@ -507,7 +563,8 @@ export class Pen {
     const [x, y] = this.at(cx, cy, z0), rx = r * S * 0.707, ry = r * S * 0.354
     this.grow(x - rx, y - h, x + rx, y + ry)
     this.path(`M${f(x - rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x + rx)} ${f(y)}L${f(x)} ${f(y - h)}Z`, fill, o)
-    this.path(`M${f(x)} ${f(y - h)}L${f(x + rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 1 ${f(x + rx * 0.2)} ${f(y + ry * 0.98)}Z`, shade(fill, 0.82), { sw: 0, op: 0.9 })
+    if (look.soft) this.path(`M${f(x)} ${f(y - h)}L${f(x - rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x - rx * 0.2)} ${f(y + ry * 0.98)}Z`, shade(fill, 0.8), { sw: 0, op: 0.9 })
+    else this.path(`M${f(x)} ${f(y - h)}L${f(x + rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 1 ${f(x + rx * 0.2)} ${f(y + ry * 0.98)}Z`, shade(fill, 0.82), { sw: 0, op: 0.9 })
   }
   dome(cx: number, cy: number, r: number, z0: number, fill: string, o: Draw = {}): Pen | this {
     return this.solid(o.cls ? null : { k: 'dome', cx: cx + this.ox, cy: cy + this.oy, r, z0: z0 + this.oz, fill }, () => this.domeDrawn(cx, cy, r, z0, fill, o))
