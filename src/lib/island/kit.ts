@@ -206,7 +206,7 @@ export type Draw = { fill?: string; stroke?: string; sw?: number; op?: number; c
  * in the world (tile i, j and height z: Unity lights the island at night from
  * there), and for a window, the face it looks out of.
  */
-export type Light = [number, number] & { el?: N; glow?: string | null; w?: [number, number, number]; face?: 'x' | 'y' }
+export type Light = [number, number] & { el?: N; glow?: string | null; w?: [number, number, number]; face?: 'x' | 'y'; /** A set piece's scale, for a copy of its pane. */ tf?: string }
 
 /**
  * Things that give off light of their own (neon, a screen, a ring of bulbs),

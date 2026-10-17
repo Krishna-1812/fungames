@@ -74,7 +74,8 @@ for (const g of games) {
   const a = island.anchors[g.slug]
   if (!a) { fail(`${g.slug} was never drawn`); continue }
   const w = a.x1 - a.x0, h = a.y1 - a.y0
-  if (!(Number.isFinite(w) && Number.isFinite(h) && w > 50 && h > 40 && w < 520 && h < 460)) fail(`${g.slug} measured itself oddly: ${Math.round(w)} × ${Math.round(h)}`)
+  // (A district's set piece is drawn up to 1.5 times bigger on the cartoon island: world.ts, HERO.)
+  if (!(Number.isFinite(w) && Number.isFinite(h) && w > 50 && h > 40 && w < 680 && h < 620)) fail(`${g.slug} measured itself oddly: ${Math.round(w)} × ${Math.round(h)}`)
 }
 ok(`${Object.keys(island.anchors).length} buildings measured`)
 const links = (island.svg.match(/<a class="lm"/g) ?? []).length

@@ -146,6 +146,13 @@ export function foliage(p: Pen, c: string, blobs: [number, number, number][]) {
   p.el('path', { d, fill: 'none', stroke: dark, 'stroke-width': 1.1, 'stroke-linecap': 'round' })
 }
 
+/**
+ * Where each person drawn stands on screen, by their group: a set piece is
+ * drawn bigger than life (world.ts, HERO), and the people at it are put back
+ * to their own size, standing where they stood.
+ */
+export const figFeet = new WeakMap<N, [number, number]>()
+
 /** A person standing: head, body, legs. `pose` 'wave' raises an arm. */
 export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: string; hat?: string; pose?: 'stand' | 'wave' | 'look'; k?: number; cls?: string } = {}) {
   const [bx, by] = p.at(x, y)
@@ -157,12 +164,14 @@ export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: 
     const u = actorUse(w, o.pose ?? 'stand', pick(x + p.ox, y + p.oy, 5, 2) ? 'se' : 'sw', 0, { transform: `translate(${f(bx)} ${f(by)})${k !== 1 ? ` scale(${Math.round(k * 1000) / 1000})` : ''}` })
     if (u) {
       const g = p.group(o.cls)
+      figFeet.set(g.g, [bx, by])
       g.g.add(u)
       p.grow(bx - 30 * k, by - 24 * k, bx + 12 * k, by + 8 * k)
       return g
     }
   }
   const g = p.group(o.cls)
+  figFeet.set(g.g, [bx, by])
   g.el('ellipse', { cx: bx - 2 * k, cy: by + 0.5, rx: 5 * k, ry: 1.8 * k, fill: INK, opacity: 0.15 })
   g.el('path', { d: `M${f(bx - 1.8 * k)} ${f(by)}v${f(-6 * k)}M${f(bx + 1.8 * k)} ${f(by)}v${f(-6 * k)}`, stroke: INK, 'stroke-width': 2 * k, 'stroke-linecap': 'round', fill: 'none' })
   g.el('rect', { x: bx - 3.4 * k, y: by - 14 * k, width: 6.8 * k, height: 9 * k, rx: 2.6 * k, fill: shirt, stroke: INK, 'stroke-width': 1.2 })

@@ -12,7 +12,7 @@
 import { look, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
 import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
-import { tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
+import { figFeet, tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
 import type { FigureSet, BuildingSet } from './figures'
 import type { SkyArt } from './plate'
 import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
@@ -223,6 +223,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     for (const [a, b] of own) { if (!lm.water) { land[a][b] = true; height[a][b] = z; dist[a][b] = D(district) } else land[a][b] = false; taken.set(key(a, b), slug) }
     return { slug, district, i, j, w, d, z, lm, cells: own }
   })
+  /**
+   * Each district's set piece, on the cartoon island: drawn this much bigger,
+   * grown up and back from the front corner of its plot into the open ground
+   * behind it (so the roads in front stay clear, and the realistic island,
+   * whose picture is Unity's, keeps every plot exactly as it was).
+   */
+  const HERO: Record<string, number> = { orbit: 1.5, 'deep-time': 1.4, 'steady-hand': 1.45, 'share-this-page': 1.5, overstimulated: 1.45, auction: 1.5, 'every-second': 1.35 }
+  const heroK = (slug: string) => (plate ? 1 : HERO[slug] ?? 1)
+  /** A building's plot as drawn: its own, or for a set piece, the bigger one it grows into. */
+  const drawnPlot = (pl: { slug: string; i: number; j: number; w: number; d: number }) => { const k = heroK(pl.slug); return { i: pl.i + pl.w * (1 - k), j: pl.j + pl.d * (1 - k), w: pl.w * k, d: pl.d * k, k } }
   const coast = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => !isLand(i + a, j + b))
   const H = (i: number, j: number) => (isLand(i, j) ? height[i][j] : SEA)
 
@@ -918,12 +928,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const b = new Bounds()
       pl.lm.draw(new Pen(new N('g'), pl.i, pl.j, pl.z, b, []))
       const [, footY] = P(pl.i + pl.w / 2, pl.j + pl.d / 2, pl.z)
-      const L = Math.min(2.4, Math.max(0.35, (footY - b.y0) / 76))
-      const x0 = pl.i + 0.08, y0 = pl.j + 0.08, x1 = pl.i + pl.w - 0.08, y1 = pl.j + pl.d - 0.08
+      const hp = drawnPlot(pl)
+      const L = Math.min(2.4 * hp.k, Math.max(0.35, ((footY - b.y0) / 76) * hp.k))
+      const x0 = hp.i + 0.08, y0 = hp.j + 0.08, x1 = hp.i + hp.w - 0.08, y1 = hp.j + hp.d - 0.08
       const a = L * 0.5
       cast.push(`M${f2(x0)} ${f2(y0)}L${f2(x1)} ${f2(y0)}L${f2(x1)} ${f2(y1)}L${f2(x1 - a)} ${f2(y1 + a)}L${f2(x0 - a)} ${f2(y1 + a)}L${f2(x0 - a)} ${f2(y0 + a)}Z`)
       const e = 0.1
-      foot.push(`M${f2(pl.i - e)} ${f2(pl.j - e)}L${f2(pl.i + pl.w + e)} ${f2(pl.j - e)}L${f2(pl.i + pl.w + e)} ${f2(pl.j + pl.d + e)}L${f2(pl.i - e)} ${f2(pl.j + pl.d + e)}Z`)
+      foot.push(`M${f2(hp.i - e)} ${f2(hp.j - e)}L${f2(hp.i + hp.w + e)} ${f2(hp.j - e)}L${f2(hp.i + hp.w + e)} ${f2(hp.j + hp.d + e)}L${f2(hp.i - e)} ${f2(hp.j + hp.d + e)}Z`)
     }
     for (const [w, op] of [[0.44, 0.06], [0.28, 0.065], [0.14, 0.07], [0, 0.08]] as [number, number][]) {
       sg.add(new N('g', { opacity: op })).add(new N('path', { d: cast.join(''), fill: INK, stroke: w ? INK : undefined, 'stroke-width': w || undefined, 'stroke-linejoin': 'round' }))
@@ -1158,17 +1169,80 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const a = layer.add(new N('a', { class: 'lm', href: g?.href ?? `/${pl.slug}/`, 'data-slug': pl.slug, 'aria-label': g ? `${g.title}: ${g.blurb}` : pl.slug, style: `--d:${Math.round(Math.hypot(pl.i + pl.w / 2 - cx, pl.j + pl.d / 2 - cx) * 45)}ms` }))
       // The ring that shows under a building when it is picked.
       const [rx, ry] = P(pl.i, pl.j, pl.z)
-      a.add(new N('path', { class: 'lm-ring', d: quad([P(pl.i - 0.08, pl.j - 0.08, pl.z), P(pl.i + pl.w + 0.08, pl.j - 0.08, pl.z), P(pl.i + pl.w + 0.08, pl.j + pl.d + 0.08, pl.z), P(pl.i - 0.08, pl.j + pl.d + 0.08, pl.z)]), fill: '#ffffff', 'fill-opacity': 0.35, stroke: '#ffffff', 'stroke-width': 3, 'stroke-dasharray': '6 6' }))
+      const hp = drawnPlot(pl)
+      a.add(new N('path', { class: 'lm-ring', d: quad([P(hp.i - 0.08, hp.j - 0.08, pl.z), P(hp.i + hp.w + 0.08, hp.j - 0.08, pl.z), P(hp.i + hp.w + 0.08, hp.j + hp.d + 0.08, pl.z), P(hp.i - 0.08, hp.j + hp.d + 0.08, pl.z)]), fill: '#ffffff', 'fill-opacity': 0.35, stroke: '#ffffff', 'stroke-width': 3, 'stroke-dasharray': '6 6' }))
       void rx; void ry
       const art = a.add(joinRoot(new N('g', { class: 'lm-art', id: `lm-${pl.slug}`, 'stroke-linejoin': 'round' })))
       const b = new Bounds()
       const { sink, real } = sinkFor(pl.slug)
       const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights, sink)
+      const l0 = lights.length, g0 = glows.length, beacon0 = [beacon[0], beacon[1]]
       pl.lm.draw(lp)
+      // A set piece's people stay their own size, where they stood (before its rim is drawn round them).
+      const inv = hp.k !== 1 ? ` scale(${Math.round((1 / hp.k) * 1000) / 1000}) ` : ''
+      if (inv) {
+        const lifeSize = (n: N | string) => {
+          if (typeof n === 'string') return
+          const foot = figFeet.get(n)
+          if (foot) { n.attrs.transform = `translate(${f(foot[0])} ${f(foot[1])})${inv}translate(${f(-foot[0])} ${f(-foot[1])})`; return }
+          n.kids.forEach(lifeSize)
+        }
+        lifeSize(art)
+      }
       // The heavier line round its outside, under everything else in it (not round a photograph).
       if (!real) art.kids.unshift(rim(art))
+      if (hp.k !== 1) {
+        // A set piece: the whole drawing scaled about the front corner of its plot. Its lines are
+        // thinned to match (a little heavier than the rest: it is the district's own building), and
+        // whatever keeps a screen position of it (its bounds, its lights, its glows, a lighthouse's
+        // lamp) is moved to where it now is.
+        const k = hp.k, [ax, ay] = P(pl.i + pl.w, pl.j + pl.d, pl.z)
+        const tf = `translate(${f(ax)} ${f(ay)}) scale(${k}) translate(${f(-ax)} ${f(-ay)})`
+        const T = (x: number, y: number): [number, number] => [ax + (x - ax) * k, ay + (y - ay) * k]
+        art.attrs.transform = tf
+        const thin = (n: N | string) => {
+          if (typeof n === 'string') return
+          // (Not a person put back to size: their lines are everyone's already.)
+          if (typeof n.attrs.transform === 'string' && n.attrs.transform.includes(inv)) return
+          const sw = n.attrs['stroke-width']
+          if (typeof sw === 'number') n.attrs['stroke-width'] = Math.round((sw / k) * 1.15 * 1000) / 1000
+          for (const c of n.kids) thin(c)
+        }
+        thin(art)
+        const [x0, y0] = T(b.x0, b.y0), [x1, y1] = T(b.x1, b.y1)
+        b.x0 = x0; b.y0 = y0; b.x1 = x1; b.y1 = y1
+        for (let n = l0; n < lights.length; n++) { const l = lights[n], [x, y] = T(l[0], l[1]); l[0] = x; l[1] = y; l.tf = tf }
+        for (let n = g0; n < glows.length; n++) { const w = new N('g', { transform: tf }); w.add(glows[n]); glows[n] = w }
+        if (beacon[0] !== beacon0[0] || beacon[1] !== beacon0[1]) { const [x, y] = T(beacon[0], beacon[1]); beacon[0] = x; beacon[1] = y }
+      }
+      if (hp.k !== 1 && !pl.lm.water) {
+        // Its plinth, under it: low dressed stone a little wider than the plot, with steps up the
+        // middle of each side we see (where a road or the open ground meets it).
+        const base = new N('g', { class: 'lm-set' })
+        a.kids.splice(a.kids.indexOf(art), 0, base)
+        const bp = new Pen(base, 0, 0, pl.z, b, lights)
+        const e = 0.16, x0 = hp.i - e, y0 = hp.j - e, w = hp.w + e * 2, d = hp.d + e * 2, stone = '#d8d5cc'
+        bp.box(x0, y0, w, d, 5, { fill: stone, sw: 1.2 })
+        // Flagstones on its top, in two directions.
+        let flags = ''
+        for (let u = 0.5; u < w; u += 0.5) { const [p1, p2] = [P(x0 + u, y0, pl.z + 5), P(x0 + u, y0 + d, pl.z + 5)]; flags += `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}` }
+        for (let v = 0.5; v < d; v += 0.5) { const [p1, p2] = [P(x0, y0 + v, pl.z + 5), P(x0 + w, y0 + v, pl.z + 5)]; flags += `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}` }
+        base.add(new N('path', { d: flags, fill: 'none', stroke: shade(stone, 0.72), 'stroke-width': 0.7, opacity: 0.6 }))
+        bp.box(x0 + w, y0 + d / 2 - 0.22, 0.12, 0.44, 2.5, { fill: shade(stone, 0.97), sw: 1 })
+        bp.box(x0 + w / 2 - 0.22, y0 + d, 0.44, 0.12, 2.5, { fill: shade(stone, 0.97), sw: 1 })
+        // In front of it: a planter at each front corner, and a lamp beside each, unless that is road.
+        const sp = new Pen(a, 0, 0, pl.z, b, lights)
+        const fx = x0 + w, fy = y0 + d
+        for (const [px, py, lx, ly] of [[fx - 0.1, fy - 0.42, fx - 0.1, y0 + 0.2], [fx - 0.42, fy - 0.1, x0 + 0.2, fy - 0.1]] as [number, number, number, number][]) {
+          if (!road.has(key(Math.floor(px + 0.12), Math.floor(py + 0.12)))) {
+            sp.box(px - 0.11, py - 0.11, 0.22, 0.22, 7, { z0: 5, fill: '#b7b2a6', sw: 1.1 })
+            tree(sp.move(0, 0, 12), px, py, 'bush', C.leaf, 0.55)
+          }
+          if (!road.has(key(Math.floor(lx + 0.12), Math.floor(ly + 0.12)))) lamp(sp.move(0, 0, 5), lx, ly, 26)
+        }
+      }
       const [bx, by] = P(pl.i + pl.w / 2, pl.j + pl.d / 2, pl.z)
-      anchors[pl.slug] = { slug: pl.slug, district: pl.district, x0: f(b.x0), y0: f(b.y0), x1: f(b.x1), y1: f(b.y1), bx: f(bx), by: f(by), foot: [P(pl.i, pl.j, pl.z), P(pl.i + pl.w, pl.j, pl.z), P(pl.i + pl.w, pl.j + pl.d, pl.z), P(pl.i, pl.j + pl.d, pl.z)].map((q) => q.map(f).join(',')).join(' ') }
+      anchors[pl.slug] = { slug: pl.slug, district: pl.district, x0: f(b.x0), y0: f(b.y0), x1: f(b.x1), y1: f(b.y1), bx: f(bx), by: f(by), foot: [P(hp.i, hp.j, pl.z), P(hp.i + hp.w, hp.j, pl.z), P(hp.i + hp.w, hp.j + hp.d, pl.z), P(hp.i, hp.j + hp.d, pl.z)].map((q) => q.map(f).join(',')).join(' ') }
       // People on the roads are painted below everything that stands up, which
       // is right for whatever is in front of them; but walking past the front
       // of a building, their heads would go behind its wall. So everyone who
@@ -1498,6 +1572,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     if (d.key === 'market') return r < 0.5 ? 'cypress' : 'round'
     return r < 0.55 ? 'round' : r < 0.8 ? 'bush' : 'blossom'
   }
+  const heroPlots = placed.filter((pl) => heroK(pl.slug) !== 1 && !pl.lm.water).map(drawnPlot)
+  const under = (x: number, y: number) => heroPlots.some((h) => x > h.i - 0.12 && x < h.i + h.w + 0.12 && y > h.j - 0.12 && y < h.j + h.d + 0.12)
+  const grow = (x: number, y: number, t: Thing) => { if (!under(x, y)) things.push(t) }
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
     if (!isLand(i, j) || taken.has(key(i, j)) || pond.has(key(i, j)) || reserved.has(key(i, j))) continue
     const d = dist[i][j], z = height[i][j], coastal = coast(i, j)
@@ -1510,14 +1587,14 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const density = { peaks: 0.55, badlands: 0.3, proving: 0.28, harbour: 0.16, funfair: 0.24, market: 0.2, oldtown: 0.22 }[d.key]
     const cluster = 0.5 + 0.5 * Math.sin(i * 0.9 + 1.3) * Math.cos(j * 0.8 - 0.4)
     if (R() > density * (0.5 + cluster)) {
-      if (R() < 0.04 && !coastal && z === 0) things.push({ depth: i + j + 1, draw: (layer) => flowers(new Pen(layer, 0, 0, 0, new Bounds(), [], sinkFor(`flowers-${i}-${j}`).sink), i + 0.5, j + 0.5) })
-      else if (R() < 0.03 && !coastal && z === 0) things.push({ depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : 'stand' }) })
+      if (R() < 0.04 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => flowers(new Pen(layer, 0, 0, 0, new Bounds(), [], sinkFor(`flowers-${i}-${j}`).sink), i + 0.5, j + 0.5) })
+      else if (R() < 0.03 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : 'stand' }) })
       continue
     }
     // The Badlands grow cacti as often as anything.
     if (d.key === 'badlands' && !coastal && R() < 0.45) {
       const x = i + 0.3 + R() * 0.4, y = j + 0.3 + R() * 0.4, big = R() < 0.6, flower = R() < 0.3, k = 0.85 + R() * 0.3
-      things.push({ depth: x + y, draw: (layer) => (big ? cactus(new Pen(layer, 0, 0, z), x, y, k, flower) : barrelCactus(new Pen(layer, 0, 0, z), x, y, k)) })
+      grow(x, y, { depth: x + y, draw: (layer) => (big ? cactus(new Pen(layer, 0, 0, z), x, y, k, flower) : barrelCactus(new Pen(layer, 0, 0, z), x, y, k)) })
       continue
     }
     const kind = treeKind(d, coastal)
@@ -1527,7 +1604,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const x = i + 0.3 + R() * 0.4, y = j + 0.3 + R() * 0.4
       const c = kind === 'blossom' ? C.leaf : R() < 0.22 ? C.bloom : R() < 0.5 ? C.leaf : C.leafB
       const sz = 0.85 + R() * 0.35
-      things.push({ depth: x + y, draw: (layer) => (snowy && kind === 'pine' ? snowPine(new Pen(layer, 0, 0, z), x, y, c === C.bloom ? C.leaf : c, sz) : tree(new Pen(layer, 0, 0, z), x, y, kind, c, sz)) })
+      grow(x, y, { depth: x + y, draw: (layer) => (snowy && kind === 'pine' ? snowPine(new Pen(layer, 0, 0, z), x, y, c === C.bloom ? C.leaf : c, sz) : tree(new Pen(layer, 0, 0, z), x, y, kind, c, sz)) })
     }
   }
   // Cause and effect, part one: the ferry's passengers. One steps off when
@@ -1607,7 +1684,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const hex = (c: number[]) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('')
     const body = made.filter((m) => m.kind === 'landmark' || m.kind === 'things').map((m) => render(m.node)).join('')
       .replace(/<(\w+)([^>]*?) data-l="(\d+)"/g, (_, tag: string, attrs: string, n: string) => `<${tag}${attrs.replace(/ (fill|opacity|class)="[^"]*"/g, '')} fill="${hex(code(Number(n)))}" data-l="${n}"`)
-    const onTop = (body.match(/<(?:polygon|circle|rect|path)[^>]*data-l="\d+"[^>]*\/>/g) ?? []).join('')
+    const onTop = (body.match(/<(?:polygon|circle|rect|path)[^>]*data-l="\d+"[^>]*\/>/g) ?? []).map((m) => { const tf = lights[Number(m.match(/data-l="(\d+)"/)![1])]?.tf; return tf ? `<g transform="${tf}">${m}</g>` : m }).join('')
     const [vx, vy, vw, vh] = viewBox, W = 3200, k = W / vw
     const doc = (inner: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${W}" height="${Math.round(vh * k)}">${inner}</svg>`
     const tally = (inner: string) => {
@@ -1672,7 +1749,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if (l.el && l.glow) {
         const a: Record<string, string | number | undefined> = {}
         for (const k of ['points', 'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'transform'] as const) { const v = l.el.attrs[k]; if (v !== undefined && v !== null && v !== '') a[k] = v as string | number }
-        panes.add(new N(l.el.tag, { ...a, fill: l.glow, opacity: 0.92 }))
+        const pane = new N(l.el.tag, { ...a, fill: l.glow, opacity: 0.92 })
+        if (l.tf) panes.add(new N('g', { transform: l.tf })).add(pane)
+        else panes.add(pane)
       }
     })
     if (cores) night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8, class: 'night-cores' }))

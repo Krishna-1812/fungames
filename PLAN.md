@@ -677,6 +677,22 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
     saturation pulled in, pure white down to soft stone. Words and banners
     keep their colours.
 
+- ~~**Set pieces (Cursor Camp study, part 4)**~~ **done** (2026-10-17).
+  One building per district is drawn 1.35–1.5× bigger on the cartoon island
+  (`HERO` in world.ts): orbit, deep-time, steady-hand, share-this-page (the
+  lighthouse), overstimulated (the wheel), auction, every-second.
+  - Each grows up and back from the front corner of its plot into the open
+    ground behind it, so the roads in front stay clear. Plots, roads and the
+    random stream are unchanged, so the realistic island (Unity's picture)
+    is exactly as it was.
+  - Its people are put back to life size where they stood (`figFeet` in
+    props.ts), its lines are thinned to match, and its lights, glows,
+    bounds, ring, shadow and (for the lighthouse) beam follow the scale.
+  - It stands on a dressed-stone plinth with steps, planters and lamps at
+    its front (not where that would be road); nothing grows from under it.
+  - Picked for open ground behind: a hero needs about a tile of it on its
+    back two sides. Check with a neighbourhood map before adding one.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the
