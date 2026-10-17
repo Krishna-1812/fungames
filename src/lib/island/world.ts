@@ -1099,8 +1099,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const frames = motionPath(name, k ? [...pts].reverse() : pts, { back: true })
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
       const dur = `${f(r.length * 2.6 + R() * 8)}s`, delay = `${f(-R() * 30)}s`
-      const g = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(...xs) - 30)} ${f(Math.min(...ys) - 24)} ${f(Math.max(...xs) + 12)} ${f(Math.max(...ys) + 8)}`, style: `animation:${name} ${dur} linear infinite ${delay}` }))
-      g.add(walker(crowd[(n * 2 + k) % crowd.length], name, frames, dur, delay) ?? walkerFigure(shirts[(n * 2 + k) % shirts.length]))
+      const g = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(...xs) - 30)} ${f(Math.min(...ys) - 34)} ${f(Math.max(...xs) + 12)} ${f(Math.max(...ys) + 8)}`, style: `animation:${name} ${dur} linear infinite ${delay}` }))
+      g.add(walker(crowd[(n * 2 + k) % crowd.length], name, frames, dur, delay) ?? walkerFigure(shirts[(n * 2 + k) % shirts.length], 1, n * 2 + k))
       goers.push({ cells: cellsOf(r), node: g })
     }
   })
@@ -1140,7 +1140,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
         motionCss.push(`@keyframes cross${n}{0%,${f(h1[0] + 1)}%{${tr(kA)}}${f(h1[1] - 1)}%,${f(h2[0] + 1)}%{${tr(kB)}}${f(h2[1] - 1)}%,100%{${tr(kA)}}}`)
         const pg = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(kA[0], kB[0]) - 8)} ${f(Math.min(kA[1], kB[1]) - 24)} ${f(Math.max(kA[0], kB[0]) + 8)} ${f(Math.max(kA[1], kB[1]) + 3)}`, style: `animation:cross${n} ${dur}s linear infinite ${f(-delay)}s` }))
-        pg.add(walker(crowd[(n + 5) % crowd.length], `cross${n}`, stopsOf([[0, kA], [h1[0] + 1, kA], [h1[1] - 1, kB], [h2[0] + 1, kB], [h2[1] - 1, kA], [100, kA]]), `${dur}s`, `${f(-delay)}s`) ?? walkerFigure(shirts[(n + 2) % shirts.length]))
+        pg.add(walker(crowd[(n + 5) % crowd.length], `cross${n}`, stopsOf([[0, kA], [h1[0] + 1, kA], [h1[1] - 1, kB], [h2[0] + 1, kB], [h2[1] - 1, kA], [100, kA]]), `${dur}s`, `${f(-delay)}s`) ?? walkerFigure(shirts[(n + 2) % shirts.length], 1, 100 + n))
         walkers.add(sh)
         goers.push({ cells: cellsOf([mid]), node: pg }, { cells: cellsOf(r), node: sh })
         return
@@ -1588,7 +1588,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const cluster = 0.5 + 0.5 * Math.sin(i * 0.9 + 1.3) * Math.cos(j * 0.8 - 0.4)
     if (R() > density * (0.5 + cluster)) {
       if (R() < 0.04 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => flowers(new Pen(layer, 0, 0, 0, new Bounds(), [], sinkFor(`flowers-${i}-${j}`).sink), i + 0.5, j + 0.5) })
-      else if (R() < 0.03 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : 'stand' }) })
+      else if (R() < 0.03 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => person(new Pen(layer), i + 0.5, j + 0.5, shirts[(i + j) % shirts.length], { pose: R() < 0.3 ? 'wave' : hz(i, j, 71) < 0.3 ? 'phone' : 'stand', dog: !plate && hz(i, j, 72) < 0.35 }) })
       continue
     }
     // The Badlands grow cacti as often as anything.
@@ -1616,7 +1616,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     motionCss.push(`@keyframes isl-off{0%,33%{${tr(end)};opacity:0}34%{opacity:1}52%{${tr(land)}}58%{${tr(shore)};opacity:1}60%,100%{${tr(shore)};opacity:0}}`)
     motionCss.push(`@keyframes isl-on{0%,40%{${tr(shore)};opacity:0}41%{opacity:1}46%{${tr(land)}}59%{${tr(end)};opacity:1}61%,100%{${tr(end)};opacity:0}}`)
     const ways: Record<string, MotionFrame[]> = { 'isl-off': stopsOf([[0, end], [34, end], [52, land], [58, shore], [100, shore]]), 'isl-on': stopsOf([[0, shore], [41, shore], [46, land], [59, end], [100, end]]) }
-    for (const [name, shirt] of [['isl-off', C.rasp], ['isl-on', C.mint]] as const) things.push({ depth: 21.5 + 30.5, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(shore[0] - 30)} ${f(land[1] - 30)} ${f(end[0] + 12)} ${f(end[1] + 8)}`, style: `animation:${name} ${FERRY_DUR}s linear infinite` })); g.add(walker(who(shirt, name === 'isl-on' ? 31 : 47), name, ways[name], `${FERRY_DUR}s`, '0s') ?? walkerFigure(shirt)) } })
+    for (const [name, shirt] of [['isl-off', C.rasp], ['isl-on', C.mint]] as const) things.push({ depth: 21.5 + 30.5, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(shore[0] - 30)} ${f(land[1] - 30)} ${f(end[0] + 12)} ${f(end[1] + 8)}`, style: `animation:${name} ${FERRY_DUR}s linear infinite` })); g.add(walker(who(shirt, name === 'isl-on' ? 31 : 47), name, ways[name], `${FERRY_DUR}s`, '0s') ?? walkerFigure(shirt, 1, shirt === C.rasp ? 201 : 202)) } })
   }
   // Cause and effect, part two: people walking up to a building's door and
   // going in, and a while later coming out again and walking off.
@@ -1652,7 +1652,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       acc = 0
       ;[...pts].reverse().forEach((q, k, rv) => { if (k) { acc += Math.hypot(q[0] - rv[k - 1][0], q[1] - rv[k - 1][1]); st.push([67 + (29 * acc) / total, q]) } })
       st.push([100, pts[0]])
-      things.push({ depth: pl.i + pl.j + (pl.w + pl.d) / 2 + 0.02, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb visitor', 'data-b': `${f(Math.min(...xs) - 30)} ${f(Math.min(...ys) - 24)} ${f(Math.max(...xs) + 12)} ${f(Math.max(...ys) + 8)}`, style: `animation:${name} ${dur}s linear infinite ${f(-m * 3.7)}s` })); g.add(walker(crowd[(m + 3) % crowd.length], name, stopsOf(st), `${dur}s`, `${f(-m * 3.7)}s`) ?? walkerFigure(shirts[(m + 3) % shirts.length])) } })
+      things.push({ depth: pl.i + pl.j + (pl.w + pl.d) / 2 + 0.02, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb visitor', 'data-b': `${f(Math.min(...xs) - 30)} ${f(Math.min(...ys) - 34)} ${f(Math.max(...xs) + 12)} ${f(Math.max(...ys) + 8)}`, style: `animation:${name} ${dur}s linear infinite ${f(-m * 3.7)}s` })); g.add(walker(crowd[(m + 3) % crowd.length], name, stopsOf(st), `${dur}s`, `${f(-m * 3.7)}s`) ?? walkerFigure(shirts[(m + 3) % shirts.length], 1, 300 + m)) } })
     }
   }
 

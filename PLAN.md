@@ -693,6 +693,20 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   - Picked for open ground behind: a hero needs about a tile of it on its
     back two sides. Check with a neighbourhood map before adding one.
 
+- ~~**People of their own (Cursor Camp study, part 5)**~~ **done** (2026-10-17).
+  The cartoon island's people are drawn by folk.ts: each picked by a seed
+  (where they stand, or which walker they are), so a spot always has the
+  same person.
+  - Six skin tones, seven hair styles (short, side-swept, long, a bun,
+    curls, a cap, none) in eight colours, trousers or a skirt, a build and a
+    height, sometimes a bag or a backpack; a face, shoes, a shirt lit from
+    the right.
+  - About 1.2× the first people (`FOLK`). Walkers keep their stepping legs.
+  - Some of the people out on the grass look at a phone, and about a third
+    walk a dog on a lead (`drawDog`). Chosen by hash, not R(), so nothing
+    else on the island moves.
+  - The realistic island's people are still Unity's (actors.ts).
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

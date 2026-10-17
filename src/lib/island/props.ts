@@ -6,6 +6,7 @@
 import { C, INK, OUT, N, Pen, shade, mix, S } from './kit'
 import type { FigureSet } from './figures'
 import { who, actorUse, creatureUse } from './actors'
+import { folk, drawFolk, drawDog, FOLK, type FolkPose } from './folk'
 
 const f = (v: number) => Math.round(v * 10) / 10
 
@@ -154,14 +155,14 @@ export function foliage(p: Pen, c: string, blobs: [number, number, number][]) {
 export const figFeet = new WeakMap<N, [number, number]>()
 
 /** A person standing: head, body, legs. `pose` 'wave' raises an arm. */
-export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: string; hat?: string; pose?: 'stand' | 'wave' | 'look'; k?: number; cls?: string } = {}) {
+export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: string; hat?: string; pose?: 'stand' | 'wave' | 'look' | 'phone'; k?: number; cls?: string; dog?: boolean } = {}) {
   const [bx, by] = p.at(x, y)
   const k = o.k ?? 1, skin = o.skin ?? '#f1d9c6'
   // Unity's, on the realistic island: turned towards us, one way or the other.
   {
     const seed = (x + p.ox) * 7.31 + (y + p.oy) * 3.17
     const w = who(shirt, seed, { skin: o.skin, hat: o.hat ?? null })
-    const u = actorUse(w, o.pose ?? 'stand', pick(x + p.ox, y + p.oy, 5, 2) ? 'se' : 'sw', 0, { transform: `translate(${f(bx)} ${f(by)})${k !== 1 ? ` scale(${Math.round(k * 1000) / 1000})` : ''}` })
+    const u = actorUse(w, o.pose === 'phone' ? 'look' : o.pose ?? 'stand', pick(x + p.ox, y + p.oy, 5, 2) ? 'se' : 'sw', 0, { transform: `translate(${f(bx)} ${f(by)})${k !== 1 ? ` scale(${Math.round(k * 1000) / 1000})` : ''}` })
     if (u) {
       const g = p.group(o.cls)
       figFeet.set(g.g, [bx, by])
@@ -170,25 +171,27 @@ export function person(p: Pen, x: number, y: number, shirt: string, o: { skin?: 
       return g
     }
   }
+  // Drawn: someone of their own (folk.ts), the same one wherever this spot is drawn.
   const g = p.group(o.cls)
   figFeet.set(g.g, [bx, by])
-  g.el('ellipse', { cx: bx - 2 * k, cy: by + 0.5, rx: 5 * k, ry: 1.8 * k, fill: INK, opacity: 0.15 })
-  g.el('path', { d: `M${f(bx - 1.8 * k)} ${f(by)}v${f(-6 * k)}M${f(bx + 1.8 * k)} ${f(by)}v${f(-6 * k)}`, stroke: INK, 'stroke-width': 2 * k, 'stroke-linecap': 'round', fill: 'none' })
-  g.el('rect', { x: bx - 3.4 * k, y: by - 14 * k, width: 6.8 * k, height: 9 * k, rx: 2.6 * k, fill: shirt, stroke: INK, 'stroke-width': 1.2 })
-  if (o.pose === 'wave') g.el('path', { d: `M${f(bx + 3 * k)} ${f(by - 12 * k)}l${f(4 * k)} ${f(-5 * k)}`, stroke: INK, 'stroke-width': 1.8 * k, 'stroke-linecap': 'round', class: 'wave-arm' })
-  g.el('circle', { cx: bx, cy: by - 17.5 * k, r: 3.4 * k, fill: skin, stroke: INK, 'stroke-width': 1.2 })
-  if (o.hat) g.el('path', { d: `M${f(bx - 3.6 * k)} ${f(by - 18.5 * k)}a${f(3.6 * k)} ${f(3.2 * k)} 0 0 1 ${f(7.2 * k)} 0z`, fill: o.hat, stroke: INK, 'stroke-width': 1 })
-  p.grow(bx - 6 * k, by - 22 * k, bx + 8 * k, by + 2)
+  const seed = (x + p.ox) * 7.31 + (y + p.oy) * 3.17
+  const who1 = folk(seed, { skin: o.skin, hat: o.hat ?? null })
+  const K = k * FOLK * who1.h
+  const pose: FolkPose = o.pose === 'wave' ? 'wave' : o.pose === 'phone' ? 'phone' : 'stand'
+  const body = g.el('g', { transform: `translate(${f(bx)} ${f(by)}) scale(${Math.round(K * 1000) / 1000})` })
+  if (o.dog) drawDog(g.el('g', { transform: `translate(${f(bx + 9 * k)} ${f(by + 2.5 * k)}) scale(${Math.round(k * FOLK * 1000) / 1000})` }), seed, [-2.3, -10.1])
+  drawFolk(body, who1, shirt, pose)
+  p.grow(bx - 8 * K, by - 26 * K, bx + 18 * k, by + 4)
   return g
 }
 
 /** The figure a walker carries along its path, drawn at the origin. */
-export function walkerFigure(shirt: string, k = 1): string {
-  const s = (v: number) => f(v * k)
-  return `<ellipse cx="${s(-2)}" cy="0.5" rx="${s(5)}" ry="${s(1.8)}" fill="${INK}" opacity="0.15"/>` +
-    `<g class="legs"><path d="M${s(-1.8)} 0v${s(-6)}" stroke="${INK}" stroke-width="${s(2)}" stroke-linecap="round" class="leg-a"/><path d="M${s(1.8)} 0v${s(-6)}" stroke="${INK}" stroke-width="${s(2)}" stroke-linecap="round" class="leg-b"/></g>` +
-    `<rect x="${s(-3.4)}" y="${s(-14)}" width="${s(6.8)}" height="${s(9)}" rx="${s(2.6)}" fill="${shirt}" stroke="${INK}" stroke-width="1.2"/>` +
-    `<circle cx="0" cy="${s(-17.5)}" r="${s(3.4)}" fill="#f1d9c6" stroke="${INK}" stroke-width="1.2"/>`
+export function walkerFigure(shirt: string, k = 1, seed = 0): N {
+  const p = folk(seed * 5.71 + 3.3)
+  const K = Math.round(k * FOLK * p.h * 1000) / 1000
+  const g = new N('g', { transform: `scale(${K})` })
+  drawFolk(g, p, shirt, 'stand', true)
+  return g
 }
 
 export function lamp(p: Pen, x: number, y: number, h = 26) {
