@@ -145,7 +145,10 @@ export const proving: Record<string, Landmark> = {
       // Unity's walker, arms out, and the long pole across them, its weighted ends.
       walker.el('path', { d: `M${f(wx - 26)} ${f(wy - 9)}q26 -5 52 0`, fill: 'none', stroke: '#5b5157', 'stroke-width': 0.8, 'stroke-linecap': 'round' })
       walker.el('circle', { cx: wx - 26, cy: wy - 9, r: 1.4, fill: '#c64c66' }); walker.el('circle', { cx: wx + 26, cy: wy - 9, r: 1.4, fill: '#c64c66' })
-      walker.g.add(funambulist)
+      // (Life-size on the bigger tightrope: world.ts, HERO.)
+      const life = walker.g.add(new N('g'))
+      figFeet.set(life, [wx, wy])
+      life.add(funambulist)
     } else {
     walker.path(`M${f(wx - 26)} ${f(wy - 9)}q26 -5 52 0`, 'none', { sw: 1.6 })
     walker.el('circle', { cx: wx - 26, cy: wy - 9, r: 1.6, fill: C.rasp }); walker.el('circle', { cx: wx + 26, cy: wy - 9, r: 1.6, fill: C.rasp })

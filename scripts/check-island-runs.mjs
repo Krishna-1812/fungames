@@ -25,10 +25,13 @@ process.env.ISLAND_PLATE = '1'
 const plate = plateRef()
 const glow = plate ? plateRef('glow') : null
 if (!plate) { console.log('check-island-runs: no plate, nothing to compare'); process.exit(0) }
-const real = shape(buildIsland(games, { raster: resvgRaster, plate, glow, figures: figureSet(), buildings: buildingSet() }))
+const shots = buildingSet()
+const real = shape(buildIsland(games, { raster: resvgRaster, plate, glow, figures: figureSet(), buildings: shots }))
 let bad = 0
 for (const [slug, runs] of plain) {
   const other = real.get(slug)
+  // A set piece's plinth (world.ts, HERO) is on the realistic island once Unity has built the set pieces bigger.
+  if (!other && slug.endsWith('-set') && !shots?.heroes?.[slug.slice(0, -4)]) continue
   if (!other) { console.error(`  ${slug}: missing on the realistic island`); bad++; continue }
   // The realistic island's runs must be the plain one's, from the first: a run only the plain island has
   // (a tree or a rock drawn there, Unity's figure here) is harmless at the end, and wrong anywhere before.

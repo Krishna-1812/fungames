@@ -18,7 +18,8 @@ export type FigureInfo = { w: number; h: number; ax: number; ay: number }
 export type FigureSet = { id: string; items: Record<string, FigureInfo & { href: string }> }
 /** Unity's pictures of the buildings' solids: one for each run ("slug/run"), where it lies on the map (P()'s units). */
 export type BuildingInfo = { x: number; y: number; w: number; h: number }
-export type BuildingSet = { id: string; items: Record<string, BuildingInfo & { href: string }> }
+/** Unity's pictures of each building's runs, and the set pieces it built bigger (world.ts, HERO): slug to scale. */
+export type BuildingSet = { id: string; items: Record<string, BuildingInfo & { href: string }>; heroes?: Record<string, number> }
 
 const dir = () => path.join(process.cwd(), 'src', 'lib', 'island', 'figures')
 
@@ -50,11 +51,11 @@ export function buildingSet(): BuildingSet | null {
   const d = path.join(process.cwd(), 'src', 'lib', 'island', 'buildings')
   const f = path.join(d, 'buildings.json')
   if (!fs.existsSync(f)) return null
-  const m = JSON.parse(fs.readFileSync(f, 'utf8')) as { id: string; items: Record<string, BuildingInfo> }
+  const m = JSON.parse(fs.readFileSync(f, 'utf8')) as { id: string; items: Record<string, BuildingInfo>; heroes?: Record<string, number> }
   const items: BuildingSet['items'] = {}
   for (const [key, it] of Object.entries(m.items)) {
     const png = path.join(d, `${key.replace('/', '_')}.png`)
     if (fs.existsSync(png)) items[key] = { ...it, href: `data:image/png;base64,${fs.readFileSync(png).toString('base64')}` }
   }
-  return { id: m.id, items }
+  return { id: m.id, items, heroes: m.heroes }
 }

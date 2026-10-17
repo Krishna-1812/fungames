@@ -48,7 +48,7 @@ const out = {
   // (Each print's drawing goes to its sheet, not to Unity.)
   prints: undefined,
   // Each building's solids, for Unity: every run a list of records, written as JSON strings (JsonUtility reads no free-form objects).
-  solids: m.solids.map((b) => ({ slug: b.slug, runs: b.runs.map((r) => ({ items: r.map((x) => JSON.stringify(flatSolid(x))) })) })),
+  solids: m.solids.map((b) => ({ slug: b.slug, runs: b.runs.map((r) => ({ items: r.map((x) => JSON.stringify(flatSolid(x))) })), ...(b.k ? { k: b.k, at: b.at } : {}) })),
   piers: m.piers.map((p) => ({ from: p[0], to: p[1] })),
   buildings: m.buildings.map((b) => ({ ...b, anchor: (({ x0, y0, x1, y1, bx, by }) => ({ x0, y0, x1, y1, bx, by }))(island.anchors[b.slug]) })),
 }

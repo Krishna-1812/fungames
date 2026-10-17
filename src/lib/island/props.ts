@@ -37,7 +37,10 @@ export function figure(p: Pen, x: number, y: number, name: string, k: number): b
   if (!it) return false
   const [bx, by] = p.at(x, y)
   figuresUsed.add(name)
-  p.el('use', { href: `#fig-${name}`, transform: `translate(${f(bx)} ${f(by)}) scale(${Math.round(k * 1000) / 1000})` })
+  // (Its own size on a set piece, as people are: figFeet.)
+  const g = p.el('g')
+  figFeet.set(g, [bx, by])
+  g.add(new N('use', { href: `#fig-${name}`, transform: `translate(${f(bx)} ${f(by)}) scale(${Math.round(k * 1000) / 1000})` }))
   p.grow(bx - it.ax * k, by - it.ay * k, bx + (it.w - it.ax) * k, by + (it.h - it.ay) * k)
   return true
 }

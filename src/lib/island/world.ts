@@ -154,7 +154,7 @@ export type IslandModel = {
   /** Banks of sand out of the sea, and trenches in it: tile i, j, radius in tiles, the top's height. */
   isles: [number, number, number, number][]
   /** Each building's solids (kit.ts, Solids), in their runs, for Unity to build. */
-  solids: { slug: string; runs: Solid[][] }[]
+  solids: { slug: string; runs: Solid[][]; /** A set piece: built this much bigger about this point (tile i, j, height z). */ k?: number; at?: [number, number, number] }[]
   /**
    * The night's lights, for Unity to light the island from: where each is (tile i, j, height z), what it is
    * ('win' a window, with the face it looks out of; 'lamp' a street lamp; 'bulb' anything else that glows),
@@ -233,7 +233,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
    * whose picture is Unity's, keeps every plot exactly as it was).
    */
   const HERO: Record<string, number> = { orbit: 1.5, 'deep-time': 1.4, 'steady-hand': 1.45, 'share-this-page': 1.5, overstimulated: 1.45, auction: 1.5, 'every-second': 1.35 }
-  const heroK = (slug: string) => (plate ? 1 : HERO[slug] ?? 1)
+  // (On the realistic island, as Unity built it: none until its pictures of them are in.)
+  const heroK = (slug: string) => (plate ? opts.buildings?.heroes?.[slug] ?? 1 : HERO[slug] ?? 1)
   /** A building's plot as drawn: its own, or for a set piece, the bigger one it grows into. */
   const drawnPlot = (pl: { slug: string; i: number; j: number; w: number; d: number }) => { const k = heroK(pl.slug); return { i: pl.i + pl.w * (1 - k), j: pl.j + pl.d * (1 - k), w: pl.w * k, d: pl.d * k, k } }
   const coast = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => !isLand(i + a, j + b))
@@ -605,15 +606,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     } else g.add(ferry())
   }
   // Each building's solids, and with Unity's pictures of them (opts.buildings), those in their place.
-  const solids: { slug: string; runs: Solid[][] }[] = []
+  const solids: IslandModel['solids'] = []
   const shots = opts.buildings ?? null
+  /** Unity's pictures of runs: each already where it goes on the map, at its size (a set piece's too). */
+  const shotImgs = new WeakSet<N>()
   /** Where a building's solids are written down, and with Unity's pictures of them, put in their place. */
   const sinkFor = (slug: string) => {
     // (Any of its runs: a first run of nothing, a trench, has no picture.)
     const real = !!shots && Object.keys(shots.items).some((k) => k.startsWith(`${slug}/`))
     const sink = new Solids(!real, real ? (g, run) => {
       const it = shots!.items[`${slug}/${run}`]
-      if (it) g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' }))
+      if (it) shotImgs.add(g.add(new N('image', { href: it.href, x: it.x, y: it.y, width: it.w, height: it.h, preserveAspectRatio: 'none' })))
     } : undefined)
     solids.push({ slug, runs: sink.runs })
     return { sink, real }
@@ -1179,7 +1182,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const b = new Bounds()
       const { sink, real } = sinkFor(pl.slug)
       const lp = new Pen(art, pl.i, pl.j, pl.z, b, lights, sink)
-      const l0 = lights.length, g0 = glows.length, beacon0 = [beacon[0], beacon[1]]
+      const l0 = lights.length, g0 = glows.length, beacon0 = [beacon[0], beacon[1]], p0 = planted.length
       pl.lm.draw(lp)
       // A set piece's people stay their own size, where they stood (before its rim is drawn round them).
       const inv = hp.k !== 1 ? ` scale(${Math.round((1 / hp.k) * 1000) / 1000}) ` : ''
@@ -1202,6 +1205,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         const k = hp.k, [ax, ay] = P(pl.i + pl.w, pl.j + pl.d, pl.z)
         const tf = `translate(${f(ax)} ${f(ay)}) scale(${k}) translate(${f(-ax)} ${f(-ay)})`
         const T = (x: number, y: number): [number, number] => [ax + (x - ax) * k, ay + (y - ay) * k]
+        // The same in the world's units, about the plot's front corner.
+        const W = ([i, j, z]: [number, number, number]): [number, number, number] => [pl.i + pl.w + (i - pl.i - pl.w) * k, pl.j + pl.d + (j - pl.j - pl.d) * k, pl.z + (z - pl.z) * k]
         art.attrs.transform = tf
         const thin = (n: N | string) => {
           if (typeof n === 'string') return
@@ -1214,7 +1219,18 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         thin(art)
         const [x0, y0] = T(b.x0, b.y0), [x1, y1] = T(b.x1, b.y1)
         b.x0 = x0; b.y0 = y0; b.x1 = x1; b.y1 = y1
-        for (let n = l0; n < lights.length; n++) { const l = lights[n], [x, y] = T(l[0], l[1]); l[0] = x; l[1] = y; l.tf = tf }
+        for (let n = l0; n < lights.length; n++) { const l = lights[n], [x, y] = T(l[0], l[1]); l[0] = x; l[1] = y; l.tf = tf; if (l.w) l.w = W(l.w) }
+        // For Unity, which builds it bigger about the same point (Buildings.cs, Hero): where it is, and how much.
+        const rec = solids.find((s) => s.slug === pl.slug)
+        if (rec) { rec.k = k; rec.at = [pl.i + pl.w, pl.j + pl.d, pl.z] }
+        // What grows on it stands where it now is, its own size (as its people do).
+        for (let n = p0; n < planted.length; n++) { const q = planted[n], [x, y, z] = W([q.x, q.y, q.z]); q.x = f(x); q.y = f(y); q.z = f(z) }
+        // Unity's pictures of its runs are already where they go, and their size: the scale is undone on each.
+        if (real) {
+          const un = `translate(${f(ax)} ${f(ay)}) scale(${Math.round((1 / k) * 1e5) / 1e5}) translate(${f(-ax)} ${f(-ay)})`
+          const unscale = (n: N) => { n.kids = n.kids.map((c) => (typeof c === 'string' ? c : shotImgs.has(c) ? Object.assign(new N('g', { transform: un }), { kids: [c] }) : (unscale(c), c))) }
+          unscale(art)
+        }
         for (let n = g0; n < glows.length; n++) { const w = new N('g', { transform: tf }); w.add(glows[n]); glows[n] = w }
         if (beacon[0] !== beacon0[0] || beacon[1] !== beacon0[1]) { const [x, y] = T(beacon[0], beacon[1]); beacon[0] = x; beacon[1] = y }
       }
@@ -1223,18 +1239,20 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         // middle of each side we see (where a road or the open ground meets it).
         const base = new N('g', { class: 'lm-set' })
         a.kids.splice(a.kids.indexOf(art), 0, base)
-        const bp = new Pen(base, 0, 0, pl.z, b, lights)
+        // (Its solids written down for Unity as a building of its own, built and pictured as the rest are.)
+        const set = sinkFor(`${pl.slug}-set`)
+        const bp = new Pen(base, 0, 0, pl.z, b, lights, set.sink)
         const e = 0.16, x0 = hp.i - e, y0 = hp.j - e, w = hp.w + e * 2, d = hp.d + e * 2, stone = '#d8d5cc'
         bp.box(x0, y0, w, d, 5, { fill: stone, sw: 1.2 })
-        // Flagstones on its top, in two directions.
+        // Flagstones on its top, in two directions (Unity's stone has its own).
         let flags = ''
         for (let u = 0.5; u < w; u += 0.5) { const [p1, p2] = [P(x0 + u, y0, pl.z + 5), P(x0 + u, y0 + d, pl.z + 5)]; flags += `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}` }
         for (let v = 0.5; v < d; v += 0.5) { const [p1, p2] = [P(x0, y0 + v, pl.z + 5), P(x0 + w, y0 + v, pl.z + 5)]; flags += `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}` }
-        base.add(new N('path', { d: flags, fill: 'none', stroke: shade(stone, 0.72), 'stroke-width': 0.7, opacity: 0.6 }))
+        if (!set.real) base.add(new N('path', { d: flags, fill: 'none', stroke: shade(stone, 0.72), 'stroke-width': 0.7, opacity: 0.6 }))
         bp.box(x0 + w, y0 + d / 2 - 0.22, 0.12, 0.44, 2.5, { fill: shade(stone, 0.97), sw: 1 })
         bp.box(x0 + w / 2 - 0.22, y0 + d, 0.44, 0.12, 2.5, { fill: shade(stone, 0.97), sw: 1 })
         // In front of it: a planter at each front corner, and a lamp beside each, unless that is road.
-        const sp = new Pen(a, 0, 0, pl.z, b, lights)
+        const sp = new Pen(a, 0, 0, pl.z, b, lights, set.sink)
         const fx = x0 + w, fy = y0 + d
         for (const [px, py, lx, ly] of [[fx - 0.1, fy - 0.42, fx - 0.1, y0 + 0.2], [fx - 0.42, fy - 0.1, x0 + 0.2, fy - 0.1]] as [number, number, number, number][]) {
           if (!road.has(key(Math.floor(px + 0.12), Math.floor(py + 0.12)))) {

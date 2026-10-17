@@ -79,5 +79,8 @@ for (const [key, [x, y, w, h, centred]] of Object.entries(m.items).sort(([a], [b
   items[key] = { x: r(x - info.trimOffsetLeft / k), y: r(y - info.trimOffsetTop / k), w: r(info.width / k), h: r(info.height / k) }
 }
 const id = hash.digest('hex').slice(0, 12)
-fs.writeFileSync(path.join(out, 'buildings.json'), JSON.stringify({ id, scale: k, items }, null, 1) + '\n')
+// The set pieces Unity built bigger (world.ts, HERO, through export-island): the site draws them so once these are in.
+const isl = JSON.parse(fs.readFileSync(path.join(root, 'unity/Assets/Island/Data/island.json'), 'utf8'))
+const heroes = Object.fromEntries((isl.solids ?? []).filter((s) => s.k && s.k !== 1).map((s) => [s.slug, s.k]))
+fs.writeFileSync(path.join(out, 'buildings.json'), JSON.stringify({ id, scale: k, heroes, items }, null, 1) + '\n')
 console.log(`buildings ${id}: ${Object.keys(items).length} runs, ${(bytes / 1e6).toFixed(2)} MB`)
