@@ -12,6 +12,16 @@
  */
 import { parse, write, walk, type El } from './bake/xml'
 import { cardCss } from './moves'
+import { createHash } from 'node:crypto'
+
+/**
+ * The pictures inlined in a building's art (Unity's renders, on the realistic
+ * island), and the file the bake writes each one to (scripts/bake-island.mjs):
+ * the homepage's cards link them, cached for good, instead of carrying 2 MB of
+ * them inside every visit's page. Named by their contents.
+ */
+export const cardImages = (art: string) => [...new Set(art.match(/data:image\/png;base64,[A-Za-z0-9+/=]+/g) ?? [])]
+export const cardImageFile = (uri: string) => `k/${createHash('sha1').update(uri).digest('hex').slice(0, 12)}.webp`
 
 type IslandLike = { layers: { body: string }[]; css: string; anchors: Record<string, { foot: string; y0: number }> }
 

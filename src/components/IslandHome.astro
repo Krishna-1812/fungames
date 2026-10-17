@@ -8,7 +8,7 @@ import { faviconSvg } from '../lib/favicon'
 import { homeGames, homeIsland, homeBake, hasRealWorld, type World } from '../lib/island/home'
 import { plateInfo } from '../lib/island/plate'
 import { cardCss } from '../lib/island/moves'
-import { cardFrame } from '../lib/island/card-art'
+import { cardFrame, cardImages, cardImageFile } from '../lib/island/card-art'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
 import { inkIcon } from '../lib/ink-icon'
@@ -62,6 +62,13 @@ const CHIP: Record<string, string> = { science: 'Real science', you: 'Measures y
 
 // Each card frames its building by its footprint and its body (lib/island/card-art.ts).
 const frame = (slug: string) => cardFrame(island, slug).join(' ')
+// Each card's art, its pictures (Unity's, on the realistic island) linked from the bake rather than inlined,
+// and fetched only as the card comes near the screen (data-src, below).
+const cardArt = (slug: string) => {
+  let s = baked.cards[slug] ?? ''
+  for (const u of cardImages(s)) s = s.split(`href="${u}"`).join(`data-src="${baked.base + cardImageFile(u)}"`).split(u).join(baked.base + cardImageFile(u))
+  return s
+}
 
 // Messages in bottles: where each lies (for the passport's hint), and how a bottle is drawn in the book.
 const DNAME = Object.fromEntries(DISTRICTS.map((d) => [d.key, d.name]))
@@ -450,7 +457,7 @@ const book = BOOK.map((key) => {
                   <span class="gc-art" aria-hidden="true">
                     <svg class="gc-svg" viewBox={frame(g.slug)} xmlns="http://www.w3.org/2000/svg" data-art={g.slug}>
                       <polygon points={a.foot} fill="#ffffff" fill-opacity="0.75" stroke="#1b2340" stroke-opacity="0.18" stroke-width="1.5" />
-                      <Fragment set:html={baked.cards[g.slug] ?? ''} />
+                      <Fragment set:html={cardArt(g.slug)} />
                     </svg>
                   </span>
                   <span class="gc-body">
@@ -1557,6 +1564,14 @@ const book = BOOK.map((key) => {
   // just below the fold and took the island from 47 frames a second to 29.
   const cardIo = new IntersectionObserver((es) => { for (const e of es) e.target.classList.toggle('is-live', e.isIntersecting) })
   document.querySelectorAll('.gc-svg').forEach((sv) => cardIo.observe(sv))
+  // And its pictures are fetched once it is within a screen or so of being seen.
+  const artIo = new IntersectionObserver((es) => {
+    for (const e of es) if (e.isIntersecting) {
+      e.target.querySelectorAll<SVGImageElement>('image[data-src]').forEach((im) => { im.setAttribute('href', im.dataset.src!); im.removeAttribute('data-src') })
+      artIo.unobserve(e.target)
+    }
+  }, { rootMargin: '800px 0px' })
+  document.querySelectorAll('.gc-svg').forEach((sv) => { if (sv.querySelector('image[data-src]')) artIo.observe(sv) })
 
   /* ---- a few motions that need a clock rather than a keyframe ------------- */
   if (PLAY) isle.withEngine((e) => {
