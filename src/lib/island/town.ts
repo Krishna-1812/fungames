@@ -7,7 +7,7 @@
  * height as its floor. Anything that moves on its own carries `amb` and its
  * screen box in `data-b`, so the camera can pause it (cull() in camera.ts).
  */
-import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, puffShade } from './kit'
+import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, puffShade, render } from './kit'
 import { person, tree } from './props'
 import { vehicleUse, boatUse, actorUse, creatureUse, who, type Facing } from './actors'
 import { folk, drawFolk, drawSitter, drawBust, FOLK } from './folk'
@@ -695,6 +695,13 @@ export function fishingBoat(x: number, y: number, hull: string, delay: number): 
   return g
 }
 
+/** Someone's head and shoulders (folk.ts) at a point, at a size: in a boat, a basket, a window. */
+export function bustAt(x: number, y: number, k: number, who1: ReturnType<typeof folk>, shirt: string): N {
+  const g = new N('g', { transform: `translate(${f(x)} ${f(y)}) scale(${k})` })
+  drawBust(g, who1, shirt)
+  return g
+}
+
 /** A speedboat, drawn at the origin, facing left, with a big white wake behind it. */
 export function speedboat(hull: string): string {
   return `<path d="M12 1q16 2 32 0q-16 6 -32 4zM12 -1q12 -3 26 -6q-12 7 -26 9z" fill="#ffffff" opacity="0.8"/>` +
@@ -702,7 +709,8 @@ export function speedboat(hull: string): string {
     `<path d="M-16 -2Q-14 -6 -6 -6H12L13 2H-10Q-14 2 -16 -2Z" fill="${hull}" stroke="${INK}" stroke-width="${OUT}" stroke-linejoin="round"/>` +
     `<path d="M-3 -6L1 -11H7L8 -6Z" fill="${C.glassHi}" stroke="${INK}" stroke-width="1.1" stroke-linejoin="round"/>` +
     `<path d="M-14 -2H12" stroke="#ffffff" stroke-width="1.2"/>` +
-    `<circle cx="4" cy="-12" r="2.4" fill="#f1d9c6" stroke="${INK}" stroke-width="0.9"/>`
+    // The driver (folk.ts): head and shoulders over the side, in a cap.
+    render(bustAt(4, -0.5, 0.62, folk(12.9, { hat: C.slate }), C.mint))
 }
 
 /**
