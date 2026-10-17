@@ -19,6 +19,7 @@ import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from '.
 import { beacon, harbourArt } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
 import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
+import { paintGround, LAND, wander } from './terrain'
 import { STAMP } from '../passport-art'
 import { glassOf, BOTTLE_COUNT } from '../bottles'
 import { RULES } from './moves'
@@ -270,6 +271,30 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const washCells = [...new Set(WASH.map(([u, v]) => key(Math.floor(u), Math.floor(v))))].map((k) => k.split(',').map(Number) as [number, number])
   const wash = claim(washCells) ? WASH : null
 
+  // The cartoon island's ground, painted as one picture (terrain.ts): its
+  // coast, terraces and patches in curves. (The realistic island's ground is
+  // Unity's picture; it keeps the tiles below for what it still needs.)
+  const meadow = (i: number, j: number) => 0.5 + 0.22 * Math.sin(i * 0.55 + j * 0.31 + 1.7) + 0.2 * Math.cos(j * 0.62 - i * 0.23) + 0.08 * Math.sin(i * 2.1 + j * 1.7)
+  const snowyAt = (i: number, j: number) => dist[i][j].key === 'peaks' && (height[i][j] >= 48 || (height[i][j] === 36 && meadow(i, j) > 0.62))
+  const busySea = new Set([...PIERS.flatMap((pts) => pts.map(([u, v]) => key(Math.floor(u), Math.floor(v)))), ...placed.filter((p) => p.lm.water).flatMap((p) => p.cells.map((c) => key(...c)))])
+  // Water the open sea cannot reach: everything not land, flooded in from the edge; what is left is a pool.
+  const lakes = new Set<string>()
+  {
+    const sea = new Set<string>(), todo: [number, number][] = [[-1, -1]]
+    while (todo.length) {
+      const [i, j] = todo.pop()!, k = key(i, j)
+      if (i < -1 || j < -1 || i > GRID || j > GRID || sea.has(k) || isLand(i, j)) continue
+      sea.add(k); todo.push([i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1])
+    }
+    for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (!isLand(i, j) && !sea.has(key(i, j))) lakes.add(key(i, j))
+  }
+  const painted = plate ? null : paintGround({
+    grid: GRID, sea: SEA, beachZ: BEACH, isLand, height: (i, j) => height[i][j], district: (i, j) => dist[i][j].key,
+    beach: (i, j) => beach.has(key(i, j)), taken: (i, j) => taken.has(key(i, j)), road: (i, j) => road.has(key(i, j)),
+    busySea: (i, j) => busySea.has(key(i, j)), snowy: (i, j) => isLand(i, j) && snowyAt(i, j), river, lake: (i, j) => lakes.has(key(i, j)),
+    hz: (a, b, c) => { const v = Math.sin(a * 12.9898 + b * 78.233 + c * 3.71) * 43758.5453; return v - Math.floor(v) },
+  })
+
   if (process.env.ISLAND_ASCII) {
     const rows = ['    ' + [...Array(GRID).keys()].map((j) => j % 10).join('')]
     for (let i = 0; i < GRID; i++) { let out = String(i).padStart(3) + ' '; for (let j = 0; j < GRID; j++) { const k = key(i, j); out += !isLand(i, j) ? '.' : taken.has(k) ? '#' : road.has(k) ? '=' : wet.has(k) ? '~' : pond.has(k) ? 'o' : beach.has(k) ? ',' : height[i][j] > 0 ? String(height[i][j] / 12) : dist[i][j].key[0] } rows.push(out) }
@@ -313,8 +338,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const defs = root.add(new N('defs'))
   const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: 1500, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
   // On the realistic island, the ocean the plate fades into: its own colour, deepening further out.
-  grad.add(new N('stop', { offset: 0.3, 'stop-color': plate?.sea ?? '#a3dbff' }))
-  grad.add(new N('stop', { offset: 1, 'stop-color': plate?.sea ? deepen(plate.sea, 0.82) : C.water }))
+  grad.add(new N('stop', { offset: 0.3, 'stop-color': plate?.sea ?? LAND.seaNear }))
+  grad.add(new N('stop', { offset: 1, 'stop-color': plate?.sea ? deepen(plate.sea, 0.82) : LAND.seaFar }))
   // (data-still: on the realistic sea the page draws no wave marks of its own over it.)
   root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: 'url(#isl-sea)', 'data-still': plate ? 1 : undefined }))
   // The ground as Unity renders it, land and shallows together, over the open sea.
@@ -336,7 +361,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const sh = plate ? new N('g') : flat('shallows')
   // One outline, drawn eight times: each band and its lighter edge.
   // The coast's outline, kept in the SVG whatever happens to the shallows: the surf and the foam draw from it.
-  root.add(new N('defs')).add(new N('path', { id: 'isl-coast', d: landSq }))
+  root.add(new N('defs')).add(new N('path', { id: 'isl-coast', d: painted?.coast || landSq }))
+  if (painted) {
+    // The cartoon sea: the shallows in many close steps, so they shade towards the shore with no rings.
+    ;([[9.5, LAND.shallows[0], 0.5], [7.4, LAND.shallows[0], 1], [5.6, mix(LAND.shallows[0], LAND.shallows[1], 0.5), 1], [4.2, LAND.shallows[1], 1], [3.1, mix(LAND.shallows[1], LAND.shallows[2], 0.5), 1], [2.2, LAND.shallows[2], 1], [1.4, mix(LAND.shallows[2], LAND.shallows[3], 0.5), 1], [0.8, LAND.shallows[3], 1]] as [number, string, number][]).forEach(([w, c, op]) => {
+      sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: c, 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: op < 1 ? op : undefined }))
+    })
+  } else
   ;([[7.2, '#98d4fc'], [4.6, '#a7ddf9'], [2.6, '#b8e7f6'], [1.2, '#cdf1f4']] as [number, string][]).forEach(([w, c]) => {
     sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: mix(c, '#ffffff', 0.45), 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
     sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: c, 'stroke-width': f2(w - 0.09), 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
@@ -733,6 +764,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     if (!isLand(i, j - 1)) seg([i, j, h], [i + 1, j, h])
   }
   ground.add(new N('path', { d: edge, fill: 'none', stroke: INK, 'stroke-width': 1.4, 'stroke-linecap': 'round' }))
+  // The cartoon island: the painting in place of the tiles, with its own falls.
+  if (painted) {
+    root.kids = [painted.g]
+    for (const st of painted.falls) painted.g.add(new N('path', { d: st.d, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-dasharray': '4 5', class: 'fall amb', 'data-b': st.b }))
+  }
 
   // Roads: a verge, a surface, a dashed middle line.
   const roads = root.add(new N('g', { class: 'roads' }))
@@ -740,6 +776,36 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const [ox, oy] = P(0, 0)
   const plane = roads.add(new N('g', { transform: `translate(${f(ox)} ${f(oy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
   const rd = routes.map(toPlane).join('')
+  if (painted) {
+    // Lanes of packed gravel, turning in curves: each corner rounded off half a tile either side.
+    const curve = (r: [number, number][]) => {
+      const p = r.map(([i, j]) => [i + 0.5, j + 0.5])
+      let d = `M${p[0][0]} ${p[0][1]}`
+      for (let k = 1; k < p.length - 1; k++) {
+        const [a, b, c2] = [p[k - 1], p[k], p[k + 1]]
+        if ((b[0] - a[0]) === (c2[0] - b[0]) && (b[1] - a[1]) === (c2[1] - b[1])) continue
+        d += `L${f2(b[0] - (b[0] - a[0]) * 0.48)} ${f2(b[1] - (b[1] - a[1]) * 0.48)}Q${b[0]} ${b[1]} ${f2(b[0] + (c2[0] - b[0]) * 0.48)} ${f2(b[1] + (c2[1] - b[1]) * 0.48)}`
+      }
+      return d + `L${p[p.length - 1][0]} ${p[p.length - 1][1]}`
+    }
+    const rc = routes.map(curve).join('')
+    const st = (w: number, c: string, extra: Record<string, string | number> = {}) => plane.add(new N('path', { d: rc, fill: 'none', stroke: c, 'stroke-width': w, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', ...extra }))
+    // Grass worn thin either side, then the lane's edge, its surface, and a paler crown where the wheels go.
+    st(0.9, LAND.roadWorn, { opacity: 0.16 })
+    st(0.74, LAND.roadWorn, { opacity: 0.18 })
+    st(0.64, LAND.roadEdge)
+    st(0.55, LAND.road)
+    st(0.2, '#ece5d6', { opacity: 0.7 })
+    // Grit along it: a few darker stones, and the odd paler one.
+    let grit = '', pale = ''
+    for (const [n, r] of routes.entries()) for (const [k, [i, j]] of r.entries()) for (let q = 0; q < 3; q++) {
+      const u = i + 0.5 + (hz(n * 31 + k, q, 71) - 0.5) * 0.46, v = j + 0.5 + (hz(k, n * 17 + q, 72) - 0.5) * 0.46, s = 0.018 + hz(i, j, 73 + q) * 0.022
+      const dot = `M${f2(u - s)} ${f2(v)}a${f2(s)} ${f2(s)} 0 1 0 ${f2(s * 2)} 0a${f2(s)} ${f2(s)} 0 1 0 ${f2(-s * 2)} 0`
+      if (q === 2) pale += dot; else grit += dot
+    }
+    plane.add(new N('path', { d: grit, fill: LAND.roadEdge, opacity: 0.8 }))
+    plane.add(new N('path', { d: pale, fill: '#ffffff', opacity: 0.55 }))
+  } else {
   // Worn ground either side of every road, darker nearest it, so a road is
   // trodden into the grass rather than laid on top of it.
   plane.add(new N('g', { opacity: 0.05 })).add(new N('path', { d: rd, fill: 'none', stroke: INK, 'stroke-width': 0.86, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
@@ -747,6 +813,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   plane.add(new N('path', { d: rd, fill: 'none', stroke: '#c9cfe6', 'stroke-width': 0.66, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
   plane.add(new N('path', { d: rd, fill: 'none', stroke: '#f3f5fb', 'stroke-width': 0.56, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
   plane.add(new N('path', { d: rd, fill: 'none', stroke: '#c9cfe6', 'stroke-width': 0.035, 'stroke-dasharray': '0.14 0.16' }))
+  }
 
   // The pond, laid flat in the park: a sandy rim, deep middle, lily pads.
   if (pond.size) {
@@ -755,13 +822,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const j0 = Math.min(...cells.map((c) => c[1])), j1 = Math.max(...cells.map((c) => c[1])) + 1
     const po = plane.add(new N('g', { class: 'pond' }))
     const rr = (x0: number, y0: number, x1: number, y1: number, r: number, a: Record<string, string | number>) => po.add(new N('rect', { x: f2(x0), y: f2(y0), width: f2(x1 - x0), height: f2(y1 - y0), rx: r, ...a }))
-    rr(i0 + 0.08, j0 + 0.1, i1 - 0.08, j1 - 0.1, 0.62, { fill: SAND[1], stroke: INK, 'stroke-width': 0.035 })
-    rr(i0 + 0.2, j0 + 0.22, i1 - 0.2, j1 - 0.22, 0.52, { fill: '#9fdcff', stroke: INK, 'stroke-width': 0.03 })
-    rr(i0 + 0.42, j0 + 0.5, i1 - 0.4, j1 - 0.55, 0.36, { fill: '#7cc8fb' })
+    rr(i0 + 0.08, j0 + 0.1, i1 - 0.08, j1 - 0.1, 0.62, { fill: painted ? LAND.sand[1] : SAND[1], stroke: INK, 'stroke-width': 0.035 })
+    rr(i0 + 0.2, j0 + 0.22, i1 - 0.2, j1 - 0.22, 0.52, { fill: painted ? LAND.waterLight : '#9fdcff', stroke: INK, 'stroke-width': 0.03 })
+    rr(i0 + 0.42, j0 + 0.5, i1 - 0.4, j1 - 0.55, 0.36, { fill: painted ? LAND.water : '#7cc8fb' })
     po.add(new N('path', { d: `M${f2(i0 + 0.3)} ${f2(j0 + 0.9)}q0 -0.5 0.5 -0.58`, fill: 'none', stroke: '#ffffff', 'stroke-width': 0.06, 'stroke-linecap': 'round', opacity: 0.8 }))
     for (const [u, v, r] of [[0.3, 0.55, 0.13], [0.62, 0.32, 0.1], [0.75, 0.7, 0.12], [0.38, 0.82, 0.09]]) {
       const x = i0 + 0.2 + (i1 - i0 - 0.4) * u, y = j0 + 0.22 + (j1 - j0 - 0.44) * v
-      po.add(new N('path', { d: `M${f2(x)} ${f2(y)}L${f2(x + r)} ${f2(y - r * 0.3)}A${f2(r)} ${f2(r)} 0 1 1 ${f2(x + r)} ${f2(y + r * 0.3)}Z`, fill: '#3fcf9f', stroke: INK, 'stroke-width': 0.025 }))
+      po.add(new N('path', { d: `M${f2(x)} ${f2(y)}L${f2(x + r)} ${f2(y - r * 0.3)}A${f2(r)} ${f2(r)} 0 1 1 ${f2(x + r)} ${f2(y + r * 0.3)}Z`, fill: painted ? '#5aa64e' : '#3fcf9f', stroke: INK, 'stroke-width': 0.025 }))
     }
     const [fx2, fy2] = [i0 + 0.2 + (i1 - i0 - 0.4) * 0.62, j0 + 0.22 + (j1 - j0 - 0.44) * 0.32]
     po.add(new N('circle', { cx: f2(fx2 + 0.03), cy: f2(fy2), r: 0.045, fill: '#ffc4d4', stroke: INK, 'stroke-width': 0.02 }))
@@ -774,9 +841,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     let d = `M${wash[0][0]} ${wash[0][1]}`
     for (let k = 1; k < wash.length; k++) { const [a, b] = wash[k - 1], [c, e] = wash[k]; d += `Q${f2(a)} ${f2(b)} ${f2((a + c) / 2)} ${f2((b + e) / 2)}` }
     d += `L${wash[wash.length - 1][0]} ${wash[wash.length - 1][1]}`
-    wg.add(new N('path', { d, fill: 'none', stroke: '#a99cd2', 'stroke-width': 0.56, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
-    wg.add(new N('path', { d, fill: 'none', stroke: '#e6e0f2', 'stroke-width': 0.42, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
-    wg.add(new N('path', { d, fill: 'none', stroke: '#d9d1ec', 'stroke-width': 0.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    wg.add(new N('path', { d, fill: 'none', stroke: painted ? '#a8977d' : '#a99cd2', 'stroke-width': 0.56, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    wg.add(new N('path', { d, fill: 'none', stroke: painted ? '#e6dfd0' : '#e6e0f2', 'stroke-width': 0.42, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    wg.add(new N('path', { d, fill: 'none', stroke: painted ? '#d8cfbd' : '#d9d1ec', 'stroke-width': 0.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
     let cr = '', pb = ''
     for (let k = 0; k < wash.length - 1; k++) {
       const [a, b] = wash[k], [c, e] = wash[k + 1]
@@ -787,8 +854,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         pb += `M${f2(px + 0.1)} ${f2(py + 0.05)}a0.025 0.025 0 1 0 0.05 0a0.025 0.025 0 1 0 -0.05 0`
       }
     }
-    wg.add(new N('path', { d: cr, fill: 'none', stroke: '#b7aada', 'stroke-width': 0.022, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
-    wg.add(new N('path', { d: pb, fill: '#a59ad3', stroke: INK, 'stroke-width': 0.012 }))
+    wg.add(new N('path', { d: cr, fill: 'none', stroke: painted ? '#b3a48a' : '#b7aada', 'stroke-width': 0.022, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+    wg.add(new N('path', { d: pb, fill: painted ? '#9c8c75' : '#a59ad3', stroke: INK, 'stroke-width': 0.012 }))
   }
 
   // Zebra crossings on the roads into the busiest junctions.
@@ -911,8 +978,56 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   }
   const tuftG = root.add(new N('g', { class: 'tufts' }))
   tuftG.add(new N('path', { d: clover, fill: C.leaf, opacity: 0.5 }))
-  tuftG.add(new N('path', { d: pebbles, fill: '#e3e6f2', stroke: INK, 'stroke-width': 0.6 }))
-  for (const [c, d] of tufts) tuftG.add(new N('path', c === 'crack' ? { d, fill: 'none', stroke: '#9d95c9', 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } : c === 'ripple' ? { d, fill: 'none', stroke: '#ebe5f6', 'stroke-width': 1.1, 'stroke-linecap': 'round', opacity: 0.9 } : filled(c) ? { d, fill: c, stroke: INK, 'stroke-width': 0.5 } : { d, fill: 'none', stroke: c, 'stroke-width': 1.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
+  tuftG.add(new N('path', { d: pebbles, fill: painted ? '#d9d4c8' : '#e3e6f2', stroke: INK, 'stroke-width': 0.6 }))
+  if (painted) {
+    // Wildflowers, the way they grow: in drifts, one kind to a drift, thick in the
+    // middle and thinning out, with open grass between. A slow field says where the
+    // drifts are and another which flower; each spot of a drift is a little clump.
+    const open = (i: number, j: number) => { const k = key(i, j); return isLand(i, j) && !taken.has(k) && !road.has(k) && !wet.has(k) && !pond.has(k) && !reserved.has(k) && !beach.has(k) && dist[i][j].key !== 'badlands' && !snowyAt(i, j) }
+    const KINDS = [['#ffffff', '#f4d9e4'], ['#ff9fb6', '#ffd0dc'], ['#b9a2ff', '#ddd0ff'], ['#7fb2ff', '#c7dcff']]
+    const heads = KINDS.map(() => ''), hearts = KINDS.map(() => '')
+    let stems = '', leaves = ''
+    for (let a = 0; a < GRID * 3; a++) for (let b = 0; b < GRID * 3; b++) {
+      const u = (a + 0.5 + (hz(a, b, 81) - 0.5) * 0.9) / 3, v = (b + 0.5 + (hz(b, a, 82) - 0.5) * 0.9) / 3
+      const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j
+      if (!open(i, j) || fu < 0.08 || fv < 0.08 || fu > 0.92 || fv > 0.92) continue
+      const drift = wander(u * 0.62, v * 0.62, 12.3) + 0.25 * wander(u * 2.1, v * 2.1, 3.3)
+      if (drift < 0.3 + hz(a, b, 83) * 0.3) continue
+      const kind = Math.floor(((wander(u * 0.27, v * 0.27, 4.4) + 1) / 2) * KINDS.length * 0.999 + 4) % KINDS.length
+      const z = height[i][j], n = 2 + Math.floor(hz(a, b, 84) * 3)
+      for (let q = 0; q < n; q++) {
+        const [x, y] = P(u + (hz(a + q, b, 85) - 0.5) * 0.16, v + (hz(a, b + q, 86) - 0.5) * 0.16, z), h = 4 + hz(a, q, 87) * 3
+        stems += `M${f(x)} ${f(y)}q0.4 ${f(-h * 0.5)} 0 ${f(-h)}`
+        if (q === 0) leaves += `M${f(x)} ${f(y - 1)}q-2.6 -0.6 -3.4 -3M${f(x)} ${f(y - 1.4)}q2.4 -0.8 3 -3.2`
+        heads[kind] += `M${f(x - 2.3)} ${f(y - h)}a2.3 1.9 0 1 0 4.6 0a2.3 1.9 0 1 0 -4.6 0`
+        hearts[kind] += `M${f(x - 0.7)} ${f(y - h - 0.3)}a0.7 0.6 0 1 0 1.4 0a0.7 0.6 0 1 0 -1.4 0`
+      }
+    }
+    // Long grass in the verges, where the mower never reaches: clumps along both sides of every lane.
+    let verge = '', vergeLit = ''
+    for (const [n, r] of routes.entries()) for (let k = 1; k < r.length; k++) {
+      const [i0, j0] = r[k - 1], [i1, j1] = r[k]
+      for (const side of [-1, 1]) {
+        if (hz(n * 7 + k, side + 3, 88) > 0.55) continue
+        const di = i1 - i0, dj = j1 - j0, t = hz(k, n, 89 + side)
+        const u = i0 + 0.5 + di * t + -dj * side * 0.64, v = j0 + 0.5 + dj * t + di * side * 0.64
+        if (!open(Math.floor(u), Math.floor(v))) continue
+        const [x, y] = P(u, v, 0)
+        const blade = `M${f(x - 3)} ${f(y)}q-0.6 -4 -2.4 -6M${f(x - 1)} ${f(y)}q-0.2 -5.4 -0.8 -7.8M${f(x + 1)} ${f(y)}q0.4 -4.6 1.6 -7M${f(x + 3)} ${f(y)}q0.8 -3.4 2.6 -5`
+        if ((k + side) % 3) verge += blade; else vergeLit += blade
+      }
+    }
+    tuftG.add(new N('path', { d: verge, fill: 'none', stroke: LAND.grassDeep, 'stroke-width': 1.3, 'stroke-linecap': 'round' }))
+    tuftG.add(new N('path', { d: vergeLit, fill: 'none', stroke: LAND.lip, 'stroke-width': 1.3, 'stroke-linecap': 'round' }))
+    tuftG.add(new N('path', { d: leaves, fill: 'none', stroke: LAND.grassDeep, 'stroke-width': 1.2, 'stroke-linecap': 'round' }))
+    tuftG.add(new N('path', { d: stems, fill: 'none', stroke: LAND.grassDeep, 'stroke-width': 0.9, 'stroke-linecap': 'round' }))
+    KINDS.forEach(([c, hi], q) => {
+      if (!heads[q]) return
+      tuftG.add(new N('path', { d: heads[q], fill: c, stroke: INK, 'stroke-width': 0.55 }))
+      tuftG.add(new N('path', { d: hearts[q], fill: q === 0 ? '#f3ead2' : hi }))
+    })
+  }
+  for (const [c, d] of tufts) tuftG.add(new N('path', c === 'crack' ?{ d, fill: 'none', stroke: painted ? '#a59478' : '#9d95c9', 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } : c === 'ripple' ? { d, fill: 'none', stroke: painted ? '#e6dfd0' : '#ebe5f6', 'stroke-width': 1.1, 'stroke-linecap': 'round', opacity: 0.9 } : filled(c) ? { d, fill: c, stroke: INK, 'stroke-width': 0.5 } : { d, fill: 'none', stroke: c, 'stroke-width': 1.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
 
   // Fields, laid flat: lavender under Sky Peaks, wheat on the Proving
   // Grounds, an allotment by the harbour.
@@ -1212,7 +1327,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     if (ok.length === cells.length) {
       ok.forEach(([i, j]) => reserved.add(key(i, j)))
       at(3.35, 4.4, 7.75, (p) => tent(p, 3.35, 4.4, C.rasp))
-      at(2.6, 5.5, 8.1, (p) => tent(p, 2.6, 5.5, '#35c9a6'))
+      at(2.6, 5.5, 8.1, (p) => tent(p, 2.6, 5.5, C.leafB))
       at(3.5, 5.5, 9.0, (p) => campfire(p, 3.5, 5.45))
       at(3.75, 5.85, 9.6, (p) => sitter(p, 3.75, 5.85, C.cobalt, '#e0b899'))
     }
@@ -1383,7 +1498,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const n = kind === 'pine' && R() < 0.6 ? 2 : 1
     for (let k = 0; k < n; k++) {
       const x = i + 0.3 + R() * 0.4, y = j + 0.3 + R() * 0.4
-      const c = kind === 'blossom' ? C.leaf : R() < 0.22 ? C.bloom : R() < 0.5 ? C.leaf : '#35c9a6'
+      const c = kind === 'blossom' ? C.leaf : R() < 0.22 ? C.bloom : R() < 0.5 ? C.leaf : C.leafB
       const sz = 0.85 + R() * 0.35
       things.push({ depth: x + y, draw: (layer) => (snowy && kind === 'pine' ? snowPine(new Pen(layer, 0, 0, z), x, y, c === C.bloom ? C.leaf : c, sz) : tree(new Pen(layer, 0, 0, z), x, y, kind, c, sz)) })
     }

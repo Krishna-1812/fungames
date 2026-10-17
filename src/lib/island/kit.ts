@@ -164,9 +164,9 @@ export const mix = (a: string, b: string, t: number) => { const A = rgb(a), B = 
 export const C = {
   ink: INK, white: '#ffffff', paper: '#f4f6fc', cloud: '#eef1fa',
   cobalt: '#5b82ff', mint: '#4fe3c1', sky: '#8ccbff', lilac: '#b8a1ff', rasp: '#ff4f6e',
-  stone: '#d5d9ea', stone2: '#c3c8de', rock: '#a49dcf', rockDark: '#7d74b8', slate: '#2c355e',
-  glass: '#9fd4ff', glassHi: '#d8eeff', grass: '#4fe3c1', leaf: '#2bb99a', leaf2: '#1f9e82', bloom: '#8f7be0',
-  wood: '#9b8bd6', bill: '#8fe0bf', water: '#8ccbff', deep: '#3b5bc4',
+  stone: '#d5d9ea', stone2: '#c3c8de', rock: '#a6abb3', rockDark: '#7e848e', slate: '#2c355e',
+  glass: '#9fd4ff', glassHi: '#d8eeff', grass: '#6cb65c', leaf: '#4f9e4c', leaf2: '#3d8540', leafB: '#3f8c62', bloom: '#8f7be0',
+  wood: '#8c6e5a', bill: '#8fe0bf', water: '#3b80c6', deep: '#3b5bc4',
 }
 
 /* A box, for the helpers that decorate its faces. */

@@ -3,7 +3,7 @@
  * flowers, crates, boats, cars, birds and flags. Each is drawn at a ground
  * point (x, y) with the pen's own height as its floor.
  */
-import { C, INK, OUT, N, Pen, shade, S } from './kit'
+import { C, INK, OUT, N, Pen, shade, mix, S } from './kit'
 import type { FigureSet } from './figures'
 import { who, actorUse, creatureUse } from './actors'
 
@@ -27,7 +27,7 @@ let figs: FigureSet | null = null
 export function setFigures(set: FigureSet | null) { figs = set; planted.length = 0; figuresUsed.clear() }
 
 const pick = (x: number, y: number, seed: number, n: number) => Math.floor(Math.abs(Math.sin(x * 12.99 + y * 78.23 + seed) * 437.5)) % n
-export const colourKind = (c: string) => (c === C.bloom ? 'bloom' : c === '#35c9a6' ? 'teal' : 'leaf')
+export const colourKind = (c: string) => (c === C.bloom ? 'bloom' : c === C.leafB ? 'teal' : 'leaf')
 
 /** A figure at a ground point: written down, and drawn if Unity has made it (true), or left to the drawing (false). */
 export function figure(p: Pen, x: number, y: number, name: string, k: number): boolean {
@@ -86,7 +86,7 @@ export function tree(p: Pen, x: number, y: number, kind: TreeKind, c = C.leaf, k
   p.el('ellipse', { cx: bx - 7 * k, cy: by + 1.5, rx: 17 * k, ry: 5.8 * k, fill: INK, opacity: 0.06 })
   p.el('ellipse', { cx: bx - 5 * k, cy: by + 1.2, rx: 11 * k, ry: 3.8 * k, fill: INK, opacity: 0.09 })
   if (kind === 'bush') {
-    for (const [dx, dy, r] of [[-5, -4, 6], [4, -5, 6.5], [0, -9, 6]]) p.el('circle', { cx: bx + dx * k, cy: by + dy * k, r: r * k, fill: c, stroke: INK, 'stroke-width': OUT })
+    foliage(p, c, [[-5, -4, 6], [4, -5, 6.5], [0, -9, 6]].map(([dx, dy, r]) => [bx + dx * k, by + dy * k, r * k] as [number, number, number]))
     p.grow(bx - 12 * k, by - 16 * k, bx + 12 * k, by)
     return
   }
@@ -125,10 +125,25 @@ export function tree(p: Pen, x: number, y: number, kind: TreeKind, c = C.leaf, k
   // Round and blossom: three overlapping blobs with a lit edge.
   const top = by - trunk * k - 9 * k
   const blobs: [number, number, number][] = [[-6, 2, 8], [6, 1, 8.5], [0, -6, 9.5]]
-  for (const [dx, dy, r] of blobs) p.el('circle', { cx: bx + dx * k, cy: top + dy * k, r: r * k, fill: c, stroke: INK, 'stroke-width': OUT })
-  p.el('circle', { cx: bx - 3 * k, cy: top - 8 * k, r: 3.2 * k, fill: '#ffffff', opacity: 0.35 })
+  foliage(p, c, blobs.map(([dx, dy, r]) => [bx + dx * k, top + dy * k, r * k] as [number, number, number]))
   if (kind === 'blossom') for (const [dx, dy] of [[-7, -1], [4, -7], [8, 3], [-2, 4]]) p.el('circle', { cx: bx + dx * k, cy: top + dy * k, r: 1.8 * k, fill: '#ffd1da', stroke: INK, 'stroke-width': 0.6 })
   p.grow(bx - 16 * k, top - 17 * k, bx + 16 * k, by)
+}
+
+/**
+ * Leaves in clumps, lit as the island is (the sun high on the right): each
+ * clump outlined in its shade, its body moved up towards the light, a lit
+ * cap on top, and a few leaves' edges picked out in the shade's colour, so a
+ * crown reads as round and full rather than as three flat discs.
+ */
+export function foliage(p: Pen, c: string, blobs: [number, number, number][]) {
+  const dark = shade(c, 0.74), lit = mix(c, '#e6f5c4', 0.32)
+  for (const [x, y, r] of blobs) p.el('circle', { cx: f(x), cy: f(y), r: f(r), fill: dark, stroke: INK, 'stroke-width': OUT })
+  for (const [x, y, r] of blobs) p.el('circle', { cx: f(x + r * 0.13), cy: f(y - r * 0.17), r: f(r * 0.78), fill: c })
+  for (const [x, y, r] of blobs) p.el('circle', { cx: f(x + r * 0.3), cy: f(y - r * 0.4), r: f(r * 0.38), fill: lit })
+  let d = ''
+  for (const [x, y, r] of blobs) d += `M${f(x - r * 0.62)} ${f(y + r * 0.1)}q${f(r * 0.2)} ${f(r * 0.26)} ${f(r * 0.46)} ${f(r * 0.12)}M${f(x - r * 0.05)} ${f(y + r * 0.42)}q${f(r * 0.2)} ${f(r * 0.2)} ${f(r * 0.42)} ${f(r * 0.02)}`
+  p.el('path', { d, fill: 'none', stroke: dark, 'stroke-width': 1.1, 'stroke-linecap': 'round' })
 }
 
 /** A person standing: head, body, legs. `pose` 'wave' raises an arm. */

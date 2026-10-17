@@ -35,7 +35,7 @@ const worldHref = { cartoon: withBase('/'), real: withBase('/realistic/') }
 // Until the realistic island is the one everyone gets (plate.json's `live`), it is the one you ask for.
 const worldDefault: World = plateInfo('plate')?.live ? 'real' : 'cartoon'
 // The realistic island's open sea (scripts/unity-plate.mjs measures it), behind the canvas and in the browser's bar.
-const seaColour = world === 'real' ? plateInfo('plate')?.sea ?? '#8ccbff' : '#8ccbff'
+const seaColour = world === 'real' ? plateInfo('plate')?.sea ?? '#3b80c6' : '#3b80c6'
 const games = homeGames()
 const count = games.length
 const island = homeIsland(world)
@@ -1557,7 +1557,7 @@ const book = BOOK.map((key) => {
 </script>
 
 <style>
-  :global(body.home-isle) { background: #8ccbff; font-family: 'Fredoka', system-ui, sans-serif; color: #1b2340; }
+  :global(body.home-isle) { background: #3b80c6; font-family: 'Fredoka', system-ui, sans-serif; color: #1b2340; }
   :global(.home-isle .progress-bar) { display: none; }
 
   /* ================= the island ================= */
@@ -1567,7 +1567,7 @@ const book = BOOK.map((key) => {
     height: max(560px, min(100svh, 1100px));
     overflow: hidden;
     overflow: clip;
-    background: #8ccbff;
+    background: #3b80c6;
     outline: none;
     touch-action: none;
     user-select: none;

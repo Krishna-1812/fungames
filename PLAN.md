@@ -628,6 +628,30 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   (`node scripts/make-vapid-keys.mjs`); without them the reminder offers only
   the calendar. `save_code`, `remind`. `check-sync.mjs`.
 
+- ~~**The cartoon island, painted: natural ground (Cursor Camp study, part 2)**~~
+  **done** (2026-10-17). A second look at Cursor Camp, this time at its art,
+  found the gap was the ground: theirs is one painting, ours was a grid of
+  mint and lilac diamonds. The ground is now painted as one picture
+  (`lib/island/terrain.ts`). Each height the land reaches is the contour of a
+  soft field (its tiles blurred, with a little slow noise), so coasts,
+  beaches and Sky Peaks' terraces run in curves and bays and nest like hills.
+  Pins keep every tile with something on it on its own ground. The faces are
+  lit by the way they turn, with rock strata, a grass lip and stones at the
+  foot. The tops have patches of sun and shade, damp and dry sand, the
+  Badlands' dust, and snow. The palette is natural and still cool: greens,
+  grey-taupe dust, grey stone, brown wood and banks, deeper blue sea with
+  shallows that shade towards the shore. On top of the ground:
+  - lanes of gravel with rounded corners;
+  - trees with three-tone crowns (`foliage()` in props.ts);
+  - wildflowers in drifts;
+  - long grass in the verges;
+  - tide pools where the sea cannot reach.
+
+  The realistic island is untouched: its ground is Unity's, and the old tile
+  code still runs underneath, so the random stream, and every tree and person,
+  stays where it was. No clip-paths in the ground: the bake paints in cells,
+  and resvg panics on a clipped shape outside one.
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

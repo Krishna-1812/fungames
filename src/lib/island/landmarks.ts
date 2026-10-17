@@ -16,13 +16,13 @@ export type District = { key: DistrictKey; name: string; at: [number, number]; r
 
 /** Seven districts, each where its games belong: space up high, the sea at the front. */
 export const DISTRICTS: District[] = [
-  { key: 'peaks', name: 'Sky Peaks', at: [7, 7], r: 5.4, ground: ['#62e8c9', '#74ecd0'], tint: '#c9f7ea' },
-  { key: 'badlands', name: 'The Badlands', at: [22, 6.3], r: 5.1, ground: ['#c9c3e8', '#bdb6e0'], tint: '#e6e1f7' },
-  { key: 'proving', name: 'Proving Grounds', at: [23, 15], r: 4.9, ground: ['#5fe0bf', '#6fe4c5'], tint: '#cff6ea' },
-  { key: 'harbour', name: 'The Harbour', at: [22, 22.2], r: 4.9, ground: ['#6fe3c6', '#7fe7cc'], tint: '#d6ecff' },
-  { key: 'funfair', name: 'The Funfair', at: [14.4, 23.8], r: 5.1, ground: ['#7fe6cb', '#8deacf'], tint: '#ffe1e8' },
-  { key: 'market', name: 'Market Street', at: [7, 21.3], r: 5.1, ground: ['#9fe3dc', '#aee8e1'], tint: '#d9f3f0' },
-  { key: 'oldtown', name: 'Old Town', at: [14.4, 14], r: 6.5, ground: ['#86e9cf', '#95edd5'], tint: '#e3e9ff' },
+  { key: 'peaks', name: 'Sky Peaks', at: [7, 7], r: 5.4, ground: ['#62a95b', '#6cb162'], tint: '#c9f7ea' },
+  { key: 'badlands', name: 'The Badlands', at: [22, 6.3], r: 5.1, ground: ['#d1c7b4', '#c8bda8'], tint: '#e6e1f7' },
+  { key: 'proving', name: 'Proving Grounds', at: [23, 15], r: 4.9, ground: ['#6aaf5a', '#74b763'], tint: '#cff6ea' },
+  { key: 'harbour', name: 'The Harbour', at: [22, 22.2], r: 4.9, ground: ['#6cb65c', '#78bd66'], tint: '#d6ecff' },
+  { key: 'funfair', name: 'The Funfair', at: [14.4, 23.8], r: 5.1, ground: ['#6cb65c', '#78bd66'], tint: '#ffe1e8' },
+  { key: 'market', name: 'Market Street', at: [7, 21.3], r: 5.1, ground: ['#6cb65c', '#78bd66'], tint: '#d9f3f0' },
+  { key: 'oldtown', name: 'Old Town', at: [14.4, 14], r: 6.5, ground: ['#6cb65c', '#78bd66'], tint: '#e3e9ff' },
 ]
 
 /** Where each game stands: [slug, district, i, j] — the footprint's back corner. */
