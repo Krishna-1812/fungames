@@ -10,7 +10,7 @@
 import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, puffShade, render } from './kit'
 import { person, tree } from './props'
 import { vehicleUse, boatUse, actorUse, creatureUse, who, type Facing } from './actors'
-import { folk, drawFolk, drawSitter, drawBust, FOLK } from './folk'
+import { folk, drawFolk, drawSitter, drawBenchSitter, drawBust, FOLK } from './folk'
 
 const f = (v: number) => Math.round(v * 10) / 10
 const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0)} ${f(x1)} ${f(y1)}`
@@ -143,12 +143,9 @@ export function pigeonSquare(p: Pen, x: number, y: number, ground: Pen) {
   p.el('path', { d: `M${f(bx - 9)} ${f(by - 4)}h18M${f(bx - 8)} ${f(by - 4)}v4M${f(bx + 8)} ${f(by - 4)}v4`, stroke: INK, 'stroke-width': 1.4, 'stroke-linecap': 'round' })
   p.el('path', { d: `M${f(bx - 9)} ${f(by - 5)}h18`, stroke: C.wood, 'stroke-width': 2.6, 'stroke-linecap': 'round' })
   p.el('path', { d: `M${f(bx - 9)} ${f(by - 12)}h18`, stroke: C.wood, 'stroke-width': 2.2, 'stroke-linecap': 'round' })
-  p.el('path', { d: `M${f(bx - 2)} ${f(by - 4)}h6v4`, stroke: INK, 'stroke-width': 2, 'stroke-linecap': 'round', fill: 'none' })
-  p.el('rect', { x: f(bx - 5), y: f(by - 14.5), width: 6.4, height: 9.5, rx: 2.6, fill: '#8f9bc0', stroke: INK, 'stroke-width': 1.1 })
-  p.el('circle', { cx: f(bx - 1.8), cy: f(by - 17.6), r: 3.2, fill: SKIN[1], stroke: INK, 'stroke-width': 1.1 })
-  p.el('path', { d: `M${f(bx - 5.2)} ${f(by - 18.4)}a3.4 2.6 0 0 1 6.8 0z`, fill: '#5b6488', stroke: INK, 'stroke-width': 0.9 })
-  p.el('path', { d: `M${f(bx + 1.4)} ${f(by - 10)}l4 1.2`, stroke: INK, 'stroke-width': 1.6, 'stroke-linecap': 'round' })
-  p.el('rect', { x: f(bx + 4.6), y: f(by - 10.2), width: 3.4, height: 3.8, rx: 0.6, fill: '#efe2c8', stroke: INK, 'stroke-width': 0.7 })
+  // Him (folk.ts): in his flat cap, a hand out with the bag of crumbs in it.
+  drawBenchSitter(p.el('g', { transform: `translate(${f(bx - 1)} ${f(by)}) scale(${FOLK})` }), folk(88.8, { skin: SKIN[1], hat: '#5b6488' }), '#8f9bc0')
+  p.el('rect', { x: f(bx + 5.2), y: f(by - 11.4), width: 3.4, height: 3.8, rx: 0.6, fill: '#efe2c8', stroke: INK, 'stroke-width': 0.7 })
   p.grow(bx - 12, by - 22, bx + 12, by + 2)
 }
 const f2 = (v: number) => Math.round(v * 1000) / 1000

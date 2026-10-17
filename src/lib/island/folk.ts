@@ -135,6 +135,23 @@ export function drawSitter(g: N, p: Folk, shirt: string) {
   el(g, 'path', { d: dots([[-3.8 * p.w - 2.5, -0.5], [3.8 * p.w + 2.9, -2.9]], 1.05), fill: p.skin })
 }
 
+/**
+ * Someone sitting on a bench, feet on the ground at the origin, the seat 5
+ * above it: knees forward (to the right), a hand held out in front.
+ */
+export function drawBenchSitter(g: N, p: Folk, shirt: string) {
+  const legC = p.skirt ? shade(p.skin, 0.9) : p.legs
+  // Thighs along the seat, shins down to the ground, shoes.
+  el(g, 'path', { d: 'M-1.4 -5.6h4.8l0.5 5M-0.6 -6.6h4.6l0.6 5.4', fill: 'none', stroke: legC, 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
+  el(g, 'path', { d: dots([[4.6, -0.3], [5.4, -0.9]], 1.4, 0.8), fill: '#2a2730' })
+  const up = el(g, 'g', { transform: 'translate(-1.4 1.6)' })
+  drawTorso(up, p, shirt)
+  // An arm held out, over the knees.
+  el(up, 'path', { d: `M${f(3.7 * p.w)} -13.6l2.4 4.2l2.6 -0.6`, fill: 'none', stroke: shade(shirt, 0.9), 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
+  el(up, 'path', { d: dots([[3.7 * p.w + 5.2, -9.9]], 1.05), fill: p.skin })
+  drawHead(up, p, shirt)
+}
+
 /** Their head and shoulders (the shirt from 6.4 above the origin up), for someone seen in a window, a basket or a boat. */
 export function drawBust(g: N, p: Folk, shirt: string) {
   drawTorso(g, p, shirt)
