@@ -1,5 +1,5 @@
 {
- "id": "865db006279b",
+ "id": "d7549a466c4f",
  "sizes": {
   "person": {
    "w": 42,
@@ -246,6 +246,8 @@
   "a-deer-8e817f-down-sw",
   "a-deer-8e817f-up-se",
   "a-deer-8e817f-up-sw",
+  "a-dog-6b6670-stand-sw",
+  "a-dog-8c6e5a-stand-se",
   "a-dog-d8d2cc-c0-ne",
   "a-dog-d8d2cc-c0-nw",
   "a-dog-d8d2cc-c0-se",
@@ -716,7 +718,6 @@
   "p-8ccbff-a8714e-0-28-walk-sw-6",
   "p-8ccbff-a8714e-0-28-walk-sw-7",
   "p-8ccbff-d3a27f-0-17-stand-se",
-  "p-8ccbff-e8c4a8-0-24-stand-sw",
   "p-8ccbff-e8c4a8-0-3-walk-ne-0",
   "p-8ccbff-e8c4a8-0-3-walk-ne-1",
   "p-8ccbff-e8c4a8-0-3-walk-ne-2",
