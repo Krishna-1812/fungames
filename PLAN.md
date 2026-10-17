@@ -706,6 +706,13 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
     walk a dog on a lead (`drawDog`). Chosen by hash, not R(), so nothing
     else on the island moves.
   - The realistic island's people are still Unity's (actors.ts).
+  - Every other figure drawn by hand is in the same style too (folk.ts:
+    drawSitter, drawBenchSitter, drawBust, the kite and balance poses):
+    the picnics, the pier's fisher, the kite flyers, the tightrope walker,
+    the balloon's passengers, the speedboat's driver, the faces at Who Was
+    Alive's windows, and the pigeon man. The parade is drawn by the page's
+    canvas: the island makes each marcher's body once as a picture
+    (`folkPic`, PlayData.folk) and the canvas marches their legs.
 
 ### Phase 5 — Deal with the weak three — **done**
 
