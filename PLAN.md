@@ -652,6 +652,16 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
   stays where it was. No clip-paths in the ground: the bake paints in cells,
   and resvg panics on a clipped shape outside one.
 
+- ~~**A quieter island (Cursor Camp study, part 2)**~~ **done** (2026-10-17).
+  Cursor Camp shows almost nothing over its picture. The island now:
+  - opens down among the buildings (2.25× the whole-island view on a
+    computer, 3.3× on a phone), after a first look at the whole island;
+  - shows a building's name only near the middle of the view;
+  - keeps the bar to Passport, Today, Surprise me and one button whose
+    panel holds Cartoon/Realistic, Night and Sound;
+  - folds the mini-map behind a map button, and remembers if a visitor
+    opens it (`isl-map`).
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the

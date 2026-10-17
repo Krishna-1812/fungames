@@ -147,17 +147,24 @@ const book = BOOK.map((key) => {
         <header class="isl-top">
           <a class="isl-logo" href={withBase('/')}><span class="isl-logo-dot" aria-hidden="true" set:html={faviconSvg(true)} /><span class="isl-logo-name">{SITE.name}</span></a>
           <nav class="isl-nav" aria-label="Island">
-            {worlds && (
-              <div class="isl-world" role="group" aria-label="How the island looks">
-                <a class="isl-world-opt" href={worldHref.cartoon} data-world="cartoon" aria-label="Cartoon island" aria-current={world === 'cartoon' ? 'page' : undefined} title="The island, drawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-8.2 8.2c-.9.9-2.2 1.3-3.4 1.1l-3.4-.6.6-3.4c.2-1.2.6-2.5 1.5-3.4z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12.5 6.5l5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Cartoon</span></a>
-                <a class="isl-world-opt" href={worldHref.real} data-world="real" aria-label="Realistic island" aria-current={world === 'real' ? 'page' : undefined} title="The island, rendered in 3D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 19.5l6-9 4 5.5 2.6-3.5 6.4 7z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="17" cy="6.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Realistic</span></a>
-              </div>
-            )}
-            <button type="button" class="isl-btn isl-btn--round" id="btnTime" aria-label="Switch to night" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-sun"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></g><path class="ic-moon" d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg></button>
-            <button type="button" class="isl-btn isl-btn--round" id="btnSound" aria-label="Turn sound on" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-waves" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></button>
             <button type="button" class="isl-btn" id="btnPassport" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.5" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="10.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M8.6 10.5h6.8M12 7.1c-1.6 2-1.6 4.8 0 6.8M12 7.1c1.6 2 1.6 4.8 0 6.8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg><span>Passport</span><b class="isl-pp-n" id="ppCount" hidden></b><i class="isl-pp-new" id="ppNew" hidden></i></button>
             <button type="button" class="isl-btn" id="btnToday"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="6.5" fill="currentColor" opacity=".25" /><path d="M5.5 10a6.5 6.5 0 0 1 13 0c0 3-2.4 5-4 6.5h-5C7.9 15 5.5 13 5.5 10zM9.5 16.5 10.5 20h3l1-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Today</span><b class="isl-streak-n" id="islStreakN" hidden></b></button>
             <button type="button" class="isl-btn isl-btn--hot" id="btnSurprise"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="9" r="1.6" fill="currentColor" /><circle cx="15" cy="15" r="1.6" fill="currentColor" /><circle cx="15" cy="9" r="1.6" fill="currentColor" /><circle cx="9" cy="15" r="1.6" fill="currentColor" /></svg><span>Surprise me</span></button>
+            <div class="isl-more">
+              <button type="button" class="isl-btn isl-btn--round" id="btnMore" aria-expanded="false" aria-controls="islMorePanel" aria-label="How the island looks and sounds" title="How the island looks and sounds"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="15" cy="7" r="2.4" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="17" r="2.4" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /></svg></button>
+              <div class="isl-more-panel" id="islMorePanel" hidden>
+                {worlds && (
+                  <div class="isl-world" role="group" aria-label="How the island looks">
+                    <a class="isl-world-opt" href={worldHref.cartoon} data-world="cartoon" aria-label="Cartoon island" aria-current={world === 'cartoon' ? 'page' : undefined} title="The island, drawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-8.2 8.2c-.9.9-2.2 1.3-3.4 1.1l-3.4-.6.6-3.4c.2-1.2.6-2.5 1.5-3.4z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12.5 6.5l5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Cartoon</span></a>
+                    <a class="isl-world-opt" href={worldHref.real} data-world="real" aria-label="Realistic island" aria-current={world === 'real' ? 'page' : undefined} title="The island, rendered in 3D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 19.5l6-9 4 5.5 2.6-3.5 6.4 7z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="17" cy="6.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Realistic</span></a>
+                  </div>
+                )}
+                <div class="isl-more-row">
+                  <button type="button" class="isl-btn isl-btn--round" id="btnTime" aria-label="Switch to night" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-sun"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></g><path class="ic-moon" d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Night</span></button>
+                  <button type="button" class="isl-btn isl-btn--round" id="btnSound" aria-label="Turn sound on" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-waves" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg><span>Sound</span></button>
+                </div>
+              </div>
+            </div>
           </nav>
         </header>
 
@@ -213,6 +220,7 @@ const book = BOOK.map((key) => {
             <rect class="isl-mini-view" x="0" y="0" width="0" height="0" rx="14" />
           </svg>
         </div>
+        <button type="button" class="isl-mapbtn" id="islMapBtn" aria-expanded="false" aria-label="Show the map" title="Map"><svg class="ic-map" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5 9 4.5l6 2 5.5-2v13l-5.5 2-6-2-5.5 2z" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M9 4.5v13M15 6.5v13" fill="none" stroke="currentColor" stroke-width="2" /></svg><svg class="ic-fold" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
         <a class="isl-down" href="#games"><span>All {count} games</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
       </div>
     </section>
@@ -710,6 +718,10 @@ const book = BOOK.map((key) => {
     stageEl.addEventListener('pointerdown', () => { drags++ }, { passive: true })
     stageEl.addEventListener('wheel', () => { wheels++ }, { passive: true })
     let minied = 0
+    const mapBtn = document.getElementById('islMapBtn')!
+    const setMap = (on: boolean) => { box.classList.toggle('is-map', on); mapBtn.setAttribute('aria-expanded', String(on)); mapBtn.setAttribute('aria-label', on ? 'Fold the map away' : 'Show the map') }
+    try { setMap(localStorage.getItem('isl-map') === 'open') } catch { setMap(false) }
+    mapBtn.addEventListener('click', () => { const on = !box.classList.contains('is-map'); setMap(on); try { if (on) localStorage.setItem('isl-map', 'open'); else localStorage.removeItem('isl-map') } catch {} })
     box.querySelector('.isl-mini svg')?.addEventListener('pointerdown', () => { if (Date.now() - minied > 20_000) { minied = Date.now(); track('isl_minimap') } })
     setInterval(() => {
       if (document.visibilityState !== 'visible' || !isle.awake()) return
@@ -782,6 +794,12 @@ const book = BOOK.map((key) => {
     btnTime.setAttribute('aria-label', dark ? 'Switch to day' : 'Switch to night')
     isle.redraw()
   }
+  // How the island looks and sounds: one button in the bar, its choices in a panel under it.
+  const btnMore = document.getElementById('btnMore')!, morePanel = document.getElementById('islMorePanel')!
+  const setMore = (on: boolean) => { morePanel.hidden = !on; btnMore.setAttribute('aria-expanded', String(on)) }
+  btnMore.addEventListener('click', () => setMore(morePanel.hidden))
+  document.addEventListener('pointerdown', (e) => { if (!morePanel.hidden && !(e.target as Element).closest?.('.isl-more')) setMore(false) }, true)
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !morePanel.hidden) { setMore(false); btnMore.focus() } })
   btnTime.addEventListener('click', () => {
     const next = box.dataset.time === 'night' || box.dataset.time === 'dusk' ? 'day' : 'night'
     const clock = byClock(), clockDark = clock === 'night' || clock === 'dusk'
@@ -1652,6 +1670,22 @@ const book = BOOK.map((key) => {
   @media (max-width: 900px) { .isl-logo-name { display: none; } .isl-logo { padding: 9px 10px; } }
 
   .isl-btn--round { padding: 9px 11px; }
+  /* How the island looks and sounds: a panel under its button, with room for words. */
+  .isl-more { position: relative; }
+  .isl-more-panel {
+    position: absolute; right: 0; top: calc(100% + 12px); z-index: 6;
+    display: grid; gap: 10px; padding: 12px; min-width: 236px;
+    background: #fff; border: 3px solid #1b2340; border-radius: 18px; box-shadow: 0 4px 0 #1b2340;
+    animation: isl-more-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .isl-more-panel[hidden] { display: none; }
+  @keyframes isl-more-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+  .isl-more-panel .isl-world { box-shadow: none; border-width: 2.5px; }
+  .isl-more-panel .isl-world-opt { flex: 1; justify-content: center; padding: 6px 10px; }
+  .isl-more-panel .isl-world-opt span, .isl-more-panel .isl-btn span { display: inline; }
+  .isl-more-row { display: flex; gap: 8px; }
+  .isl-more-row .isl-btn { flex: 1; justify-content: center; padding: 8px 10px; box-shadow: 0 3px 0 #1b2340; border-width: 2.5px; font-size: 15px; }
+  #btnMore[aria-expanded='true'] { background: #1b2340; color: #fff; }
   .isl-btn .ic-moon { display: none; }
   .isl-btn[aria-pressed='true'] .ic-sun { display: none; }
   .isl-btn[aria-pressed='true'] .ic-moon { display: inline; }
@@ -1710,6 +1744,23 @@ const book = BOOK.map((key) => {
     overflow: hidden; cursor: pointer;
   }
   .isl-mini svg { width: 100%; height: 100%; display: block; }
+  /* Folded away until asked for: the island is the picture, not the map of it. */
+  .isl-box:not(.is-map) .isl-mini { visibility: hidden; opacity: 0; transform: translateY(10px) scale(0.92); pointer-events: none; }
+  .isl-mini { transform-origin: 0 100%; transition: opacity 0.22s, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0.28s; }
+  .isl-mapbtn {
+    position: absolute; left: clamp(14px, 3vw, 32px); bottom: 24px; z-index: 6;
+    display: grid; place-items: center; width: 48px; height: 48px; padding: 0;
+    color: #1b2340; background: #fff; border: 3px solid #1b2340; border-radius: 16px; box-shadow: 0 4px 0 #1b2340;
+    cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s, left 0.28s, bottom 0.28s, width 0.28s, height 0.28s, border-radius 0.28s;
+  }
+  .isl-mapbtn svg { width: 22px; height: 22px; }
+  .isl-mapbtn:hover { background: #eef4ff; }
+  .isl-mapbtn:active { transform: translateY(4px); box-shadow: 0 0 0 #1b2340; }
+  .isl-mapbtn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .isl-mapbtn .ic-fold { display: none; width: 14px; height: 14px; }
+  .isl-box.is-map .isl-mapbtn { left: calc(clamp(14px, 3vw, 32px) + 196px - 22px); bottom: calc(24px + 132px - 22px); width: 34px; height: 34px; border-radius: 999px; box-shadow: 0 3px 0 #1b2340; }
+  .isl-box.is-map .isl-mapbtn .ic-map { display: none; }
+  .isl-box.is-map .isl-mapbtn .ic-fold { display: block; }
   .isl-mini-view { fill: rgba(255, 255, 255, 0.28); stroke: #1b2340; stroke-width: 2px; vector-effect: non-scaling-stroke; }
   /* A pin for every game: white until played, mint once it has been, the day's challenge in raspberry; the one whose card is open larger. */
   .isl-mini-pin { fill: #ffffff; stroke: #1b2340; stroke-width: 1.1px; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; transition: transform 0.2s; }
@@ -1994,7 +2045,7 @@ const book = BOOK.map((key) => {
     .isl-world-opt { padding: 5px 7px; }
     .isl-btn { padding: 9px 11px; }
     .isl-logo { font-size: 17px; }
-    .isl-mini { display: none; }
+    .isl-mini, .isl-mapbtn { display: none; }
     .isl-hint { bottom: 86px; font-size: 14px; }
     /* Clear of the zoom buttons down the right. */
     .isl-welcome { bottom: 84px; left: calc(50% - 32px); max-width: calc(100% - 92px); gap: 8px; font-size: 14.5px; padding: 6px 6px 6px 9px; }

@@ -47,7 +47,7 @@ type Cam = { x: number; y: number; z: number }
  * edges, rather than a map of the whole. The Home button and the mini-map
  * are the overview. Closer still on a phone's narrow screen.
  */
-const OPEN = (w: number) => (w < 700 ? 2.1 : 1.6)
+const OPEN = (w: number) => (w < 700 ? 3.3 : 2.25)
 
 /** A frame's worth of time at 60 frames a second: the unit the easing was tuned in. */
 const FRAME = 1000 / 60
@@ -589,12 +589,14 @@ export function initIsland(o: {
     if (near) {
       // Nearest the middle first; a name that would sit on one already placed waits.
       const placed: [number, number, number, number][] = []
+      // How far from the middle a name shows: a little over a third of the view, never less than a phone's worth.
+      const focusR = Math.max(130, Math.min(W, H) * (W < 700 ? 0.36 : 0.42))
       const order = [...tags].map(([s, t]) => { const a = anchors[s]; const [sx, sy] = toScreen(a.bx, a.y1); return { s, t, sx, sy: sy + 6, d: Math.hypot(sx - W / 2, sy - H / 2) } }).sort((p, q) => p.d - q.d)
-      for (const { s, t, sx, sy } of order) {
+      for (const { s, t, sx, sy, d } of order) {
         let w = tagW.get(s)
         if (w === undefined) { w = t.offsetWidth || 120; tagW.set(s, w) }
         const r: [number, number, number, number] = [sx - w / 2 - 4, sy - 2, sx + w / 2 + 4, sy + 28]
-        const inView = sx > -80 && sx < W + 80 && sy > -40 && sy < H + 40 && s !== hot
+        const inView = sx > -80 && sx < W + 80 && sy > -40 && sy < H + 40 && s !== hot && d < focusR
         const clear = !placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])
         const on = inView && clear
         t.classList.toggle('is-on', on)
@@ -773,7 +775,8 @@ export function initIsland(o: {
   const opening = { intro: !saved && !cameFrom }
   if (cameFrom) Object.assign(cam, inside(cameFrom))
   else if (saved) Object.assign(cam, settleTo)
-  else { cam.z = settleTo.z * 0.62; cam.y -= bh * 0.08 }
+  // The first look: the whole island, then down into Old Town.
+  else { cam.z = fitZ() * 0.95; cam.y = by + bh * 0.5 }
   if (!opening.intro) hint?.classList.add('is-gone')
   if (PLAY) Object.assign(goal, cam)
   else { Object.assign(goal, settleTo); Object.assign(cam, settleTo) }
