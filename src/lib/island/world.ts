@@ -1993,7 +1993,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if (a.stroke === INK && n.tag !== 'text') {
         const fill = typeof a.fill === 'string' && /^#[0-9a-f]{6}$/i.test(a.fill) ? a.fill : null
         const w = Number(a['stroke-width'] ?? OUT)
-        if (fill) { a.stroke = shade(fill, 0.66); a['stroke-width'] = Math.max(0.35, Math.round(w * 0.5 * 100) / 100) }
+        // (A shape drawn with no line, as a beam of light is, gets none.)
+        if (w === 0) a.stroke = 'none'
+        else if (fill) { a.stroke = shade(fill, 0.66); a['stroke-width'] = Math.max(0.35, Math.round(w * 0.5 * 100) / 100) }
         else { a.stroke = '#3a3f4c'; a['stroke-width'] = Math.max(0.4, Math.round(w * 0.6 * 100) / 100); if (a.opacity === undefined) a.opacity = 0.85 }
       }
       for (const k of n.kids) deInk(k)
