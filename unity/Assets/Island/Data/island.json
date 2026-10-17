@@ -2708,8 +2708,8 @@
    "water": true,
    "anchor": {
     "x0": -158.8,
-    "y0": 672.8,
-    "x1": -30.8,
+    "y0": 705.6,
+    "x1": 33.2,
     "y1": 886.2,
     "bx": -80,
     "by": 852
@@ -14908,11 +14908,6 @@
      "items": [
       "{\"k\":\"box\",\"x\":19.63,\"y\":8.950000000000001,\"w\":0.22,\"d\":0.22,\"z0\":5,\"h\":7,\"fill\":\"#b7b2a6\"}"
      ]
-    },
-    {
-     "items": [
-      "{\"k\":\"model\",\"name\":\"lamp\",\"x\":17.24,\"y\":9.06,\"z\":5,\"h\":26}"
-     ]
     }
    ]
   },
@@ -17626,14 +17621,6 @@
    "lit": true
   },
   {
-   "i": 17.326,
-   "j": 8.974,
-   "z": 33,
-   "kind": "lamp",
-   "col": "#fff6dc",
-   "lit": true
-  },
-  {
    "i": 4.9,
    "j": 22.294,
    "z": 32.5,
@@ -17649,7 +17636,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 4.9,
@@ -17719,7 +17706,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 8.7,
@@ -17728,7 +17715,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 8.325,
@@ -17843,7 +17830,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 7.725,
@@ -17852,7 +17839,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 8.142,
@@ -17894,7 +17881,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 14.575,
@@ -17965,7 +17952,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 18.6,
@@ -17983,7 +17970,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 18.6,
@@ -18028,7 +18015,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 17.433,
@@ -18037,7 +18024,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 17.9,
@@ -18291,7 +18278,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 13.575,
@@ -18300,7 +18287,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 13.7,
@@ -18400,7 +18387,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 12.8,
@@ -18409,7 +18396,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 12.8,
@@ -18426,7 +18413,7 @@
    "z": 82,
    "kind": "bulb",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 12.494,
@@ -18434,7 +18421,7 @@
    "z": 82,
    "kind": "bulb",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 16.717,
@@ -18461,7 +18448,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 17.72,
@@ -18504,7 +18491,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 23.7,
@@ -18513,7 +18500,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 23.7,
@@ -18531,7 +18518,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 13.2,
@@ -18540,7 +18527,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 13.2,
@@ -18549,7 +18536,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 13.2,
@@ -18558,7 +18545,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 13.2,
@@ -18576,7 +18563,7 @@
    "kind": "win",
    "face": "x",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 12.367,
@@ -18585,7 +18572,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 12.7,
@@ -18603,7 +18590,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 12.367,
@@ -18621,7 +18608,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": true
+   "lit": false
   },
   {
    "i": 13.033,
@@ -18674,7 +18661,7 @@
    "kind": "win",
    "face": "y",
    "col": "#ffe6a1",
-   "lit": false
+   "lit": true
   },
   {
    "i": 26.58,
