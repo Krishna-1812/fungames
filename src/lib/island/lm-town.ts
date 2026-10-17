@@ -1,6 +1,8 @@
 /** Old Town: people and time — lives, weeks, days, births and rules. */
 import { C, INK, N, OUT, shade, r1 as f, letter, type Landmark } from './kit'
 import { creatureUse } from './actors'
+import { folk } from './folk'
+import { bustAt } from './town'
 import { person, tree, flag, lamp, flowers, bench, fence } from './props'
 
 export const town: Record<string, Landmark> = {
@@ -27,8 +29,8 @@ export const town: Record<string, Landmark> = {
       p.printFace(pf, `portrait-${k}`, at)
       if (!p.real) {
         const [fx, fy] = p.at(0.1 + 1.8 * u, 1.8, 17)
-        p.el('circle', { cx: fx, cy: fy - 1, r: 2.6, fill: '#f1d9c6', stroke: INK, 'stroke-width': 0.8 })
-        p.el('path', { d: `M${f(fx - 4)} ${f(fy + 5)}q4 -5 8 0`, fill: INK, opacity: 0.7 })
+        // Someone looking out (folk.ts): head and shoulders at the glass.
+        p.el('g').add(bustAt(fx, fy + 12.2, 0.68, folk(k * 9.7 + 3.1), ['#3f5a8c', '#7a5a8c', '#4f7d68', '#8c5a64'][k]))
       }
     }
     p.door(hall, 'x', 0.5, { w: 0.3, h: 18, fill: C.lilac })
