@@ -32,6 +32,17 @@ const flatSolid = (x) => ({ ...x, ...(x.pts ? { pts: x.pts.flat() } : {}), ...(x
 const games = listedGames()
 const island = buildIsland(games.map((g) => ({ slug: g.slug, title: g.title, blurb: g.blurb, href: `/${g.slug}/` })), { raster: resvgRaster })
 const m = island.model
+// A set piece grows back into the ground behind its plot; where that ground is higher (a terrace in Sky
+// Peaks), Unity's would come up through it, so there it is cut down to the plot's level, plinth and all.
+for (const s of m.solids) {
+  if (!s.k || !s.at) continue
+  const b = m.buildings.find((q) => q.slug === s.slug)
+  if (!b) continue
+  const e = 0.3, i0 = s.at[0] - b.w * s.k - e, j0 = s.at[1] - b.d * s.k - e
+  for (let i = Math.max(0, Math.floor(i0)); i < Math.ceil(s.at[0]); i++)
+    for (let j = Math.max(0, Math.floor(j0)); j < Math.ceil(s.at[1]); j++)
+      if (m.height[i][j] > s.at[2]) { console.log(`  ${s.slug}: tile ${i},${j} cut from ${m.height[i][j]} to ${s.at[2]}`); m.height[i][j] = s.at[2] }
+}
 const out = {
   ...m,
   // Unity's JsonUtility reads flat arrays and lists of objects, not arrays of arrays: each is flattened, row by row.
