@@ -714,6 +714,22 @@ produce good geometric/line-art SVG, not Neal's hand-drawn charm.
     canvas: the island makes each marcher's body once as a picture
     (`folkPic`, PlayData.folk) and the canvas marches their legs.
 
+- ~~**The realistic island, after Cursor Camp (part 6)**~~ **done** (2026-10-17).
+  The study's set pieces and people, in Unity.
+  - The seven set pieces are built bigger in 3D (`Buildings.Hero`): each run
+    of one grown about the front corner of its plot, so its picture, its
+    shadow on the plate, the ground lit under it, its lit rooms at night and
+    a turning piece's square all follow. The site gets the scale and that
+    point with its solids (export-island), moves its lights and what grows
+    on it to where they now stand, and undoes the scale on Unity's pictures,
+    which are already their size. Its trees and people stay life-size.
+  - Their plinths are buildings of their own (`SLUG-set`): stone, steps,
+    planters and lamps, built and pictured as the rest.
+  - Off on the realistic island until Unity's pictures say it built them
+    (buildings.json `heroes`), so the two halves never show apart.
+  - Its people walk dogs on leads (Unity's dog in the cartoon one's coat,
+    standing) and look down at phones (Actors.cs, `phone`).
+
 ### Phase 5 — Deal with the weak three — **done**
 
 - ~~**Paper Folds**~~ **done**, the second way: a real interaction, with the
