@@ -35,6 +35,7 @@ namespace Island
         public static void Prepare(BuildingSolids bs)
         {
             holes.Clear(); stands.Clear(); glassy.Clear(); boxes.Clear(); foot = float.MaxValue;
+            HeroOf(bs);
             foreach (var run in bs.runs)
                 foreach (var s in Parse(run))
                     if (s.k == "box" && WallOf(s.fill) == Glass) glassy.Add(Key(s.x, s.y, s.w, s.d, s.z0, s.h));
@@ -279,7 +280,7 @@ namespace Island
         /** A pane's seed, and over it (in twos) whether its room is lit tonight and by which light (Night.PaneLight). */
         static float PaneSeed(SolidRec s, float u, float z, float seed)
         {
-            int room = Night.PaneLight(On(s.b, s.face, u, z + s.h / 2));
+            int room = Night.PaneLight(HeroPt(On(s.b, s.face, u, z + s.h / 2)));
             return Mathf.Clamp(seed, 0, 0.999f) + (room >= 0 ? 2 * (room + 1) : 0);
         }
 

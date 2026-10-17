@@ -410,6 +410,7 @@ namespace Island
                     {
                         var go = Buildings.Run(bs.runs[r], $"{bs.slug}/{r}");
                         go.transform.SetParent(holder.transform, false);
+                        Buildings.Hero(go, bs);
                         go.GetComponent<MeshRenderer>().shadowCastingMode = blocks == "shadow" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
                     }
                 }
@@ -442,20 +443,20 @@ namespace Island
                             {
                                 float ground = d.Z(Mathf.Clamp(Mathf.FloorToInt(s.x + s.w / 2), 0, d.grid - 1), Mathf.Clamp(Mathf.FloorToInt(s.y + s.d / 2), 0, d.grid - 1));
                                 if (s.z0 > ground + 6) continue;
-                                list.Add(new Vector4(s.y, s.x, s.y + s.d, s.x + s.w));
+                                list.Add(Buildings.HeroFoot(new Vector4(s.y, s.x, s.y + s.d, s.x + s.w), bs));
                             }
                             else if (s.k == "model" && (s.name == "lighthouse" || s.name == "windmill"))
-                                list.Add(new Vector4(s.y, s.x, 0.46f, -1));
+                                list.Add(Buildings.HeroFoot(new Vector4(s.y, s.x, 0.46f, -1), bs));
                             else if (s.k == "dome" && s.r > 0)
                             {
                                 float ground = d.Z(Mathf.Clamp(Mathf.FloorToInt(s.cx), 0, d.grid - 1), Mathf.Clamp(Mathf.FloorToInt(s.cy), 0, d.grid - 1));
-                                if (s.z0 <= ground + 6) list.Add(new Vector4(s.cy, s.cx, s.r, -1));
+                                if (s.z0 <= ground + 6) list.Add(Buildings.HeroFoot(new Vector4(s.cy, s.cx, s.r, -1), bs));
                             }
                             else if (s.k == "cyl" && s.r > 0)
                             {
                                 float ground = d.Z(Mathf.Clamp(Mathf.FloorToInt(s.cx), 0, d.grid - 1), Mathf.Clamp(Mathf.FloorToInt(s.cy), 0, d.grid - 1));
                                 if (s.z0 > ground + 3) continue;
-                                list.Add(new Vector4(s.cy, s.cx, s.r, -1));
+                                list.Add(Buildings.HeroFoot(new Vector4(s.cy, s.cx, s.r, -1), bs));
                             }
                             if (list.Count >= 256) break;
                         }
@@ -592,7 +593,7 @@ namespace Island
                 if (only != "" && System.Array.IndexOf(only.Split(','), bs.slug) < 0) continue;
                 var runs = new List<GameObject>();
                 Buildings.Prepare(bs);
-                for (int r = 0; r < bs.runs.Length; r++) runs.Add(Buildings.Run(bs.runs[r], $"{bs.slug}/{r}"));
+                for (int r = 0; r < bs.runs.Length; r++) { var go = Buildings.Run(bs.runs[r], $"{bs.slug}/{r}"); Buildings.Hero(go, bs); runs.Add(go); }
                 for (int r = 0; r < runs.Count; r++)
                 {
                     for (int q = 0; q < runs.Count; q++) runs[q].GetComponent<MeshRenderer>().shadowCastingMode = q == r ? ShadowCastingMode.On : ShadowCastingMode.ShadowsOnly;
@@ -600,7 +601,8 @@ namespace Island
                     if (mesh.vertexCount == 0) continue;
                     // A piece that turns in the picture is shot square round its own point, and kept so (not trimmed).
                     bool centred = Buildings.Centred(bs.runs[r], out var box);
-                    if (!centred) box = Buildings.MapBox(mesh, runs[r].transform);
+                    if (centred) box = Buildings.HeroBox(box, bs);
+                    else box = Buildings.MapBox(mesh, runs[r].transform);
                     // Else a little room round it, and whole pixels.
                     float x0 = centred ? box.xMin : Mathf.Floor((box.xMin - 3) * scale) / scale, y0 = centred ? box.yMin : Mathf.Floor((box.yMin - 3) * scale) / scale;
                     int pw = centred ? Mathf.RoundToInt(box.width * scale) : Mathf.CeilToInt((box.xMax + 3 - x0) * scale), ph = centred ? Mathf.RoundToInt(box.height * scale) : Mathf.CeilToInt((box.yMax + 3 - y0) * scale);

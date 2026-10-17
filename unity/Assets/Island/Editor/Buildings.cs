@@ -36,10 +36,48 @@ namespace Island
         public string[] bandC, colours;
     }
     [Serializable] public class SolidRun { public string[] items; }
-    [Serializable] public class BuildingSolids { public string slug; public SolidRun[] runs; }
+    /** A building's solids; a set piece (the site's HERO) is built k times bigger about `at` (tile i, j, site height z). */
+    [Serializable] public class BuildingSolids { public string slug; public SolidRun[] runs; public float k; public float[] at; }
 
     public static partial class Buildings
     {
+        /* ---- set pieces: built bigger about the front corner of their plot ---- */
+
+        /** The building being built's scale and the point it is about (world units), set by Prepare. */
+        static float heroK = 1; static Vector3 heroAt;
+        static void HeroOf(BuildingSolids bs)
+        {
+            heroK = bs.k > 0 ? bs.k : 1;
+            heroAt = bs.at != null && bs.at.Length == 3 ? new Vector3(bs.at[1], IslandBuild.Y(bs.at[2]), bs.at[0]) : Vector3.zero;
+        }
+        /** Where a point of the building being built ends up. */
+        public static Vector3 HeroPt(Vector3 p) => heroK == 1 ? p : heroAt + (p - heroAt) * heroK;
+        /** A run of a building, put where it stands: a set piece's grown about its point. */
+        public static void Hero(GameObject go, BuildingSolids bs)
+        {
+            float k = bs.k > 0 ? bs.k : 1;
+            if (k == 1 || bs.at == null || bs.at.Length != 3) return;
+            var a = new Vector3(bs.at[1], IslandBuild.Y(bs.at[2]), bs.at[0]);
+            go.transform.localPosition = a * (1 - k);
+            go.transform.localScale = Vector3.one * k;
+        }
+        /** The same on the site's map (P()'s units): a box round a piece that turns, for its picture. */
+        public static Rect HeroBox(Rect r, BuildingSolids bs)
+        {
+            float k = bs.k > 0 ? bs.k : 1;
+            if (k == 1 || bs.at == null || bs.at.Length != 3) return r;
+            float ax = (bs.at[0] - bs.at[1]) * 32, ay = (bs.at[0] + bs.at[1]) * 16 - bs.at[2];
+            return Rect.MinMaxRect(ax + (r.xMin - ax) * k, ay + (r.yMin - ay) * k, ax + (r.xMax - ax) * k, ay + (r.yMax - ay) * k);
+        }
+        /** A footprint (j0, i0, j1, i1), or a round one (j, i, r, -1), of a set piece where it stands. */
+        public static Vector4 HeroFoot(Vector4 v, BuildingSolids bs)
+        {
+            float k = bs.k > 0 ? bs.k : 1;
+            if (k == 1 || bs.at == null || bs.at.Length != 3) return v;
+            float aj = bs.at[1], ai = bs.at[0];
+            return v.w < 0 ? new Vector4(aj + (v.x - aj) * k, ai + (v.y - ai) * k, v.z * k, -1) : new Vector4(aj + (v.x - aj) * k, ai + (v.y - ai) * k, aj + (v.z - aj) * k, ai + (v.w - ai) * k);
+        }
+
         public const int Plaster = 0, Brick = 1, Tiles = 2, Slate = 3, Timber = 4, Metal = 5, Glass = 6, Concrete = 7, Paint = 8, Cloth = 9, Pane = 10, Printed = 11;
         static Material mat;
         public static Material Mat => mat != null ? mat : (mat = NewMat());
