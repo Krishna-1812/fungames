@@ -28,7 +28,7 @@ const LEGS = ['#3b4a6b', '#2f3340', '#5d6470', '#4f5d48', '#6d5b4d', '#46557d', 
 const BAGS = ['#8c6e5a', '#3f4a66', '#a14f5c', '#4f7d68', '#6b5d8f']
 
 export type Folk = { skin: string; hair: number; hairC: string; legs: string; skirt: boolean; w: number; h: number; bag: 0 | 1 | 2; bagC: string; hat: string | null }
-export type FolkPose = 'stand' | 'wave' | 'phone'
+export type FolkPose = 'stand' | 'wave' | 'phone' | 'kite' | 'balance'
 
 /** Someone, from a seed: the shirt is the caller's (and a skin or a hat, if it has one in mind). */
 export function folk(seed: number, o: { skin?: string; hat?: string | null } = {}): Folk {
@@ -57,9 +57,8 @@ const line = (c: string) => ({ stroke: INK, 'stroke-width': 1.05, 'stroke-linejo
  * Draw someone into `g`, feet at its origin, in their own units (scale it
  * with the group). Walking, their legs are the walker's to move (leg-a, leg-b).
  */
-export function drawFolk(g: N, p: Folk, shirt: string, pose: FolkPose = 'stand', walking = false) {
+export function drawFolk(g: N, p: Folk, shirt: string, pose: FolkPose = 'stand', walking = false): { hand: [number, number] } {
   const w = p.w
-  const lit = mix(shirt, '#ffffff', 0.24), dim = shade(shirt, 0.8)
   // Their shadow on the ground, thrown away from the sun.
   el(g, 'ellipse', { cx: -1.8, cy: 0.5, rx: 5.4 * w, ry: 1.9, fill: INK, opacity: 0.15 })
   // A backpack, behind them.
@@ -74,11 +73,8 @@ export function drawFolk(g: N, p: Folk, shirt: string, pose: FolkPose = 'stand',
     el(g, 'path', { d: dots([[-1.7 * w + 0.4, -0.2], [1.7 * w + 0.4, -0.2]], 1.5, 0.85), fill: shoe })
   }
   if (p.skirt) el(g, 'path', { d: `M${f(-3.4 * w)} -8.2L${f(3.4 * w)} -8.2L${f(4.4 * w)} -4.4L${f(-4.4 * w)} -4.4Z`, fill: p.legs, ...line(p.legs) })
-  // The body: the shirt, lit on its right and in shade on its left.
   const x0 = -3.7 * w, x1 = 3.7 * w
-  el(g, 'rect', { x: f(x0), y: -15.6, width: f(x1 - x0), height: 9.2, rx: 2.7, fill: shirt, ...line(shirt) })
-  el(g, 'path', { d: `M${f(x1 - 0.6)} -14.2v6.4q0 0.9 -0.9 0.9h-${f(1.5 * w)}v-8.6q1.6 0 2.4 1.3z`, fill: lit, opacity: 0.85 })
-  el(g, 'path', { d: `M${f(x0 + 0.6)} -14.2v6.4q0 0.9 0.9 0.9h${f(1.4 * w)}v-8.6q-1.5 0 -2.3 1.3z`, fill: dim, opacity: 0.8 })
+  drawTorso(g, p, shirt)
   // Arms, and hands.
   const arms = el(g, 'g', { fill: 'none', stroke: shade(shirt, 0.9), 'stroke-width': 2, 'stroke-linecap': 'round' })
   const left = `M${f(x0 - 0.1)} -14l-0.9 5.4`
@@ -86,6 +82,14 @@ export function drawFolk(g: N, p: Folk, shirt: string, pose: FolkPose = 'stand',
     el(arms, 'path', { d: left })
     el(arms, 'path', { d: `M${f(x1 - 0.2)} -13.6l3.6 -5.6`, class: 'wave-arm' })
     el(g, 'path', { d: dots([[x0 - 1, -8.2]], 1.05), fill: p.skin })
+  } else if (pose === 'kite') {
+    // A hand up, holding the line.
+    el(arms, 'path', { d: `${left}M${f(x1)} -14l2.6 -6.5` })
+    el(g, 'path', { d: dots([[x0 - 1, -8.2], [x1 + 2.6, -20.6]], 1.05), fill: p.skin })
+  } else if (pose === 'balance') {
+    // Arms out to either side, holding a long pole.
+    el(arms, 'path', { d: `M${f(x0)} -13.6l-5 1.8M${f(x1)} -13.6l5 1.8` })
+    el(g, 'path', { d: dots([[x0 - 5, -11.8], [x1 + 5, -11.8]], 1.05), fill: p.skin })
   } else if (pose === 'phone') {
     el(arms, 'path', { d: `${left}M${f(x1)} -14l0.4 3.4l-2.6 0.6` })
     el(g, 'path', { d: dots([[x0 - 1, -8.2]], 1.05), fill: p.skin })
@@ -100,6 +104,45 @@ export function drawFolk(g: N, p: Folk, shirt: string, pose: FolkPose = 'stand',
     el(g, 'path', { d: `M${f(x0 + 1.2)} -15.2L${f(x1 + 0.2)} -9`, stroke: shade(p.bagC, 0.7), 'stroke-width': 0.8, fill: 'none' })
     el(g, 'rect', { x: f(x1 - 0.6), y: -10, width: 3.2, height: 3, rx: 0.8, fill: p.bagC, ...line(p.bagC) })
   }
+  drawHead(g, p, shirt)
+  return { hand: [x1 + 2.6, -20.6] as [number, number] }
+}
+
+/** Their shirt, lit on its right and in shade on its left (and a strap across it): from 6.4 to 15.6 above their feet. */
+function drawTorso(g: N, p: Folk, shirt: string) {
+  const w = p.w, x0 = -3.7 * w, x1 = 3.7 * w
+  el(g, 'rect', { x: f(x0), y: -15.6, width: f(x1 - x0), height: 9.2, rx: 2.7, fill: shirt, ...line(shirt) })
+  el(g, 'path', { d: `M${f(x1 - 0.6)} -14.2v6.4q0 0.9 -0.9 0.9h-${f(1.5 * w)}v-8.6q1.6 0 2.4 1.3z`, fill: mix(shirt, '#ffffff', 0.24), opacity: 0.85 })
+  el(g, 'path', { d: `M${f(x0 + 0.6)} -14.2v6.4q0 0.9 0.9 0.9h${f(1.4 * w)}v-8.6q-1.5 0 -2.3 1.3z`, fill: shade(shirt, 0.8), opacity: 0.8 })
+}
+
+/**
+ * Someone sitting on the ground, at its origin: legs out in front (to the
+ * right; mirror the group for the other way), leaning back on a hand.
+ */
+export function drawSitter(g: N, p: Folk, shirt: string) {
+  el(g, 'ellipse', { cx: 2, cy: 0.6, rx: 7, ry: 2, fill: INK, opacity: 0.15 })
+  // Legs out along the ground, and shoes at their ends.
+  el(g, 'path', { d: 'M-0.6 -1.2h8.4M-0.2 -2.6h7.4', fill: 'none', stroke: p.skirt ? shade(p.skin, 0.9) : p.legs, 'stroke-width': 2.4, 'stroke-linecap': 'round' })
+  if (p.skirt) el(g, 'path', { d: 'M-3.2 -6.6h6.6l2 5.2h-8.6z', fill: p.legs, ...line(p.legs) })
+  el(g, 'path', { d: dots([[8.6, -2.2], [7.8, -3.4]], 0.85, 1.3), fill: '#2a2730' })
+  const up = new N('g', { transform: 'translate(0 6.6)' })
+  // The hand behind them, on the ground; the other on a knee.
+  el(g, 'path', { d: `M${f(-3.8 * p.w)} -7l-2.4 6.4M${f(3.8 * p.w)} -7l2.8 4`, fill: 'none', stroke: shade(shirt, 0.88), 'stroke-width': 2, 'stroke-linecap': 'round' })
+  g.add(up)
+  drawTorso(up, p, shirt)
+  drawHead(up, p, shirt)
+  el(g, 'path', { d: dots([[-3.8 * p.w - 2.5, -0.5], [3.8 * p.w + 2.9, -2.9]], 1.05), fill: p.skin })
+}
+
+/** Their head and shoulders (the shirt from 6.4 above the origin up), for someone seen in a window, a basket or a boat. */
+export function drawBust(g: N, p: Folk, shirt: string) {
+  drawTorso(g, p, shirt)
+  drawHead(g, p, shirt)
+}
+
+/** Their head, a face, and their hair or a cap: the head's middle 19.4 above their feet. */
+function drawHead(g: N, p: Folk, shirt: string) {
   // Long hair falls behind the head.
   if (p.hair === 2) el(g, 'rect', { x: -4.4, y: -23.4, width: 8.8, height: 9.4, rx: 3.6, fill: p.hairC, ...line(p.hairC) })
   // The head, and a face.
