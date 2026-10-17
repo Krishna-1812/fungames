@@ -10,6 +10,7 @@
 import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, puffShade } from './kit'
 import { person, tree } from './props'
 import { vehicleUse, boatUse, actorUse, creatureUse, who, type Facing } from './actors'
+import { folk, drawFolk, drawSitter, drawBust, FOLK } from './folk'
 
 const f = (v: number) => Math.round(v * 10) / 10
 const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0)} ${f(x1)} ${f(y1)}`
@@ -270,11 +271,11 @@ export function sitter(p: Pen, x: number, y: number, shirt: string, skin = SKIN[
     const u = actorUse(who(shirt, (x + p.ox) * 3.1 + (y + p.oy) * 7.7, { skin }), 'ground', flip ? 'sw' : 'se', 0, { transform: `translate(${f(bx)} ${f(by)})` })
     if (u) { p.el('g').add(u); p.grow(bx - 30, by - 20, bx + 12, by + 8); return }
   }
-  const s = flip ? -1 : 1
-  p.el('path', { d: `M${f(bx)} ${f(by - 1)}h${f(s * 8)}`, stroke: INK, 'stroke-width': 2.2, 'stroke-linecap': 'round' })
-  p.el('rect', { x: bx - 3.2, y: by - 10, width: 6.4, height: 9, rx: 2.6, fill: shirt, stroke: INK, 'stroke-width': 1.1 })
-  p.el('circle', { cx: bx, cy: by - 13.2, r: 3.2, fill: skin, stroke: INK, 'stroke-width': 1.1 })
-  p.grow(bx - 8, by - 17, bx + 9, by + 1)
+  // Drawn: someone of their own (folk.ts), sitting.
+  const who1 = folk((x + p.ox) * 3.1 + (y + p.oy) * 7.7)
+  const K = Math.round(FOLK * who1.h * 1000) / 1000
+  drawSitter(p.el('g', { transform: `translate(${f(bx)} ${f(by)}) scale(${flip ? -K : K} ${K})` }), who1, shirt)
+  p.grow(bx - 10 * K, by - 18 * K, bx + 10 * K, by + 2)
 }
 
 /** A picnic: a blanket laid flat, a basket, and two people on it. */
