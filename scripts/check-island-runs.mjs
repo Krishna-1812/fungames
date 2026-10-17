@@ -30,8 +30,6 @@ const real = shape(buildIsland(games, { raster: resvgRaster, plate, glow, figure
 let bad = 0
 for (const [slug, runs] of plain) {
   const other = real.get(slug)
-  // A set piece's plinth (world.ts, HERO) is on the realistic island once Unity has built the set pieces bigger.
-  if (!other && slug.endsWith('-set') && !shots?.heroes?.[slug.slice(0, -4)]) continue
   if (!other) { console.error(`  ${slug}: missing on the realistic island`); bad++; continue }
   // The realistic island's runs must be the plain one's, from the first: a run only the plain island has
   // (a tree or a rock drawn there, Unity's figure here) is harmless at the end, and wrong anywhere before.
