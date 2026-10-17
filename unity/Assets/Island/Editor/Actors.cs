@@ -134,6 +134,8 @@ namespace Island
             }
             else if (a.pose == "wave" || a.pose == "wave1") { waveR = true; }
             else if (a.pose == "look") { headTilt = -24; armL = 2; armR = 2; }
+            // Looking down at a phone held up in front of them.
+            else if (a.pose == "phone") { headTilt = 20; armR = 24; elbR = 104; }
             else if (a.pose == "cycle") { hipL = 72; kneeL = 108; hipR = 46; kneeR = 64; armL = armR = 52; elbL = elbR = 12; lean = 9; }
             else if (a.pose == "sit") { hipL = hipR = 88; kneeL = kneeR = 86; armL = armR = 22; elbL = elbR = 40; }
             // Sitting on the ground: legs out in front, a little bent, leaning back on the hands.
@@ -207,6 +209,9 @@ namespace Island
                 r.Limb(sh, elb, 0.027f * sx, 0.022f * sx, shirt, Cloth, 10);
                 r.Limb(elb, wr, 0.021f * sx, 0.017f * sx, longSleeves ? shirt : skin, longSleeves ? Cloth : Paint, 10);
                 r.Blob(wr + (wr - elb).normalized * 0.022f, new Vector3(0.017f, 0.026f, 0.014f) * sx, skin, Paint, 10, 6);
+                // The phone, in that hand, its face turned up to them.
+                if (a.pose == "phone" && side < 0)
+                    r.Blob(wr + (wr - elb).normalized * 0.03f + new Vector3(0, 0, 0.012f), new Vector3(0.019f, 0.032f, 0.005f) * sx, Real("#23242c", Metal), Metal, 8, 4, null, Quaternion.Euler(-35, 0, 0));
             }
             Arm(1, armL, elbL, false); Arm(-1, armR, elbR, waveR && (a.pose == "wave" || a.pose == "kite"));
             if (waveR && a.pose == "wave1") { }

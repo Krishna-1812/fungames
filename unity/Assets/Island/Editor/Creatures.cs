@@ -231,10 +231,10 @@ namespace Island
                 }
                 case "dog":
                 {
-                    // A medium dog, trotting: four frames of its gait (pose c0..c3), its tail up.
-                    var coat = Real("#d8d2cc", Paint); var dark = Real("#5b5157", Paint);
-                    int fr = a.pose.Length > 1 ? a.pose[1] - '0' : 0;
-                    float ph = fr * Mathf.PI / 2, sw = Mathf.Sin(ph) * 24;
+                    // A medium dog in its coat, trotting: four frames of its gait (pose c0..c3), its tail up; or standing.
+                    var coat = Real("#" + a.shirt, Paint); var dark = a.shirt == "d8d2cc" ? Real("#5b5157", Paint) : new Color(coat.r * 0.42f, coat.g * 0.42f, coat.b * 0.42f, 1);
+                    int fr = a.pose.Length > 1 && a.pose[0] == 'c' ? a.pose[1] - '0' : 0;
+                    float ph = fr * Mathf.PI / 2, sw = a.pose == "stand" ? 0 : Mathf.Sin(ph) * 24;
                     r.Blob(new Vector3(0, 0.1f, 0), new Vector3(0.048f, 0.048f, 0.115f), coat, Paint, 14, 10);
                     r.Blob(new Vector3(0, 0.108f, 0.08f), new Vector3(0.052f, 0.054f, 0.05f), coat, Paint, 12, 8);
                     foreach (var (x, z, sgn) in new[] { (-0.028f, 0.085f, 1f), (0.028f, 0.085f, -1f), (-0.028f, -0.08f, -1f), (0.028f, -0.08f, 1f) })
