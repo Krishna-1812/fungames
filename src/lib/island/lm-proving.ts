@@ -1,6 +1,7 @@
 /** The Proving Grounds: tests of the actual you. */
 import { C, INK, N, OUT, shade, r1 as f, motionPath, letter, type Landmark } from './kit'
-import { person, tree, lamp, fence, flag } from './props'
+import { person, tree, lamp, fence, flag, figFeet } from './props'
+import { folk, drawFolk, FOLK } from './folk'
 import { actorUse, creatureUse, onPath, who } from './actors'
 
 
@@ -148,11 +149,11 @@ export const proving: Record<string, Landmark> = {
     } else {
     walker.path(`M${f(wx - 26)} ${f(wy - 9)}q26 -5 52 0`, 'none', { sw: 1.6 })
     walker.el('circle', { cx: wx - 26, cy: wy - 9, r: 1.6, fill: C.rasp }); walker.el('circle', { cx: wx + 26, cy: wy - 9, r: 1.6, fill: C.rasp })
-    walker.path(`M${f(wx - 1.8)} ${f(wy)}l0.6 -6M${f(wx + 1.8)} ${f(wy)}l-0.6 -6`, 'none', { sw: 2 })
-    walker.path(`M${f(wx - 3.4)} ${f(wy - 14)}h6.8v8.5h-6.8z`, C.mint, { sw: 1.2 })
-    walker.path(`M${f(wx - 3)} ${f(wy - 12)}l-6 2.5M${f(wx + 3)} ${f(wy - 12)}l6 2.5`, 'none', { sw: 1.5 })
-    walker.el('circle', { cx: wx, cy: wy - 17.5, r: 3.4, fill: '#f1d9c6', stroke: INK, 'stroke-width': 1.2 })
-    walker.path(`M${f(wx - 3.6)} ${f(wy - 18.5)}a3.6 3.2 0 0 1 7.2 0z`, C.rasp, { sw: 1 })
+    // Someone of their own (folk.ts), arms out along the pole, in a red cap.
+    // (Life-size on the cartoon island's bigger tightrope: world.ts, HERO.)
+    const life = walker.el('g')
+    figFeet.set(life, [wx, wy])
+    drawFolk(life.add(new N('g', { transform: `translate(${f(wx)} ${f(wy)}) scale(${FOLK})` })), folk(4.21, { hat: C.rasp }), C.mint, 'balance')
     }
     p.grow(wx - 50, wy - 30, wx + 50, wy)
     // A crowd holding its breath.
