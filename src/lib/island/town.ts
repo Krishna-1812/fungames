@@ -316,12 +316,11 @@ export function kiteFlyer(p: Pen, x: number, y: number, shirt: string, kite: str
       return
     }
   }
-  p.el('ellipse', { cx: bx, cy: by + 0.5, rx: 4.5, ry: 1.8, fill: INK, opacity: 0.15 })
-  p.el('path', { d: `M${f(bx - 1.8)} ${f(by)}v-6M${f(bx + 1.8)} ${f(by)}v-6`, stroke: INK, 'stroke-width': 2, 'stroke-linecap': 'round' })
-  p.el('rect', { x: bx - 3.4, y: by - 14, width: 6.8, height: 9, rx: 2.6, fill: shirt, stroke: INK, 'stroke-width': 1.2 })
-  p.el('path', { d: `M${f(bx + 3)} ${f(by - 12)}l4 -5`, stroke: INK, 'stroke-width': 1.8, 'stroke-linecap': 'round' })
-  p.el('circle', { cx: bx, cy: by - 17.5, r: 3.4, fill: SKIN[2], stroke: INK, 'stroke-width': 1.2 })
-  const hx = bx + 7, hy = by - 17, kx = bx + 46, ky = by - 92
+  // Drawn: someone of their own (folk.ts), a hand up with the line in it.
+  const who1 = folk((x + p.ox) * 5.3 + (y + p.oy) * 2.9)
+  const K = Math.round(FOLK * who1.h * 1000) / 1000
+  const { hand } = drawFolk(p.el('g', { transform: `translate(${f(bx)} ${f(by)}) scale(${K})` }), who1, shirt, 'kite')
+  const hx = bx + hand[0] * K, hy = by + hand[1] * K, kx = bx + 46, ky = by - 92
   const g = p.el('g', { class: 'kite amb', 'data-b': box(hx, ky - 26, kx + 24, hy), style: `animation-delay:${f(-delay)}s` })
   g.add(new N('path', { d: `M${f(hx)} ${f(hy)}Q${f(hx + 30)} ${f(hy - 30)} ${f(kx)} ${f(ky + 12)}`, fill: 'none', stroke: INK, 'stroke-width': 0.8 }))
   g.add(new N('path', { d: `M${f(kx)} ${f(ky - 12)}l9 12l-9 12l-9 -12z`, fill: kite, stroke: INK, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }))
