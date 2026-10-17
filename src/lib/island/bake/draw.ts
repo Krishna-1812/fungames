@@ -27,6 +27,11 @@ export const LEVELS = [0.5, 1, 2, 4, 8]
 export const CELL = 512
 /** Native memory (resvg's pictures) is only given back when JavaScript collects: collect often, when allowed. */
 const gc = () => (globalThis as { gc?: () => void }).gc?.()
+/**
+ * And their finalizers run only once the event loop turns: a loop that never waits keeps every picture it
+ * made until it ends (the sprites alone came to 4 GB, more than Vercel's build has room for). Collect, and let it.
+ */
+const release = () => { gc(); return new Promise<void>((r) => setImmediate(r)) }
 const MAX_SPRITE = 2048
 const PAGE = 2048
 /**
@@ -326,7 +331,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     const plate = plateRuns.get(run.id)
     const r = resvg(doc(body, refs(run.items.map((i) => i.el), run.items.flatMap((i) => i.chain)), wide), PROBE)
     const img = r.render(), ab = alphaBox(img.pixels, img.width, 0, 0, img.width, img.height)
-    gc()
+    await release()
     // Two probe pixels of margin each way: anything fainter than the probe can see is inside that.
     const probed: Box | null = ab ? [wide[0] + (ab[0] - 2) / PROBE, wide[1] + (ab[1] - 2) / PROBE, wide[0] + (ab[2] + 2) / PROBE, wide[1] + (ab[3] + 2) / PROBE] : null
     const bx = plate ? union(probed, [plate.box[0], plate.box[1], plate.box[2], plate.box[3]]) : probed
@@ -347,7 +352,9 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   // The same picture in its own units (every walker's frames, every gull's wings) is painted once and shared.
   const seen = new Map<string, number>()
   const shared = new Set<number>()
+  let painted = 0
   for (const { run, scale } of b.sprites) {
+    if (++painted % 10 === 0) await release()
     // Its pixels to its own unit, per level: the level's own, times how large its unit is.
     const u = Math.min(64, Math.max(1 / 64, scale))
     const body = runDoc(run)
