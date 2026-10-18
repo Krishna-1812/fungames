@@ -108,7 +108,10 @@ export function initIsland(o: {
   const sizeW = () => box.clientWidth || innerWidth || 1280, sizeH = () => box.clientHeight || innerHeight || 800
   let W = sizeW(), H = sizeH()
   // Past two device pixels per CSS pixel the island looks no sharper, and the canvas costs more than twice as much to fill.
-  const ratio = () => Math.min(2, window.devicePixelRatio || 1)
+  // On a phone, past one and a half: held a little way from the eye it is as sharp, and each frame has 44% fewer
+  // pixels to fill and smaller pictures to fetch, which is what a phone's frame rate and first visit are short of.
+  const PHONE = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600
+  const ratio = () => Math.min(PHONE ? 1.5 : 2, window.devicePixelRatio || 1)
   const fitZ = () => Math.min(W / (bw * 0.86), H / (bh * 0.8))
   let zMin = fitZ() * 0.85, zMax = Math.max(fitZ() * 7, 3.4)
   const cam: Cam = { x: bx + bw / 2, y: by + bh * 0.56, z: fitZ() }
