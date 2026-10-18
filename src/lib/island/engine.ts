@@ -112,6 +112,8 @@ export function createEngine(o: {
     return null
   }
   const pump = () => {
+    // What no frame has asked for lately (a size the camera has flown past) is not fetched at all.
+    for (let i = queue.length - 1; i >= 0; i--) if (frameNo - (imgs.get(queue[i].url)?.used ?? 0) > 2) queue.splice(i, 1)
     queue.sort((a, b) => a.pri - b.pri)
     while (inflight < MAX_FLIGHT && queue.length) {
       const { url } = queue.shift()!
@@ -290,7 +292,8 @@ export function createEngine(o: {
         const s2 = (night ? l2.night : l2.day).get(c2)
         const im2 = s2 && [...s2.values()][0]?.img
         if (!im2) { found = true; break }
-        if (want(im2, 2)) { out.push({ li, ci: c2, night, clip: box }); found = true }
+        // Only the smallest level is fetched to stand in; a middle one stands in only if it is here already.
+        if (li === 0 ? want(im2, 2) : imgs.get(im2)?.bm) { out.push({ li, ci: c2, night, clip: box }); found = true }
       }
       if (!found) gaps++
     }
@@ -412,7 +415,8 @@ export function createEngine(o: {
     let li = scene.levels.findIndex((l, i) => sp.at[i] && l * u >= s * 0.92)
     if (li < 0) { li = sp.at.length - 1; while (li > 0 && !sp.at[li]) li-- }
     let use = -1
-    for (let k = li; k >= 0; k--) { const at = sp.at[k]; if (!at) continue; if (want(scene.pages[at[0]].file, k === li ? 0 : 3)) { use = k; break } }
+    // The size wanted is fetched, and the smallest to stand in for it meanwhile; any size between only if it is here already.
+    for (let k = li; k >= 0; k--) { const at = sp.at[k]; if (!at) continue; const file = scene.pages[at[0]].file; if (k === li || k === 0 || !sp.at.slice(0, k).some(Boolean) ? want(file, k === li ? 0 : 3) : imgs.get(file)?.bm) { use = k; break } }
     if (use < 0) for (let k = li + 1; k < sp.at.length; k++) { const at = sp.at[k]; if (at && imgs.get(scene.pages[at[0]].file)?.bm) { use = k; break } }
     if (use < 0) { gaps++; return }
     if (use !== li) blurry++
