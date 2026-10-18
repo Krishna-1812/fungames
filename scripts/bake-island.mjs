@@ -91,7 +91,7 @@ if (island.sprites) {
 fs.writeFileSync(path.join(out, 'cards.json'), JSON.stringify(b.cards))
 // The cards' inlined pictures, each as a file of its own, for the page to link (lib/island/card-art.ts).
 {
-  const { cardImages, cardImageFile } = await import('../src/lib/island/card-art.ts')
+  const { cardImages, cardImageFile, linkCardImages } = await import('../src/lib/island/card-art.ts')
   const uris = cardImages(Object.values(b.cards).join(''))
   for (const u of uris) {
     const f = cardImageFile(u), fp = path.join(out, f)
@@ -99,6 +99,8 @@ fs.writeFileSync(path.join(out, 'cards.json'), JSON.stringify(b.cards))
     fs.writeFileSync(fp, await sharp(Buffer.from(u.slice(u.indexOf(',') + 1), 'base64')).webp({ quality: 86, alphaQuality: 95, effort: 5 }).toBuffer()); files.push(f)
   }
   if (uris.length) console.log(`  [island] card pictures: ${uris.length}`)
+  // And all the cards' art, for the homepage to fetch as its grid comes near (the page itself stays small, and this is cached for good).
+  fs.writeFileSync(path.join(out, 'art.json'), JSON.stringify(Object.fromEntries(Object.entries(b.cards).map(([k, v]) => [k, linkCardImages(v)])))); files.push('art.json')
 }
 let bytes = 0
 for (const f of files) bytes += fs.statSync(path.join(out, f)).size

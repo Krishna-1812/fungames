@@ -8,7 +8,7 @@ import { faviconSvg } from '../lib/favicon'
 import { homeGames, homeIsland, homeBake, hasRealWorld, type World } from '../lib/island/home'
 import { plateInfo } from '../lib/island/plate'
 import { cardCss } from '../lib/island/moves'
-import { cardFrame, cardImages, cardImageFile } from '../lib/island/card-art'
+import { cardFrame } from '../lib/island/card-art'
 import { DISTRICTS, PLACES } from '../lib/island/landmarks'
 import { STAMP, stampSvg, sealSvg } from '../lib/passport-art'
 import { inkIcon } from '../lib/ink-icon'
@@ -62,13 +62,6 @@ const CHIP: Record<string, string> = { science: 'Real science', you: 'Measures y
 
 // Each card frames its building by its footprint and its body (lib/island/card-art.ts).
 const frame = (slug: string) => cardFrame(island, slug).join(' ')
-// Each card's art, its pictures (Unity's, on the realistic island) linked from the bake rather than inlined,
-// and fetched only as the card comes near the screen (data-src, below).
-const cardArt = (slug: string) => {
-  let s = baked.cards[slug] ?? ''
-  for (const u of cardImages(s)) s = s.split(`href="${u}"`).join(`data-src="${baked.base + cardImageFile(u)}"`).split(u).join(baked.base + cardImageFile(u))
-  return s
-}
 
 // Messages in bottles: where each lies (for the passport's hint), and how a bottle is drawn in the book.
 const DNAME = Object.fromEntries(DISTRICTS.map((d) => [d.key, d.name]))
@@ -460,7 +453,6 @@ const book = BOOK.map((key) => {
                   <span class="gc-art" aria-hidden="true">
                     <svg class="gc-svg" viewBox={frame(g.slug)} xmlns="http://www.w3.org/2000/svg" data-art={g.slug}>
                       <polygon points={a.foot} fill="#ffffff" fill-opacity="0.75" stroke="#1b2340" stroke-opacity="0.18" stroke-width="1.5" />
-                      <Fragment set:html={cardArt(g.slug)} />
                     </svg>
                   </span>
                   <span class="gc-body">
@@ -1550,37 +1542,52 @@ const book = BOOK.map((key) => {
     setTimeout(() => { isle.flyToSlug(s, 2.4); isle.showCard(s) }, PLAY ? 500 : 0)
   }))
 
+  // Each card's building is drawn into it as that card comes near the screen, from art.json (the bake's:
+  // two thirds of what the page weighed, kept out of it and cached for good). The file is asked for once
+  // the grid is close, or once the island is in and the page has gone quiet; never while the island loads.
+  let art: Promise<Record<string, string>> | null = null
+  const getArt = () => (art ??= fetch(data.base + 'art.json').then((r) => (r.ok ? r.json() : Promise.reject(new Error(`art.json: ${r.status}`)))))
+  const drawCard = (sv: SVGSVGElement) => getArt().then((all) => {
+    const a = all[sv.dataset.art!]
+    if (!a || sv.dataset.drawn) return
+    sv.dataset.drawn = '1'
+    sv.insertAdjacentHTML('beforeend', a)
+    cardReady(sv)
+  }).catch((err) => console.error('[island] a card could not load', err))
+  const cardNear = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { cardNear.unobserve(e.target); drawCard(e.target as SVGSVGElement) } }, { rootMargin: '500px 0px' })
+  // The cards are watched from the first scroll, or once the island has had a few seconds to come in.
+  let watching = false
+  const watchCards = () => { if (watching) return; watching = true; document.querySelectorAll<SVGSVGElement>('.gc-svg[data-art]').forEach((sv) => cardNear.observe(sv)) }
+  addEventListener('scroll', watchCards, { once: true, passive: true })
+  isle.withEngine(() => setTimeout(watchCards, 3500))
+  isle.withEngine(() => setTimeout(() => ('requestIdleCallback' in window ? requestIdleCallback(() => getArt(), { timeout: 6000 }) : getArt()), 6000))
+
   // The building site counts the year as it is today, not as it was on the
   // day the page was built (its storeys only change each quarter anyway).
-  {
-    const now = new Date(), y = now.getFullYear(), day = (m: number, d: number, yy = y) => Date.UTC(yy, m, d)
-    const pct = Math.floor(((day(now.getMonth(), now.getDate()) - day(0, 1)) / (day(0, 1, y + 1) - day(0, 1))) * 100)
-    const width = (w: string | undefined) => Math.round(Number(w) * pct) / 100
-    document.querySelectorAll('.gc-svg .pg-pct').forEach((el) => { el.textContent = `${pct}%` })
-    document.querySelectorAll('.gc-svg .pg-year').forEach((el) => { el.textContent = `${y} SO FAR` })
-    document.querySelectorAll<SVGElement>('.gc-svg .pg-bar').forEach((el) => el.setAttribute('width', String(width(el.dataset.w))))
-    isle.withEngine((e) => { e.setText('pg-pct', `${pct}%`); e.setText('pg-year', `${y} SO FAR`); e.setRectWidth('pg-bar', (d) => width(d.w)); isle.redraw() })
-  }
+  const pgNow = new Date(), pgYear = pgNow.getFullYear(), utc = (m: number, d: number, yy = pgYear) => Date.UTC(yy, m, d)
+  const pgPct = Math.floor(((utc(pgNow.getMonth(), pgNow.getDate()) - utc(0, 1)) / (utc(0, 1, pgYear + 1) - utc(0, 1))) * 100)
+  const pgWidth = (w: string | undefined) => Math.round(Number(w) * pgPct) / 100
+  isle.withEngine((e) => { e.setText('pg-pct', `${pgPct}%`); e.setText('pg-year', `${pgYear} SO FAR`); e.setRectWidth('pg-bar', (d) => pgWidth(d.w)); isle.redraw() })
+
   // Each card's building moves only while that card is on screen. Every
   // animation on the page costs the whole page a frame, seen or not: with the
   // grid watched as one block, and woken 200px early, all thirty-one ran
   // just below the fold and took the island from 47 frames a second to 29.
   const cardIo = new IntersectionObserver((es) => { for (const e of es) e.target.classList.toggle('is-live', e.isIntersecting) })
-  document.querySelectorAll('.gc-svg').forEach((sv) => cardIo.observe(sv))
-  // And its pictures are fetched once it is within a screen or so of being seen.
-  const artIo = new IntersectionObserver((es) => {
-    for (const e of es) if (e.isIntersecting) {
-      e.target.querySelectorAll<SVGImageElement>('image[data-src]').forEach((im) => { im.setAttribute('href', im.dataset.src!); im.removeAttribute('data-src') })
-      artIo.unobserve(e.target)
-    }
-  }, { rootMargin: '800px 0px' })
-  document.querySelectorAll('.gc-svg').forEach((sv) => { if (sv.querySelector('image[data-src]')) artIo.observe(sv) })
+  function cardReady(sv: SVGSVGElement) {
+    // The building site's year, on its card too.
+    sv.querySelectorAll('.pg-pct').forEach((el) => { el.textContent = `${pgPct}%` })
+    sv.querySelectorAll('.pg-year').forEach((el) => { el.textContent = `${pgYear} SO FAR` })
+    sv.querySelectorAll<SVGElement>('.pg-bar').forEach((el) => el.setAttribute('width', String(pgWidth(el.dataset.w))))
+    cardIo.observe(sv)
+    // Its pictures (Unity's), fetched now: it is about to be seen.
+    sv.querySelectorAll<SVGImageElement>('image[data-src]').forEach((im) => { im.setAttribute('href', data.base + im.dataset.src!); im.removeAttribute('data-src') })
+  }
 
   /* ---- a few motions that need a clock rather than a keyframe ------------- */
   if (PLAY) isle.withEngine((e) => {
     // Who Was Alive's year, on the map and on its card.
-    const years = document.querySelectorAll('.gc-svg .wwa-year')
-    setInterval(() => { if (!isle.awake()) return; const y = String(1300 + Math.floor(Math.random() * 720)); e.setText('wwa-year', y); years.forEach((el) => { el.textContent = y }) }, 2400)
+    setInterval(() => { if (!isle.awake()) return; const y = String(1300 + Math.floor(Math.random() * 720)); e.setText('wwa-year', y); document.querySelectorAll('.gc-svg .wwa-year').forEach((el) => { el.textContent = y }) }, 2400)
     // Life in Weeks fills in, a week at a time.
     let wk = 38
     setInterval(() => { if (!isle.awake()) return; wk = wk >= 63 ? 38 : wk + 1; e.eachShape('liw-cell', (d, set) => set(Number(d.k) < wk ? (d.on ?? '#5fe0bf') : (d.off ?? '#e8e1f5'))) }, 900)

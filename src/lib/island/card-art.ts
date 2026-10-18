@@ -22,6 +22,11 @@ import { createHash } from 'node:crypto'
  */
 export const cardImages = (art: string) => [...new Set(art.match(/data:image\/png;base64,[A-Za-z0-9+/=]+/g) ?? [])]
 export const cardImageFile = (uri: string) => `k/${createHash('sha1').update(uri).digest('hex').slice(0, 12)}.webp`
+/** A card's art with its pictures linked, not inlined: each <image> waits with its file in data-src (relative to the bake), for the page to fetch as the card comes near. */
+export const linkCardImages = (art: string) => {
+  for (const u of cardImages(art)) art = art.split(`href="${u}"`).join(`data-src="${cardImageFile(u)}"`).split(u).join(cardImageFile(u))
+  return art
+}
 
 type IslandLike = { layers: { body: string }[]; css: string; anchors: Record<string, { foot: string; y0: number }> }
 
