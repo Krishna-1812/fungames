@@ -270,8 +270,9 @@ export function initIsland(o: {
    * Left alone, the island's own life (walkers, waves, birds) is drawn thirty
    * times a second, not sixty, and never takes more than about three fifths
    * of the main thread: the rest is the page's, so scrolling and taps answer
-   * at once, and a phone stays cool. Anything the hands do, a flight or the
-   * pictures still coming in is drawn every frame.
+   * at once, and a phone stays cool; and while the island is still loading,
+   * the downloads land sooner. Anything the hands do, or a flight, is drawn
+   * every frame.
    */
   const AMBIENT = 1000 / 30
   let drawnAt = 0, cost = 0
@@ -283,7 +284,8 @@ export function initIsland(o: {
     lastT = t
     const moving = step(dt)
     if (hot !== liftFor) { liftFor = hot; livelyUntil = Math.max(livelyUntil, t + 800) }
-    const busy = moving || dragging || hover.dirty || held.size > 0 || stage0 !== 'gone' || t < livelyUntil || !engine?.sharp()
+    // (Pictures still coming in are no reason: each one wakes a frame as it lands, and behind the poster nothing shows yet.)
+    const busy = moving || dragging || hover.dirty || held.size > 0 || stage0 === 'live' || t < livelyUntil
     if (engine && PLAY && !busy && t - drawnAt < Math.max(AMBIENT, cost * 1.6) - 3) { wake(); return }
     drawnAt = t
     const c0 = performance.now()
