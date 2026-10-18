@@ -134,6 +134,9 @@ const book = BOOK.map((key) => {
       <div class="isl-box" id="islBox" tabindex="0" data-world={world}>
         <div class="isl-stage" id="islStage">
           <canvas class="isl-canvas" id="islCanvas" aria-hidden="true"></canvas>
+          {/* The map and its smallest level's index, asked for at once: the script that would ask for them comes in a second or two later on a phone. */}
+          <link rel="preload" href={baked.base + 'scene.json'} as="fetch" crossorigin="anonymous" />
+          <link rel="preload" href={baked.base + baked.scene.lv[0].index} as="fetch" crossorigin="anonymous" />
           {poster && <img class="isl-poster" id="islPoster" src={baked.base + poster.file} width={poster.w} height={poster.h} alt="" fetchpriority="high" decoding="async" style={poster.tiny ? `background-image:url(${poster.tiny});background-size:100% 100%` : undefined} />}
           <noscript><img class="isl-still" src={baked.base + 'still.webp'} alt={`Tiny Island: ${count} games, each one a building`} /></noscript>
         </div>
