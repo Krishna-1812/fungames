@@ -2588,14 +2588,15 @@ const book = BOOK.map((key) => {
     55% { opacity: 1; transform: rotate(var(--rot)) scale(0.9); }
     100% { opacity: 0.93; transform: rotate(var(--rot)) scale(1); }
   }
-  .pp-slot.is-stamped.is-landing .pp-ghost { visibility: visible; animation: pp-gone 0.12s calc(var(--d, 0s) + 0.26s) both; }
+  /* Until it lands, a new stamp's place shows only its faint print, like any stamp not yet earned. */
+  .pp-slot.is-stamped.is-fresh .pp-stamp { opacity: 0.2; color: #6f7ca3; transform: none; mix-blend-mode: normal; }
   @keyframes pp-gone { to { opacity: 0; } }
   .pp-slot.is-landing::before {
     content: ''; position: absolute; left: 50%; top: 8px; width: min(100% - 8px, 132px); aspect-ratio: 1; translate: -50% 0;
     border: 3px solid var(--ink); border-radius: 50%; opacity: 0; pointer-events: none;
     animation: pp-splash 0.6s calc(var(--d, 0s) + 0.27s) ease-out both;
   }
-  @keyframes pp-splash { from { opacity: 0.55; transform: scale(0.7); } to { opacity: 0; transform: scale(1.45); } }
+  @keyframes pp-splash { 0% { opacity: 0; transform: scale(0.7); } 1% { opacity: 0.55; transform: scale(0.7); } 100% { opacity: 0; transform: scale(1.45); } }
   .pp-slot.is-landing .pp-when { animation: pp-when 0.4s calc(var(--d, 0s) + 0.35s) both; }
   @keyframes pp-when { from { opacity: 0; transform: translateY(4px); } }
 
