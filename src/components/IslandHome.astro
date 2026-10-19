@@ -452,8 +452,10 @@ const book = BOOK.map((key) => {
           {games.map((g) => {
             const a = island.anchors[g.slug]
             return (
-              <li class="gcard-slot gs-slot" data-slug={g.slug} data-cat={g.category} data-search={`${g.title} ${g.blurb} ${g.description}`.toLowerCase()}>
+              <li class="gcard-slot gs-slot" data-slug={g.slug} data-fresh={[...games].sort((p, q) => q.added.localeCompare(p.added)).slice(0, 3).some((n) => n.slug === g.slug) ? '1' : undefined} data-cat={g.category} data-search={`${g.title} ${g.blurb} ${g.description}`.toLowerCase()}>
                 <a class="gc" href={withBase(`/${g.slug}/`)} style={`--tint:${tintOf(g.slug)}`}>
+                  <span class="gc-ribbon gc-ribbon--today" hidden>Today</span>
+                  <span class="gc-ribbon gc-ribbon--new" hidden>New</span>
                   <span class="gc-art" aria-hidden="true">
                     <svg class="gc-svg" viewBox={frame(g.slug)} xmlns="http://www.w3.org/2000/svg" data-art={g.slug}>
                       <polygon points={a.foot} fill="#ffffff" fill-opacity="0.75" stroke="#1b2340" stroke-opacity="0.18" stroke-width="1.5" />
@@ -611,6 +613,23 @@ const book = BOOK.map((key) => {
   const visits = (): Record<string, Visit> => withHistory(readPassport(), readAll(), data.slugs.filter((s) => data.games[s].best))
   let sound: ReturnType<typeof islandSound> | null = null
   document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => { const b = data.games[el.dataset.best!]?.best; if (b) { el.textContent = `Best ${b}`; el.classList.add('has-best') } })
+  // The grid says what the map does: today's challenge, what is new since you last came, and what you have finished
+  // (a game you have played but kept no best for gets a tick where a best would go).
+  {
+    const seen = visits(), todayIs = dailyFor(new Date()).slug
+    for (const slot of document.querySelectorAll<HTMLElement>('.gs-slot')) {
+      const s = slot.dataset.slug!, g = slot.querySelector('.gc')!
+      const isToday = s === todayIs, isNew = !seen[s] && !finished.has(s) && slot.dataset.fresh === '1'
+      slot.querySelector<HTMLElement>('.gc-ribbon--today')!.hidden = !isToday
+      slot.querySelector<HTMLElement>('.gc-ribbon--new')!.hidden = isToday || !isNew
+      g.classList.toggle('is-today', isToday)
+      const best = slot.querySelector<HTMLElement>('.gc-best')!
+      if (!best.classList.contains('has-best') && finished.has(s)) { best.textContent = 'Played ✓'; best.classList.add('has-best') }
+    }
+    // Today's challenge leads the grid, wherever it would have come.
+    const slot = document.querySelector<HTMLElement>(`.gs-slot[data-slug="${todayIs}"]`)
+    if (slot) slot.parentElement!.prepend(slot)
+  }
 
   /* ---- things to poke, and secrets to find ---------------------------------- */
   const NAMES: Record<string, string> = { whale: 'the whale', dawnwhale: 'the dawn whale', sheep: 'a sheep', windmill: 'the windmill', balloon: 'a balloon', crab: 'a crab', fountain: 'the fountain', kite: 'a kite', dolphin: 'a dolphin', duck: 'a duck', gull: 'a gull', deer: 'the deer', ferry: 'the ferry', castaway: 'the castaway', treasure: 'the buried treasure', house32: 'the 32nd building', ufo: 'a UFO' }
@@ -2189,6 +2208,16 @@ const book = BOOK.map((key) => {
   .gc-foot { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 14px; }
   .gc-tag { font-size: 12.5px; font-weight: 700; padding: 3px 10px; border: 2px solid #1b2340; border-radius: 999px; background: var(--tint); }
   .gc-best { font-size: 13px; font-weight: 700; color: #11a887; }
+  /* Today's challenge and a new game wear a ribbon over the corner of their picture. */
+  .gc-ribbon {
+    position: absolute; left: 12px; top: 12px; z-index: 2;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 4px 11px; border: 2.5px solid #1b2340; border-radius: 999px; box-shadow: 0 3px 0 #1b2340;
+    background: #4fe3c1; color: #1b2340;
+  }
+  .gc-ribbon--new { background: #b8a1ff; }
+  .gc.is-today { box-shadow: 0 5px 0 #1b2340, 0 0 0 5px #4fe3c1; }
+  .gc.is-today:hover, .gc.is-today:focus-visible { box-shadow: 0 10px 0 #1b2340, 0 0 0 5px #4fe3c1; }
   .gc-pin {
     position: absolute; right: 12px; top: 12px; z-index: 2;
     width: 38px; height: 38px; display: grid; place-items: center;
@@ -2211,6 +2240,7 @@ const book = BOOK.map((key) => {
     .gc-tag { font-size: 11px; padding: 2px 8px; }
     .gc-best { font-size: 12px; }
     .gc-pin { right: 7px; top: 7px; width: 34px; height: 34px; border-radius: 10px; }
+    .gc-ribbon { left: 8px; top: 8px; font-size: 11.5px; padding: 3px 8px; }
     .gc-pin svg { width: 18px; height: 18px; }
   }
   .gs-slot:hover .gc-pin, .gc-pin:focus-visible { opacity: 1; transform: none; }
