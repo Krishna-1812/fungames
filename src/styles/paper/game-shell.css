@@ -13,13 +13,24 @@
   gap: 12px 16px;
   padding-block: 14px;
 }
-.shell-back { padding-left: 14px; }
+.shell-back { padding-left: 14px; font-family: 'Fredoka', var(--sans); font-weight: 700; }
+/* The site's own chrome speaks the island's language: Fredoka, as on the homepage. The game's
+   content inside the stage keeps its own voice. */
 .shell-title {
-  font-size: clamp(22px, 2.6vw, 36px);
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Fredoka', var(--sans); font-variation-settings: normal; font-weight: 700;
+  font-size: clamp(22px, 2.4vw, 32px);
+  letter-spacing: -0.01em;
   line-height: 1.02;
   min-width: 0;
   text-wrap: balance;
 }
+.shell-bldg {
+  flex: none; width: 58px; height: 44px; overflow: hidden; display: grid; place-items: center;
+  border-radius: 12px; background: var(--bldg-tint); border: 2px solid var(--ink);
+}
+/* The picture is framed with room round its plinth; the badge wants the building. */
+.shell-bldg img { width: 165%; height: auto; max-width: none; margin-top: -4%; }
 .shell-controls { display: flex; align-items: center; gap: 8px; }
 .shell-controls .pill { min-height: 44px; }
 /* Round buttons for the two that are pictures: sound, and the ⋯ menu. */
@@ -57,7 +68,8 @@
   .shell-back-word, .shell-howto-word { display: none; }
   .shell-howto { width: 44px; padding: 0; justify-content: center; }
   .shell-howto-q { display: inline; }
-  .shell-title { font-size: clamp(20px, 5.6vw, 26px); }
+  .shell-title { font-size: clamp(19px, 5.4vw, 24px); gap: 8px; }
+  .shell-bldg { width: 46px; height: 36px; border-radius: 10px; }
   .shell-controls { gap: 6px; }
 }
 
