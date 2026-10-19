@@ -47,7 +47,8 @@ type Cam = { x: number; y: number; z: number }
  * edges, rather than a map of the whole. The Home button and the mini-map
  * are the overview. Closer still on a phone's narrow screen.
  */
-const OPEN = (w: number) => (w < 700 ? 3.3 : 2.25)
+/** How far in the first look settles: close enough to read the town, far enough to see it is an island. */
+const OPEN = (w: number) => (w < 700 ? 2.1 : 1.5)
 
 /** A frame's worth of time at 60 frames a second: the unit the easing was tuned in. */
 const FRAME = 1000 / 60
@@ -341,7 +342,8 @@ export function initIsland(o: {
     stage0 = 'live'
     box.classList.add('is-live')
     // The buildings drop in (the first time this visit), unless the map is already being used; then the camera settles.
-    if (PLAY && !interacted) { if (opening.intro) engine!.intro(); settle() }
+    // A first visit holds the whole island for a moment before it comes down: the view worth arriving to.
+    if (PLAY && !interacted) { if (opening.intro) { engine!.intro(); setTimeout(settle, 1100) } else settle() }
     livelyUntil = performance.now() + 4000
     const gone = () => { stage0 = 'gone'; if (poster) poster.hidden = true }
     if (PLAY && poster) setTimeout(gone, 450)
