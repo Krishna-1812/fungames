@@ -294,8 +294,11 @@ const book = BOOK.map((key) => {
           <button type="button" class="pp-reset" id="ppReset">Start a new passport</button>
         </section>
         <section class="pp-page pp-right">
-          {book.map((p) => (
+          {book.map((p, pi) => (
             <div class="pp-sheet" role="tabpanel" data-sheet={p.key} aria-label={p.name} hidden style={`--ink:${p.ink}`}>
+              {/* Every visa page has its country's name printed large and faint under the stamps, and a number. */}
+              <p class="pp-mark" aria-hidden="true">{p.name.replace(/^The /, '')}</p>
+              <p class="pp-pageno" aria-hidden="true">{pi + 2}</p>
               <header class="pp-sheet-head">
                 <h3>{p.name}</h3>
                 <p><b data-count={p.key}>0</b> of {p.games.length} stamped</p>
@@ -2547,7 +2550,17 @@ const book = BOOK.map((key) => {
   .pp-tab--you { display: none; }
 
   /* ---- a district's page ---- */
-  .pp-sheet { position: relative; flex: 1; }
+  .pp-sheet { position: relative; flex: 1; display: flex; flex-direction: column; }
+  .pp-mark {
+    position: absolute; left: 0; right: 0; bottom: 34px; z-index: 0; margin: 0; pointer-events: none;
+    font: 700 clamp(44px, 6.4vw, 78px)/0.9 'Fredoka', system-ui, sans-serif; letter-spacing: 0.02em; text-transform: uppercase; text-align: center;
+    color: transparent; -webkit-text-stroke: 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+    transform: rotate(-4deg);
+  }
+  .pp-pageno { margin: auto 0 0; padding-top: 14px; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 0.2em; color: var(--pmute); }
+  .pp-pageno::before, .pp-pageno::after { content: '—'; margin: 0 8px; opacity: 0.5; }
+  .pp-sheet > :not(.pp-mark):not(.pp-seal-at) { position: relative; z-index: 1; }
+  .pp-pageno { order: 99; }
   .pp-sheet[hidden] { display: none; }
   .pp-sheet.is-turning { animation: pp-turn 0.45s cubic-bezier(0.2, 0.8, 0.3, 1); transform-origin: 0 50%; }
   @keyframes pp-turn { from { opacity: 0.15; transform: perspective(1400px) rotateY(-24deg) translateX(-10px); } }
