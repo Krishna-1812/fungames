@@ -480,16 +480,31 @@ const book = BOOK.map((key) => {
       </div>
     </section>
 
+    {/* The island's far shore: the sea comes back in over a wave, and every district lists its games. */}
     <footer class="ft">
+      <svg class="ft-wave" viewBox="0 0 1440 48" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M0 48V22c60-14 120-14 180 0s120 14 180 0 120-14 180 0 120 14 180 0 120-14 180 0 120 14 180 0 120-14 180 0 120 14 180 0V48z" fill="#1b2340" /></svg>
       <div class="gs-wrap ft-in">
-        <p class="ft-name">{SITE.name}</p>
-        <p class="ft-line">{count} small games, real maths, nothing to sign up for. Everything runs in your browser; visits are counted anonymously (<a class="ft-privacy" href={withBase('/privacy/')}>privacy</a>).</p>
-        {SITE.buyMeACoffee && (
-          <a class="ft-coffee" href={`https://www.buymeacoffee.com/${SITE.buyMeACoffee}`} target="_blank" rel="noopener">
-            <span class="ft-coffee-icon" aria-hidden="true" set:html={inkIcon('coffee')} />
-            <span>Buy me a coffee</span>
-          </a>
-        )}
+        <div class="ft-brand">
+          <p class="ft-name"><span class="ft-mark" aria-hidden="true" set:html={faviconSvg(true)} />{SITE.name}</p>
+          <p class="ft-line">{count} small games, real maths, nothing to sign up for. Everything runs in your browser; visits are counted anonymously (<a class="ft-privacy" href={withBase('/privacy/')}>privacy</a>).</p>
+          <div class="ft-acts">
+            {SITE.buyMeACoffee && (
+              <a class="ft-coffee" href={`https://www.buymeacoffee.com/${SITE.buyMeACoffee}`} target="_blank" rel="noopener">
+                <span class="ft-coffee-icon" aria-hidden="true" set:html={inkIcon('coffee')} />
+                <span>Buy me a coffee</span>
+              </a>
+            )}
+            <a class="ft-up" href="#main"><span aria-hidden="true">↑</span> Back to the island</a>
+          </div>
+        </div>
+        <nav class="ft-map" aria-label="Every game, by district">
+          {book.map((d) => (
+            <div class="ft-district">
+              <p class="ft-dname" style={`--ink:${d.ink}`}>{d.name}</p>
+              <ul role="list">{d.games.map((g) => <li><a href={withBase(`/${g.slug}/`)}>{g.title}</a></li>)}</ul>
+            </div>
+          ))}
+        </nav>
       </div>
     </footer>
   </main>
@@ -2208,10 +2223,25 @@ const book = BOOK.map((key) => {
   :global(html:not(.play) .gc-svg *) { animation-play-state: paused !important; }
   :global(html:not(.play) .gc-svg *:not(.mover)) { animation: none !important; transition: none !important; }
 
-  .ft { background: #1b2340; color: #fff; padding: 36px 0 44px; }
-  .ft-in { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px 24px; }
-  .ft-name { margin: 0; font-weight: 700; font-size: 24px; }
-  .ft-line { margin: 0; color: #c9d2f0; font-size: 15px; }
+  .ft { position: relative; background: #1b2340; color: #fff; padding: 40px 0 56px; margin-top: 48px; }
+  .ft-wave { position: absolute; left: 0; right: 0; top: -47px; width: 100%; height: 48px; display: block; }
+  .ft-in { display: grid; grid-template-columns: minmax(240px, 330px) 1fr; gap: 32px 56px; align-items: start; }
+  @media (max-width: 900px) { .ft-in { grid-template-columns: 1fr; } }
+  .ft-brand { display: grid; gap: 14px; }
+  .ft-name { margin: 0; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 26px; }
+  .ft-mark { display: inline-flex; width: 36px; height: 36px; flex: none; }
+  .ft-mark :global(svg) { width: 100%; height: 100%; }
+  .ft-line { margin: 0; color: #c9d2f0; font-size: 15px; line-height: 1.5; }
+  .ft-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 4px; }
+  .ft-up { color: #fff; font-weight: 700; font-size: 15px; text-decoration: none; border-bottom: 2px solid #4fe3c1; padding-bottom: 2px; }
+  .ft-up:hover { color: #4fe3c1; }
+  .ft-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 24px 28px; }
+  .ft-dname { margin: 0 0 8px; font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: #9fb2e8; display: flex; align-items: center; gap: 8px; }
+  .ft-dname::before { content: ''; width: 10px; height: 10px; border-radius: 3px; background: var(--ink); flex: none; }
+  .ft-district ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .ft-district a { color: #eef2ff; text-decoration: none; font-size: 15px; font-weight: 500; }
+  .ft-district a:hover { color: #4fe3c1; text-decoration: underline; text-underline-offset: 3px; }
+  .ft-district a:focus-visible, .ft-up:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 3px; border-radius: 4px; }
   /* Buy Me a Coffee runs its own checkout; this is only a link to it. In the
      island's mint rather than that service's yellow: the site stays cool. */
   .ft-coffee {
