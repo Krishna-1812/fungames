@@ -21,7 +21,7 @@
  * didn't answer" rather than as "nothing has ever happened" — those are
  * different facts and the page must not confuse them.
  */
-import { SITE } from '../site.config'
+import { withBase } from './base'
 import {
   EARTHQUAKE_CATEGORIES,
   FLARE_CATEGORIES,
@@ -88,7 +88,8 @@ export interface SourceResult {
 
 async function fetchDonkiRange(kind: DonkiKind, startEpoch: number, endEpoch: number): Promise<SourceResult> {
   try {
-    const url = `https://api.nasa.gov/DONKI/${kind}?startDate=${iso(startEpoch)}&endDate=${iso(endEpoch)}&api_key=${SITE.nasaApiKey}`
+    // Through the site's own cached route (pages/api/donki.ts), not straight to NASA from every browser.
+    const url = withBase(`/api/donki/?kind=${kind}&start=${iso(startEpoch)}&end=${iso(endEpoch)}`)
     const raw = await getJSON(url, 25_000)
     if (!Array.isArray(raw)) return { events: [], ok: false }
     const events = raw.map(PARSE_BY_KIND[kind]).filter((e): e is IncidentEvent => e != null)

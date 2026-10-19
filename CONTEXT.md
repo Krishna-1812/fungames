@@ -719,8 +719,9 @@ knowing as real traffic arrives:
 
 - AdSense id (`adsenseClient`) renders nothing until set. Note Vercel's free
   plan is for non-commercial sites; ads would mean the Pro plan.
-- A real NASA API key for Days Since Incident (`nasaApiKey`; `DEMO_KEY` is
-  shared worldwide and rate-limited).
+- A real NASA API key for Days Since Incident: `NASA_API_KEY` in Vercel's
+  environment (free at api.nasa.gov). Until then /api/donki/ uses `DEMO_KEY`,
+  cached at the edge for an hour.
 - Fusion worker: `npx wrangler kv namespace create FUSION`, then fill in
   `wrangler.toml` (KV id, route, `ALLOWED_ORIGINS`), `npx wrangler deploy`.
   Add rate limits and a model budget before going public. The Buy Me a
