@@ -37,7 +37,7 @@ import { perfMeter } from './perf'
 import type { Scene } from './scene'
 
 export type Anchor = { slug: string; district: string; x0: number; y0: number; x1: number; y1: number; bx: number; by: number }
-export type GameInfo = { slug: string; title: string; blurb: string; href: string; best?: string | null; tint: string }
+export type GameInfo = { slug: string; title: string; blurb: string; href: string; best?: string | null; tint: string; pic?: string; diff?: string; done?: boolean }
 
 type Cam = { x: number; y: number; z: number }
 
@@ -556,6 +556,10 @@ export function initIsland(o: {
   const cardBest = card.querySelector<HTMLElement>('.isl-card-best')!
   const cardPlay = card.querySelector<HTMLAnchorElement>('.isl-card-play')!
   const cardExtra = card.querySelector<HTMLElement>('.isl-card-extra')!
+  const cardPic = card.querySelector<HTMLElement>('.isl-card-pic'), cardImg = cardPic?.querySelector('img')
+  cardImg?.addEventListener('error', () => cardPic!.classList.add('is-missing'))
+  cardImg?.addEventListener('load', () => { cardPic!.classList.remove('is-missing'); placeOverlays() })
+  const cardDiff = card.querySelector<HTMLElement>('.isl-card-diff'), cardDone = card.querySelector<HTMLElement>('.isl-card-done')
   function showCard(slug: string, extra = '') {
     const g = games[slug]; if (!g) return
     clearTimeout(hideT)
@@ -567,6 +571,10 @@ export function initIsland(o: {
     card.querySelector('.isl-card-blurb')!.textContent = g.blurb
     cardBest.textContent = g.best ? `Best ${g.best}` : ''
     cardBest.hidden = !g.best
+    if (cardImg && g.pic && cardImg.getAttribute('src') !== g.pic) cardImg.src = g.pic
+    cardPic?.classList.toggle('is-missing', !g.pic)
+    if (cardDiff) { cardDiff.textContent = g.diff ?? ''; cardDiff.hidden = !g.diff }
+    if (cardDone) cardDone.hidden = !g.done
     cardExtra.textContent = extra; cardExtra.hidden = !extra
     cardPlay.href = g.href
     card.style.setProperty('--tint', g.tint)
