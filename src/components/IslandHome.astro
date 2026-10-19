@@ -106,10 +106,12 @@ const book = BOOK.map((key) => {
     // The island you chose last time, before anything else is fetched: the other page, at once, with
     // the address's own extras, and where you came from (so stepping out of a game still works there).
     // And come here by the switch: the one island fades into the other, where the camera was.
+    // Only the plain address (the cartoon island's, /) does this: a link to the other island (someone sharing /realistic/) opens
+    // that island, whatever this browser chose before, and does not change the choice.
     <script is:inline define:vars={{ here: world, def: worldDefault, href: worldHref }}>
       try {
         const want = localStorage.getItem('isl-world') || def
-        if (want !== here && href[want]) {
+        if (here === 'cartoon' && want !== here && href[want]) {
           sessionStorage.setItem('isl-ref', document.referrer)
           location.replace(href[want] + location.search + location.hash)
         } else if (sessionStorage.getItem('isl-swap')) {
