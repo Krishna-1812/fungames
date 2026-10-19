@@ -68,17 +68,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   initial={{ score: '$0', level: `0 / ${TIERS.length}`, moves: '0:00' }}
 >
   <div class="pm">
-  <header class="pm-head">
-    <p class="label meta pm-eyebrow">Nine real rates, one dollar bill at a time</p>
-    <p class="pm-lead">
-      A wage, a salary, a government's own hourly rate of spending — nine
-      real figures that live at wildly different scales, all reduced to the
-      one thing that makes them comparable: how many one-dollar bills that
-      buys, laid end to end. Keep this tab open and watch the top of the
-      page move while the bottom barely does.
-    </p>
-  </header>
-
+  {/* The live counter first: the money being printed is the thing to see, the words come after it. */}
   <section class="pm-hero" aria-label="Live counter">
     <i class="bolt bolt-tl" aria-hidden="true"></i><i class="bolt bolt-tr" aria-hidden="true"></i>
     <i class="bolt bolt-bl" aria-hidden="true"></i><i class="bolt bolt-br" aria-hidden="true"></i>
@@ -107,6 +97,17 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     </div>
     <p class="pm-hero-ref" id="heroRef"></p>
   </section>
+
+  <header class="pm-head">
+    <p class="label meta pm-eyebrow">Nine real rates, one dollar bill at a time</p>
+    <p class="pm-lead">
+      A wage, a salary, a government's own hourly rate of spending — nine
+      real figures that live at wildly different scales, all reduced to the
+      one thing that makes them comparable: how many one-dollar bills that
+      buys, laid end to end. Keep this tab open and watch the top of the
+      page move while the bottom barely does.
+    </p>
+  </header>
 
   <div class="pm-body-content">
     {
@@ -516,13 +517,13 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   }
   .pm [hidden] { display: none !important; }
 
-  .pm-head { max-width: 660px; margin: 2vh auto 0; text-align: center; }
+  .pm-head { max-width: 660px; margin: 5vh auto 0; text-align: center; }
   .pm-eyebrow { display: block; margin-bottom: 14px; color: var(--ink2); }
   .pm-lead { font-size: var(--fs-lead); line-height: 1.6; color: var(--ink2); max-width: 56ch; margin: 0 auto; }
 
   /* ---- the hero: a real debt-clock signboard, bolted to the page --------- */
   .pm-hero {
-    position: relative; max-width: 640px; margin: 5vh auto 0; padding: 30px clamp(14px, 4vw, 30px) 26px;
+    position: relative; max-width: 640px; margin: 1vh auto 0; padding: 30px clamp(14px, 4vw, 30px) 26px;
     border-radius: var(--r-lg); text-align: center; color: #eef1f5;
     background:
       linear-gradient(155deg, rgba(255, 255, 255, 0.05), transparent 40%),
