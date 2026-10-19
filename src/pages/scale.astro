@@ -588,7 +588,9 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; }
 
   .intro { position: relative; min-height: 86vh; display: grid; place-content: center; text-align: center; gap: 12px; padding: 160px 20px 0; }
-  .intro-title {
+  /* `.intro .intro-title`, not `.intro-title`: the title is a <p>, and `.intro p` below outranked it (18px, faded). */
+  .intro .intro-title {
+    opacity: 1; max-width: none;
     font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600;
     font-size: clamp(44px, 11cqw, 90px); line-height: 1; letter-spacing: -0.04em;
   }
