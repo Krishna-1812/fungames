@@ -504,7 +504,7 @@ console.log('\nthe stars')
   // Filled and empty must differ by more than hue, or a colourblind reader
   // cannot count them. A filled star carries a `fill="#…"`; an empty one is
   // `fill="none"` with a stroke. Counting fills is therefore counting stars.
-  const fills = (svg) => (svg.match(/fill="#f5a623"/g) ?? []).length
+  const fills = (svg) => (svg.match(/fill="#2fcfa9"/g) ?? []).length
   const outlines = (svg) => (svg.match(/fill="none"/g) ?? []).length
   // [value, gold shapes, `fill="none"` outlines]. A half star contributes one
   // of each: the left-half polygon is gold, and it sits inside a complete

@@ -1114,8 +1114,8 @@ const STAR_FULL =
   'L-5.878 8.09 L-3.633 1.181 L-9.511 -3.09 L-2.245 -3.09 Z'
 const STAR_LEFT = 'M0 -10 L-2.245 -3.09 L-9.511 -3.09 L-3.633 1.181 L-5.878 8.09 L0 3.82 Z'
 
-/** The gold a filled star is painted. */
-export const STAR_GOLD = '#f5a623'
+/** The colour a filled star is painted: the site's mint, since the site is cool all through (no gold). */
+export const STAR_FILL = '#2fcfa9'
 
 /**
  * Five stars for a rating, as inline SVG.
@@ -1138,10 +1138,10 @@ export function starsSvg(value: number, height = 20, label?: string): string {
   const stars = Array.from({ length: 5 }, (_, i) => {
     const at = `<g transform="translate(${13 + i * 20} 12)">`
     if (i < full)
-      return `${at}<path d="${STAR_FULL}" fill="${STAR_GOLD}" stroke="#6b4a10" stroke-width="1.1" stroke-linejoin="round"/></g>`
+      return `${at}<path d="${STAR_FULL}" fill="${STAR_FILL}" stroke="#0b5c4c" stroke-width="1.1" stroke-linejoin="round"/></g>`
     if (i === full && half)
       return (
-        `${at}<path d="${STAR_LEFT}" fill="${STAR_GOLD}"/>` +
+        `${at}<path d="${STAR_LEFT}" fill="${STAR_FILL}"/>` +
         `<path d="${STAR_FULL}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" opacity="0.65"/></g>`
       )
     return `${at}<path d="${STAR_FULL}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" opacity="0.5"/></g>`
