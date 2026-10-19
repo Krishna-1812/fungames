@@ -78,6 +78,8 @@ const coast = coastline(island.grid, GRID)
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
 const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, play: island.play, grid: island.grid, coast, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
 
+// The passport's thumb tabs are narrow: a district goes by its short name there.
+const SHORT: Record<string, string> = { oldtown: 'Old Town', market: 'Market', funfair: 'Funfair', harbour: 'Harbour', proving: 'Proving', badlands: 'Badlands', peaks: 'Sky Peaks' }
 // The passport: a page per district, in the order you would walk the island
 // from the middle, each game a stamp drawn here and inked by the page once
 // this browser has been there. A small tilt each, from the name, so a page of
@@ -291,14 +293,6 @@ const book = BOOK.map((key) => {
           <button type="button" class="pp-reset" id="ppReset">Start a new passport</button>
         </section>
         <section class="pp-page pp-right">
-          <div class="pp-tabs" role="tablist" aria-label="Passport pages">
-            <button type="button" role="tab" class="pp-tab pp-tab--you" data-tab="you" aria-selected="true">You</button>
-            {book.map((p) => <button type="button" role="tab" class="pp-tab" data-tab={p.key} aria-selected="false" style={`--ink:${p.ink}`}>{p.name.replace(/^The /, '')}<i data-tab-n={p.key}></i></button>)}
-            <button type="button" role="tab" class="pp-tab" data-tab="bottles" aria-selected="false" style="--ink:#1f7fa8">Bottles<i id="ppBTab"></i></button>
-            <button type="button" role="tab" class="pp-tab" data-tab="sightings" aria-selected="false" style="--ink:#2a6f8f">Sightings</button>
-            <button type="button" role="tab" class="pp-tab" data-tab="quests" aria-selected="false" style="--ink:#4a3fa8">Quests<i id="ppQTab"></i></button>
-            <button type="button" role="tab" class="pp-tab" data-tab="save" aria-selected="false" style="--ink:#1d6f8c">Save</button>
-          </div>
           {book.map((p) => (
             <div class="pp-sheet" role="tabpanel" data-sheet={p.key} aria-label={p.name} hidden style={`--ink:${p.ink}`}>
               <header class="pp-sheet-head">
@@ -421,6 +415,15 @@ const book = BOOK.map((key) => {
             </div>
           </div>
         </section>
+        {/* The page index, cut into the edge of the book like a dictionary's thumb tabs (on a phone, a row along the top). */}
+        <div class="pp-tabs" role="tablist" aria-label="Passport pages" aria-orientation="vertical">
+          <button type="button" role="tab" class="pp-tab pp-tab--you" data-tab="you" aria-selected="true"><span class="pp-tab-w">You</span></button>
+          {book.map((p) => <button type="button" role="tab" class="pp-tab" data-tab={p.key} aria-selected="false" style={`--ink:${p.ink}`}><span class="pp-tab-w" aria-hidden="true">{SHORT[p.key] ?? p.name.replace(/^The /, '')}</span><span class="sr-only">{p.name}</span><i data-tab-n={p.key}></i></button>)}
+          <button type="button" role="tab" class="pp-tab" data-tab="bottles" aria-selected="false" style="--ink:#1f7fa8"><span class="pp-tab-w">Bottles</span><i id="ppBTab"></i></button>
+          <button type="button" role="tab" class="pp-tab" data-tab="sightings" aria-selected="false" style="--ink:#2a6f8f"><span class="pp-tab-w" aria-hidden="true">Sights</span><span class="sr-only">Sightings</span></button>
+          <button type="button" role="tab" class="pp-tab" data-tab="quests" aria-selected="false" style="--ink:#4a3fa8"><span class="pp-tab-w">Quests</span><i id="ppQTab"></i></button>
+          <button type="button" role="tab" class="pp-tab" data-tab="save" aria-selected="false" style="--ink:#1d6f8c"><span class="pp-tab-w">Save</span></button>
+        </div>
         <div class="pp-cover" aria-hidden="true">
           <div class="pp-cover-front">
             <p class="pp-cover-top">Tiny Island</p>
@@ -1308,9 +1311,11 @@ const book = BOOK.map((key) => {
   // Arrow keys turn the pages, the way tabs should.
   pp.querySelector('[role="tablist"]')!.addEventListener('keydown', (e) => {
     const k = (e as KeyboardEvent).key
-    if (k !== 'ArrowRight' && k !== 'ArrowLeft') return
+    // Up and down too: on a wide screen the tabs run down the book's edges.
+    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(k)) return
+    e.preventDefault()
     const shown = ppTabs.filter((t) => t.offsetParent !== null), i = shown.findIndex((t) => t.getAttribute('aria-selected') === 'true')
-    const next = shown[(i + (k === 'ArrowRight' ? 1 : -1) + shown.length) % shown.length]
+    const next = shown[(i + (k === 'ArrowRight' || k === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length]
     next.focus(); showSheet(next.dataset.tab!)
   })
 
@@ -2406,7 +2411,7 @@ const book = BOOK.map((key) => {
   .pp-book {
     position: relative;
     display: grid; grid-template-columns: 1fr 1fr;
-    width: min(1060px, calc(100vw - 40px));
+    width: min(1060px, calc(100vw - 120px));
     height: min(700px, calc(100dvh - 40px));
     padding: 10px;
     background: linear-gradient(135deg, var(--cv-a, #26347a), var(--cv-b, #1c275c));
@@ -2482,21 +2487,36 @@ const book = BOOK.map((key) => {
   }
   .pp-reset:hover { color: #c4306f; }
 
-  /* ---- the tabs down the edge of the pages ---- */
-  /* Never shrinks: on a phone it scrolls sideways, and a scroller in a
-     flex column is otherwise squashed to nothing by a tall page below it. */
-  .pp-tabs { flex: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
-  .pp-tab {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 11px; font: 600 13.5px 'Fredoka', system-ui, sans-serif; color: #1b2340; cursor: pointer;
-    background: #fff; border: 2px solid #1b2340; border-radius: 999px;
-    transition: background-color 0.15s, color 0.15s, transform 0.12s;
+  /* ---- the thumb index: a tab per page, cut into the book's edges ----
+     The districts down the right, beside their stamp pages; your bottles,
+     sightings, quests and save down the left, beside the page about you.
+     Each in its page's own ink, the open page's tab in the paper's colour,
+     reaching a little further out, as if the page it belongs to were pulled. */
+  .pp-tabs {
+    position: absolute; inset: 72px -50px 30px -50px; z-index: 1; pointer-events: none;
+    display: grid; grid-template-columns: 50px 1fr 50px; grid-template-rows: repeat(7, minmax(0, 1fr)); row-gap: 6px;
   }
-  .pp-tab:hover { transform: translateY(-1px); background: #eef2ff; }
-  .pp-tab i { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--pmute); }
-  .pp-tab.is-complete::before { content: '✓'; font-weight: 700; color: var(--ink); }
-  .pp-tab[aria-selected='true'] { background: var(--ink, #1b2340); color: #fff; border-color: #1b2340; }
-  .pp-tab[aria-selected='true'] i, .pp-tab[aria-selected='true'].is-complete::before { color: rgba(255, 255, 255, 0.85); }
+  .pp-tab {
+    pointer-events: auto; grid-column: 3; justify-self: start;
+    position: relative; min-height: 0; width: 40px;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    writing-mode: vertical-rl; padding: 6px 0;
+    font: 700 min(12.5px, 1.75vh) 'Fredoka', system-ui, sans-serif; letter-spacing: 0.02em; color: #fff; white-space: nowrap; cursor: pointer;
+    background: var(--ink, #1b2340); border: 3px solid #1b2340; border-left: 0; border-radius: 0 12px 12px 0;
+    box-shadow: 3px 3px 0 #1b2340;
+    transition: width 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), background-color 0.15s, color 0.15s;
+  }
+  .pp-tab:hover { width: 46px; }
+  /* The four about you, mirrored down the left edge, reading upwards. */
+  .pp-tab[data-tab='bottles'], .pp-tab[data-tab='sightings'], .pp-tab[data-tab='quests'], .pp-tab[data-tab='save'] {
+    grid-column: 1; justify-self: end; border-left: 3px solid #1b2340; border-right: 0; border-radius: 12px 0 0 12px; box-shadow: -3px 3px 0 #1b2340;
+  }
+  .pp-tab[data-tab='bottles'] .pp-tab-w, .pp-tab[data-tab='sightings'] .pp-tab-w, .pp-tab[data-tab='quests'] .pp-tab-w, .pp-tab[data-tab='save'] .pp-tab-w { transform: rotate(180deg); }
+  .pp-tab[data-tab='bottles'] { grid-row: 1; } .pp-tab[data-tab='sightings'] { grid-row: 2; } .pp-tab[data-tab='quests'] { grid-row: 3; } .pp-tab[data-tab='save'] { grid-row: 4; }
+  /* The count is on the page itself; the tab says only what it is. */
+  .pp-tab i { display: none; }
+  .pp-tab.is-complete::before { content: '✓'; font-weight: 700; }
+  .pp-tab[aria-selected='true'] { width: 50px; background: var(--ppaper); color: var(--ink, #1b2340); }
   .pp-tab:focus-visible, .pp-slot:focus-visible, .pp-reset:focus-visible, .pp-close:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
   .pp-tab--you { display: none; }
 
@@ -2658,7 +2678,7 @@ const book = BOOK.map((key) => {
   .pp-save-msg:empty { display: none; }
   .pp-remind { display: grid; gap: 10px; justify-items: start; }
   .pp-remind label { letter-spacing: 0.06em; }
-  .pp-tab.has-new::after { content: ''; width: 8px; height: 8px; margin-left: 2px; border-radius: 50%; background: #ff4f6e; border: 1.5px solid #1b2340; }
+  .pp-tab.has-new::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #ff4f6e; border: 1.5px solid #1b2340; flex: none; }
 
   /* ---- the cover, which opens on the way in ---- */
   .pp-cover { position: absolute; top: 10px; bottom: 10px; left: 50%; right: 10px; z-index: 6; display: none; transform-origin: 0 50%; transform-style: preserve-3d; pointer-events: none; }
@@ -2764,9 +2784,21 @@ const book = BOOK.map((key) => {
     .pp-left { order: 1; display: none; border-radius: 0 0 15px 15px; box-shadow: none; }
     .pp-book[data-view='you'] .pp-right { flex: none; padding-bottom: 0; border-radius: 15px 15px 0 0; }
     .pp-book[data-view='you'] .pp-left { display: block; flex: 1; padding-top: 4px; }
-    .pp-tab--you { display: inline-flex; }
-    .pp-tabs { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 14px; padding: 0 56px 4px 16px; scrollbar-width: none; }
-    .pp-tab { flex: none; }
+    .pp-tab--you { display: flex; }
+    .pp-tabs {
+      position: static; order: -1; flex: none; display: flex; flex-direction: row; gap: 4px; pointer-events: auto;
+      overflow-x: auto; scrollbar-width: none; margin: 0 -6px; padding: 2px 56px 0 10px;
+    }
+    .pp-tab[data-tab] { border: 2.5px solid #1b2340; border-bottom: 0; border-radius: 12px 12px 0 0; box-shadow: none; }
+    .pp-tab[data-tab] .pp-tab-w { transform: none; }
+    .pp-tabs::-webkit-scrollbar { display: none; }
+    .pp-tab {
+      flex: none; width: auto; writing-mode: horizontal-tb; padding: 7px 12px 6px; gap: 6px;
+      font-size: 14px; border: 2.5px solid #1b2340; border-bottom: 0; border-radius: 12px 12px 0 0; box-shadow: none;
+    }
+    .pp-tab:hover { width: auto; }
+    .pp-tab i { display: inline; font-style: normal; font-size: 12px; font-weight: 700; opacity: 0.85; }
+    .pp-tab[aria-selected='true'] { width: auto; }
     .pp-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
     .pp-sights { grid-template-columns: 1fr; }
     .pp-h { font-size: 24px; }
