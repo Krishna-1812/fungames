@@ -547,6 +547,9 @@ export function initIsland(o: {
     labels.append(t)
     return { t, d }
   })
+  const dtagW = new Map<string, number>()
+  // Measured in the fallback font, a name is the wrong width once Fredoka arrives.
+  document.fonts?.addEventListener?.('loadingdone', () => { dtagW.clear(); tagW.clear() })
 
   /* ---- the card --------------------------------------------------------- */
   let hot: string | null = null, hideT = 0
@@ -603,11 +606,23 @@ export function initIsland(o: {
       card.style.transform = `translate(${(x - cw / 2).toFixed(0)}px, ${(below ? sb + 14 : sy - 14).toFixed(0)}px) translateY(${below ? '0' : '-100%'})`
       card.style.setProperty('--arrow', `${(sx - x + cw / 2).toFixed(0)}px`)
     }
+    // Zoomed right out (a phone's whole island), the districts' names are wider than the gaps between
+    // them: each tries its own spot, then a little above or below it, and waits if none is clear.
+    const dplaced: [number, number, number, number][] = []
     for (const { t, d } of dtags) {
       const [sx, sy] = toScreen(d.x, d.y)
-      const on = !near && sx > -120 && sx < W + 120 && sy > -40 && sy < H + 40
+      let on = !near && sx > -120 && sx < W + 120 && sy > -40 && sy < H + 40
+      let dy = 0
+      if (on) {
+        const w = (dtagW.get(d.key) ?? dtagW.set(d.key, t.offsetWidth || 120).get(d.key)!) / 2 + 3, h = (t.offsetHeight || 34) / 2 + 2
+        const box = (y: number): [number, number, number, number] => [sx - w, sy + y - h, sx + w, sy + y + h]
+        const clear = (r: [number, number, number, number]) => !dplaced.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])
+        const at = [0, -1, 1, -2, 2].map((k) => k * h * 1.1).find((y) => clear(box(y)))
+        if (at === undefined) on = false
+        else { dy = at; dplaced.push(box(at)) }
+      }
       t.classList.toggle('is-on', on)
-      if (on) t.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translate(-50%, -50%)`
+      if (on) t.style.transform = `translate(${sx.toFixed(0)}px, ${(sy + dy).toFixed(0)}px) translate(-50%, -50%)`
     }
     if (near) {
       // Nearest the middle first; a name that would sit on one already placed waits.
