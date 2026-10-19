@@ -1307,6 +1307,8 @@ const book = BOOK.map((key) => {
     if (tab === 'you' && wide.matches) tab = firstSheet
     ppBook.dataset.view = tab
     for (const t of ppTabs) t.setAttribute('aria-selected', String(t.dataset.tab === tab))
+    // On a phone the tabs are a row that scrolls: the open page's tab is brought into it.
+    if (!wide.matches) { const on = ppTabs.find((t) => t.dataset.tab === tab); const row = on?.parentElement; if (on && row) row.scrollTo({ left: on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2, behavior: turn && PLAY ? 'smooth' : 'auto' }) }
     for (const sh of ppSheets) sh.hidden = sh.dataset.sheet !== tab
     const sheet = ppSheets.find((sh) => sh.dataset.sheet === tab)
     if (sheet && turn && PLAY) { sheet.classList.remove('is-turning'); void sheet.offsetWidth; sheet.classList.add('is-turning'); sound?.page() }
