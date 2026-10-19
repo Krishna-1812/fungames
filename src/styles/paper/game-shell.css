@@ -61,55 +61,56 @@
   .shell-controls { gap: 6px; }
 }
 
-/* ---- score strip ----------------------------------------------------- */
+/* ---- score strip: one slim row of chips -------------------------------
+   Each number sits beside its name in a pill, and the row is one line: it
+   wraps on a wide screen and scrolls sideways on a phone, so the game
+   starts just under the bar. A chip whose value is still "—" is hidden
+   (game-shell.ts, known()) until there is something to show. */
 .shell-main { flex: 1; padding-bottom: clamp(40px, 6vw, 96px); }
 .shell-strip {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .shell-tile {
   position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  display: grid;
-  gap: 8px;
-  align-content: start;
-  padding: 14px 18px 16px;
-  border-radius: var(--r);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 16px 9px;
+  border-radius: var(--r-pill);
   background: var(--card);
   box-shadow: var(--shadow-block);
-  min-height: 92px;
+  white-space: nowrap;
 }
-.shell-tile > * { position: relative; z-index: 1; }
+.shell-tile.is-empty { display: none; }
 .shell-tile .label { color: var(--ink3); }
-.shell-tile .num { font-size: clamp(28px, 3vw, 38px); white-space: nowrap; }
-.shell-tile .num small { font-size: 0.5em; font-weight: 600; letter-spacing: 0; color: var(--ink3); margin-left: 4px; }
+.shell-tile .num { font-size: 21px; white-space: nowrap; }
+.shell-tile .num small { font-size: 0.62em; font-weight: 600; letter-spacing: 0; color: var(--ink3); margin-left: 3px; }
 .shell-tile.is-best { background: var(--cobalt); }
 .shell-tile.is-best .label, .shell-tile.is-best .num small { color: var(--ink); }
 .new-best {
-  position: absolute !important;
-  top: 12px;
-  right: 12px;
+  align-self: center;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 24px;
-  padding: 0 10px;
+  height: 22px;
+  padding: 0 9px;
   border-radius: var(--r-pill);
   background: var(--ink);
   color: var(--ink-paper);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 @media (max-width: 640px) {
-  .shell-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .shell-tile { min-height: 80px; padding: 12px 14px; }
+  .shell-strip { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(-1 * var(--gutter)); padding-inline: var(--gutter); padding-block: 2px 10px; }
+  .shell-strip::-webkit-scrollbar { display: none; }
+  .shell-tile { flex: none; padding: 7px 14px 8px; }
+  .shell-tile .num { font-size: 19px; }
 }
 
 /* ---- stage ----------------------------------------------------------- */

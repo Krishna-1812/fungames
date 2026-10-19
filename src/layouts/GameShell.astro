@@ -130,20 +130,20 @@ const structuredData = [
 
     <main id="main" class="wrap shell-main">
       <ul class="shell-strip" role="list" aria-label="Scores">
-        <li class="shell-tile" data-tile="score">
+        <li class:list={['shell-tile', { 'is-empty': (initial.score ?? '0') === '—' }]} data-tile="score">
           <span class="label">{L.score}</span>
           <span class="num tab" data-val>{initial.score ?? '0'}</span>
         </li>
-        <li class="shell-tile" data-tile="best">
+        <li class="shell-tile is-empty" data-tile="best">
           <span class="label">{L.best}</span>
           <span class="num" data-val>—</span>
           <span class="new-best" data-new-best hidden>✓ New best</span>
         </li>
-        <li class="shell-tile" data-tile="level">
+        <li class:list={['shell-tile', { 'is-empty': (initial.level ?? '1') === '—' }]} data-tile="level">
           <span class="label">{L.level}</span>
           <span class="num tab" data-val>{initial.level ?? '1'}</span>
         </li>
-        <li class="shell-tile" data-tile="moves">
+        <li class:list={['shell-tile', { 'is-empty': (initial.moves ?? '0') === '—' }]} data-tile="moves">
           <span class="label">{L.moves}</span>
           <span class="num tab" data-val>{initial.moves ?? '0'}</span>
         </li>

@@ -136,7 +136,9 @@ export function createShell(opts: ShellOptions) {
 
   /* ---- the strip -------------------------------------------------- */
 
-  if (best) val('best').textContent = best.text
+  // A number that is still "—" means nothing yet, so its chip waits out of sight until it does.
+  const known = (name: string, text: string) => tile(name).classList.toggle('is-empty', text.trim() === '—' || !text.trim())
+  if (best) { val('best').textContent = best.text; known('best', best.text) }
 
   let announceT = 0
   const pending: string[] = []
@@ -154,6 +156,7 @@ export function createShell(opts: ShellOptions) {
     if (shown[name] === text) return
     const first = shown[name] === undefined
     shown[name] = text
+    known(name, text)
     roll(val(name), text, { ms: name === 'moves' ? 500 : 900 })
     // The odometer's columns are aria-hidden, so the change is said here,
     // batched with anything else announced in the same half-second. Moves
@@ -174,6 +177,7 @@ export function createShell(opts: ShellOptions) {
     if (best && value <= best.value) return false
     best = { value, text }
     writeBest(opts.slug, best)
+    known('best', text)
     roll(val('best'), text)
     // Beaten means beaten *the best this run started with* — improving on
     // something you set two minutes ago in the same game is not a record.
