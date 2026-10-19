@@ -618,8 +618,11 @@ export function initIsland(o: {
     // them: each tries its own spot, then a little above or below it, and waits if none is clear.
     const dplaced: [number, number, number, number][] = []
     for (const { t, d } of dtags) {
-      const [sx, sy] = toScreen(d.x, d.y)
-      let on = !near && sx > -120 && sx < W + 120 && sy > -40 && sy < H + 40
+      const [px, sy] = toScreen(d.x, d.y)
+      let on = !near && px > -120 && px < W + 120 && sy > -40 && sy < H + 40
+      // A name whose banner is near the edge slides in to be read whole, rather than hanging off the screen.
+      const half = (dtagW.get(d.key) ?? t.offsetWidth ?? 120) / 2
+      const sx = Math.min(W - half - 8, Math.max(half + 8, px))
       let dy = 0
       if (on) {
         const w = (dtagW.get(d.key) ?? dtagW.set(d.key, t.offsetWidth || 120).get(d.key)!) / 2 + 3, h = (t.offsetHeight || 34) / 2 + 2
