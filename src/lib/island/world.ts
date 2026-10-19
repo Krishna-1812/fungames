@@ -1778,7 +1778,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       // (The lighthouse's lantern too: Unity's glow has it, a bright core in its glass.)
       if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb' || l.el?.attrs.class === 'stp-lamp')) return
       const [x, y] = l
-      halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 13, fill: 'url(#isl-glow)', opacity: glowRef ? 0.55 : undefined }))
+      // On the drawn island the glow is wide enough to fall on the ground round a lamp, not just ring it.
+      halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 19, fill: 'url(#isl-glow)', opacity: glowRef ? 0.55 : undefined }))
       if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
       // The pane or bulb itself, in its glow colour, above the veil.
       if (l.el && l.glow) {
