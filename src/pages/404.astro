@@ -1,73 +1,96 @@
 ---
-import { iconSvg } from '../lib/icons'
-import Base from '../layouts/Base.astro'
-import Backdrop from '../components/Backdrop.astro'
+/**
+ * Off the map: the page for a link to nowhere. It is the island's own sea,
+ * with a small boat that has drifted out and the island far off on the
+ * horizon, and one way back. Drawn here in a few shapes (no picture to load),
+ * in the homepage's own type and buttons, so a wrong turn still looks like
+ * part of the same place.
+ */
+import Paper from '../layouts/Paper.astro'
 import { SITE } from '../site.config'
 import { withBase } from '../lib/base'
 ---
 
-<Base title={`Lost — ${SITE.name}`} noindex>
-  <Backdrop variant="paper" />
-  <div class="lost">
-    <span class="glyph" aria-hidden="true" set:html={iconSvg('compass')} />
-    <h1>Nothing here</h1>
-    <p>That page does not exist, or it was retired.</p>
-    <a class="btn" href={withBase('/')}>Back to the games →</a>
-  </div>
-</Base>
+<Paper
+  title={`Off the map — ${SITE.name}`}
+  description="That page is not on the island."
+  bodyClass="lost-sea"
+  masthead={false}
+  colophon={false}
+  themeColor="#3b80c6"
+  colorScheme="dark"
+  fonts={['Fredoka:wght@500..700']}
+  paperFonts={false}
+  noindex
+  status={404}
+>
+  <main class="lost" id="main">
+    <svg class="scene" viewBox="0 0 400 220" aria-hidden="true" focusable="false">
+      <!-- The island on the horizon, with its lighthouse. -->
+      <g class="far">
+        <ellipse cx="318" cy="96" rx="46" ry="9" fill="#9fd4f7" opacity=".55" />
+        <path d="M282 96c6-12 20-17 34-16 12 1 24 6 32 16z" fill="#4fb889" />
+        <path d="M298 92c6-6 13-8 20-7l-2 7z" fill="#3d9a72" />
+        <rect x="333" y="70" width="6" height="22" rx="1.5" fill="#f3f5f8" />
+        <rect x="333" y="76" width="6" height="4" fill="#ff4f6e" />
+        <rect x="333" y="84" width="6" height="4" fill="#ff4f6e" />
+        <path d="M331.5 70h9l-4.5-6z" fill="#1b2340" />
+        <g class="beam"><path d="M336 67 L392 52 L392 70z" fill="#eaf6ff" opacity=".35" /></g>
+      </g>
+      <!-- The sea's own wave marks, the homepage's little white ticks. -->
+      <g fill="none" stroke="#cfe8ff" stroke-width="2" stroke-linecap="round" opacity=".55">
+        <path d="M40 124q6-5 12 0q6 5 12 0" /><path d="M120 150q6-5 12 0q6 5 12 0" />
+        <path d="M250 136q6-5 12 0q6 5 12 0" /><path d="M330 176q6-5 12 0q6 5 12 0" />
+        <path d="M70 192q6-5 12 0q6 5 12 0" /><path d="M200 204q6-5 12 0q6 5 12 0" />
+      </g>
+      <!-- The boat, bobbing. -->
+      <g class="boat">
+        <ellipse cx="150" cy="172" rx="38" ry="5" fill="#2a64a8" opacity=".6" />
+        <path d="M114 160h72l-12 14h-48z" fill="#f3f5f8" stroke="#1b2340" stroke-width="3" stroke-linejoin="round" />
+        <path d="M118 166h64" stroke="#5b82ff" stroke-width="3" />
+        <path d="M150 96v62" stroke="#1b2340" stroke-width="3" stroke-linecap="round" />
+        <path d="M153 100c18 12 26 30 26 52h-26z" fill="#4fe3c1" stroke="#1b2340" stroke-width="3" stroke-linejoin="round" />
+        <path d="M147 108c-12 10-18 24-18 44h18z" fill="#f3f5f8" stroke="#1b2340" stroke-width="3" stroke-linejoin="round" />
+        <path d="M150 96l12 4-12 4" fill="#ff4f6e" stroke="#1b2340" stroke-width="2" stroke-linejoin="round" />
+      </g>
+    </svg>
+    <h1>You've drifted off the map</h1>
+    <p>That page isn't on the island. It may have moved, or it never existed.</p>
+    <div class="ways">
+      <a class="go" href={withBase('/')}>Sail back to the island</a>
+      <a class="go go--line" href={withBase('/#games')}>All the games</a>
+    </div>
+  </main>
+</Paper>
 
 <style>
+  :global(body.lost-sea) {
+    background: radial-gradient(120% 80% at 50% 30%, #4a95da 0%, #3b80c6 55%, #2c68ad 100%);
+    color: #fff; font-family: 'Fredoka', system-ui, sans-serif;
+  }
   .lost {
-    min-height: 100dvh;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    text-align: center;
-    gap: 8px;
-    padding: 24px;
-    animation: rise-in 480ms var(--ease) backwards;
+    min-height: 100svh; display: grid; place-content: center; justify-items: center;
+    text-align: center; gap: 14px; padding: 32px max(20px, env(safe-area-inset-right, 0px)) 40px max(20px, env(safe-area-inset-left, 0px));
   }
-  .glyph {
-    /* The drawing sizes itself from inside — see iconSvg. A rule here that
-       targeted the <svg> would not apply to it, because it arrives via
-       set:html. */
-    display: inline-block;
-    width: 44px;
-    height: 44px;
-    margin-bottom: 6px;
-    filter: drop-shadow(0 8px 18px rgba(20, 18, 28, 0.14));
-    /* A compass that can't settle — it's lost too. */
-    animation: spin-hunt 3.6s ease-in-out infinite;
+  .scene { width: min(520px, 92vw); height: auto; margin-bottom: 4px; }
+  h1 { margin: 0; font: 700 clamp(34px, 6vw, 56px)/1.04 'Fredoka', system-ui, sans-serif; letter-spacing: -0.01em; text-wrap: balance; text-shadow: 0 3px 0 rgba(27, 35, 64, 0.35); }
+  p { margin: 0; max-width: 34ch; font: 500 clamp(17px, 2vw, 20px)/1.45 'Fredoka', system-ui, sans-serif; color: #eaf4ff; }
+  .ways { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 12px; }
+  /* The homepage's own buttons (components/IslandHome.astro, .isl-btn). */
+  .go {
+    font: 700 17px/1 'Fredoka', system-ui, sans-serif; color: #1b2340; text-decoration: none;
+    background: #4fe3c1; border: 3px solid #1b2340; border-radius: 16px; box-shadow: 0 4px 0 #1b2340;
+    padding: 13px 20px; transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
   }
-  @keyframes spin-hunt {
-    0%, 100% { transform: rotate(-14deg); }
-    50% { transform: rotate(14deg); }
-  }
-  h1 { font-size: 48px; margin: 0; }
-  p { color: var(--ink-soft); margin: 0; }
-  .btn {
-    margin-top: 16px;
-    border: var(--sticker-border);
-    border-radius: 999px;
-    padding: 10px 22px;
-    font-size: 15px;
-    font-weight: 600;
-    text-decoration: none;
-    color: var(--ink);
-    background: linear-gradient(180deg, #fff 0%, color-mix(in oklab, var(--card) 88%, var(--line)) 100%);
-    box-shadow: var(--sticker-shadow);
-    transition: transform 180ms var(--ease-bounce), box-shadow 180ms var(--ease-bounce);
-  }
-  .btn:hover {
-    transform: translateY(-3px) rotate(-1.5deg);
-    box-shadow: var(--sticker-shadow-hover);
-  }
-  .btn:active { transform: translateY(0) rotate(0deg); box-shadow: 1px 2px 0 rgba(22, 21, 26, 0.18); }
-  @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
+  .go--line { background: #fff; }
+  .go:hover { background: #7bf0d4; }
+  .go--line:hover { background: #eef4ff; }
+  .go:active { transform: translateY(4px); box-shadow: 0 0 0 #1b2340; }
+  .go:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+  :global(html.play) .boat { animation: bob 3.4s ease-in-out infinite; transform-origin: 150px 170px; transform-box: view-box; }
+  :global(html.play) .beam { animation: sweep 4s ease-in-out infinite; transform-origin: 336px 67px; transform-box: view-box; }
+  @keyframes bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(5px) rotate(3deg); } }
+  @keyframes sweep { 0%, 100% { opacity: 0.2; transform: rotate(-6deg); } 50% { opacity: 1; transform: rotate(6deg); } }
 </style>
 
-<script>
-  import { start } from '../lib/analytics/client'
-  // A broken link is worth knowing about: this page reports itself as a 404.
-  start({ status: 404 })
-</script>

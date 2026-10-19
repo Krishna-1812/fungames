@@ -37,6 +37,8 @@ interface Props {
   /** Load Fraunces and Zalando Sans. The homepage draws in Fredoka instead. */
   paperFonts?: boolean
   colorScheme?: 'light' | 'dark'
+  /** The HTTP status the page stands for (the 404 page), for the visit count. */
+  status?: number
 }
 
 const {
@@ -52,6 +54,7 @@ const {
   themeColor = '#EEF0F3',
   colorScheme = 'light',
   paperFonts = true,
+  status,
 } = Astro.props
 
 const fontHref =
@@ -160,7 +163,7 @@ const favicon = faviconHref(true)
       <script is:inline defer data-domain={SITE.plausibleDomain} src="https://plausible.io/js/script.js"></script>
     )}
   </head>
-  <body class={bodyClass}>
+  <body class={bodyClass} data-status={status}>
     <a class="skip" href="#main">Skip to content</a>
     <div class="progress-bar" aria-hidden="true"></div>
     {masthead && <Masthead />}
@@ -172,7 +175,7 @@ const favicon = faviconHref(true)
       import { startSync } from '../lib/sync-client'
       initMotion()
       // Visits, counted (lib/analytics/client.ts; what and how is on /privacy/).
-      start()
+      start({ status: Number(document.body.dataset.status) || undefined })
       // A save code's progress, kept level with the other devices (lib/sync-client.ts).
       startSync()
       // In through a building's circle (the first script above): the circle's
