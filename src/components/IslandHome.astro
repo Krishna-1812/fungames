@@ -288,6 +288,7 @@ const book = BOOK.map((key) => {
             <li><b id="ppQuestsDone">0</b><span>of {QUESTS.length} quests complete</span></li>
             <li class="pp-tally-bottles"><b id="ppBottles">0</b><span>of {BOTTLE_COUNT} bottles found</span><span class="pp-bpips" id="ppBPips" aria-hidden="true">{bottles.map((b) => <i data-pip={b.n} style={`--glass:${glassOf(b.n)}`} />)}</span></li>
           </ul>
+          <p class="pp-ticks-h" aria-hidden="true">Every game, in its district's ink</p>
           <div class="pp-ticks" id="ppTicks" aria-hidden="true">{games.map((g) => <i data-tick={g.slug} style={`--ink:${STAMP[districtOf[g.slug]]?.ink ?? '#4637a6'}`} />)}</div>
           <p class="pp-mrz" id="ppMrz" aria-hidden="true"></p>
           <button type="button" class="pp-reset" id="ppReset">Start a new passport</button>
@@ -2469,15 +2470,24 @@ const book = BOOK.map((key) => {
   .pp-fields dt { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--pmute); }
   .pp-fields dd { margin: 1px 0 0; font-size: 17px; font-weight: 600; }
   .pp-fields b { color: #4637a6; }
-  .pp-tally { list-style: none; margin: 20px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .pp-tally li { padding: 10px 12px; background: rgba(255, 255, 255, 0.8); border: 2px solid #1b2340; border-radius: 14px; box-shadow: 0 3px 0 #1b2340; }
-  .pp-tally b { display: block; font-size: 28px; line-height: 1; }
-  .pp-tally span { font-size: 13px; color: var(--pmute); font-weight: 600; }
-  .pp-ticks { display: flex; gap: 3px; margin: 16px 0 0; }
+  /* The data page is one column that fits the page, its machine-readable lines at the foot. */
+  .pp-left { display: flex; flex-direction: column; }
+  /* What you have done, as a ruled ledger printed on the page: no boxes, the numbers do the work. */
+  .pp-tally {
+    list-style: none; margin: 18px 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    border-top: 1.5px solid var(--pline);
+  }
+  .pp-tally li { padding: 9px 10px 10px 0; border-bottom: 1.5px solid var(--pline); }
+  .pp-tally li:not(:nth-child(3n + 1)) { padding-left: 12px; border-left: 1.5px solid var(--pline); }
+  .pp-tally b { display: block; font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -0.01em; color: #1b2340; }
+  .pp-tally span { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.25; color: var(--pmute); font-weight: 600; }
+  .pp-ticks-h { margin: 14px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--pmute); }
+  .pp-ticks { display: flex; gap: 3px; margin: 0; }
   .pp-ticks i { flex: 1; height: 12px; border-radius: 3px; background: #dfe5f6; }
   .pp-ticks i.is-on { background: var(--ink); }
   .pp-mrz {
-    margin: 16px 0 0; padding: 10px 12px; white-space: pre; overflow: hidden;
+    margin: auto 0 0; padding: 10px 12px; white-space: pre; overflow: hidden;
     font: 600 12.5px/1.5 ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace; letter-spacing: 0.1em; color: #3a4466;
     background: rgba(220, 229, 250, 0.7); border-radius: 10px;
   }
@@ -2709,10 +2719,8 @@ const book = BOOK.map((key) => {
   @keyframes pp-recover { 40% { transform: scale(0.985) rotate(-0.4deg); } }
 
   /* ---- bottles, on your page ---- */
-  .pp-tally .pp-tally-bottles { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 10px; }
-  .pp-tally-bottles b { grid-row: 1 / 3; }
-  .pp-bpips { display: flex; gap: 4px; margin-top: 4px; }
-  .pp-bpips i { width: 11px; height: 17px; border-radius: 3px 3px 5px 5px; border: 1.5px dashed #b7c1dc; }
+  .pp-tally .pp-bpips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+  .pp-bpips i { display: block; width: 7px; height: 11px; border-radius: 2px 2px 3px 3px; border: 1.2px dashed #b7c1dc; }
   .pp-bpips i.is-on { background: var(--glass); border: 1.5px solid #1b2340; }
 
   /* ---- the bottles' own page ---- */
