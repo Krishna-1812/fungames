@@ -1,13 +1,11 @@
 import type { APIRoute } from 'astro'
-import { Resvg } from '@resvg/resvg-js'
 import { SITE } from '../site.config'
-import { siteCardSvg } from '../lib/og-card'
+import { homeGames } from '../lib/island/home'
+import { homePostcard } from '../lib/og-postcard'
 
-// The homepage's own share image — no single game's colours apply to it.
-export const GET: APIRoute = () => {
-  const svg = siteCardSvg({ name: SITE.name, tagline: SITE.tagline })
-  const png = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } }).render().asPng()
-
+// The homepage's own share image: the whole island by day (lib/og-postcard.ts).
+export const GET: APIRoute = async () => {
+  const png = await homePostcard(homeGames().length, SITE.tagline)
   return new Response(new Uint8Array(png), {
     headers: {
       'content-type': 'image/png',
