@@ -449,6 +449,10 @@ export function createEngine(o: {
         const real = blend ? N.real[blend as 'multiply' | 'saturation'] : null
         a *= real ? timed(`veil:${blend}`, real[st.time]?.[1] ?? 0, N.fadeMs) : timed('veil', N.veil[st.time]?.[1] ?? 0, N.fadeMs)
       }
+      else if (t === 'night-grade') {
+        const blend = (n as V).st.blend as 'multiply' | 'saturation'
+        a *= timed(`grade:${blend}`, N.toon[blend]?.[st.time]?.[1] ?? 0, N.fadeMs)
+      }
       else if (t === 'night-glow') a *= timed('glow', N.glow[st.time] ?? 0, N.fadeMs)
       else if (t === 'layer-night') a *= timed('night', st.time === 'day' ? 0 : 1, N.fadeMs)
       else if (t === 'cloud') a *= timed('cloud', st.time === 'night' ? LAYERS.cloud.night : st.near ? LAYERS.cloud.near : 1, LAYERS.cloud.fadeMs)
@@ -463,13 +467,13 @@ export function createEngine(o: {
   const tagFill = (n: V): string | undefined => {
     if (!n.tags) return undefined
     for (const t of n.tags) {
-      if (t === 'night-veil') {
+      if (t === 'night-veil' || t === 'night-grade') {
         if (!n.st.blend) return LAYERS.night.veil[st.time]?.[0]
-        // The realistic veils' colours move from one time's to the next as their strength does (by day, they keep the last).
-        const real = LAYERS.night.real[n.st.blend as 'multiply' | 'saturation']
-        const hex = real?.[st.time]?.[0]
+        // The veils' colours move from one time's to the next as their strength does (by day, they keep the last).
+        const table = (t === 'night-grade' ? LAYERS.night.toon : LAYERS.night.real)[n.st.blend as 'multiply' | 'saturation']
+        const hex = table?.[st.time]?.[0]
         const ch = [16, 8, 0].map((sh, i) => {
-          const key = `veil-c:${n.st.blend}:${i}`
+          const key = `${t === 'night-grade' ? 'grade' : 'veil'}-c:${n.st.blend}:${i}`
           return Math.round(timed(key, hex ? (parseInt(hex.slice(1), 16) >> sh) & 255 : timers.get(key)?.to ?? 255, LAYERS.night.fadeMs))
         })
         return `rgb(${ch.join(',')})`

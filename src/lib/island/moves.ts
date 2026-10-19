@@ -378,6 +378,11 @@ export const LAYERS = {
       saturation: { night: ['#808080', 0.5], dusk: ['#808080', 0.18], dawn: ['#808080', 0.08] } as Record<string, [string, number]>,
     },
     glow: { night: 1, dusk: 0.55, dawn: 0.2 } as Record<string, number>,
+    /** The drawn island's night: the same two veils as the realistic one, in its own colours. */
+    toon: {
+      multiply: { night: ['#6272b4', 1], dusk: ['#c4abe8', 1], dawn: ['#efd9f0', 1] } as Record<string, [string, number]>,
+      saturation: { night: ['#808080', 0.25], dusk: ['#808080', 0.08], dawn: ['#808080', 0.04] } as Record<string, [string, number]>,
+    },
   },
   /** Clouds: thinner and dusky at night, faint when you are close. */
   cloud: { night: 0.55, near: 0.18, fadeMs: 400, puff: { night: '#7f8fc4', dusk: '#e9defa' } as Record<string, string>, base: { night: '#6a79b0', dusk: '#cdbdf0' } as Record<string, string> },

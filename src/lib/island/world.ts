@@ -1751,7 +1751,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const [x0, y0, x1, y1] = glowRef.box
     night.add(new N('g', { class: 'night-glow' })).add(new N('image', { 'data-plate': glowRef.id, href: glowRef.href, x: x0, y: y0, width: x1 - x0, height: y1 - y0, preserveAspectRatio: 'none' }))
   }
-  else night.add(new N('rect', { class: 'night-veil', ...veilBox, fill: '#14205c', opacity: 0.5 }))
+  else {
+    // The drawn island's night is graded, not covered: its colours multiplied down to moonlight (so the
+    // outlines stay dark and the whites go blue rather than grey), and a little of their colour taken out
+    // (moves.ts, LAYERS.night.toon). A flat blue laid over everything took the contrast out with the light.
+    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'multiply', ...veilBox, fill: '#6272b4', style: 'mix-blend-mode:multiply' }))
+    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'saturation', ...veilBox, fill: '#808080', opacity: 0.25, style: 'mix-blend-mode:saturation' }))
+  }
   {
     const nd = night.add(new N('defs'))
     const glow = nd.add(new N('radialGradient', { id: 'isl-glow' }))
