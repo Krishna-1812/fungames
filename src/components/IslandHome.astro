@@ -1621,11 +1621,39 @@ const book = BOOK.map((key) => {
   // grid watched as one block, and woken 200px early, all thirty-one ran
   // just below the fold and took the island from 47 frames a second to 29.
   const cardIo = new IntersectionObserver((es) => { for (const e of es) e.target.classList.toggle('is-live', e.isIntersecting) })
+  /**
+   * The card was framed by the building's footprint (lib/island/card-art.ts, cardFrame), so a thin
+   * lighthouse on a wide plinth came out a quarter the size of a yacht that fills its own. Once drawn,
+   * the frame closes in on the building itself: what it draws, kept to a little past its footprint on
+   * either side (a lighthouse's beam) and to twice the footprint's width above it (the elevator's cable),
+   * in the same 4:3, and never wider than it was.
+   */
+  function fitCard(sv: SVGSVGElement) {
+    const a = data.anchors[sv.dataset.art!]
+    if (!a) return
+    const pts = a.foot.split(' ').map((p) => p.split(',').map(Number))
+    const fx0 = Math.min(...pts.map((p) => p[0])), fx1 = Math.max(...pts.map((p) => p[0])), fy1 = Math.max(...pts.map((p) => p[1]))
+    const fw = fx1 - fx0
+    let b: DOMRect
+    try { b = sv.getBBox() } catch { return }
+    if (!b.width || !b.height) return
+    const x0 = Math.max(b.x, fx0 - fw * 0.08), x1 = Math.min(b.x + b.width, fx1 + fw * 0.08)
+    const y0 = Math.max(b.y, fy1 - fw * 2), y1 = Math.min(b.y + b.height, fy1 + fw * 0.05)
+    const [ox, oy, ow, oh] = sv.getAttribute('viewBox')!.split(' ').map(Number)
+    let w = Math.max(x1 - x0, ((y1 - y0) * 4) / 3) * 1.12
+    w = Math.min(ow, Math.max(w, ow * 0.5))
+    const h = (w * 3) / 4
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 + h * 0.02
+    if (w > ow * 0.94) return
+    sv.setAttribute('viewBox', [cx - w / 2, cy - h / 2, w, h].map((v) => v.toFixed(1)).join(' '))
+    void ox; void oy; void oh
+  }
   function cardReady(sv: SVGSVGElement) {
     // The building site's year, on its card too.
     sv.querySelectorAll('.pg-pct').forEach((el) => { el.textContent = `${pgPct}%` })
     sv.querySelectorAll('.pg-year').forEach((el) => { el.textContent = `${pgYear} SO FAR` })
     sv.querySelectorAll<SVGElement>('.pg-bar').forEach((el) => el.setAttribute('width', String(pgWidth(el.dataset.w))))
+    fitCard(sv)
     cardIo.observe(sv)
     // Its pictures (Unity's), fetched now: it is about to be seen.
     sv.querySelectorAll<SVGImageElement>('image[data-src]').forEach((im) => { im.setAttribute('href', data.base + im.dataset.src!); im.removeAttribute('data-src') })
