@@ -470,7 +470,9 @@ const fmt = (y: number) =>
 
   /* Leave room for the fixed HUD so the title is never hidden behind it. */
   .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 150px 20px 0; }
-  .intro-title {
+  /* `.intro .intro-title`, not `.intro-title`: the title is a <p>, and `.intro p` below outranked it (18px, faded). */
+  .intro .intro-title {
+    opacity: 1; max-width: none;
     font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600;
     font-size: clamp(40px, 9cqw, 84px); line-height: 1; letter-spacing: -0.03em;
   }
