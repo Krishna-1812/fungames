@@ -2568,6 +2568,10 @@ const book = BOOK.map((key) => {
   .pp-slot:hover .pp-ghost { color: #9aa6c8; border-color: #9aa6c8; }
   .pp-slot.is-stamped .pp-stamp { opacity: 0.93; }
   .pp-slot.is-stamped .pp-ghost { visibility: hidden; }
+  /* A stamp not yet earned waits as itself, printed faint and grey, straight, where the real one will land. */
+  .pp-slot:not(.is-stamped):not(.is-landing) .pp-stamp { opacity: 0.2; color: #6f7ca3; transform: none; mix-blend-mode: normal; }
+  .pp-slot:not(.is-stamped):not(.is-landing):hover .pp-stamp { opacity: 0.36; }
+  .pp-slot:not(.is-stamped) .pp-ghost { visibility: hidden; }
   .pp-name { margin-top: 6px; font-size: 14px; font-weight: 600; line-height: 1.15; color: #1b2340; }
   .pp-when { margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--pmute); }
   .pp-slot:not(.is-stamped) .pp-name { color: #7d88a8; }
