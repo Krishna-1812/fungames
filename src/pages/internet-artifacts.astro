@@ -345,6 +345,30 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
         if (next) for (const b of group) b.el.classList.add(next)
       }
     }
+    dodgeSeams()
+  }
+
+  // An era's note hangs where the era begins, which is often exactly where a
+  // moment from that year is too (the first emoticon, ARPANET's flag day). The
+  // line marking the boundary stays put; the note drops to the nearest gap
+  // between moments below it, or rises to one above if there is none.
+  const seamNotes = [...document.querySelectorAll('.seam-bubble')] as HTMLElement[]
+  function dodgeSeams() {
+    const taken = cards.map((el) => [el.offsetTop - 16, el.offsetTop + el.offsetHeight + 16])
+    for (const b of seamNotes) {
+      b.style.transform = ''
+      b.classList.remove('is-moved')
+      const y0 = b.parentElement!.offsetTop + b.offsetTop, h = b.offsetHeight
+      const free = (dy: number) => taken.every(([a, z]) => y0 + dy + h <= a || y0 + dy >= z)
+      let dy = 0
+      if (!free(0)) {
+        dy = NaN
+        for (let d = 6; d <= 1200 && Number.isNaN(dy); d += 6) if (free(d)) dy = d
+        for (let d = 6; d <= 600 && Number.isNaN(dy); d += 6) if (free(-d)) dy = -d
+        if (Number.isNaN(dy)) dy = 0
+      }
+      if (dy) { b.style.transform = `translateY(${dy}px)`; b.classList.add('is-moved') }
+    }
   }
   relayout()
 
@@ -842,6 +866,8 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     border-left: 2px solid #1a2233; border-top: 2px solid #1a2233;
     border-radius: 3px 0 0 0; transform: rotate(45deg);
   }
+  /* Moved off its boundary to a free gap (dodgeSeams): the arrow would point at a moment, not at the line. */
+  .seam-bubble:global(.is-moved)::after { display: none; }
   .seam-name { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; color: #5a6478; display: block; }
   .seam-note { font-size: 13.5px; opacity: 0.92; margin-top: 4px; display: block; }
 
