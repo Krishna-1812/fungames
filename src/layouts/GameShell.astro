@@ -101,22 +101,30 @@ const structuredData = [
   fonts={fonts}
 >
   <div class="shell" data-shell data-slug={slug}>
+    {/* One slim bar: the way back, the name, and the three things a player reaches for (sound, how to
+        play, and pause or restart under ⋯). The game below gets the room. */}
     <header class="wrap shell-bar">
-      <a class="pill pill--line pill--sm shell-back" href={withBase('/')}>
-        <span aria-hidden="true">←</span><span>Games</span>
+      <a class="pill pill--line pill--sm shell-back" href={withBase('/')} aria-label="Back to the island">
+        <span aria-hidden="true">←</span><span class="shell-back-word">Island</span>
       </a>
       <h1 class="shell-title">{game.title}</h1>
       <div class="shell-controls" role="group" aria-label="Game controls">
-        <button type="button" class="pill pill--line pill--sm" data-act="pause" aria-haspopup="dialog">
-          <span>Pause</span>
+        <button type="button" class="shell-icon" data-act="sound" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-on" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          <span class="sr-only" data-sound-label>Sound off</span>
         </button>
-        <button type="button" class="pill pill--line pill--sm" data-act="restart"><span>Restart</span></button>
-        <button type="button" class="pill pill--line pill--sm" data-act="sound" aria-pressed="false">
-          <span data-sound-label>Sound off</span>
+        <button type="button" class="pill pill--ink pill--sm shell-howto" data-act="howto" aria-haspopup="dialog" aria-label="How to play">
+          <span class="shell-howto-q" aria-hidden="true">?</span><span class="shell-howto-word">How to play</span>
         </button>
-        <button type="button" class="pill pill--ink pill--sm" data-act="howto" aria-haspopup="dialog">
-          <span>How to play</span>
-        </button>
+        <details class="shell-more">
+          <summary class="shell-icon" aria-label="Pause or restart">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.9" fill="currentColor" /><circle cx="12" cy="12" r="1.9" fill="currentColor" /><circle cx="18.5" cy="12" r="1.9" fill="currentColor" /></svg>
+          </summary>
+          <div class="shell-menu">
+            <button type="button" data-act="pause" aria-haspopup="dialog"><span>Pause</span><kbd>P</kbd></button>
+            <button type="button" data-act="restart"><span>Restart</span></button>
+          </div>
+        </details>
       </div>
     </header>
 

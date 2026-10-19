@@ -5,29 +5,60 @@
 
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
 
-/* ---- top bar --------------------------------------------------------- */
+/* ---- top bar: one slim row, at every width ---------------------------- */
 .shell-bar {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px 20px;
-  padding-block: 18px;
+  gap: 12px 16px;
+  padding-block: 14px;
 }
 .shell-back { padding-left: 14px; }
 .shell-title {
-  font-size: clamp(26px, 3vw, 40px);
-  line-height: 1;
+  font-size: clamp(22px, 2.6vw, 36px);
+  line-height: 1.02;
   min-width: 0;
+  text-wrap: balance;
 }
-.shell-controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.shell-controls { display: flex; align-items: center; gap: 8px; }
 .shell-controls .pill { min-height: 44px; }
-@media (max-width: 860px) {
-  .shell-bar { grid-template-columns: auto minmax(0, 1fr); }
-  .shell-controls { grid-column: 1 / -1; justify-content: flex-start; }
+/* Round buttons for the two that are pictures: sound, and the ⋯ menu. */
+.shell-icon {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; padding: 0;
+  border: 2px solid var(--ink); border-radius: var(--r-pill);
+  background: var(--card); color: var(--ink);
+  cursor: pointer; list-style: none;
 }
-@media (max-width: 480px) {
-  .shell-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .shell-controls .pill { padding: 0 6px; font-size: 13px; }
+.shell-icon::-webkit-details-marker { display: none; }
+.shell-icon svg { width: 22px; height: 22px; }
+.shell-icon:hover { background: var(--ink); color: var(--ink-paper); }
+.shell-icon[aria-pressed='true'] .ic-off, .shell-icon[aria-pressed='false'] .ic-on { display: none; }
+.shell-howto-q { display: none; font-size: 19px; font-weight: 800; }
+/* Pause and Restart, under ⋯. */
+.shell-more { position: relative; }
+.shell-more[open] > .shell-icon { background: var(--ink); color: var(--ink-paper); }
+.shell-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
+  display: grid; min-width: 180px; padding: 6px;
+  border-radius: var(--r); background: var(--card); box-shadow: var(--shadow-block);
+  outline: 2px solid var(--ink);
+}
+.shell-menu button {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink); font: 600 15px/1 var(--sans); text-align: left; cursor: pointer;
+}
+.shell-menu button:hover, .shell-menu button:focus-visible { background: var(--paper2); }
+.shell-menu kbd { font: 600 12px/1 var(--sans); color: var(--ink3); border: 1px solid var(--paper3); border-radius: 6px; padding: 3px 6px; }
+@media (max-width: 640px) {
+  .shell-bar { gap: 10px; padding-block: 10px; }
+  .shell-back { width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+  .shell-back-word, .shell-howto-word { display: none; }
+  .shell-howto { width: 44px; padding: 0; justify-content: center; }
+  .shell-howto-q { display: inline; }
+  .shell-title { font-size: clamp(20px, 5.6vw, 26px); }
+  .shell-controls { gap: 6px; }
 }
 
 /* ---- score strip ----------------------------------------------------- */

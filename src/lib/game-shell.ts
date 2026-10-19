@@ -336,9 +336,15 @@ export function createShell(opts: ShellOptions) {
 
   /* ---- wiring ------------------------------------------------------ */
 
+  // The ⋯ menu (Pause, Restart) folds away after a choice, a click anywhere else, or Esc.
+  const more = shell.querySelector<HTMLDetailsElement>('.shell-more')
+  document.addEventListener('click', (e) => { if (more?.open && !more.contains(e.target as Node)) more.open = false })
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && more?.open) { more.open = false; more.querySelector('summary')?.focus() } })
+
   document.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null
     if (!b) return
+    if (more?.contains(b)) more.open = false
     const act = b.dataset.act
     if (act === 'pause') { sent('game_pause'); openPanel(pausePanel, b) }
     else if (act === 'howto') { sent('game_howto'); openPanel(howtoPanel, b) }
