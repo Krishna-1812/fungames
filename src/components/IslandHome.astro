@@ -133,6 +133,9 @@ const book = BOOK.map((key) => {
           {/* The map and its smallest level's index, asked for at once: the script that would ask for them comes in a second or two later on a phone. */}
           <link rel="preload" href={baked.base + 'scene.json'} as="fetch" crossorigin="anonymous" />
           <link rel="preload" href={baked.base + baked.scene.lv[0].index} as="fetch" crossorigin="anonymous" />
+          {/* The time of day before the poster paints, so a visit at night does not open on a sunny island
+              (the same choice the page's script makes again later: ?time=, then the button's, then the clock). */}
+          <script is:inline>{`try{var b=document.getElementById('islBox'),q=new URLSearchParams(location.search).get('time'),c=null;try{c=localStorage.getItem('isl-time')}catch(e){}var h=new Date().getHours();b.dataset.time=q&&/^(dawn|day|dusk|night)$/.test(q)?q:(c==='day'||c==='night')?c:(h>=6&&h<8?'dawn':h>=8&&h<18?'day':h>=18&&h<20?'dusk':'night')}catch(e){}`}</script>
           {poster && <img class="isl-poster" id="islPoster" src={baked.base + poster.file} width={poster.w} height={poster.h} alt="" fetchpriority="high" decoding="async" style={poster.tiny ? `background-image:url(${poster.tiny});background-size:100% 100%` : undefined} />}
           <noscript><img class="isl-still" src={baked.base + 'still.webp'} alt={`Tiny Island: ${count} games, each one a building`} /></noscript>
         </div>
@@ -1711,6 +1714,10 @@ const book = BOOK.map((key) => {
   .isl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .isl-poster { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; pointer-events: none; transition: opacity 0.4s ease; }
   :global(.isl-box.is-live) .isl-poster { opacity: 0; }
+  /* The poster is painted by day; until the canvas takes over, it is given the evening's light. */
+  :global([data-time='night']) .isl-poster { filter: brightness(0.52) saturate(0.8) hue-rotate(14deg); }
+  :global([data-time='dusk']) .isl-poster { filter: brightness(0.82) saturate(0.92) hue-rotate(6deg); }
+  :global([data-time='dawn']) .isl-poster { filter: brightness(0.9) saturate(0.95); }
   :global(html:not(.js)) .isl-poster { display: none; }
   .isl-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
   /* A link for every building, out of sight: the keyboard's way round the
