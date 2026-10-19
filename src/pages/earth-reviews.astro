@@ -624,7 +624,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
         const r = vote.getBoundingClientRect()
         burst(r.left + r.width / 2, r.top + r.height / 2, {
           count: 10,
-          colors: ['#f5a623', '#ffd96b', '#fff3d6'],
+          colors: ['#2fcfa9', '#8ccbff', '#e8fff8'],
           speed: 4,
           gravity: 0.12,
           life: 36,
@@ -694,7 +694,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   }
   .er-favicon {
     width: 15px; height: 15px; border-radius: 4px; flex: none; display: grid; place-items: center;
-    font-style: normal; font-size: 9.5px; font-weight: 800; color: #2a1a0e; background: #ffd96b;
+    font-style: normal; font-size: 9.5px; font-weight: 800; color: #062e26; background: #4fe3c1;
   }
   .er-url {
     font-size: 12.5px; color: rgba(255, 255, 255, 0.62); font-family: var(--mono, monospace);
@@ -719,20 +719,20 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
 
   .er-sitehead {
     display: flex; align-items: center; gap: 16px; padding: 12px 18px;
-    background: #2b1a12; color: #f7efe2;
+    background: #14213d; color: #eef3ff;
   }
-  .er-wordmark { display: inline-flex; align-items: center; gap: 8px; flex: none; color: #ffd96b; }
-  .er-wordmark b { font-size: 16px; letter-spacing: -0.02em; color: #fff6e6; }
-  .er-wordmark b span { color: #ffd96b; }
+  .er-wordmark { display: inline-flex; align-items: center; gap: 8px; flex: none; color: #4fe3c1; }
+  .er-wordmark b { font-size: 16px; letter-spacing: -0.02em; color: #ffffff; }
+  .er-wordmark b span { color: #4fe3c1; }
   .er-searchwrap { position: relative; flex: 1; min-width: 0; display: flex; }
   .er-searchwrap input {
     width: 100%; font: inherit; font-size: 14px; padding: 8px 12px 8px 34px;
-    border-radius: 8px; border: 1px solid #4a3324; background: #fffdf9; color: var(--er-ink);
+    border-radius: 8px; border: 1px solid #2c3d63; background: #ffffff; color: var(--er-ink);
   }
   .er-searchwrap input::placeholder { color: #6d7178; }
-  .er-searchwrap input:focus-visible { outline: 3px solid #ffd96b; outline-offset: 1px; }
+  .er-searchwrap input:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 1px; }
   .er-searchicon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #5b6169; pointer-events: none; }
-  .er-acct { font-size: 12.5px; color: #d9c7ad; flex: none; }
+  .er-acct { font-size: 12.5px; color: #b9c6e6; flex: none; }
 
   .er-view { padding: 16px 18px 28px; }
   .er-view.er-in { animation: er-fade 260ms ease; }
@@ -754,7 +754,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     font: inherit; font-size: 13.5px; padding: 7px 10px; border-radius: 8px;
     border: 1px solid var(--er-line); background: #fff; color: var(--er-ink); cursor: pointer;
   }
-  .er-sortwrap select:focus-visible { outline: 3px solid #b8892f; outline-offset: 1px; }
+  .er-sortwrap select:focus-visible { outline: 3px solid #0b7663; outline-offset: 1px; }
 
   /* ---- the grid ----------------------------------------------------------- */
   .er-grid {
@@ -770,7 +770,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   }
   .er-tilelink:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -16px rgba(0, 0, 0, 0.45); border-color: #c9c0b1; }
-  .er-tilelink:focus-visible { outline: 3px solid #b8892f; outline-offset: 2px; }
+  .er-tilelink:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
 
   /* The product shot. Dark, lit by the drawing's own dominant colour, and the
      drawing bleeds past the panel's edges rather than sitting boxed inside it
@@ -824,7 +824,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-bar { display: grid; grid-template-columns: 52px 1fr 22px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--er-mute); }
   .er-barlabel { white-space: nowrap; }
   .er-bartrack { height: 12px; border-radius: 3px; background: #e6e1d8; overflow: hidden; border: 1px solid #d8d2c6; }
-  .er-bartrack i { display: block; height: 100%; background: linear-gradient(180deg, #ffc95c, #e59512); transition: width 420ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+  .er-bartrack i { display: block; height: 100%; background: linear-gradient(180deg, #6eebcf, #23b893); transition: width 420ms cubic-bezier(0.2, 0.9, 0.3, 1); }
   .er-barn { text-align: right; color: var(--er-ink); }
   .er-stock { margin: 14px 0 0; font-size: 13px; color: #1f6b4a; font-weight: 600; }
 
@@ -838,8 +838,8 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     padding: 7px 14px; cursor: pointer; color: var(--er-mute);
   }
   .er-sortbar button + button { border-left: 1px solid var(--er-line); }
-  .er-sortbar button[aria-pressed='true'] { background: #2b1a12; color: #ffe9b8; }
-  .er-sortbar button:focus-visible { outline: 3px solid #b8892f; outline-offset: -3px; }
+  .er-sortbar button[aria-pressed='true'] { background: #14213d; color: #dffaf3; }
+  .er-sortbar button:focus-visible { outline: 3px solid #0b7663; outline-offset: -3px; }
 
   .er-rlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
   .er-review { padding: 15px 0; border-bottom: 1px solid var(--er-line); }
@@ -861,8 +861,8 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   }
   .er-helpful:hover { background: #f0ebe1; color: var(--er-ink); }
   .er-helpful:active { transform: scale(0.96); }
-  .er-helpful:focus-visible { outline: 3px solid #b8892f; outline-offset: 2px; }
-  .er-helpful[aria-pressed='true'] { background: #2b1a12; border-color: #2b1a12; color: #ffe9b8; }
+  .er-helpful:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
+  .er-helpful[aria-pressed='true'] { background: #14213d; border-color: #14213d; color: #dffaf3; }
 
   /* ---- cross-sell ---------------------------------------------------------- */
   .er-cross { margin-top: 26px; }
@@ -874,7 +874,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     transition: transform 150ms ease, border-color 150ms ease;
   }
   .er-crosslink:hover { transform: translateY(-2px); border-color: #c9c0b1; }
-  .er-crosslink:focus-visible { outline: 3px solid #b8892f; outline-offset: 2px; }
+  .er-crosslink:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
   .er-crossshot {
     position: relative; width: 62px; height: 62px; flex: none; border-radius: 8px; overflow: hidden;
     background:
