@@ -39,7 +39,7 @@ import { iconSvg } from '../lib/icons'
  *
  * So the six panels are one console, and the console is dark at every
  * altitude. Everything else follows from that: the paper glows because it is
- * the only light thing; the accent can be a real amber instead of the muddy
+ * the only light thing; the accent can be a bright mint instead of the muddy
  * brown that was the darkest gold still legible on cream; the star field is
  * visible around the instrument rather than behind it; and the contrast
  * argument gets *stronger*, because a dark surface with light ink cannot cross
@@ -1589,7 +1589,7 @@ const SHEET_ICONS: Record<string, string> = {
       pulse()
       const r = STAGE.c.getBoundingClientRect()
       burst(r.left + r.width / 2, r.top + r.height * 0.5, {
-        count: 24, colors: ['#f5b242', '#ffe0a0', '#fff'],
+        count: 24, colors: ['#4fe3c1', '#8ccbff', '#fff'],
         speed: 4.6, gravity: 0.14, life: 46, size: 4,
       })
       floatIcon(r.left + r.width / 2, r.top + r.height * 0.4, ICONS[mk.icon])
@@ -1742,7 +1742,7 @@ const SHEET_ICONS: Record<string, string> = {
         pulse()
         const r = el('figures').getBoundingClientRect()
         burst(r.left + r.width / 2, r.top, {
-          count: 22, colors: ['#f5b242', '#ffe0a0', '#fff'],
+          count: 22, colors: ['#4fe3c1', '#8ccbff', '#fff'],
           speed: 4.5, gravity: 0.14, life: 44, size: 4,
         })
         floatIcon(r.left + r.width / 2, r.top - 20, ICONS[mk.icon])
@@ -1962,7 +1962,7 @@ const SHEET_ICONS: Record<string, string> = {
     // colour than the bottom is.
     s.setProperty('--pf-lift', rgb(shade(sky.surface, 0.055)))
     s.setProperty('--pf-sink', rgb(shade(sky.well, -0.3)))
-    // The label on the amber button is the console's own recess colour, which
+    // The label on the accent button is the console's own recess colour, which
     // is the darkest thing in the palette and therefore the safest ink on it.
     s.setProperty('--pf-on-accent', rgb(sky.well))
     s.setProperty('--pf-glow', rgba(sky.accent, 0.34))
@@ -2055,7 +2055,7 @@ const SHEET_ICONS: Record<string, string> = {
     --pf-ink: #f8f0e2;
     --pf-ink-soft: #baaa8e;
     --pf-line: #3e3326;
-    --pf-accent: #f5b242;
+    --pf-accent: #4fe3c1;
     --pf-rim: #604d36;
     --pf-lift: #2b241c;
     --pf-sink: #0e0b08;

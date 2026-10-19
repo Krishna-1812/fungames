@@ -54,7 +54,7 @@ export type Sky = {
   /** Hairline dividers inside the console. Decorative; not held to a text ratio. */
   line: RGB
   /**
-   * The one warm accent, cooling as the air runs out. It sets type — the line
+   * The one accent: the site's mint on the desk, cooling through sky to lilac as the air runs out. It sets type — the line
    * naming where you are — and it is also the fill behind the primary button's
    * label, so it is checked in both directions.
    */
@@ -102,7 +102,7 @@ const STOPS: Stop[] = [
     top: [40, 29, 20], bottom: [124, 93, 58],
     surface: [30, 24, 18], well: [20, 16, 12],
     ink: [248, 240, 226], inkSoft: [186, 170, 142], line: [62, 51, 38],
-    accent: [245, 178, 66], rim: [96, 77, 54],
+    accent: [79, 227, 193], rim: [96, 77, 54],
     ground: 1, clouds: 0, curve: 0, stars: 0, galaxies: 0,
   },
   {
@@ -110,7 +110,7 @@ const STOPS: Stop[] = [
     top: [38, 29, 22], bottom: [110, 84, 54],
     surface: [30, 24, 18], well: [20, 16, 12],
     ink: [248, 240, 226], inkSoft: [186, 170, 142], line: [62, 51, 38],
-    accent: [245, 178, 66], rim: [96, 77, 54],
+    accent: [79, 227, 193], rim: [96, 77, 54],
     ground: 1, clouds: 0, curve: 0, stars: 0, galaxies: 0,
   },
   {
@@ -121,7 +121,7 @@ const STOPS: Stop[] = [
     top: [56, 58, 72], bottom: [150, 136, 112],
     surface: [30, 25, 21], well: [20, 17, 14],
     ink: [247, 241, 231], inkSoft: [184, 172, 152], line: [61, 52, 42],
-    accent: [246, 181, 75], rim: [96, 78, 60],
+    accent: [96, 224, 204], rim: [96, 78, 60],
     ground: 0.95, clouds: 0.25, curve: 0, stars: 0, galaxies: 0,
   },
   {
@@ -129,7 +129,7 @@ const STOPS: Stop[] = [
     top: [96, 140, 192], bottom: [208, 212, 202],
     surface: [30, 26, 24], well: [20, 17, 16],
     ink: [246, 242, 236], inkSoft: [182, 174, 162], line: [60, 53, 47],
-    accent: [246, 184, 84], rim: [96, 80, 66],
+    accent: [116, 218, 222], rim: [96, 80, 66],
     ground: 0.75, clouds: 0.6, curve: 0, stars: 0, galaxies: 0,
   },
   {
@@ -137,7 +137,7 @@ const STOPS: Stop[] = [
     top: [58, 116, 186], bottom: [176, 206, 230],
     surface: [28, 28, 30], well: [18, 18, 21],
     ink: [244, 246, 250], inkSoft: [176, 180, 190], line: [56, 56, 61],
-    accent: [248, 190, 100], rim: [88, 88, 96],
+    accent: [140, 203, 255], rim: [88, 88, 96],
     ground: 0.24, clouds: 1, curve: 0.15, stars: 0, galaxies: 0,
   },
   {
@@ -145,7 +145,7 @@ const STOPS: Stop[] = [
     top: [18, 44, 96], bottom: [86, 138, 190],
     surface: [26, 27, 32], well: [17, 18, 22],
     ink: [242, 245, 252], inkSoft: [170, 176, 192], line: [54, 56, 63],
-    accent: [250, 198, 116], rim: [82, 86, 100],
+    accent: [152, 200, 255], rim: [82, 86, 100],
     ground: 0, clouds: 0.5, curve: 0.6, stars: 0.25, galaxies: 0,
   },
   {
@@ -153,7 +153,7 @@ const STOPS: Stop[] = [
     top: [5, 9, 24], bottom: [16, 32, 66],
     surface: [24, 26, 36], well: [15, 17, 24],
     ink: [238, 242, 252], inkSoft: [162, 172, 194], line: [52, 56, 68],
-    accent: [252, 206, 132], rim: [78, 86, 106],
+    accent: [168, 198, 255], rim: [78, 86, 106],
     ground: 0, clouds: 0.1, curve: 1, stars: 0.7, galaxies: 0,
   },
   {
@@ -161,7 +161,7 @@ const STOPS: Stop[] = [
     top: [3, 4, 14], bottom: [8, 12, 30],
     surface: [24, 26, 38], well: [15, 17, 25],
     ink: [236, 240, 252], inkSoft: [158, 168, 192], line: [52, 56, 70],
-    accent: [250, 212, 150], rim: [76, 84, 108],
+    accent: [190, 202, 255], rim: [76, 84, 108],
     ground: 0, clouds: 0, curve: 0.25, stars: 1, galaxies: 0.1,
   },
   {
