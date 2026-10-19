@@ -125,6 +125,11 @@
   outline-offset: -2px;
 }
 .stage.is-lost { filter: saturate(0.55); }
+/* On a phone the stage runs to the screen's edges: the card's margin and
+   padding were a white frame round the game, in a screen with no width to spare. */
+@media (max-width: 640px) {
+  .stage { margin-inline: calc(-1 * var(--gutter)); border-radius: 0; padding: 14px 12px; box-shadow: none; }
+}
 .stage-note { padding: 32px; text-align: center; }
 
 /* Level up: a headline the marker sweeps across, pinned to the middle of
