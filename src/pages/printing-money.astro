@@ -512,7 +512,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   /* The page is paper. The debt clock and the bills keep their own dark
      ground — they are the pictures — and the LED red is the clock's own. */
   .pm {
-    --money-led: #ff5a3c;
+    --money-led: #ff4f6e;
     --money-green: var(--t-green);
   }
   .pm [hidden] { display: none !important; }
@@ -547,16 +547,16 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   .hero-screen {
     position: relative; display: inline-block; border-radius: 10px;
     padding: 16px clamp(10px, 3vw, 22px); background: #050403;
-    box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(255, 90, 60, 0.12);
+    box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(255, 79, 110, 0.12);
   }
   .hero-clock { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 0.02em; flex-wrap: wrap; }
   .ccy {
     font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 700; margin-right: 0.08em;
-    font-size: clamp(24px, 6.6vw, 40px); color: var(--money-led); text-shadow: 0 0 0.2em rgba(255, 90, 60, 0.6);
+    font-size: clamp(24px, 6.6vw, 40px); color: var(--money-led); text-shadow: 0 0 0.2em rgba(255, 79, 110, 0.6);
   }
   .hero-comma {
     align-self: flex-end; margin: 0 0.03em 0.06em; font-family: var(--sans); font-weight: 700;
-    font-size: clamp(16px, 4vw, 26px); color: rgba(255, 90, 60, 0.55);
+    font-size: clamp(16px, 4vw, 26px); color: rgba(255, 79, 110, 0.55);
   }
   .hero-odo { font-size: clamp(24px, 6.6vw, 40px); }
 
@@ -571,12 +571,12 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
      one of these rules silently matched nothing until this was plain
      `.digit` — the same failure shape as the Astro-scoped-CSS trap this
      file's siblings keep hitting, just from the opposite direction. */
-  .odometer { display: inline-flex; line-height: 1; --seg-on: var(--money-led); --seg-off: rgba(255, 90, 60, 0.09); }
+  .odometer { display: inline-flex; line-height: 1; --seg-on: var(--money-led); --seg-off: rgba(255, 79, 110, 0.09); }
   .digit { position: relative; display: inline-block; width: 0.56em; height: 1em; margin: 0 0.045em; flex: none; }
   .digit.flicker { animation: pm-flicker 320ms steps(1, end); }
   @keyframes pm-flicker { 0%, 18%, 36% { filter: brightness(1.9); } 9%, 27%, 100% { filter: brightness(1); } }
   .seg { position: absolute; background: var(--seg-off); transition: background 140ms linear, box-shadow 140ms linear; }
-  .seg.on { background: var(--seg-on); box-shadow: 0 0 0.08em var(--seg-on), 0 0 0.26em rgba(255, 90, 60, 0.6); }
+  .seg.on { background: var(--seg-on); box-shadow: 0 0 0.08em var(--seg-on), 0 0 0.26em rgba(255, 79, 110, 0.6); }
   .seg-a, .seg-g, .seg-d {
     left: 0.065em; width: 0.43em; height: 0.085em;
     clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
@@ -599,8 +599,8 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   .pm-hero-bar { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); overflow: hidden; position: relative; margin: 16px auto 0; max-width: 440px; }
   .pm-hero-fill {
     height: 100%; width: 0%; border-radius: 4px;
-    background: linear-gradient(90deg, #ff9a86, var(--money-led));
-    box-shadow: 0 0 12px rgba(255, 90, 60, 0.45); transition: width 120ms linear;
+    background: linear-gradient(90deg, #ff9fb2, var(--money-led));
+    box-shadow: 0 0 12px rgba(255, 79, 110, 0.45); transition: width 120ms linear;
   }
   .pm-hero-ref { margin: 8px 0 0; font-size: 11.5px; opacity: 0.55; }
 
