@@ -1554,13 +1554,21 @@ const book = BOOK.map((key) => {
     sv.insertAdjacentHTML('beforeend', a)
     cardReady(sv)
   }).catch((err) => console.error('[island] a card could not load', err))
-  const cardNear = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { cardNear.unobserve(e.target); drawCard(e.target as SVGSVGElement) } }, { rootMargin: '500px 0px' })
+  const cardNear = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { cardNear.unobserve(e.target); drawCard(e.target as SVGSVGElement) } }, { rootMargin: '900px 0px' })
   // The cards are watched from the first scroll, or once the island has had a few seconds to come in.
   let watching = false
   const watchCards = () => { if (watching) return; watching = true; document.querySelectorAll<SVGSVGElement>('.gc-svg[data-art]').forEach((sv) => cardNear.observe(sv)) }
   addEventListener('scroll', watchCards, { once: true, passive: true })
   isle.withEngine(() => setTimeout(watchCards, 3500))
-  isle.withEngine(() => setTimeout(() => ('requestIdleCallback' in window ? requestIdleCallback(() => getArt(), { timeout: 6000 }) : getArt()), 6000))
+  // And once the page has been quiet a while, the rest are drawn too, one per idle moment, so a fast
+  // scroll (or the End key) never lands on a row of empty plinths waiting for theirs.
+  const idle = (f: () => void, timeout = 2000) => ('requestIdleCallback' in window ? requestIdleCallback(f, { timeout }) : setTimeout(f, 60))
+  const fillCards = () => getArt().then(() => {
+    const left = [...document.querySelectorAll<SVGSVGElement>('.gc-svg[data-art]:not([data-drawn])')]
+    const next = () => { const sv = left.shift(); if (!sv) return; cardNear.unobserve(sv); drawCard(sv).then(() => idle(next)) }
+    idle(next)
+  }, () => {})
+  isle.withEngine(() => setTimeout(() => idle(fillCards, 6000), 6000))
 
   // The building site counts the year as it is today, not as it was on the
   // day the page was built (its storeys only change each quarter anyway).
