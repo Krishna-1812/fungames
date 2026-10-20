@@ -744,6 +744,7 @@ const book = BOOK.map((key) => {
     daily: () => dailyFor(new Date()).slug,
     ink: () => data.inks[data.anchors[dailyFor(new Date()).slug]?.district] ?? '#5b82ff',
     sound: () => sound,
+    dark: () => ({ night: 1, dusk: 0.5, dawn: 0.25 } as Record<string, number>)[box.dataset.time ?? 'day'] ?? 0,
     // Once in a while is enough to know people do it.
     onScare: (all) => { const now = Date.now(); if (now - scaredAt > 30_000) { scaredAt = now; track('isl_pigeons', { bell: all }) } },
   })
@@ -893,7 +894,8 @@ const book = BOOK.map((key) => {
   isle.withEngine((e) => {
     const nodes: Node[] = []
     for (const s of data.slugs) { if (!finished.has(s)) continue; const a = data.anchors[s]; nodes.push(...flagNodes(a.x1 - 14, a.y0 + 18)) }
-    if (ta) nodes.push(...balloonNodes((ta.x0 + ta.x1) / 2, ta.y0))
+    // On the realistic island the balloon is Unity's (play.ts); on the drawn one, the drawing.
+    if (ta && !play.setToday((ta.x0 + ta.x1) / 2, ta.y0)) nodes.push(...balloonNodes((ta.x0 + ta.x1) / 2, ta.y0))
     e.add(nodes)
   })
   // The daily challenge's streak: a number on the Today button, and the noticeboard's top row.

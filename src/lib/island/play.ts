@@ -55,6 +55,8 @@ export function createPlay(o: {
   onScare?: (all: boolean) => void
   /** Where the baked files are (the sheet of Unity's pictures for the canvas: sprites.webp). */
   base?: string
+  /** How dark it is, 0 by day to 1 at night, for what is drawn over the night's veil. */
+  dark?: () => number
 }) {
   /* ---- Unity's pictures, on the realistic island (lib/island/actors.ts, scripts/bake-island.mjs) ---- */
   type SheetMeta = { rects: Record<string, [number, number, number, number]>; sizes: Record<string, { w: number; h: number; ax: number; ay: number }> }
@@ -556,6 +558,29 @@ export function createPlay(o: {
     return n
   }
 
+  /* ---- today's balloon, on the realistic island: Unity's, not the drawing ----------------- */
+  let today: [number, number] | null = null
+  const drawToday = (c: CanvasRenderingContext2D, m: M, now: number): number => {
+    if (!today || !sheet || !meta || !sp?.balloon) return 0
+    const [x, top] = today, bob = o.play ? Math.sin(now / 1800 * Math.PI) * 3 : 0
+    const foot = top - 26 + bob
+    c.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); c.globalAlpha = 1
+    // The tether, slack, from the basket down to the roof.
+    c.strokeStyle = 'rgba(40, 44, 56, 0.55)'; c.lineWidth = 0.9
+    c.beginPath(); c.moveTo(x, foot); c.bezierCurveTo(x - 5, foot + 12, x + 5, top - 6, x, top + 8); c.stroke()
+    const d = o.dark?.() ?? 0
+    if (d > 0) c.filter = `brightness(${(1 - 0.55 * d).toFixed(2)}) saturate(${(1 - 0.3 * d).toFixed(2)})`
+    drawPic(c, sp.balloon, x, foot, 0.95)
+    c.filter = 'none'
+    // Its tag, in the island's lettering, over the envelope.
+    const ty = foot - 101
+    c.fillStyle = '#4fe3c1'; c.strokeStyle = '#1b2340'; c.lineWidth = 2
+    c.beginPath(); c.roundRect(x - 29, ty - 9, 58, 18, 9); c.fill(); c.stroke()
+    c.fillStyle = '#1b2340'; c.font = '700 11px Fredoka, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'alphabetic'
+    c.fillText('TODAY', x, ty + 4)
+    return 4
+  }
+
   /* ---- what the frame shows ---------------------------------------------------------- */
   let cw = 0, ch = 0
   /** Whether a box on the map is on the canvas at all. */
@@ -601,12 +626,14 @@ export function createPlay(o: {
         return n
       },
     },
-    top: (c, m) => drawBirdsFlying(c, m, performance.now()),
+    top: (c, m) => drawBirdsFlying(c, m, performance.now()) + drawToday(c, m, performance.now()),
     front: (c, m, _t, inWin) => drawParade(c, m, performance.now(), frameMarchers, inWin),
   }
 
   return {
     live,
+    /** Tie today's balloon over (x, top), if Unity's picture of it is there to draw; false if not (the page draws its own). */
+    setToday(x: number, top: number): boolean { if (!sp?.balloon) return false; today = [x, top]; return true },
     /**
      * A hand on the map at (x, y): if it is on the ball, the ball is picked
      * up, and goes where the hand goes until it lets go, when it is thrown the
