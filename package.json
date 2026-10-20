@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node scripts/vercel-headers.mjs",
+    "build": "node scripts/check-public-boundary.mjs && astro build && node scripts/vercel-headers.mjs && node scripts/check-public-boundary.mjs --built",
     "preview": "node scripts/preview.mjs",
     "worker:dev": "wrangler dev worker/fusion-worker.js",
     "worker:deploy": "wrangler deploy",
