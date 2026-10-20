@@ -332,7 +332,10 @@ namespace Island
         {
             switch (s.k)
             {
-                case "box": BoxDetailed(b, s); break;
+                case "box":
+                    if (IslandBuild.AuditArtPreview && auditGeology && Mathf.Abs(s.w - 1.9f) < 0.001f && Mathf.Abs(s.d - 1.9f) < 0.001f && Mathf.Abs(s.h - 11) < 0.001f) AuditStratum(b, s);
+                    else BoxDetailed(b, s);
+                    break;
                 case "band": Band(b, s.b, s.z0, s.z1, s.fill); break;
                 case "quad": Panel(b, s.b, s.face, s.u0, s.u1, s.z0, s.z1, Real(s.fill, PanelOf(s.fill)), PanelOf(s.fill), Off); break;
                 case "win": if (HolesOf(s.b) != null) WindowsDetailed(b, s); else Windows(b, s); break;

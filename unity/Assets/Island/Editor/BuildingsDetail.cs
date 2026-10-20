@@ -75,6 +75,7 @@ namespace Island
                     }
                 }
             if (foot == float.MaxValue) foot = 0;
+            auditGeology = bs.slug == "deep-time";
         }
         static void Add(SolidBox b, Hole h)
         {

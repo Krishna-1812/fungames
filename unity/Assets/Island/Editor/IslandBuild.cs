@@ -26,6 +26,37 @@ namespace Island
         public const float PxPerHeight = PxPerUnit * 0.8660254f; // and cos 30°
         const string Data = "Assets/Island/Data/island.json";
         const string Settings = "Assets/Island/Settings";
+        static Dictionary<string, string> editorArgs;
+        public static bool AuditArtPreview { get; private set; }
+
+        // Explicit menu action only: use the licensed editor, preserve its open
+        // scenes, and keep unapproved pictures out of the production render set.
+        [MenuItem("Island/Audit/Render building art preview")]
+        public static void AuditBuildingPreview()
+        {
+            if (!File.Exists(Data)) throw new System.IO.FileNotFoundException("Run node scripts/export-island.mjs first", Data);
+            var previous = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            var review = UnityEditor.SceneManagement.EditorSceneManager.NewScene(
+                UnityEditor.SceneManagement.NewSceneSetup.EmptyScene,
+                UnityEditor.SceneManagement.NewSceneMode.Additive);
+            UnityEngine.SceneManagement.SceneManager.SetActiveScene(review);
+            var savedArgs = editorArgs;
+            editorArgs = new Dictionary<string, string> {
+                ["-only"] = "deep-time,steady-hand,rule-cascade,overstimulated",
+                ["-buildings-out"] = "Renders/art-review", ["-scale"] = "4",
+                ["-ss"] = "3", ["-sky"] = "128", ["-sunn"] = "8", ["-dome"] = "1"
+            };
+            AuditArtPreview = true;
+            try {
+                BuildingShots();
+                Debug.Log("[island] Audit previews ready in Renders/art-review. Production artwork has not been replaced.");
+            }
+            finally {
+                AuditArtPreview = false; editorArgs = savedArgs;
+                if (previous.IsValid()) UnityEngine.SceneManagement.SceneManager.SetActiveScene(previous);
+                UnityEditor.SceneManagement.EditorSceneManager.CloseScene(review, true);
+            }
+        }
 
         public static float Y(float z) => z / PxPerHeight;
 
@@ -168,6 +199,7 @@ namespace Island
         {
             var go = new GameObject("eye");
             var cam = go.AddComponent<Camera>();
+            if (AuditArtPreview) cam.scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
             cam.orthographic = true;
             cam.orthographicSize = h / 2 / PxPerUnit;
             cam.aspect = w / h;
@@ -229,6 +261,7 @@ namespace Island
 
         static string Arg(string name, string fallback)
         {
+            if (editorArgs != null && editorArgs.TryGetValue(name, out var value)) return value;
             var a = System.Environment.GetCommandLineArgs();
             for (int k = 0; k < a.Length - 1; k++) if (a[k] == name) return a[k + 1];
             return fallback;
@@ -583,8 +616,9 @@ namespace Island
             float scale = float.Parse(Arg("-scale", "4"), System.Globalization.CultureInfo.InvariantCulture);
             int ss = int.Parse(Arg("-ss", "3"));
             var only = Arg("-only", "");
-            Directory.CreateDirectory("Renders/buildings");
-            if (only == "") foreach (var f in Directory.GetFiles("Renders/buildings")) File.Delete(f);
+            var renderOut = Arg("-buildings-out", "Renders/buildings");
+            Directory.CreateDirectory(renderOut);
+            if (only == "") foreach (var f in Directory.GetFiles(renderOut)) File.Delete(f);
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             var json = new System.Text.StringBuilder("{");
             int made = 0;
@@ -608,8 +642,8 @@ namespace Island
                     int pw = centred ? Mathf.RoundToInt(box.width * scale) : Mathf.CeilToInt((box.xMax + 3 - x0) * scale), ph = centred ? Mathf.RoundToInt(box.height * scale) : Mathf.CeilToInt((box.yMax + 3 - y0) * scale);
                     var cam = Eye(x0, y0, pw / scale, ph / scale);
                     cam.backgroundColor = new Color(0, 0, 0, 0);
-                    if (Lit) Dome.Shoot(cam, pw, ph, $"Renders/buildings/{bs.slug}_{r}.png", ss, true);
-                    else ShootFigure(cam, pw, ph, $"Renders/buildings/{bs.slug}_{r}.png", ss);
+                    if (Lit) Dome.Shoot(cam, pw, ph, $"{renderOut}/{bs.slug}_{r}.png", ss, true);
+                    else ShootFigure(cam, pw, ph, $"{renderOut}/{bs.slug}_{r}.png", ss);
                     Object.DestroyImmediate(cam.gameObject);
                     if (made > 0) json.Append(',');
                     json.Append($"\"{bs.slug}/{r}\":[{x0.ToString(inv)},{y0.ToString(inv)},{(pw / scale).ToString(inv)},{(ph / scale).ToString(inv)}{(centred ? ",1" : "")}]");
@@ -618,7 +652,7 @@ namespace Island
                 foreach (var go in runs) Object.DestroyImmediate(go);
             }
             json.Append('}');
-            File.WriteAllText(only == "" ? "Renders/buildings/buildings.json" : $"Renders/buildings/{only.Split(',')[0]}.json", $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
+            File.WriteAllText(Path.Combine(renderOut, only == "" ? "buildings.json" : only.Split(',')[0] + ".json"), $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
             Debug.Log($"[island] buildings: {made} runs at {scale} px a unit");
         }
 

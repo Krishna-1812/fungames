@@ -21,6 +21,26 @@ runs Unity.
 
 ## Running it
 
+### Audit artwork preview in an already licensed editor
+
+Run `node scripts/export-island.mjs` from the repository root, then open
+`unity/` in Unity 6. Choose **Island → Audit → Render building art preview**.
+This is an explicit menu action; it never runs on editor startup. It creates
+an additive review scene, restores the previously active scene when finished,
+and writes selected building runs and registration metadata to
+`unity/Renders/art-review/`. It uses 4× scale, 3× supersampling, 128 sky samples
+and 8 sun samples. Existing production renders are preserved.
+
+The Deep Time candidate replaces the seven regular box sides with a shared
+eroded contour and muted, rough stone. Adjacent layers share boundary vertices.
+Steady Hand, Rule Cascade and the ferris wheel are included as reference
+renders under the same lighting. They are not additional geometry revisions.
+The candidate is enabled only by this preview command. Compilation alone does
+not establish visual quality: inspect fossil and ladder registration, contact
+shadows, vegetation scale and day/night integration before promoting assets.
+Do not run `unity-buildings.mjs --skip-unity` on this preview folder: it is
+not the complete production render set.
+
 Unity 6 (6000.5.5f1), with a signed-in licence in Unity Hub. Close the project
 in the editor first: two Unitys cannot open it at once. The ground's photographs
 and models are not in git; fetch them once (about 70 MB, CC0, from Poly Haven):
