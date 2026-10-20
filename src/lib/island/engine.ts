@@ -18,6 +18,7 @@
  */
 import { sceneFrom, type Anim, type Box, type LevelIndex, type M, type Node, type Scene, type Style, type When } from './scene'
 import { ID, mulTo, invert, fnsMatrix, progress, sampleProp, ease, type Ease } from './anim'
+import { canvasTransforms } from './canvas-transform'
 import { POKES, POKE_SAY, POKE_MS, POKE_INNER_ORIGIN, LANDMARK, LAYERS, type Loop } from './moves'
 
 type G = Node & { k: 'g' }
@@ -330,8 +331,11 @@ export function createEngine(o: {
   let alphaNow = 1
   // Changing the transform is one of the dearer calls on a phone: most sprites are drawn in device pixels, the transform left as it is.
   let ident = false
-  const setM = (m: M) => { ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); ident = false; cs.transforms++ }
-  const toIdent = () => { if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true; cs.transforms++ } }
+  // And setting the same matrix twice in a row (sibling shapes under one group) is skipped altogether
+  // (canvas-transform.ts); anything that may change the matrix behind its back says so with invalidate().
+  const transforms = canvasTransforms(() => ctx)
+  const setM = (m: M) => { if (transforms.set(m)) cs.transforms++; ident = false }
+  const toIdent = () => { if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true; cs.transforms++; transforms.invalidate() } }
   const applyStyle = (s: Style, fillOverride?: string) => {
     const f = fillOverride ?? s.f
     if (f) ctx.fillStyle = f
@@ -382,7 +386,7 @@ export function createEngine(o: {
 
   /** The text settings the context has now (a restore puts back older ones, so it forgets them). */
   let textCtx: CanvasRenderingContext2D | null = null, textFont = '', textLs = ''
-  const restore = () => { ctx.restore(); textCtx = null; ident = false }
+  const restore = () => { ctx.restore(); textCtx = null; ident = false; transforms.invalidate() }
   const drawText = (n: T, m: M, alpha: number) => {
     if (n.bb && offscreen(m, n.bb)) return
     pose(n, tNow(), P)
@@ -566,7 +570,7 @@ export function createEngine(o: {
       if (!n.cb) restore()
       else {
         // What the page walks along the road here, through the same window.
-        if (drawLive.front && win) { cs.paths += drawLive.front(ctx, deviceM, now, (b) => !outsideWin(devBox(deviceM, b))); ident = false; textCtx = null; ctx.globalAlpha = 1 }
+        if (drawLive.front && win) { transforms.invalidate(); cs.paths += drawLive.front(ctx, deviceM, now, (b) => { transforms.invalidate(); return !outsideWin(devBox(deviceM, b)) }); ident = false; textCtx = null; transforms.invalidate(); ctx.globalAlpha = 1 }
         if (win?.on) restore(); win = outer
       }
     }
@@ -605,11 +609,11 @@ export function createEngine(o: {
     octx.imageSmoothingQuality = 'high'
     // Everything as if the canvas began at (X0, Y0): the matrices, and the device matrix the still runs use.
     const saved = ctx, savedDev = deviceM
-    ctx = octx; ident = false
+    ctx = octx; ident = false; transforms.invalidate()
     deviceM = [deviceM[0], deviceM[1], deviceM[2], deviceM[3], deviceM[4] - X0, deviceM[5] - Y0]
     const shifted: M = [mm[0], mm[1], mm[2], mm[3], mm[4] - X0, mm[5] - Y0]
     for (const k of n.kids) drawNode(k, shifted, 1)
-    ctx = saved; deviceM = savedDev; ident = false
+    ctx = saved; deviceM = savedDev; ident = false; transforms.invalidate()
     toIdent()
     ctx.globalAlpha = a
     ctx.drawImage(oc, 0, 0, w, h, X0, Y0, w, h)
@@ -745,7 +749,7 @@ export function createEngine(o: {
   const lastEnd = new Map<string, number>()
   for (const [kind, at] of scene.ends ?? []) lastEnd.set(kind, at)
   for (const [kind, at] of lastEnd) (endsAfter.get(at - 1) ?? endsAfter.set(at - 1, []).get(at - 1)!).push(kind)
-  const hook = (h: LiveHook) => { cs.paths += h(ctx, deviceM, now); ident = false; textCtx = null; ctx.globalAlpha = 1 }
+  const hook = (h: LiveHook) => { cs.paths += h(ctx, deviceM, now); ident = false; textCtx = null; transforms.invalidate(); ctx.globalAlpha = 1 }
 
   /* ---- one frame ---- */
   /** A colour to lay down before the island (a snapshot has no page behind it). */
@@ -767,7 +771,7 @@ export function createEngine(o: {
     const inv = invert(deviceM), pad = 4 / s
     vis = [inv[4] - pad, inv[5] - pad, inv[0] * canvas.width + inv[4] + pad, inv[3] * canvas.height + inv[5] + pad]
     sources = { day: planSources(false), night: st.time === 'day' && (timers.get('night')?.v ?? 0) <= 0 ? [] : planSources(true) }
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true; transforms.invalidate()
     ctx.globalAlpha = 1
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     if (under) { ctx.fillStyle = under; ctx.fillRect(0, 0, canvas.width, canvas.height) }
@@ -860,7 +864,7 @@ export function createEngine(o: {
         W = w; H = h; dpr = ratio
         canvas.width = Math.round(w * ratio); canvas.height = Math.round(h * ratio)
         // A canvas given a new size forgets its settings: so must we.
-        ident = false; textCtx = null
+        ident = false; textCtx = null; transforms.invalidate()
       }
     },
     setHot(slug: string | null) {
@@ -914,7 +918,7 @@ export function createEngine(o: {
       target.width = Math.round(w); target.height = Math.round(h)
       canvas = target
       ctx = target.getContext('2d')!
-      ident = false; textCtx = null
+      ident = false; textCtx = null; transforms.invalidate()
       cam.x = view.x; cam.y = view.y; cam.z = view.z; W = w; H = h; dpr = 1
       // The sea's colour under everything, as the page's own background is under its canvas.
       under = getComputedStyle(document.body).backgroundColor || '#8ccbff'
@@ -922,7 +926,7 @@ export function createEngine(o: {
       const out = { drawable: lastGaps === 0, sharp: lastGaps === 0 && lastBlurry === 0 }
       canvas = was.canvas; ctx = was.ctx; Object.assign(cam, was.cam); W = was.W; H = was.H; dpr = was.dpr
       lastStats = was.stats; lastGaps = was.gaps; lastBlurry = was.blurry
-      ident = false; textCtx = null
+      ident = false; textCtx = null; transforms.invalidate()
       return out
     },
     pokeKinds: scene.pokes,
