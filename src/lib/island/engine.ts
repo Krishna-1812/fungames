@@ -939,7 +939,7 @@ export function createEngine(o: {
     stats() {
       let loaded = 0, bytes = 0
       for (const im of imgs.values()) if (im.bm) { loaded++; bytes += im.bytes }
-      return { ...lastStats, level, scale: scene.levels[level], dpr, w: canvas.width, h: canvas.height, gaps: lastGaps, blurry: lastBlurry, loaded, bytes, queued: queue.length + inflight }
+      return { ...lastStats, frame: frameNo, level, scale: scene.levels[level], dpr, w: canvas.width, h: canvas.height, gaps: lastGaps, blurry: lastBlurry, loaded, bytes, queued: queue.length + inflight }
     },
   }
 }
