@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict'
+import {register} from 'node:module'
+register('./resolve-ts.mjs',import.meta.url)
+const {limited}=await import('../src/lib/analytics/request.ts')
+assert.equal(limited('limit-fixture-a',1,2,1000,100),false)
+assert.equal(limited('limit-fixture-a',1,2,1000,200),false)
+assert.equal(limited('limit-fixture-a',1,2,1000,300),true)
+assert.equal(limited('limit-fixture-b',1,2,1000,300),false,'addresses have independent limits')
+assert.equal(limited('limit-fixture-a',1,2,1000,1101),false,'expired window allows another request')
+assert.equal(limited('initial-cost-too-large',3,2,1000,2000),true)
+for(let i=0;i<5000;i++)assert.equal(limited('capacity-'+i,1,2,1000,100000),false)
+assert.equal(limited('overflow',1,2,1000,100000),false,'a full table lets a new address through rather than turning it away')
+for(let i=0;i<3;i++)limited('overflow',1,2,1000,100000)
+assert.equal(limited('overflow',1,2,1000,100000),false,'and does not grow to track it')
+assert.equal(limited('after-expiry',1,2,1000,102000),false)
+console.log('PASS independent rate windows, first-batch overshoot, expiration and a bounded table that never shuts out a new address.')

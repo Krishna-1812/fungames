@@ -2,6 +2,7 @@
  * What every analytics endpoint reads off a request: the visitor's address
  * (only ever hashed), and where Vercel says it came from.
  */
+import { createHmac, randomBytes } from 'node:crypto'
 export function clientIp(req: Request, fallback: string | undefined): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0].trim() || req.headers.get('x-real-ip') || fallback || '0.0.0.0'
 }
@@ -49,10 +50,21 @@ export function foreign(req: Request): boolean {
  * against anyone determined, which Vercel's own firewall is for.
  */
 const hits = new Map<string, { n: number; until: number }>()
+// The table holds no address: each is keyed by an HMAC under a secret made fresh in this process's memory
+// (as the privacy page says), which nothing else ever sees and which goes when the process does.
+const rateSecret = randomBytes(32)
+const CAP = 5000
 export function limited(ip: string, cost: number, max: number, windowMs: number, now = Date.now()): boolean {
-  if (hits.size > 5000) for (const [k, v] of hits) if (v.until < now) hits.delete(k)
-  const h = hits.get(ip)
-  if (!h || h.until < now) { hits.set(ip, { n: cost, until: now + windowMs }); return false }
+  if (hits.size >= CAP) for (const [k, v] of hits) if (v.until < now) hits.delete(k)
+  const key = createHmac('sha256', rateSecret).update(ip).digest('base64url')
+  const h = hits.get(key)
+  if (!h || h.until < now) {
+    // Full of live windows (a crowd, or a flood of addresses): a new address is let through untracked rather
+    // than turned away, since the limit is there to stop one address hammering, not to shut out visitors.
+    if (hits.size >= CAP && !h) return cost > max
+    hits.set(key, { n: cost, until: now + windowMs })
+    return cost > max
+  }
   h.n += cost
   return h.n > max
 }
