@@ -14,6 +14,7 @@ import { readDaily, utcDay } from './daily'
 import { mountChallenge, type Vs } from './challenge'
 import { questsAfterRun } from './quests-ui'
 import { track, onLeave } from './analytics/client'
+import { progressText } from './progress-label'
 
 export type ShellOptions = {
   slug: string
@@ -62,7 +63,8 @@ function readBest(slug: string): Best | null {
     const raw = localStorage.getItem(bestKey(slug))
     if (!raw) return null
     const v = JSON.parse(raw)
-    return typeof v?.value === 'number' && typeof v?.text === 'string' ? v : null
+    return typeof v?.value === 'number' && Number.isFinite(v.value) && typeof v?.text === 'string'
+      ? { value: v.value, text: progressText(slug, v.value, v.text) } : null
   } catch {
     return null
   }

@@ -571,7 +571,7 @@ export function initIsland(o: {
     pinHot(slug)
     card.querySelector('.isl-card-title')!.textContent = g.title
     card.querySelector('.isl-card-blurb')!.textContent = g.blurb
-    cardBest.textContent = g.best ? `Best ${g.best}` : ''
+    cardBest.textContent = g.best ?? ''
     cardBest.hidden = !g.best
     if (cardImg && g.pic && cardImg.getAttribute('src') !== g.pic) cardImg.src = g.pic
     cardPic?.classList.toggle('is-missing', !g.pic)

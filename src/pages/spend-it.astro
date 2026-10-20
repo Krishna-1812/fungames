@@ -180,7 +180,7 @@ import { productSvg } from '../lib/spend-art'
     shell.setScore(short(left))
     shell.setLevel(`${bought.length} / ${items.length}`)
     shell.setMoves(compact.format(bought.reduce((a, i) => a + i.n, 0)))
-    if (left < BUDGET) shell.considerBest(BUDGET - left, `${short(left)} left`)
+    if (left < BUDGET) shell.considerBest(BUDGET - left, `Spent ${usd(BUDGET - left)}`)
     // Zero is the ending; selling anything afterwards takes it back.
     if (left === 0 && !won) { won = true; finish() }
     else if (left > 0 && won) { won = false; shell.reset() }

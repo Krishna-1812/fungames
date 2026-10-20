@@ -551,6 +551,7 @@ const book = BOOK.map((key) => {
   import { faviconHref } from '../lib/favicon'
   import { readPassport, withHistory, newStamps, markSeen, rankFor, stampDate, clearPassport, type Visit } from '../lib/passport'
   import { readAll } from '../lib/stats'
+  import { progressSummary } from '../lib/progress-label'
   import { islandSound } from '../lib/island/sound'
   import { isMuted, setMuted, unlock, mayPlay } from '../lib/audio'
   import { track, onLeave } from '../lib/analytics/client'
@@ -628,7 +629,7 @@ const book = BOOK.map((key) => {
 
   /* ---- bests, from this browser ------------------------------------------ */
   const readBest = (slug: string): string | null => {
-    try { const v = JSON.parse(localStorage.getItem(bestKey(slug)) ?? 'null'); return typeof v?.text === 'string' ? v.text : null } catch { return null }
+    try { const v = JSON.parse(localStorage.getItem(bestKey(slug)) ?? 'null'); return typeof v?.text === 'string' && typeof v?.value === 'number' && Number.isFinite(v.value) ? progressSummary(slug, v.value, v.text) : null } catch { return null }
   }
   for (const s of data.slugs) data.games[s].best = readBest(s)
   const stats = readAll()
@@ -638,7 +639,7 @@ const book = BOOK.map((key) => {
   // with a score from before the passport existed.
   const visits = (): Record<string, Visit> => withHistory(readPassport(), readAll(), data.slugs.filter((s) => data.games[s].best))
   let sound: ReturnType<typeof islandSound> | null = null
-  document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => { const b = data.games[el.dataset.best!]?.best; if (b) { el.textContent = `Best ${b}`; el.classList.add('has-best') } })
+  document.querySelectorAll<HTMLElement>('[data-best]').forEach((el) => { const b = data.games[el.dataset.best!]?.best; if (b) { el.textContent = b; el.classList.add('has-best') } })
   // The grid says what the map does: today's challenge, what is new since you last came, and what you have finished
   // (a game you have played but kept no best for gets a tick where a best would go).
   {

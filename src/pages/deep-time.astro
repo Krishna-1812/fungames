@@ -324,7 +324,7 @@ const fmt = (y: number) =>
     shell.setScore(shortYears(years))
     shell.setLevel(`${actIdx + 1} / ${acts.length}`)
     shell.setMoves(act.yearsPerPx >= 1e4 ? `${compact.format(act.yearsPerPx)} yrs` : `${act.yearsPerPx} yr${act.yearsPerPx === 1 ? '' : 's'}`)
-    if (progress > 0) shell.considerBest(Math.round(progress * 10000), shortYears(years))
+    if (progress > 0) shell.considerBest(Math.round(progress * 10000), `${(progress * 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}% explored`)
   }
 
   function reachedToday() {
