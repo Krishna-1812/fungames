@@ -12,11 +12,11 @@ import { SITE } from '../site.config'
 <Paper title={`Privacy — ${SITE.name}`} description="What this site counts about visits, what it never does, and how to switch it off.">
   <main id="main" class="wrap pv">
     <p class="label meta">Privacy</p>
-    <h1 class="pv-title">We count visits, not people.</h1>
+    <h1 class="pv-title">What this site remembers.</h1>
     <p class="pv-lead">
       Every game here runs in your browser. To know which ones people enjoy, the site counts what happens on its pages:
       that a game was started or finished, how long a page was looked at, roughly where in the world and on what kind of device.
-      It never asks who you are, and nothing is sold or shared with anyone.
+      You do not need an account to play. Analytics can recognize repeat visits as described below. Data is not sold; hosting, database and font providers process requests needed to run the site.
     </p>
 
     <section class="pv-you" aria-labelledby="pv-you-h">
@@ -39,7 +39,7 @@ import { SITE } from '../site.config'
           <li>What happens in a game: started, finished, won or lost, the score it reports, restarts, shares, how far you got if you left part-way, and the choices it offers (which lever you pulled, which city you hit), so everyone can see how the crowd chose.</li>
           <li>What happens on the island: which buildings are visited, what is poked, where on the map it was tapped and which parts were looked at, bottles found, postcards made, what the games list is searched for.</li>
           <li>The site a visit came from (its address without anything after the path), and campaign tags on a link.</li>
-          <li>The country, region and city the request came from, read from the address and then forgotten.</li>
+          <li>The country, region and city estimated from the connection, plus latitude and longitude rounded to one decimal place. This approximate location is retained with the visit; it is not GPS location.</li>
           <li>The kind of device, its system and browser, the screen's size, language, timezone, and whether dark mode or reduced motion is on.</li>
           <li>How fast pages load, and any script errors (the message and the lines of this site’s own code it happened in), so broken things get fixed.</li>
         </ul>
@@ -47,9 +47,9 @@ import { SITE } from '../site.config'
       <section aria-labelledby="pv-never">
         <h2 id="pv-never" class="pv-h">What is never kept</h2>
         <ul>
-          <li>Your IP address or your browser's full identifying string.</li>
+          <li>Your raw IP address or full browser identifying string in the analytics database. Both are read temporarily to derive a daily recognition hash. Security rate limits use a separate keyed hash in server memory.</li>
           <li>Anything you type or draw inside a game: your messages, your drawings, the words of your answers, or your birth date (Life in Weeks reports only an age decade, and Who Was Alive only the decade of a year).</li>
-          <li>Anything from other sites. There are no advertising or tracking cookies, and no fingerprinting.</li>
+          <li>Activity on other sites. There are no advertising cookies. The daily hash is a form of limited recognition, rather than a persistent device fingerprint.</li>
           <li>Visits from browsers with Global Privacy Control switched on are counted without an ID.</li>
         </ul>
       </section>
@@ -60,13 +60,18 @@ import { SITE } from '../site.config'
       <p>
         A random string kept in this browser's storage (not a cookie), so that a visitor who comes back on another day can be told apart from a new one.
         It says nothing about you, and it is never linked to anything outside this site. In the EU, the EEA, the UK and Switzerland it is only made once you say yes;
-        elsewhere it is made on the first visit, and the buttons above take it away. Without it you are still counted, as an anonymous visit for that day only.
+        elsewhere it is made on the first visit, and the buttons above take it away. Without this stored ID, the server still hashes the IP address and full browser identifying string with a random daily salt to estimate repeat visits within the same UTC day. The salt is deleted when a later day is initialized; the derived hash remains with the retained visit. Shared connections can be counted together, and this does not establish who a person is.
       </p>
       <p>
         Records are kept in a database run for this site (Neon Postgres, through Vercel): what was done on a page for 90 days, the pages visited and an ID’s first and last visit for at most thirteen months, and then deleted.
         After 90 days a day’s events are kept only as totals for that day (so many games started, so many people chose this answer), which say nothing about any one visitor and are kept for good.
         Questions: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
       </p>
+    </section>
+
+    <section aria-labelledby="pv-providers">
+      <h2 id="pv-providers" class="pv-h">Services that receive requests</h2>
+      <p>Vercel hosts the site and receives connection information. Neon stores the analytics database. Google Fonts receives requests for the typefaces, including the connection’s IP address and browser headers. These are service providers, not a promise that no third party ever receives data. Their infrastructure may keep its own operational logs.</p>
     </section>
 
     <section aria-labelledby="pv-saveh">
