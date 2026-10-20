@@ -89,15 +89,34 @@ export const badlands: Record<string, Landmark> = {
     // The dinosaur, in the front face, a third of the way down.
     const [fx, fy] = p.at(1, 1.95, 30)
     const b = p.group('dt-fossil')
-    // On the realistic island, bone set in the rock: a pale fossil-grey, lit as the face it is in.
-    const bone = p.real ? '#d9d3e6' : '#ffffff', op = p.real ? 0.82 : undefined
-    b.path(`M${f(fx - 36)} ${f(fy + 4)}q14 -4 24 -14q14 -12 30 -6q10 4 18 -2`, 'none', { stroke: bone, sw: p.real ? 2.6 : 3, op })
-    for (let k = 0; k < 6; k++) b.path(`M${f(fx - 10 + k * 6)} ${f(fy - 12 + Math.abs(k - 2.5) * 1.5)}l-2 ${f(12 - Math.abs(k - 2.5) * 1.6)}`, 'none', { stroke: bone, sw: p.real ? 1.8 : 2.2, op })
-    b.path(`M${f(fx + 36)} ${f(fy - 12)}l8 -3l5 3l-2 5l-8 1z`, 'none', { stroke: bone, sw: p.real ? 1.8 : 2.2, op })
-    b.path(`M${f(fx - 4)} ${f(fy - 2)}l-4 12M${f(fx + 18)} ${f(fy - 4)}l2 12`, 'none', { stroke: bone, sw: p.real ? 1.8 : 2.2, op })
+    // The bones, as paths: the spine's sweep, six ribs, the skull, two legs.
+    const bones = [
+      [`M${f(fx - 36)} ${f(fy + 4)}q14 -4 24 -14q14 -12 30 -6q10 4 18 -2`, 1],
+      ...Array.from({ length: 6 }, (_, k) => [`M${f(fx - 10 + k * 6)} ${f(fy - 12 + Math.abs(k - 2.5) * 1.5)}l-2 ${f(12 - Math.abs(k - 2.5) * 1.6)}`, 0]),
+      [`M${f(fx + 36)} ${f(fy - 12)}l8 -3l5 3l-2 5l-8 1z`, 0],
+      [`M${f(fx - 4)} ${f(fy - 2)}l-4 12M${f(fx + 18)} ${f(fy - 4)}l2 12`, 0],
+    ] as [string, number][]
+    if (p.real) {
+      // Every absolute move in a bone's path, shifted (each bone's path is relative after its moves).
+      const shift = (d: string, dx: number, dy: number) => d.replace(/M(-?[\d.]+) (-?[\d.]+)/g, (_, x, y) => `M${f(+x + dx)} ${f(+y + dy)}`)
+      const round = 'stroke-linecap:round;stroke-linejoin:round'
+      // On the realistic island, bone set in the rock as a dig shows it: each bone in a groove cut round it
+      // (dark, a little below), then the bone (a warm off-white, a touch translucent so the strata show through),
+      // lit along its top edge by the same sun as the face.
+      for (const [d, spine] of bones) b.path(shift(d, 0.7, 1.1), 'none', { stroke: '#2b2440', sw: spine ? 4.2 : 3.2, op: 0.42, style: round })
+      for (const [d, spine] of bones) b.path(d, 'none', { stroke: '#d8cfc2', sw: spine ? 2.4 : 1.6, op: 0.9, style: round })
+      for (const [d, spine] of bones) b.path(shift(d, -0.3, -0.5), 'none', { stroke: '#fbf6ec', sw: spine ? 0.9 : 0.6, op: 0.8, style: round })
+    } else for (const [d, spine] of bones) b.path(d, 'none', { stroke: '#ffffff', sw: spine ? 3 : 2.2 })
     // An ammonite on the other face (in the shade: darker).
     const [ax, ay] = p.at(1.95, 0.9, 20)
-    p.path(`M${f(ax)} ${f(ay)}m-7 0a7 7 0 1 1 7 7a5 5 0 1 1 -5 -5a3 3 0 1 1 3 3`, 'none', { stroke: p.real ? '#c2bbd6' : '#ffffff', sw: p.real ? 1.5 : 1.8, op })
+    const curl = (x: number, y: number) => `M${f(x)} ${f(y)}m-7 0a7 7 0 1 1 7 7a5 5 0 1 1 -5 -5a3 3 0 1 1 3 3`
+    if (p.real) {
+      // The same as the bones: a groove, the shell, its lit edge (fainter: this face is in shade).
+      const round = 'stroke-linecap:round;stroke-linejoin:round'
+      p.path(curl(ax + 0.5, ay + 0.8), 'none', { stroke: '#211b33', sw: 2.6, op: 0.4, style: round })
+      p.path(curl(ax, ay), 'none', { stroke: '#b9b0c4', sw: 1.6, op: 0.85, style: round })
+      p.path(curl(ax - 0.25, ay - 0.35), 'none', { stroke: '#e6e0ee', sw: 0.5, op: 0.6, style: round })
+    } else p.path(curl(ax, ay), 'none', { stroke: '#ffffff', sw: 1.8 })
     // A ladder down the side, and someone at work up top.
     p.line([1.95, 1.45, 0], [1.95, 1.45, top], { sw: 1.6 })
     p.line([1.95, 1.6, 0], [1.95, 1.6, top], { sw: 1.6 })
