@@ -41,10 +41,18 @@ import { SHAPES } from '../lib/steady-shapes'
       ))}
     </ol>
 
+    {/* Drawing without a mouse or a finger: a practice pen moved by the keys, never ranked. */}
+    <div class="sh-kb">
+      <button type="button" class="sh-kb-btn" id="keyboardPractice" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M6 10h1.5M9.5 10H11M13 10h1.5M16.5 10H18M7 14h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+        <span>Keyboard practice</span>
+      </button>
+      <p id="keyboardHelp" class="sh-kb-help"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> move the pen · <kbd>Shift</kbd> small steps · <kbd>Space</kbd> starts and ends a stroke · <kbd>Home</kbd> back to the first dot · <kbd>N</kbd> next shape. Not ranked.</p>
+    </div>
     <div class="sh-board" id="board">
       {/* Behind the canvas, which clears to transparent. */}
       <div class="felt" id="felt" aria-hidden="true"></div>
-      <canvas id="c" aria-label="The drawing board. Press on the first dot and drag, in one stroke."></canvas>
+      <canvas id="c" tabindex="0" aria-describedby="keyboardHelp hint" aria-label="The drawing board. Press on the first dot and drag, in one stroke."></canvas>
 
       <p class="sh-hint" id="hint" aria-live="polite">Press on the first dot and drag to the second. One stroke.</p>
 
@@ -114,6 +122,7 @@ import { SHAPES } from '../lib/steady-shapes'
   let stroke: P[] = []    // each point carries the deviation it was drawn at
   let liveTarget: P[] = [] // the ideal, for colouring the stroke as it is drawn
   let drawing = false
+  let keyboardPractice = false
   let locked = false
   let lastScore: Score | null = null
   let strokes = 0
@@ -180,6 +189,7 @@ import { SHAPES } from '../lib/steady-shapes'
     // muscle movement in one particular direction.
     rot = Math.random() * Math.PI * 2
     dots = shape.dots(box(), rot)
+    if (keyboardPractice && dots[0]) pen = { ...dots[0] }
     stroke = []
     locked = false
     lastScore = null
@@ -292,6 +302,17 @@ import { SHAPES } from '../lib/steady-shapes'
     if (locked) drawReveal()
     drawStroke()
     drawDots()
+    // The keyboard's pen: a ring and cross-hair in the board's mint, with a dark rim so it reads on the chalk too.
+    if (keyboardPractice) {
+      ctx.save()
+      for (const [col, w] of [['rgba(10, 30, 26, 0.55)', 4.5], ['#4fe3c1', 2]] as [string, number][]) {
+        ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'
+        ctx.beginPath(); ctx.arc(pen.x, pen.y, 7, 0, Math.PI * 2); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(pen.x - 14, pen.y); ctx.lineTo(pen.x - 9, pen.y); ctx.moveTo(pen.x + 9, pen.y); ctx.lineTo(pen.x + 14, pen.y)
+        ctx.moveTo(pen.x, pen.y - 14); ctx.lineTo(pen.x, pen.y - 9); ctx.moveTo(pen.x, pen.y + 9); ctx.lineTo(pen.x, pen.y + 14); ctx.stroke()
+      }
+      ctx.restore()
+    }
   }
 
   /* ---- the round -------------------------------------------------------- */
@@ -379,16 +400,12 @@ import { SHAPES } from '../lib/steady-shapes'
     stroke.push({ x: p.x, y: p.y, t: Math.min(1, d / (TOLERANCE * strokeScale)) })
   }
 
-  canvas.addEventListener('pointerdown', (e) => {
-    if (locked || shell.paused || idx >= SHAPES.length) return
-    const p = pos(e)
+  function beginStroke(p: P) {
+    if (locked || shell.paused || idx >= SHAPES.length) return false
     if (!startOk(p)) {
       hint.textContent = 'Start on the first dot.'
-      return
+      return false
     }
-    // Capture keeps the stroke alive if the pointer leaves the canvas; it is
-    // not available for synthetic events, so failing here must not break play.
-    try { canvas.setPointerCapture(e.pointerId) } catch { /* not fatal */ }
     unlock(); sfx.click()
     drawing = true
     liveTarget = shape.target(box(), rot, [p])
@@ -401,6 +418,12 @@ import { SHAPES } from '../lib/steady-shapes'
       : 'Keep going. Do not lift.'
     render()
     nudge()
+    return true
+  }
+  canvas.addEventListener('pointerdown', (e) => {
+    if (keyboardPractice) return
+    if (!beginStroke(pos(e))) return
+    try { canvas.setPointerCapture(e.pointerId) } catch { /* synthetic input has no capture */ }
     e.preventDefault()
   })
 
@@ -420,7 +443,7 @@ import { SHAPES } from '../lib/steady-shapes'
   function finishStroke() {
     if (!drawing) return
     drawing = false
-    strokes++
+    if(!keyboardPractice)strokes++
     const end = stroke[stroke.length - 1]
     const home = shape.closed ? stroke[0] : dots[dots.length - 1]
     if (!end || stroke.length < 6 || dist(end, home) > SNAP) {
@@ -430,11 +453,16 @@ import { SHAPES } from '../lib/steady-shapes'
         : 'You have to finish on the last dot. Try again.'
       shell.shake($('board'))
       // Once a shape a page: a missed ending can come many times over.
-      if (!abandoned.has(shape.id)) { abandoned.add(shape.id); shell.pick('Stroke abandoned', shape.name) }
+      if (!keyboardPractice && !abandoned.has(shape.id)) { abandoned.add(shape.id); shell.pick('Stroke abandoned', shape.name) }
       paintStrip()
       render()
       nudge()
       return
+    }
+    if (keyboardPractice) {
+      const score = scoreStroke(shape, box(), rot, stroke)
+      hint.textContent = `Practice stroke: ${score.score.toFixed(1)}%. No ranked result saved. Home repositions the pen; Space starts again; N changes shape.`
+      render(); nudge(); return
     }
     locked = true
 
@@ -491,6 +519,44 @@ import { SHAPES } from '../lib/steady-shapes'
   canvas.addEventListener('pointerup', finishStroke)
   canvas.addEventListener('pointercancel', finishStroke)
   canvas.addEventListener('pointerleave', finishStroke)
+
+  let restoreScoredRound: (() => void) | null = null
+  $('keyboardPractice').addEventListener('click', () => {
+    if (drawing) { drawing = false; stroke = [] }
+    if(!keyboardPractice){
+      const previous={idx,shape,rot,dots,pen,stroke,liveTarget,locked,hidden:result.hidden,hint:hint.textContent}
+      restoreScoredRound=()=>{
+        idx=previous.idx;shape=previous.shape;rot=previous.rot;dots=previous.dots;pen=previous.pen
+        stroke=previous.stroke;liveTarget=previous.liveTarget;locked=previous.locked;result.hidden=previous.hidden
+        hint.textContent=previous.hint;paintRound();paintStrip()
+      }
+    }
+    keyboardPractice = !keyboardPractice
+    $('keyboardPractice').setAttribute('aria-pressed', String(keyboardPractice))
+    if (keyboardPractice) {
+      locked = false; result.hidden = true; pen = { ...dots[0] };stroke=[];liveTarget=[]
+      hint.textContent = 'Keyboard practice. Arrows position the pen; Space starts a stroke. Home returns to the first dot.'
+      canvas.focus()
+    } else {restoreScoredRound?.();restoreScoredRound=null}
+    render(); nudge()
+  })
+  canvas.addEventListener('keydown', (e) => {
+    if (!keyboardPractice || shell.paused || e.metaKey || e.ctrlKey || e.altKey) return
+    const moves: Record<string, P> = { ArrowLeft: {x:-1,y:0}, ArrowRight: {x:1,y:0}, ArrowUp: {x:0,y:-1}, ArrowDown: {x:0,y:1} }
+    if (moves[e.key]) {
+      e.preventDefault();const d=moves[e.key],step=e.shiftKey?1:4
+      pen={x:Math.max(0,Math.min(W,pen.x+d.x*step)),y:Math.max(0,Math.min(H,pen.y+d.y*step))}
+      if(drawing)push(pen)
+      render();nudge()
+    } else if (e.key === ' ' && !e.repeat) {
+      e.preventDefault(); if(drawing)finishStroke();else beginStroke({...pen})
+      // beginStroke/finishStroke own the outcome message, including failures.
+    } else if (e.key === 'Home' && !drawing) {
+      e.preventDefault();pen={...dots[0]};render();nudge()
+    } else if (e.key.toLowerCase() === 'n' && !drawing) {
+      e.preventDefault();idx=(idx+1)%SHAPES.length;shape=SHAPES[idx];place();paintRound();paintStrip();nudge()
+    }
+  })
 
   function redo() {
     if (!locked || idx >= SHAPES.length) return
@@ -587,6 +653,29 @@ import { SHAPES } from '../lib/steady-shapes'
      rules are global on purpose. Everything is prefixed. */
   .sh { display: grid; gap: 14px; container-type: inline-size; }
 
+  /* Keyboard practice: a quiet row under the round, the button a pill like the shell's, the keys drawn as keys. */
+  .sh-kb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 14px 0 12px; }
+  .sh-kb-btn {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 11px;
+    font: 600 14px/1 var(--sans); color: var(--ink); background: var(--card);
+    border: 2px solid var(--ink); border-radius: var(--r-pill); cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .sh-kb-btn svg { width: 20px; height: 20px; flex: none; }
+  .sh-kb-btn:hover { background: var(--paper2); }
+  .sh-kb-btn[aria-pressed='true'] { background: var(--ink); color: var(--ink-paper); }
+  .sh-kb-btn:focus-visible { outline: 3px solid var(--t-cobalt); outline-offset: 2px; }
+  .sh-board canvas:focus-visible { outline: 3px solid var(--mint); outline-offset: -3px; }
+  .sh-kb-help { margin: 0; flex: 1 1 320px; font-size: 13px; line-height: 1.6; color: var(--ink2); }
+  .sh-kb-help kbd {
+    display: inline-block; min-width: 1.6em; padding: 0 5px; margin: 0 1px; text-align: center;
+    font: 600 12px/1.55 var(--sans); color: var(--ink); background: var(--card);
+    border: 1px solid var(--paper3); border-bottom-width: 2px; border-radius: 5px;
+  }
+  /* Only while practising does the help need to be on screen; before that the button says enough. */
+  .sh-kb:not(:has([aria-pressed='true'])) .sh-kb-help { display: none; }
+  /* A touch screen with no mouse or keyboard has no use for it. */
+  @media not (any-pointer: fine) { .sh-kb { display: none; } }
   .sh-round { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
   .sh-round li {
     display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 2px 10px;
