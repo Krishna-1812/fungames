@@ -82,7 +82,7 @@ export function boatUse(kind: 'sail' | 'ferry' | 'fishing' | 'speed' | 'row', hu
 }
 
 /** The pictures the page itself draws on its canvas (lib/island/play.ts: the pigeons, the parade), by name; written down for Unity. */
-export type Sprites = { pigeon: Record<'stand' | 'peck' | 'up' | 'down', [string, string]>; marchers: string[][][]; dog: string[][] }
+export type Sprites = { pigeon: Record<'stand' | 'peck' | 'up' | 'down', [string, string]>; marchers: string[][][]; dog: string[][]; balloon?: string }
 export const FOUR: Facing[] = ['se', 'sw', 'nw', 'ne']
 export function spriteNames(crowd: Who[]): Sprites {
   const pig = (pose: ActorRec['pose'], a: Facing, b: Facing): [string, string] => [a, b].map((h) => { creatureUse('pigeon', '#8e93a6', pose, h); return `a-pigeon-8e93a6-${pose}-${h}` }) as [string, string]
@@ -90,6 +90,8 @@ export function spriteNames(crowd: Who[]): Sprites {
     pigeon: { stand: pig('stand', 'se', 'sw'), peck: pig('peck', 'se', 'sw'), up: pig('up', 'e', 'w'), down: pig('down', 'e', 'w') },
     marchers: crowd.map((w) => FOUR.map((h) => Array.from({ length: WALK_FRAMES }, (_, k) => { actorUse(w, 'walk', h, k); return actorName(w, 'walk', h, k) }))),
     dog: FOUR.map((h) => Array.from({ length: 4 }, (_, k) => { creatureUse('dog', '#d8d2cc', `c${k}`, h); return `a-dog-d8d2cc-c${k}-${h}` })),
+    // Today's balloon, tied over today's game (play.ts, setToday): Unity's, in the cartoon one's red and white.
+    balloon: (creatureUse('balloon', '#ff4f6e', 'stand', 'se', {}, '#ffffff'), 'a-balloon-ff4f6e_ffffff-stand-se'),
   }
 }
 

@@ -63,7 +63,7 @@ fs.writeFileSync(path.join(out, 'scene.json'), sceneJson(p.scene)); files.push('
 // sprites.webp, and sprites.json for where each is and where its foot is in it.
 if (island.sprites) {
   const sp = island.sprites
-  const names = [...new Set([...Object.values(sp.pigeon).flat(), ...sp.marchers.flat(2), ...sp.dog.flat()])]
+  const names = [...new Set([...Object.values(sp.pigeon).flat(), ...sp.marchers.flat(2), ...sp.dog.flat(), ...(sp.balloon ? [sp.balloon] : [])])]
   const dir = path.join(process.cwd(), 'src/lib/island/actors')
   const meta = JSON.parse(fs.readFileSync(path.join(dir, 'actors.json'), 'utf8'))
   const kindOf = (n) => (n.startsWith('v-') || n.startsWith('a-') ? n.split('-')[1] : 'person')
