@@ -165,12 +165,6 @@ const book = BOOK.map((key) => {
             <div class="isl-more">
               <button type="button" class="isl-btn isl-btn--round" id="btnMore" aria-expanded="false" aria-controls="islMorePanel" aria-label="How the island looks and sounds" title="How the island looks and sounds"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="15" cy="7" r="2.4" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="17" r="2.4" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /></svg><em class="isl-cap" aria-hidden="true">More</em></button>
               <div class="isl-more-panel" id="islMorePanel" hidden>
-                {worlds && (
-                  <div class="isl-world" role="group" aria-label="How the island looks">
-                    <a class="isl-world-opt" href={worldHref.cartoon} data-world="cartoon" aria-label="Cartoon island" aria-current={world === 'cartoon' ? 'page' : undefined} title="The island, drawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-8.2 8.2c-.9.9-2.2 1.3-3.4 1.1l-3.4-.6.6-3.4c.2-1.2.6-2.5 1.5-3.4z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12.5 6.5l5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Cartoon</span></a>
-                    <a class="isl-world-opt" href={worldHref.real} data-world="real" aria-label="Realistic island" aria-current={world === 'real' ? 'page' : undefined} title="The island, rendered in 3D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 19.5l6-9 4 5.5 2.6-3.5 6.4 7z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="17" cy="6.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Realistic</span></a>
-                  </div>
-                )}
                 <div class="isl-more-row">
                   <button type="button" class="isl-btn isl-btn--round" id="btnTime" aria-label="Switch to night" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-sun"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></g><path class="ic-moon" d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Night</span></button>
                   <button type="button" class="isl-btn isl-btn--round" id="btnSound" aria-label="Turn sound on" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-waves" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg><span>Sound</span></button>
@@ -232,6 +226,13 @@ const book = BOOK.map((key) => {
             <rect class="isl-mini-view" x="0" y="0" width="0" height="0" rx="14" />
           </svg>
         </div>
+        {/* Cartoon or realistic: on the map itself, by the map button, where it can be seen and reached at once. */}
+      {worlds && (
+        <div class="isl-world isl-world--map" role="group" aria-label="How the island looks">
+          <a class="isl-world-opt" href={worldHref.cartoon} data-world="cartoon" aria-label="Cartoon island" aria-current={world === 'cartoon' ? 'page' : undefined} title="The island, drawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-8.2 8.2c-.9.9-2.2 1.3-3.4 1.1l-3.4-.6.6-3.4c.2-1.2.6-2.5 1.5-3.4z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12.5 6.5l5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Cartoon</span></a>
+          <a class="isl-world-opt" href={worldHref.real} data-world="real" aria-label="Realistic island" aria-current={world === 'real' ? 'page' : undefined} title="The island, rendered in 3D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 19.5l6-9 4 5.5 2.6-3.5 6.4 7z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="17" cy="6.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Realistic</span></a>
+        </div>
+      )}
         <button type="button" class="isl-mapbtn" id="islMapBtn" aria-expanded="false" aria-label="Show the map" title="Map"><svg class="ic-map" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5 9 4.5l6 2 5.5-2v13l-5.5 2-6-2-5.5 2z" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M9 4.5v13M15 6.5v13" fill="none" stroke="currentColor" stroke-width="2" /></svg><svg class="ic-fold" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
         <a class="isl-down" href="#games"><span>All {count} games</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
       </div>
@@ -1826,9 +1827,19 @@ const book = BOOK.map((key) => {
   }
   .isl-more-panel[hidden] { display: none; }
   @keyframes isl-more-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
-  .isl-more-panel .isl-world { box-shadow: none; border-width: 2.5px; }
-  .isl-more-panel .isl-world-opt { flex: 1; justify-content: center; padding: 6px 10px; }
-  .isl-more-panel .isl-world-opt span, .isl-more-panel .isl-btn span { display: inline; }
+  .isl-more-panel .isl-btn span { display: inline; }
+  /* The island switch, down in the corner beside the map button (or alone there on a phone), always with its words. */
+  .isl-world--map { position: absolute; left: calc(clamp(14px, 3vw, 32px) + 60px); bottom: 24px; z-index: 6; transition: left 0.28s; }
+  .isl-box.is-map .isl-world--map { left: calc(clamp(14px, 3vw, 32px) + 208px); }
+  .isl-world--map .isl-world-opt { padding: 6px 12px; min-height: 36px; }
+  .isl-world--map .isl-world-opt span { display: inline; }
+  @media (max-width: 760px) {
+    /* A phone's bottom edge also has the arrow down to the games, in the middle: the switch keeps to its pictures. */
+    .isl-world--map { left: 12px; bottom: 20px; padding: 3px; }
+    .isl-world--map .isl-world-opt { padding: 0; width: 44px; min-height: 40px; justify-content: center; }
+    .isl-world--map .isl-world-opt svg { width: 22px; height: 22px; }
+    .isl-world--map .isl-world-opt span { display: none; }
+  }
   .isl-more-row { display: flex; gap: 8px; }
   .isl-more-row .isl-btn { flex: 1; justify-content: center; padding: 8px 10px; box-shadow: 0 3px 0 #1b2340; border-width: 2.5px; font-size: 15px; }
   #btnMore[aria-expanded='true'] { background: #1b2340; color: #fff; }
