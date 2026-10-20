@@ -10,7 +10,25 @@ const INK = '#1b2340'
 const loop = (kf: string, dur: number, org: [number, number], ref: [number, number]): Anim => ({ kf, dur, delay: 0, ease: 'ease-in-out', iter: Infinity, dir: 0, fill: 0, org, ref })
 
 /** A small flag, its pole's foot at (x, y), fluttering from the pole. */
-export function flagNodes(x: number, y: number): Node[] {
+export function flagNodes(x: number, y: number, real = false): Node[] {
+  // On the realistic island no ink: a thin steel pole with a ball on top, and the cloth shaded where it folds.
+  if (real) return [{
+    k: 'g',
+    kids: [
+      { k: 'v', d: `M${x + 0.6} ${y}v-31`, st: { f: null, s: '#5d6470', w: 1.6 } },
+      { k: 'v', d: `M${x - 0.3} ${y}v-31`, st: { f: null, s: '#c9ced6', w: 0.7 } },
+      { k: 'v', d: `M${x - 1.6} ${y - 31.5}a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0`, st: { f: '#d9dde4', s: null } },
+      {
+        k: 'g',
+        a: [loop('isl-flutter', 1.2, [x, y - 24.5], [18, 11])],
+        kids: [
+          { k: 'v', d: `M${x} ${y - 30}c6 1 11 3 17 4.6c-5 2 -11 4 -17 6.4z`, st: { f: '#e8435f', s: null } },
+          { k: 'v', d: `M${x + 6} ${y - 28.6}c3 0.8 6 1.6 11 2.9c-4 1.4 -7 2.6 -11 3.9z`, st: { f: '#b52d47', s: null, op: 0.55 } },
+          { k: 'v', d: `M${x} ${y - 30}c6 1 11 3 17 4.6`, st: { f: null, s: '#ff8ea0', w: 0.6, op: 0.7 } },
+        ],
+      },
+    ],
+  }]
   return [{
     k: 'g',
     kids: [

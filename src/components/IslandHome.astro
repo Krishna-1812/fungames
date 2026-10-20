@@ -893,7 +893,7 @@ const book = BOOK.map((key) => {
   }
   isle.withEngine((e) => {
     const nodes: Node[] = []
-    for (const s of data.slugs) { if (!finished.has(s)) continue; const a = data.anchors[s]; nodes.push(...flagNodes(a.x1 - 14, a.y0 + 18)) }
+    for (const s of data.slugs) { if (!finished.has(s)) continue; const a = data.anchors[s]; nodes.push(...flagNodes(a.x1 - 14, a.y0 + 18, !!data.play?.sprites)) }
     // On the realistic island the balloon is Unity's (play.ts); on the drawn one, the drawing.
     if (ta && !play.setToday((ta.x0 + ta.x1) / 2, ta.y0)) nodes.push(...balloonNodes((ta.x0 + ta.x1) / 2, ta.y0))
     e.add(nodes)
