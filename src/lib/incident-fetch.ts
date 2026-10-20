@@ -178,6 +178,8 @@ export function readCache(now: number): CacheShape | null {
     const parsed = JSON.parse(raw) as CacheShape
     if (typeof parsed?.at !== 'number' || now - parsed.at > CACHE_TTL_MS) return null
     if (!Array.isArray(parsed.quakes) || !parsed.flr || !parsed.gst || !parsed.ips) return null
+    // A feed that failed is asked again, not remembered: the page says "try reloading", so reloading must try.
+    if (!parsed.flr.ok || !parsed.gst.ok || !parsed.ips.ok || parsed.quakes.some(([, r]) => !r?.ok)) return null
     return parsed
   } catch {
     return null
