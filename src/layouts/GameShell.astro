@@ -35,9 +35,11 @@ interface Props {
    * is played by scrolling up, whose ending is at the top of the page.
    */
   resultFirst?: boolean
+  /** A game that shows its own running total (Spend It's balance) does without the strip of chips above it. */
+  compactStats?: boolean
 }
 
-const { slug, labels = {}, initial = {}, fonts = [], resultFirst = false } = Astro.props
+const { slug, labels = {}, initial = {}, fonts = [], resultFirst = false, compactStats = false } = Astro.props
 const game = gameBySlug(slug)
 if (!game) throw new Error(`No registry entry for game "${slug}"`)
 
@@ -130,7 +132,7 @@ const structuredData = [
     </header>
 
     <main id="main" class="wrap shell-main">
-      <ul class="shell-strip" role="list" aria-label="Scores">
+      <ul class:list={['shell-strip', { 'shell-strip--compact': compactStats }]} role="list" aria-label="Scores">
         <li class:list={['shell-tile', { 'is-empty': (initial.score ?? '0') === '—' }]} data-tile="score">
           <span class="label">{L.score}</span>
           <span class="num tab" data-val>{initial.score ?? '0'}</span>

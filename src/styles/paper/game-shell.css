@@ -99,6 +99,7 @@
   white-space: nowrap;
 }
 .shell-tile.is-empty { display: none; }
+.shell-strip--compact { display: none; }
 .shell-tile .label { color: var(--ink3); }
 .shell-tile .num { font-size: 21px; white-space: nowrap; }
 .shell-tile .num small { font-size: 0.62em; font-weight: 600; letter-spacing: 0; color: var(--ink3); margin-left: 3px; }
