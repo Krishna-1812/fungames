@@ -292,8 +292,10 @@ const INFO: Record<string, InfoContent> = {
 
     if (!s.ok) {
       setOdometer(fig, ALL_DASHES) // the feed itself failed
+      // Say whose feed it is: NASA's space-weather log has whole days down, which reloading will not fix.
+      const nasa = !cat.id.startsWith('eq-')
       sr.textContent = 'The feed for this row did not answer.'
-      detail.textContent = 'Feed unavailable right now — try reloading in a bit.'
+      detail.textContent = nasa ? "NASA's space-weather log is down right now. This row fills in when it is back." : 'USGS did not answer in time. Try reloading in a minute.'
       return
     }
     if (s.event) {
