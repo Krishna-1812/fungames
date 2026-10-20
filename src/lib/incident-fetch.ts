@@ -90,7 +90,7 @@ async function fetchDonkiRange(kind: DonkiKind, startEpoch: number, endEpoch: nu
   try {
     // Through the site's own cached route (pages/api/donki.ts), not straight to NASA from every browser.
     const url = withBase(`/api/donki/?kind=${kind}&start=${iso(startEpoch)}&end=${iso(endEpoch)}`)
-    const raw = await getJSON(url, 25_000)
+    const raw = await getJSON(url, 45_000)
     if (!Array.isArray(raw)) return { events: [], ok: false }
     const events = raw.map(PARSE_BY_KIND[kind]).filter((e): e is IncidentEvent => e != null)
     return { events, ok: true }
@@ -101,7 +101,8 @@ async function fetchDonkiRange(kind: DonkiKind, startEpoch: number, endEpoch: nu
 
 async function queryQuake(min: number, starttime: string, timeoutMs: number): Promise<SourceResult> {
   try {
-    const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=${min}&limit=1&orderby=time&starttime=${starttime}`
+    // Through the site's own cached route (pages/api/quakes.ts): one slow USGS search serves every visitor.
+    const url = withBase(`/api/quakes/?min=${min}&start=${starttime}`)
     const j = await getJSON(url, timeoutMs)
     const f = j?.features?.[0]
     return { events: f ? [parseUsgsFeature(f)] : [], ok: true }
@@ -117,9 +118,9 @@ async function fetchQuakes(now: number): Promise<Map<string, SourceResult>> {
   await Promise.all(
     EARTHQUAKE_CATEGORIES.map(async (c) => {
       const fastStart = iso(now - QUAKE_FAST_LOOKBACK_DAYS[c.id] * DAY_MS)
-      const fast = await queryQuake(c.min, fastStart, 10_000)
+      const fast = await queryQuake(c.min, fastStart, 30_000)
       if (!fast.ok || fast.events.length) { out.set(c.id, fast); return }
-      out.set(c.id, await queryQuake(c.min, EARTHQUAKE_START, 20_000))
+      out.set(c.id, await queryQuake(c.min, EARTHQUAKE_START, 35_000))
     }),
   )
   return out
