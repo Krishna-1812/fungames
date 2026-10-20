@@ -1733,9 +1733,18 @@ const book = BOOK.map((key) => {
     content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background: rgba(70, 92, 130, 0.36); mix-blend-mode: multiply;
   }
+  /* And the air: what is furthest off (the top of the view, looking down across the island) a little paler and
+     cooler, as distance is in a photograph of a real place; at night the air is dark, so it only deepens. */
   .isl-box[data-world='real'] .isl-stage::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(ellipse 75% 70% at 50% 46%, transparent 58%, rgba(3, 22, 52, 0.16) 82%, rgba(2, 16, 40, 0.34) 100%);
+    background:
+      radial-gradient(ellipse 75% 70% at 50% 46%, transparent 58%, rgba(3, 22, 52, 0.16) 82%, rgba(2, 16, 40, 0.34) 100%),
+      linear-gradient(180deg, rgba(214, 230, 246, 0.2) 0%, rgba(214, 230, 246, 0.07) 22%, transparent 42%);
+  }
+  :global(.isl-box[data-world='real'][data-time='night']) .isl-stage::after, :global(.isl-box[data-world='real'][data-time='dusk']) .isl-stage::after {
+    background:
+      radial-gradient(ellipse 75% 70% at 50% 46%, transparent 58%, rgba(3, 12, 32, 0.22) 82%, rgba(2, 8, 24, 0.42) 100%),
+      linear-gradient(180deg, rgba(20, 30, 70, 0.22) 0%, transparent 40%);
   }
   /* The island: one canvas, under the page's own names and cards. Until it
      can draw, the poster stands in, placed by the camera (and without
