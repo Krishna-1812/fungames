@@ -749,6 +749,14 @@ export function createEngine(o: {
   const lastEnd = new Map<string, number>()
   for (const [kind, at] of scene.ends ?? []) lastEnd.set(kind, at)
   for (const [kind, at] of lastEnd) (endsAfter.get(at - 1) ?? endsAfter.set(at - 1, []).get(at - 1)!).push(kind)
+  // What the page adds (the finished buildings' flags, today's balloon) goes under the night wherever the
+  // night falls on the sky as well (the realistic island): just above the buildings, under the weather and
+  // the clouds, so it is darkened with everything round it rather than shining on top. Otherwise (the
+  // cartoon's night stops under the sky, with its balloons) it is drawn last, as before.
+  const ends = scene.ends ?? []
+  const nightIx = ends.findIndex(([k]) => k === 'night'), skyIx = ends.findIndex(([k]) => k === 'sky')
+  const airIx = ends.findIndex(([k]) => k === 'weather' || k === 'sky')
+  const extraAt = airIx > 0 && skyIx >= 0 && nightIx > skyIx ? ends[airIx - 1][1] : -1
   const hook = (h: LiveHook) => { cs.paths += h(ctx, deviceM, now); ident = false; textCtx = null; transforms.invalidate(); ctx.globalAlpha = 1 }
 
   /* ---- one frame ---- */
@@ -778,11 +786,12 @@ export function createEngine(o: {
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
     scene.root.forEach((n, i) => {
+      if (i === extraAt) for (const e of extra) drawNode(e, deviceM, 1)
       drawNode(n, deviceM, 1)
       const ended = endsAfter.get(i)
       if (ended) for (const k of ended) { const h = drawLive.after?.[k]; if (h) hook(h) }
     })
-    for (const n of extra) drawNode(n, deviceM, 1)
+    if (extraAt < 0) for (const n of extra) drawNode(n, deviceM, 1)
     if (drawLive.top) hook(drawLive.top)
     ctx.globalAlpha = 1
     lastGaps = gaps; lastBlurry = blurry
