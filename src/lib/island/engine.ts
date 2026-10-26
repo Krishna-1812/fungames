@@ -363,7 +363,10 @@ export function createEngine(o: {
     if (win && n.bb && outsideWin(devBox(m, n.bb))) return
     setM(mm)
     const st = n.st
-    const fill = fills.get(n) ?? P.fill ?? tagFill(n) ?? undefined
+    // A time's colour (tagFill) goes to the stroke of a shape that is only a stroke, such as the line under a
+    // cartoon cloud: given as a fill, it painted a solid oval there at night, under a stroke left day-white.
+    const tf = tagFill(n), strokeOnly = !st.f && !!st.s
+    const fill = fills.get(n) ?? P.fill ?? (strokeOnly ? undefined : tf) ?? undefined
     if (st.f || fill) {
       ctx.globalAlpha = a * (st.fo ?? 1)
       ctx.fillStyle = fill ?? st.f!
@@ -374,7 +377,7 @@ export function createEngine(o: {
     }
     if (st.s) {
       ctx.globalAlpha = a * (st.so ?? 1)
-      applyStyle({ ...st, f: null })
+      applyStyle({ ...st, f: null, s: strokeOnly && tf ? tf : st.s })
       let doff = P.doff ?? st.doff ?? 0
       if (ringOwner.has(n) && o.play && ringOwner.get(n) === hot) doff = marchOffset(st.doff ?? 0)
       if (st.dash) { ctx.setLineDash(st.dash); ctx.lineDashOffset = doff } else if (P.doff !== undefined) ctx.lineDashOffset = doff
