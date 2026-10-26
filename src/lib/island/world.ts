@@ -167,7 +167,7 @@ export type IslandModel = {
 }
 /** The parade's marchers as the cartoon island draws them (play.ts): the drum major, the flag, a drum, a trumpet, two children. */
 const PARADE: [number, string, number][] = [[61.3, '#5b82ff', 1.04], [72.9, '#2c355e', 1.04], [84.1, '#ffffff', 1.04], [95.7, '#4fe3c1', 1.04], [17.2, '#ff4f6e', 0.85], [23.8, '#b8a1ff', 0.85]]
-export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
+export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; moon: { x: number; y: number; run: number }; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
 /**
@@ -1706,6 +1706,32 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
 
   const [vx0] = P(0, GRID), [vx1] = P(GRID, 0), [, vy0] = P(0, 0, 220), [, vy1] = P(GRID, GRID, SEA)
   const viewBox: [number, number, number, number] = [f(vx0 - 120), f(vy0 - 60), f(vx1 - vx0 + 240), f(vy1 - vy0 + 180)]
+  // Open water at a point on the sea: no land within 1.3 tiles, and no building's picture standing over it.
+  const seaOpen = (x: number, y: number) => {
+    const u = ((y + SEA) / (S / 4) + x / (S / 2)) / 2, v = ((y + SEA) / (S / 4) - x / (S / 2)) / 2
+    return !nearLand(u, v, 1.3) && !Object.values(anchors).some((a) => x > a.x0 - 14 && x < a.x1 + 14 && y > a.y0 - 14 && y < a.y1 + 14)
+  }
+  // Where the moon hangs (the night layer): in a desktop's opening view, framed as camera.ts frames it (the
+  // view box's middle, a little low, fitted and then 1.5x closer), below the buttons along its top and
+  // inside its right edge; over open water, with the longest run of open sea below it for its path.
+  const moonAt = (() => {
+    const [bx, by, bw, bh] = viewBox, W = 1440, H = 900
+    const z = Math.min(W / (bw * 0.86), H / (bh * 0.8)) * 1.5, cx = bx + bw / 2, cy = by + bh * 0.54
+    const x1 = cx + W / z / 2 - 48 / z, y0 = cy - H / z / 2 + 84 / z
+    const spots: { x: number; y: number; run: number; d: number }[] = []
+    for (let x = cx; x <= x1 - 34; x += 8) for (let y = y0 + 34; y <= y0 + 194; y += 6) {
+      let ok = true
+      for (let dx = -34; dx <= 34 && ok; dx += 8) for (let dy = -34; dy <= 34 && ok; dy += 8) if (!seaOpen(x + dx, y + dy)) ok = false
+      if (!ok) continue
+      let run = 0
+      for (let yy = y + 40; yy < y + 460 && seaOpen(x, yy); yy += 6) run = yy - (y + 40)
+      spots.push({ x, y, run, d: Math.hypot(x - (x1 - 90), y - (y0 + 60)) })
+    }
+    // The longest run; between near-equals, the one nearest the frame's upper right.
+    const most = Math.max(0, ...spots.map((s) => s.run))
+    const best = spots.filter((s) => s.run >= most - 6).sort((p, q) => p.d - q.d)[0] ?? { x: bx + bw * 0.72, y: by + 290, run: 0 }
+    return { x: best.x, y: best.y, run: best.run }
+  })()
 
   let hiddenLights = 0
   /* ---- night ------------------------------------------------------------- */
@@ -1826,9 +1852,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       // (On the realistic island, Unity's lantern glows by itself.)
       if (!glowRef) night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 18, fill: 'url(#isl-glow)', class: 'night-shine' }))
     }
-    // The moon, low over the sea to the north-east, and its path on the water.
+    // The moon, low over the sea to the north-east, and its path on the water. Its place is picked here,
+    // over open water inside a desktop's opening view and clear of the buttons along its top, where the
+    // longest run of open sea lies below it; and its path is drawn only on that open sea. (From a fixed
+    // spot the path once ran across the Badlands' sand, the Deep Time roof and today's balloon.)
     {
-      const [vx, vy, vw] = viewBox, mx = vx + vw * 0.72, my = vy + 290
+      const [vx, vy, vw] = viewBox
+      const { x: mx, y: my, run } = moonAt
       const sky = night.add(new N('g', { class: 'night-sky' }))
       const art = glowRef ? opts.sky ?? null : null
       if (art) {
@@ -1838,16 +1868,29 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         for (const [o, col, op] of [[0, '#e6edff', 0.34], [0.28, '#cfdbff', 0.14], [0.6, '#b8c8f0', 0.04], [1, '#b8c8f0', 0]] as [number, string, number][]) mg.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
         sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 120, fill: 'url(#isl-moonglow)' }))
         sky.add(new N('image', { href: art.moon, x: f(mx - 30), y: f(my - 30), width: 60, height: 60 }))
-        sky.add(new N('image', { href: art.glintsB, x: f(mx - 150), y: f(my + 44), width: 300, height: 420, opacity: 0.75 }))
-        sky.add(new N('image', { href: art.glintsA, x: f(mx - 150), y: f(my + 44), width: 300, height: 420, class: 'moon-path', opacity: 0.85 }))
+        // The glints, cut (not squashed) to the open water below the moon: the top middle of each picture.
+        const gw = 150, gh = Math.max(30, run + 18)
+        for (const [href, cls, op] of [[art.glintsB, undefined, 0.75], [art.glintsA, 'moon-path', 0.85]] as [string, string | undefined, number][]) {
+          sky.add(new N('image', { href, x: f(mx - gw / 2), y: f(my + 40), width: gw, height: f(gh), preserveAspectRatio: 'xMidYMin slice', class: cls, opacity: op }))
+        }
       } else {
       sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 70, fill: 'url(#isl-glow)', opacity: 0.6 }))
       sky.add(new N('circle', { cx: f(mx), cy: f(my), r: 30, fill: '#f6f4ff', stroke: INK, 'stroke-width': OUT }))
       sky.add(new N('path', { d: `M${f(mx + 6)} ${f(my - 29)}a30 30 0 0 1 0 58a24 30 0 0 0 0 -58z`, fill: '#d9dcf5' }))
       for (const [dx, dy, r] of [[-10, -8, 5], [4, 10, 3.5], [-4, 16, 2.4], [10, -14, 2.6]]) sky.add(new N('circle', { cx: f(mx + dx), cy: f(my + dy), r, fill: '#e2e4f6' }))
-      let path = ''
-      for (let k = 0; k < 16; k++) { const y = my + 70 + k * 22, w = 10 + k * 3.5 + hz(k, 5, 1) * 10, x = mx + (hz(k, 6, 2) - 0.5) * 16; path += `M${f(x - w)} ${f(y)}h${f(w * 2)}` }
-      sky.add(new N('path', { d: path, stroke: '#f6f4ff', 'stroke-width': 2.4, 'stroke-linecap': 'round', class: 'moon-path', opacity: 0.7 }))
+      // Its path: broken glints, row by row down the open water, in two sets, one fading in and out over
+      // the other so they glitter; each glint only where the water under both its ends is open.
+      const glints = ['', '']
+      for (let k = 0, y = my + 40; y <= my + 40 + run; k++, y += 7) {
+        const spread = 8 + (y - my) * 0.16
+        for (let s = 0; s < 3; s++) {
+          const w = 2 + hz(k, s, 41) * 7, x = mx + (hz(k, s, 42) - 0.5) * spread * 2
+          if (!seaOpen(x - w, y) || !seaOpen(x + w, y)) continue
+          glints[(k + s) % 2] += `M${f(x - w)} ${f(y)}h${f(w * 2)}`
+        }
+      }
+      sky.add(new N('path', { d: glints[0], stroke: '#f6f4ff', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.75 }))
+      sky.add(new N('path', { d: glints[1], stroke: '#f6f4ff', 'stroke-width': 1.6, 'stroke-linecap': 'round', class: 'moon-path', opacity: 0.85 }))
       }
       // Stars across the dark water, like the sky reflected in it.
       let st = '', st2 = ''
@@ -2054,7 +2097,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, moon: moonAt, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
     grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
     ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
     height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),
