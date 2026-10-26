@@ -87,6 +87,16 @@ console.log(`  size  ${(island.svg.length / 1024).toFixed(0)} KB of markup, ${is
 // At night no window may glow through whatever stands in front of it; the
 // island hides those, and most lights should still be seen.
 check(island.hiddenLights > 0 && island.hiddenLights < island.lights.length * 0.4, `lights hidden behind something are left dark at night (${island.hiddenLights} of ${island.lights.length})`)
+{
+  // The moon and its path are over open water: nothing from the island's grid within a tile of the disc or
+  // anywhere down its path, and no building's picture there (the path once crossed the Badlands at night).
+  const { x, y, run } = island.moon, rows = island.grid.match(new RegExp(`.{${GRID}}`, 'g'))
+  const land = (px, py) => { const u = (py - 12) / 32 + px / 64, v = (py - 12) / 32 - px / 64; for (let a = Math.floor(u - 1); a <= u + 1; a++) for (let b = Math.floor(v - 1); b <= v + 1; b++) if (rows[a]?.[b] && rows[a][b] !== '0') return true; return false }
+  const onArt = (px, py) => Object.values(island.anchors).some((a) => px > a.x0 && px < a.x1 && py > a.y0 && py < a.y1)
+  let bad = 0
+  for (let dx = -30; dx <= 30; dx += 10) for (let dy = -30; dy <= 40 + run; dy += 6) if (land(x + dx * (dy > 30 ? 0.3 : 1), y + dy) || onArt(x + dx * (dy > 30 ? 0.3 : 1), y + dy)) bad++
+  check(!bad, `the moon and its path lie over open sea (${Math.round(x)}, ${Math.round(y)}, a path ${run} long)`)
+}
 // The page no longer ships this markup (the canvas draws the bake of it), so
 // this is not a download limit: it is what the bake has to read and paint, and
 // how long a build takes when the island changes.
