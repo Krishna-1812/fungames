@@ -36,7 +36,8 @@ export function bakeHash(island: IslandLike): string {
   // The canvas's own pictures (the pigeons, the parade), by name and the renders' id.
   h.update(JSON.stringify(island.play?.sprites ?? null))
   h.update(JSON.stringify({ RULES, KEYFRAMES, LAYERS, POKES, LANDMARK }))
-  for (const f of ['build.ts', 'draw.ts', 'xml.ts', '../anim.ts', '../keyframes.ts', '../scene.ts', '../../../../scripts/bake-island.mjs']) h.update(fs.readFileSync(path.join(root, 'src/lib/island/bake', f)))
+  // (plate.ts too: it reads, and may grade, the Unity plate's pixels the cells are painted from.)
+  for (const f of ['build.ts', 'draw.ts', 'xml.ts', '../anim.ts', '../keyframes.ts', '../scene.ts', '../plate.ts', '../../../../scripts/bake-island.mjs']) h.update(fs.readFileSync(path.join(root, 'src/lib/island/bake', f)))
   return h.digest('hex').slice(0, 12)
 }
 
