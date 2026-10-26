@@ -408,11 +408,14 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     ;([[9.5, LAND.shallows[0], 0.5], [7.4, LAND.shallows[0], 1], [5.6, mix(LAND.shallows[0], LAND.shallows[1], 0.5), 1], [4.2, LAND.shallows[1], 1], [3.1, mix(LAND.shallows[1], LAND.shallows[2], 0.5), 1], [2.2, LAND.shallows[2], 1], [1.4, mix(LAND.shallows[2], LAND.shallows[3], 0.5), 1], [0.8, LAND.shallows[3], 1]] as [number, string, number][]).forEach(([w, c, op]) => {
       sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: c, 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: op < 1 ? op : undefined }))
     })
-  } else
-  ;([[7.2, '#98d4fc'], [4.6, '#a7ddf9'], [2.6, '#b8e7f6'], [1.2, '#cdf1f4']] as [number, string][]).forEach(([w, c]) => {
-    sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: mix(c, '#ffffff', 0.45), 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
-    sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: c, 'stroke-width': f2(w - 0.09), 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
-  })
+  } else {
+    // (Braced: written as `else` and then a line opening with `;`, the empty statement was the whole
+    // else, and these old pale ring bands were painted over the smooth ramp above in every bake.)
+    ;([[7.2, '#98d4fc'], [4.6, '#a7ddf9'], [2.6, '#b8e7f6'], [1.2, '#cdf1f4']] as [number, string][]).forEach(([w, c]) => {
+      sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: mix(c, '#ffffff', 0.45), 'stroke-width': w, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
+      sh.add(new N('use', { href: '#isl-coast', fill: c, stroke: c, 'stroke-width': f2(w - 0.09), 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }))
+    })
+  }
   // Sand and pebbles seen through the clearest water, right by the shore.
   let seabed = ''
   for (let i = -2; i < GRID + 2; i++) for (let j = -2; j < GRID + 2; j++) {
