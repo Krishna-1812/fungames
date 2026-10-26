@@ -30,7 +30,7 @@
  * visit, so coming back finds the island where it was left, the camera
  * stepping back out of the building just played.
  */
-import { PLAY } from '../motion'
+import { WORLD_PLAY as PLAY } from '../motion'
 import { createEngine, type Engine, type IslandState } from './engine'
 import { POKE_MS } from './moves'
 import { perfMeter } from './perf'

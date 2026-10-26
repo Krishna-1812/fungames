@@ -546,7 +546,7 @@ const book = BOOK.map((key) => {
   import { flagNodes, balloonNodes } from '../lib/island/extras'
   import { RULES } from '../lib/island/moves'
   import type { Node } from '../lib/island/scene'
-  import { flip, PLAY } from '../lib/motion'
+  import { flip, PLAY, WORLD_PLAY } from '../lib/motion'
   import { bestKey, dailyFor } from '../data/game-meta'
   import { readDaily, streakOf, calendar, utcDay } from '../lib/daily'
   import { faviconHref } from '../lib/favicon'
@@ -718,7 +718,7 @@ const book = BOOK.map((key) => {
     if (r.first) {
       sound?.found(); sound?.unroll()
       // It hops first, then fades from the sand.
-      window.setTimeout(() => isle.withEngine((e) => { e.setGone([n]); isle.redraw() }), PLAY ? 950 : 0)
+      window.setTimeout(() => isle.withEngine((e) => { e.setGone([n]); isle.redraw() }), WORLD_PLAY ? 950 : 0)
       showBottles()
     }
     showNote(n, r.total, r.cover)
@@ -742,7 +742,7 @@ const book = BOOK.map((key) => {
   let diveFrom = 'map'
   const carded = new Set<string>()
   const play = createPlay({
-    data: data.play, grid: data.grid, play: PLAY, base: data.base,
+    data: data.play, grid: data.grid, play: WORLD_PLAY, base: data.base,
     daily: () => dailyFor(new Date()).slug,
     ink: () => data.inks[data.anchors[dailyFor(new Date()).slug]?.district] ?? '#5b82ff',
     sound: () => sound,
@@ -811,7 +811,7 @@ const book = BOOK.map((key) => {
     })
     // How smoothly it draws on this device: five seconds of frames, once, a little after it has settled.
     setTimeout(() => {
-      if (document.visibilityState !== 'visible' || !PLAY) return
+      if (document.visibilityState !== 'visible' || !WORLD_PLAY) return
       let frames = 0, slow = 0, last = performance.now()
       const t0 = last
       const step = (now: number) => {

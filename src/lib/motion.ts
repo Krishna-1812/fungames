@@ -13,6 +13,12 @@
 const root = document.documentElement
 export const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches
 export const PLAY = root.classList.contains('play') && !REDUCED
+/** Motion for a canvas world (the island), which hides nothing behind a CSS
+ *  starting state, so it follows only the visitor's own preference. `PLAY`
+ *  can be lost to Paper.astro's 2.5 s safety net when this module loads late
+ *  (a slow phone, a busy server), and that must not freeze every walker, boat
+ *  and wave on the island for the whole visit. */
+export const WORLD_PLAY = !REDUCED
 
 const raf = (fn: FrameRequestCallback) => requestAnimationFrame(fn)
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
