@@ -1849,8 +1849,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         for (const rot of [0, 180]) sweep.add(new N('path', { d: 'M0 -4L640 -60L640 60L0 4Z', fill: 'url(#isl-beam)', transform: rot ? 'rotate(180)' : undefined }))
       }
       motionCss.push(`.isl-layer--beam{transform-origin:${f(beacon[0] - viewBox[0])}px ${f(beacon[1] - viewBox[1])}px}`)
-      // (On the realistic island, Unity's lantern glows by itself.)
-      if (!glowRef) night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 18, fill: 'url(#isl-glow)', class: 'night-shine' }))
+      // The lantern's own light, on the realistic island too: Unity's night light was meant to light it, but
+      // its core never reaches the glass, so the island's brightest light stood dark there all night.
+      night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: glowRef ? 14 : 18, fill: 'url(#isl-glow)', class: 'night-shine' }))
     }
     // The moon, low over the sea to the north-east, and its path on the water. Its place is picked here,
     // over open water inside a desktop's opening view and clear of the buttons along its top, where the
