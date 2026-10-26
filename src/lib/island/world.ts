@@ -930,8 +930,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // darker band hugging each building's foot, where the most light is kept off.
   {
     const keep = motionCss.length, keepGlow = glows.length
-    const sg = root.add(new N('g', { class: 'shadows', transform: `translate(${f(ox)} ${f(oy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
-    const cast: string[] = [], foot: string[] = []
+    const sg = root.add(new N('g', { class: 'shadows' }))
+    // One sheet per height a building stands at: a landmark up on a terrace (the Sky Peaks) shadows its own
+    // terrace, not the ground and sea pl.z below it, where its shade once fell as grey ghosts on the cliffs.
+    const byZ = new Map<number, { cast: string[]; foot: string[] }>()
     for (const pl of placed) {
       if (pl.lm.water) continue
       const b = new Bounds()
@@ -941,14 +943,19 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const L = Math.min(2.4 * hp.k, Math.max(0.35, ((footY - b.y0) / 76) * hp.k))
       const x0 = hp.i + 0.08, y0 = hp.j + 0.08, x1 = hp.i + hp.w - 0.08, y1 = hp.j + hp.d - 0.08
       const a = L * 0.5
+      const { cast, foot } = byZ.get(pl.z) ?? byZ.set(pl.z, { cast: [], foot: [] }).get(pl.z)!
       cast.push(`M${f2(x0)} ${f2(y0)}L${f2(x1)} ${f2(y0)}L${f2(x1)} ${f2(y1)}L${f2(x1 - a)} ${f2(y1 + a)}L${f2(x0 - a)} ${f2(y1 + a)}L${f2(x0 - a)} ${f2(y0 + a)}Z`)
       const e = 0.1
       foot.push(`M${f2(hp.i - e)} ${f2(hp.j - e)}L${f2(hp.i + hp.w + e)} ${f2(hp.j - e)}L${f2(hp.i + hp.w + e)} ${f2(hp.j + hp.d + e)}L${f2(hp.i - e)} ${f2(hp.j + hp.d + e)}Z`)
     }
-    for (const [w, op] of [[0.44, 0.06], [0.28, 0.065], [0.14, 0.07], [0, 0.08]] as [number, number][]) {
-      sg.add(new N('g', { opacity: op })).add(new N('path', { d: cast.join(''), fill: INK, stroke: w ? INK : undefined, 'stroke-width': w || undefined, 'stroke-linejoin': 'round' }))
+    for (const [z, { cast, foot }] of [...byZ].sort((p, q) => p[0] - q[0])) {
+      const [zx, zy] = P(0, 0, z)
+      const hg = sg.add(new N('g', { transform: `translate(${f(zx)} ${f(zy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
+      for (const [w, op] of [[0.44, 0.06], [0.28, 0.065], [0.14, 0.07], [0, 0.08]] as [number, number][]) {
+        hg.add(new N('g', { opacity: op })).add(new N('path', { d: cast.join(''), fill: INK, stroke: w ? INK : undefined, 'stroke-width': w || undefined, 'stroke-linejoin': 'round' }))
+      }
+      hg.add(new N('g', { opacity: 0.09 })).add(new N('path', { d: foot.join(''), fill: INK, stroke: INK, 'stroke-width': 0.08, 'stroke-linejoin': 'round' }))
     }
-    sg.add(new N('g', { opacity: 0.09 })).add(new N('path', { d: foot.join(''), fill: INK, stroke: INK, 'stroke-width': 0.08, 'stroke-linejoin': 'round' }))
     motionCss.length = keep
     glows.length = keepGlow
   }
