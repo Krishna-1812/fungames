@@ -386,9 +386,11 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     const node = groupNode(el, c, false)
     c.out.push(node)
     const inner: Ctx = { cell: false, night: c.night, m: [...ID] as M, chain: [], out: node.kids, run: null, ctx: ++ctxSeq, inherit: inheritFrom([el], inh), top: c.top ?? node }
-    if (SHAPES.has(el.tag) || el.tag === 'use') {
+    if (SHAPES.has(el.tag) || el.tag === 'use' || el.tag === 'image') {
       // A single shape that cannot be drawn from its outline (a gradient
-      // fill, a <use>): a sprite of itself, inside its moving group.
+      // fill, a <use>, a picture): a sprite of itself, inside its moving group.
+      // (A moving <image> once became an empty group here: the realistic
+      // moon's second set of glints, the one that makes it shimmer, never drew.)
       const self = stripped(el)
       openRun(inner).items.push({ el: self, chain: [] })
     } else for (const kid of el.kids) if (typeof kid !== 'string') visit(kid, inner)
