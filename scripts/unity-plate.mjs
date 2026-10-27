@@ -8,8 +8,10 @@
  *   1. scripts/export-island.mjs: the island, as facts, for Unity;
  *   2. Unity, IslandBuild.Plate: the ground, the sea round it and the
  *      buildings' shadows, in tiles (unity/Renders/plate);
- *   3. here: the tiles stitched, faded at the edges into the site's own sea,
- *      and written as WebP tiles, a small copy for the island's SVG, and
+ *   3. here: the tiles stitched, graded once (scripts/plate-grade.mjs: a
+ *      calmer sea, natural lawns, highlights that roll off), faded at the
+ *      edges into the site's own sea, and written as WebP tiles, a small
+ *      copy for the island's SVG, and
  *      plate.json (where it lies on the map, and an id for the bake's hash).
  *
  *   node scripts/unity-plate.mjs [--scale 4] [--skip-unity]
@@ -19,6 +21,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
+import { gradePlate } from './plate-grade.mjs'
 
 const root = process.cwd()
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d }
@@ -55,6 +58,8 @@ const tiles = []
 for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols; c++) tiles.push({ input: path.join(renders, `${r}_${c}.png`), left: c * m.tile, top: r * m.tile })
 const px = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }, limitInputPixels: false })
   .composite(tiles).raw().toBuffer({ resolveWithObject: false })
+gradePlate(px, W, H)
+console.log('graded')
 
 // Fade the edges into the site's own sea.
 const F = FADE * m.scale
