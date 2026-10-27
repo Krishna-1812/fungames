@@ -29,8 +29,9 @@ const scale = Number(arg('--scale', '4'))
 const UNITY = process.env.UNITY ?? 'C:/Program Files/Unity/Hub/Editor/6000.5.5f1/Editor/Unity.exe'
 const renders = path.join(root, 'unity/Renders/plate')
 const out = path.join(root, 'src/lib/island/plate')
-/** How far in from the plate's edge it fades into the site's sea, in map units. */
-const FADE = 160
+/** How far in from the plate's edge it fades into the site's sea, in map units: wide, and through the sea's
+ *  own colour, so zoomed right out the rippled water dissolves into the flat sea round it with no box edge. */
+const FADE = 260
 
 const run = (cmd, args, what) => {
   const t0 = Date.now()
@@ -78,14 +79,18 @@ const sea = (() => {
   return '#' + h(r) + h(g) + h(b)
 })()
 console.log('open sea', sea)
+const seaRgb = [1, 3, 5].map((i) => parseInt(sea.slice(i, i + 2), 16))
 for (let y = 0; y < H; y++) {
   const ey = Math.min(y, H - 1 - y)
   for (let x = 0; x < W; x++) {
     const e = Math.min(ey, x, W - 1 - x)
     if (e >= F) { if (x < F) continue; x = W - F - 1; continue }
     const t = e / F, a = t * t * (3 - 2 * t)
-    const k = (y * W + x) * 4 + 3
-    px[k] = Math.round(px[k] * a)
+    const k = (y * W + x) * 4
+    // Toward the open sea's colour first, then out: the ripples ease into flat water before they fade.
+    const toSea = 1 - Math.min(1, t * 1.6)
+    for (let ch = 0; ch < 3; ch++) px[k + ch] = Math.round(px[k + ch] + (seaRgb[ch] - px[k + ch]) * toSea)
+    px[k + 3] = Math.round(px[k + 3] * a)
   }
 }
 
