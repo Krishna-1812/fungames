@@ -705,10 +705,18 @@ export function createEngine(o: {
     }
   }
 
+  /** Two #rrggbb colours mixed, t of the way from a to b, as #rrggbb. */
+  const mixHex = (a: string, b: string, t: number) => {
+    const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const x = p(a), y = p(b)
+    return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')
+  }
   const drawSea = (n: Node & { k: 'sea' }, alpha: number) => {
     setM(deviceM)
     const g = ctx.createRadialGradient(n.cx, n.cy / n.sy, 0, n.cx, n.cy / n.sy, n.r)
-    for (const [off, c] of n.stops) g.addColorStop(off, c)
+    // After dark the drawn sea deepens (LAYERS.night.sea) under the grade; the realistic sea is Unity's, left be.
+    const S = LAYERS.night.sea, k = n.still ? 0 : timed('sea-night', S.by[st.time] ?? 0, LAYERS.night.fadeMs)
+    for (const [off, c] of n.stops) g.addColorStop(off, k > 0.002 && /^#[0-9a-f]{6}$/i.test(c) ? mixHex(c, mixHex(S.near, S.far, off), k) : c)
     ctx.globalAlpha = alpha
     ctx.save()
     ctx.transform(1, 0, 0, n.sy, 0, 0)

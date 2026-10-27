@@ -381,6 +381,11 @@ export const LAYERS = {
       saturation: { night: ['#808080', 0.4], dusk: ['#808080', 0.18], dawn: ['#808080', 0.08] } as Record<string, [Shade, number]>,
     },
     glow: { night: 1, dusk: 0.55, dawn: 0.2 } as Record<string, number>,
+    /**
+     * The drawn open sea after dark: its stops move toward these (near, far) before the grade falls on it,
+     * so the sea is the darkest thing in the night and the land stands out of it, the shallows a lit lagoon.
+     */
+    sea: { near: '#22386f', far: '#17265a', by: { night: 1, dusk: 0.35 } as Record<string, number> },
     /** The drawn island's night: the same two veils as the realistic one, in its own colours. */
     toon: {
       // Moonlight from the moon's side, with red kept nearer blue than before, so red roofs go plum, not violet.
