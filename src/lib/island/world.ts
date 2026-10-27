@@ -381,9 +381,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // The open sea is a touch deeper the further it is from the island.
   const [mx, my] = P(GRID / 2, GRID / 2, SEA)
   const defs = root.add(new N('defs'))
-  const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: 1500, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
+  const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: plate ? 1500 : 1150, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
   // On the realistic island, the ocean the plate fades into: its own colour, deepening further out.
   grad.add(new N('stop', { offset: 0.3, 'stop-color': plate?.sea ?? LAND.seaNear }))
+  // (The drawn sea deepens inside the view, not off past its edges: a stop half way, a nearer far edge.)
+  if (!plate) grad.add(new N('stop', { offset: 0.55, 'stop-color': '#3a82c8' }))
   grad.add(new N('stop', { offset: 1, 'stop-color': plate?.sea ? deepen(plate.sea, 0.82) : LAND.seaFar }))
   // (data-still: on the realistic sea the page draws no wave marks of its own over it.)
   root.add(new N('rect', { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000, fill: 'url(#isl-sea)', 'data-still': plate ? 1 : undefined }))

@@ -41,7 +41,7 @@ export const LAND = {
   road: '#e2d9c5', roadEdge: '#c4b597', roadWorn: '#5a7a46',
   water: '#4a96d6', waterLight: '#6fb4e2',
   /** The sea: open water deepening away from the island, and its shallows, palest at the shore. */
-  seaNear: '#4f9cdb', seaFar: '#3b80c6', shallows: ['#4c9bd9', '#4fb0d9', '#5ec3d6', '#7dd3d4'],
+  seaNear: '#4a98d8', seaFar: '#2b65ad', shallows: ['#4c9bd9', '#4fb0d9', '#5ec3d6', '#7dd3d4'],
 }
 
 /* ---- the field ------------------------------------------------------------ */
