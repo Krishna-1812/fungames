@@ -376,13 +376,15 @@ export const LAYERS = {
      * light of the island's own lamps and windows (Unity's, again) laid over it.
      */
     real: {
-      multiply: { night: ['#4a5c9c', 1], dusk: ['#a993d4', 1], dawn: ['#e3c9ee', 1] } as Record<string, [Shade, number]>,
-      saturation: { night: ['#808080', 0.5], dusk: ['#808080', 0.18], dawn: ['#808080', 0.08] } as Record<string, [Shade, number]>,
+      // Moonlight from the moon's side (a pair: the lit end, the far end), midtones a little lifted.
+      multiply: { night: [['#6a80c4', '#40508e'], 1], dusk: ['#a993d4', 1], dawn: ['#e3c9ee', 1] } as Record<string, [Shade, number]>,
+      saturation: { night: ['#808080', 0.4], dusk: ['#808080', 0.18], dawn: ['#808080', 0.08] } as Record<string, [Shade, number]>,
     },
     glow: { night: 1, dusk: 0.55, dawn: 0.2 } as Record<string, number>,
     /** The drawn island's night: the same two veils as the realistic one, in its own colours. */
     toon: {
-      multiply: { night: ['#6272b4', 1], dusk: ['#c4abe8', 1], dawn: ['#efd9f0', 1] } as Record<string, [Shade, number]>,
+      // Moonlight from the moon's side, with red kept nearer blue than before, so red roofs go plum, not violet.
+      multiply: { night: [['#94a6d8', '#5466a0'], 1], dusk: ['#c4abe8', 1], dawn: ['#efd9f0', 1] } as Record<string, [Shade, number]>,
       saturation: { night: ['#808080', 0.25], dusk: ['#808080', 0.08], dawn: ['#808080', 0.04] } as Record<string, [Shade, number]>,
     },
   },
