@@ -377,7 +377,7 @@ export function createEngine(o: {
     }
     if (st.s) {
       ctx.globalAlpha = a * (st.so ?? 1)
-      applyStyle({ ...st, f: null, s: strokeOnly && tf ? tf : st.s })
+      applyStyle({ ...st, f: null, s: strokeOnly && typeof tf === 'string' ? tf : st.s })
       let doff = P.doff ?? st.doff ?? 0
       if (ringOwner.has(n) && o.play && ringOwner.get(n) === hot) doff = marchOffset(st.doff ?? 0)
       if (st.dash) { ctx.setLineDash(st.dash); ctx.lineDashOffset = doff } else if (P.doff !== undefined) ctx.lineDashOffset = doff
@@ -471,19 +471,35 @@ export function createEngine(o: {
     }
     return a
   }
-  const tagFill = (n: V): string | undefined => {
+  /** A veil's gradient, kept while its colours stand still (rebuilt only while a change of time fades). */
+  const veilGrads = new WeakMap<V, { key: string; g: CanvasGradient }>()
+  const tagFill = (n: V): string | CanvasGradient | undefined => {
     if (!n.tags) return undefined
     for (const t of n.tags) {
       if (t === 'night-veil' || t === 'night-grade') {
         if (!n.st.blend) return LAYERS.night.veil[st.time]?.[0]
         // The veils' colours move from one time's to the next as their strength does (by day, they keep the last).
+        // A time's colour may be a pair, the lit end and the far end: then the veil is a gradient along the line
+        // the island drew on it (data-light, from the side the light comes from), so the light has a direction.
         const table = (t === 'night-grade' ? LAYERS.night.toon : LAYERS.night.real)[n.st.blend as 'multiply' | 'saturation']
-        const hex = table?.[st.time]?.[0]
-        const ch = [16, 8, 0].map((sh, i) => {
-          const key = `${t === 'night-grade' ? 'grade' : 'veil'}-c:${n.st.blend}:${i}`
-          return Math.round(timed(key, hex ? (parseInt(hex.slice(1), 16) >> sh) & 255 : timers.get(key)?.to ?? 255, LAYERS.night.fadeMs))
+        const spec = table?.[st.time]?.[0]
+        const ends = spec === undefined ? null : typeof spec === 'string' ? [spec, spec] : spec
+        const side = (e: 0 | 1) => [16, 8, 0].map((sh, i) => {
+          const key = `${t === 'night-grade' ? 'grade' : 'veil'}-c:${n.st.blend}:${e}:${i}`
+          return Math.round(timed(key, ends ? (parseInt(ends[e].slice(1), 16) >> sh) & 255 : timers.get(key)?.to ?? 255, LAYERS.night.fadeMs))
         })
-        return `rgb(${ch.join(',')})`
+        const near = side(0).join(','), far = side(1).join(',')
+        const line = n.data?.light
+        if (near === far || !line) return `rgb(${near})`
+        const key = `${near}|${far}`
+        let v = veilGrads.get(n)
+        if (!v || v.key !== key) {
+          const [x0, y0, x1, y1] = line.split(' ').map(Number)
+          const g = ctx.createLinearGradient(x0, y0, x1, y1)
+          g.addColorStop(0, `rgb(${near})`); g.addColorStop(1, `rgb(${far})`)
+          v = { key, g }; veilGrads.set(n, v)
+        }
+        return v.g
       }
       if (t === 'cloud-puff') return LAYERS.cloud.puff[st.time]
       if (t === 'cloud-base') return LAYERS.cloud.base[st.time]

@@ -1814,9 +1814,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // some of its colour taken out, rather than a blue laid over it (moves.ts, LAYERS.night.real).
   const glowRef = opts.plate ? opts.glow ?? null : null
   const veilBox = { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000 }
+  // The line the night's light falls along (engine.ts tagFill, when a time's veil colour is a pair): from the
+  // moon across the island to its far side, so the land nearest the moon is the most lit.
+  const [icx, icy] = P(GRID / 2, GRID / 2)
+  const light = [moonAt.x, moonAt.y, 2 * icx - moonAt.x, 2 * icy - moonAt.y].map((v) => f(v)).join(' ')
   if (glowRef) {
-    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'multiply', ...veilBox, fill: '#3c4a82', style: 'mix-blend-mode:multiply' }))
-    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'saturation', ...veilBox, fill: '#808080', opacity: 0.5, style: 'mix-blend-mode:saturation' }))
+    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'multiply', 'data-light': light, ...veilBox, fill: '#3c4a82', style: 'mix-blend-mode:multiply' }))
+    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'saturation', 'data-light': light, ...veilBox, fill: '#808080', opacity: 0.5, style: 'mix-blend-mode:saturation' }))
     // The light of the lamps and the lit windows: on the ground round them, on the walls and the trees,
     // in the rooms, given back by the sea (Unity: Night.cs). Painted by the bake from its full-size render.
     const [x0, y0, x1, y1] = glowRef.box
@@ -1826,8 +1830,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // The drawn island's night is graded, not covered: its colours multiplied down to moonlight (so the
     // outlines stay dark and the whites go blue rather than grey), and a little of their colour taken out
     // (moves.ts, LAYERS.night.toon). A flat blue laid over everything took the contrast out with the light.
-    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'multiply', ...veilBox, fill: '#6272b4', style: 'mix-blend-mode:multiply' }))
-    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'saturation', ...veilBox, fill: '#808080', opacity: 0.25, style: 'mix-blend-mode:saturation' }))
+    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'multiply', 'data-light': light, ...veilBox, fill: '#6272b4', style: 'mix-blend-mode:multiply' }))
+    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'saturation', 'data-light': light, ...veilBox, fill: '#808080', opacity: 0.25, style: 'mix-blend-mode:saturation' }))
   }
   {
     const nd = night.add(new N('defs'))
