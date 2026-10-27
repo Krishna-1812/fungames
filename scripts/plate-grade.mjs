@@ -85,3 +85,41 @@ export function gradePlate(px, W, H, G = GRADE) {
   }
   return px
 }
+
+/**
+ * The night light's grade (scripts/unity-glow.mjs), applied as its tiles are stitched. Unity gives the light
+ * as a colour at full brightness and its strength as alpha. Its street lamps came out a cold neutral white,
+ * their pools clipping, and on the lawns a neon green (white light on a Kelly-green ground). Street lighting
+ * is sodium or warm LED, about 3000 K: so light that is nearly neutral is warmed to that, light off the lawns
+ * is warmed and calmed toward yellow-green, and the strongest of it rolls off rather than clipping. Light
+ * that has a colour of its own (an amber room, a television's blue, a coloured bulb) keeps it.
+ */
+export const GLOW = {
+  warm: [1, 0.88, 0.72], neutral: [0.15, 0.3],
+  green: { from: [62, 76], to: [150, 166], sat: [0.22, 0.4], hueTo: 58, hueK: 0.45, desat: 0.35 },
+  knee: 0.72, kneeK: 0.45,
+}
+
+/** Grades the night light's straight (unpremultiplied) RGBA pixels in place. */
+export function gradeGlow(px, W, H, G = GLOW) {
+  const n = W * H
+  for (let p = 0; p < n; p++) {
+    const k = p * 4
+    if (px[k + 3] === 0) continue
+    let [h, s, v] = rgb2hsv(px[k] / 255, px[k + 1] / 255, px[k + 2] / 255)
+    const s0 = s
+    // Off a lawn: toward yellow-green, and less of it.
+    const g = smooth(G.green.from[0], G.green.from[1], h) * (1 - smooth(G.green.to[0], G.green.to[1], h)) * smooth(G.green.sat[0], G.green.sat[1], s)
+    if (g > 0) { h -= (h - G.green.hueTo) * G.green.hueK * g; s *= 1 - G.green.desat * g }
+    let [r, gg, b] = hsv2rgb(h, s, v)
+    // Warmed to a street lamp's colour (all of the near-neutral light, and the lawns' with it), as bright as it was.
+    const w = Math.max(1 - smooth(G.neutral[0], G.neutral[1], s0), g)
+    r *= 1 + (G.warm[0] - 1) * w; gg *= 1 + (G.warm[1] - 1) * w; b *= 1 + (G.warm[2] - 1) * w
+    const lift = v / Math.max(r, gg, b, 1e-6)
+    px[k] = Math.round(r * lift * 255); px[k + 1] = Math.round(gg * lift * 255); px[k + 2] = Math.round(b * lift * 255)
+    // The strongest light rolls off.
+    const a = px[k + 3] / 255
+    if (a > G.knee) px[k + 3] = Math.round((G.knee + (a - G.knee) * G.kneeK) * 255)
+  }
+  return px
+}
