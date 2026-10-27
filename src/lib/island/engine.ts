@@ -597,8 +597,12 @@ export function createEngine(o: {
         win = { path: lv.clip, m: mm, box: devBox(mm, n.cb), on: false }
       } else { ctx.save(); setM(mm); ctx.clip(lv.clip) }
     }
+    // The lamps' and the windows' light is added to what it falls on, as light is, not laid over it as paint.
+    const adds = !!n.tags?.includes('night-halos')
+    if (adds) ctx.globalCompositeOperation = 'lighter'
     if (iso && n.bb) drawApart(n, m, mm, a)
     else for (const k of n.kids) drawNode(k, mm, a)
+    if (adds) ctx.globalCompositeOperation = 'source-over'
     if (n.clip) {
       if (!n.cb) restore()
       else {

@@ -1847,6 +1847,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     glow.add(new N('stop', { offset: 0, 'stop-color': '#fff4cf', 'stop-opacity': 0.95 }))
     glow.add(new N('stop', { offset: 0.35, 'stop-color': '#ffe7a8', 'stop-opacity': 0.45 }))
     glow.add(new N('stop', { offset: 1, 'stop-color': '#ffe7a8', 'stop-opacity': 0 }))
+    // A lamp's own light, added to what it falls on (the halos are drawn 'lighter'): white-hot at its middle,
+    // warm round that, and a faint amber reach. (isl-glow, a softer cream, stays the moon's air.)
+    const lampGlow = nd.add(new N('radialGradient', { id: 'isl-lamp' }))
+    for (const [o, col, op] of [[0, '#fffaf0', 0.9], [0.22, '#ffd08a', 0.35], [0.6, '#ffb27a', 0.08], [1, '#ffb27a', 0]] as [number, string, number][]) lampGlow.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
     let cores = ''
     const halos = night.add(new N('g', { class: 'night-halos' }))
     const seen = opts.raster ? occlusion(opts.raster) : lights.map(() => true)
@@ -1862,7 +1866,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb' || l.el?.attrs.class === 'stp-lamp')) return
       const [x, y] = l
       // On the drawn island the glow is wide enough to fall on the ground round a lamp, not just ring it.
-      halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 19, fill: 'url(#isl-glow)', opacity: glowRef ? 0.55 : undefined }))
+      halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 19, fill: 'url(#isl-lamp)', opacity: glowRef ? 0.55 : undefined }))
       if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
       // The pane or bulb itself, in its glow colour, above the veil.
       if (l.el && l.glow) {
