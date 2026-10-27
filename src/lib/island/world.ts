@@ -1914,6 +1914,28 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         else panes.add(pane)
       }
     })
+    // Lights over the water, given back by it: under each, broken streaks on the ripples, wide near the
+    // water line and narrowing and fading below, as long as the light is high. Only on open water: a streak
+    // that would land on the land, or on a building standing in the sea, is left out.
+    if (!glowRef) {
+      const onWater = (sx: number, sy: number) => {
+        const d = sx / S * 2, s = (sy + SEA) / S * 4, i = Math.floor((s + d) / 2), j = Math.floor((s - d) / 2)
+        return inGrid(i, j) && !land[i][j] && !taken.has(key(i, j))
+      }
+      lights.forEach((l, n) => {
+        if (!lit[n] || !l.w || !l.glow) return
+        const [wi, wj, wz] = l.w
+        if (isLand(Math.floor(wi), Math.floor(wj)) && isLand(Math.floor(wi + 1), Math.floor(wj + 1))) return
+        const tall = l.el?.attrs.class === 'stp-lamp', h = Math.min(tall ? 160 : 60, wz - SEA), count = tall ? 10 : Math.max(4, Math.min(6, Math.round(h / 10)))
+        if (h < 6) return
+        const [x, y] = l, wy = y + h
+        for (let k = 0; k < count; k++) {
+          const t = k / (count - 1), dy = wy + (k + 0.6) * (h * 1.1) / count, w = (tall ? 12 : 7) - t * (tall ? 8 : 5), dx = x + (hz(n, k, 5) - 0.5) * 3
+          if (!onWater(dx, dy)) continue
+          halos.add(new N('path', { d: `M${f(dx - w / 2)} ${f(dy)}h${f(w)}`, stroke: l.glow, 'stroke-width': 1.6, 'stroke-linecap': 'round', fill: 'none', opacity: f(0.55 - t * 0.43) }))
+        }
+      })
+    }
     if (cores) night.add(new N('path', { d: cores, fill: '#fff8de', opacity: 0.8, class: 'night-cores' }))
     // Everything that shines by itself, as bright as by day.
     const shine = night.add(new N('g', { class: 'night-shine' }))
