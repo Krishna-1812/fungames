@@ -598,11 +598,13 @@ export function createEngine(o: {
       } else { ctx.save(); setM(mm); ctx.clip(lv.clip) }
     }
     // The lamps' and the windows' light is added to what it falls on, as light is, not laid over it as paint.
-    const adds = !!n.tags?.includes('night-halos')
+    // (And the lighthouse's beam is light in the air: screened over what it crosses, it brightens without whitening.)
+    const adds = !!n.tags?.includes('night-halos'), screens = !adds && !!n.tags?.includes('layer-beam')
     if (adds) ctx.globalCompositeOperation = 'lighter'
+    else if (screens) ctx.globalCompositeOperation = 'screen'
     if (iso && n.bb) drawApart(n, m, mm, a)
     else for (const k of n.kids) drawNode(k, mm, a)
-    if (adds) ctx.globalCompositeOperation = 'source-over'
+    if (adds || screens) ctx.globalCompositeOperation = 'source-over'
     if (n.clip) {
       if (!n.cb) restore()
       else {

@@ -1860,6 +1860,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // And a street lamp's, in a pool on the ground under it.
     const pool = nd.add(new N('radialGradient', { id: 'isl-pool' }))
     for (const [o, col, op] of [[0, '#ffd9a0', 0.42], [0.6, '#ffb877', 0.12], [1, '#ffb877', 0]] as [number, string, number][]) pool.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
+    const lantern = nd.add(new N('radialGradient', { id: 'isl-lantern' }))
+    for (const [o, col] of [[0, '#ffffff'], [0.5, '#fff0c8'], [1, '#ffc477']]) lantern.add(new N('stop', { offset: o, 'stop-color': col }))
     let cores = ''
     const halos = night.add(new N('g', { class: 'night-halos' }))
     /** The ground's height at a world point, or null where there is no land to light. */
@@ -1884,7 +1886,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       // (The lighthouse's lantern too: Unity's glow has it, a bright core in its glass.)
       if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb' || l.el?.attrs.class === 'stp-lamp')) return
       const [x, y] = l
-      if (!glowRef && l.face && l.w) {
+      if (!glowRef && l.el?.attrs.class === 'stp-lamp') { /* the lantern: below */ }
+      else if (!glowRef && l.face && l.w) {
         // A window: a tight bloom round its pane (a wide one fogged the walls between the windows), and, on a
         // ground floor, its light thrown on the ground in front, out along the way it faces.
         halos.add(new N('circle', { cx: f(x), cy: f(y), r: 5, fill: 'url(#isl-lamp)', opacity: 0.6 }))
@@ -1903,6 +1906,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         // Bulbs on strings and the like: a glow of their own, small enough that a row of them stays a row of lights.
         halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 10, fill: 'url(#isl-lamp)', opacity: glowRef ? 0.55 : 0.8 }))
         if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
+      }
+      // The cartoon lighthouse's lantern: its glass lit from within, white at the lamp and amber at the
+      // frame, with the frame's bars across it, and its light in the air round it, one bloom inside another.
+      if (!glowRef && l.el?.attrs.class === 'stp-lamp') {
+        const { x: gx, y: gy, width: gw, height: gh, rx } = l.el.attrs as Record<string, number>
+        const glass = new N('g', { transform: l.tf })
+        glass.add(new N('rect', { x: gx, y: gy, width: gw, height: gh, rx, fill: 'url(#isl-lantern)', stroke: INK, 'stroke-width': 2 }))
+        glass.add(new N('path', { d: [0.25, 0.5, 0.75].map((u) => `M${f(gx + gw * u)} ${f(gy)}v${f(gh)}`).join(''), stroke: INK, 'stroke-width': 1.2, fill: 'none' }))
+        panes.add(glass)
+        for (const [r, op] of [[10, 0.55], [22, 0.22], [46, 0.08]]) halos.add(new N('circle', { cx: f(x), cy: f(y), r, fill: 'url(#isl-lamp)', opacity: op }))
+        return
       }
       // The pane or bulb itself, in its glow colour, above the veil.
       if (l.el && l.glow) {
@@ -1949,19 +1963,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const beam = open('beam')
       const bd = beam.add(new N('defs')).add(new N('linearGradient', { id: 'isl-beam' }))
       const sweep = beam.add(new N('g', { transform: `translate(${f(beacon[0])} ${f(beacon[1])})` }))
-      if (glowRef) {
-        // A shaft of light in the night air: brightest down its middle, fading to nothing at its sides
-        // (wedges inside wedges, each faint) and along its length as the air takes it; a clean cool white.
-        for (const [o, op] of [[0, 0.5], [0.25, 0.26], [0.6, 0.08], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': '#eef3ff', 'stop-opacity': op }))
-        for (const rot of [0, 180]) for (const w of [1, 0.72, 0.48, 0.3, 0.16]) sweep.add(new N('path', { d: `M0 ${f(-2.5 * w)}L700 ${f(-58 * w)}L700 ${f(58 * w)}L0 ${f(2.5 * w)}Z`, fill: 'url(#isl-beam)', opacity: 0.3, transform: rot ? 'rotate(180)' : undefined }))
-      } else {
-        for (const [o, op] of [[0, 0.75], [0.5, 0.22], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': '#fff8e0', 'stop-opacity': op }))
-        for (const rot of [0, 180]) sweep.add(new N('path', { d: 'M0 -4L640 -60L640 60L0 4Z', fill: 'url(#isl-beam)', transform: rot ? 'rotate(180)' : undefined }))
-      }
+      // A shaft of light in the night air: brightest down its middle, fading to nothing at its sides (wedges
+      // inside wedges, each faint) and along its length as the air takes it. Laid on as light (engine.ts: the
+      // beam's layer is drawn 'screen'), so it brightens what it crosses without whitewashing it: a clean cool
+      // white on the realistic island, the lamp's warm white on the drawn one. (The drawn one was one solid
+      // cream wedge, and painted the harbour over.)
+      for (const [o, op] of glowRef ? [[0, 0.5], [0.25, 0.26], [0.6, 0.08], [1, 0]] : [[0, 0.42], [0.25, 0.2], [0.6, 0.06], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': glowRef ? '#eef3ff' : '#fff3da', 'stop-opacity': op }))
+      for (const rot of [0, 180]) for (const w of [1, 0.72, 0.48, 0.3, 0.16]) sweep.add(new N('path', { d: `M0 ${f(-2.5 * w)}L700 ${f(-58 * w)}L700 ${f(58 * w)}L0 ${f(2.5 * w)}Z`, fill: 'url(#isl-beam)', opacity: 0.3, transform: rot ? 'rotate(180)' : undefined }))
       motionCss.push(`.isl-layer--beam{transform-origin:${f(beacon[0] - viewBox[0])}px ${f(beacon[1] - viewBox[1])}px}`)
       // The lantern's own light, on the realistic island too: Unity's night light was meant to light it, but
       // its core never reaches the glass, so the island's brightest light stood dark there all night.
-      night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: glowRef ? 14 : 18, fill: 'url(#isl-glow)', class: 'night-shine' }))
+      if (glowRef) night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 14, fill: 'url(#isl-glow)', class: 'night-shine' }))
     }
     // The moon, low over the sea to the north-east, and its path on the water. Its place is picked here,
     // over open water inside a desktop's opening view and clear of the buttons along its top, where the
