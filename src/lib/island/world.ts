@@ -1854,12 +1854,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // A lit window's light on the ground in front of it: from the wall, fading out along the way it faces.
     for (const [id, x1, x2] of [['isl-spill-x', 0, 1], ['isl-spill-y', 1, 0]] as const) {
       const sg = nd.add(new N('linearGradient', { id, x1, y1: 0, x2, y2: 1 }))
-      sg.add(new N('stop', { offset: 0, 'stop-color': '#ffd9a0', 'stop-opacity': 0.32 }))
+      sg.add(new N('stop', { offset: 0, 'stop-color': '#ffd9a0', 'stop-opacity': 0.5 }))
       sg.add(new N('stop', { offset: 1, 'stop-color': '#ffd9a0', 'stop-opacity': 0 }))
     }
     // And a street lamp's, in a pool on the ground under it.
     const pool = nd.add(new N('radialGradient', { id: 'isl-pool' }))
-    for (const [o, col, op] of [[0, '#ffd9a0', 0.42], [0.6, '#ffb877', 0.12], [1, '#ffb877', 0]] as [number, string, number][]) pool.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
+    for (const [o, col, op] of [[0, '#ffdcaa', 0.62], [0.55, '#ffb877', 0.2], [1, '#ffb877', 0]] as [number, string, number][]) pool.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
     const lantern = nd.add(new N('radialGradient', { id: 'isl-lantern' }))
     for (const [o, col] of [[0, '#ffffff'], [0.5, '#fff0c8'], [1, '#ffc477']]) lantern.add(new N('stop', { offset: o, 'stop-color': col }))
     let cores = ''
@@ -1890,17 +1890,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       else if (!glowRef && l.face && l.w) {
         // A window: a tight bloom round its pane (a wide one fogged the walls between the windows), and, on a
         // ground floor, its light thrown on the ground in front, out along the way it faces.
-        halos.add(new N('circle', { cx: f(x), cy: f(y), r: 5, fill: 'url(#isl-lamp)', opacity: 0.6 }))
+        halos.add(new N('circle', { cx: f(x), cy: f(y), r: 7, fill: 'url(#isl-lamp)', opacity: 0.7 }))
         const [wi, wj, wz] = l.w, gz = groundAt(wi + (l.face === 'x' ? 0.2 : 0), wj + (l.face === 'y' ? 0.2 : 0))
         if (gz !== null && wz - gz <= 22) {
-          const q = (l.face === 'x' ? [[0, -0.16], [0, 0.16], [0.45, 0.26], [0.45, -0.26]] : [[-0.16, 0], [0.16, 0], [0.26, 0.45], [-0.26, 0.45]]).map(([a, b]) => P(wi + a, wj + b, gz))
+          const q = (l.face === 'x' ? [[0, -0.16], [0, 0.16], [0.6, 0.3], [0.6, -0.3]] : [[-0.16, 0], [0.16, 0], [0.3, 0.6], [-0.3, 0.6]]).map(([a, b]) => P(wi + a, wj + b, gz))
           halos.add(new N('path', { d: 'M' + q.map(([qx, qy]) => `${f(qx)} ${f(qy)}`).join('L') + 'Z', fill: `url(#isl-spill-${l.face})` }))
         }
       } else if (!glowRef && l.el?.attrs.class === 'lamp-bulb' && l.w) {
         // A street lamp: a bloom round its bulb, and its light in a pool on the ground below.
         halos.add(new N('circle', { cx: f(x), cy: f(y), r: 9, fill: 'url(#isl-lamp)' }))
         const gz = groundAt(l.w[0], l.w[1]), drop = gz === null ? 0 : l.w[2] - gz
-        if (drop >= 8 && drop <= 48) halos.add(new N('ellipse', { cx: f(x), cy: f(y + drop), rx: 26, ry: 13, fill: 'url(#isl-pool)' }))
+        if (drop >= 8 && drop <= 48) halos.add(new N('ellipse', { cx: f(x), cy: f(y + drop), rx: 30, ry: 15, fill: 'url(#isl-pool)' }))
         cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
       } else {
         // Bulbs on strings and the like: a glow of their own, small enough that a row of them stays a row of lights.
@@ -1928,8 +1928,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         else panes.add(pane)
       }
     })
-    // Lights over the water, given back by it: under each, broken streaks on the ripples, wide near the
-    // water line and narrowing and fading below, as long as the light is high. Only on open water: a streak
+    // Lights over the water, given back by it: broken streaks on the ripples round where its mirror image
+    // lies (as far below the water line as the light is above it), widest and brightest nearest the light. Only on open water: a streak
     // that would land on the land, or on a building standing in the sea, is left out.
     if (!glowRef) {
       const onWater = (sx: number, sy: number) => {
@@ -1944,9 +1944,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         if (h < 6) return
         const [x, y] = l, wy = y + h
         for (let k = 0; k < count; k++) {
-          const t = k / (count - 1), dy = wy + (k + 0.6) * (h * 1.1) / count, w = (tall ? 12 : 7) - t * (tall ? 8 : 5), dx = x + (hz(n, k, 5) - 0.5) * 3
+          const t = k / (count - 1), dy = wy + h * (0.35 + 1.3 * t), w = (tall ? 16 : 10) - t * (tall ? 10 : 6), dx = x + (hz(n, k, 5) - 0.5) * 4
           if (!onWater(dx, dy)) continue
-          halos.add(new N('path', { d: `M${f(dx - w / 2)} ${f(dy)}h${f(w)}`, stroke: l.glow, 'stroke-width': 1.6, 'stroke-linecap': 'round', fill: 'none', opacity: f(0.55 - t * 0.43) }))
+          halos.add(new N('path', { d: `M${f(dx - w / 2)} ${f(dy)}h${f(w)}`, stroke: l.glow, 'stroke-width': 2, 'stroke-linecap': 'round', fill: 'none', opacity: f(0.75 - t * 0.55) }))
         }
       })
     }
