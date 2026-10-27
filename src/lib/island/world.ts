@@ -1851,8 +1851,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // warm round that, and a faint amber reach. (isl-glow, a softer cream, stays the moon's air.)
     const lampGlow = nd.add(new N('radialGradient', { id: 'isl-lamp' }))
     for (const [o, col, op] of [[0, '#fffaf0', 0.9], [0.22, '#ffd08a', 0.35], [0.6, '#ffb27a', 0.08], [1, '#ffb27a', 0]] as [number, string, number][]) lampGlow.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
+    // A lit window's light on the ground in front of it: from the wall, fading out along the way it faces.
+    for (const [id, x1, x2] of [['isl-spill-x', 0, 1], ['isl-spill-y', 1, 0]] as const) {
+      const sg = nd.add(new N('linearGradient', { id, x1, y1: 0, x2, y2: 1 }))
+      sg.add(new N('stop', { offset: 0, 'stop-color': '#ffd9a0', 'stop-opacity': 0.32 }))
+      sg.add(new N('stop', { offset: 1, 'stop-color': '#ffd9a0', 'stop-opacity': 0 }))
+    }
     let cores = ''
     const halos = night.add(new N('g', { class: 'night-halos' }))
+    /** The ground's height at a world point, or null where there is no land to light. */
+    const groundAt = (i: number, j: number) => (isLand(Math.floor(i), Math.floor(j)) ? height[Math.floor(i)][Math.floor(j)] : null)
     const seen = opts.raster ? occlusion(opts.raster) : lights.map(() => true)
     hiddenLights = seen.filter((v) => !v).length
     // A town at night is not every window lit: about one in five stays dark.
@@ -1865,9 +1873,20 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       // (The lighthouse's lantern too: Unity's glow has it, a bright core in its glass.)
       if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb' || l.el?.attrs.class === 'stp-lamp')) return
       const [x, y] = l
-      // On the drawn island the glow is wide enough to fall on the ground round a lamp, not just ring it.
-      halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 19, fill: 'url(#isl-lamp)', opacity: glowRef ? 0.55 : undefined }))
-      if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
+      if (!glowRef && l.face && l.w) {
+        // A window: a tight bloom round its pane (a wide one fogged the walls between the windows), and, on a
+        // ground floor, its light thrown on the ground in front, out along the way it faces.
+        halos.add(new N('circle', { cx: f(x), cy: f(y), r: 5, fill: 'url(#isl-lamp)', opacity: 0.6 }))
+        const [wi, wj, wz] = l.w, gz = groundAt(wi + (l.face === 'x' ? 0.2 : 0), wj + (l.face === 'y' ? 0.2 : 0))
+        if (gz !== null && wz - gz <= 22) {
+          const q = (l.face === 'x' ? [[0, -0.16], [0, 0.16], [0.45, 0.26], [0.45, -0.26]] : [[-0.16, 0], [0.16, 0], [0.26, 0.45], [-0.26, 0.45]]).map(([a, b]) => P(wi + a, wj + b, gz))
+          halos.add(new N('path', { d: 'M' + q.map(([qx, qy]) => `${f(qx)} ${f(qy)}`).join('L') + 'Z', fill: `url(#isl-spill-${l.face})` }))
+        }
+      } else {
+        // On the drawn island the glow is wide enough to fall on the ground round a lamp, not just ring it.
+        halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 19, fill: 'url(#isl-lamp)', opacity: glowRef ? 0.55 : undefined }))
+        if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
+      }
       // The pane or bulb itself, in its glow colour, above the veil.
       if (l.el && l.glow) {
         const a: Record<string, string | number | undefined> = {}
