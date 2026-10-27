@@ -29,6 +29,10 @@ import { snowPine, cactus, barrelCactus, reeds, hedge, topiary, toadstools, arch
 export const GRID = 30
 const SEA = -12
 const BEACH = -6
+/** The hot-air balloons: where each loops round (a tile and a height), its two colours, and its start in the loop (s). */
+const BALLOONS: [number, number, number, string, string, number][] = [[9, 26, 230, C.rasp, '#ffffff', 0], [26, 10, 260, C.cobalt, C.mint, 40]]
+/** The two fishing boats moored off the coast: a tile, the hull's colour, and when each starts to bob. */
+const FISHING: [number, number, string, number][] = [[31.6, 11.4, C.mint, 0], [-2.6, 9.2, C.rasp, 2.2]]
 /** Piers: a run of ground points from a beach out over the water. */
 const PIERS: [number, number][][] = [[[5.5, 17.2], [5.5, 14.3]], [[14.5, 29.4], [14.5, 31.7]], [[21.5, 27.3], [21.5, 30.1]]]
 /** The ferry ties up at the end of the last pier, on its far side; a crossing takes this long. */
@@ -579,7 +583,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   for (const [n, pts] of PIERS.slice(0, 2).entries()) { const [ei, ej] = pts[pts.length - 1], [si, sj] = pts[0]; const di = Math.sign(ei - si), dj = Math.sign(ej - sj); const [x, y] = P(ei - di * 0.6 + (dj ? 0.42 : 0), ej - dj * 0.6 + (di ? 0.42 : 0), SEA); root.add(ripple(x, y + 4, 22, 6.5, n * 1.9 + 0.6)); root.add(rowboat(x, y, n ? C.cobalt : C.mint)) }
   ;[[30, 21], [26.5, 29.2], [31, 16.5]].forEach(([i, j], n) => { const [x, y] = P(i, j, SEA); root.add(ripple(x, y + 2, 13, 4.6, n * 1.3)); root.add(buoy(x, y, n * 1.4)) })
   // Two fishing boats at anchor, out past the rocks.
-  ;[[31.6, 11.4, C.mint, 0], [-2.6, 9.2, C.rasp, 2.2]].forEach(([i, j, c, d]) => { const [x, y] = P(i as number, j as number, SEA); root.add(ripple(x, y + 5, 30, 8, (d as number) + 1)); root.add(fishingBoat(x, y, c as string, d as number)) })
+  FISHING.forEach(([i, j, c, d]) => { const [x, y] = P(i, j, SEA); root.add(ripple(x, y + 5, 30, 8, d + 1)); root.add(fishingBoat(x, y, c, d)) })
   // A speedboat racing along the bottom of the map and back.
   {
     const a = P(33, 27, SEA), b = P(25, 37.5, SEA)
@@ -1711,25 +1715,51 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const u = ((y + SEA) / (S / 4) + x / (S / 2)) / 2, v = ((y + SEA) / (S / 4) - x / (S / 2)) / 2
     return !nearLand(u, v, 1.3) && !Object.values(anchors).some((a) => x > a.x0 - 14 && x < a.x1 + 14 && y > a.y0 - 14 && y < a.y1 + 14)
   }
-  // Where the moon hangs (the night layer): in a desktop's opening view, framed as camera.ts frames it (the
-  // view box's middle, a little low, fitted and then 1.5x closer), below the buttons along its top and
-  // inside its right edge; over open water, with the longest run of open sea below it for its path.
+  // What the moon's light must not fall on, beyond land and buildings: the loops the balloons fly (they
+  // would pass under it at night on the realistic island, whose night is drawn over the sky), and whatever
+  // stays put on the water, the moored fishing boats and the rocks with their gulls.
+  const flown = BALLOONS.map(([i, j, z]) => { const [x, y] = P(i, j, z); return [x - 124, y - 132, x + 124, y + 62] })
+  const underBalloon = (x: number, y: number) => flown.some((b) => x > b[0] && x < b[2] && y > b[1] && y < b[3])
+  const moored = [...FISHING.map(([i, j]) => [...P(i, j, SEA), 70, 60]), ...seaRocks.map(([i, j, k]) => [...P(i, j, SEA), 30 * k + 14, 30 * k + 20])]
+  const onMoored = (x: number, y: number) => moored.some(([mx, my, rx, ry]) => Math.abs(x - mx) < rx && y > my - ry && y < my + 12)
+  // Where the moon hangs (the night layer). It must be seen whole in a desktop's opening view, and is
+  // better still if a phone's opening shows it too: framed as camera.ts frames them (the view box's middle,
+  // a little low; fitted, then 1.5x closer on a desktop and 2.1x on a phone, in boxes about 1440x842 and
+  // 390x660), clear of the buttons, the title and the switches over the map. It hangs over open water,
+  // outside the loops the balloons fly (they would pass under it at night on the realistic island, whose
+  // night is drawn over the sky), with as long a run of open sea below it as there is, for its path.
   const moonAt = (() => {
-    const [bx, by, bw, bh] = viewBox, W = 1440, H = 900
-    const z = Math.min(W / (bw * 0.86), H / (bh * 0.8)) * 1.5, cx = bx + bw / 2, cy = by + bh * 0.54
-    const x1 = cx + W / z / 2 - 48 / z, y0 = cy - H / z / 2 + 84 / z
-    const spots: { x: number; y: number; run: number; d: number }[] = []
-    for (let x = cx; x <= x1 - 34; x += 8) for (let y = y0 + 34; y <= y0 + 194; y += 6) {
+    const [bx, by, bw, bh] = viewBox, cx = bx + bw / 2, cy = by + bh * 0.54
+    const view = (W: number, H: number, k: number, ui: [number, number, number, number][]) => {
+      const z = Math.min(W / (bw * 0.86), H / (bh * 0.8)) * k
+      const sx = (x: number) => W / 2 + (x - cx) * z, sy = (y: number) => H / 2 + (y - cy) * z
+      // The disc and its glow (r 40) whole on the screen, 10px in from the edges, and off every control.
+      return (x: number, y: number) => {
+        const r = 40 * z, x0 = sx(x) - r, x1 = sx(x) + r, y0 = sy(y) - r, y1 = sy(y) + r
+        return x0 > 10 && y0 > 10 && x1 < W - 10 && y1 < H - 10 && !ui.some((u) => x1 > u[0] - 8 && x0 < u[2] + 8 && y1 > u[1] - 8 && y0 < u[3] + 8)
+      }
+    }
+    const desk = view(1440, 842, 1.5, [[32, 16, 236, 72], [928, 18, 1396, 70], [552, 84, 872, 188], [32, 826, 320, 842], [1344, 650, 1396, 842]])
+    const phone = view(390, 660, 2.1, [[10, 16, 380, 72], [60, 82, 330, 152], [330, 440, 380, 660], [10, 600, 380, 660]])
+    const deskFoot = cy + 842 / 2 / (Math.min(1440 / (bw * 0.86), 842 / (bh * 0.8)) * 1.5)
+    // The disc keeps off the boats and rocks too; its path may run on between them (see the glints).
+    const clear = (x: number, y: number) => seaOpen(x, y) && !underBalloon(x, y)
+    const clearDisc = (x: number, y: number) => clear(x, y) && !onMoored(x, y)
+    const spots: { x: number; y: number; run: number; both: boolean }[] = []
+    for (let x = bx; x <= bx + bw; x += 8) for (let y = by; y <= by + bh; y += 6) {
+      if (!desk(x, y)) continue
       let ok = true
-      for (let dx = -34; dx <= 34 && ok; dx += 8) for (let dy = -34; dy <= 34 && ok; dy += 8) if (!seaOpen(x + dx, y + dy)) ok = false
+      for (let dx = -34; dx <= 34 && ok; dx += 8) for (let dy = -34; dy <= 34 && ok; dy += 8) if (!clearDisc(x + dx, y + dy)) ok = false
       if (!ok) continue
       let run = 0
-      for (let yy = y + 40; yy < y + 460 && seaOpen(x, yy); yy += 6) run = yy - (y + 40)
-      spots.push({ x, y, run, d: Math.hypot(x - (x1 - 90), y - (y0 + 60)) })
+      // (Only as far as the desktop's view reaches: water below the frame is never seen.)
+      for (let yy = y + 40; yy < Math.min(y + 300, deskFoot) && clear(x, yy); yy += 6) run = yy - (y + 40)
+      spots.push({ x, y, run, both: phone(x, y) })
     }
-    // The longest run; between near-equals, the one nearest the frame's upper right.
-    const most = Math.max(0, ...spots.map((s) => s.run))
-    const best = spots.filter((s) => s.run >= most - 6).sort((p, q) => p.d - q.d)[0] ?? { x: bx + bw * 0.72, y: by + 290, run: 0 }
+    // The longest run, counting a phone seeing it too as worth 40; between near-equals, the highest.
+    const score = (s: { run: number; both: boolean }) => s.run + (s.both ? 40 : 0)
+    const most = Math.max(0, ...spots.map(score))
+    const best = spots.filter((s) => score(s) >= most - 6).sort((p, q) => p.y - q.y)[0] ?? { x: bx + bw * 0.72, y: by + 290, run: 0 }
     return { x: best.x, y: best.y, run: best.run }
   })()
 
@@ -1886,7 +1916,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         const spread = 8 + (y - my) * 0.16
         for (let s = 0; s < 3; s++) {
           const w = 2 + hz(k, s, 41) * 7, x = mx + (hz(k, s, 42) - 0.5) * spread * 2
-          if (!seaOpen(x - w, y) || !seaOpen(x + w, y)) continue
+          if (!seaOpen(x - w, y) || !seaOpen(x + w, y) || onMoored(x - w, y) || onMoored(x + w, y)) continue
           glints[(k + s) % 2] += `M${f(x - w)} ${f(y)}h${f(w * 2)}`
         }
       }
@@ -2020,7 +2050,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudModel(n, k) ?? cloudShape(k))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
-  ;([[9, 26, 230, C.rasp, '#ffffff', 0], [26, 10, 260, C.cobalt, C.mint, 40]] as [number, number, number, string, string, number][]).forEach(([i, j, z, a, b, d], n) => {
+  BALLOONS.forEach(([i, j, z, a, b, d], n) => {
     const [x, y] = P(i, j, z)
     sky.add(pokeN('balloon')).add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d))
   })
