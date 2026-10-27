@@ -513,7 +513,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // stroked narrow and white, so it hugs every beach and cliff foot.
   const coastT = `translate(${f(sox)} ${f(soy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)`
   const foamG = plate ? new N('g', { transform: coastT }) : root.add(new N('g', { transform: coastT }))
-  foamG.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': 0.86, 'stroke-linejoin': 'round', opacity: 0.35 }))
+  // A broken lace of foam a little way out, so the rim reads as water breaking rather than a sticker's edge.
+  foamG.add(new N('use', { href: '#isl-coast', fill: 'none', stroke: '#ffffff', 'stroke-width': 0.7, 'stroke-dasharray': '0.9 0.3 2.1 0.45 1.3 0.35', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.45 }))
+  foamG.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': 0.86, 'stroke-linejoin': 'round', opacity: 0.2 }))
   foamG.add(new N('use', { href: '#isl-coast', fill: '#ffffff', stroke: '#ffffff', 'stroke-width': 0.42, 'stroke-linejoin': 'round', opacity: 0.9 }))
   // Rocks at the waterline, here and there along the sides we can see: a
   // few stones in a ring of their own foam, never in front of a pier or a
