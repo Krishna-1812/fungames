@@ -1869,6 +1869,14 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // A town at night is not every window lit: about one in five stays dark.
     const lit = lights.map((l, n) => seen[n] && litTonight(l, n))
     const panes = night.add(new N('g', { class: 'night-panes' }))
+    // Lit rooms are not all one colour (Unity's Night.Rooms has the same mix): most a lamp's amber or a warm
+    // white, some a cool daylight bulb, a few a television's blue. Each brightest at the sill.
+    const ROOMS: [number, string][] = [[0.45, '#ffd28a'], [0.75, '#fff1d6'], [0.9, '#d7e6ff'], [1, '#8fb2ff']]
+    ROOMS.forEach(([, col], k) => {
+      const rg = nd.add(new N('linearGradient', { id: `isl-room-${k}`, x1: 0, y1: 1, x2: 0, y2: 0 }))
+      rg.add(new N('stop', { offset: 0, 'stop-color': col }))
+      rg.add(new N('stop', { offset: 1, 'stop-color': col, 'stop-opacity': 0.8 }))
+    })
     lights.forEach((l, n) => {
       if (!lit[n]) return
       // With Unity's night light, the windows and the street lamps are in it, glowing as they really do;
@@ -1900,7 +1908,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if (l.el && l.glow) {
         const a: Record<string, string | number | undefined> = {}
         for (const k of ['points', 'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'transform'] as const) { const v = l.el.attrs[k]; if (v !== undefined && v !== null && v !== '') a[k] = v as string | number }
-        const pane = new N(l.el.tag, { ...a, fill: l.glow, opacity: 0.92 })
+        const room = l.face && l.glow === '#ffe6a1' ? ROOMS.findIndex(([p]) => hz(n, 7, 3) < p) : -1
+        const pane = new N(l.el.tag, { ...a, fill: room >= 0 ? `url(#isl-room-${room})` : l.glow, opacity: 0.92 })
         if (l.tf) panes.add(new N('g', { transform: l.tf })).add(pane)
         else panes.add(pane)
       }
