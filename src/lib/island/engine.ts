@@ -471,8 +471,14 @@ export function createEngine(o: {
     }
     return a
   }
-  /** A veil's gradient, kept while its colours stand still (rebuilt only while a change of time fades). */
+  /** A veil's gradient, kept while its colours and its line stand still (rebuilt only while a change of time fades). */
   const veilGrads = new WeakMap<V, { key: string; g: CanvasGradient }>()
+  /** Where the light comes from for a veil now: the low sun's line at dusk and dawn (data-sun), else the moon's. */
+  const lightLine = (n: V): number[] | null => {
+    const to = ((st.time === 'dusk' || st.time === 'dawn') && n.data?.sun) || n.data?.light
+    // The line turns from one to the other as the colours change, rather than jumping at the change of time.
+    return to ? to.split(' ').map((v, i) => Math.round(timed(`veil-line:${i}`, Number(v), LAYERS.night.fadeMs))) : null
+  }
   const tagFill = (n: V): string | CanvasGradient | undefined => {
     if (!n.tags) return undefined
     for (const t of n.tags) {
@@ -489,12 +495,12 @@ export function createEngine(o: {
           return Math.round(timed(key, ends ? (parseInt(ends[e].slice(1), 16) >> sh) & 255 : timers.get(key)?.to ?? 255, LAYERS.night.fadeMs))
         })
         const near = side(0).join(','), far = side(1).join(',')
-        const line = n.data?.light
-        if (near === far || !line) return `rgb(${near})`
-        const key = `${near}|${far}`
+        const line = near === far ? null : lightLine(n)
+        if (!line) return `rgb(${near})`
+        const key = `${near}|${far}|${line.join(' ')}`
         let v = veilGrads.get(n)
         if (!v || v.key !== key) {
-          const [x0, y0, x1, y1] = line.split(' ').map(Number)
+          const [x0, y0, x1, y1] = line
           const g = ctx.createLinearGradient(x0, y0, x1, y1)
           g.addColorStop(0, `rgb(${near})`); g.addColorStop(1, `rgb(${far})`)
           v = { key, g }; veilGrads.set(n, v)

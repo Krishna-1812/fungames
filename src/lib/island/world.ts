@@ -1820,8 +1820,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // moon across the island to its far side, so the land nearest the moon is the most lit.
   const [icx, icy] = P(GRID / 2, GRID / 2)
   const light = [moonAt.x, moonAt.y, 2 * icx - moonAt.x, 2 * icy - moonAt.y].map((v) => f(v)).join(' ')
+  // And the low sun's at dusk and dawn: from just off the island's top right, the side its baked light comes
+  // from (faces to +i lit, shadows thrown to the front left), to its bottom left.
+  const sun = [icx + 620, icy - 420, icx - 620, icy + 420].map((v) => f(v)).join(' ')
   if (glowRef) {
-    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'multiply', 'data-light': light, ...veilBox, fill: '#3c4a82', style: 'mix-blend-mode:multiply' }))
+    night.add(new N('rect', { class: 'night-veil', 'data-blend': 'multiply', 'data-light': light, 'data-sun': sun, ...veilBox, fill: '#3c4a82', style: 'mix-blend-mode:multiply' }))
     night.add(new N('rect', { class: 'night-veil', 'data-blend': 'saturation', 'data-light': light, ...veilBox, fill: '#808080', opacity: 0.5, style: 'mix-blend-mode:saturation' }))
     // The light of the lamps and the lit windows: on the ground round them, on the walls and the trees,
     // in the rooms, given back by the sea (Unity: Night.cs). Painted by the bake from its full-size render.
@@ -1832,7 +1835,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     // The drawn island's night is graded, not covered: its colours multiplied down to moonlight (so the
     // outlines stay dark and the whites go blue rather than grey), and a little of their colour taken out
     // (moves.ts, LAYERS.night.toon). A flat blue laid over everything took the contrast out with the light.
-    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'multiply', 'data-light': light, ...veilBox, fill: '#6272b4', style: 'mix-blend-mode:multiply' }))
+    night.add(new N('rect', { class: 'night-grade', 'data-blend': 'multiply', 'data-light': light, 'data-sun': sun, ...veilBox, fill: '#6272b4', style: 'mix-blend-mode:multiply' }))
     night.add(new N('rect', { class: 'night-grade', 'data-blend': 'saturation', 'data-light': light, ...veilBox, fill: '#808080', opacity: 0.25, style: 'mix-blend-mode:saturation' }))
   }
   {
