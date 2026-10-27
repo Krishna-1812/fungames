@@ -2053,9 +2053,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const sky = open('sky')
   ;[[-0.2, 0.1, 1.2], [0.25, 0.45, 1], [0.6, 0.2, 1.3], [0.05, 0.7, 0.9], [0.8, 0.6, 1.1]].forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
-    const g = sky.add(new N('g', { class: 'cloud', style: `animation-delay:${-n * 23}s;animation-duration:${150 + n * 20}s` }))
-    // Its shadow on the ground far below: on the realistic island, soft-edged, as a cloud's is.
-    g.add(new N('ellipse', { cx: f(x + 14), cy: f(y + 120), rx: f(56 * k * (plate ? 1.25 : 1)), ry: f(17 * k * (plate ? 1.25 : 1)), fill: plate ? puffShade(g, `cl-shadow${n}`, '#1b2340', 0.16) : INK, opacity: plate ? undefined : 0.06, class: 'cloud-shadow' }))
+    const drift = { class: 'cloud', style: `animation-delay:${-n * 23}s;animation-duration:${150 + n * 20}s` }
+    // Its shadow on the ground far below (on the realistic island, soft-edged, as a cloud's is), drifting with
+    // it in a group of its own, so each is a sprite of its own size.
+    const sh = sky.add(new N('g', { ...drift }))
+    sh.add(new N('ellipse', { cx: f(x + 14), cy: f(y + 120), rx: f(56 * k * (plate ? 1.25 : 1)), ry: f(17 * k * (plate ? 1.25 : 1)), fill: plate ? puffShade(sh, `cl-shadow${n}`, '#1b2340', 0.16) : INK, opacity: plate ? undefined : 0.06, class: 'cloud-shadow' }))
+    const g = sky.add(new N('g', { ...drift }))
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudModel(n, k) ?? cloudShape(k))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.

@@ -46,7 +46,7 @@ const SHAPES = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polygon', 
 /** Presentation attributes that children inherit. */
 const INHERITED = ['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'letter-spacing', 'dominant-baseline', 'visibility']
 /** Classes the engine finds and drives by itself. */
-const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg-year', 'pg-bar', 'dt-fossil', 'cloud-puff', 'cloud-base', 'night-veil', 'night-grade', 'lm-ring', 'lm-art', 'pk-say', 'mill-sails', 'fount-up', 'kite', 'cloud', 'isl-plane', 'walker', 'dsi-count', 'sign-words'])
+const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg-year', 'pg-bar', 'dt-fossil', 'night-veil', 'night-grade', 'lm-ring', 'lm-art', 'pk-say', 'mill-sails', 'fount-up', 'kite', 'cloud', 'isl-plane', 'walker', 'dsi-count', 'sign-words'])
 /**
  * Of those, the ones whose own paint the engine changes (a fill, a dash, a
  * width): drawn from their outlines. Everything else that moves is a
@@ -54,7 +54,9 @@ const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg
  * drawing the shape again: fifteen hundred shapes drawn from their outlines
  * every frame held the map to twelve frames a second.
  */
-const OUTLINED = new Set(['es-win', 'liw-cell', 'pg-bar', 'cloud-puff', 'cloud-base', 'night-veil', 'night-grade', 'lm-ring'])
+// (The cartoon clouds' parts left this list when the night's grade took over their colouring: a cloud is
+// now one sprite, moved whole, instead of seven shapes drawn from their outlines every frame.)
+const OUTLINED = new Set(['es-win', 'liw-cell', 'pg-bar', 'night-veil', 'night-grade', 'lm-ring'])
 /**
  * Classes whose opacity the time of day sets (moves.ts LAYERS): the page's
  * CSS set it over the element's own opacity attribute, so the engine's value

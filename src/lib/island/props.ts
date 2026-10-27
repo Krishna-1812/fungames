@@ -314,11 +314,13 @@ export function cloudModel(n: number, k = 1): N | null {
 
 export function cloudShape(k = 1): string {
   const parts: [number, number, number][] = [[0, 0, 26], [30, 8, 20], [-28, 9, 18], [10, -16, 20], [-12, -12, 17]]
-  return '<g class="cloud-body" opacity="0.9">' +
-    `<ellipse cx="${f(2 * k)}" cy="${f(17 * k)}" rx="${f(46 * k)}" ry="${f(11 * k)}" fill="#d9e2f6" class="cloud-base"/>` +
-    parts.map(([x, y, r]) => `<circle cx="${f(x * k)}" cy="${f(y * k)}" r="${f(r * k)}" fill="#ffffff" class="cloud-puff"/>`).join('') +
-    `<path d="M${f(-40 * k)} ${f(14 * k)}q${f(42 * k)} ${f(10 * k)} ${f(86 * k)} 0" fill="none" stroke="#e6ecfa" stroke-width="${f(6 * k)}" stroke-linecap="round" class="cloud-base"/>` +
-    `<ellipse cx="${f(-6 * k)}" cy="${f(-18 * k)}" rx="${f(12 * k)}" ry="${f(6 * k)}" fill="#ffffff" opacity="0.9"/></g>`
+  // Each part at 0.9, not the group: baked as one sprite, a group's opacity made the whole cloud see-through,
+  // where the parts, drawn one by one, stacked to near solid in the middle.
+  return '<g class="cloud-body">' +
+    `<ellipse cx="${f(2 * k)}" cy="${f(17 * k)}" rx="${f(46 * k)}" ry="${f(11 * k)}" fill="#d9e2f6" opacity="0.9"/>` +
+    parts.map(([x, y, r]) => `<circle cx="${f(x * k)}" cy="${f(y * k)}" r="${f(r * k)}" fill="#ffffff" opacity="0.9"/>`).join('') +
+    `<path d="M${f(-40 * k)} ${f(14 * k)}q${f(42 * k)} ${f(10 * k)} ${f(86 * k)} 0" fill="none" stroke="#e6ecfa" stroke-width="${f(6 * k)}" stroke-linecap="round" opacity="0.9"/>` +
+    `<ellipse cx="${f(-6 * k)}" cy="${f(-18 * k)}" rx="${f(12 * k)}" ry="${f(6 * k)}" fill="#ffffff" opacity="0.81"/></g>`
 }
 
 export { N }
