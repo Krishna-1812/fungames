@@ -2,7 +2,8 @@
  * Tiny Island — what the page puts on the map for this visitor alone: a flag
  * on every building they have finished, and today's balloon over the day's
  * building. Made here as the engine's own nodes (lib/island/scene), drawn
- * over everything else, and moved by the island's own keyframes.
+ * with the sky (above the buildings and the night's lights, graded with the
+ * sky after dark), and moved by the island's own keyframes.
  */
 import type { Anim, Node } from './scene'
 

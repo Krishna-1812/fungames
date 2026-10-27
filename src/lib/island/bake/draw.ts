@@ -79,7 +79,7 @@ export async function paint(b: Built, view: [number, number, number, number], ha
   const edit = (opts: { solid?: boolean } = {}) => (e: El): Record<string, string> | null => {
     const cs = classes(e)
     // Hidden by day, or only for the engine to show.
-    if (cs.some((c) => c === 'ufo' || c === 'dawn-whale' || c === 'fireworks' || c === 'night-dim') && !opts.solid) return null
+    if (cs.some((c) => c === 'ufo' || c === 'dawn-whale' || c === 'fireworks') && !opts.solid) return null
     const a: Record<string, string> = {}
     for (const [k, v] of Object.entries(e.attrs)) {
       if (k.startsWith('data-') || k === 'class' || k === 'aria-label' || k === 'href' && e.tag === 'a') continue

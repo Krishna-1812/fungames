@@ -2127,10 +2127,15 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     }
     for (const m of made) if (m.kind === 'landmark' || m.kind === 'things') walk(m.node)
   }
-  // The realistic night falls on everything in the world, the clouds, the balloons and the birds as well:
-  // its layer (and the lighthouse's beam, which is light) goes over the sky's, under only the districts' names.
-  if (glowRef) {
-    const late = made.filter((m) => m.kind === 'night' || m.kind === 'beam' || m.kind === 'banners')
+  // The order, in both worlds: the night (its grade, and the lights it does not grade) and the lighthouse's
+  // beam; then the sky above them, which the engine grades apart with the night's own veils (engine.ts,
+  // gradeSky), so the balloons, clouds and birds are darkened like everything else and yet no lit window
+  // shows through them; then the lanterns, which give off light of their own; then the districts' names.
+  {
+    const of = (want: (m: (typeof made)[number]) => boolean) => made.filter(want)
+    const night = of((m) => m.kind === 'night' || m.kind === 'beam'), sky = of((m) => m.kind === 'sky')
+    const lanterns = of((m) => m.kind === 'weather' && m.slug === 'lanterns'), names = of((m) => m.kind === 'banners')
+    const late = [...night, ...sky, ...lanterns, ...names]
     made.splice(0, made.length, ...made.filter((m) => !late.includes(m)), ...late)
   }
   const layers: Layer[] = made.map((m) => ({ kind: m.kind, slug: m.slug, body: render(m.node) }))

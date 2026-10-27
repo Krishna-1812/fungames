@@ -51,7 +51,7 @@ fs.writeFileSync(path.join(out, 'scene.json'), sceneJson(p.scene)); files.push('
   const [vx, vy, vw, vh] = island.viewBox, k = 0.6
   // By day and out of season: no night, no beam, no weather, and none of what only comes at certain hours.
   const { parse, write, classes } = await import('../src/lib/island/bake/xml.ts')
-  const AWAY = new Set(['ufo', 'dawn-whale', 'fireworks', 'night-dim'])
+  const AWAY = new Set(['ufo', 'dawn-whale', 'fireworks'])
   const day = island.layers.filter((l) => !['night', 'beam', 'weather'].includes(l.kind))
     .map((l) => parse(l.body).map((n) => write(n, (e) => (classes(e).some((c) => AWAY.has(c)) ? null : e.attrs))).join(''))
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${Math.round(vw * k)}" height="${Math.round(vh * k)}"><style>${island.css}</style>${day.join('')}</svg>`

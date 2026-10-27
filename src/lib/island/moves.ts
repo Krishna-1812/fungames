@@ -360,7 +360,6 @@ export const LAYERS = {
   fireworks: { when: { season: ['newyear', 'diwali', 'fest'], time: ['night', 'dusk'] } as When },
   ufo: { when: { hour: [3] } as When },
   dawnWhale: { when: { time: ['dawn'] } as When },
-  nightDim: { when: NIGHT_ONLY },
   /** How the night comes on: a veil, then the lights, each with its own strength. */
   night: {
     fadeMs: 1600,
@@ -393,8 +392,8 @@ export const LAYERS = {
       saturation: { night: ['#808080', 0.25], dusk: ['#808080', 0.08], dawn: ['#808080', 0.04] } as Record<string, [Shade, number]>,
     },
   },
-  /** Clouds: thinner and dusky at night, faint when you are close. */
-  cloud: { night: 0.55, near: 0.18, fadeMs: 400, puff: { night: '#7f8fc4', dusk: '#e9defa' } as Record<string, string>, base: { night: '#6a79b0', dusk: '#cdbdf0' } as Record<string, string> },
+  /** Clouds: a little thinner at night (the night's grade colours them, with the rest of the sky), faint when you are close. */
+  cloud: { night: 0.8, near: 0.18, fadeMs: 400 },
 }
 
 /* ---- the cards: the same motions, as CSS, for the buildings drawn as SVG ---- */

@@ -501,8 +501,6 @@ export function createEngine(o: {
         }
         return v.g
       }
-      if (t === 'cloud-puff') return LAYERS.cloud.puff[st.time]
-      if (t === 'cloud-base') return LAYERS.cloud.base[st.time]
     }
     return undefined
   }
@@ -777,14 +775,55 @@ export function createEngine(o: {
   const lastEnd = new Map<string, number>()
   for (const [kind, at] of scene.ends ?? []) lastEnd.set(kind, at)
   for (const [kind, at] of lastEnd) (endsAfter.get(at - 1) ?? endsAfter.set(at - 1, []).get(at - 1)!).push(kind)
-  // What the page adds (the finished buildings' flags, today's balloon) goes under the night wherever the
-  // night falls on the sky as well (the realistic island): just above the buildings, under the weather and
-  // the clouds, so it is darkened with everything round it rather than shining on top. Otherwise (the
-  // cartoon's night stops under the sky, with its balloons) it is drawn last, as before.
+  // The sky's run of top-level nodes (world.ts puts it above the night). What the page adds (the finished
+  // buildings' flags, today's balloon) goes in at its start: in the air, and graded with it.
   const ends = scene.ends ?? []
-  const nightIx = ends.findIndex(([k]) => k === 'night'), skyIx = ends.findIndex(([k]) => k === 'sky')
-  const airIx = ends.findIndex(([k]) => k === 'weather' || k === 'sky')
-  const extraAt = airIx > 0 && skyIx >= 0 && nightIx > skyIx ? ends[airIx - 1][1] : -1
+  const skyIx = ends.findIndex(([k]) => k === 'sky')
+  const skyStart = skyIx < 0 ? -1 : skyIx === 0 ? 0 : ends[skyIx - 1][1], skyEnd = skyIx < 0 ? -1 : ends[skyIx][1]
+  // The night's veils (its grade): drawn once more, over the sky alone, by gradeSky.
+  const veils: V[] = []
+  const findVeils = (n: Node) => { if (n.k === 'v') { if (n.tags?.some((t) => t === 'night-grade' || t === 'night-veil')) veils.push(n) } else if (n.k === 'g') n.kids.forEach(findVeils) }
+  scene.root.forEach(findVeils)
+  /**
+   * After dark, the sky is drawn apart and graded there, then laid over the island: the night's lights (its
+   * lit windows, lamps and glow) sit under the sky, and the sky is darkened by the night's own veils all the
+   * same. Done exactly, in premultiplied colour: the sky over black, multiplied by the veils on that opaque
+   * ground; the island cut where the sky covers it (by the sky's own alpha), and the graded sky added back.
+   * Two canvases of the screen's size, kept; six calls a frame, and only while it is not day.
+   */
+  const skyCanvases: OffscreenCanvas[] = []
+  const skyCanvas = (k: number) => {
+    const w = canvas.width, h = canvas.height
+    const oc = skyCanvases[k] ?? (skyCanvases[k] = new OffscreenCanvas(w, h))
+    if (oc.width !== w || oc.height !== h) { oc.width = w; oc.height = h }
+    return oc
+  }
+  let skyOn: { saved: CanvasRenderingContext2D } | null = null
+  const beginSky = () => {
+    const b = skyCanvas(0), bctx = b.getContext('2d')! as unknown as CanvasRenderingContext2D
+    bctx.setTransform(1, 0, 0, 1, 0, 0); bctx.globalAlpha = 1; bctx.globalCompositeOperation = 'source-over'
+    bctx.clearRect(0, 0, b.width, b.height)
+    bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = 'high'
+    skyOn = { saved: ctx }
+    ctx = bctx; ident = false; textCtx = null; transforms.invalidate()
+  }
+  const gradeSky = () => {
+    if (!skyOn) return
+    const b = skyCanvas(0), a = skyCanvas(1), actx = a.getContext('2d')! as unknown as CanvasRenderingContext2D
+    actx.setTransform(1, 0, 0, 1, 0, 0); actx.globalAlpha = 1; actx.globalCompositeOperation = 'source-over'
+    actx.fillStyle = '#000'; actx.fillRect(0, 0, a.width, a.height)
+    actx.drawImage(b, 0, 0)
+    ctx = actx; ident = false; textCtx = null; transforms.invalidate()
+    const ga = timed('night', st.time === 'day' ? 0 : 1, LAYERS.night.fadeMs)
+    for (const v of veils) drawVector(v, deviceM, ga)
+    ctx = skyOn.saved; skyOn = null; ident = false; textCtx = null; transforms.invalidate()
+    toIdent()
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(b, 0, 0)
+    ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(a, 0, 0)
+    ctx.globalCompositeOperation = 'source-over'
+    cs.images += 3; cs.paths++
+  }
   const hook = (h: LiveHook) => { cs.paths += h(ctx, deviceM, now); ident = false; textCtx = null; transforms.invalidate(); ctx.globalAlpha = 1 }
 
   /* ---- one frame ---- */
@@ -813,13 +852,16 @@ export function createEngine(o: {
     if (under) { ctx.fillStyle = under; ctx.fillRect(0, 0, canvas.width, canvas.height) }
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
+    // The sky is graded apart whenever the night is anywhere near (see gradeSky).
+    const graded = skyStart >= 0 && veils.length > 0 && (st.time !== 'day' || (timers.get('night')?.v ?? 0) > 0.002)
     scene.root.forEach((n, i) => {
-      if (i === extraAt) for (const e of extra) drawNode(e, deviceM, 1)
+      if (i === skyStart) { if (graded) beginSky(); for (const e of extra) drawNode(e, deviceM, 1) }
       drawNode(n, deviceM, 1)
       const ended = endsAfter.get(i)
       if (ended) for (const k of ended) { const h = drawLive.after?.[k]; if (h) hook(h) }
+      if (i === skyEnd - 1) gradeSky()
     })
-    if (extraAt < 0) for (const n of extra) drawNode(n, deviceM, 1)
+    if (skyStart < 0) for (const n of extra) drawNode(n, deviceM, 1)
     if (drawLive.top) hook(drawLive.top)
     ctx.globalAlpha = 1
     lastGaps = gaps; lastBlurry = blurry

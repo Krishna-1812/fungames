@@ -64,7 +64,7 @@ const TIMED_OPACITY = new Set(['night-veil', 'night-grade', 'night-halos', 'nigh
 /** Groups whose only change is how strongly they show (by the time of day): painted into cells like still painting. */
 const ALPHA = new Set(['night-halos', 'night-panes', 'night-shine', 'night-sky', 'night-cores', 'night-glow', 'fireworks'])
 /** Groups that are only there at some times. */
-const WHEN: Record<string, When> = { ufo: LAYERS.ufo.when, 'dawn-whale': LAYERS.dawnWhale.when, 'night-dim': LAYERS.nightDim.when, fireworks: LAYERS.fireworks.when }
+const WHEN: Record<string, When> = { ufo: LAYERS.ufo.when, 'dawn-whale': LAYERS.dawnWhale.when, fireworks: LAYERS.fireworks.when }
 
 export function build(island: { layers: { kind: string; slug?: string; body: string }[]; css: string; viewBox: [number, number, number, number] }): Built {
   const warnings: string[] = []

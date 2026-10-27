@@ -568,8 +568,8 @@ export function createPlay(o: {
     // The tether, slack, from the basket down to the roof.
     c.strokeStyle = 'rgba(40, 44, 56, 0.55)'; c.lineWidth = 0.9
     c.beginPath(); c.moveTo(x, foot); c.bezierCurveTo(x - 5, foot + 12, x + 5, top - 6, x, top + 8); c.stroke()
-    // Drawn after the sky and before the realistic night (the `sky` hook below), so the night darkens it,
-    // tag and all, like every other balloon: no per-frame canvas filter.
+    // Drawn with the sky (the `sky` hook below), so the night darkens it, tag and all, like every other
+    // balloon: no per-frame canvas filter.
     drawPic(c, sp.balloon, x, foot, 0.95)
     // Its tag, in the island's lettering, over the envelope.
     const ty = foot - 101
@@ -624,10 +624,9 @@ export function createPlay(o: {
         void t
         return n
       },
-      // Today's balloon, with the other balloons: on the realistic island the night layer comes after this.
-      sky: (c, m) => drawToday(c, m, performance.now()),
+      // Today's balloon and the birds in flight: in the air, so graded with the sky after dark (engine.ts gradeSky).
+      sky: (c, m) => drawToday(c, m, performance.now()) + drawBirdsFlying(c, m, performance.now()),
     },
-    top: (c, m) => drawBirdsFlying(c, m, performance.now()),
     front: (c, m, _t, inWin) => drawParade(c, m, performance.now(), frameMarchers, inWin),
   }
 
