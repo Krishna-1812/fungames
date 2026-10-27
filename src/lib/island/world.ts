@@ -1857,6 +1857,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       sg.add(new N('stop', { offset: 0, 'stop-color': '#ffd9a0', 'stop-opacity': 0.32 }))
       sg.add(new N('stop', { offset: 1, 'stop-color': '#ffd9a0', 'stop-opacity': 0 }))
     }
+    // And a street lamp's, in a pool on the ground under it.
+    const pool = nd.add(new N('radialGradient', { id: 'isl-pool' }))
+    for (const [o, col, op] of [[0, '#ffd9a0', 0.42], [0.6, '#ffb877', 0.12], [1, '#ffb877', 0]] as [number, string, number][]) pool.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
     let cores = ''
     const halos = night.add(new N('g', { class: 'night-halos' }))
     /** The ground's height at a world point, or null where there is no land to light. */
@@ -1882,9 +1885,15 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
           const q = (l.face === 'x' ? [[0, -0.16], [0, 0.16], [0.45, 0.26], [0.45, -0.26]] : [[-0.16, 0], [0.16, 0], [0.26, 0.45], [-0.26, 0.45]]).map(([a, b]) => P(wi + a, wj + b, gz))
           halos.add(new N('path', { d: 'M' + q.map(([qx, qy]) => `${f(qx)} ${f(qy)}`).join('L') + 'Z', fill: `url(#isl-spill-${l.face})` }))
         }
+      } else if (!glowRef && l.el?.attrs.class === 'lamp-bulb' && l.w) {
+        // A street lamp: a bloom round its bulb, and its light in a pool on the ground below.
+        halos.add(new N('circle', { cx: f(x), cy: f(y), r: 9, fill: 'url(#isl-lamp)' }))
+        const gz = groundAt(l.w[0], l.w[1]), drop = gz === null ? 0 : l.w[2] - gz
+        if (drop >= 8 && drop <= 48) halos.add(new N('ellipse', { cx: f(x), cy: f(y + drop), rx: 26, ry: 13, fill: 'url(#isl-pool)' }))
+        cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
       } else {
-        // On the drawn island the glow is wide enough to fall on the ground round a lamp, not just ring it.
-        halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 19, fill: 'url(#isl-lamp)', opacity: glowRef ? 0.55 : undefined }))
+        // Bulbs on strings and the like: a glow of their own, small enough that a row of them stays a row of lights.
+        halos.add(new N('circle', { cx: f(x), cy: f(y), r: glowRef ? 7 : 10, fill: 'url(#isl-lamp)', opacity: glowRef ? 0.55 : 0.8 }))
         if (!glowRef) cores += `M${f(x - 1.2)} ${f(y)}a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0`
       }
       // The pane or bulb itself, in its glow colour, above the veil.
