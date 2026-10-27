@@ -248,9 +248,12 @@ export async function paint(b: Built, view: [number, number, number, number], ha
     const fx = tw / width, fy = th / height
     const bw = Math.round((width + ml + mr) * fx), bh = Math.round((height + mt + mb) * fy)
     const ox = Math.min(bw - tw, Math.round(ml * fx)), oy = Math.min(bh - th, Math.round(mt * fy))
-    const part = await sharp(plate.px, { raw: { width: plate.width, height: plate.height, channels: 4 }, limitInputPixels: false })
+    let pipe = sharp(plate.px, { raw: { width: plate.width, height: plate.height, channels: 4 }, limitInputPixels: false })
       .extract({ left: left - ml, top: top - mt, width: width + ml + mr, height: height + mt + mb }).resize(bw, bh, { kernel: 'lanczos3', fit: 'fill' })
-      .extract({ left: ox, top: oy, width: tw, height: th }).raw().toBuffer()
+    // Scaled up (the closest levels, at twice the plate's own detail), a light sharpen gives back the grain
+    // the filter softens; the margin keeps it off the piece's border as well.
+    if (fx > 1.2) pipe = pipe.sharpen({ sigma: 0.55, m1: 0.4, m2: 1.6 })
+    const part = await pipe.extract({ left: ox, top: oy, width: tw, height: th }).raw().toBuffer()
     for (let y = 0; y < th; y++) {
       let si = y * tw * 4, di = ((dy + y) * w + dx) * 4
       for (let x = 0; x < tw; x++, si += 4, di += 4) {
