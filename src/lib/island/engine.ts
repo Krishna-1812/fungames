@@ -441,6 +441,8 @@ export function createEngine(o: {
     cs.images++; cs.sprites++
   }
 
+  /** The ways the night's veils are laid on (data-blend): LAYERS.night.real and .toon have each one's colours. */
+  type Blend = 'multiply' | 'saturation' | 'soft-light'
   /** How strongly something tagged shows: the night's layers, the clouds, a building's ring. */
   const tagAlpha = (tags: string[], n: Node): number => {
     let a = 1
@@ -453,11 +455,11 @@ export function createEngine(o: {
       else if (t === 'night-sky') a *= timed('sky', N.sky[st.time] ?? 0, N.fadeMs)
       else if (t === 'night-veil') {
         const blend = n.k === 'v' ? (n as V).st.blend : undefined
-        const real = blend ? N.real[blend as 'multiply' | 'saturation'] : null
+        const real = blend ? N.real[blend as Blend] : null
         a *= real ? timed(`veil:${blend}`, real[st.time]?.[1] ?? 0, N.fadeMs) : timed('veil', N.veil[st.time]?.[1] ?? 0, N.fadeMs)
       }
       else if (t === 'night-grade') {
-        const blend = (n as V).st.blend as 'multiply' | 'saturation'
+        const blend = (n as V).st.blend as Blend
         a *= timed(`grade:${blend}`, N.toon[blend]?.[st.time]?.[1] ?? 0, N.fadeMs)
       }
       else if (t === 'night-glow') a *= timed('glow', N.glow[st.time] ?? 0, N.fadeMs)
@@ -487,7 +489,8 @@ export function createEngine(o: {
         // The veils' colours move from one time's to the next as their strength does (by day, they keep the last).
         // A time's colour may be a pair, the lit end and the far end: then the veil is a gradient along the line
         // the island drew on it (data-light, from the side the light comes from), so the light has a direction.
-        const table = (t === 'night-grade' ? LAYERS.night.toon : LAYERS.night.real)[n.st.blend as 'multiply' | 'saturation']
+        const blend = n.st.blend as Blend
+        const table = (t === 'night-grade' ? LAYERS.night.toon : LAYERS.night.real)[blend]
         const spec = table?.[st.time]?.[0]
         const ends = spec === undefined ? null : typeof spec === 'string' ? [spec, spec] : spec
         const side = (e: 0 | 1) => [16, 8, 0].map((sh, i) => {
@@ -495,14 +498,21 @@ export function createEngine(o: {
           return Math.round(timed(key, ends ? (parseInt(ends[e].slice(1), 16) >> sh) & 255 : timers.get(key)?.to ?? 255, LAYERS.night.fadeMs))
         })
         const near = side(0).join(','), far = side(1).join(',')
-        const line = near === far ? null : lightLine(n)
+        const line = near === far && blend !== 'soft-light' ? null : lightLine(n)
         if (!line) return `rgb(${near})`
         const key = `${near}|${far}|${line.join(' ')}`
         let v = veilGrads.get(n)
         if (!v || v.key !== key) {
           const [x0, y0, x1, y1] = line
-          const g = ctx.createLinearGradient(x0, y0, x1, y1)
-          g.addColorStop(0, `rgb(${near})`); g.addColorStop(1, `rgb(${far})`)
+          let g: CanvasGradient
+          if (blend === 'soft-light') {
+            // The sun's warmth: a round glow from where the line starts, gone a little past the island's middle.
+            g = ctx.createRadialGradient(x0, y0, 0, x0, y0, Math.hypot(x1 - x0, y1 - y0) * 0.62)
+            g.addColorStop(0, `rgba(${near},0.45)`); g.addColorStop(1, `rgba(${near},0)`)
+          } else {
+            g = ctx.createLinearGradient(x0, y0, x1, y1)
+            g.addColorStop(0, `rgb(${near})`); g.addColorStop(1, `rgb(${far})`)
+          }
           v = { key, g }; veilGrads.set(n, v)
         }
         return v.g

@@ -380,6 +380,9 @@ export const LAYERS = {
       multiply: { night: [['#6a80c4', '#40508e'], 1], dusk: [['#f2cdbd', '#8580c4'], 1], dawn: [['#f6dccd', '#c9c6ec'], 1] } as Record<string, [Shade, number]>,
       // Golden hour keeps its colour: the evening and the morning have more of it than the day, not less.
       saturation: { night: ['#808080', 0.4], dusk: ['#808080', 0.05], dawn: ['#808080', 0.03] } as Record<string, [Shade, number]>,
+      // The low sun's warmth (soft light: brighter and warmer where it falls, the darks kept), strongest just
+      // off the island on its side and gone by the far side (engine.ts tagFill makes it a round glow there).
+      'soft-light': { dusk: ['#ffa050', 1], dawn: ['#ffd9bf', 0.6] } as Record<string, [Shade, number]>,
     },
     glow: { night: 1, dusk: 0.55, dawn: 0.2 } as Record<string, number>,
     /**
@@ -393,6 +396,7 @@ export const LAYERS = {
       // Dusk and dawn as the realistic island's: warm where the low sun falls, cool on the far side.
       multiply: { night: [['#94a6d8', '#5466a0'], 1], dusk: [['#ffd9cc', '#9c90d6'], 1], dawn: [['#fbe6d4', '#d7def5'], 1] } as Record<string, [Shade, number]>,
       saturation: { night: ['#808080', 0.25], dawn: ['#808080', 0.03] } as Record<string, [Shade, number]>,
+      'soft-light': { dusk: ['#ffa050', 1], dawn: ['#ffd9bf', 0.6] } as Record<string, [Shade, number]>,
     },
   },
   /** Clouds: a little thinner at night (the night's grade colours them, with the rest of the sky), faint when you are close. */
