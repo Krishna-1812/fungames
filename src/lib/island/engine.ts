@@ -719,14 +719,15 @@ export function createEngine(o: {
       waves = Array.from({ length: WAVES.sets }, () => {
         const p = new Path2D()
         for (let k = 0; k < WAVES.each; k++) {
-          const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0), s = 0.75 + rnd() * 0.5
-          p.moveTo(x, y); p.quadraticCurveTo(x + 5 * s, y - 3.6 * s, x + 10 * s, y); p.quadraticCurveTo(x + 15 * s, y - 3.6 * s, x + 20 * s, y)
+          const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0), s = 0.75 + rnd() * 0.5, L = 16 * s + rnd() * 18
+          // A single soft crest (two humps read as a gull).
+          p.moveTo(x, y); p.quadraticCurveTo(x + L / 2, y - 2.4 * s, x + L, y)
         }
         return p
       })
     }
     const t = (now - t0) / 1000
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     for (let k = 0; k < WAVES.sets; k++) {
       const ph = t / WAVES.period + k / WAVES.sets, cyc = Math.floor(ph), u = ph - cyc
       const a = 0.5 - 0.5 * Math.cos(u * Math.PI * 2)

@@ -443,10 +443,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     for (let k = 0; k < 45; k++) {
       const u = R() * (GRID + 16) - 8, v = R() * (GRID + 16) - 8
       if (nearLand(u, v, 3.5)) continue
-      const [x, y] = P(u, v, SEA)
-      d += `M${f(x)} ${f(y)}q7 -5 14 0q7 -5 14 0`
+      const [x, y] = P(u, v, SEA), L = 16 + hz(g, k, 51) * 24
+      // One soft crest, its length varied (hz, so the dice above are thrown exactly as before).
+      d += `M${f(x)} ${f(y)}q${f(L / 2)} -2.5 ${f(L)} 0`
     }
-    if (!plate) waves.add(new N('path', { d, fill: 'none', stroke: '#ffffff', 'stroke-width': 2.2, 'stroke-linecap': 'round', class: `wave w${g}` }))
+    if (!plate) waves.add(new N('path', { d, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.4, 'stroke-linecap': 'round', opacity: f(0.2 + g * 0.04), class: `wave w${g}` }))
   }
   // Rocks standing in the shallows, each with a ring of foam, and a little
   // sandbar off the harbour with one palm on it.
