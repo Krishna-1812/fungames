@@ -401,7 +401,8 @@ export function initIsland(o: {
     const v = framing(slug, zoom)
     flyTo(v.x, v.y, v.z)
   }
-  const home = () => { firstTouch(); flyTo(bx + bw / 2, by + bh * 0.56, fitZ()) }
+  // Home is where the island opened (the mini-map is the overview).
+  const home = () => { firstTouch(); const v = openView(); flyTo(v.x, v.y, v.z) }
 
   /* ---- pointers: drag, pinch, wheel, double-click ------------------------ */
   const ptrs = new Map<number, { x: number; y: number }>()
