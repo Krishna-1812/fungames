@@ -1907,6 +1907,8 @@ const book = BOOK.map((key) => {
   .isl-zoom { position: absolute; right: clamp(14px, 3vw, 32px); bottom: 24px; z-index: 5; display: grid; gap: 10px; }
   .isl-zoom button { width: 48px; height: 48px; padding: 0; justify-content: center; font-size: 26px; line-height: 1; }
   .isl-zoom svg { width: 20px; height: 20px; }
+  /* On a touch screen, fingers pinch: the zoom buttons only stand over the island (the keys still zoom). */
+  @media (pointer: coarse) { #zIn, #zOut { display: none; } }
   .isl-zoom .isl-snap { position: relative; margin-bottom: 6px; background: #e3f3ff; }
   .isl-zoom .isl-snap svg { width: 24px; height: 24px; }
   .isl-zoom .isl-snap:hover { background: #cfe9ff; }
@@ -2184,6 +2186,8 @@ const book = BOOK.map((key) => {
     opacity: 0; transition: opacity 0.25s;
   }
   :global(.isl-box.z-near .isl-tag.is-on) { opacity: 1; }
+  /* A phone's building names, smaller: more of them fit between the buildings they name. */
+  @media (max-width: 699px) { :global(.isl-tag) { padding: 2px 8px; font-size: 12px; border-width: 2px; box-shadow: 0 2px 0 #1b2340; } }
   /* The district names, the same size at every zoom (the still picture for a
      page without script has them drawn on). */
   /* Lettering painted on the map, as an illustrated map names its regions, rather than white boxes (seven
