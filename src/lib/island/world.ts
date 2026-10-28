@@ -9,7 +9,7 @@
  * People walk those roads; boats sail round the coast; clouds and birds go
  * over the top. Everything is painted back to front.
  */
-import { look, signBoxes, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
+import { SHADOW, look, signBoxes, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
 import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
 import { folkPic } from './folk'
@@ -962,10 +962,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     for (const [z, { cast, foot }] of [...byZ].sort((p, q) => p[0] - q[0])) {
       const [zx, zy] = P(0, 0, z)
       const hg = sg.add(new N('g', { transform: `translate(${f(zx)} ${f(zy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
-      for (const [w, op] of [[0.44, 0.06], [0.28, 0.065], [0.14, 0.07], [0, 0.08]] as [number, number][]) {
-        hg.add(new N('g', { opacity: op })).add(new N('path', { d: cast.join(''), fill: INK, stroke: w ? INK : undefined, 'stroke-width': w || undefined, 'stroke-linejoin': 'round' }))
+      // In the cool shadow blue (kit.ts SHADOW), in five sheets each reaching a little less far, so the edge
+      // fades without visible steps; then the darker band hugging the foot.
+      for (const [w, op] of [[0.48, 0.045], [0.36, 0.05], [0.24, 0.055], [0.12, 0.06], [0, 0.065]] as [number, number][]) {
+        hg.add(new N('g', { opacity: op })).add(new N('path', { d: cast.join(''), fill: SHADOW, stroke: w ? SHADOW : undefined, 'stroke-width': w || undefined, 'stroke-linejoin': 'round' }))
       }
-      hg.add(new N('g', { opacity: 0.09 })).add(new N('path', { d: foot.join(''), fill: INK, stroke: INK, 'stroke-width': 0.08, 'stroke-linejoin': 'round' }))
+      hg.add(new N('g', { opacity: 0.1 })).add(new N('path', { d: foot.join(''), fill: SHADOW, stroke: SHADOW, 'stroke-width': 0.08, 'stroke-linejoin': 'round' }))
     }
     motionCss.length = keep
     glows.length = keepGlow

@@ -188,6 +188,8 @@ export const mix = (a: string, b: string, t: number) => { const A = rgb(a), B = 
  * in shade, deep and cooled by the sky. (They were 1 : 0.93 : 0.8, too near one another: the town read as flat
  * clip-art rather than a lit illustration.) The realistic island's few drawn solids keep their old tones.
  */
+/** Cast shadows on the drawn island: a cool blue (skylight fills them), not the outline's ink. */
+export const SHADOW = '#24306e'
 export const FACE = {
   top: (c: string) => (look.soft ? mix(c, '#fff8ec', 0.08) : c),
   lit: (c: string) => (look.soft ? mix(shade(c, 0.9), '#fff1dc', 0.04) : shade(c, 0.93)),
@@ -393,9 +395,10 @@ export class Pen {
     // down and to the left, crossing the buildings' own shadows.)
     if (soft && z0 === 0 && h >= 8 && w >= 0.25 && d >= 0.25 && !o.cls) {
       const len = Math.min(0.95, (h / S) * 0.45)
-      for (const [k, op] of [[1, 0.1], [0.62, 0.1], [0.3, 0.08]] as [number, number][]) {
+      // (In five sheets of the cool shadow blue, so its edge fades without steps.)
+      for (const [k, op] of [[1, 0.06], [0.8, 0.06], [0.6, 0.065], [0.4, 0.07], [0.2, 0.07]] as [number, number][]) {
         const a = len * k
-        this.el('polygon', { points: [[x, y], [x + w, y], [x + w, y + d], [x + w - a, y + d + a], [x - a, y + d + a], [x - a, y + a]].map(([u, v]) => this.at(u, v, 0).map(f).join(',')).join(' '), fill: '#1c2a52', opacity: op })
+        this.el('polygon', { points: [[x, y], [x + w, y], [x + w, y + d], [x + w - a, y + d + a], [x - a, y + d + a], [x - a, y + a]].map(([u, v]) => this.at(u, v, 0).map(f).join(',')).join(' '), fill: SHADOW, opacity: op })
       }
     }
     g.poly([[x + w, y, z0], [x + w, y + d, z0], [x + w, y + d, z0 + h], [x + w, y, z0 + h]], right, s)
