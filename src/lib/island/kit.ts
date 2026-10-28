@@ -455,15 +455,16 @@ export class Pen {
     const pane = o.pane ?? C.glass, frame = o.frame ?? C.white
     const len = face === 'x' ? b.d : b.w
     const slot = 1 / cols, ww = slot * wide
-    const dark = face === 'x' ? 0.95 : 0.84
+    // Each in the light of the face it is on (FACE), as the wall round it is.
+    const tone = face === 'x' ? FACE.lit : FACE.shade
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const u = slot * (c + 0.5), z = (o.z0 ?? 8) + r * (h + gap)
       const fu = 1.6 / (S * len)
-      this.quad(b, face, u - ww / 2 - fu, u + ww / 2 + fu, z - 1.5, z + h + 1.5, shade(frame, dark), { sw: 1 })
-      const glass = this.quad(b, face, u - ww / 2, u + ww / 2, z, z + h, shade(pane, dark), { sw: 0.8, cls: o.cls ?? 'win' })
-      this.quad(b, face, u - ww / 2, u - ww / 2 + ww * 0.35, z + h * 0.45, z + h, shade(C.glassHi, dark), { sw: 0, op: 0.7 })
+      this.quad(b, face, u - ww / 2 - fu, u + ww / 2 + fu, z - 1.5, z + h + 1.5, tone(frame), { sw: 1 })
+      const glass = this.quad(b, face, u - ww / 2, u + ww / 2, z, z + h, tone(pane), { sw: 0.8, cls: o.cls ?? 'win' })
+      this.quad(b, face, u - ww / 2, u - ww / 2 + ww * 0.35, z + h * 0.45, z + h, tone(C.glassHi), { sw: 0, op: 0.7 })
       if (look.soft) this.quad(b, face, u - ww / 2, u + ww / 2, z + h - Math.min(3, h * 0.28), z + h, '#1c2a52', { sw: 0, op: 0.22 })
-      this.quad(b, face, u - ww / 2 - fu * 2, u + ww / 2 + fu * 2, z - 2.5, z - 1, shade(frame, dark * 0.9), { sw: 0.8 })
+      this.quad(b, face, u - ww / 2 - fu * 2, u + ww / 2 + fu * 2, z - 2.5, z - 1, shade(tone(frame), 0.9), { sw: 0.8 })
       if (o.lit !== false) {
         const Z = b.z0 + z + h / 2
         this.light(face === 'x' ? P(b.x + b.w + this.ox, b.y + u * b.d + this.oy, Z + this.oz) : P(b.x + u * b.w + this.ox, b.y + b.d + this.oy, Z + this.oz), glass, '#ffe6a1', Z, face)
@@ -482,8 +483,10 @@ export class Pen {
     const len = face === 'x' ? b.d : b.w
     const w = (o.w ?? 0.22) / len, h = o.h ?? 16
     const fill = o.fill ?? C.cobalt
-    this.quad(b, face, u - w / 2 - 0.02 / len, u + w / 2 + 0.02 / len, 0, h + 2, C.white, { sw: 1 })
-    this.quad(b, face, u - w / 2, u + w / 2, 0, h, shade(fill, face === 'x' ? 0.95 : 0.82), { sw: 1 })
+    // In the light of their face, frame and all (the frame was day-white on the shaded face).
+    const tone = face === 'x' ? FACE.lit : FACE.shade
+    this.quad(b, face, u - w / 2 - 0.02 / len, u + w / 2 + 0.02 / len, 0, h + 2, tone(C.white), { sw: 1 })
+    this.quad(b, face, u - w / 2, u + w / 2, 0, h, tone(fill), { sw: 1 })
     this.quad(b, face, u - w / 2 + w * 0.12, u - w / 2 + w * 0.42, h * 0.45, h * 0.85, C.glassHi, { sw: 0.6, op: 0.8 })
   }
   /** A striped awning sticking out from a face. */
@@ -504,8 +507,8 @@ export class Pen {
   }
   private pyramidDrawn(x: number, y: number, w: number, d: number, z: number, h: number, fill: string, o: Draw = {}) {
     const ax = x + w / 2, ay = y + d / 2
-    this.poly([[x + w, y, z], [x + w, y + d, z], [ax, ay, z + h]], shade(fill, 0.95), o)
-    this.poly([[x, y + d, z], [x + w, y + d, z], [ax, ay, z + h]], shade(fill, 0.8), o)
+    this.poly([[x + w, y, z], [x + w, y + d, z], [ax, ay, z + h]], FACE.lit(fill), o)
+    this.poly([[x, y + d, z], [x + w, y + d, z], [ax, ay, z + h]], FACE.shade(fill), o)
   }
   /** A pitched roof; ridge along x ('x') or y ('y'), with tile lines. */
   gable(x: number, y: number, w: number, d: number, z: number, h: number, fill: string, axis: 'x' | 'y' = 'x', o: Draw & { lines?: number; over?: number } = {}) {
@@ -518,18 +521,21 @@ export class Pen {
     // Three tones: the gable end in shade, the long slope, and along its
     // ridge a lighter band where the sun catches the top of it.
     const lit = mix(fill, '#ffffff', 0.24), r = 0.3
+    // The slope turned from the sun a little in shade, the one facing it a little warm (FACE takes walls further:
+    // a roof's colour is what names a house).
+    const away = look.soft ? mix(shade(fill, 0.86), '#3c4c94', 0.08) : fill, toward = look.soft ? mix(fill, '#fff1dc', 0.06) : shade(fill, 0.96)
     if (axis === 'x') {
       const my = y + d / 2
-      this.poly([[x + w, y, z], [x + w, y + d, z], [x + w, my, z + h]], shade(fill, 0.84), o)
-      this.poly([[x, y + d, z], [x + w, y + d, z], [x + w, my, z + h], [x, my, z + h]], fill, o)
+      this.poly([[x + w, y, z], [x + w, y + d, z], [x + w, my, z + h]], look.soft ? FACE.lit(fill) : shade(fill, 0.84), o)
+      this.poly([[x, y + d, z], [x + w, y + d, z], [x + w, my, z + h], [x, my, z + h]], away, o)
       this.poly([[x, my, z + h], [x + w, my, z + h], [x + w, my + (d / 2) * r, z + h * (1 - r)], [x, my + (d / 2) * r, z + h * (1 - r)]], lit, { sw: 0 })
       for (let k = 1; k <= lines; k++) { const t = k / (lines + 1); this.line([x, my + (d / 2) * t, z + h * (1 - t)], [x + w, my + (d / 2) * t, z + h * (1 - t)], { sw: 0.8, stroke: shade(fill, 0.75) }) }
       this.line([x, my, z + h], [x + w, my, z + h], { sw: o.sw ?? OUT, stroke: o.stroke ?? INK })
     } else {
       const mx = x + w / 2
-      this.poly([[x + w, y, z], [x + w, y + d, z], [mx, y + d, z + h], [mx, y, z + h]], shade(fill, 0.96), o)
-      this.poly([[mx, y, z + h], [mx, y + d, z + h], [mx + (w / 2) * r, y + d, z + h * (1 - r)], [mx + (w / 2) * r, y, z + h * (1 - r)]], mix(shade(fill, 0.96), '#ffffff', 0.24), { sw: 0 })
-      this.poly([[x, y + d, z], [x + w, y + d, z], [mx, y + d, z + h]], shade(fill, 0.8), o)
+      this.poly([[x + w, y, z], [x + w, y + d, z], [mx, y + d, z + h], [mx, y, z + h]], toward, o)
+      this.poly([[mx, y, z + h], [mx, y + d, z + h], [mx + (w / 2) * r, y + d, z + h * (1 - r)], [mx + (w / 2) * r, y, z + h * (1 - r)]], mix(toward, '#ffffff', 0.24), { sw: 0 })
+      this.poly([[x, y + d, z], [x + w, y + d, z], [mx, y + d, z + h]], FACE.shade(fill), o)
       for (let k = 1; k <= lines; k++) { const t = k / (lines + 1); this.line([mx + (w / 2) * t, y, z + h * (1 - t)], [mx + (w / 2) * t, y + d, z + h * (1 - t)], { sw: 0.8, stroke: shade(fill, 0.8) }) }
       this.line([mx, y, z + h], [mx, y + d, z + h], { sw: o.sw ?? OUT, stroke: o.stroke ?? INK })
     }
@@ -546,8 +552,8 @@ export class Pen {
     // A soft vertical highlight down the lit side.
     if (look.soft) {
       // The left of the drum in shade, a highlight down its lit right.
-      g.path(`M${f(x - rx)} ${f(y - h)}L${f(x - rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x - rx * 0.25)} ${f(y + ry * 0.97)}L${f(x - rx * 0.25)} ${f(y - h + ry * 0.97)}Z`, '#1c2a52', { sw: 0, op: 0.16 })
-      g.path(`M${f(x + rx * 0.5)} ${f(y - h + ry * 0.9)}L${f(x + rx * 0.5)} ${f(y + ry * 0.7)}`, 'none', { stroke: '#ffffff', sw: 2.5, op: 0.35 })
+      g.path(`M${f(x - rx)} ${f(y - h)}L${f(x - rx)} ${f(y)}A${f(rx)} ${f(ry)} 0 0 0 ${f(x - rx * 0.25)} ${f(y + ry * 0.97)}L${f(x - rx * 0.25)} ${f(y - h + ry * 0.97)}Z`, '#2a3878', { sw: 0, op: 0.27 })
+      g.path(`M${f(x + rx * 0.5)} ${f(y - h + ry * 0.9)}L${f(x + rx * 0.5)} ${f(y + ry * 0.7)}`, 'none', { stroke: '#ffffff', sw: 2.5, op: 0.45 })
     } else g.path(`M${f(x - rx * 0.55)} ${f(y - h + ry * 0.9)}L${f(x - rx * 0.55)} ${f(y + ry * 0.7)}`, 'none', { stroke: '#ffffff', sw: 2.5, op: 0.35 })
     g.el('ellipse', { cx: x, cy: y - h, rx, ry, fill: o.top ?? fill, stroke: o.stroke ?? INK, 'stroke-width': o.sw ?? OUT })
     return g
