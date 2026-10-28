@@ -411,8 +411,10 @@ export function initIsland(o: {
   let mid = { x: 0, y: 0 }
   let press = { x: 0, y: 0 }
   let interacted = false
-  setTimeout(() => hint?.classList.add('is-gone'), 9000)
-  function firstTouch() { if (interacted) return; interacted = true; hint?.classList.add('is-gone'); engine?.endIntro() }
+  /** The visitor has started exploring (or has had nine seconds to): the title and the hint step aside. */
+  const explored = () => { box.classList.add('is-explored'); hint?.classList.add('is-gone') }
+  setTimeout(explored, 9000)
+  function firstTouch() { if (interacted) return; interacted = true; explored(); engine?.endIntro() }
   const local = (e: { clientX: number; clientY: number }) => { const r = box.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
   const twoFingers = () => {
     const [a, b] = [...ptrs.values()], r = box.getBoundingClientRect()
@@ -848,7 +850,7 @@ export function initIsland(o: {
   else if (saved) Object.assign(cam, settleTo)
   // The first look: the whole island, then down into Old Town.
   else { cam.z = fitZ() * 0.95; cam.y = by + bh * 0.5 }
-  if (!opening.intro) hint?.classList.add('is-gone')
+  if (!opening.intro) explored()
   if (PLAY) Object.assign(goal, cam)
   else { Object.assign(goal, settleTo); Object.assign(cam, settleTo) }
   Object.assign(raw, goal)

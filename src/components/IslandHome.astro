@@ -1893,9 +1893,10 @@ const book = BOOK.map((key) => {
     background: rgba(255, 255, 255, 0.9); border: 2.5px solid #1b2340; border-radius: 999px; padding: 5px 14px;
   }
   [data-time='night'] .isl-title-l { background: rgba(223, 230, 250, 0.92); }
-  /* It steps aside with the hint once you start exploring. */
+  /* It steps aside with the hint once you start exploring (camera.ts sets the box's state; it once hung on the
+     hint being the very next element). */
   .isl-title { transition: opacity 0.5s; }
-  .isl-title:has(+ .isl-hint.is-gone) { opacity: 0; }
+  .isl-box.is-explored .isl-title { opacity: 0; }
   /* Below the top bar once the bar is wide enough to reach it: five buttons
      and a passport count meet a centred title at about 1560px. */
   @media (max-width: 1560px) { .isl-title { top: 84px; } }
