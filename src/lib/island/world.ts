@@ -959,13 +959,16 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       const e = 0.1
       foot.push(`M${f2(hp.i - e)} ${f2(hp.j - e)}L${f2(hp.i + hp.w + e)} ${f2(hp.j - e)}L${f2(hp.i + hp.w + e)} ${f2(hp.j + hp.d + e)}L${f2(hp.i - e)} ${f2(hp.j + hp.d + e)}Z`)
     }
-    for (const [z, { cast, foot }] of [...byZ].sort((p, q) => p[0] - q[0])) {
+    for (const [n, [z, { cast, foot }]] of [...byZ].sort((p, q) => p[0] - q[0]).entries()) {
       const [zx, zy] = P(0, 0, z)
       const hg = sg.add(new N('g', { transform: `translate(${f(zx)} ${f(zy)}) matrix(${S / 2} ${S / 4} ${-S / 2} ${S / 4} 0 0)` }))
       // In the cool shadow blue (kit.ts SHADOW), in five sheets each reaching a little less far, so the edge
-      // fades without visible steps; then the darker band hugging the foot.
+      // fades without visible steps; then the darker band hugging the foot. (The sheets use one shape: five
+      // copies of it cost the island's markup some 10 KB.)
+      const id = `isl-cast-${n}`
+      hg.add(new N('defs')).add(new N('path', { id, d: cast.join('') }))
       for (const [w, op] of [[0.48, 0.045], [0.36, 0.05], [0.24, 0.055], [0.12, 0.06], [0, 0.065]] as [number, number][]) {
-        hg.add(new N('g', { opacity: op })).add(new N('path', { d: cast.join(''), fill: SHADOW, stroke: w ? SHADOW : undefined, 'stroke-width': w || undefined, 'stroke-linejoin': 'round' }))
+        hg.add(new N('use', { href: `#${id}`, fill: SHADOW, stroke: w ? SHADOW : undefined, 'stroke-width': w || undefined, 'stroke-linejoin': 'round', opacity: op }))
       }
       hg.add(new N('g', { opacity: 0.1 })).add(new N('path', { d: foot.join(''), fill: SHADOW, stroke: SHADOW, 'stroke-width': 0.08, 'stroke-linejoin': 'round' }))
     }

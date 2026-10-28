@@ -395,8 +395,9 @@ export class Pen {
     // down and to the left, crossing the buildings' own shadows.)
     if (soft && z0 === 0 && h >= 8 && w >= 0.25 && d >= 0.25 && !o.cls) {
       const len = Math.min(0.95, (h / S) * 0.45)
-      // (In five sheets of the cool shadow blue, so its edge fades without steps.)
-      for (const [k, op] of [[1, 0.06], [0.8, 0.06], [0.6, 0.065], [0.4, 0.07], [0.2, 0.07]] as [number, number][]) {
+      // (In the cool shadow blue: three sheets, each reaching less far. A box's shadow is short enough that its steps
+      // do not show, and two more sheets on every box took the island's markup 19 KB over its limit.)
+      for (const [k, op] of [[1, 0.09], [0.62, 0.1], [0.3, 0.08]] as [number, number][]) {
         const a = len * k
         this.el('polygon', { points: [[x, y], [x + w, y], [x + w, y + d], [x + w - a, y + d + a], [x - a, y + d + a], [x - a, y + a]].map(([u, v]) => this.at(u, v, 0).map(f).join(',')).join(' '), fill: SHADOW, opacity: op })
       }
@@ -419,10 +420,9 @@ export class Pen {
         }
         if (cs) g.el('path', { d: cs, fill: 'none', stroke: shade(c, 0.6), 'stroke-width': 0.6, opacity: 0.22, 'stroke-linecap': 'round' })
       }
-      // (Brighter along the lit face, where the sun is behind the edge, than along the shaded one.)
-      const [p1, p2, p3] = [this.at(x + w, y, z0 + h - 1.2), this.at(x + w, y + d, z0 + h - 1.2), this.at(x, y + d, z0 + h - 1.2)]
+      // (Along the lit face only, where the sun is behind the edge: the shaded face's top keeps just its outline.)
+      const [p1, p2] = [this.at(x + w, y, z0 + h - 1.2), this.at(x + w, y + d, z0 + h - 1.2)]
       g.el('path', { d: `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.5, 'stroke-linecap': 'round' })
-      g.el('path', { d: `M${f(p2[0])} ${f(p2[1])}L${f(p3[0])} ${f(p3[1])}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.3, 'stroke-linecap': 'round' })
     }
     g.poly([[x, y, z0 + h], [x + w, y, z0 + h], [x + w, y + d, z0 + h], [x, y + d, z0 + h]], top, s)
     const b = { x, y, w, d, z0, h }
