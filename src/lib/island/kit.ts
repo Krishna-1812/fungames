@@ -182,6 +182,17 @@ const rgb = (h: string) => { const v = h.replace('#', ''); return [0, 2, 4].map(
 const hx = (c: number[]) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')
 export const shade = (h: string, k: number) => hx(rgb(h).map((c) => c * k))
 export const mix = (a: string, b: string, t: number) => { const A = rgb(a), B = rgb(b); return hx(A.map((c, i) => c + (B[i] - c) * t)) }
+/**
+ * The faces of a solid on the drawn island, lit as the island is (the sun high and behind it on the right): the
+ * top in full sun and a touch warm, the right-hand (+i) face lit a little less and warm, the left-hand (+j) face
+ * in shade, deep and cooled by the sky. (They were 1 : 0.93 : 0.8, too near one another: the town read as flat
+ * clip-art rather than a lit illustration.) The realistic island's few drawn solids keep their old tones.
+ */
+export const FACE = {
+  top: (c: string) => (look.soft ? mix(c, '#fff8ec', 0.08) : c),
+  lit: (c: string) => (look.soft ? mix(shade(c, 0.9), '#fff1dc', 0.04) : shade(c, 0.93)),
+  shade: (c: string) => (look.soft ? mix(shade(c, 0.7), '#3c4c94', 0.14) : shade(c, 0.8)),
+}
 
 export const C = {
   ink: INK, white: '#ffffff', paper: '#f4f6fc', cloud: '#eef1fa',
@@ -373,8 +384,8 @@ export class Pen {
   private boxDrawn(x: number, y: number, w: number, d: number, h: number, o: Draw & { z0?: number; top?: string; left?: string; right?: string; trim?: string } = {}): Box {
     const z0 = o.z0 ?? 0, c = o.fill ?? C.white
     const soft = look.soft
-    // Three tones: the top in the sun, the right face lit, and the left in a shade cooled by the sky.
-    const top = o.top ?? (soft ? mix(c, '#ffffff', 0.06) : c), right = o.right ?? shade(c, 0.93), left = o.left ?? (soft ? mix(shade(c, 0.8), '#41508f', 0.1) : shade(c, 0.8))
+    // Three tones (FACE): the top in the sun, the right face lit, and the left in a shade cooled by the sky.
+    const top = o.top ?? FACE.top(c), right = o.right ?? FACE.lit(c), left = o.left ?? FACE.shade(c)
     const g = o.cls ? this.group(o.cls) : this
     const s = { sw: o.sw, stroke: o.stroke }
     // Standing on the ground and big enough to matter: its shadow, thrown away from the sun (towards +y).
@@ -403,8 +414,10 @@ export class Pen {
         }
         if (cs) g.el('path', { d: cs, fill: 'none', stroke: shade(c, 0.6), 'stroke-width': 0.6, opacity: 0.22, 'stroke-linecap': 'round' })
       }
+      // (Brighter along the lit face, where the sun is behind the edge, than along the shaded one.)
       const [p1, p2, p3] = [this.at(x + w, y, z0 + h - 1.2), this.at(x + w, y + d, z0 + h - 1.2), this.at(x, y + d, z0 + h - 1.2)]
-      g.el('path', { d: `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}L${f(p3[0])} ${f(p3[1])}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.35, 'stroke-linecap': 'round' })
+      g.el('path', { d: `M${f(p1[0])} ${f(p1[1])}L${f(p2[0])} ${f(p2[1])}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.5, 'stroke-linecap': 'round' })
+      g.el('path', { d: `M${f(p2[0])} ${f(p2[1])}L${f(p3[0])} ${f(p3[1])}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.3, 'stroke-linecap': 'round' })
     }
     g.poly([[x, y, z0 + h], [x + w, y, z0 + h], [x + w, y + d, z0 + h], [x, y + d, z0 + h]], top, s)
     const b = { x, y, w, d, z0, h }
@@ -425,8 +438,8 @@ export class Pen {
     this.solid({ k: 'band', b: this.wb(b), z0, z1, fill }, () => this.bandDrawn(b, z0, z1, fill))
   }
   private bandDrawn(b: Box, z0: number, z1: number, fill: string) {
-    this.quad(b, 'x', 0, 1, z0, z1, shade(fill, 0.93), { sw: 1.1 })
-    this.quad(b, 'y', 0, 1, z0, z1, shade(fill, 0.8), { sw: 1.1 })
+    this.quad(b, 'x', 0, 1, z0, z1, FACE.lit(fill), { sw: 1.1 })
+    this.quad(b, 'y', 0, 1, z0, z1, FACE.shade(fill), { sw: 1.1 })
   }
   /**
    * A grid of framed windows on a face: a frame, a pane with a glint, and a
