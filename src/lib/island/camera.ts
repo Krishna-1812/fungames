@@ -570,6 +570,24 @@ export function initIsland(o: {
     return { t, d }
   })
   const dtagW = new Map<string, number>()
+  /**
+   * What the districts' names keep clear of, in the box's pixels: the title while it shows, and the buttons
+   * down the side. Measured once a size (and again when the title goes), not every frame.
+   */
+  let wayKey = '', way: [number, number, number, number][] = []
+  const inTheWay = () => {
+    const gone = box.classList.contains('is-explored'), key = `${W}x${H}:${gone}`
+    if (key !== wayKey) {
+      wayKey = key
+      const r0 = box.getBoundingClientRect()
+      const els = [...box.querySelectorAll<HTMLElement>('.isl-zoom > button'), ...(gone ? [] : [box.querySelector<HTMLElement>('.isl-title')])]
+      way = els.filter((e): e is HTMLElement => !!e && e.offsetParent !== null).map((e) => {
+        const r = e.getBoundingClientRect()
+        return [r.left - r0.left - 4, r.top - r0.top - 4, r.right - r0.left + 4, r.bottom - r0.top + 4] as [number, number, number, number]
+      })
+    }
+    return way
+  }
   // Measured in the fallback font, a name is the wrong width once Fredoka arrives.
   document.fonts?.addEventListener?.('loadingdone', () => { dtagW.clear(); tagW.clear() })
 
@@ -637,27 +655,37 @@ export function initIsland(o: {
       card.style.setProperty('--arrow', `${(sx - x + cw / 2).toFixed(0)}px`)
     }
     // Zoomed right out (a phone's whole island), the districts' names are wider than the gaps between
-    // them: each tries its own spot, then a little above or below it, and waits if none is clear.
-    const dplaced: [number, number, number, number][] = []
+    // them: each tries its own spot, then a little above or below it, or to one side of what it would sit
+    // on, and waits if none is clear. The title (while it shows) and the buttons down the side are in the
+    // way as well.
+    const dplaced: [number, number, number, number][] = [...inTheWay()]
+    const band = W < 700 ? BAND.phone : BAND.desk
     for (const { t, d } of dtags) {
       const [px, py] = toScreen(d.x, d.y)
       let on = !near && px > -120 && px < W + 120 && py > -40 && py < H + 40
-      // A name whose banner is near an edge slides in to be read whole, rather than hanging off the screen:
-      // sideways, and down from the top (Sky Peaks, at the island's crown, sat half above a desktop's opening).
+      // A name near an edge slides in to be read whole, rather than hanging off the screen or under the
+      // top bar or the bottom row; one that would have to slide far is not shown (its district is out of
+      // sight, and the name would point at somewhere else). Sideways it may go further: on a phone's opening
+      // the Market and the Badlands run off the sides, and their names at the edges say what is there.
       const half = (dtagW.get(d.key) ?? t.offsetWidth ?? 120) / 2, halfH = (t.offsetHeight || 34) / 2
       const sx = Math.min(W - half - 8, Math.max(half + 8, px))
-      const sy = Math.min(H - halfH - 8, Math.max(halfH + 8, py))
-      let dy = 0
+      const sy = Math.min(H - band.bottom - halfH, Math.max(band.top + halfH, py))
+      if (Math.abs(sx - px) > 140 || Math.abs(sy - py) > 60) on = false
+      let dx = 0, dy = 0
       if (on) {
         const w = (dtagW.get(d.key) ?? dtagW.set(d.key, t.offsetWidth || 120).get(d.key)!) / 2 + 3, h = (t.offsetHeight || 34) / 2 + 2
-        const box = (y: number): [number, number, number, number] => [sx - w, sy + y - h, sx + w, sy + y + h]
-        const clear = (r: [number, number, number, number]) => !dplaced.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])
-        const at = [0, -1, 1, -2, 2].map((k) => k * h * 1.1).find((y) => clear(box(y)))
+        type R = [number, number, number, number]
+        const box = (x: number, y: number): R => [sx + x - w, sy + y - h, sx + x + w, sy + y + h]
+        const hits = (r: R, q: R) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]
+        const clear = (r: R) => !dplaced.some((q) => hits(r, q))
+        const tries: [number, number][] = [0, -1, 1, -2, 2].map((k) => [0, k * h * 1.1])
+        for (const q of dplaced) if (hits(box(0, 0), q)) tries.push([q[0] - (sx + w) - 2, 0], [q[2] - (sx - w) + 2, 0])
+        const at = tries.find(([x, y]) => Math.abs(x) <= 90 && sx + x - w >= 4 && sx + x + w <= W - 4 && clear(box(x, y)))
         if (at === undefined) on = false
-        else { dy = at; dplaced.push(box(at)) }
+        else { [dx, dy] = at; dplaced.push(box(dx, dy)) }
       }
       t.classList.toggle('is-on', on)
-      if (on) t.style.transform = `translate(${sx.toFixed(0)}px, ${(sy + dy).toFixed(0)}px) translate(-50%, -50%)`
+      if (on) t.style.transform = `translate(${(sx + dx).toFixed(0)}px, ${(sy + dy).toFixed(0)}px) translate(-50%, -50%)`
     }
     if (near) {
       // Nearest the middle first; a name that would sit on one already placed waits.
