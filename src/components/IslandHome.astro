@@ -1534,7 +1534,8 @@ const book = BOOK.map((key) => {
         const until = performance.now() + 6000
         await new Promise<void>((done) => {
           const once = () => isle.withEngine((e) => {
-            const a = e.snapshot(photo, { x: cr.x, y: cr.y, z: cr.z }, ps.w, ps.h)
+            // The photograph through the miniature's lens, its far and near edges soft, however close it was taken.
+            const a = e.snapshot(photo, { x: cr.x, y: cr.y, z: cr.z }, ps.w, ps.h, 0.85)
             let b = { sharp: true }
             if (lm) { const sw = (lm.x1 - lm.x0) * 1.35, sh = (lm.y1 - lm.y0) * 1.22, z = Math.min(STAMP_PHOTO.w / sw, STAMP_PHOTO.h / sh); b = e.snapshot(stamp, { x: (lm.x0 + lm.x1) / 2, y: (lm.y0 + lm.y1) / 2 + (lm.y1 - lm.y0) * 0.04, z }, STAMP_PHOTO.w, STAMP_PHOTO.h) }
             if ((a.sharp && b.sharp) || performance.now() > until) done()
