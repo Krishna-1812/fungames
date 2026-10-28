@@ -77,7 +77,11 @@ const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title:
 // The coastline, for the soundscape's surf (lib/island/sound.ts).
 const coast = coastline(island.grid, GRID)
 const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
-const data = { bounds: island.viewBox, land: island.land, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, play: island.play, grid: island.grid, coast, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
+// The island's silhouette, which the first look frames: its coast and its buildings (all but the space
+// elevator's cable, which runs on up off the top of any frame that shows the town).
+const silPts: [number, number][] = [...coast, ...Object.entries(island.anchors).filter(([s]) => s !== 'space-elevator').flatMap(([, a]) => [[a.x0, a.y0], [a.x1, a.y1]] as [number, number][])]
+const sil = [Math.min(...silPts.map((p) => p[0])), Math.min(...silPts.map((p) => p[1])), Math.max(...silPts.map((p) => p[0])), Math.max(...silPts.map((p) => p[1]))].map(Math.round)
+const data = { bounds: island.viewBox, land: island.land, sil, districts, anchors: island.anchors, games: info, slugs: games.map((g) => g.slug), base: baked.base, posterScale: baked.scene.levels[0], pokes: baked.scene.pokes, play: island.play, grid: island.grid, coast, bottles, inks: Object.fromEntries(Object.entries(STAMP).map(([k, v]) => [k, v.ink])) }
 
 // The passport's thumb tabs are narrow: a district goes by its short name there.
 const SHORT: Record<string, string> = { oldtown: 'Old Town', market: 'Market', funfair: 'Funfair', harbour: 'Harbour', proving: 'Proving', badlands: 'Badlands', peaks: 'Sky Peaks' }
@@ -597,6 +601,7 @@ const book = BOOK.map((key) => {
   const data = JSON.parse(document.getElementById('isl-data')!.textContent!) as {
     bounds: [number, number, number, number]
     land: [number, number, number, number]
+    sil: [number, number, number, number]
     coast: [number, number][]
     districts: { key: string; name: string; x: number; y: number }[]
     anchors: Record<string, { x0: number; y0: number; x1: number; y1: number; bx: number; by: number; district: string; slug: string }>
@@ -761,7 +766,7 @@ const book = BOOK.map((key) => {
     poster: document.getElementById('islPoster') as HTMLImageElement | null, posterScale: data.posterScale,
     scene, base: data.base,
     state: () => ({ time: box.dataset.time ?? 'day', season: box.dataset.season ?? '', hour: Number(box.dataset.hour ?? new Date().getHours()), fest: fest() }),
-    bounds: data.bounds, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games,
+    bounds: data.bounds, sil: data.sil, land: data.land, districts: data.districts, anchors: data.anchors, games: data.games,
     links: new Map([...box.querySelectorAll<HTMLAnchorElement>('.isl-lm')].map((a) => [a.dataset.slug!, a])),
     onPoke, onEnter: (slug) => { sound?.dive(data.games[slug].href, PLAY); track('isl_dive', { from: diveFrom }, slug); diveFrom = 'map' },
     onBack: () => sound?.back(),

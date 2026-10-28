@@ -42,13 +42,12 @@ export type GameInfo = { slug: string; title: string; blurb: string; href: strin
 type Cam = { x: number; y: number; z: number }
 
 /**
- * How close the island opens, as a share of the zoom that fits it all: close
- * enough that the buildings are the subject and the coast peeks in at the
- * edges, rather than a map of the whole. The Home button and the mini-map
- * are the overview. Closer still on a phone's narrow screen.
+ * The band of the box the page's controls leave free, top bar to bottom row, in CSS pixels: the first look
+ * frames the island in it. (A phone's title and subtitle sit lower and take more of its height.)
  */
-/** How far in the first look settles: close enough to read the town, far enough to see it is an island. */
-const OPEN = (w: number) => (w < 700 ? 2.1 : 1.5)
+const BAND = { desk: { top: 76, bottom: 64 }, phone: { top: 150, bottom: 72 } }
+/** On a desktop the first look is never further out than this share of the zoom that fits the whole box. */
+const OPEN_MIN = 1.3
 
 /** A frame's worth of time at 60 frames a second: the unit the easing was tuned in. */
 const FRAME = 1000 / 60
@@ -68,6 +67,8 @@ export function initIsland(o: {
   /** The time of day, the season, the hour, as the page has them. */
   state: () => Omit<IslandState, 'near'>
   bounds: [number, number, number, number]
+  /** The island's silhouette, its coast and its buildings (x0, y0, x1, y1): what the first look frames. */
+  sil?: [number, number, number, number]
   /** The island itself, without the sea: the camera never lets it all go off screen. */
   land?: [number, number, number, number]
   /** The district names, where their banners stand on the map. */
@@ -114,6 +115,20 @@ export function initIsland(o: {
   const PHONE = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600
   const ratio = () => Math.min(PHONE ? 1.5 : 2, window.devicePixelRatio || 1)
   const fitZ = () => Math.min(W / (bw * 0.86), H / (bh * 0.8))
+  /**
+   * The first look (and Home's): the island's silhouette fitted into the band the controls leave free. On a
+   * desktop never smaller than OPEN_MIN times the fitting zoom, so the buildings stay the subject: the Peaks'
+   * crown just under the title, the pier at the foot. On a phone it fills the band's height, its sides
+   * running off the screen (fitted to the width, the town would be a few pixels tall).
+   */
+  const openView = (): Cam => {
+    const phone = W < 700, b = phone ? BAND.phone : BAND.desk
+    const [s0, s1, s2, s3] = o.sil ?? [bx, by + bh * 0.1, bx + bw, by + bh * 0.9]
+    const band = Math.max(120, H - b.top - b.bottom)
+    const fitted = phone ? band / (s3 - s1) : Math.min(W / (s2 - s0), band / (s3 - s1))
+    const z = phone ? fitted : Math.max(fitted, fitZ() * OPEN_MIN)
+    return { x: (s0 + s2) / 2, y: (s1 + s3) / 2 + (H / 2 - (b.top + H - b.bottom) / 2) / z, z }
+  }
   let zMin = fitZ() * 0.85, zMax = Math.max(fitZ() * 7, 3.4)
   const cam: Cam = { x: bx + bw / 2, y: by + bh * 0.56, z: fitZ() }
   /** Where the camera is going. */
@@ -823,7 +838,7 @@ export function initIsland(o: {
   const settleTo: Cam = saved
     ? { x: saved.x, y: saved.y, z: saved.n * fitZ() }
     : cameFrom ? framing(cameFrom, 2.2)
-    : { x: bx + bw / 2, y: by + bh * 0.54, z: fitZ() * OPEN(W) }
+    : openView()
   place(settleTo, settleTo, false)
   const opening = { intro: !saved && !cameFrom }
   if (cameFrom) Object.assign(cam, inside(cameFrom))
@@ -854,6 +869,8 @@ export function initIsland(o: {
       /** Put the camera somewhere at once (z as a share of the fitting zoom). */
       jump: (x: number, y: number, n: number) => { firstTouch(); Object.assign(goal, { x, y, z: n * fitZ() }); clampGoal(); Object.assign(cam, goal); wake(); return { ...cam } },
       view: () => ({ ...cam }),
+      /** The first look, for the bench (z as a share of the fitting zoom). */
+      opening: () => { const v = openView(); return { x: v.x, y: v.y, n: v.z / fitZ() } },
       /** Fly there, as the mini-map and the signposts do. */
       fly: (x: number, y: number, n: number) => { firstTouch(); flyTo(x, y, n * fitZ()) },
       time: (t: string) => { box.dataset.time = t; wake() },

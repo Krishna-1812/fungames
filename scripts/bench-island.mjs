@@ -202,9 +202,11 @@ try {
   // The busiest close view: the building with the most others round it.
   const lm = Object.values(geo.a).map((a) => ({ x: (a.x0 + a.x1) / 2, y: (a.y0 + a.y1) / 2 }))
   const busy = lm.map((p) => ({ p, k: lm.filter((q) => Math.hypot(q.x - p.x, q.y - p.y) < 260).length })).sort((a, b) => b.k - a.k)[0].p
+  // The page's own first look (an older build without it opened at 1.6 times the fit, there).
+  const op = (await page.ev('window.__island.opening ? window.__island.opening() : null')) ?? { x: cx, y: by + bh * 0.54, n: 1.6 }
   const views = [
     ['whole', 'the whole island', cx, by + bh * 0.56, 1, 'day'],
-    ['opening', 'the opening view', cx, by + bh * 0.54, 1.6, 'day'],
+    ['opening', 'the opening view', op.x, op.y, op.n, 'day'],
     ['closer', 'closer in, on the busiest corner', busy.x, busy.y, 3, 'day'],
     ['closest', 'as close as it goes, there', busy.x, busy.y, 7, 'day'],
     ['night', 'the whole island at night', cx, by + bh * 0.56, 1, 'night'],
