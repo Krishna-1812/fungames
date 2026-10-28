@@ -2185,15 +2185,23 @@ const book = BOOK.map((key) => {
   :global(.isl-box.z-near .isl-tag.is-on) { opacity: 1; }
   /* The district names, the same size at every zoom (the still picture for a
      page without script has them drawn on). */
+  /* Lettering painted on the map, as an illustrated map names its regions, rather than white boxes (seven
+     of those over the art read as a menu): white capitals in the map's ink outline, a step of ink below. */
   :global(.isl-dtag) {
     position: absolute; left: 0; top: 0;
-    padding: 4px 13px;
-    font: 700 15px 'Fredoka', system-ui, sans-serif; color: #1b2340; white-space: nowrap;
-    background: #fff; border: 2.5px solid #1b2340; border-radius: 10px; box-shadow: 0 3px 0 #1b2340;
+    font: 700 14px 'Fredoka', system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.07em;
+    color: #fff; white-space: nowrap;
+    -webkit-text-stroke: 3.5px #1b2340; paint-order: stroke fill; text-shadow: 0 2px 0 #1b2340;
     opacity: 0; transition: opacity 0.3s;
   }
+  @media (max-width: 699px) { :global(.isl-dtag) { font-size: 12.5px; } }
+  /* Over a photograph-like island an ink outline looks drawn on: there the names are lit lettering, with a
+     soft shadow to lift them off the ground. */
+  :global(.isl-box[data-world='real'] .isl-dtag) {
+    -webkit-text-stroke: 0; text-shadow: 0 1px 2px rgba(4, 10, 28, 0.85), 0 0 5px rgba(4, 10, 28, 0.6), 0 0 14px rgba(4, 10, 28, 0.35);
+  }
   :global(.isl-dtag.is-on) { opacity: 1; }
-  :global([data-time='night'] .isl-dtag), :global([data-time='night'] .isl-tag) { background: #dfe6fa; }
+  :global([data-time='night'] .isl-tag) { background: #dfe6fa; }
   /* The mini-map's picture is the island by day: after dark it dims with the island, and its box goes the night sea's blue. */
   .isl-mini image { transition: filter 1.6s; }
   :global([data-time='night']) .isl-mini { background: #2c3a78; }
