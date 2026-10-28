@@ -327,7 +327,9 @@ export function initIsland(o: {
       const n = cam.z / fitZ()
       box.classList.toggle('z-far', n < 1.25)
       const wasNear = near
-      near = n > 2.1
+      // (A phone opens at about 2.4 times the fit, the island filling its height: its districts' names stay
+      // until it is closer than that.)
+      near = n > (W < 700 ? 2.9 : 2.1)
       if (near !== wasNear) box.classList.toggle('z-near', near)
       if (miniView) {
         const w = W / cam.z, h = H / cam.z
