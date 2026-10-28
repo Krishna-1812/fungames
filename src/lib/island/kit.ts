@@ -388,12 +388,14 @@ export class Pen {
     const top = o.top ?? FACE.top(c), right = o.right ?? FACE.lit(c), left = o.left ?? FACE.shade(c)
     const g = o.cls ? this.group(o.cls) : this
     const s = { sw: o.sw, stroke: o.stroke }
-    // Standing on the ground and big enough to matter: its shadow, thrown away from the sun (towards +y).
+    // Standing on the ground and big enough to matter: its shadow, thrown away from the sun as everything's is
+    // (world.ts, the trees, the people, Unity's): along (-1, +1), straight to the left on the screen. (It went
+    // down and to the left, crossing the buildings' own shadows.)
     if (soft && z0 === 0 && h >= 8 && w >= 0.25 && d >= 0.25 && !o.cls) {
-      const len = Math.min(1.3, (h / S) * 0.62), a = len * 0.18
+      const len = Math.min(0.95, (h / S) * 0.45)
       for (const [k, op] of [[1, 0.1], [0.62, 0.1], [0.3, 0.08]] as [number, number][]) {
-        const L = len * k, A = a * k
-        this.el('polygon', { points: [[x, y], [x + w, y], [x + w + A, y + L], [x + w + A, y + d + L], [x + A, y + d + L], [x, y + d]].map(([u, v]) => this.at(u, v, 0).map(f).join(',')).join(' '), fill: '#1c2a52', opacity: op })
+        const a = len * k
+        this.el('polygon', { points: [[x, y], [x + w, y], [x + w, y + d], [x + w - a, y + d + a], [x - a, y + d + a], [x - a, y + a]].map(([u, v]) => this.at(u, v, 0).map(f).join(',')).join(' '), fill: '#1c2a52', opacity: op })
       }
     }
     g.poly([[x + w, y, z0], [x + w, y + d, z0], [x + w, y + d, z0 + h], [x + w, y, z0 + h]], right, s)
