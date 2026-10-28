@@ -1736,14 +1736,14 @@ const book = BOOK.map((key) => {
   .isl-box.is-grabbing { cursor: grabbing; }
   .isl-box:focus-visible { box-shadow: inset 0 0 0 4px #1b2340; }
   .isl-stage { position: absolute; inset: 0; }
-  /* The realistic island seen as through a lens: the corners a little deeper, the eye drawn in. */
   /* The monsoon's light: a soft grey over everything, as under heavy cloud. */
   .isl-box[data-season='monsoon'] .isl-stage::before {
     content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background: rgba(70, 92, 130, 0.36); mix-blend-mode: multiply;
   }
-  /* And the air: what is furthest off (the top of the view, looking down across the island) a little paler and
-     cooler, as distance is in a photograph of a real place; at night the air is dark, so it only deepens. */
+  /* The island seen as through a lens: the corners a little deeper, the eye drawn in. And the air: what is
+     furthest off (the top of the view, looking down across the island) a little paler and cooler, as distance
+     is in a photograph of a real place; at night the air is dark, so it only deepens. */
   .isl-box[data-world='real'] .isl-stage::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
     background:
@@ -1761,6 +1761,21 @@ const book = BOOK.map((key) => {
     background:
       radial-gradient(ellipse 75% 70% at 50% 46%, transparent 58%, rgba(30, 20, 62, 0.14) 82%, rgba(22, 14, 50, 0.3) 100%),
       linear-gradient(180deg, rgba(255, 196, 180, 0.16) 0%, rgba(255, 196, 180, 0.05) 24%, transparent 42%);
+  }
+  /* The drawn island gets the same lens, a little lighter (it was once lit evenly from edge to edge, the Peaks as
+     crisp as the pier). Written as it is over the whole island, where it is strongest; closer in it eases off. */
+  .isl-box[data-world='cartoon'] .isl-stage::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    opacity: 0.77; transition: opacity 0.6s ease;
+    background:
+      radial-gradient(ellipse 78% 74% at 50% 48%, transparent 60%, rgba(16, 34, 86, 0.21) 84%, rgba(12, 26, 70, 0.39) 100%),
+      linear-gradient(180deg, rgba(232, 242, 255, 0.16) 0%, rgba(232, 242, 255, 0.05) 18%, transparent 30%);
+  }
+  :global(.isl-box[data-world='cartoon'].z-far) .isl-stage::after { opacity: 1; }
+  :global(.isl-box[data-world='cartoon'][data-time='dawn']) .isl-stage::after {
+    background:
+      radial-gradient(ellipse 78% 74% at 50% 48%, transparent 60%, rgba(30, 34, 96, 0.19) 84%, rgba(22, 26, 80, 0.36) 100%),
+      linear-gradient(180deg, rgba(255, 228, 214, 0.16) 0%, rgba(255, 228, 214, 0.05) 18%, transparent 30%);
   }
   /* The island: one canvas, under the page's own names and cards. Until it
      can draw, the poster stands in, placed by the camera (and without
