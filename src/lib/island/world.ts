@@ -1267,7 +1267,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
         // (Its solids written down for Unity as a building of its own, built and pictured as the rest are.)
         const set = sinkFor(`${pl.slug}-set`)
         const bp = new Pen(base, 0, 0, pl.z, b, lights, set.sink)
-        const e = 0.16, x0 = hp.i - e, y0 = hp.j - e, w = hp.w + e * 2, d = hp.d + e * 2, stone = '#d8d5cc'
+        const e = 0.16, x0 = hp.i - e, y0 = hp.j - e, w = hp.w + e * 2, d = hp.d + e * 2, stone = '#d0cbbf'
         bp.box(x0, y0, w, d, 5, { fill: stone, sw: 1.2 })
         // Flagstones on its top, in two directions (Unity's stone has its own).
         let flags = ''

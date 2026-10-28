@@ -37,8 +37,9 @@ export const LAND = {
   dust: '#c2b8aa', dustLight: '#d0c8bc', dustShade: '#b1a594', dustFace: ['#a8998a', '#8c7e70'], dustLip: '#a99c8b',
   snow: '#f3f7fb', snowShade: '#dfe7f1', snowFace: ['#c6ccd6', '#aab1bd'],
   alpine: '#62a95b', alpineLight: '#7fbd69',
-  paving: '#e4dfd3', pavingEdge: '#c3baa7',
-  road: '#e2d9c5', roadEdge: '#c4b597', roadWorn: '#5a7a46',
+  // (Stepped off white, so the white walls stand out of their ground rather than into it.)
+  paving: '#dad3c4', pavingEdge: '#c3baa7',
+  road: '#d8cdb6', roadEdge: '#c4b597', roadWorn: '#5a7a46',
   water: '#4a96d6', waterLight: '#6fb4e2',
   /** The sea: open water deepening away from the island, and its shallows, palest at the shore. */
   seaNear: '#4a98d8', seaFar: '#2b65ad', shallows: ['#4c9bd9', '#4fb0d9', '#5ec3d6', '#7dd3d4'],
