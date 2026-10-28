@@ -171,7 +171,7 @@ export type IslandModel = {
 }
 /** The parade's marchers as the cartoon island draws them (play.ts): the drum major, the flag, a drum, a trumpet, two children. */
 const PARADE: [number, string, number][] = [[61.3, '#5b82ff', 1.04], [72.9, '#2c355e', 1.04], [84.1, '#ffffff', 1.04], [95.7, '#4fe3c1', 1.04], [17.2, '#ff4f6e', 0.85], [23.8, '#b8a1ff', 0.85]]
-export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; moon: { x: number; y: number; run: number }; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
+export type Island = { land: [number, number, number, number]; hiddenLights: number; svg: string; layers: Layer[]; css: string; viewBox: [number, number, number, number]; moon: { x: number; y: number; run: number }; anchors: Record<string, Anchor>; lights: [number, number][]; banners: Record<string, [number, number]>; labels: Record<string, [number, number]>; mini: string; bottles: Bottle[]; signposts: Signpost[]; play: PlayData; grid: string; model: IslandModel }
 export type GameLink = { slug: string; title: string; blurb: string; href: string }
 
 /**
@@ -2148,6 +2148,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     g.add(new N('rect', { x: x - w / 2, y: y - 19, width: w, height: 29, rx: 8, fill: '#ffffff', stroke: INK, 'stroke-width': 2.4 }))
     g.add(new N('text', { x, y: y + 1, 'text-anchor': 'middle', 'font-family': 'Fredoka, system-ui, sans-serif', 'font-weight': 700, 'font-size': 16, fill: INK }).text(d.name))
   }
+  // Where the live map letters each district's name (the page's, not this picture's): on the ground in front of
+  // its hero. (Over each banner's spot, the Harbour's name sat on the lighthouse's lantern, the Funfair's on its
+  // wheel's hub, Sky Peaks' in the title.)
+  const labels: Record<string, [number, number]> = {}
+  for (const d of DISTRICTS) { const [x, y] = P(...(d.label ?? [d.at[0] + 1.2, d.at[1] + 1.2, 0])); labels[d.key] = [f(x), f(y)] }
   const sky = open('sky')
   ;[[-0.2, 0.1, 1.2], [0.25, 0.45, 1], [0.6, 0.2, 1.3], [0.05, 0.7, 0.9], [0.8, 0.6, 1.1]].forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
@@ -2243,7 +2248,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, moon: moonAt, anchors, lights, banners, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, moon: moonAt, anchors, lights, banners, labels, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
     grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
     ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
     height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),

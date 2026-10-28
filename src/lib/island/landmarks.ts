@@ -12,15 +12,22 @@ export const LANDMARKS: Record<string, Landmark> = { ...peaks, ...badlands, ...p
 
 export type DistrictKey = 'peaks' | 'badlands' | 'proving' | 'harbour' | 'funfair' | 'market' | 'oldtown'
 
-export type District = { key: DistrictKey; name: string; at: [number, number]; r: number; ground: [string, string]; tint: string }
+export type District = {
+  key: DistrictKey; name: string; at: [number, number]; r: number; ground: [string, string]; tint: string
+  /**
+   * Where its name is lettered on the live map (tile i, j, height): on open ground in front of its hero, not over
+   * its roof. Unset, 1.2 tiles in front of its middle, on the ground (world.ts labels).
+   */
+  label?: [number, number, number]
+}
 
 /** Seven districts, each where its games belong: space up high, the sea at the front. */
 export const DISTRICTS: District[] = [
-  { key: 'peaks', name: 'Sky Peaks', at: [7, 7], r: 5.4, ground: ['#62a95b', '#6cb162'], tint: '#c9f7ea' },
+  { key: 'peaks', name: 'Sky Peaks', at: [7, 7], r: 5.4, ground: ['#62a95b', '#6cb162'], tint: '#c9f7ea', label: [8.8, 8.8, 60] },
   { key: 'badlands', name: 'The Badlands', at: [22, 6.3], r: 5.1, ground: ['#d1c7b4', '#c8bda8'], tint: '#e6e1f7' },
   { key: 'proving', name: 'Proving Grounds', at: [23, 15], r: 4.9, ground: ['#6aaf5a', '#74b763'], tint: '#cff6ea' },
-  { key: 'harbour', name: 'The Harbour', at: [22, 22.2], r: 4.9, ground: ['#6cb65c', '#78bd66'], tint: '#d6ecff' },
-  { key: 'funfair', name: 'The Funfair', at: [14.4, 23.8], r: 5.1, ground: ['#6cb65c', '#78bd66'], tint: '#ffe1e8' },
+  { key: 'harbour', name: 'The Harbour', at: [22, 22.2], r: 4.9, ground: ['#6cb65c', '#78bd66'], tint: '#d6ecff', label: [21.4, 25.6, 0] },
+  { key: 'funfair', name: 'The Funfair', at: [14.4, 23.8], r: 5.1, ground: ['#6cb65c', '#78bd66'], tint: '#ffe1e8', label: [14.6, 25.6, 0] },
   { key: 'market', name: 'Market Street', at: [7, 21.3], r: 5.1, ground: ['#6cb65c', '#78bd66'], tint: '#d9f3f0' },
   { key: 'oldtown', name: 'Old Town', at: [14.4, 14], r: 6.5, ground: ['#6cb65c', '#78bd66'], tint: '#e3e9ff' },
 ]

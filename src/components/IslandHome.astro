@@ -76,7 +76,7 @@ const daily = dailyFor(new Date())
 const info = Object.fromEntries(games.map((g) => [g.slug, { slug: g.slug, title: g.title, blurb: g.blurb, href: withBase(`/${g.slug}/`), tint: tintOf(g.slug), cat: g.category, pic: withBase(`/next/${world}/${g.slug}.webp`), diff: META[g.slug]?.difficulty ?? 'Explore', done: false }]))
 // The coastline, for the soundscape's surf (lib/island/sound.ts).
 const coast = coastline(island.grid, GRID)
-const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.banners[d.key][0], y: island.banners[d.key][1] }))
+const districts = DISTRICTS.map((d) => ({ key: d.key, name: d.name, x: island.labels[d.key][0], y: island.labels[d.key][1] }))
 // The island's silhouette, which the first look frames: its coast and its buildings (all but the space
 // elevator's cable, which runs on up off the top of any frame that shows the town).
 const silPts: [number, number][] = [...coast, ...Object.entries(island.anchors).filter(([s]) => s !== 'space-elevator').flatMap(([, a]) => [[a.x0, a.y0], [a.x1, a.y1]] as [number, number][])]
