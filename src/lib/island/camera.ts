@@ -203,7 +203,7 @@ export function initIsland(o: {
   /** Do something with the engine now, or as soon as there is one. */
   const withEngine = (fn: (e: Engine) => void) => { if (engine) fn(engine); else waiting.push(fn) }
   o.scene.then((scene) => {
-    const e = createEngine({ canvas, base: o.base, scene, play: PLAY, state: () => ({ ...o.state(), near }) })
+    const e = createEngine({ canvas, base: o.base, scene, play: PLAY, state: () => ({ ...o.state(), near, lens }), deepLens: box.dataset.world === 'real' })
     e.onLoaded = () => wake()
     e.setHot(hot); e.dim(keep)
     engine = e
@@ -295,13 +295,32 @@ export function initIsland(o: {
    */
   const AMBIENT = 1000 / 30
   let drawnAt = 0, cost = 0
+  /**
+   * The lens (engine.ts drawLens): the far and near edges of the view soft, as in a photograph of a model, at
+   * full strength over the whole island and gone by 1.6 times it. Only with a mouse (a phone opens closer than
+   * that anyway), and only while frames keep up once the island is in: under about 42 a second it fades out,
+   * for eight seconds at least, and comes back once they are over 52 again. ?lens=1 or 0: always or never.
+   */
+  const LENS_ASK = new URLSearchParams(location.search).get('lens'), FINE = matchMedia('(pointer: fine)').matches
+  let lens = 0, lensOn = LENS_ASK === '1' || (LENS_ASK !== '0' && FINE) ? 1 : 0, lensWant = lensOn, lensAt = 0, gap = FRAME
+  /** The lens for this frame; and whether it is still fading in or out. */
+  const lensStep = (t: number, raw: number) => {
+    if (!LENS_ASK && FINE && stage0 === 'gone') {
+      gap += (Math.min(raw, 100) - gap) * 0.03
+      if (gap > 1000 / 42) { lensWant = 0; lensAt = t + 8000 }
+      else if (gap < 1000 / 52 && t > lensAt) lensWant = 1
+    }
+    lensOn = lensWant > lensOn ? Math.min(lensWant, lensOn + raw / 500) : Math.max(lensWant, lensOn - raw / 500)
+    lens = lensOn * Math.min(1, Math.max(0, (1.6 - cam.z / fitZ()) / 0.6))
+    return lensOn !== lensWant
+  }
   /** Until when it is drawn every frame anyway: while the buildings drop in, and while a picked one lifts or settles. */
   let livelyUntil = 0, liftFor: string | null = null
   function frame(t: number) {
     raf = 0
-    const dt = lastT ? Math.min(64, Math.max(1, t - lastT)) : FRAME
+    const raw = lastT ? t - lastT : FRAME, dt = Math.min(64, Math.max(1, raw))
     lastT = t
-    const moving = step(dt)
+    const moved = step(dt), moving = lensStep(t, raw) || moved
     if (hot !== liftFor) { liftFor = hot; livelyUntil = Math.max(livelyUntil, t + 800) }
     // (Pictures still coming in are no reason: each one wakes a frame as it lands, and behind the poster nothing shows yet.)
     const busy = moving || dragging || hover.dirty || held.size > 0 || stage0 === 'live' || t < livelyUntil

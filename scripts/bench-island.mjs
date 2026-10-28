@@ -184,7 +184,8 @@ if (!base) {
   server = await serve(dist)
   base = `http://127.0.0.1:${server.address().port}/`
 }
-const url = new URL('?perf', base).href
+// With the lens always on (camera.ts turns it off by itself on a slow machine): the frames measured are its dearest.
+const url = new URL('?perf&lens=1', base).href
 console.log(`bench-island: ${url}\n  in ${exe}`)
 const page = await launch(exe)
 try {

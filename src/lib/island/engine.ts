@@ -25,7 +25,8 @@ type G = Node & { k: 'g' }
 type V = Node & { k: 'v' }
 type T = Node & { k: 'txt' }
 type Cam = { x: number; y: number; z: number }
-export type IslandState = { time: string; season: string; hour: number; near: boolean; fest?: boolean }
+/** lens: how much of the miniature's shallow focus the view has (see drawLens), 0 to 1. */
+export type IslandState = { time: string; season: string; hour: number; near: boolean; fest?: boolean; lens?: number }
 /**
  * Something the page draws itself, live, in the painting's own order (a ball
  * you can throw, pigeons, a parade): given the canvas, the world-to-device
@@ -81,6 +82,8 @@ export function createEngine(o: {
   /** Whether things move at all (reduced motion says no). */
   play: boolean
   state: () => IslandState
+  /** The lens's blur goes an octave deeper: the realistic island, which has no ink lines to smear. */
+  deepLens?: boolean
 }) {
   const { base } = o
   /** The canvas being drawn: the page's, or a postcard's while it is painted (snapshot). */
@@ -846,6 +849,67 @@ export function createEngine(o: {
     ctx.globalCompositeOperation = 'source-over'
     cs.images += 3; cs.paths++
   }
+  /* ---- the lens ---- */
+  /**
+   * A tilt-shift photograph of a model: over the whole island the far edge of the view and the near one go
+   * soft. Each band is halved down to a quarter of its size in CSS pixels (an eighth, deepLens), brought back
+   * up the same way, faded towards the middle by a mask and laid over the frame at the lens's strength (the
+   * near one at 0.8 of it). Halving a step at a time keeps the small copy from shimmering while the view
+   * moves. Up to five canvases kept; 12 to 18 calls a frame, and none while the lens is 0.
+   */
+  const LENS = [{ from: 0, to: 0.28, far: true, k: 1 }, { from: 0.78, to: 1, far: false, k: 0.8 }]
+  const lensPool: OffscreenCanvas[] = []
+  const lensCanvas = (k: number, w: number, h: number) => {
+    const oc = lensPool[k] ?? (lensPool[k] = new OffscreenCanvas(w, h))
+    if (oc.width !== w || oc.height !== h) { oc.width = w; oc.height = h }
+    const c = oc.getContext('2d')! as unknown as OffscreenCanvasRenderingContext2D
+    c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'
+    return { oc, c }
+  }
+  const lensMasks = new Map<string, CanvasGradient>()
+  function drawLens(at: number) {
+    // (One step more on a sharp screen: the softness is the same in CSS pixels.)
+    const w = canvas.width, h = canvas.height, steps = (o.deepLens ? 3 : 2) + (dpr >= 1.5 ? 1 : 0)
+    const tall = Math.ceil(h * Math.max(...LENS.map((b) => b.to - b.from)))
+    const ladder = [lensCanvas(0, w, tall)]
+    for (let i = 1; i <= steps; i++) ladder.push(lensCanvas(i, Math.ceil(w / 2 ** i), Math.ceil(tall / 2 ** i)))
+    toIdent()
+    for (const b of LENS) {
+      const y0 = Math.round(h * b.from), bh = Math.round(h * b.to) - y0
+      const size = (i: number) => [Math.ceil(w / 2 ** i), Math.ceil(bh / 2 ** i)]
+      // Down: the frame's band into the first half, then each into the next.
+      for (let i = 1; i <= steps; i++) {
+        const [dw, dh] = size(i), { c } = ladder[i]
+        c.globalCompositeOperation = 'copy'
+        if (i === 1) c.drawImage(canvas, 0, y0, w, bh, 0, 0, dw, dh)
+        else { const [sw, sh] = size(i - 1); c.drawImage(ladder[i - 1].oc, 0, 0, sw, sh, 0, 0, dw, dh) }
+      }
+      // And up again, to the band's own size.
+      for (let i = steps - 1; i >= 0; i--) {
+        const [dw, dh] = size(i), [sw, sh] = size(i + 1), { c } = ladder[i]
+        c.globalCompositeOperation = 'copy'
+        c.drawImage(ladder[i + 1].oc, 0, 0, sw, sh, 0, 0, dw, dh)
+      }
+      // Sharp towards the middle: an S of a fade, full at the frame's edge, none at the band's inner one.
+      const key = `${b.far}:${bh}`
+      let g = lensMasks.get(key)
+      if (!g) {
+        g = ladder[0].c.createLinearGradient(0, b.far ? 0 : bh, 0, b.far ? bh : 0) as CanvasGradient
+        for (const [s, a] of [[0, 1], [0.3, 0.82], [0.64, 0.3], [1, 0]]) g.addColorStop(s, `rgba(0,0,0,${a})`)
+        lensMasks.set(key, g)
+      }
+      const { oc, c } = ladder[0]
+      c.globalCompositeOperation = 'destination-in'
+      c.fillStyle = g; c.fillRect(0, 0, w, bh)
+      c.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = at * b.k
+      ctx.drawImage(oc, 0, 0, w, bh, 0, y0, w, bh)
+      cs.images += steps * 2 + 1; cs.paths++
+    }
+    ctx.globalAlpha = 1
+  }
+  /** The lens a snapshot is taken with (a postcard's), over the page's own. */
+  let lensFor: number | null = null
   const hook = (h: LiveHook) => { cs.paths += h(ctx, deviceM, now); ident = false; textCtx = null; transforms.invalidate(); ctx.globalAlpha = 1 }
 
   /* ---- one frame ---- */
@@ -886,6 +950,8 @@ export function createEngine(o: {
     if (skyStart < 0) for (const n of extra) drawNode(n, deviceM, 1)
     if (drawLive.top) hook(drawLive.top)
     ctx.globalAlpha = 1
+    const lens = lensFor ?? st.lens ?? 0
+    if (lens > 0.004) drawLens(lens)
     lastGaps = gaps; lastBlurry = blurry
     pump()
     if (frameNo % 60 === 0) trim()
@@ -1014,7 +1080,7 @@ export function createEngine(o: {
      * were. Whether everything in the view was drawn at its own sharpness: if
      * not, what it still wants is on its way, and another try will be sharper.
      */
-    snapshot(target: HTMLCanvasElement, view: Cam, w: number, h: number): { drawable: boolean; sharp: boolean } {
+    snapshot(target: HTMLCanvasElement, view: Cam, w: number, h: number, lens = 0): { drawable: boolean; sharp: boolean } {
       const was = { canvas, ctx, cam: { ...cam }, W, H, dpr, stats: lastStats, gaps: lastGaps, blurry: lastBlurry }
       target.width = Math.round(w); target.height = Math.round(h)
       canvas = target
@@ -1023,7 +1089,8 @@ export function createEngine(o: {
       cam.x = view.x; cam.y = view.y; cam.z = view.z; W = w; H = h; dpr = 1
       // The sea's colour under everything, as the page's own background is under its canvas.
       under = getComputedStyle(document.body).backgroundColor || '#8ccbff'
-      try { frame(performance.now()) } finally { under = null }
+      lensFor = lens
+      try { frame(performance.now()) } finally { under = null; lensFor = null }
       const out = { drawable: lastGaps === 0, sharp: lastGaps === 0 && lastBlurry === 0 }
       canvas = was.canvas; ctx = was.ctx; Object.assign(cam, was.cam); W = was.W; H = was.H; dpr = was.dpr
       lastStats = was.stats; lastGaps = was.gaps; lastBlurry = was.blurry
