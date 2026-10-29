@@ -276,8 +276,9 @@ namespace Island
                 case Plaster: case Concrete: case Brick:
                 {
                     if (s < 0.12f && v > 0.9f)
-                        // White: lime-washed render, or pale limestone.
-                        return material == Concrete ? H(38, 0.07f, 0.84f) : (pick % 3 == 0 ? H(40, 0.1f, 0.9f) : H(36, 0.06f, 0.92f));
+                        // White: lime-washed render, or pale limestone; concrete a weathered grey (a white plinth was
+                        // the brightest, flattest thing on the island).
+                        return material == Concrete ? H(36, 0.06f, 0.72f) : (pick % 3 == 0 ? H(40, 0.1f, 0.9f) : H(36, 0.06f, 0.92f));
                     if (s < 0.32f && v > 0.6f)
                     {
                         // Pale tinted greys: dressed stone and render in their quiet colours.
@@ -287,7 +288,7 @@ namespace Island
                     }
                     if (v < 0.35f) return H(deg, s * 0.35f, v * 0.85f);
                     // A coloured wall: painted render, the colour kept but weathered.
-                    return H(deg, s * 0.55f, Mathf.Min(v * 0.8f, 0.78f));
+                    return H(deg, s * 0.45f, Mathf.Min(v * 0.8f, 0.78f));
                 }
                 case Timber:
                     // The site's lilac wood is wood; other colours are painted boards.
@@ -308,8 +309,9 @@ namespace Island
                 case Glass:
                     return H(deg, s * 0.5f, Mathf.Clamp(v * 0.93f, 0.08f, 0.9f));
                 default:
-                    // Paint, cloth, skin: the colour as paint and dye really give it.
-                    return H(deg, s * 0.82f, Mathf.Clamp(v * 0.9f, 0.06f, 0.88f));
+                    // Paint, cloth, skin: the colour as paint and dye really give it, weathered (at 0.82 of the
+                    // site's saturation it read as toy plastic).
+                    return H(deg, s * 0.62f, Mathf.Clamp(v * 0.86f, 0.06f, 0.88f));
             }
         }
         static bool Is(string hex, params string[] any) { foreach (var a in any) if (string.Equals(hex, a, StringComparison.OrdinalIgnoreCase)) return true; return false; }
