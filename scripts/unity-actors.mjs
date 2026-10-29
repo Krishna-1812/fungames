@@ -38,6 +38,8 @@ if (!process.argv.includes('--skip-unity')) {
   const text = fs.readFileSync(log, 'utf8')
   const broken = [...new Set(text.split('\n').filter((l) => /Shader error|error CS\d|Exception:/.test(l)))]
   if (broken.length || !/\[island\] actors:/.test(text)) { console.error(broken.join('\n') || 'no actors rendered'); process.exit(1) }
+  // Unity's clouds are heaps of white balls: the clouds made as mist (make-clouds.mjs) go over them, every time.
+  run(process.execPath, ['scripts/make-clouds.mjs'], 'clouds')
 }
 
 const m = JSON.parse(fs.readFileSync(path.join(renders, 'actors.json'), 'utf8'))
