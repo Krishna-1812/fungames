@@ -255,6 +255,16 @@ export function fountain(p: Pen, x: number, y: number) {
   p.cyl(x, y, 0.13, 19, 3, '#d5d9ea', { sw: 1.1, top: '#9fdcff' })
   const [bx, by] = p.at(x, y, 22)
   const g = p.el('g', { class: 'amb', 'data-b': box(bx - 26, by - 14, bx + 26, by + 24) })
+  // On the realistic island, water: a soft veil of spray with a bright thread down its middle, not dashes.
+  if (p.real) {
+    const water = (n: N, d: string) => {
+      n.add(new N('path', { d, fill: 'none', stroke: '#eaf4ff', 'stroke-width': 1.1, 'stroke-linecap': 'round', opacity: 0.55 }))
+      n.add(new N('path', { d, fill: 'none', stroke: '#ffffff', 'stroke-width': 0.5, 'stroke-linecap': 'round', opacity: 0.8 }))
+    }
+    for (const s of [-1, 1]) water(g, `M${f(bx + s * 4)} ${f(by)}q${f(s * 9)} -4 ${f(s * 14)} 14`)
+    water(g.add(new N('g', { class: 'fount-up' })), `M${f(bx)} ${f(by - 2)}v-8`)
+    return
+  }
   for (const s of [-1, 1]) g.add(new N('path', { d: `M${f(bx + s * 4)} ${f(by)}q${f(s * 9)} -4 ${f(s * 14)} 14`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-dasharray': '3 4', class: 'fount' }))
   g.add(new N('path', { d: `M${f(bx)} ${f(by - 2)}v-8`, fill: 'none', stroke: '#ffffff', 'stroke-width': 2, 'stroke-linecap': 'round', class: 'fount-up' }))
 }
