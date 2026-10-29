@@ -2165,26 +2165,31 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // (the sun is on the right, so they fall to the left, as the buildings' do), each a soft blot of a few
   // overlapping puffs, drifting as its cloud does. Three more for clouds too high to be in the picture, so a
   // shadow still crosses a street now and then when you are close in, where the clouds themselves are faint.
+  // (One soft shade for every shadow in the sky, and one drawing of the cartoon cloud, used at each size: the
+  // island's markup has a limit.)
+  const sunShade = puffShade(sky, 'isl-sun-shade', SHADOW, 0.3)
   ;[...clouds, [0.42, 0.95, 1.3], [0.98, 0.3, 1.1], [0.15, 0.4, 1.2]].forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 0)
     const g = sky.add(new N('g', { class: 'cloud-shade', ...drift(n) }))
-    const fill = puffShade(g, `cl-shade${n}`, SHADOW, 0.3)
     for (const [dx, dy, rx, ry] of [[0, 0, 40, 17], [-26, 5, 26, 12], [27, 3, 28, 12], [4, -6, 24, 10]]) {
-      g.add(new N('ellipse', { cx: f(x - 102 + dx * k), cy: f(y + dy * k), rx: f(rx * k), ry: f(ry * k), fill }))
+      g.add(new N('ellipse', { cx: f(x - 102 + dx * k), cy: f(y + dy * k), rx: f(rx * k), ry: f(ry * k), fill: sunShade }))
     }
   })
+  let cloudDef = false
   clouds.forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
     // (The realistic island's go when you are close in: a photograph's clouds are not see-through.)
     const g = sky.add(new N('g', { class: plate ? 'cloud cloud-real' : 'cloud', ...drift(n) }))
-    g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudModel(n, k) ?? cloudShape(k))
+    const drawn = cloudModel(n, k)
+    if (!drawn && !cloudDef) { sky.add(new N('defs')).add(new N('g', { id: 'isl-cloud' })).add(cloudShape()); cloudDef = true }
+    g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(drawn ?? new N('use', { href: '#isl-cloud', transform: k !== 1 ? `scale(${k})` : undefined }))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
   BALLOONS.forEach(([i, j, z, a, b, d], n) => {
     const [x, y] = P(i, j, z)
-    sky.add(pokeN('balloon')).add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d, z))
+    sky.add(pokeN('balloon')).add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d, z, sunShade))
   })
-  sky.add(skyPlane('isl-plane'))
+  sky.add(skyPlane('isl-plane', sunShade))
   { const [x, y] = P(23.4, 6.4, 170), [, gy] = P(23.4, 6.4, 0); sky.add(pokeN('ufo')).add(ufo(x, y, gy)) }
   { const [x, y] = P(24, 23, 150); sky.add(gullsCircling(x, y, 70, 26, 'gulls0', 14)) }
   { const [x, y] = P(5, 20, 130); sky.add(gullsCircling(x, y, 50, 20, 'gulls1', 11)) }

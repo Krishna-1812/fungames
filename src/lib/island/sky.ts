@@ -3,7 +3,7 @@
  * little plane towing a banner across. Both are drawn at the origin of their
  * own group and moved by a CSS keyframe path (motionPath in kit.ts).
  */
-import { C, INK, OUT, N, SHADOW, shade, motionPath, puffShade } from './kit'
+import { C, INK, OUT, N, shade, motionPath } from './kit'
 import { creatureUse } from './actors'
 import { folk, drawBust } from './folk'
 
@@ -11,22 +11,23 @@ const f = (v: number) => Math.round(v * 10) / 10
 
 /**
  * The shadow of something flying `high` over the ground, on the ground: down there, and moved along the sun's
- * way (to the left, as a cloud's is: world.ts), a soft blot `rx` across. Gone by moonlight (engine.ts, sun-shade).
+ * way (to the left, as a cloud's is: world.ts), a soft blot `rx` across, in `fill` (the sky's one soft shade).
+ * Gone by moonlight (engine.ts, sun-shade).
  */
-export function airShadow(parent: N, id: string, high: number, rx: number, ry: number, dx = 0): N {
+export function airShadow(parent: N, fill: string, high: number, rx: number, ry: number, dx = 0): N {
   const g = parent.add(new N('g', { class: 'sun-shade' }))
-  g.add(new N('ellipse', { cx: f(dx - high * 0.6), cy: f(high), rx, ry, fill: puffShade(g, id, SHADOW, 0.3) }))
+  g.add(new N('ellipse', { cx: f(dx - high * 0.6), cy: f(high), rx, ry, fill }))
   return g
 }
 
 /** A striped balloon with a basket and two people in it, drifting round a slow loop `high` over the ground. */
-export function hotAirBalloon(x: number, y: number, a: string, b: string, name: string, dur: number, delay: number, high = 0): N {
+export function hotAirBalloon(x: number, y: number, a: string, b: string, name: string, dur: number, delay: number, high = 0, shadow = ''): N {
   const pts: [number, number][] = []
   for (let k = 0; k < 16; k++) { const t = (k / 16) * Math.PI * 2; pts.push([x + Math.cos(t) * 90, y + Math.sin(t) * 30 + Math.sin(t * 2) * 10]) }
   motionPath(name, pts, { closed: true })
   const g = new N('g', { class: 'mover amb hab', 'data-b': `${f(x - 140 - high * 0.6)} ${f(y - 140)} ${f(x + 140)} ${f(y + Math.max(80, high + 40))}`, style: `animation:${name} ${dur}s linear infinite ${f(-delay)}s` })
   // Its shadow far below on the sea or the land, following it round (not bobbing with it).
-  if (high) airShadow(g, `${name}-shadow`, high, 24, 10)
+  if (high && shadow) airShadow(g, shadow, high, 24, 10)
   const bob = g.add(new N('g', { class: 'bob' }))
   const env = 'M-30 -56a30 32 0 1 1 60 0c0 17-12 26-19 33h-22c-7-7-19-16-19-33z'
   // Unity's (Creatures.cs); after dark the engine grades it with the rest of the sky.
@@ -48,12 +49,11 @@ export function hotAirBalloon(x: number, y: number, a: string, b: string, name: 
 }
 
 /** A small plane towing a striped banner, crossing the whole sky now and then. */
-export function plane(name: string): N {
+export function plane(name: string, shadow = ''): N {
   void name
   const g = new N('g', { class: 'isl-plane' })
   // Its shadow, and its banner's, on the ground below it.
-  airShadow(g, 'isl-plane-shadow', 200, 22, 6)
-  airShadow(g, 'isl-banner-shadow', 200, 44, 6, -105)
+  if (shadow) { airShadow(g, shadow, 200, 22, 6); airShadow(g, shadow, 200, 44, 6, -105) }
   const body = g.add(new N('g'))
   // The plane: Unity's, nose to the right (and then the banner is cloth, without the drawing's ink round it).
   const real = creatureUse('plane', C.rasp, 'stand', 'e')
