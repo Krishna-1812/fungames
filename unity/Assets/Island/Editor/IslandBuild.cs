@@ -438,8 +438,14 @@ namespace Island
                 // building of its own). BuildingShots hides a building's own while it is shot.
                 var holder = new GameObject("occluders");
                 occluders.Clear();
+                var slugs = new HashSet<string>();
+                foreach (var bs in d.solids) slugs.Add(bs.slug);
                 foreach (var bs in d.solids)
                 {
+                    // A set piece is drawn standing at the foot of its plinth (the plinth painted under it), so its
+                    // lowest few units are inside the stone: its stand-in stands on the plinth's top instead, or the
+                    // plinth's top under a flat base (the orrery's disc) is shut in and black.
+                    float lift = bs.k > 0 && bs.k != 1 && slugs.Contains(bs.slug + "-set") ? Y(5) : 0;
                     Buildings.Prepare(bs);
                     var mine = new List<GameObject>();
                     for (int r = 0; r < bs.runs.Length; r++)
@@ -447,6 +453,7 @@ namespace Island
                         var go = Buildings.Run(bs.runs[r], $"occlude:{bs.slug}/{r}");
                         go.transform.SetParent(holder.transform, false);
                         Buildings.Hero(go, bs);
+                        go.transform.localPosition += Vector3.up * lift;
                         go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
                         mine.Add(go);
                     }
@@ -650,9 +657,12 @@ namespace Island
             {
                 if (only != "" && System.Array.IndexOf(only.Split(','), bs.slug) < 0) continue;
                 var runs = new List<GameObject>();
-                // (Its own stand-ins away while it is shot: its runs cast for themselves, below.)
+                // (Its own stand-ins away while it is shot: its runs cast for themselves, below. A set piece's
+                // plinth's too: its foot is inside it, and would be shut in black.)
                 occluders.TryGetValue(bs.slug, out var own);
+                occluders.TryGetValue(bs.slug + "-set", out var plinth);
                 if (own != null) foreach (var go in own) go.SetActive(false);
+                if (plinth != null) foreach (var go in plinth) go.SetActive(false);
                 Buildings.Prepare(bs);
                 for (int r = 0; r < bs.runs.Length; r++) { var go = Buildings.Run(bs.runs[r], $"{bs.slug}/{r}"); Buildings.Hero(go, bs); runs.Add(go); }
                 for (int r = 0; r < runs.Count; r++)
@@ -678,6 +688,7 @@ namespace Island
                 }
                 foreach (var go in runs) Object.DestroyImmediate(go);
                 if (own != null) foreach (var go in own) go.SetActive(true);
+                if (plinth != null) foreach (var go in plinth) go.SetActive(true);
             }
             json.Append('}');
             File.WriteAllText(Path.Combine(renderOut, only == "" ? "buildings.json" : only.Split(',')[0] + ".json"), $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
