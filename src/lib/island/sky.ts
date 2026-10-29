@@ -41,14 +41,15 @@ export function plane(name: string): N {
   void name
   const g = new N('g', { class: 'isl-plane' })
   const body = g.add(new N('g'))
+  // The plane: Unity's, nose to the right (and then the banner is cloth, without the drawing's ink round it).
+  const real = creatureUse('plane', C.rasp, 'stand', 'e')
   // The banner first, trailing behind (to the left), on a towline.
   body.add(new N('path', { d: 'M-34 -2L-62 -2', stroke: INK, 'stroke-width': 1 }))
   const flag = body.add(new N('g', { class: 'tow' }))
-  flag.add(new N('path', { d: 'M-62 -10h-86q6 8 0 16h86z', fill: '#ffffff', stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }))
+  const ink = real ? {} : { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }
+  flag.add(new N('path', { d: 'M-62 -10h-86q6 8 0 16h86z', fill: real ? '#f3f4f6' : '#ffffff', ...ink }))
   for (const [x0, c] of [[-80, C.rasp], [-104, C.mint], [-128, C.cobalt]] as [number, string][]) flag.add(new N('path', { d: `M${x0} -10h-10v16h10z`, fill: c }))
-  flag.add(new N('path', { d: 'M-62 -10h-86q6 8 0 16h86z', fill: 'none', stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }))
-  // The plane: Unity's, nose to the right.
-  const real = creatureUse('plane', C.rasp, 'stand', 'e')
+  if (!real) flag.add(new N('path', { d: 'M-62 -10h-86q6 8 0 16h86z', fill: 'none', ...ink }))
   if (real) {
     body.add(new N('g', { transform: 'translate(-4 -2)' })).add(real)
     return g
