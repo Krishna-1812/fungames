@@ -234,9 +234,9 @@ Shader "Island/Building"
                 }
                 else if (m == 7)
                 {
-                    // Concrete or stone.
-                    alb *= Photo(9, uv, seed, 0.5, 0.1, bump);
-                    bump *= 0.6;
+                    // Concrete or stone; where it faces the sky, paving slabs (a plinth was one flat grey from edge to edge).
+                    if (N.y > 0.9) { alb *= Photo(10, uv, seed, 0.9, 0.15, bump) * 0.8; bump *= 0.8; }
+                    else { alb *= Photo(9, uv, seed, 0.5, 0.1, bump); bump *= 0.6; }
                 }
                 else if (m == 8)
                 {

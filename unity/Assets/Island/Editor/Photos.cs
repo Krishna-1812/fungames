@@ -48,8 +48,9 @@ namespace Island
             "corrugated_iron_02",   // 7 metal sheet, on walls
             "metal_plate_02",       // 8 metal panels: roofs and domes
             "concrete_wall_008",    // 9 concrete and stone
+            "concrete_pavers_02",   // 10 concrete underfoot: plinths, platforms, flat roofs
         };
-        public static readonly float[] WallMetres = { 2, 1, 1.8f, 2, 3, 3, 2, 2.7f, 2, 2.71f };
+        public static readonly float[] WallMetres = { 2, 1, 1.8f, 2, 3, 3, 2, 2.7f, 2, 2.71f, 2.5f };
 
         public static Texture2DArray Colour, Normal, WallColour, WallNormal;
         /** Each layer's average colour (linear), for taking the detail without the colour. */

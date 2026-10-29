@@ -52,6 +52,7 @@ export const WALLS = {
   corrugated_iron_02: 'metal sheet',
   metal_plate_02: 'metal panels and domes',
   concrete_wall_008: 'concrete',
+  concrete_pavers_02: 'paving, on plinths and flat roofs',
 }
 /** The models, as FBX with their textures. */
 export const MODELS = ['boulder_01', 'rock_07', 'namaqualand_boulder_02', 'shrub_02', 'shrub_04', 'street_lamp_01', 'painted_wooden_bench']
