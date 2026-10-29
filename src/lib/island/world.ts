@@ -2175,7 +2175,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   })
   clouds.forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
-    const g = sky.add(new N('g', { class: 'cloud', ...drift(n) }))
+    // (The realistic island's go when you are close in: a photograph's clouds are not see-through.)
+    const g = sky.add(new N('g', { class: plate ? 'cloud cloud-real' : 'cloud', ...drift(n) }))
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudModel(n, k) ?? cloudShape(k))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.

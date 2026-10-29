@@ -46,7 +46,7 @@ const SHAPES = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polygon', 
 /** Presentation attributes that children inherit. */
 const INHERITED = ['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'letter-spacing', 'dominant-baseline', 'visibility']
 /** Classes the engine finds and drives by itself. */
-const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg-year', 'pg-bar', 'dt-fossil', 'night-veil', 'night-grade', 'lm-ring', 'lm-art', 'pk-say', 'mill-sails', 'fount-up', 'kite', 'cloud', 'cloud-shade', 'sun-shade', 'isl-plane', 'walker', 'dsi-count', 'sign-words'])
+const DRIVEN = new Set(['mover', 'es-win', 'liw-cell', 'wwa-year', 'pg-pct', 'pg-year', 'pg-bar', 'dt-fossil', 'night-veil', 'night-grade', 'lm-ring', 'lm-art', 'pk-say', 'mill-sails', 'fount-up', 'kite', 'cloud', 'cloud-real', 'cloud-shade', 'sun-shade', 'isl-plane', 'walker', 'dsi-count', 'sign-words'])
 /**
  * Of those, the ones whose own paint the engine changes (a fill, a dash, a
  * width): drawn from their outlines. Everything else that moves is a

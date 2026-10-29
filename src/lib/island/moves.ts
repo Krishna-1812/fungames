@@ -405,10 +405,10 @@ export const LAYERS = {
   },
   /**
    * Clouds: a little thinner at night (the night's grade colours them, with the rest of the sky), faint when you
-   * are close. Their shadows on the ground (shade), by the time of day:
+   * are close (the realistic island's gone: nearReal). Their shadows on the ground (shade), by the time of day:
    * as strong as the sun is, and none by moonlight. Unlike the clouds, they stay when you are close.
    */
-  cloud: { night: 0.8, near: 0.18, fadeMs: 400, shade: { day: 1, dawn: 0.55, dusk: 0.4, night: 0 } as Record<string, number> },
+  cloud: { night: 0.8, near: 0.18, nearReal: 0, fadeMs: 400, shade: { day: 1, dawn: 0.55, dusk: 0.4, night: 0 } as Record<string, number> },
 }
 
 /* ---- the cards: the same motions, as CSS, for the buildings drawn as SVG ---- */
