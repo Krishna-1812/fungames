@@ -2233,6 +2233,33 @@ const book = BOOK.map((key) => {
   }
   :global(.isl-dtag.is-on) { opacity: 1; }
   :global([data-time='night'] .isl-tag) { background: #dfe6fa; }
+  /* The realistic island's chrome, quieter: over a photograph-like place the sticker look (white, an ink rim, a
+     hard step of ink) shouted, at night most of all. There the controls are frosted white with a hairline and a
+     soft lift, and the buildings' names dark glass with a pin of the game's colour. The mint Surprise stays. */
+  :global(.isl-box[data-world='real']) :is(.isl-btn, .isl-zoom button, .isl-down, .isl-logo, .isl-world, .isl-mapbtn) {
+    background-color: rgba(255, 255, 255, 0.9); border: 1.5px solid rgba(27, 35, 64, 0.2); box-shadow: 0 6px 20px rgba(4, 12, 32, 0.28);
+  }
+  :global(.isl-box[data-world='real']) :is(.isl-btn, .isl-zoom button, .isl-down, .isl-mapbtn):active { transform: translateY(1px); box-shadow: 0 3px 10px rgba(4, 12, 32, 0.3); }
+  :global(.isl-box[data-world='real']) :is(.isl-btn, .isl-zoom button, .isl-down, .isl-mapbtn):hover { background-color: rgba(238, 244, 255, 0.95); }
+  :global(.isl-box[data-world='real']) .isl-btn.isl-btn--hot { background-color: #4fe3c1; }
+  :global(.isl-box[data-world='real']) .isl-btn.isl-btn--hot:hover { background-color: #6debcd; }
+  :global(.isl-box[data-world='real']) .isl-btn[aria-pressed='true'] { background-color: #1b2340; }
+  :global(.isl-box[data-world='real']) .isl-zoom .isl-snap { background-color: rgba(227, 243, 255, 0.92); }
+  :global(.isl-box[data-world='real'][data-time='night']) :is(.isl-btn, .isl-zoom button, .isl-down, .isl-logo, .isl-world, .isl-mapbtn):not(.isl-btn--hot):not([aria-pressed='true']) {
+    background-color: rgba(218, 226, 246, 0.84); border-color: rgba(8, 14, 36, 0.3); box-shadow: 0 6px 20px rgba(2, 6, 18, 0.45);
+  }
+  :global(.isl-box[data-world='real'][data-time='night']) .isl-btn.isl-btn--hot { background-color: #3fc2a5; }
+  :global(.isl-box[data-world='real'] .isl-tag) {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-weight: 600; color: #fff; background: rgba(12, 20, 44, 0.66);
+    border: 0; padding: 4px 11px 4px 9px; box-shadow: 0 4px 14px rgba(4, 12, 32, 0.3);
+  }
+  :global(.isl-box[data-world='real'] .isl-tag::before) {
+    content: ''; width: 4px; height: 4px; flex: none; border-radius: 50%;
+    background: var(--tint, #4fe3c1); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+  }
+  :global(.isl-box[data-world='real'][data-time='night'] .isl-tag) { background: rgba(6, 10, 28, 0.74); color: #e8edfa; }
+  @media (max-width: 699px) { :global(.isl-box[data-world='real'] .isl-tag) { padding: 3px 9px 3px 7px; } }
   /* The mini-map's picture is the island by day: after dark it dims with the island, and its box goes the night sea's blue. */
   .isl-mini image { transition: filter 1.6s; }
   :global([data-time='night']) .isl-mini { background: #2c3a78; }
