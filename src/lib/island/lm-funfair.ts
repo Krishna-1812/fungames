@@ -83,7 +83,8 @@ export const funfair: Record<string, Landmark> = {
     })
     for (let k = 0; k < 10; k++) {
       const a = (k / 10) * Math.PI * 2, x = hx + Math.cos(a) * 58, y = hy + Math.sin(a) * 58
-      wheel.el('circle', { cx: hx + Math.cos(a + 0.31) * 58, cy: hy + Math.sin(a + 0.31) * 58, r: 2.4, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6, class: 'chase', style: `animation-delay:${k * 0.1}s` })
+      // (On the realistic island a bulb is a bulb, not a drawn dot in an ink ring.)
+      wheel.el('circle', { cx: hx + Math.cos(a + 0.31) * 58, cy: hy + Math.sin(a + 0.31) * 58, r: p.real ? 1.6 : 2.4, fill: p.real ? '#f4f1e8' : '#ffffff', stroke: p.real ? undefined : INK, 'stroke-width': p.real ? undefined : 0.6, class: 'chase', style: `animation-delay:${k * 0.1}s` })
       // Each car hangs level while the wheel turns.
       const car = new Pen(wheel.el('g', { class: 'spin-rev', style: `transform-origin:${f(x)}px ${f(y)}px` }), wheel.ox, wheel.oy, wheel.oz, wheel.b, wheel.lights, wheel.sink)
       const fill = [C.rasp, C.mint, C.sky, C.lilac, C.cobalt][k % 5]
@@ -96,7 +97,16 @@ export const funfair: Record<string, Landmark> = {
     // After dark the rim's bulbs shine through: a ring of them turning with the wheel.
     const ring = glow(new N('g', { class: 'spin' }))
     ring.add(new N('circle', { cx: hx, cy: hy, r: 58, fill: 'none', stroke: '#ffffff', 'stroke-width': 1, opacity: 0 }))
-    for (let k = 0; k < 20; k++) { const a = (k / 20) * Math.PI * 2 + 0.31; ring.add(new N('circle', { cx: f(hx + Math.cos(a) * 58), cy: f(hy + Math.sin(a) * 58), r: 2.2, fill: ['#fff6dc', '#ffd1da', '#d6ecff', '#d8f7ec'][k % 4], class: 'chase', style: `animation-delay:${(k % 5) * 0.1}s` })) }
+    const tints = ['#fff6dc', '#ffd1da', '#d6ecff', '#d8f7ec']
+    // On the realistic island each is lit: a white-hot core in a halo of its own colour (one circle, its gradient's).
+    if (p.real) {
+      const defs = ring.add(new N('defs'))
+      tints.forEach((c, n) => {
+        const g = defs.add(new N('radialGradient', { id: `ff-bulb-${n}` }))
+        for (const [o, col, op] of [[0, '#ffffff', 1], [0.2, '#ffffff', 1], [0.26, c, 0.45], [1, c, 0]] as [number, string, number][]) g.add(new N('stop', { offset: o, 'stop-color': col, 'stop-opacity': op }))
+      })
+    }
+    for (let k = 0; k < 20; k++) { const a = (k / 20) * Math.PI * 2 + 0.31; ring.add(new N('circle', { cx: f(hx + Math.cos(a) * 58), cy: f(hy + Math.sin(a) * 58), r: p.real ? 4.5 : 2.2, fill: p.real ? `url(#ff-bulb-${k % 4})` : tints[k % 4], class: 'chase', style: `animation-delay:${(k % 5) * 0.1}s` })) }
     ring.add(new N('circle', { cx: hx, cy: hy, r: 4, fill: '#ffd1da' }))
     // A mast of screens, all shouting at once.
     p.line([1.86, 0.5, 0], [1.86, 0.5, 88], { sw: 3.2 })
@@ -107,7 +117,10 @@ export const funfair: Record<string, Landmark> = {
       const s = glow(p.face(b, face, 0.5, 1.6, { w: 18, h: 16 }))
       const w = 15
       const scr = s.add(new N('g', { class: 'pop', style: `animation-delay:${k * 0.7}s` }))
-      scr.add(new N('rect', { x: -w / 2, y: -15.8, width: w, height: 15, fill: ['#ff8fb0', C.mint, '#8ccbff'][k] }))
+      const lit = ['#ff8fb0', C.mint, '#8ccbff'][k]
+      // A realistic screen lights the air round it a little.
+      if (p.real) for (const [d, op] of [[7, 0.05], [4, 0.1], [2, 0.18]]) scr.add(new N('rect', { x: -w / 2 - d, y: -15.8 - d, width: w + d * 2, height: 15 + d * 2, rx: d, fill: lit, opacity: op }))
+      scr.add(new N('rect', { x: -w / 2, y: -15.8, width: w, height: 15, fill: lit }))
       if (kind === 'like') scr.add(new N('path', { d: 'M0 -3.6l-4.6 -4.6a2.7 2.7 0 0 1 4.6 -3.8a2.7 2.7 0 0 1 4.6 3.8z', fill: '#ffffff', stroke: INK, 'stroke-width': 0.6 }))
       if (kind === 'new') letter(scr, 0, -6, 'NEW!', { size: 6, fill: INK })
       if (kind === 'bang') letter(scr, 0, -4.4, '!!!', { size: 10, fill: C.rasp })
@@ -117,7 +130,7 @@ export const funfair: Record<string, Landmark> = {
     p.windows(bth, 'y', { cols: 1, z0: 8, h: 8, wide: 0.6, pane: '#ffffff' })
     p.gable(1.25, 1.25, 0.65, 0.65, 22, 12, '#ffffff', 'y', { lines: 1 })
     const bulbs = glow(new N('g'))
-    for (let k = 0; k < 6; k++) { const [x, y] = p.at(1.25 + k * 0.13, 1.9, 22); p.el('circle', { cx: x, cy: y, r: 2, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6, class: 'chase', style: `animation-delay:${k * 0.12}s` }); bulbs.add(new N('circle', { cx: x, cy: y, r: 1.8, fill: '#fff6dc', class: 'chase', style: `animation-delay:${k * 0.12}s` })) }
+    for (let k = 0; k < 6; k++) { const [x, y] = p.at(1.25 + k * 0.13, 1.9, 22); p.el('circle', { cx: x, cy: y, r: p.real ? 1.5 : 2, fill: p.real ? '#f4f1e8' : '#ffffff', stroke: p.real ? undefined : INK, 'stroke-width': p.real ? undefined : 0.6, class: 'chase', style: `animation-delay:${k * 0.12}s` }); bulbs.add(new N('circle', { cx: x, cy: y, r: 1.8, fill: '#fff6dc', class: 'chase', style: `animation-delay:${k * 0.12}s` })) }
     const [kx, ky] = p.at(1.9, 1.5, 14)
     for (const [dx, dy, c] of [[6, -34, C.mint], [12, -28, C.lilac], [1, -26, C.sky]] as const) {
       p.path(`M${f(kx)} ${f(ky)}q${f(dx * 0.4)} ${f(dy * 0.5)} ${f(dx)} ${f(dy + 6)}`, 'none', { sw: 0.8 })
