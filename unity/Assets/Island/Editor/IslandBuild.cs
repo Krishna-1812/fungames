@@ -431,7 +431,28 @@ namespace Island
                         mr.shadowCastingMode = blocks == "shadow" || blocks == "occlude" ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
                 }
             }
-            if (blocks == "occlude") { }
+            if (blocks == "occlude" && d.solids != null)
+            {
+                // For the buildings' own pictures: every building there too, unseen, casting its shadow and shutting
+                // out the sky, so each is shot in its neighbours' shade (a tower on its own plinth, the plinth a
+                // building of its own). BuildingShots hides a building's own while it is shot.
+                var holder = new GameObject("occluders");
+                occluders.Clear();
+                foreach (var bs in d.solids)
+                {
+                    Buildings.Prepare(bs);
+                    var mine = new List<GameObject>();
+                    for (int r = 0; r < bs.runs.Length; r++)
+                    {
+                        var go = Buildings.Run(bs.runs[r], $"occlude:{bs.slug}/{r}");
+                        go.transform.SetParent(holder.transform, false);
+                        Buildings.Hero(go, bs);
+                        go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+                        mine.Add(go);
+                    }
+                    occluders[bs.slug] = mine;
+                }
+            }
             else if (blocks != "none" && d.solids != null && d.solids.Length > 0)
             {
                 // The buildings themselves (Buildings.cs): in the plate, their shadows.
@@ -607,6 +628,9 @@ namespace Island
          * Renders/buildings/SLUG_RUN.png at `-scale` pixels a map unit, and
          * buildings.json, where each lies on the map. `-only slug` for one.
          */
+        /** Every building's runs as unseen shadow casters, by slug (Scene, 'occlude'). */
+        static readonly Dictionary<string, List<GameObject>> occluders = new Dictionary<string, List<GameObject>>();
+
         public static void BuildingShots()
         {
             Pipeline();
@@ -626,6 +650,9 @@ namespace Island
             {
                 if (only != "" && System.Array.IndexOf(only.Split(','), bs.slug) < 0) continue;
                 var runs = new List<GameObject>();
+                // (Its own stand-ins away while it is shot: its runs cast for themselves, below.)
+                occluders.TryGetValue(bs.slug, out var own);
+                if (own != null) foreach (var go in own) go.SetActive(false);
                 Buildings.Prepare(bs);
                 for (int r = 0; r < bs.runs.Length; r++) { var go = Buildings.Run(bs.runs[r], $"{bs.slug}/{r}"); Buildings.Hero(go, bs); runs.Add(go); }
                 for (int r = 0; r < runs.Count; r++)
@@ -650,6 +677,7 @@ namespace Island
                     made++;
                 }
                 foreach (var go in runs) Object.DestroyImmediate(go);
+                if (own != null) foreach (var go in own) go.SetActive(true);
             }
             json.Append('}');
             File.WriteAllText(Path.Combine(renderOut, only == "" ? "buildings.json" : only.Split(',')[0] + ".json"), $"{{\"scale\":{scale.ToString(inv)},\"items\":{json}}}");
