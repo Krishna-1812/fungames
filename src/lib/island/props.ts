@@ -302,25 +302,36 @@ export function birds(): string {
   return [[0, 0], [16, 8], [-14, 10]].map(([x, y]) => `<path class="flap" d="M${x - 7} ${y}q3.5 -5 7 0q3.5 -5 7 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`).join('')
 }
 
-/**
- * A cloud, drawn at the origin: soft and a little see-through, with no ink
- * outline, so it floats over the map rather than sitting on it. A shaded
- * base, then the lit puffs on top. Its shadow is drawn separately below it.
- */
 /** A cloud, Unity's (one of five cumulus), drawn at the origin; null if it has not been made. */
 export function cloudModel(n: number, k = 1): N | null {
   return creatureUse('cloud', '#fbfcff', `c${n % 5}`, 'se', { transform: k !== 1 ? `scale(${Math.round(k * 100) / 100})` : undefined, opacity: 0.96 })
 }
 
+/**
+ * A cloud, drawn at the origin: puffs on a flat base, one solid shape, lit
+ * from the top right as the island is. Its outline in a soft blue (not ink),
+ * so it floats over the map rather than sitting on it; then the shade under
+ * it and down its left, the lit puffs over that, a crease where one puff
+ * sits in front of the next. Its shadow is drawn
+ * separately, on the ground (world.ts).
+ */
 export function cloudShape(k = 1): string {
-  const parts: [number, number, number][] = [[0, 0, 26], [30, 8, 20], [-28, 9, 18], [10, -16, 20], [-12, -12, 17]]
-  // Each part at 0.9, not the group: baked as one sprite, a group's opacity made the whole cloud see-through,
-  // where the parts, drawn one by one, stacked to near solid in the middle.
+  const puffs: [number, number, number][] = [[-33, 5, 11], [-17, -5, 17], [5, -12, 21], [27, -3, 16], [41, 6, 10]]
+  const ring = (x: number, y: number, r: number) => `M${f((x - r) * k)} ${f(y * k)}a${f(r * k)} ${f(r * k)} 0 1 1 ${f(2 * r * k)} 0a${f(r * k)} ${f(r * k)} 0 1 1 ${f(-2 * r * k)} 0Z`
+  const pill = (x0: number, x1: number, y: number, h: number) => `M${f(x0 * k)} ${f(y * k)}H${f(x1 * k)}a${f((h / 2) * k)} ${f((h / 2) * k)} 0 0 1 0 ${f(h * k)}H${f(x0 * k)}a${f((h / 2) * k)} ${f((h / 2) * k)} 0 0 1 0 ${f(-h * k)}Z`
+  // The whole shape: every puff and the base as one path, all wound the same way, so they fill as one.
+  const whole = puffs.map(([x, y, r]) => ring(x, y, r)).join('') + pill(-36, 43, 0, 16)
+  // The lit part: each puff pulled in towards its top right, leaving the shade round its bottom left.
+  const lit = puffs.map(([x, y, r]) => ring(x + r * 0.11, y - r * 0.17, r * 0.8)).join('') + pill(-34, 42, -1, 12)
+  const crease = puffs.slice(1, 4).map(([x, y, r]) => {
+    const a0 = 1.95, a1 = 2.85, R = r * 0.8, cx = x + r * 0.11, cy = y - r * 0.17
+    return `M${f((cx + Math.cos(a0) * R) * k)} ${f((cy + Math.sin(a0) * R) * k)}A${f(R * k)} ${f(R * k)} 0 0 1 ${f((cx + Math.cos(a1) * R) * k)} ${f((cy + Math.sin(a1) * R) * k)}`
+  }).join('')
   return '<g class="cloud-body">' +
-    `<ellipse cx="${f(2 * k)}" cy="${f(17 * k)}" rx="${f(46 * k)}" ry="${f(11 * k)}" fill="#d9e2f6" opacity="0.9"/>` +
-    parts.map(([x, y, r]) => `<circle cx="${f(x * k)}" cy="${f(y * k)}" r="${f(r * k)}" fill="#ffffff" opacity="0.9"/>`).join('') +
-    `<path d="M${f(-40 * k)} ${f(14 * k)}q${f(42 * k)} ${f(10 * k)} ${f(86 * k)} 0" fill="none" stroke="#e6ecfa" stroke-width="${f(6 * k)}" stroke-linecap="round" opacity="0.9"/>` +
-    `<ellipse cx="${f(-6 * k)}" cy="${f(-18 * k)}" rx="${f(12 * k)}" ry="${f(6 * k)}" fill="#ffffff" opacity="0.81"/></g>`
+    `<path d="${whole}" fill="#a3aed8" stroke="#a3aed8" stroke-width="${f(2.6 * k)}" stroke-linejoin="round"/>` +
+    `<path d="${whole}" fill="#d3dbf2"/>` +
+    `<path d="${lit}" fill="#fbfcff"/>` +
+    `<path d="${crease}" fill="none" stroke="#e2e7f6" stroke-width="${f(1.5 * k)}" stroke-linecap="round"/></g>`
 }
 
 export { N }
