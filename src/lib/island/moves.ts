@@ -205,6 +205,7 @@ export const RULES: Rule[] = [
   { on: ['leg-a'], inside: 'walker', loop: L('isl-step', 0.5, 'ease-in-out', { dir: 'alternate' }) },
   { on: ['leg-b'], inside: 'walker', loop: L('isl-step', 0.5, 'ease-in-out', { dir: 'alternate-reverse' }) },
   { on: ['cloud'], loop: L('isl-cloud', 160, 'linear') },
+  { on: ['cloud-shade'], loop: L('isl-cloud', 160, 'linear') },
   { on: ['flock'], loop: L('isl-flock', 38, 'linear') },
   { on: ['flock1'], loop: L('isl-flock', 52, 'linear') },
   { on: ['flap'], loop: L('isl-flap', 0.5, 'ease-in-out', { dir: 'alternate' }), fillBox: true, origin: 'center' },
@@ -402,8 +403,12 @@ export const LAYERS = {
       'soft-light': { dusk: ['#ffa050', 1], dawn: ['#ffd9bf', 0.6] } as Record<string, [Shade, number]>,
     },
   },
-  /** Clouds: a little thinner at night (the night's grade colours them, with the rest of the sky), faint when you are close. */
-  cloud: { night: 0.8, near: 0.18, fadeMs: 400 },
+  /**
+   * Clouds: a little thinner at night (the night's grade colours them, with the rest of the sky), faint when you
+   * are close. Their shadows on the ground (shade), by the time of day:
+   * as strong as the sun is, and none by moonlight. Unlike the clouds, they stay when you are close.
+   */
+  cloud: { night: 0.8, near: 0.18, fadeMs: 400, shade: { day: 1, dawn: 0.55, dusk: 0.4, night: 0 } as Record<string, number> },
 }
 
 /* ---- the cards: the same motions, as CSS, for the buildings drawn as SVG ---- */

@@ -468,6 +468,8 @@ export function createEngine(o: {
       else if (t === 'night-glow') a *= timed('glow', N.glow[st.time] ?? 0, N.fadeMs)
       else if (t === 'layer-night') a *= timed('night', st.time === 'day' ? 0 : 1, N.fadeMs)
       else if (t === 'cloud') a *= timed('cloud', st.time === 'night' ? LAYERS.cloud.night : st.near ? LAYERS.cloud.near : 1, LAYERS.cloud.fadeMs)
+      // A shadow cast by the sun (a cloud's, a balloon's): none by moonlight. Close in or not.
+      else if (t === 'cloud-shade' || t === 'sun-shade') a *= timed('sun-shade', LAYERS.cloud.shade[st.time] ?? 0, LAYERS.cloud.fadeMs)
       else if (t === 'layer-beam') a *= st.time === 'dusk' ? LAYERS.beam.dusk : 1
       else if (t === 'lm-ring') { const lmn = ringOwner.get(n); a *= lmn ? lmS(lmn).ring : 0 }
       else if (t === 'isl-plane' && !o.play) a = 0

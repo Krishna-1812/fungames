@@ -2159,14 +2159,23 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const labels: Record<string, [number, number]> = {}
   for (const d of DISTRICTS) { const [x, y] = P(...(d.label ?? [d.at[0] + 1.2, d.at[1] + 1.2, 0])); labels[d.key] = [f(x), f(y)] }
   const sky = open('sky')
-  ;[[-0.2, 0.1, 1.2], [0.25, 0.45, 1], [0.6, 0.2, 1.3], [0.05, 0.7, 0.9], [0.8, 0.6, 1.1]].forEach(([u, v, k], n) => {
+  const clouds: [number, number, number][] = [[-0.2, 0.1, 1.2], [0.25, 0.45, 1], [0.6, 0.2, 1.3], [0.05, 0.7, 0.9], [0.8, 0.6, 1.1]]
+  const drift = (n: number) => ({ style: `animation-delay:${-n * 23}s;animation-duration:${150 + n * 20}s` })
+  // The clouds' shadows, under all of them: where the ground below each cloud is, moved along the sun's way
+  // (the sun is on the right, so they fall to the left, as the buildings' do), each a soft blot of a few
+  // overlapping puffs, drifting as its cloud does. Three more for clouds too high to be in the picture, so a
+  // shadow still crosses a street now and then when you are close in, where the clouds themselves are faint.
+  ;[...clouds, [0.42, 0.95, 1.3], [0.98, 0.3, 1.1], [0.15, 0.4, 1.2]].forEach(([u, v, k], n) => {
+    const [x, y] = P(u * GRID * 1.3, v * GRID, 0)
+    const g = sky.add(new N('g', { class: 'cloud-shade', ...drift(n) }))
+    const fill = puffShade(g, `cl-shade${n}`, SHADOW, 0.3)
+    for (const [dx, dy, rx, ry] of [[0, 0, 40, 17], [-26, 5, 26, 12], [27, 3, 28, 12], [4, -6, 24, 10]]) {
+      g.add(new N('ellipse', { cx: f(x - 102 + dx * k), cy: f(y + dy * k), rx: f(rx * k), ry: f(ry * k), fill }))
+    }
+  })
+  clouds.forEach(([u, v, k], n) => {
     const [x, y] = P(u * GRID * 1.3, v * GRID, 170)
-    const drift = { class: 'cloud', style: `animation-delay:${-n * 23}s;animation-duration:${150 + n * 20}s` }
-    // Its shadow on the ground far below (on the realistic island, soft-edged, as a cloud's is), drifting with
-    // it in a group of its own, so each is a sprite of its own size.
-    const sh = sky.add(new N('g', { ...drift }))
-    sh.add(new N('ellipse', { cx: f(x + 14), cy: f(y + 120), rx: f(56 * k * (plate ? 1.25 : 1)), ry: f(17 * k * (plate ? 1.25 : 1)), fill: plate ? puffShade(sh, `cl-shadow${n}`, '#1b2340', 0.16) : INK, opacity: plate ? undefined : 0.06, class: 'cloud-shadow' }))
-    const g = sky.add(new N('g', { ...drift }))
+    const g = sky.add(new N('g', { class: 'cloud', ...drift(n) }))
     g.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` })).add(cloudModel(n, k) ?? cloudShape(k))
   })
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
