@@ -101,11 +101,11 @@ export const badlands: Record<string, Landmark> = {
       const shift = (d: string, dx: number, dy: number) => d.replace(/M(-?[\d.]+) (-?[\d.]+)/g, (_, x, y) => `M${f(+x + dx)} ${f(+y + dy)}`)
       const round = 'stroke-linecap:round;stroke-linejoin:round'
       // On the realistic island, bone set in the rock as a dig shows it: each bone in a groove cut round it
-      // (dark, a little below), then the bone (a warm off-white, a touch translucent so the strata show through),
-      // lit along its top edge by the same sun as the face.
-      for (const [d, spine] of bones) b.path(shift(d, 0.7, 1.1), 'none', { stroke: '#2b2440', sw: spine ? 4.2 : 3.2, op: 0.42, style: round })
-      for (const [d, spine] of bones) b.path(d, 'none', { stroke: '#d8cfc2', sw: spine ? 2.4 : 1.6, op: 0.9, style: round })
-      for (const [d, spine] of bones) b.path(shift(d, -0.3, -0.5), 'none', { stroke: '#fbf6ec', sw: spine ? 0.9 : 0.6, op: 0.8, style: round })
+      // (dark, a little below), then the bone (old bone's tan, translucent so the strata show through), lit along
+      // its top edge by the same sun as the face. Finer than the drawing's: the rock is earth now, and fossils small.
+      for (const [d, spine] of bones) b.path(shift(d, 0.5, 0.8), 'none', { stroke: '#2e2820', sw: spine ? 2.9 : 2.2, op: 0.42, style: round })
+      for (const [d, spine] of bones) b.path(d, 'none', { stroke: '#cdbfa6', sw: spine ? 1.7 : 1.1, op: 0.75, style: round })
+      for (const [d, spine] of bones) b.path(shift(d, -0.2, -0.35), 'none', { stroke: '#f3ecdc', sw: spine ? 0.6 : 0.4, op: 0.7, style: round })
     } else for (const [d, spine] of bones) b.path(d, 'none', { stroke: '#ffffff', sw: spine ? 3 : 2.2 })
     // An ammonite on the other face (in the shade: darker).
     const [ax, ay] = p.at(1.95, 0.9, 20)
@@ -113,9 +113,9 @@ export const badlands: Record<string, Landmark> = {
     if (p.real) {
       // The same as the bones: a groove, the shell, its lit edge (fainter: this face is in shade).
       const round = 'stroke-linecap:round;stroke-linejoin:round'
-      p.path(curl(ax + 0.5, ay + 0.8), 'none', { stroke: '#211b33', sw: 2.6, op: 0.4, style: round })
-      p.path(curl(ax, ay), 'none', { stroke: '#b9b0c4', sw: 1.6, op: 0.85, style: round })
-      p.path(curl(ax - 0.25, ay - 0.35), 'none', { stroke: '#e6e0ee', sw: 0.5, op: 0.6, style: round })
+      p.path(curl(ax + 0.5, ay + 0.8), 'none', { stroke: '#2a241c', sw: 2.2, op: 0.4, style: round })
+      p.path(curl(ax, ay), 'none', { stroke: '#c4b8a2', sw: 1.3, op: 0.8, style: round })
+      p.path(curl(ax - 0.25, ay - 0.35), 'none', { stroke: '#ece4d4', sw: 0.45, op: 0.6, style: round })
     } else p.path(curl(ax, ay), 'none', { stroke: '#ffffff', sw: 1.8 })
     // A ladder down the side, and someone at work up top.
     p.line([1.95, 1.45, 0], [1.95, 1.45, top], { sw: 1.6 })

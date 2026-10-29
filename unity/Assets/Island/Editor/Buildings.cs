@@ -335,7 +335,7 @@ namespace Island
             switch (s.k)
             {
                 case "box":
-                    if (IslandBuild.AuditArtPreview && auditGeology && Mathf.Abs(s.w - 1.9f) < 0.001f && Mathf.Abs(s.d - 1.9f) < 0.001f && Mathf.Abs(s.h - 11) < 0.001f) AuditStratum(b, s);
+                    if (geology && Mathf.Abs(s.w - 1.9f) < 0.001f && Mathf.Abs(s.d - 1.9f) < 0.001f && Mathf.Abs(s.h - 11) < 0.001f) Stratum(b, s);
                     else BoxDetailed(b, s);
                     break;
                 case "band": Band(b, s.b, s.z0, s.z1, s.fill); break;

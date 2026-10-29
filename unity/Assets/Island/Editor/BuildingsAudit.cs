@@ -1,16 +1,16 @@
-// Candidate geometry for the explicit audit preview. Normal rendering retains
-// the approved building set until these pictures have been visually reviewed.
+// Deep Time's cliff as rock: its seven boxes become strata with eroded,
+// uneven edges (first tried in the audit preview, now the building itself).
 using UnityEngine;
 
 namespace Island
 {
     public static partial class Buildings
     {
-        static bool auditGeology;
+        static bool geology;
 
         // Every layer uses the same continuous contour function and global
         // height. Adjacent strata share vertices rather than leaving seams.
-        static Vector3 AuditRockPoint(SolidRec s, float perimeter, float height)
+        static Vector3 RockPoint(SolidRec s, float perimeter, float height)
         {
             float side = Mathf.Repeat(perimeter, 4), x, y;
             if (side < 1) { x = s.x + s.w; y = s.y + s.d * side; }
@@ -26,31 +26,35 @@ namespace Island
             return W(cx + (x - cx) * (1 - erosion), cy + (y - cy) * (1 - erosion), height);
         }
 
-        static void AuditStratum(Bm b, SolidRec s)
+        static void Stratum(Bm b, SolidRec s)
         {
             const int edgeSteps = 8, heightSteps = 3;
-            // Cool sedimentary stone, using the existing rough concrete
-            // material and the island's existing sun/sky lighting pipeline.
-            string[] stone = { "#625c79", "#79718b", "#8b8196", "#a095aa", "#919bab", "#b7adbd", "#ccc3cc" };
+            // Earth's own colours, oldest at the foot: dark shale, mudstones and sandstones going paler upwards, and
+            // the pale clay of the line where the dinosaurs end (the site's 66 MYA). Taken as they are, not through
+            // Real (which would make them the town's dressed stone), in the rough concrete's grain.
+            string[] stone = { "#4a4b55", "#6a645c", "#827768", "#9d8c75", "#d7d0c1", "#8c806e", "#b0a28a" };
             int layer = Mathf.Clamp(Mathf.RoundToInt((s.z0 - foot) / 11), 0, 6);
-            var colour = Real(stone[layer], Concrete);
+            var colour = Hex(stone[layer]).linear;
             for (int edge = 0; edge < 4; edge++)
                 for (int segment = 0; segment < edgeSteps; segment++)
                     for (int h = 0; h < heightSteps; h++)
                     {
                         float a = edge + segment / (float)edgeSteps, c = edge + (segment + 1f) / edgeSteps;
                         float z0 = s.z0 + s.h * h / heightSteps, z1 = s.z0 + s.h * (h + 1) / heightSteps;
-                        b.Quad(AuditRockPoint(s, a, z0), AuditRockPoint(s, c, z0),
-                            AuditRockPoint(s, c, z1), AuditRockPoint(s, a, z1), colour, Concrete);
+                        b.Quad(RockPoint(s, a, z0), RockPoint(s, c, z0),
+                            RockPoint(s, c, z1), RockPoint(s, a, z1), colour, Concrete);
                     }
             // Close every layer; the common perimeter also closes the top's
             // irregular outline. Existing top props keep their registration.
             float top = s.z0 + s.h;
             var centre = W(s.x + s.w * 0.5f, s.y + s.d * 0.5f, top);
-            var topColour = layer == 6 ? Real("#829d91", Concrete) : colour;
+            // The top rough dry grass, and the ledges where a layer is worn back rough rock: in plaster's grain, not Concrete's
+            // (whose sky-facing side is paving).
+            bool last = layer == 6;
+            var topColour = last ? Hex("#7f8c5c").linear : colour;
             for (int k = 0; k < edgeSteps * 4; k++)
-                b.Tri(centre, AuditRockPoint(s, k / (float)edgeSteps, top),
-                    AuditRockPoint(s, (k + 1f) / edgeSteps, top), topColour, Concrete);
+                b.Tri(centre, RockPoint(s, k / (float)edgeSteps, top),
+                    RockPoint(s, (k + 1f) / edgeSteps, top), topColour, Plaster);
         }
     }
 }
