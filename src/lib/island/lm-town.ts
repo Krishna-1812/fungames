@@ -219,7 +219,8 @@ export const town: Record<string, Landmark> = {
     const m = p.face(st, 'x', 0.5, 4, { w: 40, h: 23 })
     m.add(new N('path', {
       d: 'M-14 -9a5.5 5.5 0 1 1 0.1 0M10 -9a5.5 5.5 0 1 0 -0.1 0M-14 -9l7 -9l9 0l2 9M-7 -18l4 9l7 0M10 -9l-3 -11h4M-9 -20h4M-3 -9l-2 2',
-      fill: 'none', stroke: C.cobalt, 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'fm-draw',
+      // (On the realistic island, paint on a wall: a deeper blue, a finer line, the wall showing through.)
+      fill: 'none', stroke: p.real ? '#3b5aa6' : C.cobalt, 'stroke-width': p.real ? 1.3 : 1.6, opacity: p.real ? 0.7 : undefined, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'fm-draw',
     }))
     letter(m, 0, -1, 'FROM MEMORY', { size: 3.6, fill: C.rasp, ls: 0.4 })
     // A painter at an easel out front, the easel and canvas painter-sized.

@@ -371,7 +371,8 @@ export function initIsland(o: {
   // The lettering on the map is in the page's own fonts: wait for them, a little.
   let fontsIn = !document.fonts
   if (document.fonts) {
-    Promise.all(['600 16px Fredoka', '16px Silkscreen'].map((f) => document.fonts.load(f).catch(() => null))).finally(() => { fontsIn = true; wake() })
+    // (The realistic island's signs are lettered in Inter.)
+    Promise.all(['600 16px Fredoka', '16px Silkscreen', ...(box.dataset.world === 'real' ? ['600 16px Inter'] : [])].map((f) => document.fonts.load(f).catch(() => null))).finally(() => { fontsIn = true; wake() })
     setTimeout(() => { fontsIn = true; wake() }, 2500)
   }
   function goLive() {

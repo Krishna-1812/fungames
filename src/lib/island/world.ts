@@ -2216,6 +2216,31 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       for (const k of n.kids) deInk(k)
     }
     for (const m of made) if (!KEEP.has(m.kind)) deInk(m.node)
+    // And its lettering is sign-writing in the light: a plain sans (Inter, as the page's text) a little spaced,
+    // its colour taken a little towards the board it is painted on, and not quite opaque, so it sits in the paint
+    // rather than floating over it. Neon and the lettering drawn with an outline are lights and keep their own.
+    const HEX = /^#[0-9a-f]{6}$/i
+    const reletter = (n: N | string) => {
+      if (typeof n === 'string') return
+      if (typeof n.attrs.class === 'string' && /\b(pk-say|say|sign-words|neon)\b/.test(n.attrs.class)) return
+      // (A group lettered in outlined light, as neon is under any name, keeps all of its words.)
+      const lit = n.kids.some((k) => typeof k !== 'string' && k.tag === 'text' && !!k.attrs.stroke && k.attrs.stroke !== 'none')
+      let board: string | null = null
+      for (const k of n.kids) {
+        if (typeof k === 'string') continue
+        const a = k.attrs
+        if (k.tag !== 'text') { if (k.tag !== 'g' && typeof a.fill === 'string' && HEX.test(a.fill)) board = a.fill; reletter(k); continue }
+        if (lit || (a.stroke && a.stroke !== 'none')) continue
+        if (!/^Fredoka/.test(String(a['font-family'] ?? 'Fredoka'))) continue
+        const size = Number(a['font-size'] ?? 8)
+        a['font-family'] = 'Inter, system-ui, sans-serif'; a['font-weight'] = 600
+        a['letter-spacing'] = Math.round((Number(a['letter-spacing'] ?? 0) + size * 0.06) * 100) / 100
+        const fill = typeof a.fill === 'string' ? a.fill : INK
+        if (board && HEX.test(fill)) a.fill = mix(fill, board, 0.12)
+        a.opacity = Math.round(Number(a.opacity ?? 1) * 0.92 * 100) / 100
+      }
+    }
+    for (const m of made) if (!KEEP.has(m.kind)) reletter(m.node)
   }
   // The cartoon island's buildings and things, graded towards paint: the candy-bright colours (a full cobalt, a hot
   // raspberry) lose some of their saturation, and pure white goes to a soft stone, so the ground's natural greens lead
