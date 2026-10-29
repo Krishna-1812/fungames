@@ -2182,7 +2182,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // Hot-air balloons drifting slowly over, and a little plane towing a banner.
   BALLOONS.forEach(([i, j, z, a, b, d], n) => {
     const [x, y] = P(i, j, z)
-    sky.add(pokeN('balloon')).add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d))
+    sky.add(pokeN('balloon')).add(hotAirBalloon(x, y, a, b, `hab${n}`, 90 + n * 30, d, z))
   })
   sky.add(skyPlane('isl-plane'))
   { const [x, y] = P(23.4, 6.4, 170), [, gy] = P(23.4, 6.4, 0); sky.add(pokeN('ufo')).add(ufo(x, y, gy)) }
