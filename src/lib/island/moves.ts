@@ -258,6 +258,9 @@ export const RULES: Rule[] = [
   // The lighthouse flashes "HI" in real Morse timing: .... ..
   { on: ['stp-beam'], loop: L('stp-morse', 4.8, 'linear'), base: { opacity: 0 } },
   { on: ['stp-arc'], loop: L('isl-blink', 1.2, 'steps(2, jump-none)') },
+  // On the realistic island the beams flash only once the light is going; the lantern itself flashes always.
+  { on: ['stp-beam-dark'], loop: L('stp-morse', 4.8, 'linear'), base: { opacity: 0 }, when: { time: ['night', 'dusk'] } },
+  { on: ['stp-flash'], loop: L('stp-morse', 4.8, 'linear'), base: { opacity: 0 } },
   { on: ['au-gavel'], loop: L('au-knock', 3, 'ease-in'), fillBox: true, origin: '50% 100%' },
   { on: ['au-sold'], loop: L('au-pop', 3, 'cubic-bezier(0.34, 1.56, 0.64, 1)'), fillBox: true, origin: '0 100%' },
   { on: ['pm-bills'], loop: L('pm-roll', 2, 'linear') },

@@ -127,18 +127,25 @@ export const harbour: Record<string, Landmark> = {
       lg.add(new N('stop', { offset: 0.55, 'stop-color': '#ffffff', 'stop-opacity': 0.35 }))
       lg.add(new N('stop', { offset: 1, 'stop-color': '#ffffff', 'stop-opacity': 0 }))
     }
-    const beam = p.group('stp-beam')
+    // (On the realistic island a white wedge in daylight was a cartoon's, across the Internet Museum: it waits
+    // for dusk, and by day only the lantern flashes.)
+    const beam = p.group(p.real ? 'stp-beam-dark' : 'stp-beam')
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x + 190)} ${f(y - 140)}L${f(x + 190)} ${f(y - 72)}Z`, 'url(#stp-fade-r)', { sw: 0 })
     beam.path(`M${f(x)} ${f(y - 102)}L${f(x - 190)} ${f(y - 140)}L${f(x - 190)} ${f(y - 72)}Z`, 'url(#stp-fade-l)', { sw: 0 })
     // The lamp: on the realistic island the model's lantern shows, and only the light is left here (unseen, for the night).
     p.light([x, y - 102], p.el('rect', { x: x - 11, y: y - 112, width: 22, height: 20, rx: 3, fill: C.glass, stroke: INK, 'stroke-width': 2, class: 'stp-lamp', opacity: p.real ? 0 : undefined }), '#fff8e0', 104)
     beacon[0] = x; beacon[1] = y - 102
+    if (p.real) {
+      const fl = p.el('defs').add(new N('radialGradient', { id: 'stp-flash-g' }))
+      for (const [o, c, op] of [[0, '#fffbe8', 0.95], [0.4, '#fff0c0', 0.4], [1, '#fff0c0', 0]] as const) fl.add(new N('stop', { offset: o, 'stop-color': c, 'stop-opacity': op }))
+      p.group('stp-flash').el('circle', { cx: x, cy: y - 102, r: 10, fill: 'url(#stp-flash-g)' })
+    }
     if (!p.real) {
       p.path(`M${f(x - 4)} ${f(y - 108)}h8v12h-8z`, '#ffffff', { sw: 1, cls: 'stp-lamp' })
       p.path(`M${f(x - 14)} ${f(y - 112)}Q${f(x)} ${f(y - 132)} ${f(x + 14)} ${f(y - 112)}Z`, C.slate)
       p.path(`M${f(x)} ${f(y - 124)}v-10M${f(x - 6)} ${f(y - 130)}h12`, 'none', { sw: 1.4 })
     }
-    for (let k = 0; k < 3; k++) p.path(`M${f(x + 22 + k * 8)} ${f(y - 118 - k * 5)}q9 11 0 22`, 'none', { stroke: p.real ? '#f2f6ff' : C.cobalt, sw: p.real ? 0.9 : 2.4, op: p.real ? 0.55 : undefined, cls: 'stp-arc', style: `animation-delay:${k * 0.3}s` })
+    if (!p.real) for (let k = 0; k < 3; k++) p.path(`M${f(x + 22 + k * 8)} ${f(y - 118 - k * 5)}q9 11 0 22`, 'none', { stroke: C.cobalt, sw: 2.4, cls: 'stp-arc', style: `animation-delay:${k * 0.3}s` })
     p.grow(x - 40, y - 140, x + 60, y)
     person(p, 0.9, 1.9, C.mint, { pose: 'wave' })
     lamp(p, 0.2, 1.0, 22)
