@@ -93,6 +93,8 @@ export function sunOnWater(openSea: string, play: boolean) {
     c.setTransform(a * 32, d * 16, -a * 32, d * 16, e, d * 12 + f)
     c.clip(clip, 'evenodd')
     c.globalCompositeOperation = 'lighter'
+    // The flecks are soft already: the cheap filter does, across the whole screen.
+    c.imageSmoothingQuality = 'low'
     n += 3
     for (const [pat, w] of [[pats.day, 1 - warmth], [pats.warm, warmth]] as [CanvasPattern, number][]) {
       if (w < 0.01) continue
