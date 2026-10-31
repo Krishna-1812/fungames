@@ -71,9 +71,7 @@ export const KEYFRAMES = `
 @keyframes isl-arm { 50% { transform: rotate(-35deg); } }
 @keyframes isl-jetski { 50% { transform: translate(-40px, 16px); } }
 @keyframes isl-surf { 0%, 100% { opacity: 0; } 35% { opacity: 0.6; } 70% { opacity: 0.08; } }
-@keyframes isl-shim { 0%, 100% { opacity: 0; } 30%, 45% { opacity: 0.8; } }
 @keyframes isl-ripple { 0% { transform: scale(0.5); opacity: 0; } 18% { opacity: 0.9; } 100% { transform: scale(1.55); opacity: 0; } }
-@keyframes isl-glint { 0%, 55%, 100% { opacity: 0; transform: scale(0.3); } 72% { opacity: 0.95; transform: scale(1); } }
 @keyframes isl-flow { to { stroke-dashoffset: -9; } }
 @keyframes isl-spray { to { stroke-dashoffset: -7; } }
 @keyframes isl-fish { 0%, 70% { transform: translate(0, 0) rotate(0); opacity: 0; } 74% { opacity: 1; } 80% { transform: translate(14px, -22px) rotate(-30deg); } 86% { transform: translate(28px, 0) rotate(30deg); opacity: 1; } 88%, 100% { opacity: 0; transform: translate(28px, 0); } }
@@ -182,9 +180,6 @@ export const RULES: Rule[] = [
   { on: ['wave'], base: { opacity: 0.5 } },
   { on: ['w1'], base: { opacity: 0.32 } },
   { on: ['w3'], base: { opacity: 0.32 } },
-  // Sun on the water: a glint swells and goes, here and there. Not at night.
-  { on: ['shim'], loop: L('isl-shim', 6, 'ease-in-out'), base: { opacity: 0 }, when: { time: ['dawn', 'day', 'dusk'] } },
-  { on: ['glint'], loop: L('isl-glint', 5, 'ease-in-out'), base: { opacity: 0 }, fillBox: true, origin: 'center', when: { time: ['dawn', 'day', 'dusk'] } },
   // White water running down each fall of the river, and up out of the
   // fountain. (Until the map moved to a canvas these named the keyframes
   // that slid the weather down the map, and flew off with it.)

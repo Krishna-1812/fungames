@@ -493,23 +493,11 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     root.add(new N('path', { d: `M${f(x - 34)} ${f(y + 3)}q34 14 68 0`, fill: 'none', stroke: SAND[2], 'stroke-width': 2.4, 'stroke-linecap': 'round' }))
     for (const [dx, dy] of [[-14, 1], [10, 4], [20, 0]]) root.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r: 1.3, fill: '#ffffff', stroke: INK, 'stroke-width': 0.6 }))
   }
-  // Shimmer: short streaks of light lying flat on the water, a few at a
-  // time catching the sun, thickest just off the shore. (On the realistic
-  // island the sea's own picture glitters: these, and the glints, are kept out.)
-  const shim = plate ? new N('g') : root.add(new N('g', { class: 'shimmer' }))
-  for (let k = 0; k < 40; k++) {
-    const u = hz(k, 1, 21) * (GRID + 10) - 5, v = hz(k, 2, 22) * (GRID + 10) - 5
-    if (nearLand(u, v, 0.8) || !nearLand(u, v, 4.5)) continue
-    const [x, y] = P(u, v, SEA), w = (6 + hz(k, 3, 23) * 10) * (plate ? 0.6 : 1)
-    shim.add(new N('path', { d: `M${f(x - w)} ${f(y)}h${f(w * 2)}M${f(x - w * 0.5)} ${f(y + 3)}h${f(w)}`, stroke: '#ffffff', 'stroke-width': plate ? 0.8 : 1.6, opacity: plate ? 0.45 : undefined, 'stroke-linecap': 'round', class: 'shim amb', 'data-b': `${f(x - w)} ${f(y - 2)} ${f(x + w)} ${f(y + 5)}`, style: `animation-delay:${f(-hz(k, 4, 24) * 6)}s` }))
-  }
-  // Glints of sun on the water, here and there.
-  const glints = plate ? new N('g') : root.add(new N('g', { class: 'glints' }))
+  // (The sun's glints on the water are drawn live now, drifting, in both worlds: water.ts. The dice the
+  // fixed ones threw are thrown still, so everything after lands where it did.)
   for (let k = 0; k < 26; k++) {
     const u = R() * (GRID + 14) - 7, v = R() * (GRID + 14) - 7
-    if (nearLand(u, v, 1.5)) continue
-    const [x, y] = P(u, v, SEA), r = (3 + R() * 3) * (plate ? 0.45 : 1)
-    glints.add(new N('path', { d: `M${f(x)} ${f(y - r)}Q${f(x)} ${f(y)} ${f(x + r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y + r)}Q${f(x)} ${f(y)} ${f(x - r)} ${f(y)}Q${f(x)} ${f(y)} ${f(x)} ${f(y - r)}Z`, fill: '#ffffff', class: 'glint amb', 'data-b': `${f(x - r)} ${f(y - r)} ${f(x + r)} ${f(y + r)}`, style: `animation-delay:${f(-R() * 4)}s` }))
+    if (!nearLand(u, v, 1.5)) { R(); R() }
   }
   // Foam where the water meets the land: the coast's outline once more,
   // stroked narrow and white, so it hugs every beach and cliff foot.
