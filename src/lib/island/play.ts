@@ -32,6 +32,7 @@ const SEA = -12, BEACH = -6, GRID = 30
 export type FolkPic = { svg: string; legs: string; k: number }
 export type PlayData = { square: [number, number]; board: [number, number]; /** The open sea (where the sun sparkles on it), in tiles, filled even-odd. */ openSea?: string; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: FolkPic[] }
 import type { Sprites } from './actors'
+import { sunOnWater } from './water'
 export type Sounds = { thump?: (k: number) => void; splash?: () => void; flutter?: () => void }
 
 /** The parade's timetable: once every this many seconds, by the clock. */
@@ -86,6 +87,8 @@ export function createPlay(o: {
   const onSand = (i: number, j: number) => ballCells.has(`${Math.floor(i)},${Math.floor(j)}`)
   const inSea = (i: number, j: number) => ground(i, j) === '0'
   let last = 0
+  /** The sun glittering on the open sea (water.ts). */
+  const sparkle = o.data.openSea && typeof document !== 'undefined' ? sunOnWater(o.data.openSea, o.play) : null
   /** Device pixels to a map unit, as the last frame drew. */
   let scale = 1
 
@@ -587,11 +590,11 @@ export function createPlay(o: {
   let frameMarchers: Marcher[] = []
   const live: LiveLayer = {
     after: {
-      // The sea's rings, and the ball when it floats: under the shallows' edge and everything on land.
+      // The sun on the open sea, its rings, and the ball when it floats: under everything on land.
       sea: (c, m, t) => {
         cw = c.canvas.width; ch = c.canvas.height; scale = m[0]
-        let n = 0
         const now = performance.now()
+        let n = sparkle ? sparkle(c, m, now, o.dark?.() ?? 0) : 0
         if (rings.length) {
           c.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); n++
           c.strokeStyle = '#ffffff'; c.lineWidth = 1.4
