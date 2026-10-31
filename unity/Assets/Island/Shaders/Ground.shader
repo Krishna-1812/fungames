@@ -168,18 +168,22 @@ Shader "Island/Ground"
                 detail += saturate(1 - sum);
 
                 alb *= detail;
-                // Under the sea: caustics, strongest in the shallows, gone by the shelf's edge.
+                // Under the sea: wet and darker at once, and the water taking the red out of it first, then the
+                // green, the deeper it lies; faint caustics in the shallows, gone by the shelf's edge.
                 float under = _IslandSea - i.ws.y;
                 if (under > 0)
                 {
+                    alb *= lerp(1, 0.66, smoothstep(0, 0.012, under)) * exp(-under * float3(5, 1.7, 1));
                     float fade = smoothstep(0.0, 0.05, under) * (1 - smoothstep(0.1, 0.65, under));
-                    alb *= 1 + Caustics(p) * 0.6 * fade;
+                    alb *= 1 + Caustics(p * 0.6) * 0.25 * fade;
                 }
+                // Just above the water: a band of wet sand, darker, drying as it rises.
+                else alb *= lerp(0.76, 1, smoothstep(0, 0.03, -under));
                 // Fine bumps where there is no photo, so the flat still catches the light unevenly.
                 float2 q = p * 120;
                 float bx = vnoise(q + float2(0.5, 0)) - vnoise(q - float2(0.5, 0));
                 float bz = vnoise(q + float2(0, 0.5)) - vnoise(q - float2(0, 0.5));
-                bend += float3(-bx, 0, -bz) * 0.35 * saturate(1 - sum);
+                bend += float3(-bx, 0, -bz) * 0.35 * saturate(1 - sum) * (under > 0 ? 0 : 1);
                 float3 n = normalize(N + bend * 0.9);
                 // Under a building: lit as the open ground round it is, a little darker (it is never seen but as the building lifts).
                 if (!islandNightPass() && islandUnderFoot(i.ws)) return half4(islandLightOpen(alb * 0.85, n, i.ws, i.c.r), 1);

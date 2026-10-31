@@ -81,7 +81,7 @@ Shader "Island/Water"
                 float patches = vnoise(i.ws.xz * 0.22 + 3.1) * 0.6 + vnoise(i.ws.xz * 0.6 + 11.7) * 0.4;
                 col *= lerp(1.0, lerp(0.86, 1.1, patches), t2);
                 col *= 0.97 + 0.06 * sw;
-                float alpha = lerp(0.3, 1.0, smoothstep(0.0, 0.45, d));
+                float alpha = lerp(0.5, 1.0, smoothstep(0.0, 0.45, d));
 
                 float3 view = GetWorldSpaceNormalizeViewDir(i.ws);
                 if (islandNightPass())
@@ -119,14 +119,15 @@ Shader "Island/Water"
                 float spec = (pow(nh, 260) * 1.8 + pow(nh, 40) * 0.06 + glint * pow(nh, 12) * 0.5) * sun.shadowAttenuation * saturate(d * 4);
                 lit += spec * sun.color;
                 alpha = saturate(alpha + spec);
-                // Foam where it meets the sand, broken up; and the lines of surf coming in behind it.
+                // Foam where it meets the sand: a thin line, broken into lace; and two lines of surf coming in behind it.
                 float breakup = smoothstep(0.35, 0.65, vnoise(i.ws.xz * 26) * 0.7 + n1 * 0.3);
-                float foam = smoothstep(0.035, 0.0, d) * breakup;
-                [unroll] for (int w = 1; w <= 3; w++)
+                float foam = smoothstep(0.018, 0.0, d) * smoothstep(0.25, 0.55, vnoise(i.ws.xz * 26) * 0.7 + n1 * 0.3) * smoothstep(0.25, 0.55, vnoise(i.ws.xz * 7 + 2.3));
+                [unroll] for (int w = 1; w <= 2; w++)
                 {
                     float at = 0.045 * w + (vnoise(i.ws.xz * 1.3 + w * 4.1) - 0.5) * 0.02;
-                    float crest = smoothstep(0.009, 0.0, abs(d - at)) * smoothstep(0.3, 0.7, vnoise(i.ws.xz * float2(6, 6) + w * 9.3) * 0.75 + n1 * 0.25);
-                    foam = max(foam, crest * (0.85 - 0.22 * w));
+                    // Each line of surf comes and goes along its length, as a wave breaks here and not there.
+                    float crest = smoothstep(0.011, 0.0, abs(d - at)) * smoothstep(0.38, 0.75, vnoise(i.ws.xz * float2(6, 6) + w * 9.3) * 0.6 + vnoise(i.ws.xz * 2.1 + w * 3.7) * 0.25 + n1 * 0.15);
+                    foam = max(foam, crest * (w == 1 ? 0.5 : 0.3));
                 }
                 // Wet, darker sand just under the water's edge.
                 lit *= lerp(0.9, 1.0, smoothstep(0.0, 0.05, d));
@@ -141,7 +142,7 @@ Shader "Island/Water"
                     foam = max(foam, ring);
                     lit = lerp(lit, float3(0.62, 0.9, 0.9), smoothstep(2.4, 1.0, dd) * 0.35);
                 }
-                lit = lerp(lit, float3(0.95, 0.97, 1.0), foam);
+                lit = lerp(lit, float3(0.88, 0.92, 0.94), foam * 0.8);
                 alpha = max(alpha, foam * 0.95);
                 // The water is its own light (the sky in it): in the lit passes it is added once, with the sun,
                 // and put through the knee's inverse, so the grade takes it as a surface in the sun. Over
