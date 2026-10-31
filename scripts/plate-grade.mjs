@@ -20,10 +20,11 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 
 /** The grade's settings: tuned on the renders by eye against reference photographs. */
 export const GRADE = {
-  // Water: hue 160–240, saturation above about 0.3.
-  water: { from: [160, 178], to: [228, 242], sat: [0.26, 0.44], desat: 0.16, hueTo: 206, hueK: 0.25, deepen: 0.16 },
-  // The shelf's neon cyan (hue 180–195 at high saturation and value) is pulled further toward clear aqua.
-  shelf: { hue: [176, 198], val: [0.5, 0.8], desat: 0.16 },
+  // Water: hue 160–240, saturation above about 0.3. (Unity's water is natural now, Water.shader: these stand at
+  // nothing, kept to put a render right that needs it.)
+  water: { from: [160, 178], to: [228, 242], sat: [0.26, 0.44], desat: -0.22, hueTo: 206, hueK: 0, deepen: 0 },
+  // The shelf's cyan (hue 180–195 at high saturation and value), pulled toward clear aqua if it needs it.
+  shelf: { hue: [176, 198], val: [0.5, 0.8], desat: 0 },
   // Grass: hue 70–150, leaning toward 86 and a little less saturated.
   green: { from: [62, 76], to: [140, 156], sat: [0.18, 0.32], hueTo: 86, hueK: 0.35, desat: 0.12 },
   // Highlights roll off rather than clip.
@@ -94,8 +95,9 @@ export function gradePlate(px, W, H, G = GRADE) {
  * is warmed and calmed toward yellow-green, and the strongest of it rolls off rather than clipping. Light
  * that has a colour of its own (an amber room, a television's blue, a coloured bulb) keeps it.
  */
+// (Unity's lamps are warm themselves now, Night.cs: the warming of near-neutral light stands at nothing.)
 export const GLOW = {
-  warm: [1, 0.88, 0.72], neutral: [0.15, 0.3],
+  warm: [1, 1, 1], neutral: [0.15, 0.3],
   green: { from: [62, 76], to: [150, 166], sat: [0.22, 0.4], hueTo: 58, hueK: 0.45, desat: 0.35 },
   knee: 0.72, kneeK: 0.45,
 }

@@ -7,9 +7,10 @@
  ],
  "scale": 4,
  "tile": 2048,
+ "margin": 8,
  "cols": 5,
  "rows": 3,
- "id": "a1ebd86099e0",
- "sea": "#3a70a1",
+ "id": "de1a93988999",
+ "sea": "#3b608a",
  "live": false
 }
