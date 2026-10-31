@@ -34,7 +34,7 @@ namespace Island
         /** A little more contrast in the midtones, after the tone curve. */
         public static float Contrast = 0.1f;
         /** The grade: exposure into the filmic curve, and colour as strong as a good photograph's (more where it is weak). */
-        public static float Exposure = 1.05f, Saturation = 1.06f, Vibrance = 0.2f;
+        public static float Exposure = 1.05f, Saturation = 1.0f, Vibrance = 0.1f;
         /** For looking at one light alone: "sun" or "sky" (else both). */
         public static string Only = "";
         /** Also write the light before the tone curve (linear, float32 RGB, row by row from the top), beside the PNG as .f32: for trying out the light's balance and the grade offline. */
@@ -103,7 +103,11 @@ namespace Island
             float mx = Mathf.Max(r, Mathf.Max(g, b)), mn = Mathf.Min(r, Mathf.Min(g, b));
             float k = Saturation + Vibrance * (1 - (mx > 0 ? (mx - mn) / mx : 0));
             r = Mathf.Max(0, l + (r - l) * k); g = Mathf.Max(0, l + (g - l) * k); b = Mathf.Max(0, l + (b - l) * k);
-            return new Color(Grade(Mathf.LinearToGammaSpace(Aces(r))), Grade(Mathf.LinearToGammaSpace(Aces(g))), Grade(Mathf.LinearToGammaSpace(Aces(b))));
+            // The curve on each channel alone bends a colour's hue as it brightens (a blue sea toward cyan); on the
+            // brightness alone it keeps the hue. Half of each: the hue held, the highlights still rolling off.
+            float li = 0.2126f * r + 0.7152f * g + 0.0722f * b, s = li > 1e-6f ? Aces(li) / li : 0;
+            float R = 0.5f * Aces(r) + 0.5f * Mathf.Min(1, r * s), G = 0.5f * Aces(g) + 0.5f * Mathf.Min(1, g * s), B = 0.5f * Aces(b) + 0.5f * Mathf.Min(1, b * s);
+            return new Color(Grade(Mathf.LinearToGammaSpace(R)), Grade(Mathf.LinearToGammaSpace(G)), Grade(Mathf.LinearToGammaSpace(B)));
         }
 
         static float Grade(float v)
