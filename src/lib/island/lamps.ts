@@ -4,7 +4,7 @@
  * Cars and buses with their headlights (a pool of light on the road ahead)
  * and tail lights; boats with a white light at the masthead, a red or green
  * one at the side and warm windows, each laid on the black water below as a
- * wavering streak; buoys blinking red and green. Whatever carries them names
+ * wavering streak; buoys blinking red. Whatever carries them names
  * itself with data-lamp (world.ts, town.ts: "car:se", "fishing:w:646.4:700"),
  * and its lights are looked up here, in its own units, so they turn and move
  * with it (and can be put right without baking the island again). The engine (engine.ts) gathers
