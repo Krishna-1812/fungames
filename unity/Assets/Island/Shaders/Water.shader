@@ -8,10 +8,11 @@ Shader "Island/Water"
     {
         _Depth ("Depth map", 2D) = "white" {}
         _Map ("Map: origin x, z; size x, z", Vector) = (0, 0, 1, 1)
-        _Shallow ("Shallow", Color) = (0.56, 0.93, 0.88, 1)
-        _Mid ("Over the shelf", Color) = (0.13, 0.66, 0.74, 1)
-        _Deep ("Deep", Color) = (0.06, 0.40, 0.66, 1)
-        _Abyss ("Far out", Color) = (0.035, 0.27, 0.52, 1)
+        // Natural water: a clear green-turquoise over the sand, teal over the shelf, a deep sea blue, no primaries.
+        _Shallow ("Shallow", Color) = (0.42, 0.78, 0.73, 1)
+        _Mid ("Over the shelf", Color) = (0.12, 0.52, 0.58, 1)
+        _Deep ("Deep", Color) = (0.06, 0.30, 0.47, 1)
+        _Abyss ("Far out", Color) = (0.035, 0.19, 0.34, 1)
     }
     SubShader
     {
@@ -110,11 +111,11 @@ Shader "Island/Water"
                 float3 lit = col * lerp(0.62, 1.0, sun.shadowAttenuation);
                 // The sky in it: more of it the flatter the water is seen, and where a wave's back faces up.
                 float fres = 0.04 + 0.96 * pow(1 - saturate(dot(n, view)), 5);
-                lit = lerp(lit, float3(0.6, 0.76, 0.95), saturate(fres * 0.55) * t2);
+                lit = lerp(lit, float3(0.62, 0.72, 0.84), 0.08 + 0.12 * fres);
                 // The sun on the ripples: a hot core and a wider sheen, glittering where the ripples catch it.
                 float3 h = normalize(sun.direction + view);
                 float nh = saturate(dot(n, h));
-                float glint = smoothstep(0.62, 0.9, vnoise(i.ws.xz * 55) * 0.6 + vnoise(i.ws.xz * 23 + 5) * 0.4);
+                float glint = smoothstep(0.62, 0.9, vnoise(i.ws.xz * 18) * 0.6 + vnoise(i.ws.xz * 9 + 5) * 0.4);
                 float spec = (pow(nh, 260) * 1.8 + pow(nh, 40) * 0.06 + glint * pow(nh, 12) * 0.5) * sun.shadowAttenuation * saturate(d * 4);
                 lit += spec * sun.color;
                 alpha = saturate(alpha + spec);
