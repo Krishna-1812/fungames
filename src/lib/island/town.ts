@@ -496,8 +496,9 @@ export function rowboat(x: number, y: number, c: string): N {
 /** A buoy, red and white, bobbing. */
 export function buoy(x: number, y: number, delay: number): N {
   const g = new N('g', { class: 'moored amb', 'data-b': box(x - 10, y - 20, x + 10, y + 5), style: `animation-delay:${f(-delay)}s` })
-  // Unity's buoy (Creatures8.cs), riding the swell; a little white water round it.
+  // Unity's buoy (Creatures8.cs), riding the swell; a little white water round it. At night its light blinks.
   const real = creatureUse('buoy', C.rasp, 'stand', 'se', { transform: `translate(${f(x)} ${f(y)})` })
+  g.attrs['data-lamp'] = buoyLamp(x, y, !!real)
   if (real) { g.add(new N('ellipse', { cx: f(x), cy: f(y + 1), rx: 7, ry: 2.4, fill: '#ffffff', opacity: 0.35 })); g.add(real); return g }
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 2), rx: 9, ry: 3, fill: '#ffffff', opacity: 0.55 }))
   g.add(new N('path', { d: `M${f(x - 5)} ${f(y)}L${f(x - 3)} ${f(y - 12)}h6L${f(x + 5)} ${f(y)}Z`, fill: '#ffffff', stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
