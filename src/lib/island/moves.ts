@@ -367,6 +367,8 @@ export const LAYERS = {
     cores: { night: 0.8, dusk: 0.55, dawn: 0.25 } as Record<string, number>,
     panes: { night: 1, dusk: 0.7 } as Record<string, number>,
     shine: { night: 1, dusk: 0.7 } as Record<string, number>,
+    /** The lights things carry (lamps.ts): headlights, boats' lights, buoys. */
+    lamps: { night: 1, dusk: 0.6, dawn: 0.25 } as Record<string, number>,
     sky: { night: 1 } as Record<string, number>,
     /**
      * The realistic island's night (a Unity render under it): the day's picture multiplied down to

@@ -19,6 +19,7 @@
 import { sceneFrom, type Anim, type Box, type LevelIndex, type M, type Node, type Scene, type Style, type When } from './scene'
 import { ID, mulTo, invert, fnsMatrix, progress, sampleProp, ease, type Ease } from './anim'
 import { canvasTransforms } from './canvas-transform'
+import { drawLamps, type Lamp } from './lamps'
 import { POKES, POKE_SAY, POKE_MS, POKE_INNER_ORIGIN, LANDMARK, LAYERS, type Loop } from './moves'
 
 type G = Node & { k: 'g' }
@@ -580,6 +581,8 @@ export function createEngine(o: {
     // A bottle that has been found: gone, after it has had a moment to hop.
     if (n.poke && n.data?.n) a *= timed(`gone:${n.data.n}`, gone.has(Number(n.data.n)) ? 0 : 1, 700)
     if (a <= 0.002) return
+    // Something that carries lights at night (lamps.ts): noted where it is, for its light to go on after the night.
+    if (lampK > 0.01 && n.data?.lamp) lamps.push({ m: mm.slice() as M, a, spec: n.data.lamp, win: win && { path: win.path, m: win.m } })
     // A building: faded when filtered out, and fading in as it drops in at the start.
     // Either fade is of the building as a whole (as CSS opacity is), so it is drawn apart.
     let iso = false
@@ -913,6 +916,43 @@ export function createEngine(o: {
     }
     ctx.globalAlpha = 1
   }
+  /** What carries lights (cars, boats, buoys), as drawn this frame; and how strongly they shine now. */
+  const lamps: Lamp[] = []
+  let lampK = 0, lampsLit = false
+  const lampsOn = () => {
+    lampsLit = true
+    if (!lamps.length) return
+    // The buildings drawn this frame, by their masks: the lights they stand in front of are hidden.
+    covering.length = 0
+    for (const [slug, g] of lms) {
+      const lv = live.get(g), mk = lv?.drawn && lv.frame === frameNo ? maskOf(`lm:${slug}`) : null
+      if (mk) covering.push({ inv: invert(lv!.drawn!), mk })
+    }
+    cs.images += drawLamps(ctx, lamps, lampK, deviceM[0], tNow(), seen)
+    ident = false; transforms.invalidate(); ctx.globalAlpha = 1
+  }
+  const covering: { inv: M; mk: NonNullable<ReturnType<typeof maskOf>> }[] = []
+  const covered = (px: number, py: number) => covering.some(({ inv, mk }) => {
+    const x = inv[0] * px + inv[2] * py + inv[4], y = inv[1] * px + inv[3] * py + inv[5]
+    const u = Math.floor((x - mk.box[0]) * mk.res), v = Math.floor((y - mk.box[1]) * mk.res)
+    if (u < 0 || v < 0 || u >= mk.w || v >= mk.h) return false
+    const i = v * mk.w + u
+    return !!(mk.bits[i >> 3] & (1 << (i & 7)))
+  })
+  /**
+   * Whether a light shows. Everything on the roads is drawn under the buildings, and drawn again through a
+   * window in front of each (world.ts): so a light shows where no building covers it, from what carries it;
+   * and where one does, only from its copy, and only inside that window: in front of the building, not behind.
+   */
+  const seen = (x: number, y: number, L: Lamp) => {
+    const hid = covered(x, y)
+    if (!L.win) return !hid
+    if (!hid) return false
+    ctx.setTransform(L.win.m[0], L.win.m[1], L.win.m[2], L.win.m[3], L.win.m[4], L.win.m[5])
+    const inside = ctx.isPointInPath(L.win.path, x, y)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    return inside
+  }
   /** The lens a snapshot is taken with (a postcard's), over the page's own. */
   let lensFor: number | null = null
   const hook = (h: LiveHook) => { cs.paths += h(ctx, deviceM, now); ident = false; textCtx = null; transforms.invalidate(); ctx.globalAlpha = 1 }
@@ -926,6 +966,8 @@ export function createEngine(o: {
     gaps = levels[0] ? 0 : 1; blurry = levels[level] ? 0 : 1
     now = t; frameNo++
     st = o.state()
+    lamps.length = 0; lampsLit = false
+    lampK = timed('lamps', LAYERS.night.lamps[st.time] ?? 0, LAYERS.night.fadeMs)
     const s = cam.z * dpr
     // The level: the smallest at least as sharp as the screen (a little upscaling allowed).
     let want0 = scene.levels.findIndex((l) => l >= s * 0.9)
@@ -949,10 +991,11 @@ export function createEngine(o: {
       if (i === skyStart) { if (graded) beginSky(); for (const e of extra) drawNode(e, deviceM, 1) }
       drawNode(n, deviceM, 1)
       const ended = endsAfter.get(i)
-      if (ended) for (const k of ended) { const h = drawLive.after?.[k]; if (h) hook(h) }
+      if (ended) for (const k of ended) { const h = drawLive.after?.[k]; if (h) hook(h); if (k === 'night') lampsOn() }
       if (i === skyEnd - 1) gradeSky()
     })
     if (skyStart < 0) for (const n of extra) drawNode(n, deviceM, 1)
+    if (!lampsLit) lampsOn()
     if (drawLive.top) hook(drawLive.top)
     ctx.globalAlpha = 1
     const lens = lensFor ?? st.lens ?? 0

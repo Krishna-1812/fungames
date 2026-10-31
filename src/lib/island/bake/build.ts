@@ -126,7 +126,7 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     else if (lay === 'surf' || lay === 'night') k = 'alpha'
     else if (lay === 'beam' || lay === 'weather') k = 'dyn'
     else if (el.tag === 'text') k = 'dyn'
-    else if (el.attrs['data-poke'] || cs.includes('lm') || cs.some((c) => DRIVEN.has(c))) k = 'dyn'
+    else if (el.attrs['data-poke'] || el.attrs['data-lamp'] || cs.includes('lm') || cs.some((c) => DRIVEN.has(c))) k = 'dyn'
     else if (rulesOf(el).loop) k = 'dyn'
     else if (cs.some((c) => ALPHA.has(c)) || rulesOf(el).when) k = 'alpha'
     kinds.set(el, k)
@@ -437,6 +437,8 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
     if (tags.length) node.tags = tags
     if (r.when) node.when = r.when
     if (cs.includes('lm')) { node.lm = el.attrs['data-slug']; node.data = { d: (styleOf(el)['--d'] ?? '0ms').replace('ms', '') } }
+    // The lights it carries at night (lamps.ts).
+    if (el.attrs['data-lamp']) node.data = { ...(node.data ?? {}), lamp: String(el.attrs['data-lamp']) }
     if (el.attrs['data-poke']) {
       node.poke = el.attrs['data-poke']
       // Which one of its kind (the bottles are counted one by one).
