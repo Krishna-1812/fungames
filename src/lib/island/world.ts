@@ -124,7 +124,7 @@ export type Signpost = { i: number; j: number; at: [number, number]; boards: { d
  * the ball can roll on, and for every building the roads from the town square
  * to its door, for the day's parade. All in tiles.
  */
-export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: import('./play').FolkPic[] }
+export type PlayData = { square: [number, number]; board: [number, number]; /** The open sea (where the sun sparkles on it), in tiles, filled even-odd. */ openSea?: string; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: import('./play').FolkPic[] }
 /**
  * The island as facts rather than a picture, for anything that draws it
  * another way (the Unity scene in unity/, which renders it in 3D): every
@@ -2289,11 +2289,35 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const late = [...night, ...sky, ...lanterns, ...names]
     made.splice(0, made.length, ...made.filter((m) => !late.includes(m)), ...late)
   }
+  // The open sea, for the sun's sparkle on it (water.ts): everywhere, less what stands in the water or
+  // breaks it, in half tiles. A tile's grace off the coast (the foam and the surf), round each rock and
+  // bank, the piers, the buildings in the water. Row by row, in tiles; filled even-odd round a field far out.
+  const keepOut: [number, number, number][] = [
+    ...seaRocks.map(([i, j, k]) => [i + 0.5, j + 0.5, k + 0.4] as [number, number, number]),
+    ...isles.filter(([, , , z]) => z > SEA - 1).map(([i, j, r]) => [i, j, r + 0.6] as [number, number, number]),
+    ...PIERS.flatMap(([[u0, v0], [u1, v1]]) => Array.from({ length: 9 }, (_, n) => [u0 + (u1 - u0) * n / 8, v0 + (v1 - v0) * n / 8, 0.7] as [number, number, number])),
+    ...placed.filter((p) => p.lm.water).flatMap((p) => p.cells.map(([a, b]) => [a + 0.5, b + 0.5, 1.3] as [number, number, number])),
+  ]
+  const shut = (u: number, v: number) => {
+    for (let a = Math.floor(u - 2); a <= u + 1; a++) for (let b = Math.floor(v - 2); b <= v + 1; b++) {
+      if (isLand(a, b) && Math.hypot(Math.max(a - u, 0, u - a - 1), Math.max(b - v, 0, v - b - 1)) < 1.05) return true
+    }
+    return keepOut.some(([i, j, r]) => Math.hypot(u - i, v - j) < r)
+  }
+  let openSea = 'M-80 -80H110V110H-80Z'
+  for (let b = -12; b < GRID + 12; b += 0.5) {
+    let run = -1
+    for (let a = -12; a <= GRID + 12; a += 0.5) {
+      const s = a < GRID + 12 && shut(a + 0.25, b + 0.25)
+      if (s && run < 0) run = a
+      else if (!s && run >= 0) { openSea += `M${run} ${b}h${a - run}v.5H${run}Z`; run = -1 }
+    }
+  }
   const layers: Layer[] = made.map((m) => ({ kind: m.kind, slug: m.slug, body: render(m.node) }))
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, moon: moonAt, anchors, lights, banners, labels, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, moon: moonAt, anchors, lights, banners, labels, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, openSea, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
     grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
     ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
     height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),

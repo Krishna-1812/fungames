@@ -30,7 +30,7 @@ const SEA = -12, BEACH = -6, GRID = 30
 
 /** A marcher of the parade as a picture (folk.ts): their body without legs, for the canvas to march; the colour of their legs, and how big they are. */
 export type FolkPic = { svg: string; legs: string; k: number }
-export type PlayData = { square: [number, number]; board: [number, number]; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: FolkPic[] }
+export type PlayData = { square: [number, number]; board: [number, number]; /** The open sea (where the sun sparkles on it), in tiles, filled even-odd. */ openSea?: string; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: FolkPic[] }
 import type { Sprites } from './actors'
 export type Sounds = { thump?: (k: number) => void; splash?: () => void; flutter?: () => void }
 
