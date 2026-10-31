@@ -11,6 +11,7 @@ import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, pu
 import { person, tree } from './props'
 import { vehicleUse, boatUse, actorUse, creatureUse, who, type Facing } from './actors'
 import { folk, drawFolk, drawSitter, drawBenchSitter, drawBust, FOLK } from './folk'
+import { vehicleLamps, boatLamps, buoyLamp } from './lamps'
 
 const f = (v: number) => Math.round(v * 10) / 10
 const box = (x0: number, y0: number, x1: number, y1: number) => `${f(x0)} ${f(y0)} ${f(x1)} ${f(y1)}`
@@ -591,10 +592,11 @@ export function shuttle(kind: 'car' | 'bus' | 'bike', body: string, a: [number, 
     const turn = stops ? 50.1 : 48
     motionCss.push(`@keyframes ${name}-o{0%,${turn - 0.1}%{opacity:1}${turn}%,99.9%{opacity:0}100%{opacity:1}}`)
     motionCss.push(`@keyframes ${name}-h{0%,${turn - 0.1}%{opacity:0}${turn}%,99.9%{opacity:1}100%{opacity:0}}`)
-    g.add(new N('g', { style: `animation:${name}-o ${dur}s linear infinite ${f(-delay)}s` })).add(goOut!)
-    g.add(new N('g', { style: `animation:${name}-h ${dur}s linear infinite ${f(-delay)}s` })).add(goHome!)
+    g.add(new N('g', { style: `animation:${name}-o ${dur}s linear infinite ${f(-delay)}s`, 'data-lamp': vehicleLamps(kind, out) })).add(goOut!)
+    g.add(new N('g', { style: `animation:${name}-h ${dur}s linear infinite ${f(-delay)}s`, 'data-lamp': vehicleLamps(kind, home) })).add(goHome!)
     return Object.assign(g, { holds })
   }
+  g.attrs['data-lamp'] = vehicleLamps(kind, null)
   g.add(new N('ellipse', { cx: 0, cy: 1, rx: kind === 'bus' ? 20 : kind === 'bike' ? 7 : 13, ry: 3.5, fill: INK, opacity: 0.15 }))
   if (kind === 'car') {
     g.add(new N('path', { d: 'M-12 -2L-9 -8Q-7 -10 -4 -10H5Q8 -10 9 -8L12 -2V2H-12Z', fill: body, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
