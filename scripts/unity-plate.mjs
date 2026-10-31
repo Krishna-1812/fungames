@@ -56,7 +56,12 @@ const m = JSON.parse(fs.readFileSync(path.join(renders, 'plate.json'), 'utf8'))
 const W = m.cols * m.tile, H = m.rows * m.tile
 console.log(`stitching ${m.cols}×${m.rows} tiles: ${W}×${H} px`)
 const tiles = []
-for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols; c++) tiles.push({ input: path.join(renders, `${r}_${c}.png`), left: c * m.tile, top: r * m.tile })
+// Each tile comes with a guard band round it (IslandBuild.Plate), cut off here.
+const g = m.margin ?? 0
+for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols; c++) {
+  const f = path.join(renders, `${r}_${c}.png`)
+  tiles.push({ input: g ? await sharp(f).extract({ left: g, top: g, width: m.tile, height: m.tile }).png().toBuffer() : f, left: c * m.tile, top: r * m.tile })
+}
 const px = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }, limitInputPixels: false })
   .composite(tiles).raw().toBuffer({ resolveWithObject: false })
 gradePlate(px, W, H)

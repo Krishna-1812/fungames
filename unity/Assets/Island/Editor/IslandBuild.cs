@@ -868,23 +868,25 @@ namespace Island
             Footprints(d);
             var b = Floats(Arg("-box", "-1216,-200,1216,1130"));
             float scale = float.Parse(Arg("-scale", "4"), System.Globalization.CultureInfo.InvariantCulture);
-            int tile = int.Parse(Arg("-tile", "2048")), ss = int.Parse(Arg("-ss", "2"));
-            float step = tile / scale;
+            // Each tile is rendered with a guard band of m pixels all round, which unity-plate.mjs cuts off: at a
+            // render's very edge the averaging down and the shadows come out a little off, a hairline at every seam.
+            int tile = int.Parse(Arg("-tile", "2048")), ss = int.Parse(Arg("-ss", "2")), m = 8;
+            float step = tile / scale, mu = m / scale;
             int cols = Mathf.CeilToInt((b[2] - b[0]) / step), rows = Mathf.CeilToInt((b[3] - b[1]) / step);
             Directory.CreateDirectory("Renders/plate");
             foreach (var f in Directory.GetFiles("Renders/plate")) File.Delete(f);
             for (int r = 0; r < rows; r++)
                 for (int c = 0; c < cols; c++)
                 {
-                    var cam = Eye(b[0] + c * step, b[1] + r * step, step, step);
+                    var cam = Eye(b[0] + c * step - mu, b[1] + r * step - mu, step + 2 * mu, step + 2 * mu);
                     cam.backgroundColor = SiteSea;
-                    if (Lit) Dome.Shoot(cam, tile, tile, $"Renders/plate/{r}_{c}.png", ss, false);
-                    else Shoot(cam, tile, tile, $"Renders/plate/{r}_{c}.png", false, ss);
+                    if (Lit) Dome.Shoot(cam, tile + 2 * m, tile + 2 * m, $"Renders/plate/{r}_{c}.png", ss, false);
+                    else Shoot(cam, tile + 2 * m, tile + 2 * m, $"Renders/plate/{r}_{c}.png", false, ss);
                     Object.DestroyImmediate(cam.gameObject);
                 }
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             File.WriteAllText("Renders/plate/plate.json",
-                $"{{\"box\":[{b[0].ToString(inv)},{b[1].ToString(inv)},{(b[0] + cols * step).ToString(inv)},{(b[1] + rows * step).ToString(inv)}],\"scale\":{scale.ToString(inv)},\"tile\":{tile},\"cols\":{cols},\"rows\":{rows}}}");
+                $"{{\"box\":[{b[0].ToString(inv)},{b[1].ToString(inv)},{(b[0] + cols * step).ToString(inv)},{(b[1] + rows * step).ToString(inv)}],\"scale\":{scale.ToString(inv)},\"tile\":{tile},\"margin\":{m},\"cols\":{cols},\"rows\":{rows}}}");
             Debug.Log($"[island] plate: {cols}×{rows} tiles of {tile}px at {scale} px a unit");
         }
     }
