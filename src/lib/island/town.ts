@@ -689,9 +689,10 @@ export function ferry(): string {
 /** A fishing boat at anchor: a wheelhouse, a mast with nets, gulls hoping. */
 export function fishingBoat(x: number, y: number, hull: string, delay: number): N {
   // Unity's, riding at anchor.
-  const real = boatUse('fishing', hull, delay > 1 ? 'e' : 'w', { transform: `translate(${f(x)} ${f(y)})` })
-  if (real) { const g = new N('g', { class: 'moored amb', 'data-b': box(x - 90, y - 90, x + 70, y + 40), style: `animation-delay:${f(-delay)}s` }); g.add(real); return g }
-  const g = new N('g', { class: 'moored amb', 'data-b': box(x - 30, y - 40, x + 30, y + 14), style: `animation-delay:${f(-delay)}s` })
+  const facing = delay > 1 ? 'e' : 'w'
+  const real = boatUse('fishing', hull, facing, { transform: `translate(${f(x)} ${f(y)})` })
+  if (real) { const g = new N('g', { class: 'moored amb', 'data-b': box(x - 90, y - 90, x + 70, y + 40), style: `animation-delay:${f(-delay)}s`, 'data-lamp': boatLamps('fishing', facing, [x, y]) }); g.add(real); return g }
+  const g = new N('g', { class: 'moored amb', 'data-b': box(x - 30, y - 40, x + 30, y + 14), style: `animation-delay:${f(-delay)}s`, 'data-lamp': boatLamps('fishing', null, [x, y]) })
   g.add(new N('path', { d: `M${f(x - 18)} ${f(y + 4)}L${f(x + 18)} ${f(y + 4)}L${f(x + 14)} ${f(y + 12)}L${f(x - 14)} ${f(y + 12)}Z`, fill: hull, opacity: 0.18 }))
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 24, ry: 4.5, fill: '#ffffff', opacity: 0.5 }))
   g.add(new N('path', { d: `M${f(x - 22)} ${f(y - 6)}L${f(x + 20)} ${f(y - 4)}L${f(x + 15)} ${f(y + 4)}L${f(x - 16)} ${f(y + 4)}Z`, fill: hull, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))

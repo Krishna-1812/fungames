@@ -117,7 +117,7 @@ export function headingOf(dx: number, dy: number): Facing {
  * its way: a picture for each heading it takes, each shown while it heads
  * that way. `pic` makes the picture for a heading (null if not made yet).
  */
-export function onPath(pic: (h: Facing) => N | null, name: string, frames: MotionFrame[], dur: string, delay: string, eight = true): N | null {
+export function onPath(pic: (h: Facing) => N | null, name: string, frames: MotionFrame[], dur: string, delay: string, eight = true, lamp?: (h: Facing) => string | undefined): N | null {
   const heads: Facing[] = []
   for (let i = 0; i + 1 < frames.length; i++) { const dx = frames[i + 1][1] - frames[i][1], dy = frames[i + 1][2] - frames[i][2]; heads.push(eight ? headingOf(dx, dy) : facingOf(dx, dy)) }
   const g = new N('g', { class: 'actor' })
@@ -133,7 +133,7 @@ export function onPath(pic: (h: Facing) => N | null, name: string, frames: Motio
     const u = pic(face)
     if (!u) { missing = true; continue }
     if (on) motionCss.push(`@keyframes ${name}-${face}{${stops.join('')}}`)
-    g.add(new N('g', { style: `animation:${name}-${face} ${dur} linear infinite ${delay}` })).add(u)
+    g.add(new N('g', { style: `animation:${name}-${face} ${dur} linear infinite ${delay}`, 'data-lamp': lamp?.(face) })).add(u)
   }
   return missing ? null : g
 }

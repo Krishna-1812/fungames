@@ -12,6 +12,7 @@
 import { SHADOW, look, signBoxes, printsWanted, puffShade, C, INK, N, OUT, P, Pen, render, rng, shade, mix, S, Bounds, motionCss, motionPath, r1, joinRoot, glows, type Light, Solids, type Solid, type MotionFrame } from './kit'
 import { type Who } from './actors'
 import { setActors, walker, who, actorsWanted, onPath, boatUse, headingOf, creatureUse, spriteNames, type ActorRec, type Sprites } from './actors'
+import { boatLamps } from './lamps'
 import { folkPic } from './folk'
 import { figFeet, tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
 import type { FigureSet, BuildingSet } from './figures'
@@ -560,7 +561,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const frames = motionPath(name, pts, { closed: true })
     const g = boats.add(new N('g', { class: 'mover', style: `animation:${name} ${dur}s linear infinite ${begin}s` }))
     // Unity's (lib/island/actors.ts): turning to each of its eight headings as it goes round.
-    g.add(onPath((h) => boatUse('sail', hull as string, h), name, frames, `${dur}s`, `${begin}s`) ?? sailboat(hull as string, '#ffffff', 1.1))
+    // At night, its lights (lamps.ts), on whichever heading shows.
+    const pic = onPath((h) => boatUse('sail', hull as string, h), name, frames, `${dur}s`, `${begin}s`, true, (h) => boatLamps('sail', h))
+    g.add(pic ?? sailboat(hull as string, '#ffffff', 1.1))
+    if (!pic) g.attrs['data-lamp'] = boatLamps('sail', null)
   })
   for (const [i, j, d] of [[27, 26, 0], [2, 26, 3.5], [29, 10, 6]]) {
     const [x, y] = P(i, j, SEA)
@@ -589,9 +593,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const g = root.add(new N('g', { class: 'mover amb', 'data-b': `${f(b[0] - 70)} ${f(a[1] - 50)} ${f(a[0] + 70)} ${f(b[1] + 40)}`, style: 'animation:isl-speed 22s ease-in-out infinite -4s' }))
     if (real) {
       motionCss.push('@keyframes isl-speed-o{0%,46.9%{opacity:1}47%,96.9%{opacity:0}97%,100%{opacity:1}}', '@keyframes isl-speed-b{0%,46.9%{opacity:0}47%,96.9%{opacity:1}97%,100%{opacity:0}}')
-      g.add(new N('g', { style: 'animation:isl-speed-o 22s linear infinite -4s' })).add(out!)
-      g.add(new N('g', { style: 'animation:isl-speed-b 22s linear infinite -4s' })).add(back!)
-    } else g.add(speedboat(C.rasp))
+      g.add(new N('g', { style: 'animation:isl-speed-o 22s linear infinite -4s', 'data-lamp': boatLamps('speed', headingOf(b[0] - a[0], b[1] - a[1])) })).add(out!)
+      g.add(new N('g', { style: 'animation:isl-speed-b 22s linear infinite -4s', 'data-lamp': boatLamps('speed', headingOf(a[0] - b[0], a[1] - b[1])) })).add(back!)
+    } else { g.add(speedboat(C.rasp)); g.attrs['data-lamp'] = boatLamps('speed', null) }
   }
   // The ferry: in from the open sea, a while at the jetty, out again.
   {
@@ -603,9 +607,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     const g = root.add(pokeN('ferry')).add(new N('g', { class: 'mover amb', 'data-b': `${f(a[0] - 130)} ${f(b[1] - 90)} ${f(b[0] + 130)} ${f(a[1] + 60)}`, style: `animation:isl-ferry ${FERRY_DUR}s linear infinite` }))
     if (real) {
       motionCss.push('@keyframes isl-ferry-i{0%,62.2%{opacity:1}62.3%,100%{opacity:0}}', '@keyframes isl-ferry-o{0%,62.2%{opacity:0}62.3%,100%{opacity:1}}')
-      g.add(new N('g', { style: `animation:isl-ferry-i ${FERRY_DUR}s linear infinite` })).add(inb!)
-      g.add(new N('g', { style: `animation:isl-ferry-o ${FERRY_DUR}s linear infinite` })).add(outb!)
-    } else g.add(ferry())
+      g.add(new N('g', { style: `animation:isl-ferry-i ${FERRY_DUR}s linear infinite`, 'data-lamp': boatLamps('ferry', headingOf(b[0] - a[0], b[1] - a[1])) })).add(inb!)
+      g.add(new N('g', { style: `animation:isl-ferry-o ${FERRY_DUR}s linear infinite`, 'data-lamp': boatLamps('ferry', headingOf(a[0] - b[0], a[1] - b[1])) })).add(outb!)
+    } else { g.add(ferry()); g.attrs['data-lamp'] = boatLamps('ferry', null) }
   }
   // Each building's solids, and with Unity's pictures of them (opts.buildings), those in their place.
   const solids: IslandModel['solids'] = []
