@@ -52,8 +52,8 @@ function tile(rgb: string): HTMLCanvasElement {
         g.beginPath(); g.ellipse(cx, cy, L * s / 2, w * s / 2, 0, 0, Math.PI * 2); g.fill()
       }
       // The brightest catch the sun full: a little star of light across them.
-      if (big > 0.92) {
-        g.fillStyle = `rgba(${rgb}, ${a * 0.8})`
+      if (big > 0.97) {
+        g.fillStyle = `rgba(${rgb}, ${a * 0.45})`
         g.beginPath(); g.ellipse(cx, cy, L * 1.6, w * 0.22, 0, 0, Math.PI * 2); g.fill()
         g.beginPath(); g.ellipse(cx, cy, w * 0.3, L * 0.9, 0, 0, Math.PI * 2); g.fill()
       }
