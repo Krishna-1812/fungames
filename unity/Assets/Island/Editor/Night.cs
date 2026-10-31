@@ -31,8 +31,10 @@ namespace Island
         /** The light in a lit room (display colours): a soft warm white, a plain white, a cool white, and a television's blue. */
         public static readonly Color[] Rooms = { new Color(1f, 0.9f, 0.77f), new Color(1f, 0.96f, 0.91f), new Color(0.86f, 0.92f, 1f), new Color(0.56f, 0.7f, 1f) };
         static readonly float[] RoomLevel = { 1.05f, 1.0f, 0.95f, 0.5f };
-        /** A street lamp's light: a clean, slightly cool white. */
-        static readonly Color LampColour = new Color(0.94f, 0.97f, 1f);
+        /** A street lamp's light: the warm amber of an old sodium lamp. */
+        static readonly Color LampColour = new Color(1f, 0.83f, 0.62f);
+        /** The lighthouse's lantern: a warm white, bright. */
+        static readonly Color LanternColour = new Color(1f, 0.93f, 0.80f);
 
         struct L { public Vector3 p, n; public Color c; public float range, core, kind; }
         static List<L> lights;
@@ -66,10 +68,10 @@ namespace Island
                     lights.Add(new L { p = p + n * 0.05f, n = n, c = Rooms[room].linear * RoomLevel[room] * 0.04f, range = 0.9f, kind = 1 });
                 }
                 else if (x.kind == "lamp")
-                    lights.Add(new L { p = p, c = LampColour.linear * 0.7f, range = 1.5f, core = 0.055f, kind = 0 });
+                    lights.Add(new L { p = p, c = LampColour.linear * 0.7f * 0.75f, range = 1.5f, core = 0.055f, kind = 0 });
                 else if (x.z > 90 && string.Equals(x.col, "#fff8e0", StringComparison.OrdinalIgnoreCase))
                     // The lighthouse's lantern: bright, and seen far off.
-                    lights.Add(new L { p = p, c = LampColour.linear * 1.4f, range = 3.2f, core = 0.12f, kind = 3 });
+                    lights.Add(new L { p = p, c = LanternColour.linear * 1.6f, range = 3.2f, core = 0.30f, kind = 3 });
                 else
                     lights.Add(new L { p = p, c = Hex(x.col).linear * 0.07f, range = 0.75f, kind = 2 });
             }

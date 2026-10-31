@@ -87,8 +87,12 @@ Shader "Island/Water"
                 if (islandNightPass())
                 {
                     // At night: every light near the water given back by it, broken by the ripples into a streak
-                    // (under it on the picture, as a reflection is), and the lamps' light on the foam and the shallows.
+                    // (under it on the picture, as a reflection is), and the lamps' light on the foam. The streak is
+                    // broken across into bright bars, as light on moving water is, and nothing lights the water
+                    // itself into a haze.
                     float3 refl = 0;
+                    float2 vf = normalize(view.xz + 1e-5), vs = float2(-vf.y, vf.x);
+                    float bars = smoothstep(0.45, 0.8, vnoise(float2(dot(i.ws.xz, vf) * 3, dot(i.ws.xz, vs) * 38)));
                     int cnt = (int)_IslandLampN;
                     [loop] for (int k = 0; k < cnt; k++)
                     {
@@ -96,14 +100,14 @@ Shader "Island/Water"
                         if (dd > 12) continue;
                         float3 l = dl * rsqrt(dd);
                         float3 hh = normalize(l + view);
-                        float s1 = pow(saturate(dot(n, hh)), 90), s2 = pow(saturate(dot(n, hh)), 30) * 0.015;
                         float kind = _IslandLampD[k].w;
-                        float boost = kind > 2.5 ? 0.6 : kind < 0.5 ? 1.0 : 3.0;
+                        float s1 = pow(saturate(dot(n, hh)), 90) * bars, s2 = abs(kind - 2) < 0.5 ? 0 : pow(saturate(dot(n, hh)), 30) * 0.015;
+                        float boost = kind > 2.5 ? 0.6 : kind < 0.5 ? 1.0 : 1.2;
                         refl += _IslandLampC[k].rgb * boost * (s1 + s2) / (dd + 0.3);
                     }
                     float3 core; float3 e = islandLamps(float3(0, 1, 0), i.ws, core);
                     float foamN = smoothstep(0.035, 0.0, d) * smoothstep(0.35, 0.65, vnoise(i.ws.xz * 26) * 0.7 + n1 * 0.3);
-                    float3 glowN = refl * 0.9 + e * lerp(col * 0.4, float3(0.8, 0.85, 0.9), foamN);
+                    float3 glowN = refl * 0.9 + e * float3(0.8, 0.85, 0.9) * foamN;
                     return half4(glowN, max(alpha, foamN));
                 }
                 Light sun = GetMainLight(TransformWorldToShadowCoord(i.ws));
