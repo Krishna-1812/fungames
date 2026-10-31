@@ -475,6 +475,11 @@ export function createEngine(o: {
       // A shadow cast by the sun (a cloud's, a balloon's): none by moonlight. Close in or not.
       else if (t === 'cloud-shade' || t === 'sun-shade') a *= timed('sun-shade', LAYERS.cloud.shade[st.time] ?? 0, LAYERS.cloud.fadeMs)
       else if (t === 'layer-beam') a *= st.time === 'dusk' ? LAYERS.beam.dusk : 1
+      // The lighthouse's flash: as either end of its beam (turning with it, squashed flat) points down the screen, at you.
+      else if (t === 'beacon-flash') {
+        const turn = (tNow() / LAYERS.beam.loop.dur) % 1
+        a *= !o.play || (st.time !== 'night' && st.time !== 'dusk') ? 0 : Math.pow(Math.abs(Math.sin(turn * Math.PI * 2)), 12) * (st.time === 'dusk' ? LAYERS.beam.dusk : 1)
+      }
       else if (t === 'lm-ring') { const lmn = ringOwner.get(n); a *= lmn ? lmS(lmn).ring : 0 }
       else if (t === 'isl-plane' && !o.play) a = 0
       // A signpost's names, only once they are big enough to read.

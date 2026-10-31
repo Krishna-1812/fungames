@@ -64,7 +64,7 @@ const OUTLINED = new Set(['es-win', 'liw-cell', 'pg-bar', 'night-veil', 'night-g
  */
 const TIMED_OPACITY = new Set(['night-veil', 'night-grade', 'night-halos', 'night-cores', 'night-panes', 'night-shine', 'night-sky', 'night-glow', 'cloud', 'cloud-shade', 'sun-shade'])
 /** Groups whose only change is how strongly they show (by the time of day): painted into cells like still painting. */
-const ALPHA = new Set(['night-halos', 'night-panes', 'night-shine', 'night-sky', 'night-cores', 'night-glow', 'fireworks'])
+const ALPHA = new Set(['night-halos', 'night-panes', 'night-shine', 'night-sky', 'night-cores', 'night-glow', 'fireworks', 'beacon-flash'])
 /** Groups that are only there at some times. */
 const WHEN: Record<string, When> = { ufo: LAYERS.ufo.when, 'dawn-whale': LAYERS.dawnWhale.when, fireworks: LAYERS.fireworks.when }
 

@@ -1844,6 +1844,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     glow.add(new N('stop', { offset: 0, 'stop-color': '#fff4cf', 'stop-opacity': 0.95 }))
     glow.add(new N('stop', { offset: 0.35, 'stop-color': '#ffe7a8', 'stop-opacity': 0.45 }))
     glow.add(new N('stop', { offset: 1, 'stop-color': '#ffe7a8', 'stop-opacity': 0 }))
+    // The lighthouse's flash, as its beam swings round at you: a great soft bloom of white light.
+    const flash = nd.add(new N('radialGradient', { id: 'isl-flash' }))
+    for (const [o, op] of [[0, 0.5], [0.15, 0.3], [0.45, 0.08], [1, 0]]) flash.add(new N('stop', { offset: o, 'stop-color': '#fff6e6', 'stop-opacity': op }))
     // A lamp's own light, added to what it falls on (the halos are drawn 'lighter'): white-hot at its middle,
     // warm round that, and a faint amber reach. (isl-glow, a softer cream, stays the moon's air.)
     const lampGlow = nd.add(new N('radialGradient', { id: 'isl-lamp' }))
@@ -1986,6 +1989,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       // The lantern's own light, on the realistic island too: Unity's night light was meant to light it, but
       // its core never reaches the glass, so the island's brightest light stood dark there all night.
       if (glowRef) night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 14, fill: 'url(#isl-glow)', class: 'night-shine' }))
+      // And its flash each time the beam comes round to face you (engine.ts tagAlpha times it to the beam).
+      night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 70, fill: 'url(#isl-flash)', class: 'night-halos beacon-flash' }))
     }
     // The moon, low over the sea to the north-east, and its path on the water. Its place is picked here,
     // over open water inside a desktop's opening view and clear of the buttons along its top, where the
