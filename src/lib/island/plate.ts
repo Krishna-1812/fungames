@@ -36,7 +36,11 @@ export function plateRef(name: PlateName = 'plate', force = false): PlateRef | n
   const p = plateInfo(name)
   if (!p || !live || !(force || live.live || process.env.ISLAND_PLATE === '1')) return null
   const low = fs.readFileSync(path.join(dir(name), 'low.png')).toString('base64')
-  return { box: p.box, id: p.id, href: `data:image/png;base64,${low}`, sea: live.sea }
+  // Its surf lines (scripts/plate-surf.mjs), if they were traced from this picture.
+  const sf = path.join(dir(name), 'surf.json')
+  const s = fs.existsSync(sf) ? JSON.parse(fs.readFileSync(sf, 'utf8')) : null
+  const surf = s && s.id === p.id ? [s.out, s.mid, s.in] as string[] : undefined
+  return { box: p.box, id: p.id, href: `data:image/png;base64,${low}`, sea: live.sea, surf }
 }
 
 /** The whole picture at full size, straight (not premultiplied: sharp scales it right), for the bake to cut cells from. */

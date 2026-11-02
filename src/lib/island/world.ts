@@ -188,7 +188,7 @@ export type Raster = (svg: string, width: number) => { width: number; height: nu
  * the island draws that picture in place of its own ground and still
  * shallows; the bake paints the map from the full-size picture (bake/draw.ts).
  */
-export type PlateRef = { box: [number, number, number, number]; href: string; id: string; /** The open sea's colour round the picture's edges (scripts/unity-plate.mjs). */ sea?: string }
+export type PlateRef = { box: [number, number, number, number]; href: string; id: string; /** The open sea's colour round the picture's edges (scripts/unity-plate.mjs). */ sea?: string; /** Where its surf breaks, outer line first (scripts/plate-surf.mjs): path data in map units. */ surf?: string[] }
 
 export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: PlateRef | null; glow?: PlateRef | null; sky?: SkyArt | null; figures?: FigureSet | null; buildings?: BuildingSet | null } = {}): Island {
   const plate = opts.plate ?? null
@@ -538,9 +538,20 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // of its own whose opacity rises and falls in turn, so the waves seem to
   // roll in to the shore. Fading a whole layer costs the browser nothing;
   // moving a line round the whole coast would cost it every frame.
+  // On the realistic island, three lines where Unity's shallows are (traced from its picture), drawn as
+  // foam is: a faint haze of spray, the broken body of the wave, a brighter core, each breaking up along
+  // its length in its own rhythm, so no two lines (nor two beaches) break the same.
+  if (plate) (plate.surf ?? []).forEach((d, n) => {
+    root = open('surf', `real-${n}`)
+    const id = `isl-surf-line-${n}`
+    root.add(new N('defs')).add(new N('path', { id, d }))
+    for (const [w, op, dash] of [[5, 0.12, '40 60 90 50 25 70'], [1.8, 0.4, '10 14 26 22 6 18 18 30'], [0.8, 0.6, '5 16 12 20 3 14 16 26']] as [number, number, string][]) {
+      root.add(new N('use', { href: `#${id}`, fill: 'none', stroke: '#ffffff', 'stroke-width': w, 'stroke-opacity': op, 'stroke-dasharray': dash, 'stroke-dashoffset': n * 37, 'stroke-linecap': 'round' }))
+    }
+  })
   for (const [k, w0, w1] of [['out', 1.66, 1.82], ['in', 1.1, 1.24]] as [string, number, number][]) {
-    root = open('surf', k)
     if (plate) continue
+    root = open('surf', k)
     const id = `isl-surf-${k}`
     const m = root.add(new N('mask', { id, maskUnits: 'userSpaceOnUse', x: f(sx0 - 400), y: f(sy1 - 1400), width: f(sx1 - sx0 + 800), height: f(sy2 - sy1 + 2000) }))
     const mg = m.add(new N('g', { transform: coastT }))
