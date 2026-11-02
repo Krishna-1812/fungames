@@ -447,7 +447,11 @@ export function build(island: { layers: { kind: string; slug?: string; body: str
       if (fb) node.pokeOrg = [fb[0] + (fb[2] - fb[0]) / 2, fb[3]]
     }
     // Layer-wide motions.
-    if (lay === 'surf') { const L2 = el.attrs['data-slug'] === 'in' ? LAYERS.surfIn : LAYERS.surfOut; node.op = L2.opacity; node.a = [animFor(el, L2.loop, { base: {} })] }
+    if (lay === 'surf') {
+      const slug = el.attrs['data-slug'] ?? '', real = /^real-(d)$/.exec(slug), R = LAYERS.surfReal
+      const L2 = real ? { opacity: R.opacity, loop: { ...R.loop, delay: Number(real[1]) * R.stagger } } : slug === 'in' ? LAYERS.surfIn : LAYERS.surfOut
+      node.op = L2.opacity; node.a = [animFor(el, L2.loop, { base: {} })]
+    }
     else if (lay === 'night') { node.when = { time: ['dawn', 'dusk', 'night'] } }
     else if (lay === 'beam') {
       node.when = LAYERS.beam.when

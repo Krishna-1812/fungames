@@ -347,6 +347,9 @@ export const LANDMARK = {
 export const LAYERS = {
   surfOut: { opacity: 0.35, loop: L('isl-surf', 5.2, 'ease-in-out') },
   surfIn: { opacity: 0.35, loop: L('isl-surf', 5.2, 'ease-in-out', { delay: 1.6 }) },
+  // The realistic island's three lines (world.ts, scripts/plate-surf.mjs), the outer first, each `stagger` seconds
+  // after the one before (the first and last in time with the drawn two): its own lace, so the layer may be whiter.
+  surfReal: { opacity: 0.95, loop: L('isl-surf', 5.2, 'ease-in-out'), stagger: 0.8 },
   beam: { loop: L('isl-beam', 10, 'linear'), when: { time: ['night', 'dusk'] } as When, dusk: 0.5 },
   snow: { loop: L('isl-sift', 40, 'linear'), when: { season: ['winter', 'newyear'] } as When },
   petals: { loop: L('isl-sift', 70, 'linear'), when: { season: ['spring'] } as When },
