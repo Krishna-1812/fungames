@@ -12,7 +12,8 @@
  *      calmer sea, natural lawns, highlights that roll off), faded at the
  *      edges into the site's own sea, and written as WebP tiles, a small
  *      copy for the island's SVG, and
- *      plate.json (where it lies on the map, and an id for the bake's hash).
+ *      plate.json (where it lies on the map, and an id for the bake's hash);
+ *   4. scripts/plate-surf.mjs: where the surf breaks, traced from the picture.
  *
  *   node scripts/unity-plate.mjs [--scale 4] [--skip-unity]
  */
@@ -118,3 +119,4 @@ fs.writeFileSync(path.join(out, 'low.png'), low)
 const id = hash.digest('hex').slice(0, 12)
 fs.writeFileSync(path.join(out, 'plate.json'), JSON.stringify({ ...m, id, sea, live }, null, 1) + '\n')
 console.log(`plate ${id}: ${m.cols * m.rows} tiles, ${(bytes / 1e6).toFixed(1)} MB; small copy ${(low.length / 1e3).toFixed(0)} KB`)
+spawnSync(process.execPath, [path.join(root, 'scripts/plate-surf.mjs')], { stdio: 'inherit' })
