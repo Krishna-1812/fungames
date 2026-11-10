@@ -565,6 +565,7 @@ const book = BOOK.map((key) => {
   import { gather, sync, progress, readQuests, unseen, markQuestsSeen, questCovers } from '../lib/quests'
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
   import { createPlay, type PlayData } from '../lib/island/play'
+  import { createAir } from '../lib/island/air'
   import { timetable, isFest, type Row } from '../lib/island/timetable'
   import { seasonOn, nextSeason, seeSeason, SEASONS as SEASON_NAMES, type SeasonKey } from '../lib/island/seasons'
   import { readLink, cleanCode, showCode } from '../lib/sync'
@@ -779,7 +780,13 @@ const book = BOOK.map((key) => {
     onTap: (x, y, z, hit, what) => { if (taps++ < 80) track('isl_tap', { x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10, z: Math.round(z * 100) / 100, hit, what }) },
   })
   let taps = 0
-  isle.withEngine((e) => e.setLive(play.live))
+  // The air (lib/island/air): the aurora once the night has fallen over the map, the mist and the sun's shafts over all.
+  const air = createAir({ play: WORLD_PLAY, time: () => box.dataset.time ?? 'day' })
+  isle.withEngine((e) => e.setLive({
+    ...play.live,
+    after: { ...play.live.after, night: air.aurora },
+    top: (c, m, t) => (play.live.top ? play.live.top(c, m, t) : 0) + air.top(c, m, t),
+  }))
 
   // How the island was explored, summed up as the page is left: drags,
   // wheel turns, the closest it was looked at, and which districts were in
