@@ -277,7 +277,7 @@ export function crab(p: Pen, x: number, y: number, delay = 0) {
 /** A dolphin that leaps out of the sea and back in. Drawn at a sea point. */
 export function dolphin(x: number, y: number, delay: number, flip = false): N {
   const g = new N('g', { class: 'amb', 'data-b': box(x - 50, y - 50, x + 50, y + 10) })
-  g.add(new N('ellipse', { cx: f(x), cy: f(y + 2), rx: 18, ry: 4, fill: '#ffffff', class: 'dol-ring', opacity: 0, style: `animation-delay:${f(-delay)}s` }))
+  g.add(new N('ellipse', { cx: f(x), cy: f(y + 2), rx: 22, ry: 5, fill: puffWhite(g.add(new N('defs')), `dol-foam${Math.round(delay * 10)}`, 0.7), class: 'dol-ring', opacity: 0, style: `animation-delay:${f(-delay)}s` }))
   const jump = g.add(new N('g', { class: 'dolphin', style: `animation-delay:${f(-delay)}s`, transform: flip ? `translate(${f(x * 2)} 0) scale(-1 1)` : undefined }))
   const inner = jump.add(new N('g', { transform: `translate(${f(x)} ${f(y)})` }))
   // Unity's, side on, as it leaps.
@@ -297,7 +297,8 @@ export function whale(x: number, y: number): N {
     // Unity's back and flukes, and the blow as a soft cloud of spray.
     const real = creatureUse('whale', '#4f5a74', 'stand', 'w', { transform: `translate(${f(x)} ${f(y)})` })
     if (real) {
-      g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 70, ry: 13, fill: '#ffffff', opacity: 0.3 }))
+      // The water it breaks, foam that thins out to nothing at its edge, not a ring.
+      g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 84, ry: 16, fill: puffWhite(g.add(new N('defs')), 'wh-foam', 0.6) }))
       g.add(real)
       const spout = g.add(new N('g', { class: 'whale-spout' }))
       for (const [dx, dy, r] of [[-30, -14, 7], [-38, -22, 9], [-26, -26, 8], [-33, -32, 10], [-29, -40, 7]]) spout.add(new N('circle', { cx: f(x + dx), cy: f(y + dy), r, fill: '#ffffff', opacity: 0.55 }))
