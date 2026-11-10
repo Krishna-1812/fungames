@@ -566,6 +566,7 @@ const book = BOOK.map((key) => {
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
   import { createPlay, type PlayData } from '../lib/island/play'
   import { createAir } from '../lib/island/air'
+  import { createSeaLife } from '../lib/island/sealife'
   import { timetable, isFest, type Row } from '../lib/island/timetable'
   import { seasonOn, nextSeason, seeSeason, SEASONS as SEASON_NAMES, type SeasonKey } from '../lib/island/seasons'
   import { readLink, cleanCode, showCode } from '../lib/sync'
@@ -775,16 +776,26 @@ const book = BOOK.map((key) => {
     grab: (x, y, z, touch) => {
       const h = play.grab(x, y, z, touch)
       return h && { move: h.move, up() { h.up(); track('isl_ball', { touch }) } }
-    }, pointer: play.pointer, grabbable: play.overBall,
+    }, pointer: (x, y, z, kind) => { play.pointer(x, y, z, kind); life.startle(x, y) }, grabbable: play.overBall,
     // Where people tap, for the admin page's heat-map: rounded to ten map units, and at most eighty a visit.
     onTap: (x, y, z, hit, what) => { if (taps++ < 80) track('isl_tap', { x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10, z: Math.round(z * 100) / 100, hit, what }) },
   })
   let taps = 0
   // The air (lib/island/air): the aurora once the night has fallen over the map, the mist and the sun's shafts over all.
   const air = createAir({ play: WORLD_PLAY, time: () => box.dataset.time ?? 'day' })
+  // What lives in the water (lib/island/sealife): shadows under the sun's sparkle, and after dark what glows.
+  const life = createSeaLife({
+    grid: data.grid, size: Math.round(Math.sqrt(data.grid.length)), openSea: data.play.openSea, play: WORLD_PLAY,
+    dark: () => ({ night: 1, dusk: 0.5, dawn: 0.25 } as Record<string, number>)[box.dataset.time ?? 'day'] ?? 0,
+  })
+  const seaLive = play.live.after?.sea
   isle.withEngine((e) => e.setLive({
     ...play.live,
-    after: { ...play.live.after, night: air.aurora },
+    after: {
+      ...play.live.after,
+      sea: (c, m, t) => life.under(c, m, t) + (seaLive ? seaLive(c, m, t) : 0),
+      night: (c, m, t) => life.glow(c, m, t) + air.aurora(c, m, t),
+    },
     top: (c, m, t) => (play.live.top ? play.live.top(c, m, t) : 0) + air.top(c, m, t),
   }))
 
