@@ -482,6 +482,13 @@ const book = BOOK.map((key) => {
           </div>
         </div>
 
+        <button type="button" class="gs-rank" id="gsRank" hidden>
+          <span class="gs-rank-mark" aria-hidden="true" set:html={faviconSvg(true)} />
+          <span class="gs-rank-words"><b id="gsRankName"></b><span id="gsRankLine"></span></span>
+          <span class="gs-rank-bar" aria-hidden="true"><i id="gsRankFill"></i></span>
+          <span class="gs-rank-go" aria-hidden="true">Passport →</span>
+        </button>
+
         <ul class="gs-grid" role="list" id="grid">
           {games.map((g) => {
             const a = island.anchors[g.slug]
@@ -568,6 +575,7 @@ const book = BOOK.map((key) => {
   import { drawPostcard, crop, shapeFor, photoSize, STAMP_PHOTO } from '../lib/island/postcard'
   import { createPlay, type PlayData } from '../lib/island/play'
   import { createAir } from '../lib/island/air'
+  import { gridFx } from '../lib/home/grid-fx'
   import { createSeaLife } from '../lib/island/sealife'
   import { timetable, isFest, type Row } from '../lib/island/timetable'
   import { seasonOn, nextSeason, seeSeason, SEASONS as SEASON_NAMES, type SeasonKey } from '../lib/island/seasons'
@@ -1157,6 +1165,8 @@ const book = BOOK.map((key) => {
   const ppBook = document.getElementById('ppBook')!
   const btnPassport = document.getElementById('btnPassport')!
   const ppCountEl = document.getElementById('ppCount')!, ppNewEl = document.getElementById('ppNew')!
+  const gsRank = document.getElementById('gsRank')!
+  gsRank.addEventListener('click', () => btnPassport.click())
   const ppSlots = new Map([...pp.querySelectorAll<HTMLButtonElement>('.pp-slot')].map((b) => [b.dataset.slug!, b]))
   const ppTabs = [...pp.querySelectorAll<HTMLButtonElement>('[data-tab]')]
   const ppSheets = [...pp.querySelectorAll<HTMLElement>('[data-sheet]')]
@@ -1239,6 +1249,12 @@ const book = BOOK.map((key) => {
     renderBottles()
     const newQuests = renderQuests()
     ppCountEl.textContent = `${n}/${total}`; ppCountEl.hidden = n === 0
+    // The same, over the list of games: how far round the island you have been, and the way into the passport.
+    gsRank.hidden = false
+    gsRank.setAttribute('aria-label', `${rank}: ${n} of ${total} games visited. Open your passport`)
+    document.getElementById('gsRankName')!.textContent = rank
+    document.getElementById('gsRankLine')!.textContent = n ? `${n} of ${total} games visited` : 'Visit any building to start your passport'
+    document.getElementById('gsRankFill')!.style.width = `${n ? Math.max(4, (n / total) * 100) : 0}%`
     ppNewEl.textContent = `+${fresh.size + newQuests}`; ppNewEl.hidden = fresh.size + newQuests === 0
     btnPassport.setAttribute('aria-label', `Passport: ${n} of ${total} games visited${fresh.size ? `, ${fresh.size} new stamp${fresh.size > 1 ? 's' : ''}` : ''}`)
     return fresh
@@ -1616,6 +1632,8 @@ const book = BOOK.map((key) => {
   /* ---- the cards: filter, search, and "show on the island" ---------------- */
   const slots = Array.from(document.querySelectorAll<HTMLElement>('.gs-slot'))
   const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-filter]'))
+  const gridEl = document.getElementById('grid')!
+  gridFx(gridEl)
   const q = document.getElementById('q') as HTMLInputElement
   const empty = document.getElementById('empty')!
   let filter = new URLSearchParams(location.search).get('c') ?? 'all'
@@ -1624,6 +1642,7 @@ const book = BOOK.map((key) => {
     const term = q.value.trim().toLowerCase()
     chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.filter === filter)))
     const keep = new Set<string>()
+    gridEl.dispatchEvent(new Event('gs:filter'))
     flip(slots, () => {
       for (const s of slots) {
         const ok = (filter === 'all' || s.dataset.cat === filter) && (!term || s.dataset.search!.includes(term))
@@ -2405,6 +2424,44 @@ const book = BOOK.map((key) => {
 
   .gs-grid { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 262px), 1fr)); gap: clamp(14px, 1.6vw, 22px); }
   .gs-slot { position: relative; display: flex; }
+  /* How far round the island you have been, over the list: your rank, a bar, and the way into the passport. */
+  .gs-rank {
+    display: flex; align-items: center; gap: 12px 16px; width: 100%; margin-top: 24px; padding: 12px 18px 12px 14px;
+    font: inherit; color: #1b2340; text-align: left; cursor: pointer;
+    background: linear-gradient(100deg, #ffffff 0%, #e8f6ff 100%); border: 3px solid #1b2340; border-radius: 20px; box-shadow: 0 4px 0 #1b2340;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .gs-rank[hidden] { display: none; }
+  .gs-rank:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #1b2340; }
+  .gs-rank:active { transform: translateY(4px); box-shadow: 0 0 0 #1b2340; }
+  .gs-rank:focus-visible { outline: 3px solid #5b82ff; outline-offset: 3px; }
+  .gs-rank-mark { width: 40px; height: 40px; flex: none; }
+  .gs-rank-mark :global(svg) { display: block; width: 100%; height: 100%; }
+  .gs-rank-words { display: grid; gap: 1px; flex: none; }
+  .gs-rank-words b { font-size: 19px; line-height: 1.1; }
+  .gs-rank-words span { font-size: 14.5px; font-weight: 500; color: #4a5372; }
+  .gs-rank-bar { flex: 1; min-width: 80px; height: 16px; background: #fff; border: 2.5px solid #1b2340; border-radius: 999px; overflow: hidden; }
+  .gs-rank-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4fe3c1, #5b82ff); border-radius: 999px; transition: width 1.1s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .gs-rank-go { flex: none; font-weight: 700; font-size: 15px; }
+  @media (max-width: 600px) {
+    .gs-rank { flex-wrap: wrap; margin-top: 18px; padding: 10px 12px; border-width: 2.5px; border-radius: 16px; }
+    .gs-rank-words { flex: 1; }
+    .gs-rank-bar { order: 3; flex-basis: 100%; height: 13px; }
+    .gs-rank-go { display: none; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* A card comes up into place the first time it is scrolled to (lib/home/grid-fx.ts). */
+    .gs-grid.is-fx .gs-slot { opacity: 0; translate: 0 28px; transition: opacity 0.45s ease var(--in, 0ms), translate 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.25) var(--in, 0ms); }
+    .gs-grid.is-fx .gs-slot.is-in { opacity: 1; translate: 0 0; }
+  }
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    /* Under a mouse a card leans toward the pointer, and a soft light on its picture follows it. */
+    .gs-slot { perspective: 900px; }
+    .gs-slot .gc.is-lean { transform: translateY(-6px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); box-shadow: 0 12px 0 #1b2340; transition: transform 0.14s ease-out, box-shadow 0.3s; }
+    .gs-slot .gc.is-today.is-lean { box-shadow: 0 12px 0 #1b2340, 0 0 0 5px #4fe3c1; }
+    .gc-art::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s; background: radial-gradient(circle at var(--mx, 50%) var(--my, 30%), rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%); }
+    .gc.is-lean .gc-art::after { opacity: 1; }
+  }
   .gc {
     position: relative; display: flex; flex-direction: column; width: 100%;
     background: #fff; border: 3px solid #1b2340; border-radius: 22px; box-shadow: 0 5px 0 #1b2340;
