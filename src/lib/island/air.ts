@@ -3,7 +3,10 @@
  *
  *   - after dark, an aurora over the far sea, and now and then a shooting star;
  *   - at dawn, mist lying on the water, and a wisp or two round the Peaks all day;
- *   - by day, the sun's shafts slanting in from where it stands (the top right).
+ *   - by day, the sun's shafts slanting in from where it stands (the top right);
+ *   - the wind, where it can be seen: a curl of it crossing the view now and
+ *     then, and a few petals and leaves carried along;
+ *   - and where the map is touched, a small burst of light.
  *
  * None of it is baked: it is drawn live by the engine's hooks (LiveLayer in
  * engine.ts), a few canvas calls a frame, and it eases in and out as the
@@ -34,7 +37,12 @@ const mixHex = (a: string, b: string, t: number) => {
   return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')
 }
 
-export function createAir(o: { play: boolean; time: () => string }) {
+/** A gust, as it is drawn: a long line with a curl in it (map units), and how long that is. */
+const GUST = 'M0 0C60 -18 110 -14 150 -4C176 3 187 -14 174 -24C161 -33 145 -21 156 -7C168 9 232 7 330 -6', GUST_LEN = 432
+/** What the wind carries: how many, and their colours (a petal, a paler one, a leaf). */
+const DRIFT = { n: 30, inks: ['#ffd0e2', '#ffffff', '#b9ecc0'] }
+
+export function createAir(o: { play: boolean; time: () => string; /** A season that brings its own weather (snow, blossom): the wind carries nothing of its own then. */ season?: () => string }) {
   /** How far in each is (0 to 1), eased toward what the hour asks for. */
   const k = { aurora: 0, mist: 0, wisp: 0, shafts: 0 }
   const WANT: Record<string, typeof k> = {
@@ -204,7 +212,88 @@ export function createAir(o: { play: boolean; time: () => string }) {
         }
       }
     }
+    n += wind(c, m, now, cw, ch)
     return n
   }
-  return { aurora, top }
+
+  /* ---- the wind ---- */
+  type Gust = { at: number; x: number; y: number; k: number; life: number }
+  const gusts: Gust[] = []
+  let gustPath: Path2D | null = null, nextGust = 0
+  type Burst = { at: number; x: number; y: number; ink: string }
+  const bursts: Burst[] = []
+  const wind = (c: CanvasRenderingContext2D, m: [number, number, number, number, number, number], now: number, cw: number, ch: number): number => {
+    let n = 0
+    const night = o.time() === 'night' ? 0.45 : 1
+    if (o.play) {
+      // A gust: somewhere in view, every few seconds; its line runs along its own path, head first.
+      if (!nextGust) nextGust = now + 1500
+      if (now > nextGust && gusts.length < 3) {
+        const sx = cw * (0.05 + rnd() * 0.6), sy = ch * (0.14 + rnd() * 0.7)
+        gusts.push({ at: now, x: (sx - m[4]) / m[0], y: (sy - m[5]) / m[3], k: (0.8 + rnd() * 0.5) / Math.max(0.6, Math.min(1.6, m[0] / (cw / 1440))), life: 2300 + rnd() * 900 })
+        nextGust = now + 2600 + rnd() * 4200
+      }
+      if (gusts.length) {
+        if (!gustPath) gustPath = new Path2D(GUST)
+        c.strokeStyle = '#ffffff'; c.lineCap = 'round'; c.lineJoin = 'round'
+        for (let q = gusts.length - 1; q >= 0; q--) {
+          const g = gusts[q], u = (now - g.at) / g.life
+          if (u >= 1) { gusts.splice(q, 1); continue }
+          const seg = 150, e = u * u * (3 - 2 * u), drift = 60 * u
+          c.setTransform(m[0] * g.k, 0, 0, m[3] * g.k, m[0] * (g.x + drift) + m[4], m[3] * g.y + m[5])
+          c.setLineDash([seg, GUST_LEN + seg]); c.lineDashOffset = seg - e * (GUST_LEN + seg)
+          c.lineWidth = 2.4
+          c.globalAlpha = 0.75 * Math.sin(u * Math.PI) * night
+          c.stroke(gustPath); n += 2
+        }
+        c.setLineDash([]); c.globalAlpha = 1
+      }
+    }
+    // Petals and leaves on the wind, in the screen's space: each on its own slow fall across the view.
+    if (!(o.season?.() ?? '')) {
+      const t = clock(now), k = Math.max(1, cw / 1440)
+      c.setTransform(1, 0, 0, 1, 0, 0); n++
+      const paths = DRIFT.inks.map(() => new Path2D())
+      for (let q = 0; q < DRIFT.n; q++) {
+        const h = (a: number) => { const v = Math.sin(q * 127.1 + a * 311.7) * 43758.5453; return v - Math.floor(v) }
+        const vx = 26 + h(1) * 30, vy = 9 + h(2) * 14, W = cw + 80 * k, H = ch + 80 * k
+        const x = ((h(3) * W + vx * t * k) % W) - 40 * k + Math.sin(t * (0.5 + h(4)) + q) * 14 * k
+        const y = ((h(5) * H + vy * t * k) % H) - 40 * k + Math.cos(t * (0.4 + h(6)) + q * 2) * 10 * k
+        const r = (2.2 + h(7) * 2.2) * k, spin = t * (0.8 + h(8) * 1.6) + q, flat = 0.35 + 0.45 * Math.abs(Math.sin(t * (0.7 + h(9)) + q))
+        const p = paths[q % paths.length]
+        p.moveTo(x + Math.cos(spin) * r, y + Math.sin(spin) * r)
+        p.ellipse(x, y, r, r * flat, spin, 0, Math.PI * 2)
+      }
+      c.globalAlpha = 0.8 * night
+      paths.forEach((p, q) => { c.fillStyle = DRIFT.inks[q]; c.fill(p); n++ })
+      c.globalAlpha = 1
+    }
+    // Where the map was touched: a ring going out, and sparks flying from it.
+    if (bursts.length) {
+      c.setTransform(1, 0, 0, 1, 0, 0); n++
+      c.lineCap = 'round'
+      for (let q = bursts.length - 1; q >= 0; q--) {
+        const b = bursts[q], u = (now - b.at) / 620
+        if (u >= 1) { bursts.splice(q, 1); continue }
+        const x = m[0] * b.x + m[4], y = m[3] * b.y + m[5], e = 1 - (1 - u) * (1 - u), k = Math.max(1, cw / 1440)
+        c.globalAlpha = 1 - u
+        c.strokeStyle = '#ffffff'; c.lineWidth = 2.2 * k * (1 - u * 0.6)
+        c.beginPath(); c.ellipse(x, y, (6 + e * 22) * k, (3 + e * 11) * k, 0, 0, Math.PI * 2); c.stroke()
+        c.strokeStyle = b.ink; c.lineWidth = 2.6 * k
+        c.beginPath()
+        for (let s = 0; s < 8; s++) {
+          const a = (s / 8) * Math.PI * 2 + 0.4, r0 = (8 + e * 16) * k, r1 = (13 + e * 26) * k
+          c.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0 * 0.62 - e * 6 * k); c.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1 * 0.62 - e * 6 * k)
+        }
+        c.stroke(); n += 2
+      }
+      c.globalAlpha = 1
+    }
+    return n
+  }
+  return {
+    aurora, top,
+    /** The map was touched at (x, y): a burst of light there, in a colour. */
+    burst(x: number, y: number, ink = '#4ee8c2') { if (o.play && bursts.length < 6) bursts.push({ at: performance.now(), x, y, ink }) },
+  }
 }
