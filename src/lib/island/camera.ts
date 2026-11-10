@@ -203,7 +203,7 @@ export function initIsland(o: {
   /** Do something with the engine now, or as soon as there is one. */
   const withEngine = (fn: (e: Engine) => void) => { if (engine) fn(engine); else waiting.push(fn) }
   o.scene.then((scene) => {
-    const e = createEngine({ canvas, base: o.base, scene, play: PLAY, state: () => ({ ...o.state(), near, lens }), deepLens: box.dataset.world === 'real' })
+    const e = createEngine({ canvas, base: o.base, scene, play: PLAY, state: () => ({ ...o.state(), near, lens, glow: glowOn }), deepLens: box.dataset.world === 'real' })
     e.onLoaded = () => wake()
     e.setHot(hot); e.dim(keep)
     engine = e
@@ -302,6 +302,9 @@ export function initIsland(o: {
    * for eight seconds at least, and comes back once they are over 52 again. ?lens=1 or 0: always or never.
    */
   const LENS_ASK = new URLSearchParams(location.search).get('lens'), FINE = matchMedia('(pointer: fine)').matches
+  /** The glow (engine.ts drawGlow) keeps the lens's company: with a mouse, while frames keep up; at any zoom. ?glow=1 or 0: always or never. */
+  const GLOW_ASK = new URLSearchParams(location.search).get('glow')
+  let glowOn = 0
   let lens = 0, lensOn = LENS_ASK === '1' || (LENS_ASK !== '0' && FINE) ? 1 : 0, lensWant = lensOn, lensAt = 0, gap = FRAME
   /** The lens for this frame; and whether it is still fading in or out. */
   const lensStep = (t: number, raw: number) => {
@@ -312,6 +315,7 @@ export function initIsland(o: {
     }
     lensOn = lensWant > lensOn ? Math.min(lensWant, lensOn + raw / 500) : Math.max(lensWant, lensOn - raw / 500)
     lens = lensOn * Math.min(1, Math.max(0, (1.6 - cam.z / fitZ()) / 0.6))
+    glowOn = GLOW_ASK === '1' ? 1 : GLOW_ASK === '0' ? 0 : lensOn
     return lensOn !== lensWant
   }
   /** Until when it is drawn every frame anyway: while the buildings drop in, and while a picked one lifts or settles. */

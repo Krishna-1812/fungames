@@ -27,7 +27,7 @@ type V = Node & { k: 'v' }
 type T = Node & { k: 'txt' }
 type Cam = { x: number; y: number; z: number }
 /** lens: how much of the miniature's shallow focus the view has (see drawLens), 0 to 1. */
-export type IslandState = { time: string; season: string; hour: number; near: boolean; fest?: boolean; lens?: number }
+export type IslandState = { time: string; season: string; hour: number; near: boolean; fest?: boolean; lens?: number; /** The bloom (drawGlow), 0 to 1. */ glow?: number }
 /**
  * Something the page draws itself, live, in the painting's own order (a ball
  * you can throw, pigeons, a parade): given the canvas, the world-to-device
@@ -921,6 +921,47 @@ export function createEngine(o: {
     }
     ctx.globalAlpha = 1
   }
+  /* ---- the glow ---- */
+  /**
+   * Light that spills: what is bright in the frame (a lit window, a lamp, white surf, a sunlit wall) glows a
+   * little into what is round it, as it does through a camera. The frame is halved down to an eighth of its
+   * size in CSS pixels, multiplied by itself twice there (so only what is bright is left), softened a step
+   * further down and back, and screened over the frame. Four small canvases; ten calls a frame, none at 0.
+   */
+  const GLOW: Record<string, number> = { day: 0.34, dawn: 0.46, dusk: 0.56, night: 0.8 }
+  const glowPool: OffscreenCanvas[] = []
+  function drawGlow(at: number) {
+    const w = canvas.width, h = canvas.height, steps = dpr >= 1.5 ? 4 : 3
+    const lad = Array.from({ length: steps + 2 }, (_, i) => {
+      const cw = Math.max(1, Math.ceil(w / 2 ** (i + 1))), ch = Math.max(1, Math.ceil(h / 2 ** (i + 1)))
+      const oc = glowPool[i] ?? (glowPool[i] = new OffscreenCanvas(cw, ch))
+      if (oc.width !== cw || oc.height !== ch) { oc.width = cw; oc.height = ch }
+      const c = oc.getContext('2d')! as unknown as OffscreenCanvasRenderingContext2D
+      c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'
+      return { oc, c, cw, ch }
+    })
+    toIdent()
+    // Down, a half at a time (so it does not shimmer as the view moves).
+    lad.forEach((l, i) => {
+      if (i >= steps) return
+      l.c.globalCompositeOperation = 'copy'
+      if (i === 0) l.c.drawImage(canvas, 0, 0, w, h, 0, 0, l.cw, l.ch)
+      else l.c.drawImage(lad[i - 1].oc, 0, 0, lad[i - 1].cw, lad[i - 1].ch, 0, 0, l.cw, l.ch)
+    })
+    // Only the bright is kept: the small picture times itself, twice.
+    const b = lad[steps - 1]
+    b.c.globalCompositeOperation = 'multiply'
+    b.c.drawImage(b.oc, 0, 0); b.c.drawImage(b.oc, 0, 0)
+    // Softer: two steps further down, and back.
+    for (let i = steps; i < steps + 2; i++) { const l = lad[i], p = lad[i - 1]; l.c.globalCompositeOperation = 'copy'; l.c.drawImage(p.oc, 0, 0, p.cw, p.ch, 0, 0, l.cw, l.ch) }
+    for (let i = steps; i >= steps - 1; i--) { const l = lad[i], p = lad[i + 1]; l.c.globalCompositeOperation = 'copy'; l.c.drawImage(p.oc, 0, 0, p.cw, p.ch, 0, 0, l.cw, l.ch) }
+    ctx.globalCompositeOperation = 'screen'
+    ctx.globalAlpha = at
+    ctx.drawImage(b.oc, 0, 0, b.cw, b.ch, 0, 0, w, h)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+    cs.images += steps + 7
+  }
   /** What carries lights (cars, boats, buoys), as drawn this frame; and how strongly they shine now. */
   const lamps: Lamp[] = []
   let lampK = 0, lampsLit = false
@@ -1003,6 +1044,8 @@ export function createEngine(o: {
     if (!lampsLit) lampsOn()
     if (drawLive.top) hook(drawLive.top)
     ctx.globalAlpha = 1
+    const glow = (st.glow ?? 0) * timed('glow', GLOW[st.time] ?? GLOW.day, LAYERS.night.fadeMs)
+    if (glow > 0.004) drawGlow(glow)
     const lens = lensFor ?? st.lens ?? 0
     if (lens > 0.004) drawLens(lens)
     lastGaps = gaps; lastBlurry = blurry
