@@ -382,9 +382,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // The open sea is a touch deeper the further it is from the island.
   const [mx, my] = P(GRID / 2, GRID / 2, SEA)
   const defs = root.add(new N('defs'))
-  const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: plate ? 1500 : 1150, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
-  // On the realistic island, the ocean the plate fades into: its own colour, deepening further out.
-  grad.add(new N('stop', { offset: 0.3, 'stop-color': plate?.sea ?? LAND.seaNear }))
+  // On the realistic island, the ocean the plate fades into: its own colour all the way round the picture's box,
+  // corners and all, deepening only past them (deepened at the box's edges, as it was from a third of the way out,
+  // the picture showed as a panel of bluer water when zoomed out).
+  const reach = plate ? Math.max(...[plate.box[0], plate.box[2]].flatMap((x) => [plate.box[1], plate.box[3]].map((y) => Math.hypot(x - mx, (y - my) / 0.55)))) : 0
+  const grad = defs.add(new N('radialGradient', { id: 'isl-sea', cx: f(mx), cy: f(my), r: plate ? f(reach / 0.7) : 1150, gradientUnits: 'userSpaceOnUse', gradientTransform: `translate(${f(mx)} ${f(my)}) scale(1 0.55) translate(${f(-mx)} ${f(-my)})` }))
+  grad.add(new N('stop', { offset: plate ? 0.7 : 0.3, 'stop-color': plate?.sea ?? LAND.seaNear }))
   // (The drawn sea deepens inside the view, not off past its edges: a stop half way, a nearer far edge.)
   if (!plate) grad.add(new N('stop', { offset: 0.55, 'stop-color': '#3a82c8' }))
   grad.add(new N('stop', { offset: 1, 'stop-color': plate?.sea ? deepen(plate.sea, 0.82) : LAND.seaFar }))

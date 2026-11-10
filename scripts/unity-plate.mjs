@@ -71,18 +71,22 @@ console.log('graded')
 // Fade the edges into the site's own sea.
 const F = FADE * m.scale
 // The open sea's own colour, as it comes out round the edges (a band just inside the fade): the site's
-// sea is painted in it, so the picture fades into the same water (plate.json's `sea`).
+// sea is painted in it, so the picture fades into the same water (plate.json's `sea`). Each channel's
+// middle value rather than its mean: the island's four tips reach into the band, and their sand and
+// shallows (a fifth of it) lifted the mean well above the water's own colour.
 const sea = (() => {
-  let r = 0, g = 0, b = 0, n = 0
+  const hist = [0, 1, 2].map(() => new Uint32Array(256))
+  let n = 0
   for (let y = 0; y < H; y += 3) for (let x = 0; x < W; x += 3) {
     const e = Math.min(y, H - 1 - y, x, W - 1 - x)
     if (e < F || e > 2 * F) continue
     const k = (y * W + x) * 4
     if (px[k + 3] < 250) continue
-    r += px[k]; g += px[k + 1]; b += px[k + 2]; n++
+    for (let ch = 0; ch < 3; ch++) hist[ch][px[k + ch]]++
+    n++
   }
-  const h = (v) => Math.round(v / Math.max(1, n)).toString(16).padStart(2, '0')
-  return '#' + h(r) + h(g) + h(b)
+  const mid = (h) => { let c = 0; for (let v = 0; v < 256; v++) if ((c += h[v]) * 2 >= n) return v; return 0 }
+  return '#' + hist.map((h) => mid(h).toString(16).padStart(2, '0')).join('')
 })()
 console.log('open sea', sea)
 const seaRgb = [1, 3, 5].map((i) => parseInt(sea.slice(i, i + 2), 16))
