@@ -70,8 +70,10 @@ namespace Island
                 else if (x.kind == "lamp")
                     lights.Add(new L { p = p, c = LampColour.linear * 0.7f * 0.75f, range = 1.5f, core = 0.055f, kind = 0 });
                 else if (x.z > 90 && string.Equals(x.col, "#fff8e0", StringComparison.OrdinalIgnoreCase))
-                    // The lighthouse's lantern: bright, and seen far off.
-                    lights.Add(new L { p = p, c = LanternColour.linear * 1.6f, range = 3.2f, core = 0.30f, kind = 3 });
+                    // The lighthouse's lantern: bright, and seen far off. Its glass is 10.5 px from the lamp (Models.cs,
+                    // Lighthouse), and the lighthouse is a set piece built half as big again (world.ts, HERO; Buildings.Hero),
+                    // so the glass stands 0.35 out: the core is as much bigger, or it never reaches it.
+                    lights.Add(new L { p = p, c = LanternColour.linear * 1.6f, range = 3.2f, core = 0.30f * 1.5f, kind = 3 });
                 else
                     lights.Add(new L { p = p, c = Hex(x.col).linear * 0.07f, range = 0.75f, kind = 2 });
             }

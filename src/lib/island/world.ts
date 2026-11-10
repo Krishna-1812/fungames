@@ -1901,7 +1901,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if (!lit[n]) return
       // With Unity's night light, the windows and the street lamps are in it, glowing as they really do;
       // what is left (bulbs on strings, the hall's display) keeps a softer glow of its own.
-      // (The lighthouse's lantern too: Unity's glow has it, a bright core in its glass.)
+      // (The lighthouse's lantern too: Unity's glow lights its glass, and its light in the air is laid on below, with the beam's.)
       if (glowRef && (l.face || l.el?.attrs.class === 'lamp-bulb' || l.el?.attrs.class === 'stp-lamp')) return
       const [x, y] = l
       if (!glowRef && l.el?.attrs.class === 'stp-lamp') { /* the lantern: below */ }
@@ -1997,9 +1997,10 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       for (const [o, op] of glowRef ? [[0, 0.5], [0.25, 0.26], [0.6, 0.08], [1, 0]] : [[0, 0.42], [0.25, 0.2], [0.6, 0.06], [1, 0]]) bd.add(new N('stop', { offset: o, 'stop-color': glowRef ? '#eef3ff' : '#fff3da', 'stop-opacity': op }))
       for (const rot of [0, 180]) for (const w of [1, 0.72, 0.48, 0.3, 0.16]) sweep.add(new N('path', { d: `M0 ${f(-2.5 * w)}L700 ${f(-58 * w)}L700 ${f(58 * w)}L0 ${f(2.5 * w)}Z`, fill: 'url(#isl-beam)', opacity: 0.3, transform: rot ? 'rotate(180)' : undefined }))
       motionCss.push(`.isl-layer--beam{transform-origin:${f(beacon[0] - viewBox[0])}px ${f(beacon[1] - viewBox[1])}px}`)
-      // The lantern's own light, on the realistic island too: Unity's night light was meant to light it, but
-      // its core never reaches the glass, so the island's brightest light stood dark there all night.
-      if (glowRef) night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 14, fill: 'url(#isl-glow)', class: 'night-shine' }))
+      // The lantern's own light, on the realistic island too, laid on the glass we see: Unity's round lantern puts
+      // its front lower on the screen than the lamp at the tower's middle, by half its width (8, at the lighthouse's
+      // size), and a glow on the lamp itself sat on the cap's rim.
+      if (glowRef) night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1] + 8), r: 14, fill: 'url(#isl-glow)', class: 'night-shine' }))
       // And its flash each time the beam comes round to face you (engine.ts tagAlpha times it to the beam).
       night.add(new N('circle', { cx: f(beacon[0]), cy: f(beacon[1]), r: 70, fill: 'url(#isl-flash)', class: 'night-halos beacon-flash' }))
     }
