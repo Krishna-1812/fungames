@@ -180,7 +180,7 @@ const book = BOOK.map((key) => {
           </nav>
         </header>
 
-        <h1 class="isl-title"><span class="isl-title-k">Tiny Island</span>{' '}<span class="isl-title-l">{count} small games, one on every building</span></h1>
+        <h1 class="isl-title"><span class="isl-title-k" data-t="Tiny Island">Tiny Island</span>{' '}<span class="isl-title-l">{count} small games, one on every building</span></h1>
         <p class="isl-hint"><span class="isl-hint-long">Drag to explore · click any building to play</span><span class="isl-hint-short">Drag · pinch · tap a building</span></p>
 
         <div class="isl-welcome" id="islWelcome" hidden>
@@ -1917,7 +1917,9 @@ const book = BOOK.map((key) => {
   .isl-sky-opt { border: 0; background: none; cursor: pointer; }
   .isl-sky-opt[aria-pressed='true'] { background: #1b2340; color: #fff; }
   .isl-sky-opt[aria-pressed='true']:hover { background: #1b2340; }
-  .isl-sky--map { position: absolute; left: 50%; bottom: 24px; z-index: 6; transform: translateX(-50%); }
+  .isl-sky--map { position: absolute; left: calc(clamp(14px, 3vw, 32px) + 308px); bottom: 24px; z-index: 6; transition: left 0.28s; }
+  .isl-box.is-map .isl-sky--map { left: calc(clamp(14px, 3vw, 32px) + 456px); }
+  @media (max-width: 1100px) { .isl-sky--map { left: calc(clamp(14px, 3vw, 32px) + 292px); } }
   .isl-sky--map .isl-world-opt { padding: 6px 10px; min-height: 36px; }
   .isl-sky--map .isl-world-opt span { display: none; }
   .isl-sky--map .isl-world-opt[aria-pressed='true'] span { display: inline; }
@@ -2543,6 +2545,56 @@ const book = BOOK.map((key) => {
     .isl-nav { margin-left: auto; }
     .isl-btn, .isl-btn--round { padding: 8px 6px; }
     .isl-world-opt { padding: 5px 4px; }
+  }
+
+  /* ---- the island as a game's title screen ---- */
+  /* The title is a logo: over its white letters a copy lit from above (white down to the sky's pale blue), which
+     a glint crosses now and then; under them, a soft shadow on the sea. */
+  .isl-title-k { position: relative; text-shadow: 0 5px 0 #1b2340, 0 14px 24px rgba(10, 20, 60, 0.4); }
+  .isl-title-k::after {
+    content: attr(data-t); position: absolute; left: 0; top: 0;
+    -webkit-text-stroke: 0; text-shadow: none; color: transparent;
+    background: linear-gradient(100deg, rgba(255, 255, 255, 0) 42%, #ffffff 50%, rgba(255, 255, 255, 0) 58%) 130% 0 / 260% 100% no-repeat, linear-gradient(180deg, #ffffff 30%, #dcf2ff 58%, #9fd9fb 100%);
+    -webkit-background-clip: text; background-clip: text;
+  }
+  @media (max-width: 699px) { .isl-title-k { text-shadow: 0 4px 0 #1b2340, 0 10px 18px rgba(10, 20, 60, 0.4); } }
+  /* The card of a building: its picture on a floor of the game's colour, lit from above; and the way in, which beats. */
+  .isl-card-pic { position: relative; height: 146px; background: radial-gradient(120% 90% at 50% 0%, #fff 0%, color-mix(in srgb, var(--tint, #e3e9ff) 55%, #fff) 45%, var(--tint, #e3e9ff) 100%); }
+  .isl-card-pic img { position: absolute; left: 50%; bottom: -18%; height: 165%; width: auto; max-width: none; margin: 0; transform: translateX(-50%); }
+  .isl-card-title { font-size: 24px; }
+  .isl-card-play { position: relative; }
+  /* The buildings' names: a pin of the game's colour before each. */
+  :global(.isl-box[data-world='cartoon'] .isl-tag) { display: inline-flex; align-items: center; gap: 6px; padding-left: 8px; }
+  :global(.isl-box[data-world='cartoon'] .isl-tag::before) { content: ''; width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--tint, #4fe3c1); border: 2px solid #1b2340; }
+  @media (prefers-reduced-motion: no-preference) {
+    /* The logo drops in with a bounce; the glint crosses every few seconds. */
+    .isl-title-k { animation: isl-logo-in 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s backwards; }
+    .isl-title-k::after { animation: isl-logo-glint 7s ease-in-out 1.6s infinite; }
+    .isl-title-l { animation: isl-logo-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.45s backwards; }
+    @keyframes isl-logo-in { from { transform: translateY(-26px) scale(0.72); opacity: 0; } }
+    @keyframes isl-logo-glint { 0%, 62% { background-position: 130% 0, 0 0; } 82%, 100% { background-position: -30% 0, 0 0; } }
+    /* The bar comes down and the corner controls come up, one after another, as the page opens. */
+    .isl-top > *, .isl-nav > * { animation: isl-hud-down 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) backwards; }
+    .isl-top > * { animation-delay: 0.1s; }
+    .isl-nav > *:nth-child(1) { animation-delay: 0.18s; } .isl-nav > *:nth-child(2) { animation-delay: 0.25s; }
+    .isl-nav > *:nth-child(3) { animation-delay: 0.32s; } .isl-nav > *:nth-child(4) { animation-delay: 0.39s; }
+    .isl-top > .isl-nav { animation: none; }
+    @keyframes isl-hud-down { from { translate: 0 -90px; } }
+    @keyframes isl-hud-up { from { translate: 0 110px; } }
+    .isl-zoom > *, .isl-mapbtn, .isl-world--map, .isl-sky--map { animation: isl-hud-up 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) 0.3s backwards; }
+    .isl-zoom > *:nth-child(2) { animation-delay: 0.36s; } .isl-zoom > *:nth-child(3) { animation-delay: 0.42s; } .isl-zoom > *:nth-child(4) { animation-delay: 0.48s; }
+    /* A button lifts to meet the pointer. */
+    @media (hover: hover) {
+      :global(.isl-box[data-world='cartoon']) :is(.isl-btn, .isl-zoom button, .isl-down, .isl-card-play):hover:not(:active) { transform: translateY(-2px); box-shadow: 0 6px 0 #1b2340; }
+      .isl-btn:hover svg { animation: isl-ic-nod 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+      @keyframes isl-ic-nod { 40% { transform: rotate(-12deg) scale(1.15); } 70% { transform: rotate(8deg) scale(1.05); } }
+    }
+    /* Surprise me, and the way into a game: a sheen crosses them, and Play's rim beats. */
+    .isl-btn--hot, .isl-card-play { background-image: linear-gradient(100deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.75) 50%, rgba(255, 255, 255, 0) 60%); background-size: 260% 100%; background-repeat: no-repeat; background-position: 130% 0; animation: isl-sheen 5.5s ease-in-out 2.2s infinite; }
+    .isl-nav > .isl-btn--hot { animation: isl-hud-down 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) 0.32s backwards, isl-sheen 5.5s ease-in-out 2.2s infinite; }
+    @keyframes isl-sheen { 0%, 70% { background-position: 130% 0; } 90%, 100% { background-position: -30% 0; } }
+    .isl-card.is-on .isl-card-play::after { content: ''; position: absolute; inset: -3px; border-radius: 14px; border: 3px solid #4fe3c1; animation: isl-play-beat 1.8s ease-out infinite; pointer-events: none; }
+    @keyframes isl-play-beat { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(1.22, 1.5); } }
   }
 </style>
 
