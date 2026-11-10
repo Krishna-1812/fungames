@@ -170,6 +170,7 @@ const book = BOOK.map((key) => {
             <div class="isl-more">
               <button type="button" class="isl-btn isl-btn--round" id="btnMore" aria-expanded="false" aria-controls="islMorePanel" aria-label="How the island looks and sounds" title="How the island looks and sounds"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="15" cy="7" r="2.4" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /><circle cx="9" cy="17" r="2.4" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /></svg><em class="isl-cap" aria-hidden="true">More</em></button>
               <div class="isl-more-panel" id="islMorePanel" hidden>
+                <div class="isl-world isl-sky isl-sky--panel" role="group" aria-label="Time of day on the island"><button type="button" class="isl-world-opt isl-sky-opt" data-sky="dawn" aria-pressed="false" aria-label="Dawn" title="Dawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 17a5.5 5.5 0 0 1 11 0z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M2.5 17h19M12 5.5V8M4.9 9.9l1.8 1.8M19.1 9.9l-1.8 1.8M9.5 21l2.5-2.5 2.5 2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg><span>Dawn</span></button><button type="button" class="isl-world-opt isl-sky-opt" data-sky="day" aria-pressed="false" aria-label="Day" title="Day"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg><span>Day</span></button><button type="button" class="isl-world-opt isl-sky-opt" data-sky="dusk" aria-pressed="false" aria-label="Dusk" title="Dusk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 17a5.5 5.5 0 0 1 11 0z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M2.5 17h19M12 5.5V8M4.9 9.9l1.8 1.8M19.1 9.9l-1.8 1.8M9.5 20l2.5 2 2.5-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg><span>Dusk</span></button><button type="button" class="isl-world-opt isl-sky-opt" data-sky="night" aria-pressed="false" aria-label="Night" title="Night"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Night</span></button></div>
                 <div class="isl-more-row">
                   <button type="button" class="isl-btn isl-btn--round" id="btnTime" aria-label="Switch to night" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-sun"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></g><path class="ic-moon" d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Night</span></button>
                   <button type="button" class="isl-btn isl-btn--round" id="btnSound" aria-label="Turn sound on" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-waves" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg><span>Sound</span></button>
@@ -233,6 +234,7 @@ const book = BOOK.map((key) => {
         </div>
         {/* Cartoon or realistic: on the map itself, by the map button, where it can be seen and reached at once. */}
       {worlds && (
+        <div class="isl-world isl-sky isl-sky--map" role="group" aria-label="Time of day on the island"><button type="button" class="isl-world-opt isl-sky-opt" data-sky="dawn" aria-pressed="false" aria-label="Dawn" title="Dawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 17a5.5 5.5 0 0 1 11 0z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M2.5 17h19M12 5.5V8M4.9 9.9l1.8 1.8M19.1 9.9l-1.8 1.8M9.5 21l2.5-2.5 2.5 2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg><span>Dawn</span></button><button type="button" class="isl-world-opt isl-sky-opt" data-sky="day" aria-pressed="false" aria-label="Day" title="Day"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg><span>Day</span></button><button type="button" class="isl-world-opt isl-sky-opt" data-sky="dusk" aria-pressed="false" aria-label="Dusk" title="Dusk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 17a5.5 5.5 0 0 1 11 0z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M2.5 17h19M12 5.5V8M4.9 9.9l1.8 1.8M19.1 9.9l-1.8 1.8M9.5 20l2.5 2 2.5-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg><span>Dusk</span></button><button type="button" class="isl-world-opt isl-sky-opt" data-sky="night" aria-pressed="false" aria-label="Night" title="Night"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg><span>Night</span></button></div>
         <div class="isl-world isl-world--map" role="group" aria-label="How the island looks">
           <a class="isl-world-opt" href={worldHref.cartoon} data-world="cartoon" aria-label="Cartoon island" aria-current={world === 'cartoon' ? 'page' : undefined} title="The island, drawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-8.2 8.2c-.9.9-2.2 1.3-3.4 1.1l-3.4-.6.6-3.4c.2-1.2.6-2.5 1.5-3.4z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12.5 6.5l5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Cartoon</span></a>
           <a class="isl-world-opt" href={worldHref.real} data-world="real" aria-label="Realistic island" aria-current={world === 'real' ? 'page' : undefined} title="The island, rendered in 3D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 19.5l6-9 4 5.5 2.6-3.5 6.4 7z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="17" cy="6.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Realistic</span></a>
@@ -619,7 +621,7 @@ const book = BOOK.map((key) => {
   }
   const box = document.getElementById('islBox')!
   /* ---- the cartoon island or the realistic one: the other page, remembered for next time ---- */
-  for (const a of document.querySelectorAll<HTMLAnchorElement>('.isl-world-opt')) {
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('a.isl-world-opt')) {
     a.addEventListener('click', (ev) => {
       if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return
       ev.preventDefault()
@@ -627,7 +629,7 @@ const book = BOOK.map((key) => {
       try { localStorage.setItem('isl-world', a.dataset.world!); sessionStorage.setItem('isl-swap', '1') } catch {}
       track('isl_world', { to: a.dataset.world! })
       // The pill turns over at once; the page follows.
-      for (const b of document.querySelectorAll('.isl-world-opt')) b.removeAttribute('aria-current')
+      for (const b of document.querySelectorAll('a.isl-world-opt')) b.removeAttribute('aria-current')
       a.setAttribute('aria-current', 'page')
       location.assign(a.href + location.search)
     })
@@ -778,11 +780,11 @@ const book = BOOK.map((key) => {
       return h && { move: h.move, up() { h.up(); track('isl_ball', { touch }) } }
     }, pointer: (x, y, z, kind) => { play.pointer(x, y, z, kind); life.startle(x, y) }, grabbable: play.overBall,
     // Where people tap, for the admin page's heat-map: rounded to ten map units, and at most eighty a visit.
-    onTap: (x, y, z, hit, what) => { if (taps++ < 80) track('isl_tap', { x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10, z: Math.round(z * 100) / 100, hit, what }) },
+    onTap: (x, y, z, hit, what) => { air.burst(x, y); if (taps++ < 80) track('isl_tap', { x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10, z: Math.round(z * 100) / 100, hit, what }) },
   })
   let taps = 0
   // The air (lib/island/air): the aurora once the night has fallen over the map, the mist and the sun's shafts over all.
-  const air = createAir({ play: WORLD_PLAY, time: () => box.dataset.time ?? 'day' })
+  const air = createAir({ play: WORLD_PLAY, time: () => box.dataset.time ?? 'day', season: () => box.dataset.season ?? '' })
   // What lives in the water (lib/island/sealife): shadows under the sun's sparkle, and after dark what glows.
   const life = createSeaLife({
     grid: data.grid, size: Math.round(Math.sqrt(data.grid.length)), openSea: data.play.openSea, play: WORLD_PLAY,
@@ -864,6 +866,7 @@ const book = BOOK.map((key) => {
   // eight. The sun/moon button picks day or night by hand, remembered in this
   // browser; picking what the clock would have chosen goes back to the clock.
   const btnTime = document.getElementById('btnTime')!
+  const skyOpts = [...document.querySelectorAll<HTMLButtonElement>('.isl-sky-opt')]
   // The season, from the visitor's own date: snow from December to Twelfth
   // Night, fireworks on New Year's Eve and Day, blossom in April. A page can
   // ask for one (?season=winter, spring or newyear) and for a time of day
@@ -881,9 +884,10 @@ const book = BOOK.map((key) => {
   const readTime = () => { try { return localStorage.getItem('isl-time') } catch { return null } }
   const showTime = () => {
     const forced = ask.get('time'), chosen = readTime()
-    const t = forced && ['dawn', 'day', 'dusk', 'night'].includes(forced) ? forced : chosen === 'day' || chosen === 'night' ? chosen : byClock()
+    const t = forced && ['dawn', 'day', 'dusk', 'night'].includes(forced) ? forced : chosen && ['dawn', 'day', 'dusk', 'night'].includes(chosen) ? chosen : byClock()
     box.dataset.time = t
     const dark = t === 'night' || t === 'dusk'
+    for (const b of skyOpts) b.setAttribute('aria-pressed', String(b.dataset.sky === t))
     btnTime.setAttribute('aria-pressed', String(dark))
     btnTime.setAttribute('aria-label', dark ? 'Switch to day' : 'Switch to night')
     isle.redraw()
@@ -898,6 +902,14 @@ const book = BOOK.map((key) => {
     const next = box.dataset.time === 'night' || box.dataset.time === 'dusk' ? 'day' : 'night'
     const clock = byClock(), clockDark = clock === 'night' || clock === 'dusk'
     try { if ((next === 'night') === clockDark) localStorage.removeItem('isl-time'); else localStorage.setItem('isl-time', next) } catch {}
+    track('isl_time', { mode: next })
+    showTime()
+  })
+  // The sky's four hours, each a button (down the middle of the map, and in the panel on a phone): the hour
+  // the clock is at anyway goes back to following the clock.
+  for (const b of skyOpts) b.addEventListener('click', () => {
+    const next = b.dataset.sky!
+    try { if (next === byClock()) localStorage.removeItem('isl-time'); else localStorage.setItem('isl-time', next) } catch {}
     track('isl_time', { mode: next })
     showTime()
   })
@@ -1901,6 +1913,18 @@ const book = BOOK.map((key) => {
     .isl-world--map .isl-world-opt span { display: none; }
   }
   .isl-more-row { display: flex; gap: 8px; }
+  /* The sky's hours: dawn, day, dusk, night, the one showing filled. Down the middle of the map where there is room; in the panel on a phone. */
+  .isl-sky-opt { border: 0; background: none; cursor: pointer; }
+  .isl-sky-opt[aria-pressed='true'] { background: #1b2340; color: #fff; }
+  .isl-sky-opt[aria-pressed='true']:hover { background: #1b2340; }
+  .isl-sky--map { position: absolute; left: 50%; bottom: 24px; z-index: 6; transform: translateX(-50%); }
+  .isl-sky--map .isl-world-opt { padding: 6px 10px; min-height: 36px; }
+  .isl-sky--map .isl-world-opt span { display: none; }
+  .isl-sky--map .isl-world-opt[aria-pressed='true'] span { display: inline; }
+  .isl-sky--panel { display: none; box-shadow: none; border-width: 2.5px; justify-content: space-between; }
+  .isl-sky--panel .isl-world-opt { flex: 1; justify-content: center; padding: 8px 6px; }
+  .isl-sky--panel .isl-world-opt span { display: none; }
+  @media (max-width: 900px) { .isl-sky--map { display: none; } .isl-sky--panel { display: flex; } .isl-more-panel .isl-more-row #btnTime { display: none; } }
   .isl-more-row .isl-btn { flex: 1; justify-content: center; padding: 8px 10px; box-shadow: 0 3px 0 #1b2340; border-width: 2.5px; font-size: 15px; }
   #btnMore[aria-expanded='true'] { background: #1b2340; color: #fff; }
   .isl-btn .ic-moon { display: none; }
