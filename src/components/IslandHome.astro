@@ -1059,7 +1059,7 @@ const book = BOOK.map((key) => {
     // Where the ferry is along its crossing (0..1), to hear its horn from there.
     // And where the drawn surf is in its roll, so the sound breaks with it (only while the waves move).
     let ferry = (): number | null => null, surf = (): number | null => null
-    isle.withEngine((e) => { ferry = () => e.phase('isl-ferry'); if (PLAY) surf = () => e.phase('isl-surf') })
+    isle.withEngine((e) => { ferry = () => e.phase('isl-ferry'); if (WORLD_PLAY) surf = () => e.phase('isl-surf') })
     const uf = data.anchors['universe-forecast']
     // Whatever is open over the island, from a game's card to the passport: the island heard through a door.
     const card = box.querySelector('.isl-card')!, board = byId('islBoard'), books = [byId('pp'), byId('pc')] as HTMLDialogElement[]
@@ -1701,7 +1701,9 @@ const book = BOOK.map((key) => {
   }
 
   /* ---- a few motions that need a clock rather than a keyframe ------------- */
-  if (PLAY) isle.withEngine((e) => {
+  // They are drawn on the island's canvas, so like its walkers and waves they follow only the visitor's own
+  // preference (WORLD_PLAY): PLAY is lost when motion.ts loads late, and that must not leave them standing still.
+  if (WORLD_PLAY) isle.withEngine((e) => {
     // Who Was Alive's year, on the map and on its card.
     setInterval(() => { if (!isle.awake()) return; const y = String(1300 + Math.floor(Math.random() * 720)); e.setText('wwa-year', y); document.querySelectorAll('.gc-svg .wwa-year').forEach((el) => { el.textContent = y }) }, 2400)
     // Life in Weeks fills in, a week at a time.
