@@ -1826,7 +1826,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // The realistic island (Unity's night light to lay over it): the day multiplied down to moonlight and
   // some of its colour taken out, rather than a blue laid over it (moves.ts, LAYERS.night.real).
   const glowRef = opts.plate ? opts.glow ?? null : null
-  const veilBox = { x: sx0 - 400, y: sy1 - 1400, width: sx1 - sx0 + 800, height: sy2 - sy1 + 2000 }
+  // (Well past the sea, on every side: a phone zoomed right out sees much more sea than the island has, and the
+  // sea that lay outside this box stayed day-bright below a hard line at night.)
+  const veilBox = { x: sx0 - 1600, y: sy1 - 2400, width: sx1 - sx0 + 3200, height: sy2 - sy1 + 5600 }
   // The line the night's light falls along (engine.ts tagFill, when a time's veil colour is a pair): from the
   // moon across the island to its far side, so the land nearest the moon is the most lit.
   const [icx, icy] = P(GRID / 2, GRID / 2)
