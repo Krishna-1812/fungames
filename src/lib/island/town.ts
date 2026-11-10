@@ -7,7 +7,7 @@
  * height as its floor. Anything that moves on its own carries `amb` and its
  * screen box in `data-b`, so the camera can pause it (cull() in camera.ts).
  */
-import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, puffShade, render } from './kit'
+import { C, INK, OUT, N, Pen, shade, mix, S, motionCss, r1, print, ballShade, puffShade, render, look } from './kit'
 import { person, tree } from './props'
 import { vehicleUse, boatUse, actorUse, creatureUse, who, type Facing } from './actors'
 import { folk, drawFolk, drawSitter, drawBenchSitter, drawBust, FOLK } from './folk'
@@ -445,19 +445,30 @@ function surfDrawn(p: Pen, bx: number, by: number, c: string) {
  * standing on posts in the water, with a fisher at the end.
  */
 export function pier(p: Pen, pts: [number, number][], z: number, fisher: string | null) {
+  const feet: [number, number][] = []
+  pierBody(p, pts, z, fisher, feet)
+  // In the drawn sea the posts carry on a little way under it, darker and broken, with a ring of lap where each
+  // goes in (the sea's surface is 7 below the deck's BEACH + 1: world.ts). Last of all, so the solids the pier
+  // is made of stay one run, as the realistic island (which has none of this) records them.
+  if (!look.soft) return
+  const under = feet.map(([px, py]) => [[z - 12, z - 17], [z - 20, z - 24]].map(([z0, z1]) => `M${p.at(px, py, z0).map(f).join(' ')}L${p.at(px, py, z1).map(f).join(' ')}`).join('')).join('')
+  p.path(under, 'none', { sw: 2.4, stroke: '#2a5d9a', op: 0.35 })
+  const lap = feet.map(([px, py]) => { const [sx, sy] = p.at(px, py, z - 7); return `M${f(sx - 3.6)} ${f(sy + 0.4)}q3.6 2.4 7.2 0` }).join('')
+  p.path(lap, 'none', { sw: 0.9, stroke: '#ffffff', op: 0.55 })
+}
+
+function pierBody(p: Pen, pts: [number, number][], z: number, fisher: string | null, feet: [number, number][]) {
   const w = 0.24
   for (let n = 0; n < pts.length - 1; n++) {
     const [a, b] = [pts[n], pts[n + 1]]
     const along = Math.abs(b[0] - a[0]) > Math.abs(b[1] - a[1])
     const x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1])
     const len = along ? Math.abs(b[0] - a[0]) : Math.abs(b[1] - a[1])
+    const posts: [number, number][] = []
+    for (let t = 0; t <= len + 0.001; t += 0.3) for (const side of [-1, 1]) posts.push([along ? x0 + t : a[0] + side * w * 0.45, along ? a[1] + side * w * 0.45 : y0 + t])
+    feet.push(...posts)
     // Posts first, so the deck sits on them.
-    for (let t = 0; t <= len + 0.001; t += 0.3) {
-      for (const side of [-1, 1]) {
-        const px = along ? x0 + t : a[0] + side * w * 0.45, py = along ? a[1] + side * w * 0.45 : y0 + t
-        p.line([px, py, z - 12], [px, py, z], { sw: 2.4, stroke: shade(C.wood, 0.75) })
-      }
-    }
+    for (const [px, py] of posts) p.line([px, py, z - 12], [px, py, z], { sw: 2.4, stroke: shade(C.wood, 0.75) })
     const bx = along ? x0 : a[0] - w / 2, by = along ? a[1] - w / 2 : y0
     const bw = along ? len : w, bd = along ? w : len
     const deck = p.box(bx, by, bw, bd, 2.5, { z0: z, fill: '#c6b6ee', top: '#d6caf3', sw: 1.2 })
