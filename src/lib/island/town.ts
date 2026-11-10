@@ -486,6 +486,8 @@ export function rowboat(x: number, y: number, c: string): N {
   if (real) { const g = new N('g', { class: 'moored amb', 'data-b': box(x - 40, y - 30, x + 20, y + 20) }); g.add(real); return g }
   const g = new N('g', { class: 'moored amb', 'data-b': box(x - 20, y - 12, x + 20, y + 8) })
   g.add(new N('path', { d: `M${f(x - 11)} ${f(y + 3)}Q${f(x)} ${f(y + 6)} ${f(x + 10)} ${f(y + 3)}L${f(x + 13)} ${f(y + 9)}Q${f(x)} ${f(y + 11)} ${f(x - 13)} ${f(y + 7)}Z`, fill: c, opacity: 0.18 }))
+  // Its reflection: the hull turned over at the waterline.
+  g.add(new N('path', { d: `M${f(x - 15)} ${f(y + 10)}Q${f(x)} ${f(y + 7)} ${f(x + 15)} ${f(y + 12)}L${f(x + 10)} ${f(y + 3)}Q${f(x)} ${f(y + 1)} ${f(x - 11)} ${f(y + 4)}Z`, fill: c, opacity: 0.2 }))
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 18, ry: 4.5, fill: '#ffffff', opacity: 0.5 }))
   g.add(new N('path', { d: `M${f(x - 15)} ${f(y - 4)}Q${f(x)} ${f(y - 1)} ${f(x + 15)} ${f(y - 6)}L${f(x + 10)} ${f(y + 3)}Q${f(x)} ${f(y + 5)} ${f(x - 11)} ${f(y + 2)}Z`, fill: c, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
   g.add(new N('path', { d: `M${f(x - 12)} ${f(y - 3.5)}Q${f(x)} ${f(y - 0.5)} ${f(x + 12)} ${f(y - 5)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.2 }))
@@ -695,6 +697,8 @@ export function fishingBoat(x: number, y: number, hull: string, delay: number): 
   if (real) { const g = new N('g', { class: 'moored amb', 'data-b': box(x - 90, y - 90, x + 70, y + 40), style: `animation-delay:${f(-delay)}s`, 'data-lamp': boatLamps('fishing', facing, [x, y]) }); g.add(real); return g }
   const g = new N('g', { class: 'moored amb', 'data-b': box(x - 30, y - 40, x + 30, y + 14), style: `animation-delay:${f(-delay)}s`, 'data-lamp': boatLamps('fishing', null, [x, y]) })
   g.add(new N('path', { d: `M${f(x - 18)} ${f(y + 4)}L${f(x + 18)} ${f(y + 4)}L${f(x + 14)} ${f(y + 12)}L${f(x - 14)} ${f(y + 12)}Z`, fill: hull, opacity: 0.18 }))
+  // Its reflection: the hull, the wheelhouse and the mast turned over at the waterline.
+  g.add(new N('path', { d: `M${f(x - 22)} ${f(y + 14)}L${f(x + 20)} ${f(y + 12)}L${f(x + 15)} ${f(y + 4)}L${f(x - 16)} ${f(y + 4)}ZM${f(x + 2)} ${f(y + 13)}v11h11v-11zM${f(x - 9.8)} ${f(y + 13)}V${f(y + 38)}h1.6V${f(y + 13)}z`, fill: hull, opacity: 0.2 }))
   g.add(new N('ellipse', { cx: f(x), cy: f(y + 3), rx: 24, ry: 4.5, fill: '#ffffff', opacity: 0.5 }))
   g.add(new N('path', { d: `M${f(x - 22)} ${f(y - 6)}L${f(x + 20)} ${f(y - 4)}L${f(x + 15)} ${f(y + 4)}L${f(x - 16)} ${f(y + 4)}Z`, fill: hull, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
   g.add(new N('path', { d: `M${f(x - 21)} ${f(y - 3)}L${f(x + 19)} ${f(y - 1)}`, stroke: '#ffffff', 'stroke-width': 1.4 }))

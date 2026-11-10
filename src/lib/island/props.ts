@@ -279,7 +279,9 @@ export function flag(p: Pen, x: number, y: number, z: number, c: string, h = 22,
  */
 export function sailboat(hull: string, sail = '#ffffff', k = 1): string {
   const s = (v: number) => f(v * k)
-  return `<path d="M${s(1)} ${s(7)}L${s(1)} ${s(30)}L${s(14)} ${s(9)}ZM${s(-1)} ${s(7)}L${s(-1)} ${s(23)}L${s(-11)} ${s(8)}Z" fill="${sail}" opacity="0.22"/>` +
+  // Its reflection: the hull and the sails turned over at the waterline, faint.
+  return `<g transform="translate(0 ${s(12)}) scale(1 -1)" opacity="0.2"><path d="M${s(-20)} ${s(-3)}L${s(20)} ${s(-3)}L${s(13)} ${s(6)}L${s(-14)} ${s(6)}Z" fill="${hull}"/><path d="M${s(1)} ${s(-4)}L${s(1)} ${s(-34)}L${s(17)} ${s(-7)}ZM${s(-1)} ${s(-6)}L${s(-1)} ${s(-26)}L${s(-13)} ${s(-7)}Z" fill="${sail}"/></g>` +
+    `<path d="M${s(1)} ${s(7)}L${s(1)} ${s(30)}L${s(14)} ${s(9)}ZM${s(-1)} ${s(7)}L${s(-1)} ${s(23)}L${s(-11)} ${s(8)}Z" fill="${sail}" opacity="0.22"/>` +
     `<path d="M${s(-14)} ${s(6)}L${s(13)} ${s(6)}L${s(10)} ${s(11)}L${s(-11)} ${s(11)}Z" fill="${hull}" opacity="0.18"/>` +
     `<path d="M${s(-22)} ${s(4)}q${s(-12)} ${s(3)} ${s(-26)} ${s(2)}M${s(22)} ${s(4)}q${s(12)} ${s(3)} ${s(26)} ${s(2)}M${s(-18)} ${s(8)}q${s(-9)} ${s(3)} ${s(-18)} ${s(3)}M${s(18)} ${s(8)}q${s(9)} ${s(3)} ${s(18)} ${s(3)}" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" opacity="0.75"/>` +
     `<ellipse cx="0" cy="${s(3)}" rx="${s(24)}" ry="${s(5)}" fill="#ffffff" opacity="0.45"/>` +
