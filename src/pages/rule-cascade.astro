@@ -170,6 +170,7 @@ const total = RULES.length
   import { WORLD_PLAY } from '../lib/motion'
   import { RULES, chars } from '../lib/cascade-rules'
   import { createDeck } from '../lib/cascade/deck'
+  import { createMoth } from '../lib/cascade/moth'
   import { recordPlay } from '../lib/stats'
   import { dailyFor } from '../data/game-meta'
   import { loadCrowd, fillCrowd, standing, median, people } from '../lib/crowd'
@@ -326,6 +327,7 @@ const total = RULES.length
 
     const all = RULES.every((r) => r.ok(v, ctx))
     if (all && !won) finish(n)
+    moth.poke()
   }
 
   function finish(n: number) {
@@ -371,21 +373,42 @@ const total = RULES.length
   const MOTH_RULE = RULES.find((r) => r.live === 'moth')!.id
   const SACRIFICE_RULE = RULES.find((r) => r.live === 'sacrifice')!.id
 
-  setInterval(() => {
-    if (won || shell.paused || ctx.unlocked < MOTH_RULE) return
-    if (RULES[MOTH_RULE - 1].ok(input.value, ctx)) return
-    const a = chars(input.value)
-    const edible = a.map((_, i) => i).filter((i) => a[i] !== '🕷')
-    if (!edible.length) return
-    const at = edible[(Math.random() * edible.length) | 0]
-    const eaten = a[at]
-    a.splice(at, 1)
-    input.value = a.join('')
-    sfx.bad()
-    shell.shake(field)
-    shell.announce(`The moth ate a character: ${eaten}.`)
-    render()
-  }, 6000)
+  /* The moth is real now (lib/cascade/moth.ts): it circles the lamp, comes
+     down onto one letter every six seconds, and eats it. A spider sends it off. */
+  const desk = document.getElementById('desk')!
+  const moth = createMoth({
+    host: desk,
+    field: input,
+    animate: WORLD_PLAY,
+    lamp: () => {
+      const d = desk.getBoundingClientRect(), b = board.getBoundingClientRect()
+      return { x: b.left - d.left + b.width * 0.3, y: b.top - d.top + 24 }
+    },
+    present: () => !won && ctx.unlocked >= MOTH_RULE,
+    hungry: () => !RULES[MOTH_RULE - 1].ok(input.value, ctx),
+    paused: () => shell.paused,
+    pick: () => {
+      const a = chars(input.value)
+      const edible = a.map((_, i) => i).filter((i) => a[i] !== '🕷')
+      return edible.length ? edible[(Math.random() * edible.length) | 0] : null
+    },
+    eat: (i) => {
+      const a = chars(input.value)
+      if (i >= a.length || a[i] === '🕷') return false
+      const eaten = a[i]
+      // Keep the caret where it was, less the letter that went from before it.
+      const at = input.selectionStart ?? 0, from = a.slice(0, i).join('').length
+      a.splice(i, 1)
+      input.value = a.join('')
+      if (document.activeElement === input) { const p = at > from ? at - eaten.length : at; input.setSelectionRange(p, p) }
+      for (let k = 0; k < 3; k++) hit({ dur: 0.025, gain: 0.12, freq: 2800 + k * 300, q: 3, delay: k * 0.07 })
+      tone({ freq: 170, to: 110, dur: 0.18, type: 'sawtooth', gain: 0.07, filter: 800, delay: 0.2 })
+      shell.announce(`The moth ate a character: ${eaten}.`)
+      render()
+      return true
+    },
+    onFlutter: () => { for (let k = 0; k < 6; k++) hit({ dur: 0.028, gain: 0.045, freq: 240, type: 'lowpass', delay: k * 0.034 }) },
+  })
 
   function maybeSacrifice() {
     if (ctx.banned || ctx.unlocked < SACRIFICE_RULE) return
@@ -437,6 +460,7 @@ const total = RULES.length
     approved.clear(); stampSeq = 0
     nodes.clear()
     deck.clear()
+    moth.reset()
     list.innerHTML = ''
     render()
     input.focus()
@@ -449,7 +473,7 @@ const total = RULES.length
   render()
   input.focus({ preventScroll: true })
 
-  if (import.meta.env.DEV) (window as any).__cascade = { deck, ctx, render, input }
+  if (import.meta.env.DEV) (window as any).__cascade = { deck, ctx, render, input, moth }
 </script>
 
 <style is:global>
@@ -495,6 +519,9 @@ const total = RULES.length
       radial-gradient(130% 100% at 45% 30%, transparent 55%, rgba(3, 6, 12, 0.5) 100%);
   }
   .rc-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+  .rc-moth { position: absolute; left: 0; top: 0; z-index: 50; pointer-events: none; will-change: transform; }
+  .rc-moth[hidden] { display: none; }
+  .rc-crumb { position: absolute; z-index: 49; border-radius: 1px; pointer-events: none; }
 
   .rc-cols {
     display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 500px);
