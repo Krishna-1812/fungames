@@ -70,6 +70,7 @@ import { iconSvg } from '../lib/icons'
 
     <button type="button" class="stop" id="stopBtn" hidden>Make it stop</button>
   </div>
+  <canvas class="over-confetti" id="confetti" aria-hidden="true"></canvas>
   </div>
 
   <Fragment slot="howto">
@@ -102,6 +103,7 @@ import { iconSvg } from '../lib/icons'
   import { createShell } from '../lib/game-shell'
   import { PLAY, WORLD_PLAY } from '../lib/motion'
   import { createMarbles } from '../lib/over/marbles'
+  import { createConfetti } from '../lib/over/confetti'
 
   const prefersReducedMotion = !PLAY
   // Restart is the default reload: nothing about the noise is worth keeping.
@@ -182,6 +184,12 @@ import { iconSvg } from '../lib/icons'
     return { x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height / 2 }
   }
   let spendTo = { x: 0, y: 0 }
+  const confetti = createConfetti({
+    canvas: el<HTMLCanvasElement>('confetti'),
+    animate: WORLD_PLAY,
+    // What lands, lands on the glass ledge along the front of the tank.
+    floor: () => { const t = tankBox(); return { left: t.left, right: t.right, y: t.bottom + 5 } },
+  })
 
   const sky = new ShaderSurface(document.getElementById('oversky')!, OVER_FRAG, {
     // Every layer here is low frequency; three-quarter resolution costs nothing
@@ -314,12 +322,7 @@ import { iconSvg } from '../lib/icons'
     { id: 'music', name: 'A backing track', note: 'It has one idea', cost: 80,
       apply: startMusic },
     { id: 'confetti', name: 'Confetti', note: 'For no particular reason', cost: 120,
-      apply: () => timers.push(every(() => {
-        burst(Math.random() * innerWidth, -10, {
-          count: 10, colors: ['#ff5f9e', '#8affc4', '#63c9f0', '#8affc4'],
-          speed: 3, gravity: 0.22, spread: Math.PI, angle: Math.PI / 2, shape: 'square', size: 7, life: 90,
-        })
-      }, 900)) },
+      apply: () => { confetti.pop(at(el('bigBtn')).x, at(el('bigBtn')).y, 60); timers.push(every(() => confetti.rain(9), 700)) } },
     { id: 'ad', name: 'One tasteful ad', note: 'It is not tasteful', cost: 180, rate: 4,
       apply: () => world.classList.add('has-ad') },
     { id: 'cursor', name: 'A second cursor', note: 'It is slightly behind yours', cost: 260,
@@ -343,10 +346,7 @@ import { iconSvg } from '../lib/icons'
         world.classList.add('has-everything')
         timers.push(every(spawnNotification, 900))
         timers.push(every(spawnRunner, 700))
-        timers.push(every(() => burst(Math.random() * innerWidth, -10, {
-          count: 14, colors: ['#ff5f9e', '#8affc4', '#63c9f0'], speed: 4, gravity: 0.26,
-          spread: Math.PI, angle: Math.PI / 2, shape: 'square', size: 8, life: 90,
-        }), 400))
+        timers.push(every(() => confetti.rain(14), 300))
       } },
   ]
 
@@ -458,6 +458,7 @@ import { iconSvg } from '../lib/icons'
     if (!shell.paused) {
       marbles.sync(Math.floor(attention), at(el('bigBtn')), spendTo)
       marbles.frame(dt)
+      confetti.frame(dt)
     }
     // The strip rolls its digits; four times a second is plenty.
     if (now - lastStrip > 250) {
@@ -531,6 +532,7 @@ import { iconSvg } from '../lib/icons'
     cursorEls.forEach((c) => c.remove())
     cursorEls = []
     world.querySelectorAll('.notif, .achv, .popup, .runner').forEach((n) => n.remove())
+    confetti.clear()
     world.className = 'world calm'
     world.style.removeProperty('--sx')
     world.style.removeProperty('--sy')
@@ -605,6 +607,7 @@ import { iconSvg } from '../lib/icons'
 
   .oversky { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
   .oversky .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .over-confetti { position: absolute; inset: 0; z-index: 60; width: 100%; height: 100%; display: block; pointer-events: none; }
   .over-marbles { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; display: block; pointer-events: none; }
   .over-legend {
     position: absolute; z-index: 3; margin: 0; padding: 0; list-style: none; display: flex; gap: 10px;
