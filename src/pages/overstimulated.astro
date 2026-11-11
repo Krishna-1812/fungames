@@ -469,9 +469,10 @@ import { iconSvg } from '../lib/icons'
   function loop(now: number) {
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
-    if (perSec && !shell.paused) { attention += perSec * dt; paint() }
+    // Once it has been made to stop, nothing more comes in: the quiet is the point.
+    if (perSec && !shell.paused && !stopping) { attention += perSec * dt; paint() }
     if (!shell.paused) {
-      marbles.sync(Math.floor(attention), at(el('bigBtn')), spendTo)
+      if (!stopping) marbles.sync(Math.floor(attention), at(el('bigBtn')), spendTo)
       marbles.frame(dt)
       confetti.frame(dt)
     }
@@ -548,6 +549,7 @@ import { iconSvg } from '../lib/icons'
     cursorEls = []
     world.querySelectorAll('.notif, .achv, .popup, .runner').forEach((n) => n.remove())
     confetti.clear()
+    el('rate').hidden = true
     world.className = 'world calm'
     world.style.removeProperty('--sx')
     world.style.removeProperty('--sy')
@@ -901,7 +903,7 @@ import { iconSvg } from '../lib/icons'
     .over-body .shop { position: absolute; right: 0; left: 0; top: auto; bottom: 0; width: auto; height: 42%;
       grid-template-columns: 1fr 1fr; border-left: 0; border-top: 1px solid #2a1140; }
     .over-body .notif { right: 10px; width: min(230px, 62vw); }
-    .over-body .stop { bottom: calc(42% + 12px); }
+    .over-body .stop { bottom: auto; top: 12px; left: 12px; }
     .over-body .ad { display: none; }
   }
 
