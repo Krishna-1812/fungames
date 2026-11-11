@@ -136,6 +136,8 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
   let lastScore: Score | null = null
   let strokes = 0
   let round: Record<string, number> = {}
+  /** The tube each kept score was drawn with, for the sign at the end. */
+  let kept: Record<string, P[]> = {}
 
   const shell = createShell({ slug: 'steady-hand', onRestart: restart })
   loadCrowd('steady-hand')
@@ -505,6 +507,7 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
     unlock(); sfx.click()
     // The score kept, not every attempt (recordPlay has those).
     shell.pick('Score kept, per shape', Math.round(round[shape.id]), shape.name)
+    kept[shape.id] = stroke.map((q) => ({ x: q.x, y: q.y }))
     idx++
     if (idx >= SHAPES.length) return finishRound()
     shape = SHAPES[idx]
@@ -539,9 +542,12 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
 
     const ranked = SHAPES.map((sh) => ({ name: sh.name, v: round[sh.id] })).sort((a, b) => b.v - a.v)
     shell.resultExtra.innerHTML = `
+      <figure class="sh-sign"><canvas aria-label="Your four tubes, lit, side by side on the wall"></canvas>
+        <figcaption>Your sign, as you bent it</figcaption></figure>
       <ul class="sh-summary">${SHAPES.map((sh) => `
-        <li><span class="label">${sh.name}</span><b class="num">${round[sh.id].toFixed(1)}%</b><i>${verdictFor(round[sh.id])}</i></li>`).join('')}
+        <li style="--gas: ${(GASES[sh.id]?.rgb ?? [140, 200, 255]).join(', ')}"><span class="label">${sh.name}</span><b class="num">${round[sh.id].toFixed(1)}%</b><i>${verdictFor(round[sh.id])}</i></li>`).join('')}
       </ul>`
+    paintSign(shell.resultExtra.querySelector('.sh-sign canvas') as HTMLCanvasElement)
     const beat = shell.considerBest(Math.round(r * 10), `${r.toFixed(1)}%`)
     const lines = [`Steadiest on the ${ranked[0].name.toLowerCase()}, shakiest on the ${ranked[ranked.length - 1].name.toLowerCase()}.`]
     if (beat === 'beaten') lines.push('✓ Your best round yet.')
@@ -561,7 +567,34 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
     })
   }
 
+  /**
+   * The round's four tubes, each scaled into its own bay and lit together on
+   * one piece of wall: the sign you made. Drawn once, still.
+   */
+  function paintSign(cv: HTMLCanvasElement, tries = 0) {
+    // The result card is laid out a frame or two after the round ends.
+    if (!cv.clientWidth && tries < 30) { requestAnimationFrame(() => paintSign(cv, tries + 1)); return }
+    const w = cv.clientWidth || 640
+    const cols = w < 520 ? 2 : 4, rows = cols === 2 ? 2 : 1
+    const h = Math.round((w / cols) * (rows === 2 ? 1.8 : 0.82))
+    cv.style.height = h + 'px'
+    const sign = createNeon(cv, { animate: false })
+    const cw = w / cols, ch = h / rows, pad = Math.min(cw, ch) * 0.17
+    const extra = SHAPES.map((sh, i) => {
+      const pts = kept[sh.id] ?? []
+      if (pts.length < 2) return null
+      const xs = pts.map((q) => q.x), ys = pts.map((q) => q.y)
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys)
+      const k = Math.min((cw - pad * 2) / Math.max(1, x1 - x0), (ch - pad * 2) / Math.max(1, y1 - y0))
+      const ox = (i % cols) * cw + cw / 2, oy = Math.floor(i / cols) * ch + ch / 2
+      return { pts: pts.map((q) => ({ x: ox + (q.x - (x0 + x1) / 2) * k, y: oy + (q.y - (y0 + y1) / 2) * k })), gas: GASES[sh.id].rgb }
+    }).filter(Boolean) as Array<{ pts: P[]; gas: [number, number, number] }>
+    sign.resize(w, h, Math.min(2, devicePixelRatio || 1))
+    sign.set({ marks: [], startRing: false, centreMark: false, ideal: null, tube: [], mode: 'none', cursor: null, extra })
+  }
+
   function restart() {
+    kept = {}
     idx = 0
     shape = SHAPES[0]
     round = {}
@@ -722,6 +755,10 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
   /* The round, inside the ink result card. */
   .sh-summary { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   @media (max-width: 640px) { .sh-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .sh-sign { margin: 0 0 16px; }
+  .sh-sign canvas { display: block; width: 100%; border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+  .sh-sign figcaption { margin-top: 8px; font-size: 13px; opacity: 0.7; }
+  .sh-summary b { color: rgb(var(--gas, 243, 245, 248)); text-shadow: 0 0 12px rgba(var(--gas, 0, 0, 0), 0.5); }
   .sh-summary li { display: grid; gap: 8px; padding: 16px; border-radius: var(--r); box-shadow: inset 0 0 0 1.5px rgba(243, 245, 248, 0.28); }
   .sh-summary b { font-size: clamp(28px, 3.4vw, 40px); }
   .sh-summary i { font-style: normal; font-size: 14px; opacity: 0.8; }
