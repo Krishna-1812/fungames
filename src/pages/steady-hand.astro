@@ -59,13 +59,13 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M6 10h1.5M9.5 10H11M13 10h1.5M16.5 10H18M7 14h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
         <span>Keyboard practice</span>
       </button>
-      <p id="keyboardHelp" class="sh-kb-help"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> move the pen · <kbd>Shift</kbd> small steps · <kbd>Space</kbd> starts and ends a stroke · <kbd>Home</kbd> back to the first dot · <kbd>N</kbd> next shape. Not ranked.</p>
+      <p id="keyboardHelp" class="sh-kb-help"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> move the pen · <kbd>Shift</kbd> small steps · <kbd>Space</kbd> starts and ends a stroke · <kbd>Home</kbd> back to the first mark · <kbd>N</kbd> next shape. Not ranked.</p>
     </div>
     </div>
     <div class="sh-board" id="board">
-      <canvas id="c" tabindex="0" aria-describedby="keyboardHelp hint" aria-label="The drawing board. Press on the first dot and drag, in one stroke."></canvas>
+      <canvas id="c" tabindex="0" aria-describedby="keyboardHelp hint" aria-label="The drawing board. Press on the first mark and drag, in one stroke."></canvas>
 
-      <p class="sh-hint" id="hint" aria-live="polite">Press on the first dot and drag to the second. One stroke.</p>
+      <p class="sh-hint" id="hint" aria-live="polite">Press on the first mark and drag to the second. One stroke.</p>
 
       <div class="sh-card" id="result" hidden tabindex="-1">
         <p class="label meta" id="cardShape">Line</p>
@@ -84,16 +84,16 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
 
   <Fragment slot="howto">
     <p>
-      Four shapes, freehand, one unbroken stroke each: a <b>line</b>, a
-      <b>circle</b>, a <b>square</b> and a <b>spiral</b>. Dots mark where to
-      start and finish; nothing is traced for you.
+      You are bending neon. Four shapes, freehand, one unbroken stroke each: a
+      <b>line</b>, a <b>circle</b>, a <b>square</b> and a <b>spiral</b>. Steel
+      marks on the wall show where to start and finish; nothing is traced for you.
     </p>
     <ul>
-      <li>Press on the first dot, drag without lifting, and finish on the last one. Closed shapes finish where they started.</li>
-      <li>Your score is how close the stroke stayed to the ideal shape, how much of it you drew, and how directly you travelled. The ideal appears afterwards.</li>
+      <li>Press on the first mark, drag without lifting, and finish on the last one. Closed shapes finish where they started. Finish on the mark and the tube lights; miss it and the glass breaks.</li>
+      <li>Your score is how close the stroke stayed to the ideal shape, how much of it you drew, and how directly you travelled. The ideal is chalked on the wall afterwards.</li>
       <li>Redo any shape as often as you like before moving on. The shape turns to a new angle every time.</li>
     </ul>
-    <p>The round's rating is the mean of the four. Your best is your best round.</p>
+    <p>The round's rating is the mean of the four, and your four tubes become one sign. Your best is your best round.</p>
   </Fragment>
 </GameShell>
 
@@ -328,7 +328,7 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
   function beginStroke(p: P) {
     if (locked || shell.paused || idx >= SHAPES.length) return false
     if (!startOk(p)) {
-      hint.textContent = 'Start on the first dot.'
+      hint.textContent = 'Start on the first mark.'
       return false
     }
     unlock(); sfx.click()
@@ -380,8 +380,8 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
       stroke = []
       tubeMode = 'none'
       hint.textContent = shape.closed
-        ? 'You have to come back to where you started. Try again.'
-        : 'You have to finish on the last dot. Try again.'
+        ? 'It has to come back to where it started, or the glass breaks. Try again.'
+        : 'It has to end on the last mark, or the glass breaks. Try again.'
       shell.shake($('board'))
       // Once a shape a page: a missed ending can come many times over.
       if (!keyboardPractice && !abandoned.has(shape.id)) { abandoned.add(shape.id); shell.pick('Stroke abandoned', shape.name) }
@@ -468,7 +468,7 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
     $('keyboardPractice').setAttribute('aria-pressed', String(keyboardPractice))
     if (keyboardPractice) {
       locked = false; result.hidden = true; pen = { ...dots[0] };stroke=[];liveTarget=[]
-      hint.textContent = 'Keyboard practice. Arrows position the pen; Space starts a stroke. Home returns to the first dot.'
+      hint.textContent = 'Keyboard practice. Arrows position the pen; Space starts a stroke. Home returns to the first mark.'
       canvas.focus()
     } else {restoreScoredRound?.();restoreScoredRound=null}
     render(); nudge()

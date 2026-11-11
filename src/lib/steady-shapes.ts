@@ -168,7 +168,7 @@ export const SHAPES: Shape[] = [
   {
     id: 'circle',
     name: 'Circle',
-    brief: 'Go all the way round the dot and back to where you started.',
+    brief: 'Go all the way round the mark and back to where you started.',
     closed: true,
     dots(box) {
       const c = centre(box)
