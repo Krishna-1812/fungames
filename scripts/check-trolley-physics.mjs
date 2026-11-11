@@ -109,7 +109,7 @@ console.log('\n5. the routes')
   check(Math.abs(end.z - TRACK.SIDE) < 1e-6, 'the siding ends up beside the main line')
   const atStand = at(loop, distAtX(loop, TRACK.STAND))
   check(Math.abs(atStand.z) < 1e-6, 'the loop is back on the main line where people stand')
-  const mid = at(loop, distAtX(loop, -2.5))
+  const mid = at(loop, distAtX(loop, -0.75))
   check(Math.abs(mid.z - TRACK.LOOP_SIDE) < 0.4, 'and well off it in between')
   check(Math.abs(main.length - (TRACK.FAR - TRACK.START + 8)) < 1e-6, 'the main line is straight')
   for (const [name, r] of [['siding', side], ['loop', loop]]) {
@@ -120,7 +120,7 @@ console.log('\n5. the routes')
       const turn = Math.abs(Math.atan2(b.tz, b.tx) - Math.atan2(a.tz, a.tx))
       if (turn > 1e-6) tight = Math.min(tight, 1 / turn)
     }
-    check(tight > 6.5, `the ${name}'s tightest curve is ${tight.toFixed(1)} m radius`)
+    check(tight > 5, `the ${name}'s tightest curve is ${tight.toFixed(1)} m radius`)
   }
   const b = branch(true)
   check(Math.abs(b.pts[0].z) < 1e-6 && Math.abs(b.pts[b.pts.length - 1].z) < 1e-3, 'the loop branch starts and ends on the main line')

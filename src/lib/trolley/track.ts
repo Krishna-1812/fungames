@@ -18,15 +18,15 @@ export const TRACK = {
   /** Top of the rail. */
   RAIL: 0.46,
   /** How far off the siding runs. Negative z is away from the camera. */
-  SIDE: -7.5,
-  LOOP_SIDE: -5,
+  SIDE: -6.5,
+  LOOP_SIDE: -4.2,
   /** Where the points are. */
-  FORK: -8,
-  LOOP_FORK: -17,
+  FORK: -6,
+  LOOP_FORK: -12.5,
   /** Where whoever is on a track stands. */
-  STAND: 15,
+  STAND: 12,
   /** Where the tram waits. */
-  START: -27,
+  START: -16,
   FAR: 90,
 } as const
 
@@ -37,9 +37,9 @@ const smoother = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * t * (t * (t *
 
 /** The siding's z at a given x. */
 export function sideZ(x: number, loop: boolean) {
-  if (!loop) return TRACK.SIDE * smoother((x - TRACK.FORK) / 20)
-  const out = smoother((x - TRACK.LOOP_FORK) / 14)
-  const back = smoother((x + 2) / 14)
+  if (!loop) return TRACK.SIDE * smoother((x - TRACK.FORK) / 16)
+  const out = smoother((x - TRACK.LOOP_FORK) / 11.5)
+  const back = smoother((x + 0.5) / 11.5)
   return TRACK.LOOP_SIDE * (out - back)
 }
 
@@ -62,7 +62,7 @@ export function route(diverted: boolean, loop = false, x0: number = TRACK.START 
 
 /** The branch on its own, from the points outwards, for laying rails along. */
 export function branch(loop: boolean): Route {
-  return loop ? build((x) => sideZ(x, true), TRACK.LOOP_FORK, 12.5) : build((x) => sideZ(x, false), TRACK.FORK, TRACK.FAR)
+  return loop ? build((x) => sideZ(x, true), TRACK.LOOP_FORK, 11.2) : build((x) => sideZ(x, false), TRACK.FORK, TRACK.FAR)
 }
 
 /** Position and heading a distance along a route. */

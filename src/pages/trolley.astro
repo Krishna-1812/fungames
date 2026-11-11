@@ -33,16 +33,17 @@ const first = DILEMMAS[0]
 >
   <div class="tr">
     <figure class="tr-scene">
+      <canvas id="stage3d" aria-hidden="true"></canvas>
       <svg id="scene" viewBox="0 0 320 152" aria-hidden="true"></svg>
-      <ol class="tr-rail" id="rail" aria-hidden="true">
-        {DILEMMAS.map(() => <li></li>)}
-      </ol>
+      <div class="tr-tags" id="tags" aria-hidden="true"></div>
     </figure>
 
     <div class="tr-side">
-      <p class="label meta" id="tag">Problem 1 of {total}</p>
-      <h2 class="tr-title" id="title">{first.title}</h2>
-      <p class="tr-setup" id="setup">{first.setup}</p>
+      <div class="tr-brief">
+        <p class="label meta" id="tag">Problem 1 of {total}</p>
+        <h2 class="tr-title" id="title">{first.title}</h2>
+        <p class="tr-setup" id="setup">{first.setup}</p>
+      </div>
 
       <div class="tr-choices" role="group" aria-label="Your choice">
         <button type="button" class="pill tr-choice" data-side="left" id="btnLeft">
@@ -63,6 +64,10 @@ const first = DILEMMAS[0]
         <p class="tr-keys"><kbd>N</kbd> or <kbd>Enter</kbd></p>
       </div>
     </div>
+
+    <ol class="tr-rail" id="rail" aria-hidden="true">
+      {DILEMMAS.map(() => <li></li>)}
+    </ol>
   </div>
 
   <Fragment slot="howto">
@@ -102,7 +107,8 @@ const first = DILEMMAS[0]
 
 <script>
   import { createShell } from '../lib/game-shell'
-  import { PLAY } from '../lib/motion'
+  import { PLAY, REDUCED } from '../lib/motion'
+  import type { Stage } from '../lib/trolley/stage'
   import { recordPlay } from '../lib/stats'
   import { sfx, unlock, hit } from '../lib/audio'
   import { sceneSvg, GEO } from '../lib/trolley-scene'
@@ -127,6 +133,19 @@ const first = DILEMMAS[0]
   let picks: Side[] = []
 
   const shell = createShell({ slug: 'trolley', onRestart: restart })
+
+  /* ---- the layout, when the browser can draw it ----------------------- */
+  let stage: Stage | null = null
+  if (new URLSearchParams(location.search).has('3d')) {
+    const fig = SCENE.parentElement!.parentElement!
+    fig.classList.add('is-3d')
+    import('../lib/trolley/stage').then((m) => {
+      stage = m.createStage({ canvas: $('stage3d') as HTMLCanvasElement, total: TOTAL, animate: !REDUCED })
+      if (!stage) return fig.classList.remove('is-3d')
+      stage.show(DILEMMAS[Math.min(i, TOTAL - 1)].scene, Math.min(i, TOTAL - 1))
+      if (import.meta.env.DEV) (window as any).__trolley = { stage, go: (n: number) => { i = n; render() } }
+    }).catch(() => fig.classList.remove('is-3d'))
+  }
   loadCrowd('trolley')
 
   /* ---- the scene ------------------------------------------------------ */
@@ -170,6 +189,7 @@ const first = DILEMMAS[0]
     const d = DILEMMAS[i]
     chosen = false
     SCENE.innerHTML = sceneSvg(d.scene)
+    stage?.show(d.scene, i)
     $('tag').textContent = `Problem ${i + 1} of ${TOTAL}`
     $('title').textContent = d.title
     $('setup').textContent = d.setup
@@ -361,8 +381,11 @@ const first = DILEMMAS[0]
      global on purpose. The drawing carries its own fills (see the header of
      lib/trolley-scene.ts); what is here is the frame around it and the two
      things that have to be CSS because they are animation. */
-  .tr { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(18px, 3vw, 44px); align-items: start; }
-  @media (max-width: 900px) { .tr { grid-template-columns: minmax(0, 1fr); } }
+  .tr { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: clamp(18px, 3vw, 44px); align-items: start; }
+  .tr-side { grid-column: 2; grid-row: 1 / span 2; }
+  .tr-rail { grid-column: 1; }
+  @media (max-width: 900px) { .tr { grid-template-columns: minmax(0, 1fr); } .tr-side, .tr-rail { grid-column: 1; } .tr-rail { order: 1; } }
+  .tr-brief { display: contents; }
 
   .tr-scene { margin: 0; position: sticky; top: 16px; }
   /* One column: read the setup, see the picture, then choose. The side
@@ -377,6 +400,61 @@ const first = DILEMMAS[0]
     display: block; width: 100%; height: auto;
     border: 2px solid var(--ink); border-radius: var(--r-lg);
     overflow: hidden;
+  }
+  /* ---- the layout: the picture is the page, the words sit on it ------- */
+  .tr-scene canvas, .tr-tags { display: none; }
+  .tr.is-3d { grid-template-columns: minmax(0, 1fr); }
+  .tr.is-3d .tr-scene { position: relative; grid-column: 1; grid-row: 1; }
+  .tr.is-3d .tr-scene canvas {
+    display: block; width: 100%; aspect-ratio: 2.3 / 1; min-height: 440px; border-radius: var(--r-lg);
+    background: linear-gradient(#9fc0de, #d7e3ea 55%, #71894a 56%, #4f6a30);
+  }
+  .tr.is-3d .tr-scene svg { display: none; }
+  .tr.is-3d .tr-rail { grid-column: 1; grid-row: 2; }
+  .tr.is-3d .tr-side {
+    grid-column: 1; grid-row: 1; position: relative; z-index: 2; pointer-events: none;
+    grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start;
+    padding: clamp(14px, 2vw, 26px); gap: 12px;
+  }
+  .tr.is-3d .tr-side > * { pointer-events: auto; }
+  .tr.is-3d .tr-brief {
+    display: grid; gap: 8px; justify-self: start; max-width: min(430px, 44%);
+    padding: 18px 22px 20px; border-radius: 22px; color: #f3f6fc;
+    background: rgba(10, 16, 30, 0.46); border: 1px solid rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25); backdrop-filter: blur(16px) saturate(1.25);
+    box-shadow: 0 18px 50px rgba(6, 10, 22, 0.28);
+  }
+  .tr.is-3d .tr-brief .label { color: rgba(226, 234, 250, 0.78); }
+  .tr.is-3d .tr-title { font-size: clamp(28px, 3.1vw, 46px); color: #fff; }
+  .tr.is-3d .tr-setup { font-size: clamp(15px, 1.25vw, 18px); color: rgba(240, 244, 252, 0.92); max-width: none; }
+  .tr.is-3d .tr-choices { align-self: end; justify-self: center; width: min(640px, 100%); margin: 0; }
+  .tr.is-3d .tr-choice { box-shadow: 0 14px 34px rgba(6, 10, 22, 0.32); border-color: transparent; }
+  .tr.is-3d .tr-outcome { align-self: end; justify-self: end; width: min(440px, 100%); margin: 0; grid-row: 2; }
+  .tr.is-3d .tr-choices:has(~ .tr-outcome:not([hidden])) { display: none; }
+  .tr.is-3d .tr-tags { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: var(--r-lg); }
+  .tr-tag {
+    position: absolute; left: 0; top: 0; padding: 3px 9px 4px; border-radius: 999px; white-space: nowrap;
+    font: 700 12px/1.2 var(--sans); letter-spacing: 0.04em; color: #0d1424; background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 14px rgba(6, 10, 22, 0.3); will-change: transform; transition: opacity 240ms;
+  }
+  .tr-tag::after {
+    content: ""; position: absolute; left: 50%; top: 100%; width: 2px; height: 10px; margin-left: -1px;
+    background: rgba(255, 255, 255, 0.9);
+  }
+  .tr-tag.is-gone { opacity: 0; }
+  @media (max-width: 900px) {
+    .tr.is-3d .tr-side { display: contents; }
+    .tr.is-3d .tr-scene { grid-row: auto; margin-inline: -12px; }
+    .tr.is-3d .tr-scene canvas { aspect-ratio: 5 / 6; min-height: 0; border-radius: 0; }
+    .tr.is-3d .tr-tags { border-radius: 0; }
+    .tr.is-3d .tr-rail { grid-row: auto; }
+    .tr.is-3d .tr-brief { max-width: none; background: none; border: 0; box-shadow: none; padding: 0; color: inherit; -webkit-backdrop-filter: none; backdrop-filter: none; margin-bottom: 14px; }
+    .tr.is-3d .tr-brief .label { color: inherit; }
+    .tr.is-3d .tr-title { color: var(--ink); }
+    .tr.is-3d .tr-setup { color: var(--ink2); }
+    .tr.is-3d .tr-choices { width: 100%; margin-top: 14px; }
+    .tr.is-3d .tr-choice { box-shadow: none; border-color: var(--ink); }
+    .tr.is-3d .tr-outcome { width: 100%; margin-top: 14px; }
   }
   .tr-scene .switch { transform-box: fill-box; transform-origin: 0% 100%; }
   .tr-scene .switch.thrown { transform: rotate(38deg); }
