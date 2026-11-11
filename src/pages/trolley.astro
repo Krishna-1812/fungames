@@ -136,7 +136,8 @@ const first = DILEMMAS[0]
 
   /* ---- the layout, when the browser can draw it ----------------------- */
   let stage: Stage | null = null
-  if (new URLSearchParams(location.search).has('3d')) {
+  // The drawn layout is the fallback: no WebGL 2, or ?flat in the address.
+  if (!new URLSearchParams(location.search).has('flat')) {
     const fig = SCENE.parentElement!.parentElement!
     fig.classList.add('is-3d')
     import('../lib/trolley/stage').then((m) => {
@@ -462,7 +463,7 @@ const first = DILEMMAS[0]
   @media (max-width: 900px) {
     .tr.is-3d .tr-side { display: contents; }
     .tr.is-3d .tr-scene { grid-row: auto; margin-inline: -12px; }
-    .tr.is-3d .tr-scene canvas { aspect-ratio: 5 / 6; min-height: 0; border-radius: 0; }
+    .tr.is-3d .tr-scene canvas { aspect-ratio: 1 / 1; min-height: 0; border-radius: 0; }
     .tr.is-3d .tr-tags { border-radius: 0; }
     .tr.is-3d .tr-rail { grid-row: auto; }
     .tr.is-3d .tr-brief { max-width: none; background: none; border: 0; box-shadow: none; padding: 0; color: inherit; -webkit-backdrop-filter: none; backdrop-filter: none; margin-bottom: 14px; }
