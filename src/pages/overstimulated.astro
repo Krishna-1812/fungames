@@ -59,7 +59,8 @@ import { iconSvg } from '../lib/icons'
       </div>
 
       <button type="button" class="big" id="bigBtn">
-        <span id="bigLabel">Click me</span>
+        <span class="big-ring" aria-hidden="true"></span>
+        <span class="big-cap"><span id="bigLabel">Click me</span></span>
       </button>
 
       <p class="sub" id="sub">That is the whole game. For now.</p>
@@ -155,7 +156,7 @@ import { iconSvg } from '../lib/icons'
     const b = root.getBoundingClientRect(), s = shop.getBoundingClientRect()
     const right = narrow() ? b.width - 14 : s.left - b.left - 16
     const bottom = narrow() ? s.top - b.top - 12 : b.height - 16
-    return { left: 16, right, bottom, height: Math.min(190, Math.max(110, b.height * (narrow() ? 0.16 : 0.24))) }
+    return { left: 16, right, bottom, height: narrow() ? Math.max(86, b.height * 0.12) : Math.min(190, Math.max(110, b.height * 0.24)) }
   }
   const marbles = createMarbles({
     canvas: el<HTMLCanvasElement>('marbles'),
@@ -167,6 +168,8 @@ import { iconSvg } from '../lib/icons'
   })
   function placeLegend() {
     const t = tankBox()
+    // The button and its words stand above the tank, never in it.
+    root.style.setProperty('--tank-top', t.bottom - t.height - 6 + 'px')
     const lg = el('legend')
     lg.style.left = t.left + 10 + 'px'
     lg.style.top = t.bottom - t.height + 8 + 'px'
@@ -400,7 +403,15 @@ import { iconSvg } from '../lib/icons'
     'You are doing great', 'Why', 'Yes', 'MORE',
   ]
 
+  /* The cap is on a spring: it goes down while held, comes back up past
+     where it started, and settles. A click from the keyboard still knocks it. */
+  const press = { x: 0, v: 0, to: 0 }
+  const bigBtn = el('bigBtn')
+  bigBtn.addEventListener('pointerdown', () => { press.to = 1 })
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) bigBtn.addEventListener(ev, () => { press.to = 0 })
+
   el('bigBtn').addEventListener('click', (e) => {
+    if (press.to === 0) press.v += 34
     unlock()
     clicks++
     const now = performance.now()
@@ -465,6 +476,12 @@ import { iconSvg } from '../lib/icons'
     // you are currently going rather than a latch on your best run.
     const hot = Math.max(0, 1 - (now - comboAt) / 900) * (combo / 12)
     world.style.setProperty('--combo', hot.toFixed(3))
+    if (prefersReducedMotion) press.x = press.to
+    else {
+      press.v += (900 * (press.to - press.x) - 26 * press.v) * dt
+      press.x += press.v * dt
+    }
+    bigBtn.style.setProperty('--press', press.x.toFixed(3))
 
     /* Under reduced motion the shared ticker never runs, so the surface has to
        be asked for a frame. Only when something it depends on has actually
@@ -613,7 +630,7 @@ import { iconSvg } from '../lib/icons'
   .over-body .world.has-everything { animation-duration: 6s, 1.6s; }
 
   .over-body .core {
-    position: absolute; inset: 0; display: grid; place-content: center;
+    position: absolute; inset: 0 0 auto; height: var(--tank-top, 100%); display: grid; place-content: center;
     justify-items: center; gap: 16px; padding: 20px; text-align: center;
   }
   .over-body .score { display: grid; justify-items: center; }
@@ -624,36 +641,63 @@ import { iconSvg } from '../lib/icons'
   .over-body .score span { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: #b58fd6; }
   .over-body .score em { font-style: normal; font-size: 13px; color: #7ce0b0; margin-top: 4px; }
 
+  /* ---- the button: a real arcade push-button ---------------------------
+     A brushed-steel bezel, a dark well, and a translucent cap with a lamp
+     under it. --press (driven by a spring in the script) sinks the cap into
+     the well and shortens its side wall; --combo turns the lamp up. */
   .over-body .big {
-    position: relative; overflow: hidden;
-    border: 0; border-radius: 999px; cursor: pointer;
-    padding: 22px 54px; font-size: clamp(18px, 3.4vw, 26px); font-weight: 700;
-    font-family: var(--display);
-    /* Highlight top-left, where a light would be, over the gradient. */
+    position: relative; width: clamp(176px, 19vw, 220px); aspect-ratio: 1; padding: 0;
+    border: 0; border-radius: 50%; background: none; cursor: pointer; color: #fff;
+    font-family: var(--display); -webkit-tap-highlight-color: transparent;
+  }
+  .over-body .big:focus-visible { outline: 3px solid #8affc4; outline-offset: 6px; }
+  .over-body .big-ring {
+    position: absolute; inset: 0; border-radius: 50%;
     background:
-      radial-gradient(130% 150% at 26% -6%, rgba(255, 255, 255, 0.34), transparent 56%),
-      linear-gradient(140deg, #ff4d94, #a24cf0);
-    color: #fff;
-    /* --combo is driven from the loop and decays on its own, so the button
-       visibly runs hotter the faster you click and cools when you stop. It is
-       the smallest possible version of the argument the whole game is making. */
+      radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.18) 66%, transparent 70%),
+      conic-gradient(from 18deg, #dfe3ec, #8c91a3 11%, #f5f7fb 24%, #7b8093 37%, #e7eaf2 50%, #858a9c 62%, #f7f8fc 74%, #7e8395 87%, #dfe3ec);
     box-shadow:
-      0 10px 34px rgba(200, 60, 200, calc(0.30 + 0.40 * var(--combo, 0))),
-      0 0 0 calc(1px + 6px * var(--combo, 0)) rgba(255, 120, 190, calc(0.10 + 0.20 * var(--combo, 0))),
-      inset 0 1px 0 rgba(255, 255, 255, 0.42);
-    transition: transform 160ms var(--ease-bounce), box-shadow 220ms var(--ease);
+      0 26px 50px rgba(4, 0, 14, 0.62), 0 6px 12px rgba(4, 0, 14, 0.5),
+      inset 0 2px 1px rgba(255, 255, 255, 0.85), inset 0 -3px 5px rgba(20, 16, 34, 0.55);
   }
-  /* A specular travelling across the face. Clipped to the pill by overflow. */
-  .over-body .big::after {
-    content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(102deg, transparent 40%, rgba(255, 255, 255, 0.30) 50%, transparent 60%);
-    animation: bigSweep calc(3.6s - 2.3s * var(--combo, 0)) var(--ease) infinite;
+  /* Fine machining rings on the steel. */
+  .over-body .big-ring::before {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: repeating-radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.06) 1px 2.5px);
+    mix-blend-mode: overlay;
   }
-  @keyframes bigSweep { from { transform: translateX(-105%); } to { transform: translateX(105%); } }
-  /* Above the sweep, or the highlight washes over the label. */
-  .over-body .big > span { position: relative; z-index: 1; }
-  .over-body .big:hover { transform: translateY(-2px) scale(1.02); }
-  .over-body .big:active { transform: scale(0.95); }
+  /* The well the cap sits in. */
+  .over-body .big-ring::after {
+    content: ""; position: absolute; inset: 9%; border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #2a0b2e, #0c0210 72%);
+    box-shadow: inset 0 6px 10px rgba(0, 0, 0, 0.85), inset 0 -1px 1px rgba(255, 255, 255, 0.25), 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+  .over-body .big-cap {
+    position: absolute; inset: 13% 13% 15%; border-radius: 50%;
+    display: grid; place-items: center; padding: 18%; text-align: center;
+    transform: translateY(calc(var(--press, 0) * 6px - 4px)) scale(calc(1 - var(--press, 0) * 0.015));
+    background:
+      radial-gradient(circle at 50% 56%, rgba(255, 210, 240, calc(0.18 + 0.55 * var(--combo, 0))), transparent 58%),
+      radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.5), transparent 34%),
+      linear-gradient(155deg, #ff5fa2 8%, #e0399a 42%, #9a3ae6 92%);
+    box-shadow:
+      0 calc(9px - var(--press, 0) * 7px) 0 #6e1660,
+      0 calc(12px - var(--press, 0) * 8px) 14px rgba(0, 0, 0, 0.55),
+      inset 0 -8px 16px rgba(70, 0, 80, 0.55), inset 0 3px 5px rgba(255, 255, 255, 0.55),
+      0 0 calc(16px + 46px * var(--combo, 0)) rgba(255, 96, 190, calc(0.25 + 0.45 * var(--combo, 0)));
+    transition: filter 160ms var(--ease);
+  }
+  /* The dome's highlight: a soft window of light across the top of the cap. */
+  .over-body .big-cap::before {
+    content: ""; position: absolute; inset: 5% 14% 50%; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+  }
+  .over-body .big:hover .big-cap { filter: brightness(1.08) saturate(1.05); }
+  .over-body .big #bigLabel {
+    position: relative; font-size: clamp(16px, 1.7vw, 21px); font-weight: 700; line-height: 1.05;
+    text-shadow: 0 1px 0 rgba(110, 10, 80, 0.7), 0 0 12px rgba(255, 200, 235, 0.35); text-wrap: balance;
+  }
   .over-body .sub { color: #a487c4; font-size: 14.5px; margin: 0; max-width: 34ch; }
 
   .over-body .shop {
@@ -790,7 +834,6 @@ import { iconSvg } from '../lib/icons'
     .over-body { height: clamp(640px, 90vh, 920px); }
     .over-body .shop { position: absolute; right: 0; left: 0; top: auto; bottom: 0; width: auto; height: 42%;
       grid-template-columns: 1fr 1fr; border-left: 0; border-top: 1px solid #2a1140; }
-    .over-body .core { bottom: 42%; inset-block-end: 42%; }
     .over-body .notif { right: 10px; width: min(230px, 62vw); }
     .over-body .stop { bottom: calc(42% + 12px); }
     .over-body .world.has-ad::after { display: none; }
@@ -806,5 +849,4 @@ import { iconSvg } from '../lib/icons'
   html:not(.play) .over-body .world.has-tilt.has-rainbow,
   html:not(.play) .over-body .world.has-everything { animation: none; }
   html:not(.play) .over-body .runner { display: none; }
-  html:not(.play) .over-body .big::after { animation: none; opacity: 0; }
 </style>
