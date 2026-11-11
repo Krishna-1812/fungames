@@ -314,6 +314,7 @@ const total = RULES.length
     if (broke.length) paper.snatch()
     pileBar.hidden = met.length < 2
 
+    grow()
     const n = chars(v).length
     count.textContent = `${n} character${n === 1 ? '' : 's'}`
     scoreEl.textContent = `${passing.size} / ${TOTAL} rules`
@@ -394,6 +395,14 @@ const total = RULES.length
     ctx.banned = [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0]
     shell.announce(`The letter ${ctx.banned} has been taken away.`)
     sfx.thud()
+  }
+
+  /** The field grows with what you type, so every letter can be seen (and landed on). */
+  function grow() {
+    input.style.height = 'auto'
+    const want = input.scrollHeight + 2
+    input.style.height = Math.min(want, 300) + 'px'
+    input.style.overflowY = want > 300 ? 'auto' : 'hidden'
   }
 
   /* ---- the approved pile ------------------------------------------ */
