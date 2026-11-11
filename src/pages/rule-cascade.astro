@@ -130,9 +130,12 @@ const total = RULES.length
 
           <div class="rc-office" id="office">
             <p class="rc-office-label">For office use only</p>
+            <p class="rc-received" id="received" aria-hidden="true"><b>Received</b><span id="receivedAt"></span></p>
             <div class="rc-slip" id="slip" hidden>
-              <span>Confiscated</span>
-              <b id="slipLetter">e</b>
+              <i class="rc-staple" aria-hidden="true"></i>
+              <span class="rc-slip-ink">Confiscated</span>
+              <b id="slipLetter">E</b>
+              <small>Not to be returned</small>
             </div>
             <div class="rc-accept" id="accept" hidden aria-hidden="true"><span>Accepted</span></div>
           </div>
@@ -330,8 +333,31 @@ const total = RULES.length
     moth.poke()
   }
 
+  /* ---- the office box -------------------------------------------- */
+  const slip = document.getElementById('slip')!
+  const accept = document.getElementById('accept')!
+  {
+    // Date-stamped the moment you sat down, like any form.
+    const d = new Date()
+    document.getElementById('receivedAt')!.textContent =
+      d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() +
+      ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  }
+  const replay = (el: HTMLElement, cls: string) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls) }
+  function confiscate(letter: string) {
+    document.getElementById('slipLetter')!.textContent = letter.toUpperCase() + letter
+    slip.hidden = false
+    replay(slip, 'is-new')
+    // A staple: the snap, then the thud of the stapler on the board.
+    hit({ dur: 0.03, gain: 0.3, freq: 4200, q: 2.4 }); hit({ dur: 0.08, gain: 0.22, freq: 300, type: 'lowpass', delay: 0.02 })
+  }
+
   function finish(n: number) {
     won = true
+    accept.hidden = false
+    replay(accept, 'is-new')
+    paper.stamp()
+    replay(board, 'is-thumped')
     cleared(RULES[TOTAL - 1].id)
     shell.pick('Rule that took longest', slowest.id)
     const secs = Math.round((Date.now() - started) / 1000)
@@ -417,6 +443,7 @@ const total = RULES.length
     if (!counts.size) return
     ctx.banned = [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0]
     shell.announce(`The letter ${ctx.banned} has been taken away.`)
+    confiscate(ctx.banned)
     sfx.thud()
   }
 
@@ -461,6 +488,8 @@ const total = RULES.length
     nodes.clear()
     deck.clear()
     moth.reset()
+    slip.hidden = true
+    accept.hidden = true
     list.innerHTML = ''
     render()
     input.focus()
@@ -609,6 +638,58 @@ const total = RULES.length
     padding: 10px 12px;
   }
   .rc-office-label { margin: 0; font: 700 9.5px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: #6a7898; }
+  /* A date stamp, in the violet ink date stamps always seem to have. */
+  .rc-received {
+    position: absolute; right: 12px; top: 9px; margin: 0;
+    display: grid; justify-items: center; gap: 3px; padding: 5px 8px 4px;
+    color: rgba(84, 66, 190, 0.8); border: 1.5px solid currentColor; border-radius: 4px;
+    font: 800 9px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+    transform: rotate(-3.5deg); mix-blend-mode: multiply; filter: url(#rc-ink-s);
+  }
+  .rc-received span { font-family: var(--type); font-weight: 700; letter-spacing: 0.06em; font-size: 10px; }
+  /* A slip stapled into the box: the letter you have lost. */
+  .rc-slip {
+    position: relative; display: inline-grid; justify-items: start; gap: 3px;
+    margin-top: 10px; padding: 12px 14px 9px 12px; min-width: 150px;
+    color: #1b1e27; border-radius: 1px;
+    background: linear-gradient(176deg, #ffffff, #f2f3f0);
+    box-shadow: 0 0 0 0.5px rgba(30, 40, 60, 0.25), 0 1px 1px rgba(0, 0, 0, 0.18), 2px 4px 7px rgba(10, 20, 40, 0.22);
+    transform: rotate(-2.2deg);
+    clip-path: polygon(0 0, 100% 0, 100% 92%, 96% 100%, 88% 94%, 79% 100%, 70% 95%, 60% 100%, 50% 94%, 40% 100%, 30% 95%, 20% 100%, 10% 94%, 0 100%);
+  }
+  .rc-staple {
+    position: absolute; left: 50%; top: 4px; width: 26px; height: 4px; transform: translateX(-50%) rotate(2deg);
+    border-radius: 1px; background: linear-gradient(#f3f5f8, #8d96a4 55%, #c9ced6);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  }
+  .rc-slip-ink {
+    color: var(--stamp-red); border: 1.5px solid currentColor; border-radius: 3px; padding: 3px 6px 2px;
+    font: 800 10px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase;
+    mix-blend-mode: multiply; filter: url(#rc-ink-s); transform: rotate(-1.5deg);
+  }
+  .rc-slip b { font: 700 30px/1 var(--type); letter-spacing: 0.06em; color: #161922; text-decoration: line-through 2px rgba(204, 36, 72, 0.75); }
+  .rc-slip small { font: 400 italic 11px/1 var(--type); color: #5c6274; }
+  html.play .rc-slip.is-new { animation: rcSlip 520ms cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+  @keyframes rcSlip {
+    0% { opacity: 0; transform: translate(40px, -30px) rotate(9deg) scale(1.12); }
+    60% { opacity: 1; transform: translate(0, 0) rotate(-3deg) scale(0.99); }
+    100% { transform: rotate(-2.2deg); }
+  }
+  /* And at the end, the one stamp that matters. */
+  .rc-accept {
+    position: absolute; left: 50%; top: 50%; pointer-events: none;
+    transform: translate(-50%, -50%) rotate(-9deg);
+    mix-blend-mode: multiply;
+  }
+  .rc-accept span {
+    display: block; color: var(--stamp-blue); filter: url(#rc-ink);
+    font: 800 34px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase;
+    padding: 10px 16px 8px 20px; border: 4px solid currentColor; border-radius: 8px;
+    box-shadow: inset 0 0 0 3px transparent, inset 0 0 0 5px currentColor;
+  }
+  html.play .rc-accept.is-new span { animation: rcStamp 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+  html.play .rc-board.is-thumped { animation: rcThump 360ms var(--ease); }
+  @keyframes rcThump { 30% { transform: translateY(2px) scale(0.996); } }
 
   /* ---- the cards --------------------------------------------------------- */
   /* Its own layer, under the clipboard: on a phone the cards scroll beneath it. */
