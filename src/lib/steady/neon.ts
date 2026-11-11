@@ -435,6 +435,8 @@ export function createNeon(canvas: HTMLCanvasElement, o: { animate: boolean; onL
       wake()
     },
     get lit() { return lit },
+    /** For scripts/check-steady-neon.mjs. */
+    _shards: () => shards,
     get busy() { return !!raf },
     draw,
   }
