@@ -37,8 +37,8 @@ export type Hour = {
 
 const KEYS: Array<[number, Hour]> = [
   [0, {
-    el: 15, az: -64, skyEl: 15, turbidity: 5, rayleigh: 2.4, sun: [1, 0.8, 0.6], sunPower: 3.4,
-    fillSky: [0.62, 0.72, 0.95], fillGround: [0.42, 0.36, 0.26], fill: 0.5, env: 0.55,
+    el: 15, az: -64, skyEl: 15, turbidity: 5, rayleigh: 2.4, sun: [1, 0.7, 0.46], sunPower: 3.8,
+    fillSky: [0.7, 0.68, 0.9], fillGround: [0.46, 0.36, 0.24], fill: 0.46, env: 0.5,
     fog: [0.86, 0.78, 0.7], fogDensity: 0.0045, exposure: 0.5, clouds: 0.42, stars: 0, lamps: 0,
   }],
   [0.24, {

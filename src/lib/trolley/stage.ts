@@ -303,7 +303,7 @@ export function createStage(o: StageOptions) {
     tram.setNumber(index + 1)
     play.set(p, index, hour.lamps)
     must = [
-      new Vector3(TRACK.START - 2.4, 0.4, 1.4), new Vector3(TRACK.START - 2.4, 3.9, -1.4),
+      new Vector3(TRACK.START - 4, 0.4, 1.4), new Vector3(TRACK.START - 4, 3.9, -1.4),
       new Vector3(TRACK.STAND + 8, 0.3, 1.6), new Vector3(TRACK.STAND + 8, 3.4, TRACK.SIDE - 1.4),
       new Vector3(TRACK.FORK, 0, 3.8),
     ]
