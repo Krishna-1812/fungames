@@ -99,7 +99,7 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
 
 <script>
   import { createShell } from '../lib/game-shell'
-  import { roll, PLAY } from '../lib/motion'
+  import { PLAY } from '../lib/motion'
   import { sfx, unlock } from '../lib/audio'
   import { hit, tone } from '../lib/audio'
   import { createNeon, GASES } from '../lib/steady/neon'
@@ -408,8 +408,10 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
     $('cardShape').textContent = shape.name + (beatShape ? ' · ✓ your best' : '')
     const big = $('bigScore')
     const txt = s.score.toFixed(1) + '%'
-    if (PLAY) roll(big, txt, { from: txt.replace(/\d/g, '0'), ms: 900 })
-    else big.textContent = txt
+    // The number is neon too: it catches with the tube rather than rolling,
+    // which would clip its glow into boxes.
+    big.textContent = txt
+    big.classList.remove('is-catching'); void big.offsetWidth; big.classList.add('is-catching')
     $('verdict').textContent = verdictFor(s.score)
     $('factors').innerHTML = [
       ['Accuracy', s.accuracy, 'how close you were'],
@@ -723,6 +725,11 @@ const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
   .sh-big {
     font-size: 54px; color: rgb(var(--gas, 140, 200, 255));
     text-shadow: 0 0 4px rgba(var(--gas, 140, 200, 255), 0.9), 0 0 18px rgba(var(--gas, 140, 200, 255), 0.6), 0 0 42px rgba(var(--gas, 140, 200, 255), 0.35);
+  }
+  html.play .sh-big.is-catching { animation: sh-catch 520ms linear both; }
+  @keyframes sh-catch {
+    0%, 7% { opacity: 0.08; } 9% { opacity: 0.9; } 14% { opacity: 0.2; } 20% { opacity: 0.8; }
+    24% { opacity: 0.1; } 30% { opacity: 0.4; } 36% { opacity: 1; } 40% { opacity: 0.65; } 50%, 100% { opacity: 1; }
   }
   .sh-verdict { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: 22px; line-height: 1.1; letter-spacing: -0.02em; }
   .sh-crowd:not(:empty) { margin-top: 12px; }
