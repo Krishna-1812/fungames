@@ -188,7 +188,8 @@ export function createMarbles(o: {
 
   function birth(tier: number, x: number, y: number, vx = 0, vy = 0): Marble {
     const r = base * SIZE[tier]
-    const m: Marble = { x, y, px: x - vx / 60, py: y - vy / 60, r, tier, a: rnd() * 6.28, state: 'live', to: { x, y }, from: { x, y }, t: 0, dur: 0, age: 0, seed: rnd() }
+    // Verlet keeps velocity as the last substep's movement: four substeps a 60 Hz frame.
+    const m: Marble = { x, y, px: x - vx / 240, py: y - vy / 240, r, tier, a: rnd() * 6.28, state: 'live', to: { x, y }, from: { x, y }, t: 0, dur: 0, age: 0, seed: rnd() }
     marbles.push(m)
     count[tier]++
     unsettled = true
