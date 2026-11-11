@@ -35,6 +35,10 @@ import { iconSvg } from '../lib/icons'
       view. Keeping the room still while the furniture lurches is also the more
       unpleasant of the two, which is the point. */}
   <div class="oversky" id="oversky" aria-hidden="true"></div>
+  <canvas class="over-marbles" id="marbles" aria-hidden="true"></canvas>
+  <ol class="over-legend" id="legend" aria-label="What each colour of marble is worth">
+    <li style="--c: #5ff0c0">1</li><li style="--c: #56b8ff">10</li><li style="--c: #a080ff">100</li><li style="--c: #ff68b0">1,000</li><li style="--c: #e8f0ff">10,000</li>
+  </ol>
 
   <script
     type="application/json"
@@ -95,7 +99,8 @@ import { iconSvg } from '../lib/icons'
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
-  import { PLAY } from '../lib/motion'
+  import { PLAY, WORLD_PLAY } from '../lib/motion'
+  import { createMarbles } from '../lib/over/marbles'
 
   const prefersReducedMotion = !PLAY
   // Restart is the default reload: nothing about the noise is worth keeping.
@@ -143,6 +148,37 @@ import { iconSvg } from '../lib/icons'
   }
   measureFocus()
   addEventListener('resize', measureFocus)
+
+  /* ---- attention, in glass ---------------------------------------------- */
+  const narrow = () => matchMedia('(max-width: 760px)').matches
+  function tankBox() {
+    const b = root.getBoundingClientRect(), s = shop.getBoundingClientRect()
+    const right = narrow() ? b.width - 14 : s.left - b.left - 16
+    const bottom = narrow() ? s.top - b.top - 12 : b.height - 16
+    return { left: 16, right, bottom, height: Math.min(190, Math.max(110, b.height * (narrow() ? 0.16 : 0.24))) }
+  }
+  const marbles = createMarbles({
+    canvas: el<HTMLCanvasElement>('marbles'),
+    tank: tankBox,
+    // The visitor's own setting, not PLAY, which a slow load can lose.
+    animate: WORLD_PLAY,
+    onClick: (k, tier) => tone({ freq: 2300 + tier * 260 + Math.random() * 500, dur: 0.035 + k * 0.03, type: 'sine', gain: 0.012 + k * 0.05 }),
+    onMerge: (tier) => { tone({ freq: 1320 + tier * 220, dur: 0.22, type: 'sine', gain: 0.06 }); tone({ freq: 1980 + tier * 330, dur: 0.3, type: 'sine', gain: 0.035, delay: 0.04 }) },
+  })
+  function placeLegend() {
+    const t = tankBox()
+    const lg = el('legend')
+    lg.style.left = t.left + 10 + 'px'
+    lg.style.top = t.bottom - t.height + 8 + 'px'
+  }
+  placeLegend()
+  addEventListener('resize', placeLegend)
+  /** Where new marbles come from, and where spent ones go. */
+  const at = (n: Element) => {
+    const b = root.getBoundingClientRect(), r = n.getBoundingClientRect()
+    return { x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height / 2 }
+  }
+  let spendTo = { x: 0, y: 0 }
 
   const sky = new ShaderSurface(document.getElementById('oversky')!, OVER_FRAG, {
     // Every layer here is low frequency; three-quarter resolution costs nothing
@@ -330,6 +366,7 @@ import { iconSvg } from '../lib/icons'
   function purchase(up: Up, b: HTMLButtonElement) {
     if (owned.has(up.id) || attention < up.cost) return
     attention -= up.cost
+    spendTo = at(b)
     owned.add(up.id)
     if (up.rate) perSec += up.rate
     unlock()
@@ -407,6 +444,10 @@ import { iconSvg } from '../lib/icons'
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
     if (perSec && !shell.paused) { attention += perSec * dt; paint() }
+    if (!shell.paused) {
+      marbles.sync(Math.floor(attention), at(el('bigBtn')), spendTo)
+      marbles.frame(dt)
+    }
     // The strip rolls its digits; four times a second is plenty.
     if (now - lastStrip > 250) {
       lastStrip = now
@@ -527,6 +568,12 @@ import { iconSvg } from '../lib/icons'
   })
 
   shell.setLevel(`0 / ${UPGRADES.length}`)
+  if (import.meta.env.DEV) (window as any).__over = {
+    add(n: number) { attention += n; paint() },
+    buy(id: string) { const up = UPGRADES.find((u) => u.id === id)!; attention = Math.max(attention, up.cost); purchase(up, cards.get(id)!) },
+    click() { el('bigBtn').click() },
+    marbles,
+  }
 
   paint()
   requestAnimationFrame(loop)
@@ -541,9 +588,19 @@ import { iconSvg } from '../lib/icons'
 
   .oversky { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
   .oversky .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .over-marbles { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; display: block; pointer-events: none; }
+  .over-legend {
+    position: absolute; z-index: 3; margin: 0; padding: 0; list-style: none; display: flex; gap: 10px;
+    font: 600 10.5px/1 var(--sans); letter-spacing: 0.06em; color: rgba(236, 226, 255, 0.62); pointer-events: none;
+  }
+  .over-legend li { display: flex; align-items: center; gap: 4px; }
+  .over-legend li::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff 0 12%, var(--c) 40%, color-mix(in srgb, var(--c) 45%, #000) 100%);
+  }
 
   .over-body .world {
-    position: relative; z-index: 1; height: 100%; overflow: hidden;
+    position: relative; z-index: 2; height: 100%; overflow: hidden;
     transform: translate(var(--sx, 0), var(--sy, 0));
   }
   .over-body .world.has-tilt { animation: slowTilt 24s ease-in-out infinite; }
