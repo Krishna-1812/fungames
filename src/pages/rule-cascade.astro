@@ -13,6 +13,13 @@ import { RULES } from '../lib/cascade-rules'
  * letter of the alphabet away from you permanently, and a rule about how many
  * rules are on screen, which therefore moves every time you satisfy it.
  *
+ * It is played at a desk. The form is a sheet on a clipboard; every rule is an
+ * index card tossed onto the leather beside it. Cards still to meet lie in a
+ * column you can read; met ones are stamped and go on the pile, which gets
+ * thicker as you go (lib/cascade/deck.ts moves them, as paper: picked up,
+ * carried, put down). The joke is still that this is an ordinary form; the
+ * desk is where ordinary forms are filled in.
+ *
  * The rules live in lib/cascade-rules.ts; scripts/check-cascade.mjs builds a
  * real solution for all 24 hours and all 26 possible sacrifices.
  *
@@ -27,40 +34,129 @@ const total = RULES.length
   slug="rule-cascade"
   labels={{ score: 'Rules met', best: 'Best', level: 'Rule', moves: 'Keystrokes' }}
   initial={{ score: '0', level: '1', moves: '0' }}
+  fonts={['Courier Prime:ital,wght@0,400;0,700;1,400']}
 >
-  <div class="rc">
-    <div class="rc-head">
-      <p class="label meta">Step 1 of 1</p>
-      <h2 class="rc-title">Choose a <em class="wonk">username</em>.</h2>
-      <p class="rc-sub">It should not take long.</p>
-    </div>
+  <div class="rc-desk" id="desk">
+    <svg class="rc-defs" aria-hidden="true" width="0" height="0" focusable="false">
+      <!-- Rubber-stamp ink: the edge wanders, the ink is patchy where the pad
+           was dry, and there are pinholes where the rubber did not touch. -->
+      <filter id="rc-ink" x="-8%" y="-20%" width="116%" height="140%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="3" result="edge" />
+        <feDisplacementMap in="SourceGraphic" in2="edge" scale="2.6" xChannelSelector="R" yChannelSelector="G" result="rough" />
+        <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="11" result="dry" />
+        <feColorMatrix in="dry" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -2.2 0 0 0 1.9" result="pad" />
+        <feComposite in="rough" in2="pad" operator="in" result="patchy" />
+        <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="1" seed="5" result="pin" />
+        <feColorMatrix in="pin" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -7 0 0 0 4.6" result="holes" />
+        <feComposite in="patchy" in2="holes" operator="in" />
+      </filter>
+      <!-- The same ink for small type: a steadier hand, and fewer holes. -->
+      <filter id="rc-ink-s" x="-8%" y="-20%" width="116%" height="140%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="9" result="edge" />
+        <feDisplacementMap in="SourceGraphic" in2="edge" scale="0.9" xChannelSelector="R" yChannelSelector="G" result="rough" />
+        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="4" result="dry" />
+        <feColorMatrix in="dry" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -1.4 0 0 0 1.75" result="pad" />
+        <feComposite in="rough" in2="pad" operator="in" />
+      </filter>
+    </svg>
 
-    <div class="rc-field">
-      <label class="sr-only" for="input">Username</label>
-      <textarea
-        id="input"
-        rows="2"
-        spellcheck="false"
-        autocomplete="off"
-        autocapitalize="off"
-        placeholder="type something"></textarea>
-      <div class="rc-meter">
-        <span id="count">0 characters</span>
-        <span id="score">0 / {total} rules</span>
+    <div class="rc-light" aria-hidden="true"></div>
+
+    <div class="rc-cols">
+      <div class="rc-board" id="board">
+        <span class="rc-clip" aria-hidden="true">
+          <svg viewBox="0 0 180 64" width="180" height="64">
+            <defs>
+              <linearGradient id="rcClipPlate" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f7f9fc" />
+                <stop offset="0.18" stop-color="#c9d1dc" />
+                <stop offset="0.55" stop-color="#8b95a5" />
+                <stop offset="0.78" stop-color="#d9dee6" />
+                <stop offset="1" stop-color="#7d8696" />
+              </linearGradient>
+              <linearGradient id="rcClipWire" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#6c7584" />
+                <stop offset="0.35" stop-color="#f3f6fa" />
+                <stop offset="0.6" stop-color="#9aa3b1" />
+                <stop offset="1" stop-color="#5d6574" />
+              </linearGradient>
+              <radialGradient id="rcRivet" cx="0.38" cy="0.32" r="0.7">
+                <stop offset="0" stop-color="#ffffff" />
+                <stop offset="0.45" stop-color="#b8c0cc" />
+                <stop offset="1" stop-color="#5a6372" />
+              </radialGradient>
+            </defs>
+            <!-- the lever: a bent wire loop standing up off the plate -->
+            <path d="M58 30 C58 8, 122 8, 122 30" fill="none" stroke="#1b2130" stroke-opacity="0.35" stroke-width="7" transform="translate(2 3)" />
+            <path d="M58 30 C58 8, 122 8, 122 30" fill="none" stroke="url(#rcClipWire)" stroke-width="6" stroke-linecap="round" />
+            <!-- the plate, its rolled front edge and the jaw biting the paper -->
+            <path d="M14 26 H166 a8 8 0 0 1 8 8 V44 Q90 54 6 44 V34 a8 8 0 0 1 8 -8Z" fill="url(#rcClipPlate)" stroke="#5b6474" stroke-width="1" />
+            <path d="M12 44 Q90 54 168 44" fill="none" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1.4" />
+            <circle cx="34" cy="35" r="4.2" fill="url(#rcRivet)" stroke="#4d5665" stroke-width="0.7" />
+            <circle cx="146" cy="35" r="4.2" fill="url(#rcRivet)" stroke="#4d5665" stroke-width="0.7" />
+          </svg>
+        </span>
+
+        <div class="rc-sheet" id="sheet">
+          <header class="rc-letter">
+            <span class="rc-seal" aria-hidden="true">
+              <svg viewBox="0 0 40 40" width="40" height="40">
+                <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1.4" />
+                <circle cx="20" cy="20" r="14.5" fill="none" stroke="currentColor" stroke-width="0.8" />
+                <path d="M13 26 V17 L20 12 L27 17 V26 M11 26 H29 M16 26 V19 M20 26 V19 M24 26 V19" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="rc-org"><b>Registry of Usernames</b><small>Form U-1 · Application for a username</small></span>
+            <span class="rc-ref">Step 1 of 1</span>
+          </header>
+
+          <h2 class="rc-title">Choose a <em class="wonk">username</em>.</h2>
+          <p class="rc-sub">It should not take long.</p>
+
+          <div class="rc-field" id="field">
+            <label class="rc-label" for="input">Username <span>(block capitals not required)</span></label>
+            <textarea
+              id="input"
+              rows="2"
+              spellcheck="false"
+              autocomplete="off"
+              autocapitalize="off"
+              placeholder="type something"></textarea>
+            <div class="rc-meter">
+              <span id="count">0 characters</span>
+              <span id="score">0 / {total} rules</span>
+            </div>
+          </div>
+
+          <div class="rc-office" id="office">
+            <p class="rc-office-label">For office use only</p>
+            <div class="rc-slip" id="slip" hidden>
+              <span>Confiscated</span>
+              <b id="slipLetter">e</b>
+            </div>
+            <div class="rc-accept" id="accept" hidden aria-hidden="true"><span>Accepted</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rc-side">
+        <ol class="rc-tray" id="rules" aria-label="Rules"></ol>
+        <div class="rc-pile-bar" id="pileBar" hidden>
+          <button class="rc-fan" id="fan" type="button" aria-pressed="false">Spread the approved pile</button>
+        </div>
       </div>
     </div>
-
-    <ol class="rc-rules" id="rules" aria-label="Rules"></ol>
   </div>
 
   <Fragment slot="howto">
     <p>
-      You are picking a username. Type it in the box. A rule appears; satisfy
-      it and the next one arrives — and every rule already on screen <b>stays
-      live</b>, so a late rule will often break an early one.
+      You are picking a username. Type it on the form. A rule card lands on the
+      desk; satisfy it and the next one arrives — and every rule already on the
+      desk <b>stays live</b>, so a late rule will often break an early one.
     </p>
     <ul>
-      <li>Unmet rules sit at the top with a <b>✗</b>. Met ones sink below, filled blue with a <b>✓</b>.</li>
+      <li>Rules still to meet lie in a column, marked <b>Required</b>. Met ones are stamped <b>Approved</b> and go on the pile. If one stops being true it comes back off the pile.</li>
+      <li>Spread the pile to read the approved cards again.</li>
       <li>Some rules act on you: a moth eats a character every few seconds until you give it a spider, and one rule takes a letter away for good.</li>
       <li>Everything is checked in your browser. Nothing you type is sent anywhere.</li>
     </ul>
@@ -70,9 +166,10 @@ const total = RULES.length
 
 <script>
   import { createShell } from '../lib/game-shell'
-  import { sfx, unlock } from '../lib/audio'
-  import { PLAY } from '../lib/motion'
+  import { sfx, unlock, hit, tone } from '../lib/audio'
+  import { WORLD_PLAY } from '../lib/motion'
   import { RULES, chars } from '../lib/cascade-rules'
+  import { createDeck } from '../lib/cascade/deck'
   import { recordPlay } from '../lib/stats'
   import { dailyFor } from '../data/game-meta'
   import { loadCrowd, fillCrowd, standing, median, people } from '../lib/crowd'
@@ -82,6 +179,10 @@ const total = RULES.length
   const list = document.getElementById('rules')!
   const count = document.getElementById('count')!
   const scoreEl = document.getElementById('score')!
+  const fanBtn = document.getElementById('fan') as HTMLButtonElement
+  const pileBar = document.getElementById('pileBar')!
+  const board = document.getElementById('board')!
+  const field = document.getElementById('field')!
 
   const ctx = { hour: new Date().getHours(), unlocked: 1, banned: null as string | null }
   let won = false
@@ -89,6 +190,25 @@ const total = RULES.length
   let started = Date.now()
   let passedBefore = new Set<number>()
   const nodes = new Map<number, HTMLLIElement>()
+  /** When each met rule was approved, so the newest sits on top of the pile. */
+  const approved = new Map<number, number>()
+  let stampSeq = 0
+
+  /* ---- sounds of paper ---------------------------------------------- */
+  const paper = {
+    /** A card meeting the leather. */
+    land: (hard: number) => hit({ dur: 0.05 + hard * 0.04, gain: 0.05 + hard * 0.12, freq: 700 + hard * 500, q: 0.7 }),
+    /** A rubber stamp: the thump of the handle and the smack of the rubber. */
+    stamp: () => { hit({ dur: 0.07, gain: 0.32, freq: 240, type: 'lowpass' }); hit({ dur: 0.03, gain: 0.16, freq: 2400, q: 1.4, delay: 0.005 }); tone({ freq: 110, to: 60, dur: 0.12, gain: 0.22 }) },
+    /** A card snatched back off the pile. */
+    snatch: () => hit({ dur: 0.16, gain: 0.12, freq: 1600, sweepTo: 600, q: 0.9 }),
+  }
+
+  const deck = createDeck({
+    tray: list,
+    animate: WORLD_PLAY,
+    onLand: (_, hard) => { if (hard > 0.15) paper.land(hard) },
+  })
 
   const shell = createShell({
     slug: 'rule-cascade',
@@ -118,12 +238,20 @@ const total = RULES.length
     if (li) return li
     li = document.createElement('li')
     li.dataset.id = String(r.id)
+    // The stamp is turned the way a hand turns it, a little differently each time.
+    li.style.setProperty('--stamp-r', `${(-13 + ((r.id * 37) % 11)).toFixed(0)}deg`)
     li.innerHTML =
-      '<span class="rc-mark" aria-hidden="true"></span>' +
-      '<span class="rc-body"><span class="rc-no">Rule ' + r.id + '</span>' +
+      '<span class="rc-shadow" aria-hidden="true"></span>' +
+      '<span class="rc-face">' +
+      '<span class="rc-head"><span class="rc-no">No. ' + r.id + '</span><span class="rc-req" aria-hidden="true">Required</span></span>' +
       '<span class="sr-only rc-state"></span>' +
-      '<span class="rc-text"></span></span>'
+      '<span class="rc-text"></span>' +
+      '<span class="rc-stamp" aria-hidden="true"><span>Approved</span></span>' +
+      '</span>'
+    li.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') deck.lookAt(r.id) })
+    li.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') deck.lookAt(null) })
     nodes.set(r.id, li)
+    deck.add(r.id, li)
     return li
   }
 
@@ -138,10 +266,6 @@ const total = RULES.length
     const active = RULES.slice(0, ctx.unlocked)
     const passing = new Set(active.filter((r) => r.ok(v, ctx)).map((r) => r.id))
 
-    const arrived: HTMLElement[] = []
-    const broke: HTMLElement[] = []
-    const fixed: HTMLElement[] = []
-
     if (ctx.unlocked > before) {
       sfx.blip(Math.min(9, ctx.unlocked))
       for (let i = before; i < ctx.unlocked; i++) shell.announce(`New rule ${RULES[i].id}. ${RULES[i].text(ctx)}`)
@@ -149,53 +273,46 @@ const total = RULES.length
       for (let i = before + 1; i <= ctx.unlocked; i++) if (i % 10 === 0) shell.levelUp(`Rule ${i}`)
     }
 
-    // FLIP, part one: where every rule sits before the list changes.
-    const firstTop = new Map<number, number>()
-    if (PLAY) for (const [id, li] of nodes) if (li.isConnected) firstTop.set(id, li.getBoundingClientRect().top)
-
+    const arrived: number[] = [], broke: number[] = [], fixed: number[] = []
     const order = active.slice().sort((a, b) =>
       (passing.has(a.id) ? 1 : 0) - (passing.has(b.id) ? 1 : 0) || a.id - b.id)
 
-    for (const r of order) {
+    order.forEach((r, i) => {
+      const isNew = !nodes.has(r.id)
       const li = nodeFor(r)
       const done = passing.has(r.id)
-      const isNew = !li.isConnected
-      const cls = 'rc-rule ' + (done ? 'is-ok' : 'is-bad')
-      if (li.className !== cls) li.className = cls
+      const cls = 'rc-card ' + (done ? 'is-ok' : 'is-bad')
+      if (!li.className.startsWith(cls)) li.className = cls
       const txt = r.text(ctx)
       const t = li.querySelector('.rc-text')!
       if (t.textContent !== txt) t.textContent = txt
-      li.querySelector('.rc-mark')!.textContent = done ? '✓' : '✗'
       li.querySelector('.rc-state')!.textContent = done ? ', met. ' : ', not met. '
-      list.appendChild(li)
-      if (isNew) arrived.push(li)
-      else if (done && !passedBefore.has(r.id)) fixed.push(li)
-      else if (!done && passedBefore.has(r.id)) broke.push(li)
-    }
+      // Reading order for a screen reader: still to do first, then the rest.
+      if (list.children[i] !== li) list.insertBefore(li, list.children[i] ?? null)
+      if (isNew) arrived.push(r.id)
+      if (done && (isNew || !passedBefore.has(r.id))) { fixed.push(r.id); approved.set(r.id, ++stampSeq) }
+      else if (!done && passedBefore.has(r.id)) { broke.push(r.id); approved.delete(r.id) }
+    })
 
     for (const r of active) {
-      if (passing.has(r.id) && !passedBefore.has(r.id)) { sfx.good(); shell.announce(`Rule ${r.id} met.`) }
+      if (passing.has(r.id) && !passedBefore.has(r.id)) shell.announce(`Rule ${r.id} met.`)
       else if (!passing.has(r.id) && passedBefore.has(r.id)) { sfx.bad(); shell.announce(`Rule ${r.id} no longer met.`) }
     }
     passedBefore = passing
 
-    // FLIP, part two: carry each rule from where it was to where it is.
-    if (PLAY) {
-      for (const [id, li] of nodes) {
-        const was = firstTop.get(id)
-        if (!li.isConnected || was === undefined) continue
-        const dy = was - li.getBoundingClientRect().top
-        if (Math.abs(dy) < 1) continue
-        li.style.transition = 'none'
-        li.style.transform = `translateY(${dy}px)`
-        void li.offsetHeight
-        li.style.transition = ''
-        li.style.transform = ''
-      }
+    const unmet = order.filter((r) => !passing.has(r.id)).map((r) => r.id)
+    const met = [...approved.keys()].filter((id) => passing.has(id)).sort((a, b) => approved.get(a)! - approved.get(b)!)
+    deck.layout(unmet, met)
+    if (WORLD_PLAY) for (const id of arrived) deck.toss(deck.get(id)!)
+    for (const id of fixed) {
+      const li = nodes.get(id)!
+      li.classList.remove('just-ok'); void li.offsetWidth; li.classList.add('just-ok')
+      if (!arrived.includes(id)) deck.press(id)
     }
-    arrived.forEach((li) => shell.pop(li))
-    fixed.forEach((li) => shell.pop(li))
-    broke.forEach((li) => shell.shake(li))
+    if (fixed.length) paper.stamp()
+    for (const id of broke) deck.jolt(id)
+    if (broke.length) paper.snatch()
+    pileBar.hidden = met.length < 2
 
     const n = chars(v).length
     count.textContent = `${n} character${n === 1 ? '' : 's'}`
@@ -207,43 +324,45 @@ const total = RULES.length
     shell.considerBest(liveBest(passing.size), `${passing.size} / ${TOTAL}`)
 
     const all = RULES.every((r) => r.ok(v, ctx))
-    if (all && !won) {
-      won = true
-      cleared(RULES[TOTAL - 1].id)
-      shell.pick('Rule that took longest', slowest.id)
-      const secs = Math.round((Date.now() - started) / 1000)
-      recordPlay('rule-cascade', { keystrokes, seconds: secs, length: n }, { keystrokes: 'low', seconds: 'low' })
-      const beat = shell.considerBest(finishBest(keystrokes), `${keystrokes.toLocaleString('en-GB')} keys`)
-      const daily = dailyFor(new Date())
-      const cap = Number(daily.goal.match(/fewer than (\d+)/)?.[1] ?? 0)
-      const lines = [
-        `keystrokes for all ${TOTAL} rules — a ${n}-character username in ${Math.floor(secs / 60)}m ${secs % 60}s.`,
-        beat === 'beaten' ? '✓ That is a new personal best.'
-          : beat === 'first' ? 'Your first finish — that is the best to beat now.'
-          : `Your best is still ${shell.best?.text}.`,
-      ]
-      if (daily.slug === 'rule-cascade' && cap)
-        shell.daily(keystrokes < cap, `The target: all ${TOTAL} rules in fewer than ${cap} keystrokes. You took ${keystrokes.toLocaleString('en-GB')}.`)
-      // The crowd: how your slowest rule compares, and which rule holds everyone up.
-      const hold = slowest
-      const crowdEl = document.createElement('div')
-      shell.resultExtra.replaceChildren(crowdEl)
-      fillCrowd(crowdEl, 'rule-cascade', (c) => {
-        const st = standing(c, 'Seconds to clear each rule', `Rule ${hold.id}`, hold.s, 'low')
-        const meds = RULES.map((r) => ({ id: r.id, m: median(c, 'Seconds to clear each rule', `Rule ${r.id}`) })).filter((x) => x.m && x.m.n >= 10)
-        const worst = meds.sort((a, b) => b.m!.v - a.m!.v)[0]
-        const parts: string[] = []
-        if (st) parts.push(`Your slowest was Rule ${hold.id}, at ${hold.s} s: quicker than <b>${st.pct}%</b> of ${people(st.n)} players who reached it.`)
-        if (worst) parts.push(worst.id === hold.id ? 'It holds up everyone else longest too.' : `The rule that holds everyone up longest is Rule ${worst.id}: a typical player needs ${worst.m!.v} s for it.`)
-        return parts.length ? parts.join(' ') : null
-      }, 'crowd-note--block')
-      shell.win({
-        kicker: '✓ Username accepted',
-        title: 'Fine. That is a username.',
-        score: keystrokes.toLocaleString('en-GB'),
-        lines,
-      })
-    }
+    if (all && !won) finish(n)
+  }
+
+  function finish(n: number) {
+    won = true
+    cleared(RULES[TOTAL - 1].id)
+    shell.pick('Rule that took longest', slowest.id)
+    const secs = Math.round((Date.now() - started) / 1000)
+    recordPlay('rule-cascade', { keystrokes, seconds: secs, length: n }, { keystrokes: 'low', seconds: 'low' })
+    const beat = shell.considerBest(finishBest(keystrokes), `${keystrokes.toLocaleString('en-GB')} keys`)
+    const daily = dailyFor(new Date())
+    const cap = Number(daily.goal.match(/fewer than (\d+)/)?.[1] ?? 0)
+    const lines = [
+      `keystrokes for all ${TOTAL} rules — a ${n}-character username in ${Math.floor(secs / 60)}m ${secs % 60}s.`,
+      beat === 'beaten' ? '✓ That is a new personal best.'
+        : beat === 'first' ? 'Your first finish — that is the best to beat now.'
+        : `Your best is still ${shell.best?.text}.`,
+    ]
+    if (daily.slug === 'rule-cascade' && cap)
+      shell.daily(keystrokes < cap, `The target: all ${TOTAL} rules in fewer than ${cap} keystrokes. You took ${keystrokes.toLocaleString('en-GB')}.`)
+    // The crowd: how your slowest rule compares, and which rule holds everyone up.
+    const hold = slowest
+    const crowdEl = document.createElement('div')
+    shell.resultExtra.replaceChildren(crowdEl)
+    fillCrowd(crowdEl, 'rule-cascade', (c) => {
+      const st = standing(c, 'Seconds to clear each rule', `Rule ${hold.id}`, hold.s, 'low')
+      const meds = RULES.map((r) => ({ id: r.id, m: median(c, 'Seconds to clear each rule', `Rule ${r.id}`) })).filter((x) => x.m && x.m.n >= 10)
+      const worst = meds.sort((a, b) => b.m!.v - a.m!.v)[0]
+      const parts: string[] = []
+      if (st) parts.push(`Your slowest was Rule ${hold.id}, at ${hold.s} s: quicker than <b>${st.pct}%</b> of ${people(st.n)} players who reached it.`)
+      if (worst) parts.push(worst.id === hold.id ? 'It holds up everyone else longest too.' : `The rule that holds everyone up longest is Rule ${worst.id}: a typical player needs ${worst.m!.v} s for it.`)
+      return parts.length ? parts.join(' ') : null
+    }, 'crowd-note--block')
+    shell.win({
+      kicker: '✓ Username accepted',
+      title: 'Fine. That is a username.',
+      score: keystrokes.toLocaleString('en-GB'),
+      lines,
+    })
   }
 
   /* ---- the rules that do something to you ------------------------- */
@@ -262,7 +381,7 @@ const total = RULES.length
     a.splice(at, 1)
     input.value = a.join('')
     sfx.bad()
-    shell.shake(input.closest('.rc-field')!)
+    shell.shake(field)
     shell.announce(`The moth ate a character: ${eaten}.`)
     render()
   }, 6000)
@@ -277,6 +396,26 @@ const total = RULES.length
     sfx.thud()
   }
 
+  /* ---- the approved pile ------------------------------------------ */
+
+  fanBtn.addEventListener('click', () => {
+    const on = !deck.fanned
+    fanBtn.setAttribute('aria-pressed', String(on))
+    fanBtn.textContent = on ? 'Square up the pile' : 'Spread the approved pile'
+    deck.setFanned(on)
+    render()
+    hit({ dur: 0.3, gain: 0.1, freq: 1300, sweepTo: 500, q: 0.6 })
+  })
+
+  /* On a phone the clipboard rides along at the top of the screen, but only
+     its lower half: the heading scrolls away and the field stays, because
+     that is the part you are typing into. */
+  function stick() {
+    const head = field.getBoundingClientRect().top - board.getBoundingClientRect().top
+    board.style.setProperty('--stick', `${-Math.max(0, head - 12)}px`)
+  }
+  new ResizeObserver(stick).observe(board)
+
   function restart() {
     input.value = ''
     ctx.unlocked = 1
@@ -286,7 +425,9 @@ const total = RULES.length
     started = Date.now()
     ruleAt = started; slowest = { id: 0, s: -1 }; reached = 0
     passedBefore = new Set()
+    approved.clear(); stampSeq = 0
     nodes.clear()
+    deck.clear()
     list.innerHTML = ''
     render()
     input.focus()
@@ -294,90 +435,243 @@ const total = RULES.length
 
   input.addEventListener('input', () => { unlock(); keystrokes++; render() })
   setInterval(() => { if (shell.paused) return; ctx.hour = new Date().getHours(); render() }, 5000)
+  // Heights change once the typewriter face arrives; lay the cards out again.
+  document.fonts?.ready.then(() => render())
   render()
   input.focus({ preventScroll: true })
+
+  if (import.meta.env.DEV) (window as any).__cascade = { deck, ctx, render, input }
 </script>
 
 <style is:global>
-  /* Rules are built by the script, and script-built nodes never get Astro's
+  /* Cards are built by the script, and script-built nodes never get Astro's
      scoped-style attribute, so every rule here is global on purpose. */
-  .rc { max-width: 720px; margin: 0 auto; }
-  .rc-head { text-align: center; }
-  .rc-title { font-size: var(--fs-h2); margin-top: 10px; }
-  .rc-sub { margin-top: 10px; color: var(--ink2); font-size: var(--fs-lead); }
 
-  .rc-field {
-    margin-top: 28px;
-    border-radius: var(--r);
-    border: 2px solid var(--ink);
-    background: var(--card);
-    overflow: hidden;
-    position: sticky;
-    top: 12px;
-    z-index: 3;
-    box-shadow: var(--shadow-block);
+  /* ---- the desk ---------------------------------------------------------
+     A navy leather blotter under a cool desk lamp. The grain is an embossed
+     noise lit from the same upper left as everything else on the page. */
+  .stage:has(> .rc-desk) { padding: 0; overflow: clip; background: #17202e; }
+  .rc-desk {
+    --type: 'Courier Prime', 'Courier New', ui-monospace, monospace;
+    --ink-blue: #25418a;
+    --stamp-blue: rgba(30, 74, 196, 0.86);
+    --stamp-red: rgba(204, 36, 72, 0.86);
+    position: relative; isolation: isolate;
+    min-height: 640px;
+    padding: clamp(26px, 4vw, 54px) clamp(16px, 3vw, 44px) 56px;
+    background:
+      radial-gradient(120% 90% at 50% 0%, #2a3a55 0%, #1c283c 55%, #121a28 100%);
+    color: #e7edf7;
   }
-  .rc-field:has(textarea:focus-visible) { outline: 2px solid var(--ink); outline-offset: 3px; }
-  .rc-field textarea {
-    display: block;
-    width: 100%;
-    border: 0;
-    outline: 0;
-    resize: none;
-    padding: 16px 18px;
-    font-family: var(--sans);
-    font-size: 22px;
-    font-weight: 500;
-    line-height: 1.4;
-    background: transparent;
-    color: var(--ink);
+  .rc-desk::before {
+    /* the grain */
+    content: ""; position: absolute; inset: 0; z-index: -2; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='l' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.21' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeDiffuseLighting surfaceScale='2.2' lighting-color='%23fff' diffuseConstant='1.1'%3E%3CfeDistantLight azimuth='225' elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23l)'/%3E%3C/svg%3E");
+    background-size: 300px 300px;
+    mix-blend-mode: overlay; opacity: 0.38;
   }
-  .rc-field textarea::placeholder { color: var(--ink3); opacity: 1; }
-  .rc-meter {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 9px 18px;
-    border-top: 1.5px solid var(--paper3);
-    background: var(--paper2);
-    font-size: var(--fs-label);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--ink2);
-  }
-
-  /* Pieces: an unmet rule is an ink-outlined card with a ✗; a met rule
-     sinks into a sky block with a ✓. Two px of paper between them. */
-  .rc-rules { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 8px; }
-  .rc-rule {
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-    padding: 14px 16px;
+  .rc-desk::after {
+    /* the stitched edge of the blotter */
+    content: ""; position: absolute; inset: 12px; z-index: -1; pointer-events: none;
     border-radius: 14px;
-    border: 2px solid var(--ink);
-    background: var(--card);
-    color: var(--ink);
+    border: 1.6px dashed rgba(178, 196, 226, 0.32);
+    box-shadow: 0 0 0 5px rgba(5, 9, 16, 0.18), inset 0 0 0 5px rgba(5, 9, 16, 0.18);
   }
-  .rc-rule.is-ok { background: var(--sky); border-color: var(--sky); }
-  .rc-mark {
-    flex: none;
-    display: inline-grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    font-weight: 800;
-    font-size: 15px;
-    line-height: 1;
-    background: var(--ink);
-    color: var(--ink-paper);
+  /* The lamp, up and to the left of the clipboard, and the room falling
+     away into the corners. */
+  .rc-light {
+    position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(52% 40% at 30% 16%, rgba(214, 230, 255, 0.24), rgba(214, 230, 255, 0.07) 55%, transparent 80%),
+      radial-gradient(130% 100% at 45% 30%, transparent 55%, rgba(3, 6, 12, 0.5) 100%);
   }
-  .rc-rule.is-bad .rc-mark { background: var(--red); color: var(--ink); }
-  .rc-body { display: grid; gap: 2px; font-size: 16px; line-height: 1.4; }
-  .rc-no { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-  .rc-rule.is-bad .rc-no { color: var(--t-red); }
+  .rc-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
-  html.play .rc-rule { transition: transform 380ms var(--glide); }
+  .rc-cols {
+    display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 500px);
+    gap: clamp(28px, 4vw, 60px); justify-content: center; align-items: start;
+  }
+
+  /* ---- the clipboard ----------------------------------------------------
+     Smoked blue acrylic, polished at the edge, with a steel clip. */
+  .rc-board {
+    position: sticky; top: 14px; z-index: 5;
+    padding: 40px 16px 18px; border-radius: 20px;
+    background:
+      linear-gradient(155deg, rgba(166, 196, 240, 0.34), rgba(70, 102, 160, 0.30) 45%, rgba(40, 64, 112, 0.36));
+    -webkit-backdrop-filter: blur(2px) saturate(1.3); backdrop-filter: blur(2px) saturate(1.3);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 0 0 1px rgba(196, 220, 255, 0.28),
+      inset 0 -2px 0 rgba(10, 20, 40, 0.35),
+      0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 18px -6px rgba(0, 0, 0, 0.5), 0 34px 60px -18px rgba(0, 0, 0, 0.65);
+  }
+  .rc-clip {
+    position: absolute; left: 50%; top: -14px; z-index: 3; transform: translateX(-50%);
+    filter: drop-shadow(2px 5px 4px rgba(0, 0, 0, 0.45));
+    pointer-events: none;
+  }
+  .rc-clip svg { display: block; }
+
+  /* ---- the form ---------------------------------------------------------- */
+  .rc-sheet {
+    position: relative; border-radius: 3px;
+    padding: 34px clamp(20px, 3vw, 34px) 26px;
+    color: #1b1e27;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .33 0 0 0 0 .36 .16 0 0 0 -.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E"),
+      radial-gradient(90% 70% at 18% 8%, #ffffff, #f7f8f6 60%, #ecede9);
+    box-shadow:
+      0 0 0 0.5px rgba(30, 40, 60, 0.2),
+      0 1px 1px rgba(0, 0, 0, 0.25), 0 3px 6px rgba(0, 0, 0, 0.18);
+  }
+  .rc-letter {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+    padding-bottom: 12px; border-bottom: 1.5px solid var(--ink-blue);
+    color: var(--ink-blue);
+  }
+  .rc-seal { display: block; width: 40px; height: 40px; opacity: 0.9; }
+  .rc-seal svg { display: block; }
+  .rc-org { display: grid; gap: 2px; line-height: 1.15; }
+  .rc-org b { font: 700 12px/1.1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; }
+  .rc-org small { font: 500 11px/1.2 var(--sans); letter-spacing: 0.02em; color: #4a5f92; }
+  .rc-ref {
+    font: 700 10px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase;
+    border: 1.2px solid currentColor; padding: 5px 7px; border-radius: 2px;
+  }
+  .rc-title { font-size: clamp(30px, 4.4vw, 44px); margin-top: 22px; line-height: 1.02; color: #14161d; }
+  .rc-sub { margin-top: 8px; color: #555a68; font-size: 16px; }
+
+  .rc-field { margin-top: 22px; }
+  .rc-label {
+    display: block; margin-bottom: 6px;
+    font: 700 10.5px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-blue);
+  }
+  .rc-label span { font-weight: 500; letter-spacing: 0.04em; text-transform: none; color: #6a7898; }
+  .rc-field textarea {
+    display: block; width: 100%; resize: none;
+    padding: 12px 14px;
+    border: 0; border-radius: 2px; outline: 0;
+    font: 400 22px/1.38 var(--type); color: #161922;
+    /* typed ink sits in the paper, very slightly spread */
+    text-shadow: 0 0 0.6px rgba(22, 25, 34, 0.55);
+    background:
+      linear-gradient(rgba(37, 65, 138, 0.035), rgba(37, 65, 138, 0.035)),
+      transparent;
+    box-shadow: inset 0 0 0 1.4px var(--ink-blue), inset 0 0 0 4px rgba(255, 255, 255, 0.0), inset 0 0 0 5px rgba(37, 65, 138, 0.35);
+    transition: box-shadow 160ms var(--ease);
+  }
+  .rc-field textarea:focus-visible { box-shadow: inset 0 0 0 2px var(--ink-blue), inset 0 0 0 6px rgba(37, 65, 138, 0.12); }
+  .rc-field textarea::placeholder { color: #9aa1b1; opacity: 1; font-style: italic; }
+  .rc-meter {
+    display: flex; justify-content: space-between; gap: 12px; margin-top: 8px;
+    font: 700 10.5px/1 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: #4a5f92;
+  }
+
+  .rc-office {
+    position: relative; margin-top: 22px; min-height: 92px;
+    border: 1.2px dashed rgba(37, 65, 138, 0.55); border-radius: 2px;
+    padding: 10px 12px;
+  }
+  .rc-office-label { margin: 0; font: 700 9.5px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: #6a7898; }
+
+  /* ---- the cards --------------------------------------------------------- */
+  /* Its own layer, under the clipboard: on a phone the cards scroll beneath it. */
+  .rc-side { position: relative; z-index: 1; }
+  .rc-tray { position: relative; list-style: none; margin: 0; padding: 0; min-height: 140px; }
+  .rc-card {
+    position: absolute; left: 0; top: 0; width: 100%;
+    transform-origin: 50% 40%;
+    will-change: transform;
+    contain: layout style;
+  }
+  .rc-shadow {
+    position: absolute; inset: 2px; border-radius: 4px; z-index: 0;
+    background: rgba(2, 5, 12, 0.5);
+    box-shadow: 0 2px 3px rgba(2, 5, 12, 0.55), 0 8px 20px rgba(2, 5, 12, 0.45);
+    filter: blur(1.5px);
+    will-change: transform, opacity;
+  }
+  /* An index card: white board, a red rule under the heading, blue rules
+     to type on, and a little fibre in the paper. */
+  .rc-face {
+    --lh: 24px;
+    position: relative; z-index: 1; display: block;
+    padding: 9px 20px 14px 22px; border-radius: 3px;
+    color: #1a1d26;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .33 0 0 0 0 .36 .18 0 0 0 -.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E"),
+      linear-gradient(to bottom, transparent 33px, rgba(214, 64, 92, 0.6) 33px, rgba(214, 64, 92, 0.6) 34.4px, transparent 34.4px),
+      repeating-linear-gradient(to bottom, transparent 0 calc(var(--lh) - 1.2px), rgba(84, 136, 212, 0.34) calc(var(--lh) - 1.2px) var(--lh)) 0 41px / 100% calc(100% - 48px) no-repeat,
+      linear-gradient(172deg, #ffffff, #f6f7f4 70%, #eeefeb);
+    box-shadow: inset 0 0 0 0.5px rgba(30, 40, 60, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+  .rc-head { display: flex; justify-content: space-between; align-items: center; height: 22px; }
+  .rc-no { font: 700 13px/1 var(--type); letter-spacing: 0.04em; color: #3b4255; }
+  .rc-text {
+    display: block; margin-top: 14px;
+    font: 400 16.5px/var(--lh) var(--type); color: #161922;
+    text-shadow: 0 0 0.5px rgba(22, 25, 34, 0.5);
+    overflow-wrap: anywhere;
+    padding-right: 4px;
+  }
+  /* The inks. Both are rubber stamps, filtered so the edge wanders and the
+     pad was not quite even. */
+  .rc-req, .rc-stamp > span {
+    font: 800 11px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase;
+    filter: url(#rc-ink);
+  }
+  .rc-req { filter: url(#rc-ink-s); }
+  .rc-req {
+    color: var(--stamp-red); border: 1.6px solid currentColor; border-radius: 3px; padding: 3px 6px 2px 7px;
+    transform: rotate(-2.5deg); mix-blend-mode: multiply;
+  }
+  .rc-card.is-ok .rc-req { visibility: hidden; }
+  .rc-stamp {
+    position: absolute; right: 16px; bottom: 10px; pointer-events: none;
+    transform: rotate(var(--stamp-r, -9deg));
+    mix-blend-mode: multiply; visibility: hidden; opacity: 0.86;
+  }
+  .rc-stamp > span {
+    display: block; color: var(--stamp-blue);
+    font-size: 15px; letter-spacing: 0.14em; padding: 6px 9px 5px 11px;
+    border: 2.6px solid currentColor; border-radius: 5px;
+    box-shadow: inset 0 0 0 2px transparent, inset 0 0 0 3.4px currentColor;
+  }
+  .rc-card.is-ok .rc-stamp { visibility: visible; }
+  html.play .rc-card.just-ok .rc-stamp > span { animation: rcStamp 340ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+  @keyframes rcStamp {
+    0% { opacity: 0; transform: scale(1.7); }
+    45% { opacity: 1; transform: scale(0.94); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  .rc-pile-bar { display: flex; justify-content: center; margin-top: 4px; }
+  .rc-fan {
+    font: 600 12.5px/1 var(--sans); letter-spacing: 0.02em; color: #dfe8f7;
+    padding: 9px 14px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(190, 210, 245, 0.28);
+    background: rgba(20, 30, 48, 0.55);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  .rc-fan:hover { background: rgba(32, 46, 72, 0.7); }
+
+  /* ---- a phone ---------------------------------------------------------- */
+  @media (max-width: 860px) {
+    .rc-cols { grid-template-columns: minmax(0, 1fr); gap: 26px; max-width: 560px; margin: 0 auto; }
+    .rc-board { top: var(--stick, 0px); padding: 30px 10px 12px; border-radius: 16px; }
+    .rc-clip { transform: translateX(-50%) scale(0.8); transform-origin: 50% 0; top: -10px; }
+    .rc-sheet { padding: 24px 16px 16px; }
+    .rc-title { margin-top: 14px; }
+    .rc-office { min-height: 0; padding: 8px 10px; margin-top: 14px; }
+  }
+  @media (max-width: 480px) {
+    .rc-desk { padding: 30px 12px 40px; }
+    .rc-letter { grid-template-columns: auto 1fr; }
+    .rc-ref { display: none; }
+    .rc-field textarea { font-size: 19px; padding: 10px 12px; }
+    .rc-face { padding: 8px 14px 12px 16px; }
+    .rc-text { font-size: 15.5px; }
+    .rc-stamp > span { font-size: 12.5px; }
+  }
 </style>
