@@ -25,9 +25,11 @@ import { createRailKit } from './rails'
 import type { BranchKind } from './rails'
 import { hourAt, sunDir } from './light'
 import { rng } from './kit'
-import { TRACK, at, distAtX, groundAt, route, sideZ } from './track'
-import type { Route } from './track'
-import { buildTram, TRAM } from './tram'
+import { TRACK, groundAt, sideZ } from './track'
+import { buildTram } from './tram'
+import { createCast } from './cast'
+import { createPlay } from './play'
+import type { Sound, Tag } from './play'
 
 export type StageOptions = {
   canvas: HTMLCanvasElement
@@ -35,6 +37,9 @@ export type StageOptions = {
   total: number
   /** False under reduced motion: the picture is drawn and then holds still. */
   animate: boolean
+  /** Where the name tags go: an element laid exactly over the canvas. */
+  tags: HTMLElement
+  sound?: (s: Sound, strength: number) => void
 }
 
 /**
@@ -146,14 +151,33 @@ export function createStage(o: StageOptions) {
   /* ---- the tram ---- */
   const tram = buildTram()
   scene.add(tram.group)
-  /** The line it is on, how far along its middle is, and how fast it is going. */
-  const run = { route: route(false) as Route, s: 0, v: 0, yaw: 0, x: 0, z: 0 }
-  function placeTram() {
-    const f = at(run.route, run.s + TRAM.AXLE), b = at(run.route, run.s - TRAM.AXLE)
-    run.x = (f.x + b.x) / 2; run.z = (f.z + b.z) / 2
-    run.yaw = Math.atan2(-(f.z - b.z), f.x - b.x)
-    tram.group.position.set(run.x, TRACK.RAIL, run.z)
-    tram.group.rotation.y = run.yaw
+  const cast = createCast()
+  let tags: Tag[] = []
+  const play = createPlay({
+    scene, cast, tram, ground, animate: o.animate,
+    sound: (s, k) => o.sound?.(s, k),
+    setPoints: (t) => rails?.setPoints(t),
+    onTags(list) {
+      tags = list
+      o.tags.textContent = ''
+      for (const t of list) {
+        t.el = document.createElement('span')
+        t.el.className = 'tr-tag'
+        t.el.textContent = t.text
+        o.tags.append(t.el)
+      }
+      placeTags()
+    },
+  })
+  const tagAt = new Vector3()
+  function placeTags() {
+    for (const t of tags) {
+      if (!t.el) continue
+      t.el.classList.toggle('is-gone', !!t.gone)
+      const q = tagAt.copy(t.at).project(camera)
+      const x = (q.x * 0.5 + 0.5) * size.x, y = (0.5 - q.y * 0.5) * size.y
+      t.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) translateY(-10px)`
+    }
   }
 
   /* ---- the picture ---- */
@@ -204,7 +228,7 @@ export function createStage(o: StageOptions) {
       const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0), up = new Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
       look.addScaledVector(right, ((b.x0 + b.x1) / 2) * halfW)
       // What matters sits a little below the middle; the sky gets the rest.
-      look.addScaledVector(up, ((b.y0 + b.y1) / 2 + 0.34 + 0.08 * k) * halfH)
+      look.addScaledVector(up, ((b.y0 + b.y1) / 2 + 0.2 * k) * halfH)
     }
     home.copy(look).addScaledVector(dir, reach)
     camera.position.copy(home)
@@ -277,22 +301,24 @@ export function createStage(o: StageOptions) {
     const hour = setHour(o.total > 1 ? index / (o.total - 1) : 0)
     tram.setLamps(hour.lamps)
     tram.setNumber(index + 1)
-    run.route = route(false, kind === 'loop')
-    run.s = distAtX(run.route, TRACK.START)
-    run.v = 0
-    placeTram()
+    play.set(p, index, hour.lamps)
     must = [
-      new Vector3(TRACK.START - 4.2, 0.4, 1.4), new Vector3(TRACK.START - 4.2, 3.9, -1.4),
-      new Vector3(TRACK.STAND + 3, 0.3, 1.6), new Vector3(TRACK.STAND + 3, 2.2, -1),
-      new Vector3(TRACK.STAND + 3, 2.4, TRACK.SIDE - 1.4), new Vector3(TRACK.FORK - 2.4, 0, 3.6),
+      new Vector3(TRACK.START - 2.4, 0.4, 1.4), new Vector3(TRACK.START - 2.4, 3.9, -1.4),
+      new Vector3(TRACK.STAND + 8, 0.3, 1.6), new Vector3(TRACK.STAND + 8, 3.4, TRACK.SIDE - 1.4),
+      new Vector3(TRACK.FORK, 0, 3.8),
     ]
     if (p.branch.kind === 'box') must.push(new Vector3(TRACK.STAND + 9, 5, TRACK.SIDE - 1.5))
+    if (p.bridge) must.push(new Vector3(0, cast.DECK + 2.6, 0))
+    dolly.x = dolly.v = 0
     frame()
+    placeTags()
     dirty = true
   }
 
   /* ---- the loop ---- */
   let raf = 0, last = 0, clock = 0, dirty = true, seen = true, disposed = false
+  /** How far the camera has slid along the line to keep the tram in view. */
+  const dolly = { x: 0, v: 0 }
   function tick(now: number) {
     raf = 0
     if (disposed) return
@@ -304,10 +330,25 @@ export function createStage(o: StageOptions) {
       sky.material.uniforms.time.value = clock * 6
       pointer.sx += (pointer.x - pointer.sx) * Math.min(1, dt * 3)
       pointer.sy += (pointer.y - pointer.sy) * Math.min(1, dt * 3)
+      const shake = play.update(dt)
+      // Follow the tram, a little behind it, and only as far as it needs.
+      const want = play.acting ? Math.max(0, Math.min(11, play.run.x - 1)) * 0.75 : 0
+      const a = 9 * (want - dolly.x) - 5.5 * dolly.v
+      dolly.v += a * dt; dolly.x += dolly.v * dt
       camera.position.copy(home)
+      camera.position.x += dolly.x
       camera.translateX(pointer.sx * reach * 0.02)
       camera.translateY(pointer.sy * reach * 0.012)
-      camera.lookAt(look)
+      camera.lookAt(tmp.copy(look).setX(look.x + dolly.x))
+      if (shake > 0.01) {
+        // Trauma squared: a knock is sharp and dies quickly.
+        const k = shake * shake * reach * 0.006
+        camera.position.x += Math.sin(clock * 71) * k
+        camera.position.y += Math.sin(clock * 93 + 1.3) * k
+        camera.rotation.z += Math.sin(clock * 57 + 0.7) * shake * shake * 0.006
+      }
+      camera.updateMatrixWorld()
+      placeTags()
       dirty = true
     }
     if (dirty) { composer.render(dt); dirty = false }
@@ -333,10 +374,12 @@ export function createStage(o: StageOptions) {
 
   return {
     show(p: Problem, index: number) { show(p, index); wake() },
+    /** Run the decision; `done` is called when the outcome can be told. */
+    act(acts: boolean, deaths: number, done: () => void) { play.act(acts, deaths, done); dirty = true; wake() },
     resize,
     ground,
     /** For looking at it from a console. */
-    debug: { tram, run, placeTram, renderer, scene, camera, composer, tilt, sun, fill, look, home, setHour, redraw: () => { dirty = true; wake() } },
+    debug: { tram, play, renderer, scene, camera, composer, tilt, sun, fill, look, home, setHour, redraw: () => { dirty = true; wake() } },
     dispose() {
       disposed = true
       cancelAnimationFrame(raf)
@@ -344,7 +387,7 @@ export function createStage(o: StageOptions) {
       document.removeEventListener('visibilitychange', onVis)
       removeEventListener('pointermove', onMove)
       rails?.dispose()
-      railKit.dispose(); land.dispose(); tram.dispose()
+      play.dispose(); cast.dispose(); railKit.dispose(); land.dispose(); tram.dispose()
       envTarget?.dispose(); pmrem.dispose()
       starGeo.dispose(); starMat.dispose()
       target.dispose(); composer.dispose(); renderer.dispose()

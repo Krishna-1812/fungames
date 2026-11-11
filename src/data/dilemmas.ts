@@ -51,6 +51,8 @@ export type Token = {
   consent?: boolean
   /** Shown under a crowd, where drawing n figures is not an option. */
   label?: string
+  /** Not born yet: drawn as people who are not quite there. */
+  ghost?: boolean
 }
 
 export type Scene = {
@@ -63,6 +65,8 @@ export type Scene = {
   money?: boolean
   /** A footbridge over the track, with someone on it. There is no lever. */
   bridge?: boolean
+  /** The lever starts thrown towards the branch, so doing nothing sends the tram there. */
+  thrown?: boolean
 }
 
 export type Dilemma = {
@@ -216,7 +220,7 @@ export const DILEMMAS: Dilemma[] = [
   {
     title: 'The future',
     setup: 'Five people are on the main track. They are alive in two hundred years. On the other track is one person, alive today, whom you can see.',
-    scene: { straight: { kind: 'people', n: 5 }, branch: { kind: 'people', n: 1 } },
+    scene: { straight: { kind: 'people', n: 5, ghost: true }, branch: { kind: 'people', n: 1 } },
     left: { label: 'Do nothing', deaths: 5, acts: false, outcome: 'Five people die, eventually, and none of them exist yet to mind.' },
     right: { label: 'Pull the lever', deaths: 1, acts: true, outcome: 'A person alive today dies, in front of you, for people who are not born.' },
     endorse: { util: 'right', deon: 'left', contract: 'right', virtue: 'left' },
@@ -243,7 +247,7 @@ export const DILEMMAS: Dilemma[] = [
   {
     title: 'The machine',
     setup: 'An automatic system assessed this in nine milliseconds and has already thrown the lever, towards the five. It has reasons. You can throw it back.',
-    scene: { straight: { kind: 'people', n: 1 }, branch: { kind: 'people', n: 5 } },
+    scene: { straight: { kind: 'people', n: 1 }, branch: { kind: 'people', n: 5 }, thrown: true },
     left: { label: 'Leave it', deaths: 5, acts: false, outcome: 'Five people die. The system logs the outcome as nominal.' },
     right: { label: 'Override it', deaths: 1, acts: true, outcome: 'One person dies. The system files a note that you intervened.' },
     endorse: { util: 'right', deon: 'left', contract: 'right', virtue: 'right' },

@@ -110,7 +110,7 @@ const first = DILEMMAS[0]
   import { PLAY, REDUCED } from '../lib/motion'
   import type { Stage } from '../lib/trolley/stage'
   import { recordPlay } from '../lib/stats'
-  import { sfx, unlock, hit } from '../lib/audio'
+  import { sfx, unlock, hit, tone } from '../lib/audio'
   import { sceneSvg, GEO } from '../lib/trolley-scene'
   import { DILEMMAS, POSITIONS, scoreAnswers, REPEAT_OF_FIRST } from '../data/dilemmas'
   import type { Side } from '../data/dilemmas'
@@ -140,10 +140,22 @@ const first = DILEMMAS[0]
     const fig = SCENE.parentElement!.parentElement!
     fig.classList.add('is-3d')
     import('../lib/trolley/stage').then((m) => {
-      stage = m.createStage({ canvas: $('stage3d') as HTMLCanvasElement, total: TOTAL, animate: !REDUCED })
+      stage = m.createStage({
+        canvas: $('stage3d') as HTMLCanvasElement, tags: $('tags'), total: TOTAL, animate: !REDUCED,
+        sound(s, k) {
+          if (s === 'bell') { tone({ freq: 1320, dur: 0.5, gain: 0.1, type: 'sine' }); tone({ freq: 1975, dur: 0.4, gain: 0.05, type: 'sine' }) }
+          else if (s === 'lever') { hit({ dur: 0.07, gain: 0.3, freq: 340, q: 3 }); hit({ dur: 0.18, gain: 0.2, freq: 140, type: 'lowpass', delay: 0.09 }) }
+          else if (s === 'clack') { hit({ dur: 0.05, gain: 0.1 + 0.12 * k, freq: 520, q: 2 }); hit({ dur: 0.05, gain: 0.08 + 0.1 * k, freq: 420, q: 2, delay: 0.07 }) }
+          else if (s === 'strike') hit({ dur: 0.22, gain: 0.2 + 0.25 * k, freq: 150, sweepTo: 60, type: 'lowpass' })
+          else if (s === 'land') hit({ dur: 0.12, gain: 0.08 + 0.14 * k, freq: 110, type: 'lowpass' })
+          else if (s === 'brake') hit({ dur: 0.16, gain: 0.03 + 0.05 * k, freq: 2600, q: 9 })
+          else if (s === 'thump') hit({ dur: 0.5, gain: 0.4, freq: 90, sweepTo: 40, type: 'lowpass' })
+          else if (s === 'push') hit({ dur: 0.12, gain: 0.2, freq: 220, type: 'lowpass' })
+        },
+      })
       if (!stage) return fig.classList.remove('is-3d')
       stage.show(DILEMMAS[Math.min(i, TOTAL - 1)].scene, Math.min(i, TOTAL - 1))
-      if (import.meta.env.DEV) (window as any).__trolley = { stage, go: (n: number) => { i = n; render() } }
+      if (import.meta.env.DEV) (window as any).__trolley = { stage, go: (n: number) => { i = n; render() }, choose }
     }).catch(() => fig.classList.remove('is-3d'))
   }
   loadCrowd('trolley')
@@ -214,7 +226,9 @@ const first = DILEMMAS[0]
     const d = DILEMMAS[i]
     const opt = d[side]
     unlock()
-    if (opt.acts) {
+    if (stage) {
+      // The layout makes its own noises as things happen on it.
+    } else if (opt.acts) {
       // A mechanical clunk for the lever, then the trolley rolling on.
       hit({ dur: 0.07, gain: 0.3, freq: 340, q: 3 })
       hit({ dur: 0.5, gain: 0.16, freq: 220, sweepTo: 90, type: 'lowpass', delay: 0.08 })
@@ -247,14 +261,17 @@ const first = DILEMMAS[0]
 
     // The outcome waits for the trolley to arrive, so the picture and the text
     // land together instead of the text pre-empting it.
-    rollTrolley(opt.acts, () => {
+    const arrive = stage
+      ? (done: () => void) => stage!.act(opt.acts, opt.deaths, done)
+      : (done: () => void) => rollTrolley(opt.acts, done)
+    arrive(() => {
       const n = opt.deaths
       $('toll').textContent = n === 0 ? '✓ Nobody dies' : `${n} ${n === 1 ? 'death' : 'deaths'}`
       outcome.className = 'tr-outcome ' + (n === 0 ? 'is-none' : n >= 5 ? 'is-many' : 'is-some')
       $('outcomeText').textContent = opt.outcome
       $('nextLbl').textContent = i + 1 >= TOTAL ? 'See your verdict' : 'Next problem'
       outcome.hidden = false
-      if (n >= 5) { sfx.thud(); shell.shake($('scene').parentElement!) }
+      if (n >= 5 && !stage) { sfx.thud(); shell.shake($('scene').parentElement!) }
       else if (n === 0) { sfx.sparkle(); shell.pop(outcome) }
       shell.announce(`${$('toll').textContent}. ${opt.outcome}`)
       rail[i].className = 'is-done'
@@ -406,13 +423,13 @@ const first = DILEMMAS[0]
   .tr.is-3d { grid-template-columns: minmax(0, 1fr); }
   .tr.is-3d .tr-scene { position: relative; grid-column: 1; grid-row: 1; }
   .tr.is-3d .tr-scene canvas {
-    display: block; width: 100%; aspect-ratio: 2.3 / 1; min-height: 440px; border-radius: var(--r-lg);
+    display: block; width: 100%; aspect-ratio: 2.2 / 1; min-height: 480px; border-radius: var(--r-lg);
     background: linear-gradient(#9fc0de, #d7e3ea 55%, #71894a 56%, #4f6a30);
   }
   .tr.is-3d .tr-scene svg { display: none; }
   .tr.is-3d .tr-rail { grid-column: 1; grid-row: 2; }
   .tr.is-3d .tr-side {
-    grid-column: 1; grid-row: 1; position: relative; z-index: 2; pointer-events: none;
+    grid-column: 1; grid-row: 1; position: relative; z-index: 2; pointer-events: none; align-self: stretch;
     grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start;
     padding: clamp(14px, 2vw, 26px); gap: 12px;
   }
@@ -429,7 +446,7 @@ const first = DILEMMAS[0]
   .tr.is-3d .tr-setup { font-size: clamp(15px, 1.25vw, 18px); color: rgba(240, 244, 252, 0.92); max-width: none; }
   .tr.is-3d .tr-choices { align-self: end; justify-self: center; width: min(640px, 100%); margin: 0; }
   .tr.is-3d .tr-choice { box-shadow: 0 14px 34px rgba(6, 10, 22, 0.32); border-color: transparent; }
-  .tr.is-3d .tr-outcome { align-self: end; justify-self: end; width: min(440px, 100%); margin: 0; grid-row: 2; }
+  .tr.is-3d .tr-outcome { align-self: end; justify-self: start; width: min(430px, 100%); margin: 0; grid-row: 2; }
   .tr.is-3d .tr-choices:has(~ .tr-outcome:not([hidden])) { display: none; }
   .tr.is-3d .tr-tags { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: var(--r-lg); }
   .tr-tag {
