@@ -1,6 +1,16 @@
 ---
 import GameShell from '../layouts/GameShell.astro'
 import { SHAPES } from '../lib/steady-shapes'
+import { GASES } from '../lib/steady/neon'
+
+/** A small glyph of each shape, drawn in its own gas. */
+const GLYPH: Record<string, string> = {
+  line: 'M5 19 L19 5',
+  circle: 'M12 4 a8 8 0 1 1 -0.01 0',
+  square: 'M5 5 H19 V19 H5 Z',
+  spiral: 'M12 12 m0 -1.2 a1.2 1.2 0 1 1 -1.2 1.2 a3 3 0 0 1 3 -3 a4.6 4.6 0 0 1 4.6 4.6 a6.4 6.4 0 0 1 -6.4 6.4 a8 8 0 0 1 -8 -8',
+}
+const gasCss = (id: string) => GASES[id]?.rgb.join(', ') ?? '140, 200, 255'
 
 /**
  * Steady Hand — four shapes, one unbroken stroke each.
@@ -28,13 +38,15 @@ import { SHAPES } from '../lib/steady-shapes'
   slug="steady-hand"
   labels={{ score: 'This round', best: 'Best round', level: 'Shape', moves: 'Strokes' }}
   initial={{ score: '—', level: `1 / ${SHAPES.length}`, moves: '0' }}
+  fonts={['Caveat:wght@600']}
 >
   <div class="sh">
+    <div class="sh-top">
     <ol class="sh-round" id="round" aria-label="The round">
       {SHAPES.map((sh, i) => (
-        <li data-shape={sh.id} class={i === 0 ? 'is-now' : ''}>
-          <span class="label">{i + 1}</span>
-          <b>{sh.name}</b>
+        <li data-shape={sh.id} class={i === 0 ? 'is-now' : ''} style={`--gas: ${gasCss(sh.id)}`}>
+          <svg class="sh-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d={GLYPH[sh.id]} /></svg>
+          <b><span class="label">{i + 1}</span> {sh.name}</b>
           <span class="num sh-got" data-got>—</span>
           <span class="sh-best">best <span data-best>—</span></span>
         </li>
@@ -49,9 +61,8 @@ import { SHAPES } from '../lib/steady-shapes'
       </button>
       <p id="keyboardHelp" class="sh-kb-help"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> move the pen · <kbd>Shift</kbd> small steps · <kbd>Space</kbd> starts and ends a stroke · <kbd>Home</kbd> back to the first dot · <kbd>N</kbd> next shape. Not ranked.</p>
     </div>
+    </div>
     <div class="sh-board" id="board">
-      {/* Behind the canvas, which clears to transparent. */}
-      <div class="felt" id="felt" aria-hidden="true"></div>
       <canvas id="c" tabindex="0" aria-describedby="keyboardHelp hint" aria-label="The drawing board. Press on the first dot and drag, in one stroke."></canvas>
 
       <p class="sh-hint" id="hint" aria-live="polite">Press on the first dot and drag to the second. One stroke.</p>
@@ -90,8 +101,8 @@ import { SHAPES } from '../lib/steady-shapes'
   import { createShell } from '../lib/game-shell'
   import { roll, PLAY } from '../lib/motion'
   import { sfx, unlock } from '../lib/audio'
-  import { ShaderSurface } from '../lib/gl'
-  import { FELT_FRAG } from '../lib/steady-felt'
+  import { hit, tone } from '../lib/audio'
+  import { createNeon, GASES } from '../lib/steady/neon'
   import {
     SHAPES, scoreStroke, rating, verdictFor, ratingName,
     TOLERANCE, distToPath, dist, sizeOf,
@@ -104,14 +115,12 @@ import { SHAPES } from '../lib/steady-shapes'
   type P = { x: number; y: number; t?: number }
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
   const canvas = $<HTMLCanvasElement>('c')
-  const ctx = canvas.getContext('2d')!
   const hint = $('hint')
   const result = $('result')
   const roundEls = [...$('round').children] as HTMLLIElement[]
   const prefersReducedMotion = !PLAY
 
   const STORE = 'steady-hand:bests.v1'
-  const DOT_R = 13        // visual radius of a target dot
   const SNAP = 52         // how close the stroke must start and finish
 
   let W = 0, H = 0, dpr = 1
@@ -151,24 +160,30 @@ import { SHAPES } from '../lib/steady-shapes'
     return [(2 * q.x - W) / m, (H - 2 * q.y) / m]
   }
 
+
   let pen: P = { x: 0, y: 0 }
-  const felt = new ShaderSurface($('felt'), FELT_FRAG, {
-    // Every layer is low frequency by design; see the note in steady-felt.ts.
-    scale: 0.7,
-    uniforms: () => ({
-      // The shader lights the two ends of the task. A shape with one dot
-      // passes the same point twice, which reads as a single glow.
-      u_a: toField(dots[0] ?? { x: W / 2, y: H / 2 }),
-      u_b: toField(dots[dots.length - 1] ?? { x: W / 2, y: H / 2 }),
-      u_pen: toField(pen),
-      u_penOn: drawing ? 1 : 0,
-      u_locked: locked ? 1 : 0,
-      u_motion: prefersReducedMotion ? 0 : 1,
-    }),
+  /* The wall, the glass and the light (lib/steady/neon.ts). Shards of a
+     broken tube tick as they land. */
+  const neon = createNeon(canvas, {
+    animate: !prefersReducedMotion,
+    onLand: (k) => hit({ dur: 0.03, gain: 0.04 + k * 0.1, freq: 4200 + Math.random() * 2400, q: 6 }),
   })
-  // Under reduced motion the shared ticker never runs, so the surface has to be
-  // asked for the frames that matter.
-  function nudge() { if (prefersReducedMotion) felt.redraw() }
+  /** What the tube is doing: nothing yet, warm under the pen, or lit. */
+  let tubeMode: 'none' | 'warm' | 'lit' = 'none'
+  const gasOf = () => GASES[shape.id]?.rgb ?? [120, 200, 255]
+  const nudge = () => {}
+
+  /** The tube catching: a click, the buzz of the transformer, then a hum. */
+  function igniteSound() {
+    hit({ dur: 0.02, gain: 0.2, freq: 3000, q: 3 })
+    for (const [d, gn] of [[0.06, 0.05], [0.16, 0.03], [0.26, 0.06]]) tone({ freq: 120, dur: 0.07, type: 'sawtooth', gain: gn, filter: 700, delay: d })
+    tone({ freq: 120, dur: 0.9, type: 'sawtooth', gain: 0.035, filter: 420, delay: 0.32 })
+  }
+  /** Glass going: a crack, then the pieces. */
+  function breakSound() {
+    hit({ dur: 0.06, gain: 0.32, freq: 2600, q: 1.2 })
+    for (let k = 0; k < 7; k++) hit({ dur: 0.04, gain: 0.07, freq: 3800 + Math.random() * 3000, q: 8, delay: 0.03 + k * 0.035 + Math.random() * 0.03 })
+  }
 
   const box = () => ({ w: W, h: H })
 
@@ -176,9 +191,7 @@ import { SHAPES } from '../lib/steady-shapes'
     dpr = Math.min(window.devicePixelRatio || 1, 2)
     W = canvas.clientWidth
     H = canvas.clientHeight
-    canvas.width = Math.round(W * dpr)
-    canvas.height = Math.round(H * dpr)
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    neon.resize(W, H, dpr)
     // A resize moves the dots, so a stroke in progress or a scored one no
     // longer lines up with them: start this shape again at the new size.
     place()
@@ -191,6 +204,7 @@ import { SHAPES } from '../lib/steady-shapes'
     dots = shape.dots(box(), rot)
     if (keyboardPractice && dots[0]) pen = { ...dots[0] }
     stroke = []
+    tubeMode = 'none'
     locked = false
     lastScore = null
     result.hidden = true
@@ -199,120 +213,29 @@ import { SHAPES } from '../lib/steady-shapes'
     render()
   }
 
+
+
   /* ---- the board -------------------------------------------------------- */
 
-  /** On the line (mint) to badly off it (raspberry). */
-  const strokeColour = (t: number) => [
-    Math.round(79 + t * 176),
-    Math.round(227 - t * 148),
-    Math.round(193 - t * 83),
-  ].join(',')
-
   /**
-   * The ideal, and the band around it whose average deviation scores zero.
-   *
-   * Drawing the band is what turns a percentage into something you can learn
-   * from: you can see how far off you were relative to what the scoring
-   * actually cares about, instead of being told a number.
+   * Everything on the wall, from the game's state. After an attempt the ideal
+   * is chalked on, with the band whose average deviation scores zero: you can
+   * see how far off you were against what the scoring actually cares about.
    */
-  function drawReveal() {
-    const path = lastScore ? lastScore.target : shape.target(box(), rot, [])
-    if (path.length < 2) return
-    const size = lastScore ? lastScore.size : 0
-    const band = TOLERANCE * (size || 1) * 2
-
-    ctx.save()
-    ctx.lineJoin = 'round'
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(path[0].x, path[0].y)
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y)
-    ctx.strokeStyle = 'rgba(205, 225, 255, 0.07)'
-    ctx.lineWidth = band
-    ctx.stroke()
-
-    // The ideal itself, dashed so it never reads as your stroke.
-    ctx.setLineDash([7, 9])
-    ctx.strokeStyle = 'rgba(228, 238, 255, 0.55)'
-    ctx.lineWidth = 2
-    ctx.stroke()
-    ctx.restore()
-  }
-
-  function drawStroke() {
-    if (stroke.length < 2) return
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    /* The glow is one path and one stroke, not one per segment. Stroking each
-       segment separately at low alpha makes overlapping round caps accumulate,
-       and the line comes out beaded rather than glowing. */
-    ctx.save()
-    ctx.globalAlpha = 0.2
-    ctx.strokeStyle = '#8ccbff'
-    ctx.lineWidth = 14
-    ctx.beginPath()
-    ctx.moveTo(stroke[0].x, stroke[0].y)
-    for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y)
-    ctx.stroke()
-    ctx.restore()
-
-    /* The line itself: quadratics through the midpoints, which smooths the
-       raw pointer samples without moving them, and a width that thins as you
-       speed up the way a real pen does. Colour still says how far off the
-       ideal each part of the stroke drifted. */
-    for (let i = 1; i < stroke.length - 1; i++) {
-      const p0 = stroke[i - 1], p1 = stroke[i], p2 = stroke[i + 1]
-      const t = Math.min(1, p1.t ?? 0)
-      const sp = Math.min(1, dist(p0, p1) / 20)
-      ctx.strokeStyle = 'rgb(' + strokeColour(t) + ')'
-      ctx.lineWidth = 6.0 - sp * 3.0
-      ctx.beginPath()
-      ctx.moveTo((p0.x + p1.x) / 2, (p0.y + p1.y) / 2)
-      ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2)
-      ctx.stroke()
-    }
-  }
-
-  function drawDots() {
-    for (const q of dots) {
-      // A ring standing off the body, so the target has a footprint.
-      ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R + 7, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(140, 203, 255, 0.32)'; ctx.lineWidth = 1.5; ctx.stroke()
-      // Lit from the same direction as the surface behind it, which is what
-      // stops it reading as a circle printed on a flat colour.
-      const g = ctx.createRadialGradient(q.x - 4, q.y - 5, 1, q.x, q.y, DOT_R)
-      g.addColorStop(0, '#eef6ff')
-      g.addColorStop(1, '#7fa6ff')
-      ctx.beginPath(); ctx.arc(q.x, q.y, DOT_R, 0, Math.PI * 2)
-      ctx.fillStyle = g; ctx.fill()
-      ctx.strokeStyle = 'rgba(10, 20, 50, 0.45)'; ctx.lineWidth = 1; ctx.stroke()
-      if (q.label) {
-        ctx.fillStyle = '#111318'
-        ctx.font = '700 12px "Zalando Sans", system-ui, sans-serif'
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillText(q.label, q.x, q.y + 1)
-      }
-    }
-  }
-
   function render() {
-    ctx.clearRect(0, 0, W, H)
-    // Shown only after the attempt, so it cannot be traced.
-    if (locked) drawReveal()
-    drawStroke()
-    drawDots()
-    // The keyboard's pen: a ring and cross-hair in the board's mint, with a dark rim so it reads on the chalk too.
-    if (keyboardPractice) {
-      ctx.save()
-      for (const [col, w] of [['rgba(10, 30, 26, 0.55)', 4.5], ['#4fe3c1', 2]] as [string, number][]) {
-        ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'
-        ctx.beginPath(); ctx.arc(pen.x, pen.y, 7, 0, Math.PI * 2); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(pen.x - 14, pen.y); ctx.lineTo(pen.x - 9, pen.y); ctx.moveTo(pen.x + 9, pen.y); ctx.lineTo(pen.x + 14, pen.y)
-        ctx.moveTo(pen.x, pen.y - 14); ctx.lineTo(pen.x, pen.y - 9); ctx.moveTo(pen.x, pen.y + 9); ctx.lineTo(pen.x, pen.y + 14); ctx.stroke()
-      }
-      ctx.restore()
-    }
+    const ideal = locked ? (lastScore ? lastScore.target : shape.target(box(), rot, [])) : null
+    neon.set({
+      marks: dots,
+      startRing: !shape.closed,
+      centreMark: shape.id === 'circle',
+      ideal,
+      band: TOLERANCE * (lastScore?.size || 1) * 2,
+      tube: stroke,
+      gas: gasOf(),
+      mode: tubeMode,
+      cursor: keyboardPractice ? pen : null,
+      extra: [],
+    })
   }
 
   /* ---- the round -------------------------------------------------------- */
@@ -408,6 +331,7 @@ import { SHAPES } from '../lib/steady-shapes'
     }
     unlock(); sfx.click()
     drawing = true
+    tubeMode = 'warm'
     liveTarget = shape.target(box(), rot, [p])
     strokeScale = sizeOf(liveTarget) || 1
     stroke = []
@@ -447,7 +371,12 @@ import { SHAPES } from '../lib/steady-shapes'
     const end = stroke[stroke.length - 1]
     const home = shape.closed ? stroke[0] : dots[dots.length - 1]
     if (!end || stroke.length < 6 || dist(end, home) > SNAP) {
+      // The glass breaks where it lies.
+      neon.set({ tube: stroke })
+      neon.shatter()
+      if (stroke.length > 3) breakSound()
       stroke = []
+      tubeMode = 'none'
       hint.textContent = shape.closed
         ? 'You have to come back to where you started. Try again.'
         : 'You have to finish on the last dot. Try again.'
@@ -462,9 +391,11 @@ import { SHAPES } from '../lib/steady-shapes'
     if (keyboardPractice) {
       const score = scoreStroke(shape, box(), rot, stroke)
       hint.textContent = `Practice stroke: ${score.score.toFixed(1)}%. No ranked result saved. Home repositions the pen; Space starts again; N changes shape.`
-      render(); nudge(); return
+      tubeMode = 'lit'; render(); neon.ignite(); igniteSound(); return
     }
     locked = true
+    tubeMode = 'lit'
+    result.style.setProperty('--gas', gasOf().join(', '))
 
     const s = scoreStroke(shape, box(), rot, stroke)
     lastScore = s
@@ -486,9 +417,9 @@ import { SHAPES } from '../lib/steady-shapes'
       `<li><span>${k}</span><b class="num">${Math.round((v as number) * 100)}%</b><i>${why}</i></li>`).join('')
     $('nextLbl').textContent = idx + 1 >= SHAPES.length ? 'See the round' : 'Next shape'
 
+    igniteSound()
     if (s.score >= 92) sfx.great()
     else if (s.score >= 62) sfx.good()
-    else sfx.bad()
 
     /* A play here is a stroke, which is what the word means in this game.
        The per-shape bests stay in their own key — `stats.ts` deliberately
@@ -512,7 +443,7 @@ import { SHAPES } from '../lib/steady-shapes'
     paintRound()
     paintStrip()
     render()
-    nudge()
+    neon.ignite()
     ;($('next') as HTMLButtonElement).focus({ preventScroll: true })
   }
 
@@ -641,6 +572,9 @@ import { SHAPES } from '../lib/steady-shapes'
     shell.stage.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
   }
 
+  if (import.meta.env.DEV) (window as any).__steady = { canvas, neon, get dots() { return dots }, get shape() { return shape.id }, get rot() { return rot } }
+  document.fonts?.ready.then(() => render())
+
   new ResizeObserver(() => {
     if (canvas.clientWidth !== W || canvas.clientHeight !== H) resize()
   }).observe(canvas)
@@ -676,69 +610,100 @@ import { SHAPES } from '../lib/steady-shapes'
   .sh-kb:not(:has([aria-pressed='true'])) .sh-kb-help { display: none; }
   /* A touch screen with no mouse or keyboard has no use for it. */
   @media not (any-pointer: fine) { .sh-kb { display: none; } }
+  /* The stage is the workshop at night, edge to edge: a strip of the four
+     shapes along the top, and the wall. */
+  .stage:has(> .sh) { padding: 0; overflow: clip; background: #0b0f17; }
+  .sh { gap: 0; }
+  .sh-top {
+    padding: 16px clamp(14px, 2.4vw, 26px) 12px;
+    background: linear-gradient(#141a26, #0e131d);
+    border-bottom: 1px solid rgba(160, 190, 240, 0.08);
+  }
+  .sh .sh-kb { margin: 12px 0 0; }
+  .sh .sh-kb-btn { color: #e7edf8; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(200, 220, 255, 0.22); }
+  .sh .sh-kb-btn:hover { background: rgba(255, 255, 255, 0.09); }
+  .sh .sh-kb-btn[aria-pressed='true'] { background: #e7edf8; color: #0b0f17; }
+  .sh .sh-kb-help { color: rgba(225, 233, 248, 0.7); }
+  .sh .sh-kb-help kbd { color: #e7edf8; background: rgba(255, 255, 255, 0.06); border-color: rgba(200, 220, 255, 0.25); }
+
+  /* The four shapes: dark glass plates, each with its tube drawn small in its
+     own gas, unlit until it is the one you are on or have done. */
   .sh-round { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
   .sh-round li {
-    display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 2px 10px;
-    padding: 12px 14px; border-radius: var(--r); background: var(--paper2);
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 2px 12px;
+    padding: 10px 14px 10px 12px; border-radius: 14px; color: #e7edf8;
+    background: rgba(255, 255, 255, 0.035);
+    box-shadow: inset 0 0 0 1px rgba(200, 220, 255, 0.09);
+    transition: box-shadow 300ms var(--ease), background-color 300ms var(--ease);
   }
-  .sh-round li b { font-size: 16px; }
-  .sh-round li .label { color: var(--ink3); }
-  .sh-round .sh-got { font-size: 20px; }
-  .sh-round .sh-best { grid-column: 1 / -1; font-size: 12px; color: var(--ink2); }
-  .sh-round li.is-now { background: var(--card); box-shadow: inset 0 0 0 2px var(--ink); }
-  .sh-round li.is-done { background: var(--mint); }
-  .sh-round li.is-done .label, .sh-round li.is-done .sh-best { color: var(--ink); }
+  .sh-glyph { grid-row: span 2; width: 30px; height: 30px; overflow: visible; }
+  .sh-glyph path {
+    fill: none; stroke: rgba(210, 222, 240, 0.32); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+    transition: stroke 300ms var(--ease), filter 300ms var(--ease);
+  }
+  .sh-round li b { font-size: 15px; font-weight: 600; }
+  .sh-round li .label { color: rgba(225, 233, 248, 0.45); font-size: 12px; margin-right: 2px; }
+  .sh-round .sh-got { font-size: 19px; color: rgba(225, 233, 248, 0.4); }
+  .sh-round .sh-best { font-size: 12px; color: rgba(225, 233, 248, 0.55); }
+  .sh-round li.is-now { background: rgba(var(--gas), 0.07); box-shadow: inset 0 0 0 1.5px rgba(var(--gas), 0.6), 0 0 22px rgba(var(--gas), 0.12); }
+  .sh-round li.is-now .sh-glyph path, .sh-round li.is-done .sh-glyph path {
+    stroke: rgb(var(--gas)); filter: drop-shadow(0 0 2px rgba(var(--gas), 0.9)) drop-shadow(0 0 6px rgba(var(--gas), 0.6));
+  }
+  .sh-round li.is-done .sh-got { color: rgb(var(--gas)); text-shadow: 0 0 10px rgba(var(--gas), 0.55); }
   @media (max-width: 640px) {
     .sh-round { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sh-round li { padding: 8px 10px; gap: 2px 9px; }
+    .sh-glyph { width: 24px; height: 24px; }
   }
 
-  /* The board: a dark felt, framed, because the stroke is the one bright
-     thing and a precision game cannot put it on a busy surface. */
+  /* The wall. */
   .sh-board {
     position: relative; overflow: hidden; isolation: isolate;
-    height: clamp(420px, 66vh, 700px);
-    border: 2px solid var(--ink); border-radius: var(--r-lg);
-    background: #0b1020; touch-action: none;
+    height: clamp(440px, 68vh, 720px);
+    background: #10151f; touch-action: none;
   }
-  /* The still fallback, for anything without WebGL2. */
-  .felt {
-    position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(90% 70% at 34% 4%, #16213f 0%, transparent 62%), #0b1020;
-  }
-  .felt .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .sh-board canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
-  /* Rounded themselves, because the board stops clipping when the card hangs
-     below it on a narrow screen. */
-  .felt, .sh-board canvas { border-radius: calc(var(--r-lg) - 2px); overflow: hidden; }
 
   .sh-hint {
-    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
     width: min(92%, 560px); text-align: center; pointer-events: none;
-    color: rgba(243, 245, 248, 0.86); font-size: 15px; font-weight: 500;
+    color: rgba(240, 244, 252, 0.9); font-size: 15px; font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 18px rgba(0, 0, 0, 0.6);
   }
 
-  /* The score card: a paper card on the felt, in whichever corner is
-     furthest from the shape. */
+  /* The score: a pane of dark glass on the wall, the number lit in the
+     tube's own colour. */
   .sh-card {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: min(280px, calc(100% - 32px));
+    width: min(290px, calc(100% - 32px));
     display: grid; gap: 8px; justify-items: start;
-    padding: 20px; border-radius: var(--r-lg);
-    background: var(--card); color: var(--ink); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    padding: 20px; border-radius: 18px;
+    color: #e9eef8;
+    background: rgba(12, 16, 26, 0.78);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2);
+    box-shadow: inset 0 0 0 1px rgba(200, 220, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.5);
     outline: none;
   }
   .sh-card[hidden] { display: none; }
+  .sh-card .label { color: rgba(225, 233, 248, 0.6); }
   html.play .sh-card { transition: left 260ms var(--ease), top 260ms var(--ease); }
-  .sh-big { font-size: 52px; }
+  .sh-big {
+    font-size: 54px; color: rgb(var(--gas, 140, 200, 255));
+    text-shadow: 0 0 4px rgba(var(--gas, 140, 200, 255), 0.9), 0 0 18px rgba(var(--gas, 140, 200, 255), 0.6), 0 0 42px rgba(var(--gas, 140, 200, 255), 0.35);
+  }
   .sh-verdict { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: 22px; line-height: 1.1; letter-spacing: -0.02em; }
   .sh-crowd:not(:empty) { margin-top: 12px; }
+  .sh-card .sh-crowd { color: rgba(225, 233, 248, 0.8); }
   .sh-factors { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; width: 100%; }
   .sh-factors li { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: baseline; font-size: 13px; }
-  .sh-factors span { color: var(--ink2); font-weight: 600; }
+  .sh-factors span { color: rgba(225, 233, 248, 0.72); font-weight: 600; }
   .sh-factors b { font-size: 15px; }
-  .sh-factors i { grid-column: 1 / -1; font-style: normal; font-size: 12px; color: var(--ink3); }
+  .sh-factors i { grid-column: 1 / -1; font-style: normal; font-size: 12px; color: rgba(225, 233, 248, 0.5); }
   .sh-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .sh-keys { font-size: 12px; color: var(--ink3); }
+  .sh-card .pill--ink { background: #eef3fb; color: #0b0f17; }
+  .sh-card .pill--ink:not([disabled]):hover { background: rgb(var(--gas, 140, 200, 255)); color: #0b0f17; }
+  .sh-card .pill--line { color: #e9eef8; box-shadow: inset 0 0 0 1.5px rgba(225, 233, 248, 0.5); background: transparent; }
+  .sh-keys { font-size: 12px; color: rgba(225, 233, 248, 0.5); }
   .sh-keys kbd {
     display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 6px;
     border: 1.5px solid currentColor; font: 700 11px/1.5 var(--sans); text-align: center;
@@ -747,10 +712,10 @@ import { SHAPES } from '../lib/steady-shapes'
   /* On a board too small to have a corner the card cannot reach the shape
      from, the card sits under the board instead. Measured on the board's own
      width, not the window's: the shell's stage has padding of its own. */
-  @media (max-width: 640px) { .sh-board { height: clamp(360px, 62vh, 520px); } }
+  @media (max-width: 640px) { .sh-board { height: clamp(380px, 62vh, 540px); } }
   @container (max-width: 760px) {
     .sh-board:has(.sh-card:not([hidden])) { overflow: visible; }
-    .sh-card { top: calc(100% + 14px); left: 0; transform: none; width: 100%; box-shadow: var(--shadow-block); }
+    .sh-card { top: calc(100% + 14px); left: 14px; transform: none; width: calc(100% - 28px); }
     .sh-board:has(.sh-card:not([hidden])) { margin-bottom: var(--sh-card-h, 330px); }
   }
 
