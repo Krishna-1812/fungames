@@ -63,6 +63,65 @@ const total = RULES.length
     <div class="rc-light" aria-hidden="true"></div>
 
     <div class="rc-cols">
+      <!-- Things on the desk. The watch tells the real time, because rule 12
+           wants the hour. -->
+      <div class="rc-watch" aria-hidden="true">
+        <svg viewBox="0 0 72 240" width="72" height="240">
+          <defs>
+            <linearGradient id="rcStrap" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#0d1320" /><stop offset="0.5" stop-color="#1f2a3e" /><stop offset="1" stop-color="#0b111c" />
+            </linearGradient>
+            <radialGradient id="rcBezel" cx="0.35" cy="0.3" r="0.8">
+              <stop offset="0" stop-color="#ffffff" /><stop offset="0.35" stop-color="#c3cad5" /><stop offset="0.7" stop-color="#7b8494" /><stop offset="1" stop-color="#4a5262" />
+            </radialGradient>
+            <radialGradient id="rcDial" cx="0.4" cy="0.35" r="0.75">
+              <stop offset="0" stop-color="#fbfbf9" /><stop offset="1" stop-color="#e3e5e6" />
+            </radialGradient>
+            <linearGradient id="rcGlass" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ffffff" stop-opacity="0.55" /><stop offset="0.45" stop-color="#ffffff" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <path d="M22 4 H50 L48 92 H24Z" fill="url(#rcStrap)" />
+          <path d="M24 148 H48 L50 236 H22Z" fill="url(#rcStrap)" />
+          <g fill="none" stroke="#7d8aa3" stroke-opacity="0.55" stroke-width="0.7" stroke-dasharray="2.2 1.8">
+            <path d="M25.5 8 L27 90" /><path d="M46.5 8 L45 90" /><path d="M27 150 L25.5 232" /><path d="M45 150 L46.5 232" />
+          </g>
+          <g fill="#05080f" opacity="0.75"><ellipse cx="36" cy="178" rx="1.6" ry="2.4" /><ellipse cx="36" cy="192" rx="1.6" ry="2.4" /><ellipse cx="36" cy="206" rx="1.6" ry="2.4" /></g>
+          <rect x="64.5" y="116.5" width="5" height="7" rx="1.2" fill="url(#rcBezel)" />
+          <circle cx="36" cy="120" r="31" fill="url(#rcBezel)" />
+          <circle cx="36" cy="120" r="27" fill="#3a4251" />
+          <circle cx="36" cy="120" r="25.6" fill="url(#rcDial)" />
+          <g stroke="#1b2130"><line x1="36.00" y1="98.80" x2="36.00" y2="95.80" stroke-width="1.3"/><line x1="38.36" y1="97.52" x2="38.53" y2="95.93" stroke-width="0.5"/><line x1="40.70" y1="97.89" x2="41.03" y2="96.33" stroke-width="0.5"/><line x1="42.98" y1="98.51" x2="43.48" y2="96.98" stroke-width="0.5"/><line x1="45.19" y1="99.35" x2="45.84" y2="97.89" stroke-width="0.5"/><line x1="46.60" y1="101.64" x2="48.10" y2="99.04" stroke-width="1.3"/><line x1="49.28" y1="101.72" x2="50.22" y2="100.42" stroke-width="0.5"/><line x1="51.12" y1="103.20" x2="52.19" y2="102.02" stroke-width="0.5"/><line x1="52.80" y1="104.88" x2="53.98" y2="103.81" stroke-width="0.5"/><line x1="54.28" y1="106.72" x2="55.58" y2="105.78" stroke-width="0.5"/><line x1="54.36" y1="109.40" x2="56.96" y2="107.90" stroke-width="1.3"/><line x1="56.65" y1="110.81" x2="58.11" y2="110.16" stroke-width="0.5"/><line x1="57.49" y1="113.02" x2="59.02" y2="112.52" stroke-width="0.5"/><line x1="58.11" y1="115.30" x2="59.67" y2="114.97" stroke-width="0.5"/><line x1="58.48" y1="117.64" x2="60.07" y2="117.47" stroke-width="0.5"/><line x1="57.20" y1="120.00" x2="60.20" y2="120.00" stroke-width="1.3"/><line x1="58.48" y1="122.36" x2="60.07" y2="122.53" stroke-width="0.5"/><line x1="58.11" y1="124.70" x2="59.67" y2="125.03" stroke-width="0.5"/><line x1="57.49" y1="126.98" x2="59.02" y2="127.48" stroke-width="0.5"/><line x1="56.65" y1="129.19" x2="58.11" y2="129.84" stroke-width="0.5"/><line x1="54.36" y1="130.60" x2="56.96" y2="132.10" stroke-width="1.3"/><line x1="54.28" y1="133.28" x2="55.58" y2="134.22" stroke-width="0.5"/><line x1="52.80" y1="135.12" x2="53.98" y2="136.19" stroke-width="0.5"/><line x1="51.12" y1="136.80" x2="52.19" y2="137.98" stroke-width="0.5"/><line x1="49.28" y1="138.28" x2="50.22" y2="139.58" stroke-width="0.5"/><line x1="46.60" y1="138.36" x2="48.10" y2="140.96" stroke-width="1.3"/><line x1="45.19" y1="140.65" x2="45.84" y2="142.11" stroke-width="0.5"/><line x1="42.98" y1="141.49" x2="43.48" y2="143.02" stroke-width="0.5"/><line x1="40.70" y1="142.11" x2="41.03" y2="143.67" stroke-width="0.5"/><line x1="38.36" y1="142.48" x2="38.53" y2="144.07" stroke-width="0.5"/><line x1="36.00" y1="141.20" x2="36.00" y2="144.20" stroke-width="1.3"/><line x1="33.64" y1="142.48" x2="33.47" y2="144.07" stroke-width="0.5"/><line x1="31.30" y1="142.11" x2="30.97" y2="143.67" stroke-width="0.5"/><line x1="29.02" y1="141.49" x2="28.52" y2="143.02" stroke-width="0.5"/><line x1="26.81" y1="140.65" x2="26.16" y2="142.11" stroke-width="0.5"/><line x1="25.40" y1="138.36" x2="23.90" y2="140.96" stroke-width="1.3"/><line x1="22.72" y1="138.28" x2="21.78" y2="139.58" stroke-width="0.5"/><line x1="20.88" y1="136.80" x2="19.81" y2="137.98" stroke-width="0.5"/><line x1="19.20" y1="135.12" x2="18.02" y2="136.19" stroke-width="0.5"/><line x1="17.72" y1="133.28" x2="16.42" y2="134.22" stroke-width="0.5"/><line x1="17.64" y1="130.60" x2="15.04" y2="132.10" stroke-width="1.3"/><line x1="15.35" y1="129.19" x2="13.89" y2="129.84" stroke-width="0.5"/><line x1="14.51" y1="126.98" x2="12.98" y2="127.48" stroke-width="0.5"/><line x1="13.89" y1="124.70" x2="12.33" y2="125.03" stroke-width="0.5"/><line x1="13.52" y1="122.36" x2="11.93" y2="122.53" stroke-width="0.5"/><line x1="14.80" y1="120.00" x2="11.80" y2="120.00" stroke-width="1.3"/><line x1="13.52" y1="117.64" x2="11.93" y2="117.47" stroke-width="0.5"/><line x1="13.89" y1="115.30" x2="12.33" y2="114.97" stroke-width="0.5"/><line x1="14.51" y1="113.02" x2="12.98" y2="112.52" stroke-width="0.5"/><line x1="15.35" y1="110.81" x2="13.89" y2="110.16" stroke-width="0.5"/><line x1="17.64" y1="109.40" x2="15.04" y2="107.90" stroke-width="1.3"/><line x1="17.72" y1="106.72" x2="16.42" y2="105.78" stroke-width="0.5"/><line x1="19.20" y1="104.88" x2="18.02" y2="103.81" stroke-width="0.5"/><line x1="20.88" y1="103.20" x2="19.81" y2="102.02" stroke-width="0.5"/><line x1="22.72" y1="101.72" x2="21.78" y2="100.42" stroke-width="0.5"/><line x1="25.40" y1="101.64" x2="23.90" y2="99.04" stroke-width="1.3"/><line x1="26.81" y1="99.35" x2="26.16" y2="97.89" stroke-width="0.5"/><line x1="29.02" y1="98.51" x2="28.52" y2="96.98" stroke-width="0.5"/><line x1="31.30" y1="97.89" x2="30.97" y2="96.33" stroke-width="0.5"/><line x1="33.64" y1="97.52" x2="33.47" y2="95.93" stroke-width="0.5"/></g>
+          <text x="36" y="109" text-anchor="middle" font-size="3.4" font-weight="700" fill="#25418a" font-family="Zalando Sans, sans-serif" letter-spacing="0.6">REGISTRY</text>
+          <g id="rcHands">
+            <line class="rc-h" x1="36" y1="123" x2="36" y2="106" stroke="#1b2a4a" stroke-width="2.4" stroke-linecap="round" />
+            <line class="rc-m" x1="36" y1="124" x2="36" y2="99" stroke="#1b2a4a" stroke-width="1.6" stroke-linecap="round" />
+            <line class="rc-s" x1="36" y1="126" x2="36" y2="97.5" stroke="#cf2b4d" stroke-width="0.7" stroke-linecap="round" />
+            <circle cx="36" cy="120" r="1.6" fill="#1b2a4a" />
+          </g>
+          <circle cx="36" cy="120" r="25.6" fill="url(#rcGlass)" />
+          <path d="M14 110 A23 23 0 0 1 30 97" fill="none" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1.2" stroke-linecap="round" />
+        </svg>
+      </div>
+      <div class="rc-pen" aria-hidden="true">
+        <svg viewBox="0 0 22 250" width="22" height="250">
+          <defs>
+            <linearGradient id="rcBarrel" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#0a1024" /><stop offset="0.3" stop-color="#2b3f78" /><stop offset="0.42" stop-color="#8fa6e0" /><stop offset="0.55" stop-color="#2b3f78" /><stop offset="1" stop-color="#070c1a" />
+            </linearGradient>
+            <linearGradient id="rcChrome" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#596273" /><stop offset="0.35" stop-color="#f6f8fb" /><stop offset="0.6" stop-color="#9ba4b3" /><stop offset="1" stop-color="#4b5262" />
+            </linearGradient>
+          </defs>
+          <path d="M11 249 L8.2 232 H13.8Z" fill="#c9ced6" />
+          <circle cx="11" cy="248.4" r="0.9" fill="#3a3f4a" />
+          <path d="M8.2 232 L5 196 H17 L13.8 232Z" fill="url(#rcChrome)" />
+          <rect x="5" y="40" width="12" height="156" rx="2" fill="url(#rcBarrel)" />
+          <rect x="4.6" y="36" width="12.8" height="8" rx="1.5" fill="url(#rcChrome)" />
+          <rect x="5.2" y="6" width="11.6" height="31" rx="5" fill="url(#rcBarrel)" />
+          <path d="M14.6 12 H17.4 V86 Q16 92 14.6 86Z" fill="url(#rcChrome)" />
+        </svg>
+      </div>
       <div class="rc-board" id="board">
         <span class="rc-clip" aria-hidden="true">
           <svg viewBox="0 0 180 64" width="180" height="64">
@@ -187,6 +246,7 @@ const total = RULES.length
   const pileBar = document.getElementById('pileBar')!
   const board = document.getElementById('board')!
   const field = document.getElementById('field')!
+  const desk = document.getElementById('desk')!
 
   const ctx = { hour: new Date().getHours(), unlocked: 1, banned: null as string | null }
   let won = false
@@ -333,6 +393,18 @@ const total = RULES.length
     moth.poke()
   }
 
+  /* ---- the watch: the real time, on the desk ----------------------- */
+  {
+    const hands = document.getElementById('rcHands')
+    const set = (cls: string, deg: number) => hands?.querySelector(cls)?.setAttribute('transform', `rotate(${deg.toFixed(2)} 36 120)`)
+    const tickWatch = () => {
+      const d = new Date(), s = d.getSeconds(), m = d.getMinutes() + s / 60, h = (d.getHours() % 12) + m / 60
+      set('.rc-h', h * 30); set('.rc-m', m * 6); set('.rc-s', s * 6)
+    }
+    tickWatch()
+    setInterval(() => { if (!document.hidden) tickWatch() }, 1000)
+  }
+
   /* ---- the office box -------------------------------------------- */
   const slip = document.getElementById('slip')!
   const accept = document.getElementById('accept')!
@@ -401,7 +473,6 @@ const total = RULES.length
 
   /* The moth is real now (lib/cascade/moth.ts): it circles the lamp, comes
      down onto one letter every six seconds, and eats it. A spider sends it off. */
-  const desk = document.getElementById('desk')!
   const moth = createMoth({
     host: desk,
     field: input,
@@ -553,9 +624,17 @@ const total = RULES.length
   .rc-crumb { position: absolute; z-index: 49; border-radius: 1px; pointer-events: none; }
 
   .rc-cols {
+    position: relative; width: fit-content; max-width: 100%; margin-inline: auto;
     display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 500px);
     gap: clamp(28px, 4vw, 60px); justify-content: center; align-items: start;
   }
+
+  /* ---- things on the desk: in the margins, where the cards never go ---- */
+  .rc-watch, .rc-pen { position: absolute; z-index: 0; pointer-events: none; display: none; }
+  .rc-watch { left: -68px; top: 150px; transform: rotate(-9deg); filter: drop-shadow(3px 6px 5px rgba(0, 0, 0, 0.55)); }
+  .rc-pen { right: -58px; top: 300px; transform: rotate(7deg); filter: drop-shadow(3px 6px 4px rgba(0, 0, 0, 0.55)); }
+  .rc-watch svg, .rc-pen svg { display: block; }
+  @media (min-width: 1340px) { .rc-watch, .rc-pen { display: block; } }
 
   /* ---- the clipboard ----------------------------------------------------
      Smoked blue acrylic, polished at the edge, with a steel clip. */
