@@ -555,10 +555,13 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
     const { L, uvk } = setLook(s.look, s.mm)
     const a = s.halfW, b = s.halfD, H = Math.max(s.height, 1e-7)
     const u = Math.max(0, Math.min(1, s.u))
+    // How much of the sheet is in the picture: all of it, unless it is a
+    // strip (see the framing below), and then a few widths round the crease.
+    const ra = Math.min(a, Math.max(b, H) * 7), rb = Math.min(b, Math.max(a, H) * 7)
     // Very thin paper is still drawn with some thickness on the edge it shows
     // the camera, or a single sheet has no edge at all; a hundred-and-fiftieth
-    // of the sheet's size is under a pixel at rest and enough to catch light.
-    const drawnH = Math.max(H, Math.max(a, b) * 0.0015)
+    // of what is in the picture is under a pixel at rest and enough to catch light.
+    const drawnH = Math.max(H, Math.max(ra, rb) * 0.0015)
     const squash = 1 - 0.035 * s.press
 
     sheet.rotation.y = s.yaw
@@ -597,20 +600,26 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
     if (flap.visible) writeFlap(flapGeo, a, b, drawnH, u, s.mm, L.tile)
 
     // The pool right under the paper.
-    under.scale.set((x1 - x0) * 1.08 + 0.02, 2 * b * 1.1 + 0.02, 1)
-    under.position.set((x0 + x1) / 2, 0.0004 * Math.max(a, b), 0)
+    under.scale.set((x1 - x0) * 1.08 + 0.02 * Math.max(ra, rb), 2 * b * 1.1 + 0.02 * Math.max(ra, rb), 1)
+    under.position.set((x0 + x1) / 2, Math.min(0.0004 * Math.max(ra, rb), drawnH * 0.25), 0)
     under.material.opacity = 0.32 * s.ground
 
     // Framing: everything the sheet could occupy — the whole sheet, its stack,
     // and the height the flap reaches standing up mid-fold — so the
     // camera does not breathe while the hand moves.
-    const span = Math.max(a, b)
-    const X = a + drawnH, top = drawnH * 1.6, peak = drawnH + a * 0.95
+    //
+    // Except a strip. Gallivan's roll is a ribbon a hand wide and a kilometre
+    // long; framed whole it is a hair across the picture. So a long strip is
+    // framed around the crease, a few widths each way, running off the mat
+    // into the dark on both sides, and the flap rising out of the top.
+    const strip = ra < a
+    const span = Math.max(ra, rb)
+    const X = ra + drawnH, top = drawnH * 1.6, peak = drawnH + ra * (strip ? 0.6 : 0.95)
     const cy = Math.cos(s.yaw), sy = Math.sin(s.yaw)
     let i = 0
     const put = (x: number, y: number, z: number) => pts[i++].set(x * cy + z * sy, y, -x * sy + z * cy)
-    for (const x of [-X, X]) for (const z of [-b, b]) { put(x, 0, z); put(x, top, z) }
-    for (const z of [-b, b]) { put(0, peak, z); put(a * 0.25, peak, z) }
+    for (const x of [-X, X]) for (const z of [-rb, rb]) { put(x, 0, z); put(x, top, z) }
+    for (const z of [-rb, rb]) { put(0, peak, z); put(ra * 0.25, peak, z) }
     const fovV = (camera.fov * Math.PI) / 180
     const tanV = Math.tan(fovV / 2), tanH = tanV * camera.aspect
     want.set(0, top / 2, 0)
@@ -672,8 +681,9 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
 
     renderer.render(scene, camera)
 
-    // Where the free edge is, for the hand that says "drag me".
-    const edge = new Vector3(a, drawnH / 2, 0).applyMatrix4(sheet.matrixWorld).project(camera)
+    // Where the free edge is, for the hand that says "drag me" — or, on a
+    // strip whose end is out of sight, the furthest bit of it you can see.
+    const edge = new Vector3(strip ? ra * 0.9 : a, drawnH / 2, 0).applyMatrix4(sheet.matrixWorld).project(camera)
     gripAt = { x: (edge.x * 0.5 + 0.5) * w, y: (-edge.y * 0.5 + 0.5) * h }
     return true
   }
