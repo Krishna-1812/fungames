@@ -164,6 +164,10 @@ const FIELD_FRAG = GLSL + MATS + EMIT + `
 uniform highp usampler2D u_id;
 uniform highp usampler2D u_life;
 uniform vec2 u_grid;
+/* 0: liquid, matter, flame, gas. 1: how much of the gas is pale (steam, cloud,
+   foam) and how much is smoke, so a plume's colour blends as smoothly as its
+   thickness instead of changing a cell at a time. */
+uniform float u_which;
 
 void main() {
   vec2 gp = vec2(vUv.x, 1.0 - vUv.y) * u_grid;
@@ -171,6 +175,11 @@ void main() {
   uint id = texelFetch(u_id, c, 0).r;
   float kd = kindOf(id);
   float k = clamp(float(texelFetch(u_life, c, 0).r) / life0(id), 0.0, 1.0);
+  if (u_which > 0.5) {
+    float pale = (id == M_STEAM || id == M_FOAM) ? k : id == M_CLOUD ? 1.0 : 0.0;
+    fragColor = vec4(pale, id == M_SMOKE ? k : 0.0, 0.0, 0.0);
+    return;
+  }
   fragColor = vec4(
     kd == 2.0 ? 1.0 : 0.0,
     kd <= 2.0 ? 1.0 : 0.0,
@@ -238,6 +247,7 @@ uniform highp usampler2D u_life;
 uniform highp usampler2D u_shade;
 uniform sampler2D u_light;
 uniform sampler2D u_field;
+uniform sampler2D u_gas;
 uniform vec2 u_grid;
 
 uint  idAt(ivec2 c)    { return texelFetch(u_id,    clamp(c, ivec2(0), ivec2(u_grid) - 1), 0).r; }
@@ -585,32 +595,26 @@ void main() {
   /* A burning plank throws a few scattered flame cells, not a solid sheet,
      and averaged they all but vanish. So both fields go through a curve that
      lets a sparse few read as flame or smoke and a dense mass not blow out. */
-  float gasS = 1.0 - exp(-mix(F.a, Fw.a, 0.5) * 3.5);
+  vec4 G = texture(u_gas, vUv);
+  vec4 Gw = (texture(u_gas, vUv + o) + texture(u_gas, vUv - o)
+           + texture(u_gas, vUv + vec2(o.x, -o.y)) + texture(u_gas, vUv + vec2(-o.x, o.y))) * 0.25;
+  vec2 gm = mix(G.rg, Gw.rg, 0.5);
+  float gasS = 1.0 - exp(-(gm.x + gm.y) * 3.5);
   float fireS = 1.0 - exp(-max(F.b, Fw.b * 0.85) * 5.0);
 
   if (gasS > 0.004) {
-    // Which gas: the strongest within a cell or so, so a steam cloud beside
-    // smoke keeps its own colour instead of averaging to grey.
-    uint gid = M_SMOKE; float best = 0.0;
-    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
-      ivec2 q = ic + ivec2(dx, dy);
-      uint id = idAt(q);
-      if (kindOf(id) != 3.0) continue;
-      float w = id == M_CLOUD ? 1.0 : clamp(lifeAt(q) / life0(id), 0.0, 1.0);
-      if (w > best) { best = w; gid = id; }
-    }
+    // Pale where it is steam or cloud, grey where it is smoke, and blended
+    // between them as smoothly as the plume thins.
+    float pale = gm.x / max(gm.x + gm.y, 1e-4);
     float puff = fbm(gp * 0.42 + vec2(-u_time * 0.10, -u_time * 0.22), 4);
     float ga = clamp(gasS * 1.5 - 0.06, 0.0, 1.0) * (0.40 + 0.80 * puff);
-    vec3 gcol = gid == M_STEAM ? vec3(0.62, 0.68, 0.74)
-              : gid == M_FOAM  ? vec3(0.82, 0.84, 0.82)
-              : gid == M_CLOUD ? vec3(0.70, 0.73, 0.78) * (0.75 + 0.35 * puff)
-              // Smoke is a grey haze, lit by the room and the fire under it —
-              // not soot-black, which on the dark wall was simply invisible.
-              :                  vec3(0.20, 0.20, 0.215);
+    // Smoke is a grey haze, lit by the room and the fire under it — not
+    // soot-black, which on the dark wall was simply invisible.
+    vec3 gcol = mix(vec3(0.20, 0.20, 0.215), vec3(0.64, 0.69, 0.75) * (0.85 + 0.25 * puff), pale);
     // Lit like anything else, which is why smoke over a fire glows orange from
     // below and grey higher up.
     gcol = gcol * (amb + vec3(0.30) + lightF * 2.4);
-    col = mix(col, gcol, clamp(ga * (gid == M_CLOUD ? 1.0 : 0.92), 0.0, 1.0));
+    col = mix(col, gcol, clamp(ga * 0.94, 0.0, 1.0));
   }
 
   if (fireS > 0.004) {
@@ -726,6 +730,7 @@ class GLRenderer implements PowderRenderer {
   /** The smoothed fields, and a scratch target for blurring them. */
   private fieldA: Level | null = null
   private fieldB: Level | null = null
+  private fieldG: Level | null = null
   private vao: WebGLVertexArrayObject
   private texId: WebGLTexture
   private texLife: WebGLTexture
@@ -810,9 +815,10 @@ class GLRenderer implements PowderRenderer {
 
     for (const l of this.levels) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
     this.levels = []
-    for (const l of [this.fieldA, this.fieldB]) if (l) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
+    for (const l of [this.fieldA, this.fieldB, this.fieldG]) if (l) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
     this.fieldA = this.target(w, h)
     this.fieldB = this.target(w, h)
+    this.fieldG = this.target(w, h)
     let lw = w, lh = h
     for (let i = 0; i < LIGHT_LEVELS; i++) {
       const tex = gl.createTexture()!
@@ -926,23 +932,27 @@ class GLRenderer implements PowderRenderer {
     }
     gl.disable(gl.BLEND)
 
-    // 2c. The fields: drawn, then blurred across and back down.
+    // 2c. The fields — the main four, then the gas colours — each drawn, then
+    // blurred across and back down through the scratch target.
     const fp = this.fieldP!, bp = this.blurP!
-    this.blit(fp, this.fieldA, () => {
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texId)
-      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texLife)
-      gl.uniform1i(this.uni(fp, 'u_id'), 0)
-      gl.uniform1i(this.uni(fp, 'u_life'), 1)
-      gl.uniform2f(this.uni(fp, 'u_grid'), w, h)
-      gl.uniform2f(this.uni(fp, 'u_res'), w, h)
-      gl.uniform1f(this.uni(fp, 'u_time'), time)
-    })
-    for (const [src, dst, dx, dy] of [[this.fieldA!, this.fieldB!, 1 / w, 0], [this.fieldB!, this.fieldA!, 0, 1 / h]] as const) {
-      this.blit(bp, dst, () => {
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.tex)
-        gl.uniform1i(this.uni(bp, 'u_src'), 0)
-        gl.uniform2f(this.uni(bp, 'u_dir'), dx, dy)
+    for (const [out, which] of [[this.fieldA!, 0], [this.fieldG!, 1]] as const) {
+      this.blit(fp, out, () => {
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texId)
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texLife)
+        gl.uniform1i(this.uni(fp, 'u_id'), 0)
+        gl.uniform1i(this.uni(fp, 'u_life'), 1)
+        gl.uniform2f(this.uni(fp, 'u_grid'), w, h)
+        gl.uniform2f(this.uni(fp, 'u_res'), w, h)
+        gl.uniform1f(this.uni(fp, 'u_time'), time)
+        gl.uniform1f(this.uni(fp, 'u_which'), which)
       })
+      for (const [src, dst, dx, dy] of [[out, this.fieldB!, 1 / w, 0], [this.fieldB!, out, 0, 1 / h]] as const) {
+        this.blit(bp, dst, () => {
+          gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.tex)
+          gl.uniform1i(this.uni(bp, 'u_src'), 0)
+          gl.uniform2f(this.uni(bp, 'u_dir'), dx, dy)
+        })
+      }
     }
 
     // 3. Composite.
@@ -954,6 +964,8 @@ class GLRenderer implements PowderRenderer {
       gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.levels[0].tex)
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.fieldA!.tex)
       gl.uniform1i(this.uni(mp, 'u_field'), 4)
+      gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, this.fieldG!.tex)
+      gl.uniform1i(this.uni(mp, 'u_gas'), 5)
       gl.uniform1i(this.uni(mp, 'u_id'), 0)
       gl.uniform1i(this.uni(mp, 'u_life'), 1)
       gl.uniform1i(this.uni(mp, 'u_shade'), 2)
@@ -966,7 +978,7 @@ class GLRenderer implements PowderRenderer {
 
   dispose() {
     const gl = this.gl
-    for (const l of [...this.levels, this.fieldA, this.fieldB]) if (l) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
+    for (const l of [...this.levels, this.fieldA, this.fieldB, this.fieldG]) if (l) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
     gl.getExtension('WEBGL_lose_context')?.loseContext()
   }
 }
