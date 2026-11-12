@@ -60,8 +60,8 @@ export const shadow = (cx: number, cy: number, rx: number, ry: number, fill: str
 export const SHADOW = '#b9c6c2'
 
 export const SPEND_ART: Record<string, Product> = {
-  /* ---- Big Mac ---------------------------------------------------------- */
-  'Big Mac': {
+  /* ---- Cheeseburger ----------------------------------------------------- */
+  'Cheeseburger': {
     subject: 'a stacked burger in section — sesame bun, two patties, cheese, lettuce',
     palette: [SHADOW, '#e8a94e', '#d9933a', '#f2c273', '#6b4423', '#8a5a2f', '#f7d154', '#7fb04a', '#c8412f', '#fffdf6'],
     draw: () => {
@@ -1453,8 +1453,8 @@ export const SPEND_ART: Record<string, Product> = {
       <circle cx="92" cy="84" r="2.2" fill="#3a3a42"/>`,
   },
 
-  /* ---- Formula 1 car ----------------------------------------------------- */
-  'Formula 1 car': {
+  /* ---- Racing car -------------------------------------------------------- */
+  'Racing car': {
     subject: 'an open-wheel racer in side view, front and rear wings, halo over the cockpit, exposed suspension',
     palette: [SHADOW, '#1f7d80', '#2b9ea1', '#14494b', '#1b1b1f', '#3a3a42', '#a67f1f', '#e8eef2'],
     draw: () => `
@@ -1505,8 +1505,8 @@ export const SPEND_ART: Record<string, Product> = {
       </g>`,
   },
 
-  /* ---- Boeing 787 -------------------------------------------------------- */
-  'Boeing 787': {
+  /* ---- Wide-body airliner ------------------------------------------------ */
+  'Wide-body airliner': {
     subject: 'a widebody airliner head-on and slightly below, full wingspan, two underwing engines, raked tips',
     palette: [SHADOW, '#e8eef2', '#c9d6df', '#9fb3c4', '#1b2733', '#3a6ea5', '#5b6b78'],
     draw: () => `

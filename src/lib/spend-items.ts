@@ -18,7 +18,7 @@ export type Item = {
 }
 
 export const ITEMS: Item[] = [
-  { name: 'Big Mac', price: 6, icon: 'burger' },
+  { name: 'Cheeseburger', price: 6, icon: 'burger' },
   { name: 'Latte', price: 5, icon: 'coffee' },
   { name: 'Cinema ticket', price: 15, icon: 'film' },
   { name: 'Hardback book', price: 25, icon: 'book' },
@@ -36,11 +36,11 @@ export const ITEMS: Item[] = [
   { name: 'Family home', price: 400_000, icon: 'house' },
   { name: 'Beach villa', price: 1_500_000, icon: 'villa' },
   { name: 'Superyacht', price: 4_000_000, icon: 'yacht' },
-  { name: 'Formula 1 car', price: 9_000_000, icon: 'f1' },
+  { name: 'Racing car', price: 9_000_000, icon: 'f1' },
   { name: 'Private jet', price: 25_000_000, icon: 'jet' },
   { name: 'A Van Gogh', price: 60_000_000, icon: 'painting' },
   { name: 'Skyscraper', price: 120_000_000, icon: 'skyscraper' },
-  { name: 'Boeing 787', price: 250_000_000, icon: 'airliner' },
+  { name: 'Wide-body airliner', price: 250_000_000, icon: 'airliner' },
   { name: 'Cruise ship', price: 600_000_000, icon: 'cruise' },
   { name: 'Football club', price: 1_000_000_000, icon: 'football' },
   { name: 'Orbital rocket', price: 2_500_000_000, icon: 'rocket' },
