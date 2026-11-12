@@ -253,7 +253,7 @@ report('and they come up about equally often', spread < 1.25, `worst ratio ${spr
    object drawn perfectly). */
 console.log('\nthe likeness score')
 {
-  const { refPoints, likeness, verdictFor, MIN_INK } = await import('../src/lib/memo-score.ts')
+  const { refPoints, likeness, verdictFor, MIN_INK, NEAR } = await import('../src/lib/memo-score.ts')
   let s2 = 11
   const rnd = () => { s2 = (s2 * 1664525 + 1013904223) >>> 0; return s2 / 4294967296 }
   const toStrokes = (pts) => {
@@ -289,6 +289,21 @@ console.log('\nthe likeness score')
 
   const movedBad = ITEMS.filter((it) => likeness(refs[it.id], traces[it.id].map((s) => s.map((p) => ({ x: (p.x - 100) * 0.75 + 118, y: (p.y - 70) * 0.75 + 58 })))).score < 95).map((it) => it.id)
   report('the same drawing, smaller and off-centre, still scores 95+', movedBad.length === 0, movedBad.join(', '))
+
+  /* The reveal lays the real shape over yours where the score lined them up,
+     by running the placement backwards. If that inverse were wrong the answer
+     would land somewhere the score never looked, so: move a perfect trace,
+     run the reference through the inverse, and it has to land on the trace. */
+  const offPlace = ITEMS.filter((it) => {
+    const moved = traces[it.id].map((s) => s.map((p) => ({ x: (p.x - 100) * 0.7 + 74, y: (p.y - 70) * 0.8 + 76 })))
+    const pl = likeness(refs[it.id], moved).place
+    if (!pl) return true
+    const ink = moved.flat()
+    const back = refs[it.id].map((q) => ({ x: pl.cx + (q.x - pl.tx) / pl.sx, y: pl.cy + (q.y - pl.ty) / pl.sy }))
+    const near = back.filter((q) => ink.some((p) => Math.hypot(p.x - q.x, p.y - q.y) <= NEAR)).length / back.length
+    return near < 0.97
+  }).map((it) => it.id)
+  report('the reveal, laid where the score lined them up, lands on the drawing', offPlace.length === 0, offPlace.join(', '))
 
   const w5 = ITEMS.map((it) => likeness(refs[it.id], wobble(traces[it.id], 5)).score)
   report('a 5-unit wobble averages 80+ and never drops under 70', avg(w5) >= 80 && Math.min(...w5) >= 70, `avg ${avg(w5).toFixed(0)}, min ${Math.min(...w5)}`)

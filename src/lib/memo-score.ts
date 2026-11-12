@@ -231,7 +231,14 @@ function box(pts: P[]): Box {
  * axes may scale differently, but only by up to 35%: squashing a circle into
  * an ellipse is forgivable, turning a line into a square is not.
  */
-function align(pts: P[], onto: Box): { pts: P[]; scale: number } {
+/**
+ * Where your drawing was moved to: a point p of yours lands at
+ * (tx + (p.x - cx) * sx, ty + (p.y - cy) * sy). The reveal uses the inverse to
+ * lay the real shape over your drawing exactly where it was measured.
+ */
+export type Place = { cx: number; cy: number; sx: number; sy: number; tx: number; ty: number }
+
+function align(pts: P[], onto: Box): { pts: P[]; scale: number; place: Place } {
   const b = box(pts)
   let sx = onto.w / b.w
   let sy = onto.h / b.h
@@ -241,7 +248,7 @@ function align(pts: P[], onto: Box): { pts: P[]; scale: number } {
   sy = Math.min(g * lim, Math.max(g / lim, sy))
   const cx = b.x + b.w / 2, cy = b.y + b.h / 2
   const tx = onto.x + onto.w / 2, ty = onto.y + onto.h / 2
-  return { pts: pts.map((p) => ({ x: tx + (p.x - cx) * sx, y: ty + (p.y - cy) * sy })), scale: Math.sqrt(sx * sy) }
+  return { pts: pts.map((p) => ({ x: tx + (p.x - cx) * sx, y: ty + (p.y - cy) * sy })), scale: Math.sqrt(sx * sy), place: { cx, cy, sx, sy, tx, ty } }
 }
 
 export type Likeness = {
@@ -253,6 +260,8 @@ export type Likeness = {
   precision: number
   /** Whether lining your drawing up with the reference is what scored. */
   aligned: boolean
+  /** And if it was, where it was lined up. */
+  place?: Place
 }
 
 function fscore(ref: P[], ink: P[], inkLen: number) {
@@ -276,6 +285,7 @@ export function likeness(ref: P[], strokes: P[][]): Likeness {
     coverage: best.coverage,
     precision: best.precision,
     aligned: moved.f > inPlace.f,
+    ...(moved.f > inPlace.f ? { place: a.place } : {}),
   }
 }
 
@@ -293,6 +303,17 @@ export const BANDS = [
   [30, 'Loosely'],
   [0, 'From another planet'],
 ] as const
+/**
+ * An SVG transform that draws the reference over your drawing where the score
+ * lined them up: the inverse of the placement. Empty when nothing was moved.
+ */
+export function overYours(place?: Place) {
+  if (!place) return ''
+  const { cx, cy, sx, sy, tx, ty } = place
+  const r = (n: number) => +n.toFixed(4)
+  return `translate(${r(cx)} ${r(cy)}) scale(${r(1 / sx)} ${r(1 / sy)}) translate(${r(-tx)} ${r(-ty)})`
+}
+
 export function verdictFor(score: number) {
   return BANDS.find(([min]) => score >= min)![1]
 }
