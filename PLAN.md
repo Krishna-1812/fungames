@@ -66,7 +66,7 @@ Ruthless, because that's what was asked for.
 | **Scale** | ~~Draws *circles* for a proton, a whale and a galaxy.~~ Twenty-six drawn objects, sized on both axes, and the shader keeps the seventeen things that really are spheres and rings. | **Medium — done** |
 | **Deep Time** | ~~A Wikipedia list on a gradient.~~ ~~Forty-four events, forty-four scenes, shown at 116px in a flat box.~~ Every card lit by its own scene's colour, and the art large enough to be the picture rather than the icon beside it. | **Medium — done** |
 | **Ambient Mix** | Quietly the most *finished* thing here. Twelve real synthesised layers. Just needs presets and a shareable mix. | **Medium** |
-| **Paper Folds** | A fact, not a game. You press one button 42 times. | **Low** |
+| **Paper Folds** | ~~A fact, not a game. You press one button 42 times.~~ A real sheet on a cutting mat under a desk lamp, in 3D: the flap rolls over and presses down into a crease, has weight, and sounds like paper; the stack's edge looks like a ream, and Gallivan's roll is a ribbon across the mat. | **Low — done** |
 | **Progress** | ~~Thirteen identical bars for thirteen things that are not alike, and are not parallel either.~~ Fifteen concentric channels on one machined dial, ordered by span, plus a date model that survives a 23-hour day. | **Low — done** |
 | **Life in Weeks** | ~~The grid got a real shader; the four cards and the form around it stayed the site's original flat template.~~ One instrument, materials pulled from the grid's own palette. | **Low — done** |
 
