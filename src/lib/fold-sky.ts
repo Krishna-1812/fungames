@@ -6,7 +6,7 @@
  * "the observable universe" written next to the top of it. The number went up
  * and nothing else changed.
  *
- * So the page's own backdrop is the altitude. Fold zero is a lamplit desk; by
+ * So the page's own backdrop is the altitude. Fold zero is a desk under a cool lamp; by
  * fold thirty the sheet is past the Kármán line and so is the page; by the
  * last fold there is nothing behind it but other galaxies.
  *
@@ -97,39 +97,40 @@ export const inkMin = 0.07
  * fold the game says it does, because both come from the same doubling.
  */
 const STOPS: Stop[] = [
+  // The desk at night, under a cool lamp: slate, not lamplit brown.
   {
     at: -4, where: 'on the desk',
-    top: [40, 29, 20], bottom: [124, 93, 58],
-    surface: [30, 24, 18], well: [20, 16, 12],
-    ink: [248, 240, 226], inkSoft: [186, 170, 142], line: [62, 51, 38],
-    accent: [79, 227, 193], rim: [96, 77, 54],
+    top: [14, 19, 28], bottom: [40, 54, 74],
+    surface: [20, 25, 33], well: [12, 16, 22],
+    ink: [236, 242, 250], inkSoft: [164, 176, 194], line: [44, 53, 66],
+    accent: [79, 227, 193], rim: [78, 92, 114],
     ground: 1, clouds: 0, curve: 0, stars: 0, galaxies: 0,
   },
   {
     at: 0.6, where: 'in the room',
-    top: [38, 29, 22], bottom: [110, 84, 54],
-    surface: [30, 24, 18], well: [20, 16, 12],
-    ink: [248, 240, 226], inkSoft: [186, 170, 142], line: [62, 51, 38],
-    accent: [79, 227, 193], rim: [96, 77, 54],
+    top: [16, 21, 31], bottom: [46, 60, 82],
+    surface: [20, 25, 33], well: [12, 16, 22],
+    ink: [236, 242, 250], inkSoft: [164, 176, 194], line: [44, 53, 66],
+    accent: [79, 227, 193], rim: [78, 92, 114],
     ground: 1, clouds: 0, curve: 0, stars: 0, galaxies: 0,
   },
   {
-    // Between the lamplit room and full daylight the backdrop has to travel
+    // Between the lamplit room at night and full daylight the backdrop has to travel
     // further than anywhere else on the climb, and it has only five folds to
     // do it in. Without a stop here the sky steps rather than moves.
     at: 1.2, where: 'out of the window',
-    top: [56, 58, 72], bottom: [150, 136, 112],
-    surface: [30, 25, 21], well: [20, 17, 14],
-    ink: [247, 241, 231], inkSoft: [184, 172, 152], line: [61, 52, 42],
-    accent: [96, 224, 204], rim: [96, 78, 60],
+    top: [40, 54, 76], bottom: [104, 124, 150],
+    surface: [22, 26, 34], well: [14, 17, 23],
+    ink: [242, 246, 252], inkSoft: [176, 184, 198], line: [52, 60, 72],
+    accent: [96, 224, 204], rim: [86, 98, 118],
     ground: 0.95, clouds: 0.25, curve: 0, stars: 0, galaxies: 0,
   },
   {
     at: 2.3, where: 'above the rooftops',
     top: [96, 140, 192], bottom: [208, 212, 202],
-    surface: [30, 26, 24], well: [20, 17, 16],
-    ink: [246, 242, 236], inkSoft: [182, 174, 162], line: [60, 53, 47],
-    accent: [116, 218, 222], rim: [96, 80, 66],
+    surface: [26, 29, 35], well: [17, 19, 24],
+    ink: [244, 246, 250], inkSoft: [178, 184, 196], line: [56, 60, 68],
+    accent: [116, 218, 222], rim: [90, 98, 114],
     ground: 0.75, clouds: 0.6, curve: 0, stars: 0, galaxies: 0,
   },
   {
