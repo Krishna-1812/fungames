@@ -171,6 +171,7 @@ import { GOALS } from '../lib/orbit-goals'
   import { adjustAim } from '../lib/orbit-input'
   import { FixedClock } from '../lib/fixed-clock'
   import { createRenderer } from '../lib/orbit-render'
+  import { launchFrame, predict, type Path } from '../lib/orbit-predict'
   import {
     type Body, type StepEvents,
     makeBody, step, circularV, radiusFor, MAX_BODIES,
@@ -194,6 +195,8 @@ import { GOALS } from '../lib/orbit-goals'
   let trails = true
   let merges = 0
   let launchMass = 6
+
+  const heaviestMass = () => bodies.reduce((m, b) => Math.max(m, b.m), 0)
 
   function add(x: number, y: number, vx: number, vy: number, m: number, mine = false) {
     if (bodies.length >= MAX_BODIES) return
@@ -362,6 +365,74 @@ import { GOALS } from '../lib/orbit-goals'
   })
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && !goalPanel.hidden) showGoals(false) })
 
+  // ---- the launch: its frame, and where it goes ---------------------------
+  /** Velocity per pixel of drag. */
+  const THROW = 0.055
+  /**
+   * What the launch is thrown relative to (see lib/orbit-predict.ts), and where
+   * on it the drag started. The start rides along with the body while you aim,
+   * so a launch beside a moving planet is still beside it when you let go.
+   */
+  let anchor: { body: Body; ox: number; oy: number; reach: number } | null = null
+  let path: Path | null = null
+
+  function anchorAt(x: number, y: number) {
+    const f = launchFrame(bodies, x, y)
+    anchor = f ? { body: f.body, ox: x - f.body.x, oy: y - f.body.y, reach: f.reach } : null
+  }
+  /** Move the aim with its body, and fly the launch forward from where it is now. */
+  function follow() {
+    if (!aim) { path = null; return }
+    if (anchor && !bodies.includes(anchor.body)) anchor = null
+    if (anchor) {
+      const dx = anchor.body.x + anchor.ox - aim.x0, dy = anchor.body.y + anchor.oy - aim.y0
+      aim.x0 += dx; aim.y0 += dy; aim.x1 += dx; aim.y1 += dy
+    }
+    const v = launchVelocity()
+    path = predict(bodies, aim.x0, aim.y0, v.vx, v.vy, launchMass, anchor?.body ?? null, 420, W, H)
+  }
+  function launchVelocity() {
+    const a = aim!
+    return {
+      vx: (anchor?.body.vx ?? 0) + (a.x1 - a.x0) * THROW,
+      vy: (anchor?.body.vy ?? 0) + (a.y1 - a.y0) * THROW,
+    }
+  }
+
+  /** The predicted path: bright where it starts, fading as it goes. */
+  function drawPath() {
+    if (!path || path.n < 2) return
+    const p = path.pts, n = path.n
+    // A body that is not the star or near enough at rest gets its sphere of
+    // influence drawn, so it is clear what the throw is relative to.
+    if (anchor && Math.hypot(anchor.body.vx, anchor.body.vy) > 0.05 && Number.isFinite(anchor.reach) && anchor.reach < Math.max(W, H)) {
+      aimCtx.strokeStyle = 'rgba(160, 200, 255, 0.28)'; aimCtx.lineWidth = 1
+      aimCtx.setLineDash([2, 6]); aimCtx.beginPath()
+      aimCtx.arc(anchor.body.x, anchor.body.y, anchor.reach, 0, Math.PI * 2); aimCtx.stroke()
+      aimCtx.setLineDash([])
+    }
+    // In runs, each a little fainter than the last.
+    const RUN = 6
+    aimCtx.lineCap = 'round'; aimCtx.lineJoin = 'round'
+    for (let i = 0; i < n - 1; i += RUN) {
+      const t = i / (n - 1)
+      const a = path.closed ? 0.75 - t * 0.45 : 0.75 * (1 - t) ** 1.3
+      aimCtx.strokeStyle = `rgba(196, 226, 255, ${a.toFixed(3)})`
+      aimCtx.lineWidth = 1.6
+      aimCtx.beginPath(); aimCtx.moveTo(p[i * 2], p[i * 2 + 1])
+      for (let j = i + 1; j <= Math.min(n - 1, i + RUN); j++) aimCtx.lineTo(p[j * 2], p[j * 2 + 1])
+      aimCtx.stroke()
+    }
+    if (path.hit) {
+      const { x, y } = path.hit, s = 5
+      aimCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)'; aimCtx.lineWidth = 1.5
+      aimCtx.beginPath()
+      aimCtx.moveTo(x - s, y - s); aimCtx.lineTo(x + s, y + s)
+      aimCtx.moveTo(x + s, y - s); aimCtx.lineTo(x - s, y + s)
+      aimCtx.stroke()
+    }
+  }
+
   // ---- render ------------------------------------------------------------
   function render() {
     renderer.draw(bodies, aim, trails, radiusFor(launchMass))
@@ -376,7 +447,7 @@ import { GOALS } from '../lib/orbit-goals'
       aimCtx.arc(W / 2 + r, H / 2, 7, 0, Math.PI * 2); aimCtx.fill()
       aimCtx.font = '14px sans-serif'; aimCtx.textAlign = 'center'
       aimCtx.fillText('Start here · drag downward', W / 2, H / 2 - r - 18)
-      const length = circularV(1200, r) / .055
+      const length = circularV(1200, r) / THROW
       aimCtx.strokeStyle = '#e4efff'; aimCtx.beginPath()
       aimCtx.moveTo(W / 2 + r, H / 2 + 12); aimCtx.lineTo(W / 2 + r, H / 2 + length)
       aimCtx.lineTo(W / 2 + r - 5, H / 2 + length - 8)
@@ -384,6 +455,7 @@ import { GOALS } from '../lib/orbit-goals'
       aimCtx.stroke()
     }
     if (aim) {
+      drawPath()
       aimCtx.strokeStyle = 'rgba(255,255,255,0.5)'
       aimCtx.lineWidth = 1.5
       aimCtx.setLineDash([4, 5])
@@ -434,7 +506,7 @@ import { GOALS } from '../lib/orbit-goals'
         if (won.length) celebrate(won)
       })
     } else clock.reset()
-    if (W) render()
+    if (W) { follow(); render() }
 
     fpsFrames++
     if (now - lastFps > 500) {
@@ -455,6 +527,7 @@ import { GOALS } from '../lib/orbit-goals'
   let aim: { x0: number; y0: number; x1: number; y1: number } | null = null
   const tip = document.getElementById('tip')!
 
+  let lastPointer = { x: 0, y: 0 }
   const local = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect()
     return { x: (e.clientX - r.left) / viewScale, y: (e.clientY - r.top) / viewScale }
@@ -465,6 +538,8 @@ import { GOALS } from '../lib/orbit-goals'
     unlock()
     const p = local(e)
     aim = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }
+    lastPointer = p
+    anchorAt(p.x, p.y)
     try { canvas.setPointerCapture(e.pointerId) } catch {}
     tip.classList.add('faded')
     e.preventDefault()
@@ -472,29 +547,31 @@ import { GOALS } from '../lib/orbit-goals'
   canvas.addEventListener('pointermove', (e) => {
     if (!aim || keyboardAim) return
     const p = local(e)
-    aim.x1 = p.x; aim.y1 = p.y
+    aim.x1 += p.x - lastPointer.x; aim.y1 += p.y - lastPointer.y
+    lastPointer = p
   })
   let launches = 0
   function release() {
     if (!aim) return
-    // Velocity follows the drag direction shown by the aiming line.
-    const vx = (aim.x1 - aim.x0) * 0.055
-    const vy = (aim.y1 - aim.y0) * 0.055
+    follow()
+    // Velocity follows the drag direction shown by the aiming line, on top of
+    // the motion of whatever it was launched beside.
+    const { vx, vy } = launchVelocity()
     add(aim.x0, aim.y0, vx, vy, launchMass, true)
     // How far people get, at a few milestones rather than every throw.
     if ([1, 5, 10, 25, 50, 100].includes(++launches)) shell.pick('Bodies launched', launches)
     guide = false
     flightCard.hidden = true
-    const speed = Math.hypot(vx, vy)
+    const speed = Math.hypot(aim.x1 - aim.x0, aim.y1 - aim.y0) * THROW
     sfx.pop(Math.min(9, Math.round(speed * 2)))
     const r = canvas.getBoundingClientRect()
     burst(r.left + aim.x0 * viewScale, r.top + aim.y0 * viewScale, {
       count: 8, colors: ['#9fd0ff', '#fff'], speed: 2, gravity: 0, drag: 0.9, life: 22, size: 2,
     })
-    aim = null
+    aim = null; anchor = null; path = null
   }
   canvas.addEventListener('pointerup', () => { if (!keyboardAim) release() })
-  canvas.addEventListener('pointercancel', () => { if (!keyboardAim) aim = null })
+  canvas.addEventListener('pointercancel', () => { if (!keyboardAim) { aim = null; anchor = null } })
 
   const keyboardStatus = document.getElementById('keyboardStatus')!
   function startKeyboardAim() {
@@ -502,6 +579,7 @@ import { GOALS } from '../lib/orbit-goals'
     keyboardAim = true; flightCard.hidden = true
     const x = Math.min(W - 12, W / 2 + lessonRadius()), y = H / 2
     aim = { x0: x, y0: y, x1: x, y1: y }
+    anchorAt(x, y)
     canvas.focus()
     tip.classList.remove('faded')
     tip.textContent = 'Arrows: position · Shift + arrows: velocity · Enter: launch · Esc: cancel'
@@ -512,7 +590,7 @@ import { GOALS } from '../lib/orbit-goals'
     if (event.key.toLowerCase() === 'k') { event.preventDefault(); startKeyboardAim(); return }
     if (!keyboardAim || !aim) return
     if (event.key === 'Escape') {
-      event.preventDefault(); aim = null; keyboardAim = false
+      event.preventDefault(); aim = null; anchor = null; keyboardAim = false
       keyboardStatus.textContent = 'Launch cancelled.'; return
     }
     if (event.key === 'Enter') {
@@ -524,7 +602,9 @@ import { GOALS } from '../lib/orbit-goals'
     if (!direction) return
     event.preventDefault()
     aim = adjustAim(aim, direction, event.shiftKey, W, H)
-    keyboardStatus.textContent = `Start ${Math.round(100 * aim.x0 / W)} percent across, ${Math.round(100 * aim.y0 / H)} percent down. Horizontal velocity ${((aim.x1 - aim.x0) * .055).toFixed(1)}, vertical velocity ${((aim.y1 - aim.y0) * .055).toFixed(1)}.`
+    // Moving the start can move it into or out of a body's reach.
+    if (!event.shiftKey) anchorAt(aim.x0, aim.y0)
+    keyboardStatus.textContent = `Start ${Math.round(100 * aim.x0 / W)} percent across, ${Math.round(100 * aim.y0 / H)} percent down. Horizontal velocity ${((aim.x1 - aim.x0) * THROW).toFixed(1)}, vertical velocity ${((aim.y1 - aim.y0) * THROW).toFixed(1)}${anchor && anchor.body.m < heaviestMass() ? ', relative to the body beside it' : ''}.`
   })
 
   document.querySelectorAll<HTMLButtonElement>('.opt[data-mass]').forEach((b) => {
@@ -542,7 +622,7 @@ import { GOALS } from '../lib/orbit-goals'
 
   // ---- presets -----------------------------------------------------------
   function clear() {
-    bodies = []; merges = 0; guide = false; aim = null; keyboardAim = false
+    bodies = []; merges = 0; guide = false; aim = null; anchor = null; path = null; keyboardAim = false
     clock.reset(); tracker.reset(); renderer.clear()
     tip.classList.remove('faded')
     tip.textContent = 'Drag across the sky to launch a body. Longer drag, faster throw.'
@@ -762,6 +842,13 @@ import { GOALS } from '../lib/orbit-goals'
   }
   dock.addEventListener('scroll', dockEdges, { passive: true })
   dockEdges()
+
+  // For headless checks: the live system, and where a body sits on screen.
+  if (import.meta.env.DEV) (window as any).__orbit = {
+    get bodies() { return bodies }, get path() { return path }, get anchor() { return anchor },
+    screen: (b: Body) => { const r = canvas.getBoundingClientRect(); return { x: r.left + b.x * viewScale, y: r.top + b.y * viewScale } },
+    add, setPaused,
+  }
 
   let rt = 0
   addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(() => { resize(); dockEdges() }, 200) })
