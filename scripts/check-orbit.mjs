@@ -144,16 +144,17 @@ const circ = lapStats(twoBody(145, 1))
 const wobble = circ.rmax / circ.rmin - 1
 report('circular speed gives a circle', wobble < 0.02,
   `apoapsis/periapsis ${(circ.rmax / circ.rmin).toFixed(5)}`)
-report('...well inside the band the challenges use', wobble < 0.25 / 5,
+report('...well inside the band the challenges use', wobble < 0.25 / 50,
   `${(wobble * 100).toFixed(2)}% of wobble against a 25% threshold`)
 
-// A circle that is 1.4% out is only reassuring if the 1.4% is accounted for.
+// A circle that is 0.4% out is only reassuring if the 0.4% is accounted for.
 // There are exactly two sources and they can be separated.
 //
-// The first is the step size. Semi-implicit Euler is first order, so halving
-// dt must *halve* the radial error — not reduce it by some unspecified amount.
-// That is a strong claim and it either holds or the integrator is not the one
-// the header says it is.
+// The first is the step size. Leapfrog is second order, so halving dt must
+// *quarter* the radial error — not reduce it by some unspecified amount. That
+// is a strong claim and it either holds or the integrator is not the one the
+// header says it is. (The semi-implicit Euler this replaced halved it, and at
+// the page's step it was 1.4% out of round on its own.)
 const exact = (r) => {
   resetIds()
   return [
@@ -166,8 +167,8 @@ const conv = [2, 4, 8, 16].map((sub) => {
   return l.rmax / l.rmin - 1
 })
 const halving = conv.slice(1).map((v, i) => v / conv[i])
-report('halving the step halves the error, as first order demands',
-  halving.every((h) => h > 0.45 && h < 0.55),
+report('halving the step quarters the error, as second order demands',
+  halving.every((h) => h > 0.22 && h < 0.28),
   halving.map((h) => h.toFixed(3)).join(', '))
 if (VERBOSE) console.log('       wobble by substep:', conv.map((c) => (c * 100).toFixed(4) + '%').join('  '))
 
