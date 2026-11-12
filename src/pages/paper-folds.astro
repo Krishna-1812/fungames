@@ -1654,6 +1654,23 @@ const SHEET_ICONS: Record<string, string> = {
     })
   }
 
+  /** Let go past halfway and the flap carries on down under its own weight. */
+  function finish() {
+    if (prefersReducedMotion) { u = 0; commit(); return }
+    const from = u, t0 = performance.now()
+    const DUR = 90 + 200 * (1 - from)
+    running = requestAnimationFrame(function step(now) {
+      const k = clamp((now - t0) / DUR, 0, 1)
+      // Falling, so it speeds up as it goes.
+      u = from + (1 - from) * k * k
+      paint()
+      if (k < 1) { running = requestAnimationFrame(step); return }
+      running = 0
+      u = 0
+      commit()
+    })
+  }
+
   function refuse() {
     unlock(); sfx.bad()
     refusedAt = performance.now()
@@ -1675,8 +1692,8 @@ const SHEET_ICONS: Record<string, string> = {
     if (prefersReducedMotion) { u = 0; paint(); return }
     const from = u, t0 = performance.now()
     springing = requestAnimationFrame(function step(now) {
-      const k = clamp((now - t0) / 260, 0, 1)
-      u = from * (1 - k * k)
+      const k = clamp((now - t0) / 520, 0, 1)
+      u = k >= 1 ? 0 : from * Math.exp(-5 * k) * Math.abs(Math.cos(k * Math.PI * 2.2))
       paint()
       if (k < 1) springing = requestAnimationFrame(step)
     })
@@ -1695,7 +1712,12 @@ const SHEET_ICONS: Record<string, string> = {
   STAGE.c.addEventListener('pointermove', (e) => {
     if (!dragging) return
     const span = Math.max(70, STAGE.c.getBoundingClientRect().width * 0.6)
-    u = clamp((grabX - e.clientX) / span, 0, reach(sheet, n + 1, mode))
+    const got = reach(sheet, n + 1, mode)
+    const raw = Math.max(0, (grabX - e.clientX) / span)
+    // Free most of the way; over the last fifth of how far this stack will
+    // bend it gets heavier, and it stops at the limit without a jolt.
+    const knee = got * 0.8
+    u = got >= 1 ? Math.min(1, raw) : raw < knee ? raw : knee + (got - knee) * Math.tanh((raw - knee) / (got - knee))
     paint()
   })
   const endDrag = (e: PointerEvent) => {
@@ -1703,7 +1725,7 @@ const SHEET_ICONS: Record<string, string> = {
     dragging = false
     try { STAGE.c.releasePointerCapture(e.pointerId) } catch { /* already gone */ }
     const got = reach(sheet, n + 1, mode)
-    if (got >= 1 && u > 0.5) { u = 0; commit() }
+    if (got >= 1 && u > 0.5) finish()
     else { if (got < 1 && u > 0.05) refuse(); spring() }
   }
   STAGE.c.addEventListener('pointerup', endDrag)
