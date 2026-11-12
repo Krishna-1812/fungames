@@ -1,26 +1,32 @@
 /**
- * From Memory's ink.
+ * From Memory's pencil.
  *
- * The page asked you to draw a bicycle and then gave you a 5px round line of
- * constant width joining raw pointer samples with lineTo. That is a cursor
- * trail, not a pen: it has no weight, it does not thin when you move fast, and
- * every change of direction shows the polygon underneath, because samples
- * arrive a dozen pixels apart on a fast stroke.
+ * It used to be a pen: a ribbon of solid ink that thinned when you hurried.
+ * That was already a long way from a cursor trail, but it was still a line
+ * laid *on top of* the paper. A pencil line is made *of* the paper. Graphite
+ * is scraped off onto the tops of the paper's tiny bumps first and only
+ * reaches the hollows when you press, so a light, quick line is grainy and
+ * broken, a slow, heavy one is nearly solid, and both carry the grain of the
+ * sheet under them. That grain is the thing the eye reads as "pencil".
  *
- * Three things a nib does that this did not. It varies with speed — ink has
- * time to spread when the hand slows and is dragged thin when it hurries. It
- * pools where strokes cross. And it curves: a pen has no way to produce a
- * corner that the hand did not make, whereas a polyline produces one at every
- * sample. All three are cheap, and on a page whose whole subject is your own
- * hand they are most of the difference between a drawing and a scribble.
+ * So each stroke is drawn twice. First as pressure: a soft ribbon whose
+ * brightness is how hard the lead was pressing there, kept at its maximum
+ * where the ribbon overlaps itself (a stroke never darkens itself just by
+ * having two pieces meet). Then, a few pixels at a time as the pen moves, that
+ * pressure is turned into graphite against the paper's relief (tooth.ts), the
+ * very relief the sheet is lit from: a pixel takes graphite if the lead,
+ * pressing that hard, reaches down to that bump. Crossing an earlier stroke
+ * does darken, the way going over a pencil line does.
+ *
+ * Speed stands in for pressure on a mouse (a slow hand presses), and a real
+ * stylus reports the real thing.
  *
  * Everything works in the reference space the answers are drawn in (200x140),
  * not in device pixels, so a stroke can be re-rendered at any size: the pad at
  * whatever the layout gives it, the gallery at thumbnail size, both from the
- * same numbers. The old canvas had a backing store nailed to 800x560 whatever
- * the display did with it, so it was soft on a retina screen and wasteful on a
- * phone.
+ * same numbers.
  */
+import { tooth, toothScale, type Tooth } from './memo/tooth'
 
 /** The coordinate space every stroke is stored in. Matches the answer SVGs. */
 export const REF_W = 200
@@ -29,34 +35,21 @@ export const REF_H = 140
 export type Pt = { x: number; y: number; w: number }
 export type Stroke = Pt[]
 
-const INK = '17, 19, 24'          // #111318, the site's ink
-
-/**
- * How hard the ink lands.
- *
- * Below 1 so that crossing your own line darkens it, which is what a wet pen
- * does and what makes a drawing look drawn. It cannot simply be the fill alpha:
- * the pieces of one stroke overlap each other, so painting them straight onto
- * the sheet at 0.93 would darken every join and turn a smooth curve into a
- * string of beads. The stroke under the pen is built opaque on a layer of its
- * own and composited once — see `commit`.
- */
-const INK_ALPHA = 0.93
+/** HB graphite, fully laid down: a cool, dark grey, never black. */
+export const GRAPHITE: [number, number, number] = [44, 47, 55]
 
 /*
- * Nib width in reference units, fast to slow.
- *
- * A real pen's range is wider than people expect — better than three to one —
- * and anything narrower reads as a constant line with a wobble in it.
+ * The weight of a sample, fast to slow. Stored as `w` on every point; the
+ * pencil reads both its width and its pressure from it.
  */
 const W_FAST = 0.55
 const W_SLOW = 1.75
 
-/** Speed, in reference units per millisecond, at which the nib is fully thin. */
+/** Speed, in reference units per millisecond, at which the lead is lightest. */
 const V_FAST = 0.22
 
 /**
- * Width for a new sample.
+ * Weight for a new sample.
  *
  * Smoothed against the previous width rather than taken raw: pointer timing is
  * noisy enough that the unfiltered value makes a stroke look corrugated.
@@ -70,24 +63,39 @@ export function nibWidth(dist: number, dt: number, prev: number, pressure = 0) {
   return prev > 0 ? prev + (w - prev) * 0.35 : w
 }
 
+/** 0 at the lightest, quickest touch, 1 at the slowest and heaviest. */
+const heft = (w: number) => Math.min(1, Math.max(0, (w - W_FAST) / (W_SLOW - W_FAST)))
+/** A pencil's line hardly widens with pressure — it darkens. */
+const radius = (w: number) => (0.68 + 0.5 * heft(w)) / 2
+/** How hard the lead presses, 0..1. Never nothing: a moving pencil marks. */
+const pressure = (w: number) => 0.56 + 0.44 * heft(w)
+
 const mid = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, w: (a.w + b.w) / 2 })
 
 /**
  * A drawing surface.
  *
- * Three bitmaps: the sheet of finished strokes, the stroke currently under the
- * pen, and the canvas on screen. Nothing is ever redrawn from scratch while
- * drawing — the page replayed every stroke on every pointermove, and pointer
- * events arrive faster than frames do.
+ * Four bitmaps: the sheet of finished strokes, the pressure of the stroke
+ * under the pen, the graphite that pressure has laid, and the canvas on
+ * screen. Nothing is redrawn from scratch while drawing; only the few pixels
+ * the newest piece of the stroke touched are turned from pressure into
+ * graphite.
  */
 export class InkSurface {
   private sheet: HTMLCanvasElement
   private sx: CanvasRenderingContext2D
+  private press: HTMLCanvasElement
+  private rx: CanvasRenderingContext2D
   private pen: HTMLCanvasElement
   private px: CanvasRenderingContext2D
   private vx: CanvasRenderingContext2D
   /** Device pixels per reference unit. */
   private s = 4
+  /** The paper's relief, at the size this page is shown. */
+  private relief: Tooth = tooth(1)
+  /** Pixels touched since the last flush, and since the stroke began. */
+  private dirty: [number, number, number, number] | null = null
+  private stroke: [number, number, number, number] | null = null
 
   /**
    * @param fixed the caller has already set the backing store, and it must not
@@ -96,6 +104,8 @@ export class InkSurface {
   constructor(private view: HTMLCanvasElement, private fixed = false) {
     this.sheet = document.createElement('canvas')
     this.sx = this.sheet.getContext('2d')!
+    this.press = document.createElement('canvas')
+    this.rx = this.press.getContext('2d', { willReadFrequently: true })!
     this.pen = document.createElement('canvas')
     this.px = this.pen.getContext('2d')!
     this.vx = view.getContext('2d')!
@@ -122,72 +132,148 @@ export class InkSurface {
       h = Math.max(1, Math.round(r.height * dpr))
     }
     if (w === this.sheet.width && h === this.sheet.height) return false
-    this.sheet.width = this.pen.width = this.view.width = w
-    this.sheet.height = this.pen.height = this.view.height = h
+    this.sheet.width = this.press.width = this.pen.width = this.view.width = w
+    this.sheet.height = this.press.height = this.pen.height = this.view.height = h
     this.s = w / REF_W
+    this.relief = tooth(toothScale(w))
+    this.rx.fillStyle = '#000'
+    this.rx.fillRect(0, 0, w, h)
     return true
   }
 
   clear() {
     this.sx.clearRect(0, 0, this.sheet.width, this.sheet.height)
     this.px.clearRect(0, 0, this.pen.width, this.pen.height)
+    this.rx.globalCompositeOperation = 'source-over'
+    this.rx.fillStyle = '#000'
+    this.rx.fillRect(0, 0, this.press.width, this.press.height)
+    this.dirty = this.stroke = null
   }
 
   /** Paint sheet and pen onto the visible canvas. */
   blit() {
+    this.flush()
     const { view, vx } = this
     vx.clearRect(0, 0, view.width, view.height)
     vx.drawImage(this.sheet, 0, 0)
-    vx.globalAlpha = INK_ALPHA
     vx.drawImage(this.pen, 0, 0)
-    vx.globalAlpha = 1
+  }
+
+  private touch(x0: number, y0: number, x1: number, y1: number) {
+    const grow = (b: [number, number, number, number] | null): [number, number, number, number] =>
+      b ? [Math.min(b[0], x0), Math.min(b[1], y0), Math.max(b[2], x1), Math.max(b[3], y1)] : [x0, y0, x1, y1]
+    this.dirty = grow(this.dirty)
+    this.stroke = grow(this.stroke)
+  }
+
+  /** One disc of pressure: a soft fringe where only the side of the lead reaches, and the core. */
+  private disc(x: number, y: number, r: number, p: number) {
+    const g = this.rx
+    g.fillStyle = grey(p * 0.42)
+    g.beginPath(); g.arc(x, y, r * 1.45, 0, Math.PI * 2); g.fill()
+    g.fillStyle = grey(p)
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill()
   }
 
   /**
-   * Lay one straight piece of ribbon onto the stroke under the pen.
+   * Lay one straight piece of the stroke down as pressure.
    *
    * Filled, not stroked: a quad between the two widths plus a disc at the new
-   * end. The disc is what makes the joins invisible — a variable-width
-   * polyline with round joins still shows a notch on the outside of every
-   * corner, because the two half-widths do not match there.
+   * end, so the joins never notch. Drawn with 'lighten', which keeps the
+   * greater of the two pressures wherever pieces overlap — a stroke's own
+   * pieces must never stack up into darker beads.
    */
   segment(a: Pt, b: Pt) {
-    const g = this.px
+    const g = this.rx
     const s = this.s
     const dx = b.x - a.x, dy = b.y - a.y
     const len = Math.hypot(dx, dy)
-    g.fillStyle = `rgb(${INK})`
+    const ra = radius(a.w) * s, rb = radius(b.w) * s
+    const p = (pressure(a.w) + pressure(b.w)) / 2
+    g.globalCompositeOperation = 'lighten'
     if (len > 1e-4) {
-      const nx = (-dy / len) * s, ny = (dx / len) * s
-      const ra = a.w / 2, rb = b.w / 2
-      g.beginPath()
-      g.moveTo(a.x * s + nx * ra, a.y * s + ny * ra)
-      g.lineTo(b.x * s + nx * rb, b.y * s + ny * rb)
-      g.lineTo(b.x * s - nx * rb, b.y * s - ny * rb)
-      g.lineTo(a.x * s - nx * ra, a.y * s - ny * ra)
-      g.closePath()
-      g.fill()
+      const nx = -dy / len, ny = dx / len
+      for (const [k, q] of [[1.45, p * 0.42], [1, p]] as const) {
+        g.fillStyle = grey(q)
+        g.beginPath()
+        g.moveTo(a.x * s + nx * ra * k, a.y * s + ny * ra * k)
+        g.lineTo(b.x * s + nx * rb * k, b.y * s + ny * rb * k)
+        g.lineTo(b.x * s - nx * rb * k, b.y * s - ny * rb * k)
+        g.lineTo(a.x * s - nx * ra * k, a.y * s - ny * ra * k)
+        g.closePath()
+        g.fill()
+      }
     }
-    g.beginPath()
-    g.arc(b.x * s, b.y * s, Math.max(b.w / 2, 0.01) * s, 0, Math.PI * 2)
-    g.fill()
+    this.disc(b.x * s, b.y * s, rb, pressure(b.w))
+    g.globalCompositeOperation = 'source-over'
+    const m = Math.max(ra, rb) * 1.5 + 2
+    this.touch(Math.min(a.x, b.x) * s - m, Math.min(a.y, b.y) * s - m, Math.max(a.x, b.x) * s + m, Math.max(a.y, b.y) * s + m)
   }
 
-  /** A stroke that never moved: the mark a pen leaves just resting on paper. */
+  /** A stroke that never moved: the mark a pencil leaves just set down on paper. */
   dot(p: Pt) {
-    const g = this.px
-    g.fillStyle = `rgb(${INK})`
-    g.beginPath()
-    g.arc(p.x * this.s, p.y * this.s, Math.max(p.w * 0.62, 0.25) * this.s, 0, Math.PI * 2)
-    g.fill()
+    const s = this.s, r = Math.max(radius(p.w) * 1.1, 0.3) * s
+    this.rx.globalCompositeOperation = 'lighten'
+    this.disc(p.x * s, p.y * s, r, pressure(p.w))
+    this.rx.globalCompositeOperation = 'source-over'
+    const m = r * 1.5 + 2
+    this.touch(p.x * s - m, p.y * s - m, p.x * s + m, p.y * s + m)
   }
 
-  /** Lift the pen: the finished stroke joins the sheet, once, at ink alpha. */
+  /**
+   * Turn the pressure laid since last time into graphite.
+   *
+   * A pixel takes graphite where the lead, pressing that hard, reaches down to
+   * the paper there: the top fraction of the bumps, `reach` deep, with a soft
+   * shoulder so the grain is not a hard stipple. Harder pressure also leaves
+   * more graphite on each bump it touches.
+   */
+  private flush() {
+    if (!this.dirty) return
+    const W = this.press.width, H = this.press.height
+    const x0 = Math.max(0, Math.floor(this.dirty[0])), y0 = Math.max(0, Math.floor(this.dirty[1]))
+    const x1 = Math.min(W, Math.ceil(this.dirty[2])), y1 = Math.min(H, Math.ceil(this.dirty[3]))
+    this.dirty = null
+    const w = x1 - x0, h = y1 - y0
+    if (w <= 0 || h <= 0) return
+    const src = this.rx.getImageData(x0, y0, w, h).data
+    const out = this.px.createImageData(w, h)
+    const d = out.data
+    const { size: S, h: T } = this.relief
+    const [cr, cg, cb] = GRAPHITE
+    for (let y = 0; y < h; y++) {
+      const row = ((y0 + y) % S) * S
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4
+        const p = src[i] / 255
+        if (p < 0.02) continue
+        const reach = p * 1.1 + 0.04
+        const t = T[row + ((x0 + x) % S)]
+        // smoothstep(1 - reach, 1 - reach + 0.3, t)
+        let a = (t - (1 - reach)) / 0.3
+        if (a <= 0) continue
+        if (a > 1) a = 1
+        else a = a * a * (3 - 2 * a)
+        d[i] = cr; d[i + 1] = cg; d[i + 2] = cb
+        d[i + 3] = a * (0.34 + 0.6 * p) * 255
+      }
+    }
+    this.px.putImageData(out, x0, y0)
+  }
+
+  /** Lift the pencil: the finished stroke joins the sheet. */
   commit() {
-    this.sx.globalAlpha = INK_ALPHA
+    this.flush()
     this.sx.drawImage(this.pen, 0, 0)
-    this.sx.globalAlpha = 1
-    this.px.clearRect(0, 0, this.pen.width, this.pen.height)
+    const b = this.stroke
+    if (b) {
+      const x = Math.floor(b[0]) - 1, y = Math.floor(b[1]) - 1
+      const w = Math.ceil(b[2] - b[0]) + 2, h = Math.ceil(b[3] - b[1]) + 2
+      this.px.clearRect(x, y, w, h)
+      this.rx.fillStyle = '#000'
+      this.rx.fillRect(x, y, w, h)
+    }
+    this.stroke = this.dirty = null
   }
 
   /** Replay a whole list — after undo, clear, or a resize. */
@@ -202,8 +288,13 @@ export class InkSurface {
   }
 }
 
+const grey = (p: number) => {
+  const v = Math.round(Math.min(1, Math.max(0, p)) * 255)
+  return `rgb(${v},${v},${v})`
+}
+
 /**
- * The pen itself: turns a stream of samples into a smooth ribbon.
+ * The lead itself: turns a stream of samples into a smooth ribbon.
  *
  * Each new sample closes a quadratic running from the midpoint of the previous
  * pair to the midpoint of this one, with the sample between them as the control
