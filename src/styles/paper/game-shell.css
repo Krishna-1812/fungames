@@ -179,7 +179,9 @@
 }
 .result .label { color: var(--ink-paper); }
 .result h2 { margin-top: 14px; font-size: var(--fs-h2); }
-.result-score { display: block; margin-top: 22px; font-size: clamp(64px, 10vw, 140px); }
+/* Short scores at full size; a long one (sixteen characters of money) shrinks
+   until it fits the card instead of running off it. */
+.result-score { display: block; margin-top: 22px; font-size: clamp(34px, min(10vw, calc(150vw / var(--score-len, 8))), 140px); }
 .result-lines { margin-top: 18px; display: grid; gap: 6px; font-size: var(--fs-lead); max-width: 52ch; }
 .result-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 .result-extra { margin-top: 30px; }

@@ -250,6 +250,8 @@ export function createShell(opts: ShellOptions) {
     void result.offsetWidth
     result.classList.add('is-in')
     const scoreEl = $(result, '[data-result-score]')
+    // How many characters it has, so a long one ("$100,000,000,000") can be set smaller to fit.
+    scoreEl.style.setProperty('--score-len', String(e.score.length))
     roll(scoreEl, e.score, { from: e.from ?? e.score.replace(/\d/g, '0'), ms: 1400 })
     if (e.scroll !== false) result.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'center' })
     result.focus({ preventScroll: true })
