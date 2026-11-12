@@ -808,7 +808,8 @@ import { ROUND_SIZE } from '../data/memory'
   .fm-compare figure { margin: 0; min-width: 0; display: grid; gap: 8px; }
   .fm-compare img, .fm-compare svg {
     display: block; width: 100%; aspect-ratio: 200 / 140; border-radius: 3px;
-    background: rgb(247, 248, 250) var(--paper-tile, none) 0 0 / 256px 256px;
+    /* Smaller sheets, finer grain: the same paper seen from further off. */
+    background: rgb(247, 248, 250) var(--paper-tile, none) 0 0 / 120px 120px;
     box-shadow: 0 0.5px 1px rgba(34, 30, 26, 0.3), 3px 7px 12px rgba(44, 38, 30, 0.16), 12px 22px 40px rgba(44, 38, 30, 0.14);
   }
   @media (max-width: 480px) { .fm-compare { grid-template-columns: minmax(0, 1fr); } }
@@ -866,7 +867,7 @@ import { ROUND_SIZE } from '../data/memory'
   .fm-shot { display: grid; gap: 10px; transform: rotate(var(--tilt, 0deg)); }
   .fm-shot-pad {
     position: relative; aspect-ratio: 200 / 140; overflow: hidden; border-radius: 0 0 2px 2px;
-    background: rgb(247, 248, 250) var(--paper-tile, none) 0 0 / 256px 256px;
+    background: rgb(247, 248, 250) var(--paper-tile, none) 0 0 / 80px 80px;
     -webkit-mask: radial-gradient(circle at 50% 0, transparent 2.6px, #000 3.1px) 0 0 / 11px 100% repeat-x;
     mask: radial-gradient(circle at 50% 0, transparent 2.6px, #000 3.1px) 0 0 / 11px 100% repeat-x;
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35), 0 10px 22px rgba(0, 0, 0, 0.35);
