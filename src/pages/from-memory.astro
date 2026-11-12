@@ -21,6 +21,18 @@ import { ROUND_SIZE } from '../data/memory'
  * a traced reference from a random line of the same length. Score is your
  * average likeness so far, Drawing is progress, Moves are strokes on this
  * sheet, and Best is your best average over a full ten.
+ *
+ * The scene is a sketchbook on a desk, and everything in it is the real
+ * thing done properly (lib/memo/):
+ *   - tooth.ts, paper.ts: drawing paper with a relief, lit from the window;
+ *   - memo-ink.ts, graphite.ts: a pencil that deposits against that relief;
+ *   - scratch.ts: the sound of it, following the hand;
+ *   - desk.ts: the ash desk, and the book's binding in CSS;
+ *   - trace.ts, mark.ts: the answer on tracing paper, laid where the score
+ *     lined it up, and marked in blue pencil;
+ *   - leaf.ts: the page turning over the wire;
+ *   - memo-postcard.ts: the page, torn out and photographed on the desk.
+ * scripts/check-memo-pencil.mjs holds the paper and pencil to account.
  */
 ---
 
@@ -126,9 +138,11 @@ import { ROUND_SIZE } from '../data/memory'
 
   <Fragment slot="howto">
     <p>
-      Ten everyday things, one at a time. Draw each one from memory on the
-      sheet — mouse, pen or finger — then press <b>Reveal</b> to see the real
-      shape drawn over yours.
+      Ten everyday things, one at a time. Draw each one from memory in the
+      sketchbook, in pencil — mouse, pen or finger. A slow, firm line comes
+      out dark; a quick one, light. Then press <b>Reveal</b>: a sheet of
+      tracing paper goes over your drawing, and the real thing is inked onto
+      it, lined up with yours.
     </p>
     <ul>
       <li><b>Likeness</b> measures how much of the real shape you drew and how much of your ink lies on it. Drawing it in the wrong place or at the wrong size is forgiven; drawing the wrong shape is not.</li>
@@ -152,8 +166,10 @@ import { ROUND_SIZE } from '../data/memory'
     <p>
       Nobody draws from memory in exactly the right spot, so your drawing is
       also tried moved and scaled onto the real one — its aspect ratio allowed
-      to bend by a third at most — and the better placement counts. Ink beyond
-      1.6 times the real drawing's own length costs precision in proportion.
+      to bend by a third at most — and the better placement counts. When it
+      does, the tracing is inked exactly there, over your drawing, so what you
+      see on the tracing paper is what was measured. Ink beyond 1.6 times the
+      real drawing's own length costs precision in proportion.
     </p>
     <p>
       <code>scripts/check-memory.mjs</code> holds the number to account: a
