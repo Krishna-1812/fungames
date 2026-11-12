@@ -32,7 +32,7 @@ export function emptiestCorner(points: P[]) {
 }
 
 /** A loose hand-drawn ring, starting at the upper left and running a little past itself. */
-function ring(cx: number, cy: number, rx: number, ry: number) {
+export function ring(cx: number, cy: number, rx: number, ry: number) {
   const pts: string[] = []
   const a0 = -2.4, turn = Math.PI * 2 * 1.1
   for (let k = 0; k <= 48; k++) {

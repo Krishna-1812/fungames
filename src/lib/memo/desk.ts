@@ -22,8 +22,14 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t)
 }
 
-/** The desk as an image URL to use as a CSS background. */
+let grown: Promise<string> | null = null
+
+/** The desk as an image URL to use as a CSS background. Grown once, then shared. */
 export function deskTile(): Promise<string> {
+  return (grown ??= grow())
+}
+
+function grow(): Promise<string> {
   const W = DESK_W, H = DESK_H
   const n = W * H
   const warp = new Float32Array(n), drift = new Float32Array(n)

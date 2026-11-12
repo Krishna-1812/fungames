@@ -504,7 +504,7 @@ import { ROUND_SIZE } from '../data/memory'
     button.disabled = true
     el('exportStatus').textContent = 'Preparing your postcard…'
     try {
-      const blob = await memoryPostcard(snapshot, it.svg, it.prompt, s ? { score: s.score, verdict: verdictFor(s.score) } : undefined)
+      const blob = await memoryPostcard(snapshot, it.svg, it.prompt, s ? { score: s.score, verdict: verdictFor(s.score) } : undefined, { place: s?.place, mark: marks[i] })
       download(blob, 'from-memory-postcard.png')
       shell.pick('Postcard downloaded', it.reveal)
       if (i === roundIndex) el('exportStatus').textContent = 'Postcard ready. Check your downloads.'
