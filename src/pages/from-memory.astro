@@ -504,6 +504,8 @@ import { ROUND_SIZE } from '../data/memory'
 
   el('compareBtn').addEventListener('click', () => {
     const sideBySide = el('comparison').hidden
+    // The same paper, side by side as on the page. Made on first use.
+    if (!el('comparison').style.getPropertyValue('--paper-tile')) el('comparison').style.setProperty('--paper-tile', `url(${paperTile(1).toDataURL()})`)
     el('comparison').hidden = !sideBySide
     el('book').hidden = sideBySide
     el('compareBtn').setAttribute('aria-pressed', String(sideBySide))
@@ -806,7 +808,7 @@ import { ROUND_SIZE } from '../data/memory'
   .fm-compare figure { margin: 0; min-width: 0; display: grid; gap: 8px; }
   .fm-compare img, .fm-compare svg {
     display: block; width: 100%; aspect-ratio: 200 / 140; border-radius: 3px;
-    background: rgb(247, 248, 250);
+    background: rgb(247, 248, 250) var(--paper-tile, none) 0 0 / 256px 256px;
     box-shadow: 0 0.5px 1px rgba(34, 30, 26, 0.3), 3px 7px 12px rgba(44, 38, 30, 0.16), 12px 22px 40px rgba(44, 38, 30, 0.14);
   }
   @media (max-width: 480px) { .fm-compare { grid-template-columns: minmax(0, 1fr); } }
