@@ -27,6 +27,7 @@
  * same numbers.
  */
 import { tooth, toothScale, type Tooth } from './memo/tooth'
+import { graphite } from './memo/graphite'
 
 /** The coordinate space every stroke is stored in. Matches the answer SVGs. */
 export const REF_W = 200
@@ -245,17 +246,10 @@ export class InkSurface {
       const row = ((y0 + y) % S) * S
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4
-        const p = src[i] / 255
-        if (p < 0.02) continue
-        const reach = p * 1.1 + 0.04
-        const t = T[row + ((x0 + x) % S)]
-        // smoothstep(1 - reach, 1 - reach + 0.3, t)
-        let a = (t - (1 - reach)) / 0.3
+        const a = graphite(src[i] / 255, T[row + ((x0 + x) % S)])
         if (a <= 0) continue
-        if (a > 1) a = 1
-        else a = a * a * (3 - 2 * a)
         d[i] = cr; d[i + 1] = cg; d[i + 2] = cb
-        d[i + 3] = a * (0.34 + 0.6 * p) * 255
+        d[i + 3] = a * 255
       }
     }
     this.px.putImageData(out, x0, y0)
