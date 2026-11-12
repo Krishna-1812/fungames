@@ -28,10 +28,13 @@ import { ROUND_SIZE } from '../data/memory'
   slug="from-memory"
   labels={{ score: 'Likeness', best: 'Best average', level: 'Drawing', moves: 'Strokes' }}
   initial={{ score: '—', level: `1 / ${ROUND_SIZE}`, moves: '0' }}
+  fonts={['Caveat:wght@600']}
 >
-  <div class="fm">
-    <div class="fm-brief">
-      <p class="label meta" id="tag">Drawing 1 of {ROUND_SIZE}</p>
+  <div class="fm" id="desk">
+    <div class="fm-light" aria-hidden="true"><i></i></div>
+
+    <div class="fm-brief fm-card">
+      <p class="label meta fm-card-head" id="tag">Drawing 1 of {ROUND_SIZE}</p>
       <h2 class="fm-prompt" id="prompt">A bicycle</h2>
       <p class="fm-hint">Draw it without looking anything up. Beautifully wrong is welcome.</p>
       <ol class="fm-tally" id="tally" aria-label="Your drawings so far">
@@ -40,10 +43,15 @@ import { ROUND_SIZE } from '../data/memory'
     </div>
 
     <div class="fm-desk">
-      <div class="fm-pad" id="padBox">
-        <div class="fm-sheet" id="sheet" aria-hidden="true"></div>
-        <canvas id="pad" aria-label="Drawing area — draw with a mouse, pen or finger"></canvas>
-        <svg class="fm-ref" id="ref" viewBox="0 0 200 140" aria-hidden="true" hidden></svg>
+      <div class="fm-book" id="book">
+        <div class="fm-page" id="page">
+          <div class="fm-holes" aria-hidden="true"></div>
+          <div class="fm-pad" id="padBox">
+            <canvas id="pad" aria-label="Drawing area — draw with a mouse, pen or finger"></canvas>
+            <svg class="fm-ref" id="ref" viewBox="0 0 200 140" aria-hidden="true" hidden></svg>
+          </div>
+        </div>
+        <div class="fm-wire" aria-hidden="true"></div>
       </div>
       <div class="fm-compare" id="comparison" hidden>
         <figure><figcaption class="label meta">What you remembered</figcaption><img id="attemptImage" alt="Your drawing" /></figure>
@@ -56,8 +64,8 @@ import { ROUND_SIZE } from '../data/memory'
       </div>
     </div>
 
-    <div class="fm-verdict" id="verdict" hidden tabindex="-1">
-      <p class="label">Likeness</p>
+    <div class="fm-verdict fm-card" id="verdict" hidden tabindex="-1">
+      <p class="label fm-card-head">Likeness</p>
       <p class="fm-score"><span class="num" id="vScore">0%</span><span class="fm-word" id="vWord">Close</span></p>
       <p class="fm-why" id="vWhy"></p>
       <div class="fm-crowd" id="fmCrowd" aria-live="polite"></div>
@@ -68,6 +76,47 @@ import { ROUND_SIZE } from '../data/memory'
         <button type="button" class="pill pill--line pill--sm" id="postcardBtn"><span>Download postcard</span></button>
       </div>
       <p class="fm-status" id="exportStatus" role="status"></p>
+    </div>
+
+    <!-- On the desk, beside the book: the pencil you are drawing with, and an eraser. -->
+    <div class="fm-props" aria-hidden="true">
+      <svg class="fm-pencil" viewBox="0 0 300 24">
+        <defs>
+          <linearGradient id="fmWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ecdcc2"/><stop offset="0.55" stop-color="#dcc39f"/><stop offset="1" stop-color="#b99a72"/></linearGradient>
+          <linearGradient id="fmLead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b707a"/><stop offset="0.45" stop-color="#3a3e46"/><stop offset="1" stop-color="#22252b"/></linearGradient>
+        </defs>
+        <!-- the painted body, three faces of the hexagon showing -->
+        <path d="M58 3 H290 a2 2 0 0 1 2 2 V9 H58 Z" fill="#5876a6"/>
+        <path d="M58 9 H292 V15 H58 Z" fill="#3b5a8c"/>
+        <path d="M58 15 H292 V19 a2 2 0 0 1 -2 2 H58 Z" fill="#2a4370"/>
+        <path d="M58 9 H292 M58 15 H292" stroke="#1d3156" stroke-opacity="0.35" stroke-width="0.6"/>
+        <path d="M60 4.2 H289" stroke="#fff" stroke-opacity="0.45" stroke-width="0.8" stroke-linecap="round"/>
+        <!-- the dipped end -->
+        <path d="M282 3 H290 a2 2 0 0 1 2 2 V19 a2 2 0 0 1 -2 2 H282 Z" fill="#1f2c45" fill-opacity="0.55"/>
+        <!-- foil lettering -->
+        <text x="196" y="13.6" font-family="ui-sans-serif, system-ui, sans-serif" font-size="5.4" font-weight="700" letter-spacing="1.4" fill="#d9e1ec" fill-opacity="0.85">HB · SKETCH</text>
+        <!-- the sharpened wood, scalloped where the blade met each face -->
+        <path d="M58 3 Q52 6 58 9 Q52 12 58 15 Q52 18 58 21 L15 13.1 L15 10.9 Z" fill="url(#fmWood)"/>
+        <path d="M58 3 Q52 6 58 9 Q52 12 58 15 Q52 18 58 21" fill="none" stroke="#2a4370" stroke-width="0.9"/>
+        <path d="M55 6.6 L16 11.3" stroke="#fff" stroke-opacity="0.35" stroke-width="0.8"/>
+        <!-- the lead -->
+        <path d="M17.5 10.4 L17.5 13.6 L2 12.15 L2 11.85 Z" fill="url(#fmLead)"/>
+        <path d="M17 11 L3.5 11.95" stroke="#c7ccd6" stroke-opacity="0.7" stroke-width="0.5"/>
+      </svg>
+      <svg class="fm-eraser" viewBox="0 0 92 38">
+        <defs>
+          <linearGradient id="fmRub" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbf9"/><stop offset="0.7" stop-color="#eceeec"/><stop offset="1" stop-color="#d4d8da"/></linearGradient>
+          <linearGradient id="fmSleeve" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a86c8"/><stop offset="0.65" stop-color="#3e6aae"/><stop offset="1" stop-color="#2d5291"/></linearGradient>
+        </defs>
+        <rect x="2" y="5" width="86" height="27" rx="7" fill="url(#fmRub)"/>
+        <path d="M5 9 Q3 18 6 28" stroke="#9aa2ab" stroke-opacity="0.35" stroke-width="1.2" fill="none"/>
+        <rect x="34" y="3.5" width="55" height="30" rx="2" fill="url(#fmSleeve)"/>
+        <rect x="34" y="14.5" width="55" height="2.4" fill="#f4f7fb" fill-opacity="0.9"/>
+        <rect x="34" y="3.5" width="55" height="1.2" fill="#fff" fill-opacity="0.35"/>
+      </svg>
+      <i class="fm-crumb" style="--x: 14px; --y: 52px"></i>
+      <i class="fm-crumb" style="--x: 26px; --y: 60px; --s: 0.7"></i>
+      <i class="fm-crumb" style="--x: 6px; --y: 66px; --s: 0.55"></i>
     </div>
   </div>
 
@@ -118,6 +167,7 @@ import { ROUND_SIZE } from '../data/memory'
   import { pickRound } from '../data/memory'
   import type { Item } from '../data/memory'
   import { mountSheet } from '../lib/memo/paper'
+  import { deskTile } from '../lib/memo/desk'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import type { Pt, Stroke } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
@@ -160,7 +210,10 @@ import { ROUND_SIZE } from '../data/memory'
 
   // Paper, lit from the same relief the pencil deposits against. Painted once
   // per size and per page; it never moves.
-  const sheet = mountSheet(el('sheet'))
+  const sheet = mountSheet(el('page'), padBox)
+  // The desk is grown once, off the critical path; the plain colour under it
+  // stands in until it lands.
+  deskTile().then((url) => el('desk').style.setProperty('--wood', `url(${url})`))
 
   const band = (n: number) => (n >= 60 ? 'is-high' : n >= 45 ? 'is-mid' : 'is-low')
   const average = () => (scores.length ? Math.round(scores.reduce((a, s) => a + s.score, 0) / scores.length) : 0)
@@ -278,7 +331,7 @@ import { ROUND_SIZE } from '../data/memory'
     el('compareBtn').setAttribute('aria-pressed', 'false')
     el('compareBtn').firstElementChild!.textContent = 'Side by side'
     el('exportStatus').textContent = ''
-    padBox.hidden = false
+    el('book').hidden = false
     ink.resize()
     rebuild()
     reveal.stop()
@@ -369,7 +422,7 @@ import { ROUND_SIZE } from '../data/memory'
   el('compareBtn').addEventListener('click', () => {
     const sideBySide = el('comparison').hidden
     el('comparison').hidden = !sideBySide
-    padBox.hidden = sideBySide
+    el('book').hidden = sideBySide
     el('compareBtn').setAttribute('aria-pressed', String(sideBySide))
     shell.pick('Comparison view chosen', sideBySide ? 'Side by side' : 'Overlay')
     el('compareBtn').firstElementChild!.textContent = sideBySide ? 'Overlay drawings' : 'Side by side'
@@ -471,63 +524,154 @@ import { ROUND_SIZE } from '../data/memory'
 
 <style is:global>
   /* The gallery is built by the script, so these rules are global on purpose. */
+
+  /* ---- the desk ----------------------------------------------------------
+     Pale ash in daylight, a window up and to the left. Everything on it is
+     lit from there and throws its shadow down and to the right. */
+  .stage:has(> .fm) { padding: 0; overflow: clip; background: #d2cabe; }
   .fm {
+    --card: #fbfcfd;
+    --rule: rgba(84, 118, 178, 0.5);
+    --blue-pencil: #2f4f9a;
+    --hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+    position: relative; isolation: isolate;
     display: grid;
-    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
     grid-template-areas: 'brief desk' 'verdict desk';
     grid-template-rows: auto 1fr;
-    gap: clamp(16px, 2.6vw, 36px);
+    gap: clamp(18px, 2.6vw, 38px) clamp(24px, 3.4vw, 54px);
     align-items: start;
+    padding: clamp(30px, 3.8vw, 56px) clamp(18px, 3.6vw, 56px) clamp(36px, 4vw, 60px);
+    background: #d2cabe var(--wood, none) 0 0 / 960px 560px repeat;
   }
-  .fm-brief { grid-area: brief; display: grid; gap: 12px; }
-  .fm-desk { grid-area: desk; display: grid; gap: 14px; }
+  .fm-light {
+    position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background:
+      radial-gradient(80% 70% at 12% 0%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.06) 55%, transparent 75%),
+      radial-gradient(150% 120% at 28% 12%, transparent 48%, rgba(46, 52, 66, 0.26) 100%);
+  }
+  /* The window itself, thrown across the desk: two panes by two, soft at the
+     edges the way daylight is a metre from the glass. The blur is on the
+     wrapper, because a mask is applied after an element's own filter and
+     would cut the softened edges sharp again. */
+  .fm-light i {
+    position: absolute; left: -24%; top: -34%; width: 80%; height: 128%;
+    filter: blur(30px);
+    mix-blend-mode: soft-light;
+    transform: skewX(18deg) rotate(4deg);
+  }
+  .fm-light i::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(60% 60% at 50% 50%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.26) 65%, transparent 100%);
+    -webkit-mask: linear-gradient(90deg, #000 0 47%, transparent 47% 53%, #000 53%), linear-gradient(0deg, #000 0 46%, transparent 46% 52%, #000 52%);
+    -webkit-mask-composite: source-in; mask-composite: intersect;
+  }
+  .fm-brief { grid-area: brief; }
+  /* The book is as big as fits the window with its buttons still in view:
+     about 0.78 of its width tall, binding and board included. */
+  .fm-desk {
+    grid-area: desk; position: relative; z-index: 2; display: grid; gap: 14px; min-width: 0;
+    width: 100%; max-width: max(520px, calc((100svh - 300px) / 0.78)); justify-self: center;
+  }
   .fm-verdict { grid-area: verdict; }
   @media (max-width: 900px) {
-    .fm { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'brief' 'desk' 'verdict'; grid-template-rows: none; }
+    .fm { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'brief' 'desk' 'verdict'; grid-template-rows: none; gap: 20px; padding: 20px 14px 32px; }
   }
 
+  /* ---- index cards --------------------------------------------------------
+     The prompt, and afterwards the verdict, are written on card stock: one
+     printed rule under the heading, a little curl in how they were put down. */
+  .fm-card {
+    position: relative; z-index: 3;
+    display: grid; gap: 12px; justify-items: start;
+    padding: 16px 20px 20px; border-radius: 4px;
+    color: var(--ink); background: var(--card);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 0.5px 1px rgba(34, 30, 26, 0.3),
+      3px 7px 12px rgba(44, 38, 30, 0.16),
+      12px 22px 40px rgba(44, 38, 30, 0.16);
+    outline: none;
+  }
+  .fm-card-head { justify-self: stretch; padding-bottom: 10px; border-bottom: 1.5px solid var(--rule); }
+  .fm-brief { transform: rotate(-1.1deg); }
   .fm-prompt { font-size: var(--fs-h2); line-height: 0.98; }
   .fm-hint { color: var(--ink2); }
-  .fm-tally { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
-  .fm-tally li { aspect-ratio: 1; max-width: 32px; border-radius: 8px; background: var(--paper2); display: grid; place-items: center; }
-  .fm-tally li::after { content: attr(data-score); font: 700 10px/1 var(--sans); letter-spacing: -0.02em; color: var(--ink); }
-  .fm-tally li.is-now { background: var(--card); box-shadow: inset 0 0 0 2px var(--ink); }
-  .fm-tally li.is-high { background: var(--mint); }
-  .fm-tally li.is-mid { background: var(--sky); }
-  .fm-tally li.is-low { background: var(--lilac); }
+  .fm-tally { list-style: none; margin: 6px 0 0; padding: 0; justify-self: stretch; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+  .fm-tally li { aspect-ratio: 1; max-width: 30px; border-radius: 3px; display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(84, 118, 178, 0.42); }
+  /* Each score is written into its box in blue pencil. */
+  .fm-tally li::after { content: attr(data-score); font: 600 15px/1 var(--hand); color: var(--blue-pencil); transform: rotate(-4deg); }
+  .fm-tally li.is-now { box-shadow: inset 0 0 0 1.6px var(--ink); }
+  .fm-tally li.is-high { background: rgba(79, 227, 193, 0.26); }
+  .fm-tally li.is-mid { background: rgba(140, 203, 255, 0.3); }
+  .fm-tally li.is-low { background: rgba(184, 161, 255, 0.26); }
+  @media (max-width: 900px) { .fm-brief { transform: rotate(-0.5deg); } }
 
-  /* The sheet: drawing paper, painted by lib/memo/paper.ts. */
-  .fm-pad {
-    position: relative; aspect-ratio: 200 / 140;
-    border: 2px solid var(--ink); border-radius: var(--r-lg); overflow: hidden;
-    background: rgb(247, 248, 250);
+  /* ---- the sketchbook ------------------------------------------------------
+     Top-bound on a double loop of wire, over a dark back board a little
+     larger than the paper, with the pages underneath showing at the edge. */
+  .fm-book { position: relative; z-index: 2; margin-top: 2.6%; }
+  .fm-book[hidden] { display: none; }
+  .fm-book::before {
+    content: ""; position: absolute; z-index: -1; left: -0.6%; right: -0.6%; top: 0; bottom: -1.7%;
+    border-radius: 3px 3px 6px 6px;
+    background: linear-gradient(170deg, #4a505b, #343841 55%, #2a2d33);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 1px 1px rgba(0, 0, 0, 0.4),
+      4px 10px 16px rgba(36, 30, 24, 0.3),
+      16px 28px 52px rgba(36, 30, 24, 0.26);
   }
+  .fm-page {
+    position: relative; padding-top: 5.2%;
+    border-radius: 2px 2px 3px 3px;
+    background: rgb(247, 248, 250);
+    box-shadow:
+      0 1px 0 #dcdfe5, 0 2px 0 #f2f3f5, 0 3px 0 #d5d9e0, 0 4px 0 #eef0f3, 0 5px 0 #cdd2da,
+      0 6px 3px rgba(0, 0, 0, 0.22);
+  }
+  .fm-page > .fm-paper { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; display: block; border-radius: inherit; }
+  .fm-holes {
+    position: absolute; z-index: 1; left: 3%; right: 3%; top: 0; height: 0; padding-bottom: 5.2%;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26.74' width='20' height='26.74'%3E%3Crect x='5.4' y='12.4' width='9.2' height='4.6' rx='2.3' fill='%231b2029'/%3E%3Cpath d='M7.2 16.75h5.6' stroke='%23fff' stroke-opacity='.6' stroke-width='.5' stroke-linecap='round'/%3E%3Cpath d='M6.2 12.6h7.6' stroke='%23000' stroke-opacity='.25' stroke-width='.6' stroke-linecap='round'/%3E%3C/svg%3E") center top / auto 100% space no-repeat;
+  }
+  .fm-wire {
+    position: absolute; z-index: 4; left: 3%; right: 3%; top: 0; margin-top: -2.34%; height: 0; padding-bottom: 7%;
+    pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 36' width='20' height='36'%3E%3Cfilter id='b' x='-50%' y='-50%' width='200%' height='200%'%3E%3CfeGaussianBlur stdDeviation='0.7'/%3E%3C/filter%3E%3Cpath d='M7.5 25.8V6.2a2.5 2.5 0 0 1 5 0V25.8' fill='none' stroke='%23101622' stroke-opacity='.4' stroke-width='2.2' stroke-linecap='round' filter='url(%23b)' transform='translate(1.3 2.4)'/%3E%3Cpath d='M7.5 25.8V6.2a2.5 2.5 0 0 1 5 0V25.8' fill='none' stroke='%2339404b' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M7.5 25.8V6.2a2.5 2.5 0 0 1 5 0V25.8' fill='none' stroke='%23b3bcc8' stroke-width='1.65' stroke-linecap='round'/%3E%3Cpath d='M7.15 24.6V6.4a2.35 2.35 0 0 1 2.7-2.25' fill='none' stroke='%23fff' stroke-opacity='.85' stroke-width='.55' stroke-linecap='round'/%3E%3Cpath d='M12.15 24.6V6.6' fill='none' stroke='%23fff' stroke-opacity='.4' stroke-width='.45' stroke-linecap='round'/%3E%3C/svg%3E") center top / auto 100% space no-repeat;
+  }
+  .fm-pad { position: relative; z-index: 2; aspect-ratio: 200 / 140; }
   .fm-pad[hidden] { display: none; }
-  .fm-sheet { position: absolute; inset: 0; z-index: 0; }
-  .fm-sheet .fm-paper { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .fm-pad canvas { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  #pad { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M2 30 L6.8 21.8 L25.3 3.3 L28.7 6.7 L10.2 25.2 Z' fill='%233b5a8c' stroke='%23fff' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L6.8 21.8 L25.3 3.3 L28.7 6.7 L10.2 25.2 Z' fill='%233b5a8c' stroke='%2314213a' stroke-width='0.9' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L6.8 21.8 L10.2 25.2 Z' fill='%23e2cba6' stroke='%2314213a' stroke-width='0.9' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L3.9 26.8 L5.2 28.1 Z' fill='%232b2e35'/%3E%3Cpath d='M9.2 21.6 L25.9 4.9' stroke='%2386a2cc' stroke-width='1'/%3E%3C/svg%3E") 2 30, crosshair; }
   .fm-ref, .fm-compare svg, .fm-shot-ref {
     fill: none; stroke: var(--t-cobalt); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--t-cobalt);
   }
-  .fm-ref { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; }
+  .fm-ref { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; pointer-events: none; }
 
-  .fm-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .fm-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   .fm-compare[hidden] { display: none; }
   .fm-compare figure { margin: 0; min-width: 0; display: grid; gap: 8px; }
-  .fm-compare img, .fm-compare svg { display: block; width: 100%; aspect-ratio: 200 / 140; background: var(--card); border: 2px solid var(--ink); border-radius: var(--r); }
+  .fm-compare img, .fm-compare svg {
+    display: block; width: 100%; aspect-ratio: 200 / 140; border-radius: 3px;
+    background: rgb(247, 248, 250);
+    box-shadow: 0 0.5px 1px rgba(34, 30, 26, 0.3), 3px 7px 12px rgba(44, 38, 30, 0.16), 12px 22px 40px rgba(44, 38, 30, 0.14);
+  }
   @media (max-width: 480px) { .fm-compare { grid-template-columns: minmax(0, 1fr); } }
 
-  .fm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .fm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2.4%; }
   .fm-tools[hidden] { display: none; }
   .fm-reveal { margin-left: auto; }
 
-  /* The verdict: one block, its colour the band, the word always written. */
-  .fm-verdict { display: grid; gap: 10px; justify-items: start; padding: 22px; border-radius: var(--r-lg); color: var(--ink); background: var(--lilac); box-shadow: var(--shadow-block); outline: none; }
+  /* ---- the verdict ---------------------------------------------------------
+     A second card, on coloured stock — mint, sky or lilac for the band — so
+     the colour is a thing on the desk rather than a box on a page. */
+  .fm-verdict { gap: 10px; background: #ece7fb; transform: rotate(0.8deg); }
   .fm-verdict[hidden] { display: none; }
-  .fm-verdict.is-high { background: var(--mint); }
-  .fm-verdict.is-mid { background: var(--sky); }
+  .fm-verdict.is-high { background: #dcf5ed; }
+  .fm-verdict.is-mid { background: #e0eefc; }
+  .fm-verdict .fm-card-head { border-bottom-color: rgba(17, 19, 24, 0.22); }
   .fm-score { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
-  .fm-score .num { font-size: clamp(56px, 7vw, 88px); }
+  .fm-score .num { font-size: clamp(56px, 7vw, 84px); }
   .fm-word { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-style: italic; font-size: var(--fs-h3); letter-spacing: -0.02em; }
   .fm-why { font-weight: 600; max-width: 42ch; }
   .fm-crowd:empty { display: none; }
@@ -535,15 +679,36 @@ import { ROUND_SIZE } from '../data/memory'
   .fm-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
   .fm-status { font-size: 13px; font-weight: 600; }
   .fm-status:empty { display: none; }
+  @media (max-width: 900px) { .fm-verdict { transform: rotate(0.4deg); } }
 
-  /* The gallery, inside the ink result card. */
+  /* ---- on the desk ---------------------------------------------------------
+     The pencil and an eraser, under the cards where there is room. */
+  .fm-props { position: absolute; z-index: 1; left: clamp(18px, 3.6vw, 56px); bottom: clamp(40px, 5vw, 70px); width: 300px; height: 150px; pointer-events: none; }
+  .fm-pencil {
+    position: absolute; left: 8px; top: 36px; width: 290px; height: auto;
+    transform: rotate(-13deg);
+    filter: drop-shadow(1px 2px 1px rgba(30, 25, 20, 0.34)) drop-shadow(7px 11px 8px rgba(40, 34, 28, 0.24));
+  }
+  .fm-eraser {
+    position: absolute; left: 176px; top: 84px; width: 86px; height: auto;
+    transform: rotate(8deg);
+    filter: drop-shadow(1px 1.5px 1px rgba(30, 25, 20, 0.3)) drop-shadow(5px 8px 6px rgba(40, 34, 28, 0.22));
+  }
+  /* Rubbings, rolled into crumbs and left where they fell. */
+  .fm-crumb {
+    position: absolute; left: calc(176px + var(--x)); top: calc(76px + var(--y));
+    width: calc(7px * var(--s, 1)); height: calc(3px * var(--s, 1)); border-radius: 2px;
+    background: #8d939b; transform: rotate(calc(var(--x) * 3deg));
+    box-shadow: 1px 1.5px 1px rgba(40, 34, 28, 0.25);
+  }
+  @media (max-width: 1100px), (max-height: 700px) { .fm-props { display: none; } }
+
+  /* ---- the gallery, inside the ink result card ---------------------------- */
   .fm-shelf { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
   .fm-shot { display: grid; gap: 8px; }
   .fm-shot-pad {
     position: relative; aspect-ratio: 200 / 140; overflow: hidden; border-radius: var(--r);
-    background:
-      repeating-linear-gradient(0deg, transparent 0 calc(12.5% - 1px), var(--paper2) calc(12.5% - 1px) 12.5%),
-      var(--card);
+    background: rgb(247, 248, 250);
   }
   .fm-shot-pad img, .fm-shot-ref { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .fm-shot p { font-size: 14px; }
@@ -559,5 +724,5 @@ import { ROUND_SIZE } from '../data/memory'
   html.play .fm-brief.is-turning > * { animation: fm-turn 520ms var(--ease) both; }
   @keyframes fm-turn { from { opacity: 0; transform: translateY(12px); } }
   html.play .fm-verdict:not([hidden]) { animation: fm-settle 620ms var(--spring) both; }
-  @keyframes fm-settle { from { transform: scale(0.94); border-radius: 48px; } }
+  @keyframes fm-settle { from { transform: translate(-14px, -22px) rotate(-3deg); opacity: 0; } }
 </style>

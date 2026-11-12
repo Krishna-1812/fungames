@@ -41,14 +41,14 @@ const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10)
 
 /**
  * Gradient noise on a lattice of cx by cy cells that wraps, sampled on an
- * S by S grid, in roughly -1..1.
+ * S by SY grid (square unless SY is given), in roughly -1..1.
  */
-function periodic(S: number, cx: number, cy: number, seed: number, out: Float32Array, k: number) {
+export function periodic(S: number, cx: number, cy: number, seed: number, out: Float32Array, k: number, SY = S) {
   const r = rng(seed)
   const gx = new Float32Array(cx * cy), gy = new Float32Array(cx * cy)
   for (let i = 0; i < cx * cy; i++) { const a = r() * Math.PI * 2; gx[i] = Math.cos(a); gy[i] = Math.sin(a) }
-  for (let y = 0; y < S; y++) {
-    const fy = (y / S) * cy, iy = Math.floor(fy), ty = fy - iy
+  for (let y = 0; y < SY; y++) {
+    const fy = (y / SY) * cy, iy = Math.floor(fy), ty = fy - iy
     const y0 = iy % cy, y1 = (iy + 1) % cy, v = fade(ty)
     for (let x = 0; x < S; x++) {
       const fx = (x / S) * cx, ix = Math.floor(fx), tx = fx - ix

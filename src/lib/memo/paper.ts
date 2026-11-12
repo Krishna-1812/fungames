@@ -105,26 +105,42 @@ export function paintSheet(cv: HTMLCanvasElement, scale: number, origin = { x: 0
     g.fillRect(0, 0, W, H)
   }
   edge(0, 0, e, 0); edge(W, 0, W - e, 0); edge(0, H, 0, H - e)
+
+  // And the window's light across the whole sheet: a little more of it at the
+  // upper left, a little less at the far corner.
+  const fall = g.createLinearGradient(0, 0, W, H)
+  fall.addColorStop(0, 'rgba(255,255,255,0.10)')
+  fall.addColorStop(0.5, 'rgba(255,255,255,0)')
+  fall.addColorStop(1, 'rgba(60,70,90,0.05)')
+  g.fillStyle = fall
+  g.fillRect(0, 0, W, H)
 }
 
 /**
- * A sheet that fills its host and repaints when the host changes size, at the
- * same backing size the pencil's canvas uses, so their pixels coincide.
+ * A sheet that fills its host and repaints when the host changes size.
+ *
+ * The host is the whole page, binding strip and all; `pad` is the drawing
+ * area inside it, whose canvas the pencil draws on. The paper is painted so
+ * that its grain lands on exactly the pixels of the pencil's: the same scale
+ * (taken from the pad's width, as the pencil takes it) and the same origin.
  */
-export function mountSheet(host: HTMLElement, seed = 1) {
+export function mountSheet(host: HTMLElement, pad: HTMLElement, seed = 1) {
   const cv = document.createElement('canvas')
   cv.className = 'fm-paper'
   cv.setAttribute('aria-hidden', 'true')
-  host.append(cv)
+  host.prepend(cv)
   let page = seed
   const paint = () => {
-    const r = host.getBoundingClientRect()
+    const r = host.getBoundingClientRect(), q = pad.getBoundingClientRect()
     const dpr = Math.min(devicePixelRatio || 1, 2)
     const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr))
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h }
-    paintSheet(cv, toothScale(w), { x: 0, y: 0 }, page)
+    const origin = { x: Math.round((q.left - r.left) * dpr), y: Math.round((q.top - r.top) * dpr) }
+    paintSheet(cv, toothScale(Math.max(1, Math.round(q.width * dpr))), origin, page)
   }
-  new ResizeObserver(paint).observe(host)
+  const ro = new ResizeObserver(paint)
+  ro.observe(host)
+  ro.observe(pad)
   return {
     canvas: cv,
     /** A fresh page: same paper, different pulp. */
