@@ -418,7 +418,7 @@ import { productSvg } from '../lib/spend-art'
         `${units.toLocaleString('en-US')} things, ${bought.length} of the ${items.length} kinds.`,
         `Mostly on ${biggest.name.toLowerCase()}: ${usd(biggest.n * biggest.price)} of it.`,
       ],
-      againLabel: 'Give it back and start again',
+      againLabel: 'Give it all back',
     })
     const ul = document.createElement('ul')
     ul.className = 'sp-lines sp-lines--ink'
@@ -604,7 +604,9 @@ import { productSvg } from '../lib/spend-art'
   .sp-lines--ink { max-width: 640px; }
   .sp-lines--ink li { border-color: rgba(243, 245, 248, 0.22); }
   .sp-lines--ink .sp-l-qty { color: rgba(243, 245, 248, 0.72); }
-  .sp-lines--ink .sp-l-icon { background: var(--ink-paper); border-radius: 6px; padding: 2px; box-sizing: content-box; }
+  /* Dark ink on the light tile: glyphs drawn in currentColor (the football)
+     would otherwise take the dark card's light text colour and vanish. */
+  .sp-lines--ink .sp-l-icon { background: var(--ink-paper); color: var(--ink); border-radius: 6px; padding: 2px; box-sizing: content-box; }
   .sp-report-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 
   @media (max-width: 620px) {
