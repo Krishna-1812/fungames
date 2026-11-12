@@ -21,7 +21,7 @@ import { iconSvg } from '../lib/icons'
  * is wider than the observable universe. Reaching it takes a button that says
  * what you are doing.
  *
- * The backdrop is the altitude — fold zero is a lamplit desk, by thirty you
+ * The backdrop is the altitude — fold zero is a desk under a lamp, by thirty you
  * are past the Kármán line, and the last fold has nothing behind it but other
  * galaxies. lib/fold-sky.ts holds that journey.
  *
@@ -45,10 +45,20 @@ import { iconSvg } from '../lib/icons'
  * argument gets *stronger*, because a dark surface with light ink cannot cross
  * — see the note at the top of lib/fold-sky.ts.
  *
- * The sheet itself is drawn as an object on a desk by lib/fold-scene.ts. The
- * old edge-on diagram was and is the honest picture — both axes to one scale,
- * so the bend at the crease can be seen outgrowing the paper — so it stays, as
- * an inset, labelled.
+ * The sheet itself is a real object, in three dimensions, lying on a cutting
+ * mat under a desk lamp (lib/fold/table.ts): lit, casting its shadow, the
+ * light coming through it from behind, its grain and its stack's edge in real
+ * millimetres. The flap does not swing like a door; it rolls over in a loose
+ * curve that tightens to half the stack's thickness as it lands, the shape
+ * lib/fold/curl.ts gives and scripts/check-fold-curl.mjs holds to paper's
+ * rules. It has weight — let go past halfway and it falls the rest of the way;
+ * near its limit it gets heavier; let go early and it drops back and bounces —
+ * and it sounds like paper (lib/fold/sound.ts). Without WebGL the painted
+ * sheet of lib/fold-scene.ts is still there underneath.
+ *
+ * The old edge-on diagram was and is the honest picture — both axes to one
+ * scale, so the bend at the crease can be seen outgrowing the paper — so it
+ * stays, as an inset, labelled.
  *
  * In the shell: the sky and the console are the picture, so they sit in a
  * framed scene on the stage and keep their own palette (renamed --pf-*, and
@@ -201,9 +211,10 @@ const SHEET_ICONS: Record<string, string> = {
     <p>
       Pick a sheet. Fold it in half by dragging its right-hand edge over to the
       left — or press <b>Fold in half</b>, <kbd>→</kbd> or <kbd>Space</kbd>.
+      Let go past halfway and it falls into place.
     </p>
     <ul>
-      <li>It stops when a real sheet that size would stop: seven times for A4. The gauge shows why — every fold eats more of the paper's length than the last.</li>
+      <li>It stops when a real sheet that size would stop: seven times for A4. You will feel it get heavier, and hear it creak. The gauge shows why — every fold eats more of the paper's length than the last.</li>
       <li>After that, the button carries on without the paper: the stack keeps doubling, 0.1 mm × 2ⁿ, all the way to fold 103.</li>
       <li><kbd>←</kbd> unfolds. Changing the sheet or the way you fold starts again.</li>
     </ul>
