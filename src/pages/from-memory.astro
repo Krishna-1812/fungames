@@ -175,6 +175,7 @@ import { ROUND_SIZE } from '../data/memory'
   import { createScratch } from '../lib/memo/scratch'
   import { createTrace } from '../lib/memo/trace'
   import { emptiestCorner, writeMark } from '../lib/memo/mark'
+  import { takeLeaf } from '../lib/memo/leaf'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import type { Pt, Stroke } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
@@ -361,6 +362,8 @@ import { ROUND_SIZE } from '../data/memory'
     el('compareBtn').firstElementChild!.textContent = 'Side by side'
     el('exportStatus').textContent = ''
     el('book').hidden = false
+    // A fresh page: the same paper, its pulp laid a little differently.
+    sheet.turn(i + 1)
     ink.resize()
     rebuild()
     trace.hide()
@@ -454,10 +457,21 @@ import { ROUND_SIZE } from '../data/memory'
 
   function next() {
     if (!revealed) return
-    unlock(); sfx.click()
+    unlock()
+    // The finished page is lifted before the new one is laid, then turned
+    // over the binding on top of it.
+    const turn = WORLD_PLAY && i + 1 < ROUND.length && !el('book').hidden
+      ? takeLeaf(el('page'), { trace: el('trace'), paper: sheet.canvas, pad })
+      : null
     i++
     if (i < ROUND.length) {
       render()
+      if (turn) {
+        // Paper drawn up and over: a rising swish, and the soft slap of it landing.
+        hit({ dur: 0.5, gain: 0.06, freq: 1400, q: 0.6, sweepTo: 3600 })
+        hit({ dur: 0.09, gain: 0.05, freq: 520, q: 0.8, delay: 0.82 })
+        void turn()
+      } else sfx.click()
       padBox.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'nearest' })
       return
     }
@@ -658,6 +672,24 @@ import { ROUND_SIZE } from '../data/memory'
      Top-bound on a double loop of wire, over a dark back board a little
      larger than the paper, with the pages underneath showing at the edge. */
   .fm-book { position: relative; z-index: 2; margin-top: 2.6%; }
+
+  /* ---- the page turning over ----------------------------------------------
+     Two strips hinged at the bend, turned in 3D about the binding; each face
+     shows only from its own side. lib/memo/leaf.ts builds and drives it. */
+  .fm-leaf { position: absolute; z-index: 4; left: 0; top: 0; pointer-events: none; perspective: 2400px; perspective-origin: 50% 70%; transform-style: preserve-3d; }
+  .fm-leaf-strip { position: absolute; left: 0; top: 0; width: 100%; transform-origin: 50% 0; transform-style: preserve-3d; }
+  .fm-leaf-rest { top: 100%; }
+  .fm-leaf-face { position: absolute; inset: 0; overflow: hidden; background: rgb(247, 248, 250); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+  .fm-leaf-face > canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  .fm-leaf-back { transform: rotateX(180deg); background: #dfe3ea; }
+  .fm-leaf-back > canvas { opacity: 0.07; filter: blur(0.6px); }
+  .fm-leaf-shade { position: absolute; inset: 0; opacity: 0; background: linear-gradient(180deg, rgba(36, 44, 62, 0.45), rgba(36, 44, 62, 0.8)); }
+  .fm-leaf .fm-trace { position: absolute; }
+  .fm-leaf .fm-vellum { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: rgba(240, 245, 252, 0.62); }
+  .fm-leaf-shadow {
+    position: absolute; z-index: 3; inset: 0; pointer-events: none; opacity: 0;
+    background: linear-gradient(180deg, rgba(30, 36, 50, 0.3), rgba(30, 36, 50, 0.1) 55%, transparent 90%);
+  }
   .fm-book[hidden] { display: none; }
   .fm-book::before {
     content: ""; position: absolute; z-index: -1; left: -0.6%; right: -0.6%; top: 0; bottom: -1.7%;
@@ -683,7 +715,7 @@ import { ROUND_SIZE } from '../data/memory'
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26.74' width='20' height='26.74'%3E%3Crect x='5.4' y='12.4' width='9.2' height='4.6' rx='2.3' fill='%231b2029'/%3E%3Cpath d='M7.2 16.75h5.6' stroke='%23fff' stroke-opacity='.6' stroke-width='.5' stroke-linecap='round'/%3E%3Cpath d='M6.2 12.6h7.6' stroke='%23000' stroke-opacity='.25' stroke-width='.6' stroke-linecap='round'/%3E%3C/svg%3E") center top / auto 100% space no-repeat;
   }
   .fm-wire {
-    position: absolute; z-index: 4; left: 3%; right: 3%; top: 0; margin-top: -2.34%; height: 0; padding-bottom: 7%;
+    position: absolute; z-index: 5; left: 3%; right: 3%; top: 0; margin-top: -2.34%; height: 0; padding-bottom: 7%;
     pointer-events: none;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 36' width='20' height='36'%3E%3Cfilter id='b' x='-50%' y='-50%' width='200%' height='200%'%3E%3CfeGaussianBlur stdDeviation='0.7'/%3E%3C/filter%3E%3Cpath d='M7.5 25.8V6.2a2.5 2.5 0 0 1 5 0V25.8' fill='none' stroke='%23101622' stroke-opacity='.4' stroke-width='2.2' stroke-linecap='round' filter='url(%23b)' transform='translate(1.3 2.4)'/%3E%3Cpath d='M7.5 25.8V6.2a2.5 2.5 0 0 1 5 0V25.8' fill='none' stroke='%2339404b' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M7.5 25.8V6.2a2.5 2.5 0 0 1 5 0V25.8' fill='none' stroke='%23b3bcc8' stroke-width='1.65' stroke-linecap='round'/%3E%3Cpath d='M7.15 24.6V6.4a2.35 2.35 0 0 1 2.7-2.25' fill='none' stroke='%23fff' stroke-opacity='.85' stroke-width='.55' stroke-linecap='round'/%3E%3Cpath d='M12.15 24.6V6.6' fill='none' stroke='%23fff' stroke-opacity='.4' stroke-width='.45' stroke-linecap='round'/%3E%3C/svg%3E") center top / auto 100% space no-repeat;
   }
