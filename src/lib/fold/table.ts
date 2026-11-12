@@ -693,6 +693,11 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
     mat.scale.set(dist * 6, dist * 6, 1)
     mat.position.set(target.x, -0.0001 * span, target.z)
     const viewMm = 2 * dist * Math.tan(fovH / 2) * s.mm
+    // Close up, a paper's tooth is too fine to read as bumps: past a few
+    // centimetres across it is a soft sheen. So the grain fades as the camera
+    // comes in. Tissue's crinkles and gold's dents are big enough to stay.
+    const grain = L.relief === 'paper' ? L.normal * Math.max(0.3, Math.min(1, (viewMm - 20) / 160)) : L.normal
+    for (const m of [faceMat, underMat, flapFace, flapUnder]) m.normalScale.set(grain, grain)
     const want10 = viewMm / 26
     const dec = Math.log10(Math.max(1e-9, want10))
     const step = Math.pow(10, Math.floor(dec))
