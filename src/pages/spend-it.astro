@@ -7,6 +7,17 @@ import { productSvg } from '../lib/spend-art'
 /**
  * Spend It — the resource-disposal archetype. The list lives in lib/spend-items.
  *
+ * The money is a thing, not a number. A hundred billion dollars in
+ * hundred-dollar notes is a thousand pallets — a thousand tonnes of paper —
+ * and it stands in a warehouse beside the shop (lib/spend/vault.ts), counted
+ * into pallets, bricks, bundles and notes by lib/spend/cash.ts, which
+ * scripts/check-spend-cash.mjs holds to adding up. Buy something and what it
+ * cost is taken away: pallets lifted off the back of the hall, bricks off
+ * the top, a note floating off the pile. The camera follows what is left, so
+ * the last dollar is a single note filling the picture. It sounds like money
+ * moving, too (lib/spend/sound.ts). The notes are our own design, not any
+ * real currency (lib/spend/paper.ts).
+ *
  * In the shell: Score is what is left, Kinds and Things count what you have
  * bought, Best is the least you have ever had left, and getting to exactly
  * zero is the ending — the receipt is its result card. Sell anything after
@@ -44,8 +55,9 @@ import { productSvg } from '../lib/spend-art'
 
       <div class="sp-shop">
     <p class="sp-lede">
-      You have one hundred billion dollars. Buying one of everything costs about
-      ninety-seven billion, so getting to exactly zero is going to take some care.
+      You have one hundred billion dollars: a thousand pallets of hundred-dollar
+      notes. Buying one of everything costs about ninety-seven billion, so
+      getting to exactly zero is going to take some care.
     </p>
 
     <ul class="sp-grid">
@@ -90,10 +102,11 @@ import { productSvg } from '../lib/spend-art'
 
   <Fragment slot="howto">
     <p>
-      You have $100,000,000,000. Spend every dollar of it: the game ends at
-      exactly zero.
+      You have $100,000,000,000 — a warehouse of cash. Spend every dollar of it:
+      the game ends at exactly zero.
     </p>
     <ul>
+      <li>Whatever you buy is taken out of the warehouse: pallets for a cruise ship, bricks for a yacht, a note for a latte. The picture follows what is left.</li>
       <li><b>Buy</b> and <b>Sell</b> one at a time, or hold <kbd>Shift</kbd> for ten. You can also type a quantity straight in.</li>
       <li>You can never go below zero; anything you can no longer afford greys out.</li>
       <li><b>Receipt</b> shows what you have bought so far. What you have bought is remembered on this device.</li>
