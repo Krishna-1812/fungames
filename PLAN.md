@@ -58,7 +58,7 @@ Ruthless, because that's what was asked for.
 | **Powder** | Real cellular automaton, genuinely good tech. 12 elements vs Sandboxels' 500+. No discovery log, no reason to experiment. | **High** |
 | **Orbit** | Best engineering on the site (real n-body, HDR, bloom). Zero game. Nothing to achieve, so nobody stays. | **High** |
 | **Overstimulated** | Good joke, real escalation, but ends too early and the upgrades aren't absurd enough. Neal's version has a hamster wheel and a live video. | **High** |
-| **From Memory** | Genuinely strong concept and the best "oh no" moment on the site. Only 8 prompts. | **High** |
+| **From Memory** | Genuinely strong concept and the best "oh no" moment on the site. ~~Only 8 prompts.~~ Sixteen, drawn in pencil in a wire-bound sketchbook on a desk; the answer comes on tracing paper laid where the score lined it up, marked in blue pencil, and the page turns over the wire. | **High — done** |
 | **Trolley** | ~~12 dilemmas, and an abstract track diagram.~~ Twenty-six, and a drawn scene that changes with each one. | **Medium-high — done** |
 | **Fusion** | ~~Effectively dead without the Cloudflare worker.~~ Thirty-six local recipes, reachable from four seeds, checked in both orders. | **Medium — playable offline** |
 | **Spend It** | Competent clone. Emoji instead of product images is the main tell. Receipt endgame is good. | **Medium** |
