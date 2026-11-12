@@ -17,9 +17,9 @@
  * Within a lap the smallest and largest separations are the periapsis and
  * apoapsis, so their ratio is the shape of the orbit. For a Kepler ellipse it
  * is exactly (1+e)/(1−e), which is where the thresholds come from: a ratio of
- * 1.25 is e ≈ 0.11, and 5 is e ≈ 0.67. The field here is softened rather than
- * inverse-square (see orbit-sim.ts) so those are close rather than exact, but
- * the ratio is measured, not inferred, and it means the same thing either way.
+ * 1.25 is e ≈ 0.11, and 5 is e ≈ 0.67. The field is inverse-square everywhere
+ * a body can be (see orbit-sim.ts), so those are the textbook numbers — and
+ * the ratio is measured, not inferred, so it would mean the same thing anyway.
  *
  * "Bound" is the sign of a body's energy relative to the system's centre of
  * mass. Bound then unbound is the whole of the slingshot: a two-body encounter
@@ -29,11 +29,12 @@
  *
  * ## What is deliberately not here
  *
- * A moon orbiting a planet orbiting the star. It reads well and it cannot be
- * done: the softening length is 26, and the stable satellite zone around a
- * planet of any mass this game offers is entirely inside that radius, where
- * the force has been flattened away. Checked before it was written rather
- * than after.
+ * A moon orbiting a planet orbiting the star — or rather, not until the
+ * gravity was real. With 26 pixels of softening the stable satellite zone
+ * round any planet this game offers was entirely inside that radius, where the
+ * force had been flattened away, and a moon launched there was lost within
+ * seconds. With softening gone it holds indefinitely, and the checker proves
+ * it.
  *
  * Most challenges require a body *you launched*. Otherwise pressing "Solar
  * system" completes the first one four seconds later, and pressing "Binary"

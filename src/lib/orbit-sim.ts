@@ -18,25 +18,37 @@
  * time-reversible, which is why an ellipse here closes on itself lap after
  * lap. scripts/check-orbit.mjs measures all of it.
  *
- * ## Softening, and why it changes the maths
+ * ## Softening, and why there is almost none left
  *
- * The force is softened: the separation used is sqrt(d² + SOFT²) rather than d,
- * which stops a close pass producing an infinite impulse and flinging a body to
- * the far side of the universe in one frame. It is a standard n-body device and
- * it is the only reason a crowded system here is watchable.
+ * The separation in the force law is sqrt(d² + SOFT²) rather than d. That is a
+ * standard n-body device for stopping a close pass producing an infinite
+ * impulse, and for years SOFT here was 26 pixels.
  *
- * The cost is that this is no longer an inverse-square law, so Kepler's results
- * do not apply. The circular speed is not sqrt(GM/r). Deriving it properly:
+ * It was guarding against something that cannot happen. Bodies merge the
+ * moment they touch, so no two are ever closer than the sum of their radii —
+ * 5.6 at the very least, and 38 for a moon against the sun — and the force
+ * never gets near its singularity. What 26 pixels of softening did do was
+ * weaken gravity everywhere that mattered: by a fifth at the innermost preset
+ * orbit, so Kepler's laws did not hold, every ellipse precessed into a
+ * rosette at about 22° a lap, and the zone round a planet where a moon could
+ * stay was entirely inside it. A moon launched round a planet was lost within
+ * seconds, every time.
  *
- *     a_grav = G·M·r / (r² + s²)^(3/2)          softened acceleration
- *     v²/r   = G·M·r / (r² + s²)^(3/2)          set equal to centripetal
+ * With leapfrog the close passes are accurate without it — energy holds to a
+ * tenth of a percent through a pass that skims the star — so SOFT is now one
+ * pixel: inverse-square everywhere a body can actually be. Ellipses close,
+ * the period goes as the radius to the three halves, escape is √2 times
+ * circular, and a planet can keep a moon. scripts/check-orbit.mjs holds the
+ * simulation to each of those.
+ *
+ * The helpers below keep the softened form so they stay exact for whatever
+ * SOFT is. The circular speed, from setting the softened pull equal to the
+ * centripetal acceleration:
+ *
+ *     a_grav = G·M·r / (r² + s²)^(3/2)
  *     v²     = G·M·r² / (r² + s²)^(3/2)
  *
- * which is what `circularV` returns. The page used to use sqrt(GM/r), and at
- * the innermost preset radius that is 10% too fast — enough to turn a circle
- * into a visible ellipse. Softening also puts a floor under any hierarchy:
- * a satellite orbiting a satellite would have to sit well inside SOFT, where
- * there is barely any gravity left to hold it.
+ * which at s = 1 is Kepler's sqrt(GM/r) to within 0.05% even at contact.
  */
 
 export type Body = {
@@ -54,8 +66,8 @@ export type Body = {
 }
 
 export const G = 1
-/** Softening length. See the header — this is not a cosmetic constant. */
-export const SOFT = 26
+/** Softening length: only a guard against two bodies at one point. See the header. */
+export const SOFT = 1
 export const MAX_BODIES = 320
 /** Above this a body is drawn as a light source and counts as a star. */
 export const STAR_MASS = 200
@@ -82,7 +94,7 @@ export function makeBody(
 }
 
 /**
- * Speed for a circular orbit of radius r about mass M, in the softened field.
+ * Speed for a circular orbit of radius r about mass M.
  *
  * This is the test-particle answer, which is what the presets want: it assumes
  * the thing doing the orbiting is light enough not to move the primary. For

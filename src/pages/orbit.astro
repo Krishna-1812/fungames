@@ -608,9 +608,8 @@ import { GOALS } from '../lib/orbit-goals'
     const spin = Math.random() * Math.PI * 2
     for (let i = 0, r = 70; r <= edge; i++, r *= ratio) {
       const a = spin + i * 2.39996
-      // The softened circular speed, not sqrt(GM/r) — see orbit-sim.ts. The
-      // Kepler value is 10% too fast at r=70, and the innermost planet used to
-      // visibly swing in and out because of it.
+      // The circular speed from orbit-sim.ts, which is Kepler's now that the
+      // gravity is no longer softened, and stays exact if that ever changes.
       const v = circularV(SUN, r)
       const m = 4 + Math.random() * (heaviest - 4)
       add(cx + Math.cos(a) * r, cy + Math.sin(a) * r, -Math.sin(a) * v, Math.cos(a) * v, m)

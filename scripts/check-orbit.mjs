@@ -3,13 +3,13 @@
  *
  * Two separate jobs, and the first is the reason the second can be trusted.
  *
- * The integrator is checked against closed-form answers: the softened field
- * has a circular speed that can be derived on paper, so launching at exactly
- * that speed must produce a circle, and launching at the textbook Kepler speed
- * must not. That second assertion is a regression test for a real bug — the
- * presets used sqrt(GM/r) for years, which is 10% too fast at the innermost
- * radius, and every inner planet visibly wobbled because of it. Momentum and
- * mass are checked across a merge, and energy across ten thousand steps.
+ * The integrator is checked against closed-form answers. The field is
+ * inverse-square everywhere a body can be, so Kepler's laws have to come out
+ * of it: launching at the circular speed must produce a circle, an ellipse
+ * must close on itself rather than precess, the period must go as the radius
+ * to the three halves, and a planet must be able to keep a moon inside its
+ * Hill sphere and lose one outside it. Momentum and mass are checked across a
+ * merge, and energy across ten thousand steps.
  *
  * The challenges are then driven headlessly through the same physics the page
  * runs, at the same two-substeps-per-frame cadence. Each one is checked twice:
@@ -77,10 +77,12 @@ function run(bodies, frames, { stopOn = null } = {}) {
 }
 
 /** Shape of the orbit of `bodies[i]` about `bodies[0]`, over one full lap. */
+const wrapAngle = (a) => (((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) - Math.PI
+
 function lapStats(bodies, maxFrames = 6000, sub = 2) {
   let cur = bodies
   const TAU = Math.PI * 2
-  const wrap = (a) => (((a + Math.PI) % TAU) + TAU) % TAU - Math.PI
+  const wrap = wrapAngle
   const at = () => {
     const p = cur[0], b = cur[1]
     return { r: Math.hypot(b.x - p.x, b.y - p.y), a: Math.atan2(b.y - p.y, b.x - p.x) }
@@ -110,13 +112,13 @@ function twoBody(r, k, m = 6, M = 2600, mine = true) {
   ]
 }
 
-console.log(`\n${GOALS.length} challenges, softening length ${SOFT}, G = ${G}\n`)
+console.log(`\n${GOALS.length} challenges, softening length ${SOFT} (a guard, not a force law), G = ${G}\n`)
 
 /* -------------------------------------------------------------------------- */
 /* The field                                                                  */
 /* -------------------------------------------------------------------------- */
 
-console.log('the softened field, against closed form')
+console.log('the field, against closed form')
 
 // v² = GMr²/(r²+s²)^(3/2), derived in orbit-sim.ts. Confirm the function
 // really solves the centripetal condition rather than approximating it.
@@ -126,13 +128,20 @@ for (const r of [70, 145, 300]) {
   near(`r=${r}: v²/r equals the softened acceleration`, (v * v) / r, a, a * 1e-12)
 }
 
-near('escape speed is √2 × circular only when softening is irrelevant',
-  escapeV(2600, 4000) / circularV(2600, 4000), Math.SQRT2, 0.02)
+near('escape speed is √2 × circular, as it is for an inverse square',
+  escapeV(2600, 70) / circularV(2600, 70), Math.SQRT2, 0.001)
 
-// The bug this is a regression test for.
-const kepler = Math.sqrt(2600 / 70)
-report('the Kepler speed is measurably wrong here', kepler / circularV(2600, 70) > 1.09,
-  `${((kepler / circularV(2600, 70) - 1) * 100).toFixed(1)}% too fast at r=70`)
+// Softening used to be 26 pixels, which made the circular speed at r=70 10%
+// slower than Kepler's. It is now only a guard against two bodies at one
+// point, and no two bodies get closer than touching — so even at contact it
+// must be invisible.
+{
+  const contact = radiusFor(2600) + radiusFor(1)
+  const kepler = Math.sqrt(2600 / contact)
+  const off = kepler / circularV(2600, contact) - 1
+  report('even at contact the circular speed is Kepler’s', Math.abs(off) < 0.001,
+    `${(off * 100).toFixed(3)}% apart at r=${contact.toFixed(1)}`)
+}
 
 /* -------------------------------------------------------------------------- */
 /* The integrator                                                             */
@@ -183,9 +192,77 @@ const e = 6 / 2606
 near('what is left over is the mass ratio, not the arithmetic',
   floor, (1 + e) / (1 - e) - 1, 0.0006)
 
-const wrong = lapStats(twoBody(70, kepler / circularV(2600, 70)))
-report('the Kepler speed gives a visible ellipse', wrong.rmax / wrong.rmin > 1.2,
-  `apoapsis/periapsis ${(wrong.rmax / wrong.rmin).toFixed(3)}`)
+// An ellipse closes. In an inverse-square field the long axis stays fixed in
+// space; in the 26-pixel softened field it swung round about 22° every lap,
+// drawing a rosette. What is left is the integrator's own error. (The body
+// starts at periapsis, so the first one found is the launch, a frame late, and
+// is not counted.)
+{
+  let cur = twoBody(90, 1.18), prev = Infinity, falling = true
+  const peris = []
+  for (let f = 0; f < 8000 && peris.length < 6; f++) {
+    cur = frame(cur, null).bodies
+    const r = Math.hypot(cur[1].x - cur[0].x, cur[1].y - cur[0].y)
+    if (r > prev && falling) peris.push(Math.atan2(cur[1].y - cur[0].y, cur[1].x - cur[0].x))
+    falling = r < prev
+    prev = r
+  }
+  const turn = peris.slice(2).map((p, i) => Math.abs(wrapAngle(p - peris[i + 1])) * 180 / Math.PI)
+  report('an ellipse closes on itself, lap after lap', peris.length === 6 && turn.every((d) => d < 1),
+    `periapsis moves ${turn.map((d) => d.toFixed(2)).join(', ')}° a lap`)
+}
+
+// Kepler's third law: the square of the period goes as the cube of the radius,
+// and the constant is 4π²/GM. A lap is timed to a fraction of a frame by
+// interpolating where the swept angle crosses 2π — whole frames alone are a
+// percent out at r=90, which would hide the thing being measured.
+{
+  const period = (r) => {
+    let cur = twoBody(r, 1, 0.01), swept = 0
+    let last = Math.atan2(cur[1].y - cur[0].y, cur[1].x - cur[0].x)
+    for (let f = 1; f < 20000; f++) {
+      cur = frame(cur, null).bodies
+      const a = Math.atan2(cur[1].y - cur[0].y, cur[1].x - cur[0].x)
+      const d = wrapAngle(a - last)
+      last = a
+      if (swept + d >= 2 * Math.PI) return f - 1 + (2 * Math.PI - swept) / d
+      swept += d
+    }
+    return NaN
+  }
+  const radii = [90, 145, 300]
+  const k = radii.map((r) => period(r) ** 2 / r ** 3)
+  const want = (4 * Math.PI * Math.PI) / (G * 2600.01)
+  report('the period goes as the radius to the three halves, with 4π²/GM in front',
+    k.every((x) => Math.abs(x / want - 1) < 0.002), `T²/r³ = ${k.map((x) => x.toFixed(6)).join(', ')} against ${want.toFixed(6)}`)
+}
+
+// A planet keeps a moon. The reach of its own gravity against the star's is
+// its Hill radius, r·∛(m/3M), and a prograde moon is stable inside about half
+// of it — which is about as far out as the real ones go. Outside that the star
+// takes it. Under the old softening neither one lasted two seconds.
+{
+  const moon = (frac) => {
+    resetIds()
+    const R = 300, M = 60, rH = R * Math.cbrt(M / (3 * 2600))
+    const vp = circularV(2600, R), d = rH * frac, vm = circularV(M + 1, d)
+    let cur = [makeBody(CX, CY, 0, 0, 2600), makeBody(CX + R, CY, 0, vp, M), makeBody(CX + R + d, CY, 0, vp + vm, 1, true)]
+    let swept = 0, last = 0
+    for (let f = 0; f < 60 * 60; f++) {
+      cur = frame(cur, null).bodies
+      if (cur.length < 3) return { held: false, laps: swept / (2 * Math.PI) }
+      const a = Math.atan2(cur[2].y - cur[1].y, cur[2].x - cur[1].x)
+      if (f) swept += wrapAngle(a - last)
+      last = a
+      if (Math.hypot(cur[2].x - cur[1].x, cur[2].y - cur[1].y) > rH) return { held: false, laps: swept / (2 * Math.PI) }
+    }
+    return { held: true, laps: swept / (2 * Math.PI) }
+  }
+  const inside = moon(0.4), outside = moon(0.7)
+  report('a planet keeps a moon inside half its Hill radius', inside.held && inside.laps > 20,
+    `${inside.laps.toFixed(0)} laps in a minute`)
+  report('...and the star takes one outside it', !outside.held, `gone after ${outside.laps.toFixed(1)} laps`)
+}
 
 // One lap of a circle is 2πr/v, in sim time. Each frame advances sim time by
 // 1.0, so the frame count is the period.
@@ -308,7 +385,7 @@ console.log('\nchallenges that should be earned')
     const b = [makeBody(CX, CY, 0, 0, 2600)]
     if (withCompanion) {
       const R = 260, vc = circularV(2600, R)
-      const a = (10 / 12) * Math.PI * 2
+      const a = (4 / 12) * Math.PI * 2
       b.push(makeBody(CX + Math.cos(a) * R, CY + Math.sin(a) * R, -Math.sin(a) * vc, Math.cos(a) * vc, 500))
     }
     b.push(makeBody(CX + 90, CY, 0, circularV(2600, 90) * 1.28, 6, true))
