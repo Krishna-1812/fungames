@@ -146,6 +146,11 @@ const SHEET_ICONS: Record<string, string> = {
             </div>
             <p class="budget-text" id="budgetText"></p>
           </div>
+
+          <div class="act">
+            <button type="button" id="unfoldBtn" class="pf-unfold">Unfold</button>
+            <button type="button" id="foldBtn" class="pf-fold">Fold in half</button>
+          </div>
         </section>
 
         <section class="bay scale-bay">
@@ -187,10 +192,6 @@ const SHEET_ICONS: Record<string, string> = {
         </p>
       </section>
 
-      <div class="act">
-        <button type="button" id="unfoldBtn" class="pf-unfold">Unfold</button>
-        <button type="button" id="foldBtn" class="pf-fold">Fold in half</button>
-      </div>
     </div>
 
     <p class="hint" id="hint">Everything above is a sheet you could actually hold.</p>
@@ -2105,7 +2106,7 @@ const SHEET_ICONS: Record<string, string> = {
     z-index: 0; pointer-events: none;
   }
   .pf-scene > .console, .pf-scene > .hint { position: relative; z-index: 1; }
-  .pf-scene > .console { max-width: 780px; margin: 0 auto; }
+  .pf-scene > .console { max-width: 980px; margin: 0 auto; }
 
   /* --- the console ------------------------------------------------------- */
 
@@ -2268,7 +2269,7 @@ const SHEET_ICONS: Record<string, string> = {
 
   .stage-hold { position: relative; margin-top: 10px; }
   #stage {
-    display: block; width: 100%; height: 340px;
+    display: block; width: 100%; height: clamp(360px, 52vh, 520px);
     touch-action: none; cursor: ew-resize; border-radius: 12px;
   }
   #stage:focus-visible { outline: 3px solid var(--pf-accent); outline-offset: 2px; }
@@ -2516,9 +2517,10 @@ const SHEET_ICONS: Record<string, string> = {
 
   /* --- actions ----------------------------------------------------------- */
 
+  /* Right under the sheet, so the button that folds it is next to it. */
   .act {
     display: flex; gap: 10px; justify-content: center;
-    padding: 4px 14px 20px;
+    padding: 14px 0 4px;
   }
   .act button {
     border-radius: 999px; padding: 14px 30px; font-weight: 700; font-size: 16px;
@@ -2565,7 +2567,7 @@ const SHEET_ICONS: Record<string, string> = {
     .bay { padding: 11px 11px 13px; }
     .bay-top { flex-direction: column; gap: 9px; }
     .ways { align-self: flex-start; }
-    #stage { height: 250px; }
+    #stage { height: 300px; }
     #scale { height: 178px; }
     .scale-bay { padding: 10px 10px 9px; }
     /* The lead-in is the one part of the sentence a reader can supply from the
@@ -2583,7 +2585,7 @@ const SHEET_ICONS: Record<string, string> = {
        every one — otherwise the first of each row is ruled off from nothing. */
     .fig + .fig { border-left: 0; padding-left: 0; }
     .read .fig:nth-of-type(3) { border-left: 1px solid var(--pf-line-a); padding-left: 14px; }
-    .act { padding: 2px 10px 16px; }
+    .act { padding: 12px 0 2px; }
     .act button { padding: 13px 22px; font-size: 15px; }
   }
 
