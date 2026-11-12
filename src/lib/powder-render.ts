@@ -53,12 +53,40 @@ const MATS = `
 #define M_POWDER 13u
 #define M_GLASS  14u
 #define M_EMBER  15u
+#define M_SALT   16u
+#define M_BRINE  17u
+#define M_DIRT   18u
+#define M_MUD    19u
+#define M_SEED   20u
+#define M_METAL  21u
+#define M_RUST   22u
+#define M_SPARK  23u
+#define M_COAL   24u
+#define M_ASH    25u
+#define M_NITRO  26u
+#define M_CLOUD  27u
+#define M_SNOW   28u
+#define M_THERMITE 29u
+#define M_FUNGUS 30u
+#define M_SLIME  31u
 #define M_SODA   32u
 #define M_CLAY   33u
 #define M_WAX    34u
 #define M_CERAMIC 35u
 #define M_FOAM   36u
 #define M_MELTED_WAX 37u
+
+/* What kind of thing each material is: 0 holds its shape, 1 heaps (a powder),
+   2 pours (a liquid), 3 drifts (smoke, steam, cloud, foam), 4 burns (fire and
+   spark), 5 is air. Every id the simulation has is here — a material missing
+   from the composite used to be drawn as empty air, which is how salt, metal,
+   snow and a dozen others were invisible. */
+const float KIND[38] = float[38](
+  5.0, 1.0, 2.0, 0.0, 0.0, 4.0, 3.0, 3.0, 2.0, 2.0,
+  0.0, 0.0, 2.0, 1.0, 0.0, 1.0, 1.0, 2.0, 1.0, 1.0,
+  1.0, 0.0, 0.0, 4.0, 1.0, 1.0, 2.0, 3.0, 1.0, 1.0,
+  0.0, 2.0, 1.0, 1.0, 0.0, 0.0, 3.0, 2.0);
+float kindOf(uint id) { return id < 38u ? KIND[int(id)] : 0.0; }
 `
 
 /* Shared by the emission pass and the composite, so a flame and the light it
@@ -66,6 +94,7 @@ const MATS = `
 const EMIT = `
 float life0(uint id) {
   if (id == M_FIRE)  return 46.0;
+  if (id == M_SPARK) return 12.0;
   if (id == M_SMOKE) return 130.0;
   if (id == M_STEAM) return 170.0;
   if (id == M_EMBER) return 120.0;
@@ -97,6 +126,7 @@ vec3 emissive(uint id, float k, vec2 gp, float t) {
     return mix(vec3(0.38, 0.040, 0.007), vec3(1.0, 0.33, 0.05), glow) * (0.30 + 1.9 * glow);
   }
   if (id == M_ACID) return vec3(0.34, 0.95, 0.09) * 0.42;
+  if (id == M_SPARK) return mix(vec3(1.0, 0.62, 0.22), vec3(1.0, 0.95, 0.75), k) * (1.4 + 3.2 * k);
   return vec3(0.0);
 }
 `
@@ -119,6 +149,46 @@ void main() {
   uint id = texelFetch(u_id, c, 0).r;
   float k = float(texelFetch(u_life, c, 0).r) / life0(id);
   fragColor = vec4(emissive(id, clamp(k, 0.0, 1.0), gp, u_time), 1.0);
+}`
+
+/* -------------------------------------------------------------------------- */
+/* Pass 1b — the smoothed fields, at grid resolution                          */
+/* -------------------------------------------------------------------------- */
+
+/* Four fields, one per channel: where liquid is, where any matter is (liquid,
+   powder or solid), how hot the flames are, and how thick the gases are. They
+   are blurred a cell or two wide, so the composite can draw a pool's surface,
+   a dune's outline and a plume of smoke as smooth shapes rather than as the
+   staircase of cells the simulation works in. */
+const FIELD_FRAG = GLSL + MATS + EMIT + `
+uniform highp usampler2D u_id;
+uniform highp usampler2D u_life;
+uniform vec2 u_grid;
+
+void main() {
+  vec2 gp = vec2(vUv.x, 1.0 - vUv.y) * u_grid;
+  ivec2 c = clamp(ivec2(gp), ivec2(0), ivec2(u_grid) - 1);
+  uint id = texelFetch(u_id, c, 0).r;
+  float kd = kindOf(id);
+  float k = clamp(float(texelFetch(u_life, c, 0).r) / life0(id), 0.0, 1.0);
+  fragColor = vec4(
+    kd == 2.0 ? 1.0 : 0.0,
+    kd <= 2.0 ? 1.0 : 0.0,
+    id == M_FIRE ? 0.25 + 0.75 * k : 0.0,
+    kd == 3.0 ? (id == M_CLOUD ? 1.0 : k) : 0.0);
+}`
+
+/* A Gaussian a cell and a half wide, one axis at a time. */
+const BLUR_FRAG = GLSL_PRELUDE + `
+uniform sampler2D u_src;
+uniform vec2 u_dir;
+void main() {
+  vec4 s = texture(u_src, vUv) * 0.2270;
+  s += (texture(u_src, vUv + u_dir) + texture(u_src, vUv - u_dir)) * 0.1945;
+  s += (texture(u_src, vUv + 2.0 * u_dir) + texture(u_src, vUv - 2.0 * u_dir)) * 0.1216;
+  s += (texture(u_src, vUv + 3.0 * u_dir) + texture(u_src, vUv - 3.0 * u_dir)) * 0.0540;
+  s += (texture(u_src, vUv + 4.0 * u_dir) + texture(u_src, vUv - 4.0 * u_dir)) * 0.0162;
+  fragColor = s;
 }`
 
 /* -------------------------------------------------------------------------- */
@@ -167,17 +237,17 @@ uniform highp usampler2D u_id;
 uniform highp usampler2D u_life;
 uniform highp usampler2D u_shade;
 uniform sampler2D u_light;
+uniform sampler2D u_field;
 uniform vec2 u_grid;
 
 uint  idAt(ivec2 c)    { return texelFetch(u_id,    clamp(c, ivec2(0), ivec2(u_grid) - 1), 0).r; }
 float lifeAt(ivec2 c)  { return float(texelFetch(u_life,  clamp(c, ivec2(0), ivec2(u_grid) - 1), 0).r); }
 float shadeAt(ivec2 c) { return float(texelFetch(u_shade, clamp(c, ivec2(0), ivec2(u_grid) - 1), 0).r) / 255.0; }
 
-// Fire counts as a gas here: it rises like one in the simulation, and drawn as
-// hard squares it was the single worst-looking thing on the page.
-bool isGas(uint id)   { return id == M_SMOKE || id == M_STEAM || id == M_FIRE || id == M_FOAM; }
-bool isFluid(uint id) { return id == M_WATER || id == M_OIL || id == M_ACID || id == M_LAVA || id == M_MELTED_WAX; }
-bool isOpen(uint id)  { return id == M_EMPTY || isGas(id); }
+/* Things that pour or heap: their outline is smoothed (see the field pass),
+   so a dune is a dune and a puddle is round, not a staircase of cells. */
+bool isSoft(uint id) { float k = kindOf(id); return k == 1.0 || k == 2.0; }
+bool isFluid(uint id) { return kindOf(id) == 2.0; }
 
 float bilin(float a, float b, float c, float d, vec2 f) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
@@ -194,9 +264,23 @@ struct Surf {
   float spec;
   float shine;
   vec3 emit;
-  float alpha;      // for glass, and for droplets too small to fill a cell
+  float alpha;      // for glass, ice and the soft edge of anything that pours
   float scatter;    // how much of the light field the medium itself carries
 };
+
+/* The back of the tank: dark slate, a little mottled, lit softly from above by
+   the room — and by whatever is burning in front of it, which is what puts a
+   fire in a place instead of on a blank page. */
+vec3 wallAt(vec2 uv, vec3 lightF) {
+  vec2 p = uv * vec2(u_res.x / u_res.y, 1.0);
+  float big = fbm(p * 2.3 + 3.1, 4);
+  float fine = noise(p * 120.0);
+  float room = 0.78 + 0.34 * uv.y;
+  vec2 c = centred(uv);
+  float vig = 1.0 - dot(c, c) * 0.22;
+  vec3 slate = vec3(0.026, 0.029, 0.035) * (0.80 + 0.36 * big + 0.05 * (fine - 0.5));
+  return slate * room * vig + lightF * (0.17 + 0.16 * big);
+}
 
 void main() {
   vec2 gp = vec2(vUv.x, 1.0 - vUv.y) * u_grid;
@@ -207,8 +291,8 @@ void main() {
   float csh = shadeAt(ic);
   float clife = lifeAt(ic);
 
-  /* One 2x2 lattice, offset half a cell, drives every smooth field on the
-     page — liquid surfaces, gas edges, plant tips. Four fetches, reused. */
+  /* One 2x2 lattice, offset half a cell: the rigid materials' edges, and which
+     neighbour a smoothed outline borrows from. Four fetches, reused. */
   vec2 lat = gp - 0.5;
   ivec2 b = ivec2(floor(lat));
   vec2 fr = fract(lat);
@@ -217,9 +301,35 @@ void main() {
 
   vec3 lightF = texture(u_light, vUv).rgb;
 
-  /* ---- the solid layer -------------------------------------------------- */
+  /* The smoothed fields (see FIELD_FRAG): liquid, matter, flame, gas — and the
+     slope of the matter field, in grid terms (x right, y down). */
+  vec4 F = texture(u_field, vUv);
+  vec2 tx = 1.0 / u_grid;
+  float oR = texture(u_field, vUv + vec2(tx.x, 0.0)).g, oL = texture(u_field, vUv - vec2(tx.x, 0.0)).g;
+  float oU = texture(u_field, vUv + vec2(0.0, tx.y)).g, oD = texture(u_field, vUv - vec2(0.0, tx.y)).g;
+  vec2 og = vec2(oR - oL, oD - oU) * 0.5;
 
-  uint base = isGas(cid) ? M_EMPTY : cid;
+  /* ---- which material is here, with the outline smoothed ----------------- */
+
+  uint base = kindOf(cid) >= 3.0 ? M_EMPTY : cid;
+  float occ = F.g;
+  float aw = max(fwidth(occ) * 0.8, 0.02);
+  float edgeA = 1.0;
+  // A lone grain or droplet is round, whatever the smoothing says about it.
+  float disc = 1.0 - smoothstep(0.36, 0.52, length(fc - 0.5));
+  if (base != M_EMPTY && isSoft(base)) {
+    edgeA = max(smoothstep(0.40 - aw, 0.40 + aw, occ), disc);
+  } else if (base == M_EMPTY && occ > 0.40 - aw) {
+    // Air inside a smoothed outline: the nearest pouring neighbour fills it.
+    float w00 = (1.0 - fr.x) * (1.0 - fr.y), w10 = fr.x * (1.0 - fr.y);
+    float w01 = (1.0 - fr.x) * fr.y, w11 = fr.x * fr.y;
+    uint n = M_EMPTY; float best = 0.0;
+    if (isSoft(i00) && w00 > best) { n = i00; best = w00; }
+    if (isSoft(i10) && w10 > best) { n = i10; best = w10; }
+    if (isSoft(i01) && w01 > best) { n = i01; best = w01; }
+    if (isSoft(i11) && w11 > best) { n = i11; best = w11; }
+    if (n != M_EMPTY) { base = n; edgeA = smoothstep(0.40 - aw, 0.40 + aw, occ); }
+  }
 
   Surf s;
   s.albedo = vec3(0.0);
@@ -230,8 +340,8 @@ void main() {
   s.alpha = 1.0;
   s.scatter = 0.0;
 
-  // Coverage of the material under the cursor, and its gradient. For anything
-  // that pools, this is the meniscus.
+  // Coverage of this material over the 2x2 lattice, and its slope: the edge
+  // of anything rigid.
   float m00 = i00 == base ? 1.0 : 0.0, m10 = i10 == base ? 1.0 : 0.0;
   float m01 = i01 == base ? 1.0 : 0.0, m11 = i11 == base ? 1.0 : 0.0;
   float cov = bilin(m00, m10, m01, m11, fr);
@@ -239,28 +349,39 @@ void main() {
 
   // Distance from a cell edge, used for the shadow between grains.
   float edge = min(min(fc.x, 1.0 - fc.x), min(fc.y, 1.0 - fc.y));
+  float kb = kindOf(base);
 
-  if (base == M_SAND || base == M_POWDER || base == M_EMBER || base == M_SODA || base == M_CLAY) {
-    // A powder is grains, not a fill. Every cell gets its own tone from the
-    // simulation's own 'shade' byte, and the gaps between them are shadowed,
-    // so a dune reads as granular at any zoom.
-    //
-    // Ember belongs here and not with the gases: it is charcoal that happens to
-    // be glowing, and emissive() lights it from the inside. Left out of every
-    // branch it inherited air, and a falling coal was a bodiless streak.
-    vec3 c0 = base == M_SAND   ? vec3(0.72, 0.53, 0.22)
-            : base == M_POWDER ? vec3(0.055, 0.052, 0.062)
-            : base == M_SODA   ? vec3(0.88, 0.87, 0.83)
-            : base == M_CLAY   ? vec3(0.55, 0.35, 0.27)
-            :                    vec3(0.085, 0.050, 0.038);
+  if (kb == 1.0) {
+    /* A powder is grains, not a fill. Every cell gets its own tone from the
+       simulation's 'shade' byte, the gaps between them are shadowed, and each
+       powder has its own colour, its own spread of tones and its own shine. */
+    vec3 c0 = vec3(0.5); float spread = 0.4; float sp = 0.12; float sh = 18.0; float glint = 0.0;
+    if (base == M_SAND)          { c0 = vec3(0.72, 0.53, 0.22); spread = 0.34; sp = 0.30; }
+    else if (base == M_POWDER)   { c0 = vec3(0.055, 0.052, 0.062); spread = 0.55; sp = 0.10; }
+    else if (base == M_SODA)     { c0 = vec3(0.88, 0.87, 0.83); spread = 0.18; sp = 0.20; }
+    else if (base == M_CLAY)     { c0 = vec3(0.55, 0.35, 0.27); spread = 0.30; sp = 0.10; }
+    else if (base == M_EMBER)    { c0 = vec3(0.085, 0.050, 0.038); spread = 0.55; sp = 0.10; }
+    else if (base == M_SALT)     { c0 = vec3(0.80, 0.81, 0.80); spread = 0.16; sp = 0.55; sh = 70.0; glint = 1.0; }
+    else if (base == M_DIRT)     { c0 = vec3(0.17, 0.105, 0.060); spread = 0.50; sp = 0.05; }
+    else if (base == M_MUD)      { c0 = vec3(0.090, 0.062, 0.040); spread = 0.20; sp = 0.55; sh = 34.0; }
+    else if (base == M_SEED)     { c0 = vec3(0.46, 0.36, 0.14); spread = 0.36; sp = 0.25; }
+    else if (base == M_COAL)     { c0 = vec3(0.030, 0.030, 0.034); spread = 0.50; sp = 0.55; sh = 44.0; }
+    else if (base == M_ASH)      { c0 = vec3(0.30, 0.29, 0.28); spread = 0.20; sp = 0.03; }
+    else if (base == M_SNOW)     { c0 = vec3(0.86, 0.90, 0.95); spread = 0.10; sp = 0.40; sh = 60.0; glint = 0.7; }
+    else if (base == M_THERMITE) { c0 = vec3(0.40, 0.17, 0.09); spread = 0.40; sp = 0.18; }
     float v = csh - 0.5;
-    s.albedo = c0 * (1.0 + v * (base == M_SAND ? 0.34 : 0.55));
+    s.albedo = c0 * (1.0 + v * spread);
     s.albedo *= 0.72 + 0.28 * smoothstep(0.0, 0.30, edge);
     s.albedo *= 0.88 + 0.24 * noise(gp * 5.0 + csh * 40.0);
     // Grains catch the light on whichever side they were packed against.
-    s.n = normalize(vec3(-cg * 0.9 + (hash22(vec2(ic)) - 0.5) * 0.5, 1.0));
-    s.spec = base == M_SAND ? 0.30 : 0.10;
-    s.shine = 18.0;
+    s.n = normalize(vec3(-og * 2.0 + (hash22(vec2(ic)) - 0.5) * 0.5, 1.0));
+    s.spec = sp;
+    s.shine = sh;
+    // Crystals: now and then a grain faces the light exactly and flashes.
+    if (glint > 0.0) {
+      float g = step(0.93, hash22(vec2(ic) + 7.0).x) * glint;
+      s.emit += vec3(0.9, 0.95, 1.0) * g * (0.18 + 0.12 * sin(u_time * 3.0 + csh * 30.0));
+    }
 
   } else if (base == M_STONE || base == M_CERAMIC) {
     float mott = fbm(gp * 0.55, 4);
@@ -270,14 +391,39 @@ void main() {
     s.albedo = base == M_CERAMIC
       ? mix(vec3(0.24, 0.11, 0.075), vec3(0.62, 0.32, 0.20), mott) * (0.85 + 0.28 * csh)
       : mix(vec3(0.075, 0.077, 0.086), vec3(0.20, 0.20, 0.215), mott) * (0.85 + 0.28 * csh);
-    /* Relief at just under one cycle per cell, not 2.6. Faster than that and
-       the noise is finer than the thing it is supposed to be carving, so a
-       wall stops reading as rock and starts reading as static. */
     float rel = fbm(gp * 0.85 + 11.0, 3);
     s.albedo *= 0.82 + 0.30 * rel;
     s.n = normalize(vec3(-cg * 1.4 + (vec2(rel, fbm(gp * 0.85 + 31.0, 3)) - 0.5) * 0.6, 1.0));
     s.spec = base == M_CERAMIC ? 0.22 : 0.09;
     s.shine = base == M_CERAMIC ? 26.0 : 10.0;
+
+  } else if (base == M_METAL) {
+    // Brushed steel: fine streaks along the plate, and a reflection of the
+    // room that slides down it, which is what makes metal read as metal.
+    float brush = noise(vec2(gp.x * 0.4, gp.y * 9.0)) * 0.6 + noise(vec2(gp.x * 1.3, gp.y * 22.0)) * 0.4;
+    float room = smoothstep(0.15, 0.85, vUv.y + (fbm(gp * 0.06, 2) - 0.5) * 0.3);
+    s.albedo = vec3(0.30, 0.32, 0.35) * (0.82 + 0.30 * brush) + vec3(0.10, 0.11, 0.12) * room;
+    s.n = normalize(vec3(-cg * 1.6 + vec2(0.0, (brush - 0.5) * 0.4), 1.0));
+    s.spec = 1.0;
+    s.shine = 70.0;
+
+  } else if (base == M_RUST) {
+    // Iron oxide: flaking, pitted, and the colour of it varies a lot.
+    float flake = fbm(gp * 0.9 + 5.0, 4);
+    float pit = smoothstep(0.62, 0.78, fbm(gp * 2.2 + 9.0, 3));
+    s.albedo = mix(vec3(0.21, 0.075, 0.030), vec3(0.46, 0.19, 0.07), flake) * (1.0 - 0.45 * pit) * (0.86 + 0.26 * csh);
+    s.n = normalize(vec3(-cg * 1.2 + (vec2(flake, pit) - 0.5) * 0.9, 1.0));
+    s.spec = 0.06;
+    s.shine = 8.0;
+
+  } else if (base == M_FUNGUS) {
+    // Soft, spongy and full of pores.
+    float body = fbm(gp * 0.45 + csh * 3.0, 4);
+    float pore = smoothstep(0.66, 0.80, noise(gp * 2.6 + 13.0));
+    s.albedo = mix(vec3(0.22, 0.11, 0.26), vec3(0.52, 0.32, 0.56), body) * (1.0 - 0.5 * pore);
+    s.n = normalize(vec3(-cg * 0.9 + (vec2(body, pore) - 0.5) * 0.7, 1.0));
+    s.spec = 0.16;
+    s.shine = 16.0;
 
   } else if (base == M_WOOD) {
     // Grain runs across the plank and the rings are the only thing that varies,
@@ -290,11 +436,7 @@ void main() {
     s.shine = 14.0;
 
   } else if (base == M_PLANT) {
-    // Growing tips are where the coverage thins out, so they lighten on their
-    // own as the plant spreads.
     float tip = 1.0 - smoothstep(0.35, 0.95, cov);
-    // Two scales. One alone is a flat green mass: broad clumps give the thicket
-    // its shape, leaf-sized detail inside them gives it a surface.
     float clump = fbm(gp * 0.30, 4);
     float leaf = fbm(gp * 1.5 + csh * 24.0, 3);
     s.albedo = mix(vec3(0.020, 0.075, 0.022), vec3(0.105, 0.34, 0.055), clump);
@@ -306,12 +448,8 @@ void main() {
     s.shine = 20.0;
 
   } else if (base == M_GLASS) {
-    // Glass is mostly not there. What you see is the edge, where the surface
-    // turns away and catches the light.
     float rim = clamp(length(cg) * 1.9, 0.0, 1.0);
     s.albedo = vec3(0.38, 0.52, 0.55) * (0.25 + 0.75 * rim);
-    // A pane is not perfectly flat. The streaks are what tell you the dark
-    // patch is glass and not a hole in the world.
     float streak = fbm(vec2(gp.x * 0.30 + gp.y * 0.10, gp.y * 0.06), 3);
     s.albedo += vec3(0.10, 0.13, 0.14) * smoothstep(0.55, 0.78, streak);
     s.alpha = 0.26 + 0.58 * rim;
@@ -320,15 +458,9 @@ void main() {
     s.shine = 60.0;
 
   } else if (base == M_ICE) {
-    // Faceted, not smooth: the noise field is stepped so it breaks into planes
-    // that each catch the light at their own angle.
     float f = fbm(gp * 0.42 + csh * 6.0, 4);
-    // The steps drive colour only. Taking normals from them made every step
-    // boundary a specular edge, and the whole block crawled with white pixels.
     float facet = floor(f * 5.0) / 5.0;
     s.albedo = mix(vec3(0.155, 0.30, 0.42), vec3(0.46, 0.64, 0.76), facet) * 0.82;
-    // Fracture planes and trapped air, which is what makes ice read as frozen
-    // rather than as pale plastic.
     float veins = 1.0 - abs(f * 2.0 - 1.0);
     s.albedo += vec3(0.10, 0.14, 0.16) * pow(veins, 6.0);
     s.n = normalize(vec3(-cg * 1.1 + (vec2(f, fbm(gp * 0.42 + 17.0, 4)) - 0.5) * 0.7, 1.0));
@@ -337,40 +469,34 @@ void main() {
     s.alpha = 0.88;
 
   } else if (base == M_WAX) {
-    // Soft, not faceted: wax deforms rather than fractures, so the same fbm
-    // that carves ice into planes here just rolls, with no steps in it.
     float soft = fbm(gp * 0.32 + csh * 5.0, 3);
     s.albedo = mix(vec3(0.62, 0.52, 0.27), vec3(0.86, 0.78, 0.48), soft) * (0.88 + 0.20 * csh);
     s.n = normalize(vec3(-cg * 0.7 + (vec2(soft, fbm(gp * 0.32 + 21.0, 3)) - 0.5) * 0.35, 1.0));
     s.spec = 0.42;
     s.shine = 28.0;
 
-  } else if (isFluid(base)) {
-    // Liquids get the meniscus. 'cov' is ~1 deep inside the body and falls off
-    // at the surface, so depth-tinting and the specular both fall out of the
-    // same number.
-    float depth = smoothstep(0.25, 1.0, cov);
+  } else if (kb == 2.0) {
+    /* Liquids. Depth is how far in from open air: the smoothed matter field is
+       ~1 inside a body, against its floor and walls too, and falls only at
+       the free surface. So depth tint and the meniscus come out of one number,
+       the floor of a pool is dark rather than rimmed with surface light, and
+       the normal comes from the smoothed outline — a round pool, not a stack
+       of cells. */
+    float depth = smoothstep(0.55, 1.0, F.g);
     float surf = 1.0 - depth;
     vec2 flow = vec2(u_time * 0.35, -u_time * 0.18);
-    // Low frequency on purpose. One noise cell per two grid cells put a
-    // highlight on almost every pixel and the whole pool crawled with white
-    // speckle; a ripple has to be wider than the thing it is rippling across.
     float rip = fbm(gp * 0.20 + flow, 3);
-    // A droplet in mid-air is one cell, and one cell drawn flat is a square.
-    // Fading by coverage rounds it off against the air behind it.
-    s.alpha = smoothstep(0.05, 0.42, cov);
 
-    if (base == M_WATER) {
+    if (base == M_WATER || base == M_BRINE) {
       s.albedo = mix(vec3(0.16, 0.42, 0.72), vec3(0.015, 0.075, 0.20), depth);
-      // Caustic-ish shimmer, brightest just under the surface where light
-      // actually gets in.
+      // Brine is the same water gone cloudy and a shade greener.
+      if (base == M_BRINE) s.albedo = mix(s.albedo, vec3(0.20, 0.36, 0.40), 0.45);
       s.albedo += vec3(0.10, 0.20, 0.26) * pow(rip, 3.0) * (1.0 - depth * 0.6);
       s.spec = 0.85;
       s.shine = 52.0;
+      s.alpha = 0.94;
     } else if (base == M_OIL) {
       s.albedo = mix(vec3(0.055, 0.042, 0.030), vec3(0.012, 0.009, 0.007), depth);
-      // Thin-film sheen: only on the skin, and it shifts hue across the slick,
-      // which is the giveaway that reads as oil rather than as dark water.
       vec3 film = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + rip * 5.0 + gp.x * 0.06);
       s.albedo += film * surf * 0.15;
       s.spec = 0.72;
@@ -380,9 +506,21 @@ void main() {
       s.albedo += vec3(0.20, 0.42, 0.04) * pow(rip, 2.4);
       s.spec = 0.55;
       s.shine = 30.0;
+    } else if (base == M_NITRO) {
+      // Oily and faintly pink, with a slow swirl in it: nothing about it says
+      // it is safe.
+      float swirl = fbm(gp * 0.35 + vec2(u_time * 0.12, 0.0), 3);
+      s.albedo = mix(vec3(0.52, 0.10, 0.28), vec3(0.20, 0.03, 0.11), depth) * (0.85 + 0.3 * swirl);
+      s.spec = 0.78;
+      s.shine = 46.0;
+    } else if (base == M_SLIME) {
+      // Thick and see-through: it holds its bubbles.
+      float bub = smoothstep(0.72, 0.80, noise(gp * 1.7 + vec2(0.0, u_time * 0.08)));
+      s.albedo = mix(vec3(0.26, 0.64, 0.40), vec3(0.06, 0.24, 0.12), depth) + vec3(0.10, 0.20, 0.14) * bub;
+      s.spec = 0.85;
+      s.shine = 56.0;
+      s.alpha = 0.90;
     } else if (base == M_MELTED_WAX) {
-      // The same wax, thinner and warmer: it pools rather than sitting, so it
-      // gets the meniscus the solid block never needed.
       s.albedo = mix(vec3(0.82, 0.70, 0.40), vec3(0.52, 0.42, 0.20), depth);
       s.albedo += vec3(0.18, 0.15, 0.08) * pow(rip, 3.0) * (1.0 - depth * 0.6);
       s.spec = 0.58;
@@ -393,109 +531,111 @@ void main() {
       s.spec = 0.20;
       s.shine = 12.0;
     }
-    // Surface normal from the meniscus, roughened by the ripple so a still pool
-    // is not a mirror.
-    s.n = normalize(vec3(-cg * 2.4 + vec2(dFdx(rip), dFdy(rip)) * 2.2, 1.0));
+    s.n = normalize(vec3(-og * 4.0 + vec2(dFdx(rip), dFdy(rip)) * 2.2, 1.0));
 
   } else {
-    /* Air. Not black: it takes the light field, which is what makes a fire look
-       like it is in a room rather than pasted on top of one. */
-    vec2 p = centred(vUv);
+    /* Air: the back wall of the tank, lit by the room and by everything in
+       front of it that glows. */
     s.albedo = vec3(0.0);
-    s.emit = vec3(0.026, 0.027, 0.032) * (1.0 - dot(p, p) * 0.16);
+    s.emit = wallAt(vUv, lightF);
     s.alpha = 1.0;
-    // Air is the one medium with no surface, so it cannot pick light up the way
-    // everything else does. Without this a fire lights the floor it is standing
-    // on and leaves the room around it pitch black.
-    s.scatter = 0.24;
   }
 
-  /* Solids keep a trace of the grid they live on. Powders shadow their own
-     gaps hard, above; this is the quiet version for everything else. Without
-     it the shading smooths the world into an airbrush painting and a sandbox
-     stops reading as a sandbox. */
-  if (base == M_STONE || base == M_WOOD || base == M_PLANT || base == M_ICE || base == M_CERAMIC || base == M_WAX) {
-    s.albedo *= 0.90 + 0.10 * smoothstep(0.0, 0.20, edge);
-  }
+  /* Solids keep a trace of the grid they live on: the quiet version of the
+     powders' hard gaps. Without it a sandbox stops reading as a sandbox. */
+  if (kb == 0.0) s.albedo *= 0.90 + 0.10 * smoothstep(0.0, 0.20, edge);
 
   float k = clamp(clife / life0(base), 0.0, 1.0);
   s.emit += emissive(base, k, gp, u_time);
 
   /* ---- lighting --------------------------------------------------------- */
 
-  // A cool key from the upper left, so solids have a consistent form, plus the
-  // emitters, which are warm and are the only thing that moves.
   const vec3 KEY = vec3(-0.42, 0.60, 0.68);
   vec3 kd = normalize(KEY);
-  float diff = max(0.0, dot(s.n, kd)) * 0.5 + 0.5;      // wrapped, so nothing goes pure black
+  float diff = max(0.0, dot(s.n, kd)) * 0.5 + 0.5;
   vec3 half_ = normalize(kd + vec3(0.0, 0.0, 1.0));
   float sp = pow(max(0.0, dot(s.n, half_)), s.shine) * s.spec;
 
-  /* The blur chain accumulates five levels into level 0, so the light field
-     carries several times the energy the emitters put in. These gains bring it
-     back to something the tonemap can hold: at 1.9 a lava pool washed itself,
-     and everything within reach of it, to white. */
   vec3 amb = vec3(0.115, 0.125, 0.155);
   vec3 col = s.albedo * (amb + vec3(0.30, 0.30, 0.33) * diff + lightF * 0.62);
   col += vec3(0.55, 0.58, 0.66) * sp;
-  // Emitters glint off nearby surfaces too, or a lake beside lava stays flat.
   col += lightF * s.spec * 0.22;
   col += lightF * s.scatter;
   col += s.emit;
 
-  if (s.alpha < 1.0) {
-    // Whatever is behind glass or ice: the air plate, plus the light coming
-    // through, bent a little by the surface.
-    /* Whatever is behind glass, ice, or a droplet too small to fill its cell:
-       the same air the air branch draws, at the same scatter, bent a little by
-       the surface. Giving it a gain of its own put a bright halo around every
-       stray water cell whenever anything nearby was burning. */
-    vec3 behind = vec3(0.026, 0.027, 0.032) + texture(u_light, vUv + cg * 0.006).rgb * 0.24;
-    col = mix(behind, col, s.alpha);
+  // Seen through: the wall behind glass, ice, a thin liquid, or the soft edge
+  // of anything that pours — bent a little by the surface.
+  float a = s.alpha * edgeA;
+  if (a < 1.0) {
+    vec3 behind = wallAt(vUv + cg * 0.004 + og * 0.004, texture(u_light, vUv + cg * 0.006).rgb);
+    col = mix(behind, col, a);
   }
 
   /* ---- gases, over the top ---------------------------------------------- */
 
-  // Gases dissolve into the air instead of ending at a cell boundary. Their
-  // remaining life is their opacity, so a plume genuinely thins as it drifts.
-  float g00 = isGas(i00) ? clamp(lifeAt(b) / life0(i00), 0.0, 1.0) : 0.0;
-  float g10 = isGas(i10) ? clamp(lifeAt(b + ivec2(1, 0)) / life0(i10), 0.0, 1.0) : 0.0;
-  float g01 = isGas(i01) ? clamp(lifeAt(b + ivec2(0, 1)) / life0(i01), 0.0, 1.0) : 0.0;
-  float g11 = isGas(i11) ? clamp(lifeAt(b + ivec2(1, 1)) / life0(i11), 0.0, 1.0) : 0.0;
-  float ga = bilin(g00, g10, g01, g11, fr);
+  // Smoothed, and read a little wider again, so a plume has no cells in it.
+  vec2 o = tx * 1.5;
+  vec4 Fw = (texture(u_field, vUv + o) + texture(u_field, vUv - o)
+           + texture(u_field, vUv + vec2(o.x, -o.y)) + texture(u_field, vUv + vec2(-o.x, o.y))) * 0.25;
+  /* A burning plank throws a few scattered flame cells, not a solid sheet,
+     and averaged they all but vanish. So both fields go through a curve that
+     lets a sparse few read as flame or smoke and a dense mass not blow out. */
+  float gasS = 1.0 - exp(-mix(F.a, Fw.a, 0.5) * 3.5);
+  float fireS = 1.0 - exp(-max(F.b, Fw.b * 0.85) * 5.0);
 
-  if (ga > 0.001) {
-    // Which gas: the nearest one wins, so a steam cloud beside smoke keeps its
-    // own colour instead of averaging to grey.
-    uint gid = i00;
-    float best = g00;
-    if (g10 > best) { gid = i10; best = g10; }
-    if (g01 > best) { gid = i01; best = g01; }
-    if (g11 > best) { gid = i11; best = g11; }
-
-    float puff = fbm(gp * 0.42 + vec2(-u_time * 0.10, -u_time * 0.22), 4);
-    // Eroding the alpha with noise is what turns a blob into a plume.
-    float a = clamp(ga * 1.6 - 0.16, 0.0, 1.0);
-    a *= 0.35 + 0.85 * puff;
-
-    if (gid == M_FIRE) {
-      // A noise stretched vertically and scrolling upward fast: it breaks the
-      // plume into tongues that climb, which is the difference between fire and
-      // an orange cloud. Stretching it is what makes them vertical.
-      float lick = fbm(vec2(gp.x * 0.55, gp.y * 0.16 + u_time * 1.6), 3);
-      vec3 fc2 = emissive(M_FIRE, clamp(best * (0.55 + 0.75 * lick), 0.0, 1.0), gp, u_time);
-      float fa = clamp(a * 1.7, 0.0, 1.0) * (0.45 + 0.85 * lick);
-      col = mix(col, fc2, clamp(fa, 0.0, 1.0));
-    } else {
-      vec3 gcol = gid == M_STEAM ? vec3(0.62, 0.68, 0.74)
-                : gid == M_FOAM  ? vec3(0.82, 0.84, 0.82)
-                :                  vec3(0.085, 0.082, 0.088);
-      // Lit like anything else, which is why smoke over a fire glows orange
-      // from below and grey higher up.
-      gcol = gcol * (amb + vec3(0.30) + lightF * 2.2);
-      col = mix(col, gcol, clamp(a * 0.92, 0.0, 1.0));
+  if (gasS > 0.004) {
+    // Which gas: the strongest within a cell or so, so a steam cloud beside
+    // smoke keeps its own colour instead of averaging to grey.
+    uint gid = M_SMOKE; float best = 0.0;
+    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+      ivec2 q = ic + ivec2(dx, dy);
+      uint id = idAt(q);
+      if (kindOf(id) != 3.0) continue;
+      float w = id == M_CLOUD ? 1.0 : clamp(lifeAt(q) / life0(id), 0.0, 1.0);
+      if (w > best) { best = w; gid = id; }
     }
+    float puff = fbm(gp * 0.42 + vec2(-u_time * 0.10, -u_time * 0.22), 4);
+    float ga = clamp(gasS * 1.5 - 0.06, 0.0, 1.0) * (0.40 + 0.80 * puff);
+    vec3 gcol = gid == M_STEAM ? vec3(0.62, 0.68, 0.74)
+              : gid == M_FOAM  ? vec3(0.82, 0.84, 0.82)
+              : gid == M_CLOUD ? vec3(0.70, 0.73, 0.78) * (0.75 + 0.35 * puff)
+              // Smoke is a grey haze, lit by the room and the fire under it —
+              // not soot-black, which on the dark wall was simply invisible.
+              :                  vec3(0.20, 0.20, 0.215);
+    // Lit like anything else, which is why smoke over a fire glows orange from
+    // below and grey higher up.
+    gcol = gcol * (amb + vec3(0.30) + lightF * 2.4);
+    col = mix(col, gcol, clamp(ga * (gid == M_CLOUD ? 1.0 : 0.92), 0.0, 1.0));
   }
+
+  if (fireS > 0.004) {
+    // Tongues that climb: a noise stretched upward and scrolling fast breaks
+    // the smoothed heat into flames, hottest at their roots.
+    float lick = fbm(vec2(gp.x * 0.55, gp.y * 0.16 + u_time * 1.6), 3);
+    // A second, faster flicker, swaying, so the tongues split and rejoin.
+    float lick2 = noise(vec2(gp.x * 0.9 + sin(u_time * 3.1 + gp.y * 0.3) * 0.6, gp.y * 0.35 + u_time * 4.2));
+    float tongue = smoothstep(0.22, 0.85, fireS * (0.50 + 0.62 * lick + 0.38 * lick2));
+    float heat = clamp(fireS * (0.45 + 0.75 * lick), 0.0, 1.0);
+    vec3 fc2 = emissive(M_FIRE, heat, gp, u_time);
+    // Flame is light: mostly added, with only a little of what is behind it
+    // hidden, so you see the wall and the wood through it.
+    col = col * (1.0 - 0.3 * tongue) + fc2 * tongue;
+  }
+
+  // A spark is a point of light: crisp in its own cell, its glow in the light field.
+  if (cid == M_SPARK) {
+    float pt = 1.0 - smoothstep(0.0, 0.55, length(fc - 0.5));
+    col += emissive(M_SPARK, clamp(clife / life0(M_SPARK), 0.0, 1.0), gp, u_time) * pt;
+  }
+
+  /* ---- the glass in front ----------------------------------------------- */
+
+  // A pane between you and the tank: the faintest diagonal sheen, and its
+  // edges a touch darker where the frame shades them.
+  float sheen = smoothstep(0.30, 0.0, abs(vUv.x * 0.8 + vUv.y - 1.25)) * 0.010;
+  vec2 ce = min(vUv, 1.0 - vUv) * u_res / min(u_res.x, u_res.y);
+  float frame = smoothstep(0.0, 0.035, min(ce.x, ce.y));
+  col = col * (0.82 + 0.18 * frame) + vec3(sheen);
 
   col = aces(col * 1.05);
   col = toSRGB(col);
@@ -576,6 +716,11 @@ class GLRenderer implements PowderRenderer {
   private downP: WebGLProgram | null
   private upP: WebGLProgram | null
   private mainP: WebGLProgram | null
+  private fieldP: WebGLProgram | null
+  private blurP: WebGLProgram | null
+  /** The smoothed fields, and a scratch target for blurring them. */
+  private fieldA: Level | null = null
+  private fieldB: Level | null = null
   private vao: WebGLVertexArrayObject
   private texId: WebGLTexture
   private texLife: WebGLTexture
@@ -598,6 +743,8 @@ class GLRenderer implements PowderRenderer {
     this.downP = program(gl, DOWN_FRAG, FULLSCREEN_VERT)
     this.upP = program(gl, UP_FRAG, FULLSCREEN_VERT)
     this.mainP = program(gl, MAIN_FRAG, FULLSCREEN_VERT)
+    this.fieldP = program(gl, FIELD_FRAG, FULLSCREEN_VERT)
+    this.blurP = program(gl, BLUR_FRAG, FULLSCREEN_VERT)
 
     this.vao = gl.createVertexArray()!
     gl.bindVertexArray(this.vao)
@@ -608,7 +755,23 @@ class GLRenderer implements PowderRenderer {
     this.texShade = this.intTex()
   }
 
-  get ok() { return !!(this.emitP && this.downP && this.upP && this.mainP) }
+  get ok() { return !!(this.emitP && this.downP && this.upP && this.mainP && this.fieldP && this.blurP) }
+
+  /** An 8-bit, linearly filtered target at grid size: values 0..1 are all a field needs. */
+  private target(w: number, h: number): Level {
+    const gl = this.gl
+    const tex = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    const fb = gl.createFramebuffer()!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+    return { fb, tex, w, h }
+  }
 
   private intTex() {
     const gl = this.gl
@@ -642,6 +805,9 @@ class GLRenderer implements PowderRenderer {
 
     for (const l of this.levels) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
     this.levels = []
+    for (const l of [this.fieldA, this.fieldB]) if (l) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
+    this.fieldA = this.target(w, h)
+    this.fieldB = this.target(w, h)
     let lw = w, lh = h
     for (let i = 0; i < LIGHT_LEVELS; i++) {
       const tex = gl.createTexture()!
@@ -755,6 +921,25 @@ class GLRenderer implements PowderRenderer {
     }
     gl.disable(gl.BLEND)
 
+    // 2c. The fields: drawn, then blurred across and back down.
+    const fp = this.fieldP!, bp = this.blurP!
+    this.blit(fp, this.fieldA, () => {
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texId)
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texLife)
+      gl.uniform1i(this.uni(fp, 'u_id'), 0)
+      gl.uniform1i(this.uni(fp, 'u_life'), 1)
+      gl.uniform2f(this.uni(fp, 'u_grid'), w, h)
+      gl.uniform2f(this.uni(fp, 'u_res'), w, h)
+      gl.uniform1f(this.uni(fp, 'u_time'), time)
+    })
+    for (const [src, dst, dx, dy] of [[this.fieldA!, this.fieldB!, 1 / w, 0], [this.fieldB!, this.fieldA!, 0, 1 / h]] as const) {
+      this.blit(bp, dst, () => {
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.tex)
+        gl.uniform1i(this.uni(bp, 'u_src'), 0)
+        gl.uniform2f(this.uni(bp, 'u_dir'), dx, dy)
+      })
+    }
+
     // 3. Composite.
     const mp = this.mainP!
     this.blit(mp, null, () => {
@@ -762,6 +947,8 @@ class GLRenderer implements PowderRenderer {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texLife)
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texShade)
       gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.levels[0].tex)
+      gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.fieldA!.tex)
+      gl.uniform1i(this.uni(mp, 'u_field'), 4)
       gl.uniform1i(this.uni(mp, 'u_id'), 0)
       gl.uniform1i(this.uni(mp, 'u_life'), 1)
       gl.uniform1i(this.uni(mp, 'u_shade'), 2)
@@ -774,7 +961,7 @@ class GLRenderer implements PowderRenderer {
 
   dispose() {
     const gl = this.gl
-    for (const l of this.levels) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
+    for (const l of [...this.levels, this.fieldA, this.fieldB]) if (l) { gl.deleteFramebuffer(l.fb); gl.deleteTexture(l.tex) }
     gl.getExtension('WEBGL_lose_context')?.loseContext()
   }
 }
@@ -812,7 +999,7 @@ export function createPowderRenderer(
   let usable = false
   if (pgl) {
     // A compile failure is already logged with line numbers by `program`.
-    usable = [EMIT_FRAG, DOWN_FRAG, UP_FRAG, MAIN_FRAG]
+    usable = [EMIT_FRAG, DOWN_FRAG, UP_FRAG, MAIN_FRAG, FIELD_FRAG, BLUR_FRAG]
       .every((f) => !!program(pgl, f, FULLSCREEN_VERT))
     pgl.getExtension('WEBGL_lose_context')?.loseContext()
   }
