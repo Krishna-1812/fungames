@@ -329,6 +329,11 @@ void main() {
     if (isSoft(i01) && w01 > best) { n = i01; best = w01; }
     if (isSoft(i11) && w11 > best) { n = i11; best = w11; }
     if (n != M_EMPTY) { base = n; edgeA = smoothstep(0.40 - aw, 0.40 + aw, occ); }
+    // Rock: fill only the inside corners of its steps, never wear its edges
+    // away, so a drawn wall stays a wall and a hillside stops being stairs.
+    else if (occ > 0.5) {
+      if (i00 == M_STONE || i10 == M_STONE || i01 == M_STONE || i11 == M_STONE) { base = M_STONE; edgeA = smoothstep(0.5, 0.5 + aw * 2.0, occ); }
+    }
   }
 
   Surf s;
