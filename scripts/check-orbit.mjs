@@ -29,6 +29,7 @@ const {
   totalEnergy, bodyEnergy, barycentre, G, SOFT, STAR_MASS,
 } = await import('../src/lib/orbit-sim.ts')
 const { GOALS, GOAL_IDS, Tracker } = await import('../src/lib/orbit-goals.ts')
+const presets = await import('../src/lib/orbit-presets.ts')
 
 const VERBOSE = process.argv.includes('--verbose')
 
@@ -467,6 +468,46 @@ console.log('\nchallenges that should be earned')
     `${geo.map((g) => g.toFixed(2)).join(', ')} Hill radii`)
   report('...and that system runs clean for two minutes', survives(build(spaced, 14), 120),
     `${spaced.length} planets at ${spaced.join(', ')}`)
+}
+
+{
+  /*
+   * The preset itself, as the page builds it, at the sizes people play at: a
+   * phone, a small laptop, a desktop and a big screen. Every planet and moon
+   * has to be there two minutes later, in every one of five random rotations.
+   * Where there is room the outermost planet is a giant with a moon, and the
+   * moon has to be going round the giant, not just near it.
+   */
+  let seed = 9
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  const sizes = [[390, 640], [1000, 560], [1275, 700], [1440, 860]]
+  for (const [w, h] of sizes) {
+    let lost = 0, layout = '', moonLaps = Infinity, hasMoon = false
+    for (let t = 0; t < 5; t++) {
+      resetIds()
+      let b = presets.solar(w, h, rand)
+      const n0 = b.length
+      layout = b.slice(1).map((x) => (x.m >= 40 && x.m < 100 ? 'giant' : x.m < 1 ? 'moon' : 'rock')).join(' ')
+      const giant = b.find((x) => x.m >= 40 && x.m < 100), moon = b.find((x) => x.m < 1)
+      hasMoon = !!moon
+      let swept = 0, last = moon ? Math.atan2(moon.y - giant.y, moon.x - giant.x) : 0
+      for (let f = 0; f < 60 * 120 && b.length === n0; f++) {
+        for (let s = 0; s < 2; s++) b = step(b, 0.5, w, h).bodies
+        if (moon && b.length === n0) {
+          const a = Math.atan2(moon.y - giant.y, moon.x - giant.x)
+          swept += wrapAngle(a - last)
+          last = a
+        }
+      }
+      if (b.length < n0) lost++
+      if (moon) moonLaps = Math.min(moonLaps, Math.abs(swept) / (2 * Math.PI))
+    }
+    report(`the solar preset at ${w}×${h} keeps everything for two minutes`, lost === 0,
+      `sun, ${layout}${lost ? ` — lost something in ${lost} of 5` : ''}`)
+    if (hasMoon) report('...and its moon goes round the giant', moonLaps > 30, `at least ${moonLaps.toFixed(0)} laps`)
+  }
+  report('a phone has no room for a giant', !presets.solar(390, 640).some((x) => x.m >= 40 && x.m < 100))
+  report('a desktop does, with a moon', presets.solar(1275, 700).some((x) => x.m < 1))
 }
 
 {

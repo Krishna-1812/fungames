@@ -172,6 +172,7 @@ import { GOALS } from '../lib/orbit-goals'
   import { FixedClock } from '../lib/fixed-clock'
   import { createRenderer } from '../lib/orbit-render'
   import { launchFrame, predict, type Path } from '../lib/orbit-predict'
+  import * as presets from '../lib/orbit-presets'
   import {
     type Body, type StepEvents,
     makeBody, step, circularV, radiusFor, MAX_BODIES,
@@ -628,104 +629,11 @@ import { GOALS } from '../lib/orbit-goals'
     tip.textContent = 'Drag across the sky to launch a body. Longer drag, faster throw.'
   }
 
-  /**
-   * Cancel the system's net momentum by nudging the heaviest body.
-   *
-   * Without this a ring of planets all going the same way carries the star
-   * slowly across the screen, because a preset that hands everything a
-   * velocity and the star none is a system with somewhere to be. It is a
-   * handful of pixels over a minute, which is exactly the sort of thing that
-   * looks like a bug in the physics and is not.
-   */
-  function settle() {
-    if (!bodies.length) return
-    let px = 0, py = 0
-    for (const b of bodies) { px += b.m * b.vx; py += b.m * b.vy }
-    let heavy = bodies[0]
-    for (const b of bodies) if (b.m > heavy.m) heavy = b
-    heavy.vx -= px / heavy.m
-    heavy.vy -= py / heavy.m
-  }
-
-  /**
-   * A solar system that lasts more than five seconds.
-   *
-   * The old preset put planets at 70, 105, 145, 190, 240 and 300, which looks
-   * evenly spaced and is not. The measure that matters is the mutual Hill
-   * radius — the reach of a planet's own gravity against the star's — and it
-   * grows with distance, so equal gaps mean the outer planets get steadily
-   * more crowded in the only units that count. Those radii went from 4.3 Hill
-   * radii of separation down to 1.7, where about ten are wanted, and the
-   * system lost a planet within a few seconds every single time.
-   *
-   * Spacing geometrically instead keeps the separation constant in Hill radii
-   * all the way out. The same planets then run clean indefinitely.
-   */
-  const SUN = 2600
-  /**
-   * Gaps between orbits, measured in mutual Hill radii rather than pixels.
-   * Four loses a planet in seven runs out of twenty, though never inside the
-   * first forty seconds. Five is clean in every run tried.
-   */
-  const HILL_GAPS = 5
-
-  function solar() {
-    clear()
-    const cx = W / 2, cy = H / 2
-    add(cx, cy, 0, 0, SUN)
-    const edge = Math.min(W, H) / 2 - 12
-    // How heavy the planets can be and still leave room for four of them.
-    // A planet's Hill radius grows as the cube root of its mass, so lighter
-    // planets can be packed closer without destabilising each other, and a
-    // phone in portrait has room for three rather than two. Both ends are
-    // clamped: below 4 they are invisible, above 14 the ladder runs off the
-    // side of any screen anyway.
-    const want = Math.cbrt(edge / 70)
-    const heaviest = Math.min(14, Math.max(4, 1.5 * SUN * Math.pow((want - 1) / HILL_GAPS, 3)))
-    const ratio = 1 + HILL_GAPS * Math.cbrt((2 * heaviest) / (3 * SUN))
-    // One shared rotation, so every system looks different without ever
-    // starting two neighbours side by side.
-    const spin = Math.random() * Math.PI * 2
-    for (let i = 0, r = 70; r <= edge; i++, r *= ratio) {
-      const a = spin + i * 2.39996
-      // The circular speed from orbit-sim.ts, which is Kepler's now that the
-      // gravity is no longer softened, and stays exact if that ever changes.
-      const v = circularV(SUN, r)
-      const m = 4 + Math.random() * (heaviest - 4)
-      add(cx + Math.cos(a) * r, cy + Math.sin(a) * r, -Math.sin(a) * v, Math.cos(a) * v, m)
-    }
-    settle()
-    sfx.great()
-  }
-
-  function binary() {
-    clear()
-    const cx = W / 2, cy = H / 2
-    const sep = Math.min(W, H) * 0.22
-    const M = 900
-    // Each star travels at half the relative circular speed of the pair, and
-    // the pair's speed is set by their combined mass over the full separation.
-    const v = circularV(2 * M, 2 * sep) / 2
-    add(cx - sep, cy, 0, v, M)
-    add(cx + sep, cy, 0, -v, M)
-    for (let i = 0; i < 14; i++) {
-      const r = sep * (2.1 + Math.random() * 1.5)
-      const a = Math.random() * Math.PI * 2
-      const vv = circularV(2 * M, r)
-      add(cx + Math.cos(a) * r, cy + Math.sin(a) * r, -Math.sin(a) * vv, Math.cos(a) * vv, 3 + Math.random() * 6)
-    }
-    settle()
-    sfx.great()
-  }
-
-  function chaos() {
-    clear()
-    for (let i = 0; i < 90; i++) {
-      add(Math.random() * W, Math.random() * H, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.4, 3 + Math.random() * 12)
-    }
-    settle()
-    sfx.whoosh()
-  }
+  // The systems themselves are built in lib/orbit-presets.ts, where the
+  // checker can prove each one holds together at every screen size.
+  function solar() { clear(); bodies = presets.solar(W, H); sfx.great() }
+  function binary() { clear(); bodies = presets.binary(W, H); sfx.great() }
+  function chaos() { clear(); bodies = presets.chaos(W, H); sfx.whoosh() }
 
   document.getElementById('presetSolar')!.addEventListener('click', () => { unlock(); solar(); shell.pick('Scene started', 'Solar system') })
   document.getElementById('presetBinary')!.addEventListener('click', () => { unlock(); binary(); shell.pick('Scene started', 'Binary') })
