@@ -180,6 +180,40 @@ export function bounds(c: Cash): { min: [number, number, number]; max: [number, 
   return { min, max }
 }
 
+const plural = (n: number, one: string) => n.toLocaleString('en-US') + ' ' + (n === 1 ? one : one + 's')
+const NOTE_NAMES: Record<number, string> = { 100: 'hundred', 50: 'fifty', 20: 'twenty', 10: 'ten', 5: 'five', 1: 'one' }
+
+/**
+ * What is left, in words: the two biggest kinds of piece, and what it all
+ * weighs — a note is a gram, so a hundred billion is a thousand tonnes.
+ */
+export function describe(c: Cash): { what: string; weight: string } {
+  const parts: string[] = []
+  if (c.pallets) parts.push(plural(c.pallets, 'pallet'))
+  if (c.bricks) parts.push(plural(c.bricks, 'brick'))
+  if (c.bundles) parts.push(plural(c.bundles, 'bundle'))
+  if (c.notes) parts.push(plural(c.notes, 'note'))
+  const loose = c.change.reduce((a, b) => a + b, 0)
+  let what: string
+  if (!parts.length && !loose) what = 'Nothing. Not a single note.'
+  else if (!parts.length && c.change.length === 1) what = `One ${NOTE_NAMES[c.change[0]]}-dollar note`
+  else if (!parts.length) what = `${c.change.length} small notes, $${loose}`
+  else {
+    what = parts.length === 1 ? parts[0] : parts[0] + ' and ' + parts[1]
+    if (c.pallets === PALLETS) what += ' of hundred-dollar notes'
+    else if (parts.length === 1 && loose) what += ` and $${loose} in smaller notes`
+    what = what[0].toUpperCase() + what.slice(1)
+  }
+  const grams = c.pallets * BRICKS_PER_PALLET * BUNDLES_PER_BRICK * NOTES_PER_BUNDLE +
+    c.bricks * BUNDLES_PER_BRICK * NOTES_PER_BUNDLE + c.bundles * NOTES_PER_BUNDLE + c.notes + c.change.length
+  const t = Math.round(grams / 1e6)
+  const weight = !grams ? ''
+    : grams >= 1e6 ? `${t.toLocaleString('en-US')} ${t === 1 ? 'tonne' : 'tonnes'} of paper`
+    : grams >= 1000 ? `${(grams / 1000).toLocaleString('en-US', { maximumFractionDigits: grams < 1e4 ? 1 : 0 })} kg of paper`
+    : `${grams} ${grams === 1 ? 'gram' : 'grams'} of paper`
+  return { what, weight }
+}
+
 function hash(n: number) {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
   return x - Math.floor(x)

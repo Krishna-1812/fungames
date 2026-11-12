@@ -31,6 +31,18 @@ import { productSvg } from '../lib/spend-art'
       <div class="sp-track" id="track" aria-hidden="true"><div class="sp-track-fill" id="trackFill"></div></div>
     </div>
 
+    <div class="sp-body">
+      {/* The money itself, in a warehouse. The caption is what a screen reader
+          gets; the picture is the same thing, drawn. */}
+      <figure class="sp-vault" id="vaultBox">
+        <canvas id="vault" aria-hidden="true"></canvas>
+        <figcaption class="sp-vault-cap" aria-live="polite">
+          <b id="vaultWhat">1,000 pallets of hundred-dollar notes</b>
+          <span id="vaultWeight">1,000 tonnes of paper</span>
+        </figcaption>
+      </figure>
+
+      <div class="sp-shop">
     <p class="sp-lede">
       You have one hundred billion dollars. Buying one of everything costs about
       ninety-seven billion, so getting to exactly zero is going to take some care.
@@ -55,6 +67,8 @@ import { productSvg } from '../lib/spend-art'
         ))
       }
     </ul>
+      </div>
+    </div>
   </div>
 
   <dialog class="panel" id="sheet" aria-labelledby="receiptTitle">
@@ -94,6 +108,8 @@ import { productSvg } from '../lib/spend-art'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface } from '../lib/gl'
   import { VAULT_FRAG } from '../lib/spend-vault'
+  import { createVault } from '../lib/spend/vault'
+  import { breakDown, describe } from '../lib/spend/cash'
   import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
@@ -138,12 +154,41 @@ import { productSvg } from '../lib/spend-art'
   const KEY = 'spend-it:v1'
   const usd = (n) => '$' + Math.round(n).toLocaleString('en-US')
 
+  /* The money, as a thing: pallets of notes in a warehouse, taken away as it
+     is spent (lib/spend/vault.ts). Without WebGL the strip below stands in. */
+  const vaultCanvas = document.getElementById('vault') as HTMLCanvasElement
+  const VAULT = createVault(vaultCanvas, { reduced: prefersReducedMotion })
+  const spRoot = document.querySelector('.sp') as HTMLElement
+  spRoot.classList.toggle('has-vault', !!VAULT)
+  let vaultRaf = 0
+  const kickVault = () => { if (VAULT && !vaultRaf) vaultRaf = requestAnimationFrame(drawVault) }
+  function drawVault() {
+    vaultRaf = 0
+    const r = vaultCanvas.getBoundingClientRect()
+    const cap = (document.querySelector('.sp-vault-cap') as HTMLElement).offsetHeight + 22
+    if (VAULT!.frame(r.width, r.height, cap)) kickVault()
+  }
+  if (VAULT) new ResizeObserver(kickVault).observe(vaultCanvas)
+  // The balance bar's height, so the warehouse can stick just under it.
+  new ResizeObserver(() => spRoot.style.setProperty('--sp-bar-h', (document.querySelector('.sp-bar') as HTMLElement).offsetHeight + 'px'))
+    .observe(document.querySelector('.sp-bar')!)
+  let shownLeft: number | null = null
+  function showVault(left: number) {
+    if (!VAULT || left === shownLeft) return
+    VAULT.set(left, shownLeft === null ? 'still' : left < shownLeft ? 'buy' : 'sell')
+    shownLeft = left
+    const d = describe(breakDown(left))
+    document.getElementById('vaultWhat')!.textContent = d.what
+    document.getElementById('vaultWeight')!.textContent = d.weight
+    kickVault()
+  }
+
   /* The balance strip. 'level' eases toward the true figure rather than
      snapping, so spending reads as a level dropping instead of a value
      changing. */
   let level = 1, levelTarget = 1
   let splashAt = -1e6
-  const vault = new ShaderSurface(document.getElementById('track'), VAULT_FRAG, {
+  const vault = VAULT ? null : new ShaderSurface(document.getElementById('track'), VAULT_FRAG, {
     scale: 1,
     uniforms: () => ({
       u_level: level,
@@ -161,10 +206,10 @@ import { productSvg } from '../lib/spend-art'
       const d = levelTarget - level
       level += d * 0.18
       if (Math.abs(d) < 0.0004) level = levelTarget
-      if (prefersReducedMotion) vault.redraw()
+      if (prefersReducedMotion) vault?.redraw()
       if (level !== levelTarget) easing = requestAnimationFrame(step)
     }
-    if (prefersReducedMotion) { level = levelTarget; vault.redraw() }
+    if (prefersReducedMotion) { level = levelTarget; vault?.redraw() }
     else easing = requestAnimationFrame(step)
   }
 
@@ -195,6 +240,7 @@ import { productSvg } from '../lib/spend-art'
     trackFill.style.width = `${(1 - left / BUDGET) * 100}%`
     levelTarget = Math.max(0, Math.min(1, left / BUDGET))
     easeLevel()
+    showVault(left)
 
     for (const it of items) {
       if (document.activeElement !== it.input) it.input.value = String(it.n)
@@ -462,6 +508,43 @@ import { productSvg } from '../lib/spend-art'
 
   .sp-lede { font-size: var(--fs-lead); color: var(--ink2); max-width: 56ch; }
 
+  /* The warehouse: on a phone a band under the balance, held there while the
+     shop scrolls, so what a purchase takes is always in sight; on a wide
+     screen the left-hand half, held beside the shop. */
+  .sp-body { display: grid; gap: 18px; }
+  .sp-shop { display: grid; gap: 18px; min-width: 0; }
+  .sp-vault {
+    position: sticky; top: var(--sp-bar-h, 96px); z-index: 20;
+    margin: 0; height: 210px; border-radius: 16px; overflow: hidden;
+    background: #0a0d12; isolation: isolate;
+    box-shadow: 0 14px 30px -12px rgb(10 13 18 / 0.45);
+  }
+  .sp:not(.has-vault) .sp-vault { display: none; }
+  .sp.has-vault .sp-track { display: none; }
+  .sp-vault canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* A lens's fall-off at the corners. */
+  .sp-vault::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(120% 95% at 50% 45%, transparent 55%, rgb(4 6 9 / 0.55));
+  }
+  .sp-vault-cap {
+    position: absolute; left: 16px; right: 16px; bottom: 13px; z-index: 1;
+    display: flex; flex-direction: column; gap: 1px; pointer-events: none;
+    color: #eef3f9; font-size: 13px; text-shadow: 0 1px 3px rgb(0 0 0 / 0.7);
+  }
+  .sp-vault-cap b { font-size: 15px; font-weight: 700; }
+  .sp-vault-cap span { color: #aebbcc; }
+  @media (min-width: 980px) {
+    .sp-body { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: 22px; }
+    .sp-vault {
+      top: calc(var(--sp-bar-h, 96px) + 14px);
+      height: min(640px, calc(100vh - var(--sp-bar-h, 96px) - 44px));
+    }
+    .sp-vault-cap { left: 20px; bottom: 18px; font-size: 14px; }
+    .sp-vault-cap b { font-size: 17px; }
+    .sp-grid { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+  }
+
   .sp-grid {
     list-style: none; margin: 0; padding: 0;
     display: grid; gap: 12px;
@@ -528,7 +611,6 @@ import { productSvg } from '../lib/spend-art'
     .sp-item { padding: 12px 10px; }
     .sp-controls { display: grid; grid-template-columns: 1fr 1fr; }
     .sp-qty { grid-column: 1 / -1; order: -1; width: 100%; box-sizing: border-box; }
-    .sp-bar { grid-template-columns: 1fr; }
-    .sp-acts { justify-self: start; }
+    .sp-acts { justify-self: end; }
   }
 </style>

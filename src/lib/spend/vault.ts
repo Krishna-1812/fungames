@@ -22,8 +22,11 @@ import { noteFace, edges, bundleTop, palletSide, palletTop } from './paper'
 export type Vault = {
   /** Show this balance. 'buy' takes the difference away, 'sell' puts it back, 'still' just shows it. */
   set(dollars: number, how: 'buy' | 'sell' | 'still'): void
-  /** Draw at this size. Returns true while anything is still moving. */
-  frame(w: number, h: number): boolean
+  /**
+   * Draw at this size, keeping the money clear of the bottom `pad` pixels
+   * (where the page has its caption). Returns true while anything is still moving.
+   */
+  frame(w: number, h: number, pad?: number): boolean
   dispose(): void
 }
 
@@ -342,11 +345,14 @@ float joint(vec2 p, float every, float width) {
   }
 
   const corners = Array.from({ length: 8 }, () => new Vector3())
-  function frame(w: number, h: number) {
+  function frame(w: number, h: number, pad = 0) {
     if (w < 2 || h < 2) return false
     renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1))
     renderer.setSize(w, h, false)
-    camera.aspect = w / h
+    // The picture is framed in the part above the caption and runs on under it.
+    const fh = Math.max(h * 0.5, h - pad)
+    camera.aspect = w / fh
+    camera.setViewOffset(w, fh, 0, 0, w, h)
     const t = performance.now()
     let busy = writePieces(t)
 
@@ -396,6 +402,8 @@ float joint(vec2 p, float every, float width) {
     renderer.render(scene, camera)
     return busy
   }
+
+  if (import.meta.env.DEV) (window as unknown as { __vault: unknown }).__vault = { still, gone, camera, leaving: () => leaving.length }
 
   return {
     set,
