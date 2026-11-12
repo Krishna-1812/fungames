@@ -470,6 +470,46 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
   let look = ''
   const target = new Vector3(), want = new Vector3()
   let dist = 0, wantDist = 0, moving = false
+
+  /* The camera always looks from the same place — up at a lamp-lit angle and
+     a little round to the left — so its axes are fixed and only how far back
+     it stands, and where it aims, change. */
+  const PITCH = 0.66, AZIM = -0.18
+  const back = new Vector3(Math.sin(AZIM) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(AZIM) * Math.cos(PITCH))
+  const fwd = back.clone().negate()
+  const right = new Vector3().crossVectors(fwd, new Vector3(0, 1, 0)).normalize()
+  const up = new Vector3().crossVectors(right, fwd)
+  const pts = Array.from({ length: 12 }, () => new Vector3())
+  const q = new Vector3()
+
+  /**
+   * Frame points exactly: the nearest the camera can stand with all of them
+   * inside the picture, and the aim moved so they sit in its middle. A
+   * bounding sphere does this loosely, and on a tall narrow phone screen
+   * loosely means a corner of the sheet off the side.
+   */
+  function frame(points: Vector3[], aim: Vector3, tanH: number, tanV: number) {
+    let D = 0
+    for (let pass = 0; pass < 3; pass++) {
+      D = 0
+      for (const p of points) {
+        q.copy(p).sub(aim)
+        const z = q.dot(fwd)
+        D = Math.max(D, Math.abs(q.dot(right)) / tanH - z, Math.abs(q.dot(up)) / tanV - z)
+      }
+      // Where the points land, as a fraction of the half-frame, and how far
+      // their middle is from the middle of the picture.
+      let lx = Infinity, hx = -Infinity, ly = Infinity, hy = -Infinity
+      for (const p of points) {
+        q.copy(p).sub(aim)
+        const depth = D + q.dot(fwd)
+        const sx = q.dot(right) / depth, sy = q.dot(up) / depth
+        lx = Math.min(lx, sx); hx = Math.max(hx, sx); ly = Math.min(ly, sy); hy = Math.max(hy, sy)
+      }
+      aim.addScaledVector(right, ((lx + hx) / 2) * D).addScaledVector(up, ((ly + hy) / 2) * D)
+    }
+    return D
+  }
   let gripAt: { x: number; y: number } | null = null
 
   function setLook(id: string, mm: number) {
@@ -561,27 +601,30 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
     under.position.set((x0 + x1) / 2, 0.0004 * Math.max(a, b), 0)
     under.material.opacity = 0.32 * s.ground
 
-    // Framing: everything the sheet could occupy, flap standing included, so
-    // the camera does not breathe while the hand moves.
+    // Framing: everything the sheet could occupy — the whole sheet, its stack,
+    // and the height the flap reaches standing up mid-fold — so the
+    // camera does not breathe while the hand moves.
     const span = Math.max(a, b)
-    const ext = new Vector3(a + drawnH, Math.max(drawnH * 2.4, a * 0.5), b)
-    const radius = Math.hypot(ext.x * 1.05, ext.y * 0.55, ext.z)
-    want.set(-drawnH * 0.25, Math.min(ext.y * 0.32, drawnH * 1.2 + a * 0.12), 0)
+    const X = a + drawnH, top = drawnH * 1.6, peak = drawnH + a * 0.95
+    const cy = Math.cos(s.yaw), sy = Math.sin(s.yaw)
+    let i = 0
+    const put = (x: number, y: number, z: number) => pts[i++].set(x * cy + z * sy, y, -x * sy + z * cy)
+    for (const x of [-X, X]) for (const z of [-b, b]) { put(x, 0, z); put(x, top, z) }
+    for (const z of [-b, b]) { put(0, peak, z); put(a * 0.25, peak, z) }
     const fovV = (camera.fov * Math.PI) / 180
-    const fovH = 2 * Math.atan(Math.tan(fovV / 2) * camera.aspect)
-    wantDist = radius / Math.sin(Math.min(fovV, fovH) / 2) * 0.86
+    const tanV = Math.tan(fovV / 2), tanH = tanV * camera.aspect
+    want.set(0, top / 2, 0)
+    // A little room round the edge, and a little more across a narrow screen,
+    // where a hand covers it.
+    wantDist = frame(pts, want, tanH * (camera.aspect < 1.3 ? 0.86 : 0.9), tanV * 0.9)
+    const fovH = 2 * Math.atan(tanH)
     if (!dist) { dist = wantDist; target.copy(want) }
     const k = 0.16
     dist += (wantDist - dist) * k
     target.lerp(want, k)
     moving = Math.abs(wantDist - dist) / wantDist > 0.002 || target.distanceTo(want) / span > 0.002
 
-    const pitch = 0.66, azim = -0.18
-    camera.position.set(
-      target.x + Math.sin(azim) * Math.cos(pitch) * dist,
-      target.y + Math.sin(pitch) * dist,
-      target.z + Math.cos(azim) * Math.cos(pitch) * dist,
-    )
+    camera.position.copy(target).addScaledVector(back, dist)
     camera.near = dist * 0.02
     camera.far = dist * 40
     camera.lookAt(target)
