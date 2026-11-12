@@ -67,6 +67,9 @@ const nextData: NextData = {
   home: { cartoon: withBase('/'), real: withBase('/realistic/') },
   base: withBase('/').replace(/\/$/, ''),
 }
+/* Only a game on the island has a building to show: an unlisted one (Powder)
+   asked for a picture that was never made and showed a broken image. */
+const onIsland = nextData.games.some((g) => g.slug === slug)
 
 const gameUrl = new URL(Astro.url.pathname, Astro.site ?? SITE.url).href
 const homeUrl = new URL(withBase('/'), Astro.site ?? SITE.url).href
@@ -110,7 +113,7 @@ const structuredData = [
         <span aria-hidden="true">←</span><span class="shell-back-word">Island</span>
       </a>
       {/* The building you came in through, beside the name, in the island's own lettering. */}
-      <h1 class="shell-title"><span class="shell-bldg" aria-hidden="true"><img src={withBase(`/next/${nextData.world}/${slug}.webp`)} alt="" width="72" height="54" decoding="async" /></span><span>{game.title}</span></h1>
+      <h1 class="shell-title">{onIsland && <span class="shell-bldg" aria-hidden="true"><img src={withBase(`/next/${nextData.world}/${slug}.webp`)} alt="" width="72" height="54" decoding="async" /></span>}<span>{game.title}</span></h1>
       <div class="shell-controls" role="group" aria-label="Game controls">
         <button type="button" class="shell-icon" data-act="sound" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.2L12.5 5v14l-4.8-4H4.5z" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path class="ic-on" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><path class="ic-off" d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
