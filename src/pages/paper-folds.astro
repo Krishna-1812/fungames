@@ -232,6 +232,7 @@ const SHEET_ICONS: Record<string, string> = {
   } from '../lib/fold-paper'
   import { fold3d, fitCam, fitCorners } from '../lib/fold-scene'
   import { createTable } from '../lib/fold/table'
+  import { createPaperSound } from '../lib/fold/sound'
   import { skyAt, starField, rgb, rgba, shade } from '../lib/fold-sky'
   import {
     REFS, target as scaleTarget, passed as scalePassed, worldHeight,
@@ -298,6 +299,9 @@ const SHEET_ICONS: Record<string, string> = {
   let chipTimer = 0
   let refusedAt = -1e9
   const limit = () => maxFolds(sheet, mode)
+  /** How hard the paper is to move now: 0 for one sheet, 1 at its real limit. */
+  const stiffNow = () => clamp(n / Math.max(1, limit()), 0, 1)
+  const PAPER = createPaperSound()
 
   /** The fold under the hand, 0 to 1. */
   let u = 0
@@ -1607,6 +1611,7 @@ const SHEET_ICONS: Record<string, string> = {
   /** Land the fold: halve one way, and in alternate mode turn the sheet. */
   function commit() {
     const wasMark = currentMark().at
+    const stiff = stiffNow()
     everFolded = true
     n++
     u = 0
@@ -1616,7 +1621,8 @@ const SHEET_ICONS: Record<string, string> = {
     // better than the label on the button does.
     if (mode === 'alternate' && !prefersReducedMotion) yaw = -Math.PI / 2
     unlock()
-    tone({ freq: 180 * Math.pow(1.055, n), to: 120 * Math.pow(1.055, n), dur: 0.16, type: 'triangle', gain: 0.2 })
+    PAPER.release()
+    PAPER.crease(stiff)
     paint()
     const mk = currentMark()
     if (mk.at !== wasMark) {
@@ -1643,12 +1649,17 @@ const SHEET_ICONS: Record<string, string> = {
     }
     const t0 = performance.now()
     const DUR = got >= 1 ? 340 : 240
+    unlock()
+    let last = t0, was = u
     running = requestAnimationFrame(function step(now) {
       const k = clamp((now - t0) / DUR, 0, 1)
       u = got * (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
+      PAPER.drag((u - was) / Math.max(0.001, (now - last) / 1000), stiffNow())
+      last = now; was = u
       paint()
       if (k < 1) { running = requestAnimationFrame(step); return }
       running = 0
+      PAPER.release()
       if (got >= 1) commit()
       else { refuse(); spring() }
     })
@@ -1671,8 +1682,13 @@ const SHEET_ICONS: Record<string, string> = {
     })
   }
 
+  /** Creaked already during this drag, so letting go does not creak again. */
+  let creaked = false
+
   function refuse() {
-    unlock(); sfx.bad()
+    unlock()
+    if (!creaked) PAPER.creak(stiffNow())
+    creaked = false
     refusedAt = performance.now()
     STAGE.c.classList.remove('refuse')
     void STAGE.c.offsetWidth
@@ -1701,11 +1717,14 @@ const SHEET_ICONS: Record<string, string> = {
 
   /* Pointer, measured against the canvas's own width so the gesture means the
      same thing on a phone as on a desktop. */
-  let grabX = 0
+  let grabX = 0, lastMoveAt = 0, lastU = 0
   STAGE.c.addEventListener('pointerdown', (e) => {
     if (imaginary || running) return
     dragging = true
+    creaked = false
     grabX = e.clientX
+    lastMoveAt = performance.now(); lastU = u
+    unlock()
     STAGE.c.setPointerCapture(e.pointerId)
     cancelAnimationFrame(springing)
   })
@@ -1718,15 +1737,20 @@ const SHEET_ICONS: Record<string, string> = {
     // bend it gets heavier, and it stops at the limit without a jolt.
     const knee = got * 0.8
     u = got >= 1 ? Math.min(1, raw) : raw < knee ? raw : knee + (got - knee) * Math.tanh((raw - knee) / (got - knee))
+    const now = performance.now()
+    PAPER.drag((u - lastU) / Math.max(0.008, (now - lastMoveAt) / 1000), stiffNow())
+    lastMoveAt = now; lastU = u
+    if (got < 1 && !creaked && u > got * 0.97) { creaked = true; PAPER.creak(stiffNow()) }
     paint()
   })
   const endDrag = (e: PointerEvent) => {
     if (!dragging) return
     dragging = false
     try { STAGE.c.releasePointerCapture(e.pointerId) } catch { /* already gone */ }
+    PAPER.release()
     const got = reach(sheet, n + 1, mode)
     if (got >= 1 && u > 0.5) finish()
-    else { if (got < 1 && u > 0.05) refuse(); spring() }
+    else { if (got < 1 && u > 0.05) refuse(); creaked = false; spring() }
   }
   STAGE.c.addEventListener('pointerup', endDrag)
   STAGE.c.addEventListener('pointercancel', endDrag)
@@ -1815,7 +1839,7 @@ const SHEET_ICONS: Record<string, string> = {
     u = 0
     if (n <= limit()) imaginary = false
     geo = geoAt(n)
-    unlock(); sfx.blip(Math.max(0, 6 - (n % 6)))
+    unlock(); PAPER.unfold(stiffNow())
     paint()
   })
 
