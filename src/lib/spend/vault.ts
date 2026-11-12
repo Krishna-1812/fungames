@@ -31,6 +31,7 @@ export type Vault = {
 }
 
 type Kind = 'pallets' | 'bases' | 'bricks' | 'bundles' | 'notes' | 'c50' | 'c20' | 'c10' | 'c5' | 'c1'
+type IM = InstancedMesh<BoxGeometry, Material[]>
 const KINDS: Kind[] = ['pallets', 'bases', 'bricks', 'bundles', 'notes', 'c50', 'c20', 'c10', 'c5', 'c1']
 const CAP: Record<Kind, number> = {
   pallets: C.PALLETS, bases: C.PALLETS + 1, bricks: C.BRICKS_PER_PALLET, bundles: C.BUNDLES_PER_BRICK,
@@ -145,8 +146,8 @@ export function createVault(canvas: HTMLCanvasElement, opts: { reduced: boolean 
     scene.add(m)
     return m
   }
-  const still = Object.fromEntries(KINDS.map((k) => [k, make(k)])) as Record<Kind, InstancedMesh>
-  const gone = Object.fromEntries(KINDS.map((k) => [k, make(k)])) as Record<Kind, InstancedMesh>
+  const still = Object.fromEntries(KINDS.map((k) => [k, make(k)])) as Record<Kind, IM>
+  const gone = Object.fromEntries(KINDS.map((k) => [k, make(k)])) as Record<Kind, IM>
 
   /* ---- the floor: polished concrete, cut into slabs ------------------------ */
   const floorMat = new MeshStandardMaterial({ color: '#474d55', roughness: 0.38, metalness: 0, envMap: room, envMapIntensity: 0.4 })
@@ -288,7 +289,7 @@ float joint(vec2 p, float every, float width) {
   /** How far through, eased; 0 before it starts. */
   const ease = (t: number, t0: number, dur: number) => Math.max(0, Math.min(1, (t - t0) / dur))
 
-  function place(m: InstancedMesh, i: number, p: Piece, dx = 0, dy = 0, dz = 0, rx = 0, rz = 0) {
+  function place(m: IM, i: number, p: Piece, dx = 0, dy = 0, dz = 0, rx = 0, rz = 0) {
     o.position.set(p.x + dx, p.y + dy, p.z + dz)
     o.rotation.set(rx, p.rot ?? 0, rz)
     o.updateMatrix()

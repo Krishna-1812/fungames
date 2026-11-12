@@ -5,7 +5,7 @@
  * counting machine is a fast flutter of clicks, a shrink-wrapped brick lands
  * with a dull plastic thump, and a pallet of a million notes is lifted with a
  * low groan of hydraulics. So a purchase sounds like the size of what it takes
- * — a latte is a flick, a car is a counter's run, a yacht is a forklift — and
+ * — a latte is a flick, a car is a counter's run, a cruise ship is a forklift — and
  * selling it back is the same weight set down again.
  *
  * Everything goes through the site's master, behind the same mute.

@@ -18,7 +18,7 @@
  * pallets in their rows, then one pallet being broken into — its bricks laid
  * from the bottom layer up, one brick opened into bundles, one bundle into
  * notes, and the odd dollars as smaller notes on top. So spending a latte
- * takes a five off the top, and buying a yacht takes forty pallets off the
+ * takes a five off the top, and buying a cruise ship takes six pallets off the
  * back. Pure, and in metres, so scripts/check-spend-cash.mjs can count it.
  */
 
