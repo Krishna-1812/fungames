@@ -163,11 +163,12 @@ import { ROUND_SIZE } from '../data/memory'
 <script>
   import { createShell } from '../lib/game-shell'
   import { roll, PLAY } from '../lib/motion'
-  import { sfx, unlock } from '../lib/audio'
+  import { sfx, hit, unlock } from '../lib/audio'
   import { pickRound } from '../data/memory'
   import type { Item } from '../data/memory'
   import { mountSheet } from '../lib/memo/paper'
   import { deskTile } from '../lib/memo/desk'
+  import { createScratch } from '../lib/memo/scratch'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import type { Pt, Stroke } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
@@ -206,6 +207,10 @@ import { ROUND_SIZE } from '../data/memory'
   const shell = createShell({ slug: 'from-memory', onRestart: restart })
   loadCrowd('from-memory')
   const ink = new InkSurface(pad)
+  const scratch = createScratch()
+  /* No pointermove arrives while the hand rests, so silence has to be
+     inferred: a pencil that has not moved for a moment is not sounding. */
+  let hush = 0
   const reveal = new Reveal(ref)
 
   // Paper, lit from the same relief the pencil deposits against. Painted once
@@ -261,18 +266,26 @@ import { ROUND_SIZE } from '../data/memory'
     // A resting hand produces a lot of them.
     if (dist < 0.12) return
     const w = nibWidth(dist, at - lastT, lastW, e.pressure)
+    const prevT = lastT
     lastT = at
     lastW = w
     const pt: Pt = { x: q.x, y: q.y, w }
     drawing!.push(pt)
     nib!.push(pt)
+    // Page widths per second, and how hard the lead is pressing.
+    scratch.move(dist / REF_W / Math.max(0.004, (at - prevT) / 1000), Math.min(1, Math.max(0, (w - 0.55) / 1.2)))
+    clearTimeout(hush)
+    hush = window.setTimeout(() => scratch.move(0, 0), 70)
   }
 
   pad.addEventListener('pointerdown', (e) => {
     if (revealed || shell.paused || activePointer !== null || !e.isPrimary || e.button !== 0) return
     activePointer = e.pointerId
     try { pad.setPointerCapture(e.pointerId) } catch { /* not fatal */ }
-    unlock(); sfx.tick()
+    unlock()
+    // The lead touching down: a tap, barely.
+    hit({ dur: 0.035, gain: 0.05, freq: 2600, q: 1.2 })
+    scratch.start()
     const q = pos(e)
     lastT = e.timeStamp
     const pt: Pt = { x: q.x, y: q.y, w: nibWidth(0, 0, 0, e.pressure) }
@@ -303,6 +316,8 @@ import { ROUND_SIZE } from '../data/memory'
      two, which is not what happens with a pen. */
   const end = () => {
     activePointer = null
+    clearTimeout(hush)
+    scratch.stop()
     if (!drawing) return
     drawing = null
     nib!.end()
