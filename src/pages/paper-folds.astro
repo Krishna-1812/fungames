@@ -570,21 +570,21 @@ const SHEET_ICONS: Record<string, string> = {
       g.restore()
     }
 
-    // The room you started in: a dim floor and one warm lamp off to the left.
+    // The room you started in: a dim floor and one cool lamp off to the left.
     // Dim on purpose — the sheet of paper is meant to be the brightest thing
     // in the picture, and it cannot be if the room is.
     if (sky.ground > 0.01) {
       g.save()
       g.globalAlpha = sky.ground
       const fl = g.createLinearGradient(0, h * 0.46, 0, h)
-      fl.addColorStop(0, 'rgb(70 48 26 / 0)')
-      fl.addColorStop(1, 'rgb(48 31 16 / 0.62)')
+      fl.addColorStop(0, 'rgb(26 34 48 / 0)')
+      fl.addColorStop(1, 'rgb(12 16 24 / 0.62)')
       g.fillStyle = fl
       g.fillRect(0, h * 0.46, w, h * 0.54)
       const pool = g.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.72)
-      pool.addColorStop(0, 'rgb(255 206 132 / 0.3)')
-      pool.addColorStop(0.5, 'rgb(226 160 84 / 0.1)')
-      pool.addColorStop(1, 'rgb(200 140 70 / 0)')
+      pool.addColorStop(0, 'rgb(196 214 240 / 0.26)')
+      pool.addColorStop(0.5, 'rgb(140 166 206 / 0.09)')
+      pool.addColorStop(1, 'rgb(110 136 180 / 0)')
       g.fillStyle = pool
       g.fillRect(0, 0, w, h)
       /* Dust. A lamp in a dim room always has something floating in it, and
@@ -596,7 +596,7 @@ const SHEET_ICONS: Record<string, string> = {
         const near = 1 - Math.min(1, Math.hypot(mx - w * 0.3, my - h * 0.3) / (w * 0.6))
         if (near <= 0.02) continue
         g.globalAlpha = sky.ground * m.a * near * 0.5
-        g.fillStyle = 'rgb(255 232 186)'
+        g.fillStyle = 'rgb(222 234 252)'
         g.beginPath(); g.arc(mx, my, 0.5 + m.r * 0.7, 0, Math.PI * 2); g.fill()
       }
       g.restore()
@@ -959,8 +959,8 @@ const SHEET_ICONS: Record<string, string> = {
     }
     const body = g.createLinearGradient(x, 0, x + colW, 0)
     body.addColorStop(0, rgba(sky.accent, 0.55))
-    body.addColorStop(0.34, 'rgb(255 252 242 / 0.96)')
-    body.addColorStop(0.62, 'rgb(255 248 232 / 0.8)')
+    body.addColorStop(0.34, 'rgb(248 251 255 / 0.96)')
+    body.addColorStop(0.62, 'rgb(234 242 252 / 0.8)')
     body.addColorStop(1, rgba(sky.accent, 0.42))
     g.fillStyle = body
     g.fillRect(x, 0, colW, baseY)
@@ -1345,19 +1345,19 @@ const SHEET_ICONS: Record<string, string> = {
     /* The rim light, done properly rather than as an outline.
        Stroking the whole silhouette lights the shaded side too, which is what
        makes a backlit object look like a sticker. Clipping to the shape and
-       raking a warm gradient across it from the left puts the light where the
+       raking the lamp's light across it from the left puts the light where the
        lamp is — the same left-hand lamp the sheet on the stage is lit by. */
     if (hPx > 14) {
       g.save()
       g.clip(body)
       const rake = g.createLinearGradient(0, 0, ref.w * 0.62, 100)
-      rake.addColorStop(0, 'rgb(255 208 146 / 0.55)')
-      rake.addColorStop(0.32, 'rgb(255 196 130 / 0.12)')
-      rake.addColorStop(1, 'rgb(255 190 120 / 0)')
+      rake.addColorStop(0, 'rgb(206 224 250 / 0.55)')
+      rake.addColorStop(0.32, 'rgb(190 210 240 / 0.12)')
+      rake.addColorStop(1, 'rgb(180 200 236 / 0)')
       g.fillStyle = rake
       g.fillRect(0, 0, ref.w, 100)
       g.restore()
-      g.strokeStyle = 'rgb(255 222 172 / 0.34)'
+      g.strokeStyle = 'rgb(214 228 250 / 0.34)'
       g.lineWidth = Math.min(1.6, 1 / s)
       g.stroke(body)
     }
@@ -2084,20 +2084,20 @@ const SHEET_ICONS: Record<string, string> = {
     background: #08080c;
     /* Set from lib/fold-sky.ts every frame. The values here are only what the
        page looks like for the instant before the first paint. */
-    --pf-surface: #1e1812;
-    --pf-well: #14100c;
-    --pf-ink: #f8f0e2;
-    --pf-ink-soft: #baaa8e;
-    --pf-line: #3e3326;
+    --pf-surface: #141921;
+    --pf-well: #0c1016;
+    --pf-ink: #ecf2fa;
+    --pf-ink-soft: #a4b0c2;
+    --pf-line: #2c3542;
     --pf-accent: #4fe3c1;
-    --pf-rim: #604d36;
-    --pf-lift: #2b241c;
-    --pf-sink: #0e0b08;
-    --pf-on-accent: #14100c;
-    --pf-glow: rgb(245 178 66 / 0.34);
-    --pf-glow-soft: rgb(245 178 66 / 0.14);
-    --pf-rim-a: rgb(96 77 54 / 0.55);
-    --pf-line-a: rgb(62 51 38 / 0.85);
+    --pf-rim: #4e5c72;
+    --pf-lift: #1c222c;
+    --pf-sink: #080b10;
+    --pf-on-accent: #0c1016;
+    --pf-glow: rgb(79 227 193 / 0.3);
+    --pf-glow-soft: rgb(79 227 193 / 0.12);
+    --pf-rim-a: rgb(78 92 114 / 0.55);
+    --pf-line-a: rgb(44 53 66 / 0.85);
   }
 
   .sky {
@@ -2283,7 +2283,7 @@ const SHEET_ICONS: Record<string, string> = {
   .budget-bar.deny { animation: deny 620ms var(--ease); }
   @keyframes deny {
     0%, 100% { box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(0 0 0 / 0.5); }
-    30% { box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.75), 0 0 0 3px rgb(244 132 82 / 0.34); }
+    30% { box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.75), 0 0 0 3px rgb(255 110 140 / 0.34); }
   }
 
   /* The honest diagram, on its own little plate so it reads as an instrument
@@ -2326,7 +2326,7 @@ const SHEET_ICONS: Record<string, string> = {
   }
   .inset .in-block { fill: var(--pf-paper-lit); }
   .inset .in-ghost {
-    fill: none; stroke: #ff8a5c; stroke-width: 1.1; stroke-dasharray: 3.5 3;
+    fill: none; stroke: #ff7a9a; stroke-width: 1.1; stroke-dasharray: 3.5 3;
   }
   .inset .in-rule { stroke: var(--pf-ink-soft); stroke-width: 0.8; opacity: 0.55; }
   .inset .in-t { fill: var(--pf-ink-soft); font-size: 8px; }
@@ -2359,8 +2359,8 @@ const SHEET_ICONS: Record<string, string> = {
   }
   .b-next.short {
     background: repeating-linear-gradient(115deg,
-      rgb(244 132 82) 0 5px, rgb(158 62 32) 5px 10px);
-    box-shadow: 0 0 12px rgb(239 124 74 / 0.5);
+      rgb(255 120 150) 0 5px, rgb(150 44 78) 5px 10px);
+    box-shadow: 0 0 12px rgb(255 110 140 / 0.5);
   }
   /* The end of the paper. Nothing may cross it. */
   .b-have {
@@ -2374,7 +2374,7 @@ const SHEET_ICONS: Record<string, string> = {
      orange as the stripe it is standing in and disappearing into it. */
   .b-have.passed {
     background: var(--pf-ink);
-    box-shadow: 0 0 0 1.5px rgb(120 44 20), 0 0 12px rgb(244 132 82 / 0.9);
+    box-shadow: 0 0 0 1.5px rgb(120 30 60), 0 0 12px rgb(255 110 140 / 0.9);
   }
   .budget.spent { opacity: 0.42; filter: saturate(0.4); }
   .budget-text {
