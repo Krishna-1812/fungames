@@ -55,7 +55,7 @@ Ruthless, because that's what was asked for.
 | Game | Verdict | Ceiling |
 |---|---|---|
 | **Rule Cascade** | Best bones on the site, badly under-written. 12 rules vs 35. Every added rule is a joke and pure JS — cheapest high-value work available. | **Very high** |
-| **Powder** | Real cellular automaton, genuinely good tech. 12 elements vs Sandboxels' 500+. No discovery log, no reason to experiment. | **High** |
+| **Powder** | ~~Real cellular automaton, genuinely good tech. 12 elements vs Sandboxels' 500+. No discovery log, no reason to experiment.~~ 37 materials, 53 reactions, eight scenarios — and now a glass tank: every material visible (sixteen were drawn as air), smooth pools, dunes and plumes, a back wall the fire lights, a finer sandbox that opens on a landscape, and the sound of what is in it. | **High — done** |
 | **Orbit** | Best engineering on the site (real n-body, HDR, bloom). Zero game. Nothing to achieve, so nobody stays. | **High** |
 | **Overstimulated** | Good joke, real escalation, but ends too early and the upgrades aren't absurd enough. Neal's version has a hamster wheel and a live video. | **High** |
 | **From Memory** | Genuinely strong concept and the best "oh no" moment on the site. ~~Only 8 prompts.~~ Sixteen, drawn in pencil in a wire-bound sketchbook on a desk; the answer comes on tracing paper laid where the score lined it up, marked in blue pencil, and the page turns over the wire. | **High — done** |
