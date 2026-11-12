@@ -141,21 +141,48 @@ function reliefMap(kind: LookDef['relief']): Texture {
 }
 
 /**
- * The cut edge of a stack: one sheet, then the hairline gap to the next,
- * repeated as many times as there are layers. Mipmapped, so when there are
- * more layers than pixels they average into the edge's own colour instead of
- * shimmering — which is what a real stack's edge does too.
+ * The edge of a folded stack, top to bottom, the way the edge of a book's
+ * pages looks: every sheet a touch brighter or duller than the next, a
+ * hairline gap between them that wanders a little along its length, and the
+ * gaps deeper where whole bundles meet — a folded stack is halves inside
+ * halves, and the seam between two halves is wider than the seam between two
+ * sheets. Drawn for the whole stack at once, not one layer repeated, so when
+ * the sheets are finer than a pixel the bundles still show, as they do on a
+ * real one. Mipmapped, so what is too fine to see averages out rather than
+ * shimmering.
  */
-function laminations(): Texture {
+function foreEdge(layers: number): CanvasTexture {
+  const W = 64, H = Math.min(2048, Math.max(16, layers * 6))
   const cv = document.createElement('canvas')
-  cv.width = 4; cv.height = 16
+  cv.width = W; cv.height = H
   const g = cv.getContext('2d')!
-  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 4, 16)
-  g.fillStyle = '#c9ced6'; g.fillRect(0, 13, 4, 2)
-  g.fillStyle = '#9da4af'; g.fillRect(0, 15, 4, 1)
+  let seed = 9173
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  const lh = H / layers
+  g.fillStyle = '#f6f8fb'; g.fillRect(0, 0, W, H)
+  for (let i = 0; i < layers; i++) {
+    const v = Math.round(232 + rnd() * 23)
+    g.fillStyle = 'rgb(' + v + ' ' + Math.min(255, v + 1) + ' ' + Math.min(255, v + 3) + ')'
+    g.fillRect(0, i * lh, W, lh)
+  }
+  for (let i = 1; i < layers; i++) {
+    // How many folds deep this seam is: 0 between two sheets, more between bundles.
+    let k = 0
+    while (k < 12 && i % (2 << k) === 0) k++
+    const y = i * lh, amp = Math.min(lh * 0.35, 2.5), ph = rnd() * 6.28, f = 0.05 + rnd() * 0.08
+    g.strokeStyle = 'rgb(96 106 122 / ' + Math.min(0.85, 0.22 + 0.11 * k).toFixed(2) + ')'
+    g.lineWidth = Math.max(0.5, Math.min(lh * 0.22, 1.5)) * (1 + 0.35 * k)
+    g.beginPath()
+    for (let x = 0; x <= W; x += 4) {
+      const yy = y + Math.sin(x * f + ph) * amp
+      if (x === 0) g.moveTo(x, yy); else g.lineTo(x, yy)
+    }
+    g.stroke()
+  }
   const t = new CanvasTexture(cv)
   t.wrapS = t.wrapT = RepeatWrapping
   t.minFilter = LinearMipmapLinearFilter
+  t.anisotropy = 8
   t.colorSpace = SRGBColorSpace
   return t
 }
@@ -393,7 +420,7 @@ export function createTable(canvas: HTMLCanvasElement): Table | null {
   const fill = new HemisphereLight('#cfd9e8', '#141a22', 0.3)
   scene.add(fill)
 
-  const lam = laminations()
+  let lam = foreEdge(1), lamLayers = 1
   const reliefs = new Map<string, Texture>()
   const relief = (k: LookDef['relief']) => {
     let t = reliefs.get(k)
@@ -539,7 +566,9 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
       edgeMat.roughness = L.metal ? 0.4 : 0.9
       edgeMat.metalness = L.metal ?? 0
       edgeMat.envMap = room
-      edgeMat.envMapIntensity = L.env
+      // A stack's edge is many fibrous sheet-ends, not one smooth face, so even
+      // turned away from the lamp it catches the room's light.
+      edgeMat.envMapIntensity = L.metal ? L.env : Math.max(L.env, 0.35)
       edgeMat.needsUpdate = true
     }
     return { L, uvk: mm / L.tile }
@@ -570,8 +599,14 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * uTrans * pow(max(0.0, -dot(
     const x0 = -a, x1 = u > 1e-4 ? 0 : a
     stack.scale.set(x1 - x0, drawnH * squash, 2 * b)
     stack.position.set((x0 + x1) / 2, (drawnH * squash) / 2, 0)
-    // Layers up the edges.
-    lam.repeat.set(1, Math.max(1, Math.min(s.layers, 4096)))
+    // Layers up the edges, redrawn only when the number of them changes.
+    const nl = Math.max(1, Math.min(s.layers, 4096))
+    if (nl !== lamLayers) {
+      lam.dispose()
+      lam = foreEdge(nl); lamLayers = nl
+      edgeMat.map = lam
+      edgeMat.needsUpdate = true
+    }
     // The relief tiles in real millimetres. The box's faces each run 0..1, so
     // the repeat has to be set per size; the flap writes its own UVs.
     stackRelief!.repeat.set(Math.max(1, (x1 - x0) * uvk), Math.max(1, 2 * b * uvk))
