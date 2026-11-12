@@ -117,8 +117,7 @@ import { ROUND_SIZE } from '../data/memory'
   import { sfx, unlock } from '../lib/audio'
   import { pickRound } from '../data/memory'
   import type { Item } from '../data/memory'
-  import { ShaderSurface } from '../lib/gl'
-  import { PAPER_FRAG } from '../lib/memo-paper'
+  import { mountSheet } from '../lib/memo/paper'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import type { Pt, Stroke } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
@@ -159,9 +158,9 @@ import { ROUND_SIZE } from '../data/memory'
   const ink = new InkSurface(pad)
   const reveal = new Reveal(ref)
 
-  // Paper. Never animates: still: true is one frame on mount and one per
-  // resize. A drawing surface that shimmers would be intolerable.
-  new ShaderSurface(el('sheet'), PAPER_FRAG, { still: true })
+  // Paper, lit from the same relief the pencil deposits against. Painted once
+  // per size and per page; it never moves.
+  const sheet = mountSheet(el('sheet'))
 
   const band = (n: number) => (n >= 60 ? 'is-high' : n >= 45 ? 'is-mid' : 'is-low')
   const average = () => (scores.length ? Math.round(scores.reduce((a, s) => a + s.score, 0) / scores.length) : 0)
@@ -497,19 +496,15 @@ import { ROUND_SIZE } from '../data/memory'
   .fm-tally li.is-mid { background: var(--sky); }
   .fm-tally li.is-low { background: var(--lilac); }
 
-  /* The sheet: a white page with its ruling printed in, framed in ink. */
+  /* The sheet: drawing paper, painted by lib/memo/paper.ts. */
   .fm-pad {
     position: relative; aspect-ratio: 200 / 140;
     border: 2px solid var(--ink); border-radius: var(--r-lg); overflow: hidden;
-    /* The fallback when there is no WebGL2: eight ruled lines, as a proportion
-       of the height, so it rules the sheet exactly as the shader does. */
-    background:
-      repeating-linear-gradient(0deg, transparent 0 calc(12.5% - 1px), var(--paper2) calc(12.5% - 1px) 12.5%),
-      var(--card);
+    background: rgb(247, 248, 250);
   }
   .fm-pad[hidden] { display: none; }
   .fm-sheet { position: absolute; inset: 0; z-index: 0; }
-  .fm-sheet .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .fm-sheet .fm-paper { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .fm-pad canvas { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
   .fm-ref, .fm-compare svg, .fm-shot-ref {
     fill: none; stroke: var(--t-cobalt); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--t-cobalt);

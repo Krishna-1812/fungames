@@ -67,7 +67,7 @@ void main() {
   float isLived = step(idx, u_lived - 0.5);
   float isNow = 1.0 - step(0.5, abs(idx - u_lived));
 
-  /* No ACES past this point — deliberately, for the same reason memo-paper.ts
+  /* No ACES past this point — deliberately, for the same reason cascade-paper.ts
      has none. The tonemapper exists to stop bright HDR cores clipping; fed
      the flat 0.3-0.9 range a "blue at birth, mint near now" gradient
      actually lives in, it compresses the whole span toward the same pale
