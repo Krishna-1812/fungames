@@ -170,17 +170,17 @@ import { ROUND_SIZE } from '../data/memory'
   import { sfx, hit, unlock } from '../lib/audio'
   import { pickRound } from '../data/memory'
   import type { Item } from '../data/memory'
-  import { mountSheet } from '../lib/memo/paper'
+  import { mountSheet, paperTile } from '../lib/memo/paper'
   import { deskTile } from '../lib/memo/desk'
   import { createScratch } from '../lib/memo/scratch'
   import { createTrace } from '../lib/memo/trace'
-  import { emptiestCorner, writeMark } from '../lib/memo/mark'
+  import { emptiestCorner, writeMark, markGroup } from '../lib/memo/mark'
   import { takeLeaf } from '../lib/memo/leaf'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import type { Pt, Stroke } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
   import { memoryPostcard } from '../lib/memo-postcard'
-  import { refPoints, likeness, verdictFor } from '../lib/memo-score'
+  import { refPoints, likeness, verdictFor, overYours } from '../lib/memo-score'
   import type { Likeness } from '../lib/memo-score'
   import { download } from '../lib/share-card'
   import { recordPlay } from '../lib/stats'
@@ -210,6 +210,8 @@ import { ROUND_SIZE } from '../data/memory'
   let activePointer: number | null = null
   let saved: string[] = []          // data URLs, one per item
   let scores: Likeness[] = []
+  /** Where each page was marked, and with what word, for the gallery. */
+  let marks: ({ at: { x: number; y: number }; word: string } | null)[] = []
 
   const shell = createShell({ slug: 'from-memory', onRestart: restart })
   loadCrowd('from-memory')
@@ -428,14 +430,19 @@ import { ROUND_SIZE } from '../data/memory'
     // on it comes once the last line is down, so the drawing is read before
     // the score is.
     const at = i
+    // Marked where nothing is drawn: not on your lines, not on the answer's.
+    // Decided now, so the gallery has it even if you move on before it is written.
+    if (strokes.length) {
+      const pl = s.place
+      const answer = refPoints(it.svg).map((q) => pl ? { x: pl.cx + (q.x - pl.tx) / pl.sx, y: pl.cy + (q.y - pl.ty) / pl.sy } : q)
+      marks[at] = { at: emptiestCorner([...strokes.flat(), ...answer]), word }
+    } else marks[at] = null
     trace.show(it.svg, s.place, () => {
       if (i !== at || !revealed) return
-      if (strokes.length) {
-        // Marked where nothing is drawn: not on your lines, not on the answer's.
-        const pl = s.place
-        const answer = refPoints(it.svg).map((q) => pl ? { x: pl.cx + (q.x - pl.tx) / pl.sx, y: pl.cy + (q.y - pl.ty) / pl.sy } : q)
+      const m = marks[at]
+      if (m) {
         writeMark(ref, {
-          score: s.score, word, at: emptiestCorner([...strokes.flat(), ...answer]), animate: WORLD_PLAY,
+          score: s.score, word, at: m.at, animate: WORLD_PLAY,
           onScribble: (on) => { if (on) { scratch.start(); scratch.move(0.9, 0.6) } else scratch.stop() },
         })
       }
@@ -520,16 +527,27 @@ import { ROUND_SIZE } from '../data/memory'
 
   function finish() {
     const avg = average()
+    // Every page, torn out of the book and laid on the table: your pencil,
+    // the tracing over it where it was measured, and the mark.
+    shell.resultExtra.style.setProperty('--paper-tile', `url(${paperTile(1).toDataURL()})`)
     shell.resultExtra.innerHTML = `
       <p class="label">Everything you drew</p>
-      <ol class="fm-shelf">${ROUND.map((it, k) => `
-        <li class="fm-shot">
+      <ol class="fm-shelf">${ROUND.map((it, k) => {
+        const s = scores[k], m = marks[k]
+        const k2 = s?.place ? Math.sqrt(s.place.sx * s.place.sy) : 1
+        return `
+        <li class="fm-shot" style="--tilt: ${[-1.2, 0.8, -0.4, 1.1, -0.9][k % 5]}deg">
           <div class="fm-shot-pad">
             <img src="${saved[k] || ''}" alt="Your drawing of ${it.prompt.toLowerCase()}">
-            <svg viewBox="0 0 200 140" aria-hidden="true" class="fm-shot-ref">${it.svg}</svg>
+            <i class="fm-shot-vellum"></i>
+            <svg viewBox="0 0 200 140" aria-hidden="true" class="fm-shot-ref">
+              <g transform="${overYours(s?.place)}" stroke-width="${(1.7 * k2).toFixed(3)}">${it.svg}</g>
+              ${m && s ? markGroup(s.score, m.word, m.at) : ''}
+            </svg>
           </div>
-          <p><b class="num">${scores[k]?.score ?? 0}%</b> ${it.reveal}</p>
-        </li>`).join('')}
+          <p><b class="num">${s?.score ?? 0}%</b> ${it.reveal}</p>
+        </li>`
+      }).join('')}
       </ol>`
 
     recordPlay('from-memory', { average: avg, drawn: scores.filter((s) => s.score > 0).length }, { average: 'high' })
@@ -570,6 +588,7 @@ import { ROUND_SIZE } from '../data/memory'
     i = 0
     saved = []
     scores = []
+    marks = []
     render()
     shell.stage.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'start' })
   }
@@ -724,7 +743,7 @@ import { ROUND_SIZE } from '../data/memory'
   #pad { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M2 30 L6.8 21.8 L25.3 3.3 L28.7 6.7 L10.2 25.2 Z' fill='%233b5a8c' stroke='%23fff' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L6.8 21.8 L25.3 3.3 L28.7 6.7 L10.2 25.2 Z' fill='%233b5a8c' stroke='%2314213a' stroke-width='0.9' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L6.8 21.8 L10.2 25.2 Z' fill='%23e2cba6' stroke='%2314213a' stroke-width='0.9' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L3.9 26.8 L5.2 28.1 Z' fill='%232b2e35'/%3E%3Cpath d='M9.2 21.6 L25.9 4.9' stroke='%2386a2cc' stroke-width='1'/%3E%3C/svg%3E") 2 30, crosshair; }
   /* The answer is inked, in a deep ultramarine, wherever it appears. */
   .fm-ref, .fm-compare svg, .fm-shot-ref {
-    fill: none; stroke: var(--ink-blue); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--ink-blue);
+    fill: none; stroke: var(--ink-blue, #1f43ad); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--ink-blue, #1f43ad);
   }
 
   /* ---- the tracing ---------------------------------------------------------
@@ -822,13 +841,24 @@ import { ROUND_SIZE } from '../data/memory'
   @media (max-width: 1100px), (max-height: 700px) { .fm-props { display: none; } }
 
   /* ---- the gallery, inside the ink result card ---------------------------- */
-  .fm-shelf { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
-  .fm-shot { display: grid; gap: 8px; }
+  /* Each page torn out along its perforations — the row of half-holes left
+     along the top — and laid down a little crooked, in the light. */
+  .fm-shelf { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 22px 18px; grid-template-columns: repeat(auto-fill, minmax(min(140px, 42%), 1fr)); }
+  @media (min-width: 700px) { .fm-shelf { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); } }
+  .fm-shot { display: grid; gap: 10px; transform: rotate(var(--tilt, 0deg)); }
   .fm-shot-pad {
-    position: relative; aspect-ratio: 200 / 140; overflow: hidden; border-radius: var(--r);
-    background: rgb(247, 248, 250);
+    position: relative; aspect-ratio: 200 / 140; overflow: hidden; border-radius: 0 0 2px 2px;
+    background: rgb(247, 248, 250) var(--paper-tile, none) 0 0 / 256px 256px;
+    -webkit-mask: radial-gradient(circle at 50% 0, transparent 2.6px, #000 3.1px) 0 0 / 11px 100% repeat-x;
+    mask: radial-gradient(circle at 50% 0, transparent 2.6px, #000 3.1px) 0 0 / 11px 100% repeat-x;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35), 0 10px 22px rgba(0, 0, 0, 0.35);
   }
-  .fm-shot-pad img, .fm-shot-ref { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .fm-shot { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)) drop-shadow(0 10px 16px rgba(0, 0, 0, 0.3)); }
+  .fm-shot-pad img, .fm-shot-ref, .fm-shot-vellum { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .fm-shot-vellum { background: rgba(240, 245, 252, 0.5); }
+  .fm-shot-ref .fm-mark text { font-family: var(--hand, 'Caveat', cursive); font-weight: 600; fill: #2f4f9a; stroke: none; }
+  .fm-shot-ref .fm-mark-num { font-size: 17px; }
+  .fm-shot-ref .fm-mark-ring { fill: none; stroke: #2f4f9a; stroke-width: 1.15; }
   .fm-shot p { font-size: 14px; }
   .fm-shot b { font-size: 16px; margin-right: 4px; }
 

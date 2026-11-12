@@ -53,22 +53,32 @@ type Opts = {
   onScribble?: (on: boolean) => void
 }
 
-/** Write the mark into the tracing's SVG. */
-export function writeMark(svg: SVGSVGElement, o: Opts) {
-  const g = document.createElementNS(SVGNS, 'g')
-  g.setAttribute('class', 'fm-mark')
-  g.setAttribute('transform', `rotate(-6 ${o.at.x} ${o.at.y})`)
-  g.innerHTML = `
+/** The mark's inside, as markup: the same for the sheet and the gallery. */
+export function markMarkup(score: number, word: string, at: { x: number; y: number }) {
+  return `
     <filter id="fmGrain" x="-10%" y="-10%" width="120%" height="120%">
       <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="12" result="n"/>
       <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.8 -0.5" result="a"/>
       <feComposite in="SourceGraphic" in2="a" operator="arithmetic" k1="0.5" k2="0.55" k3="0" k4="0"/>
     </filter>
     <g filter="url(#fmGrain)">
-      <text class="fm-mark-num" x="${o.at.x}" y="${o.at.y + 3}" text-anchor="middle">${o.score}%</text>
-      <text class="fm-mark-word" x="${o.at.x + 2}" y="${o.at.y + 15}" text-anchor="middle" font-size="${Math.min(9, 100 / o.word.length).toFixed(2)}">${o.word}</text>
-      <path class="fm-mark-ring" d="${ring(o.at.x, o.at.y - 2, 20, 11.5)}"/>
+      <text class="fm-mark-num" x="${at.x}" y="${at.y + 3}" text-anchor="middle">${score}%</text>
+      <text class="fm-mark-word" x="${at.x + 2}" y="${at.y + 15}" text-anchor="middle" font-size="${Math.min(9, 100 / word.length).toFixed(2)}">${word}</text>
+      <path class="fm-mark-ring" d="${ring(at.x, at.y - 2, 20, 11.5)}"/>
     </g>`
+}
+
+/** The mark as a whole group, tilted the way a hand writes across a page. */
+export function markGroup(score: number, word: string, at: { x: number; y: number }) {
+  return `<g class="fm-mark" transform="rotate(-6 ${at.x} ${at.y})">${markMarkup(score, word, at)}</g>`
+}
+
+/** Write the mark into the tracing's SVG. */
+export function writeMark(svg: SVGSVGElement, o: Opts) {
+  const g = document.createElementNS(SVGNS, 'g')
+  g.setAttribute('class', 'fm-mark')
+  g.setAttribute('transform', `rotate(-6 ${o.at.x} ${o.at.y})`)
+  g.innerHTML = markMarkup(o.score, o.word, o.at)
   svg.append(g)
   const num = g.querySelector<SVGTextElement>('.fm-mark-num')!
   const word = g.querySelector<SVGTextElement>('.fm-mark-word')!
