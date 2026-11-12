@@ -67,15 +67,23 @@ check(C.BLOCK.w <= C.BASE.w && C.BLOCK.d <= C.BASE.d, `a pallet's cash fits on i
 const vol = C.BLOCK.w * C.BLOCK.d * C.BLOCK.h, notesPer = C.BRICKS_PER_PALLET * C.BUNDLES_PER_BRICK * C.NOTES_PER_BUNDLE
 check(Math.abs(vol - notesPer * C.NOTE.w * C.NOTE.d * C.NOTE.h) / vol < 1e-9, `a pallet is a million notes, ${vol.toFixed(2)} m³ of paper`)
 
+// A brick's place depends only on its number, so every pair of them is checked
+// once, on the fullest open pallet there can be — not again for every balance,
+// which was a billion and a half comparisons and the slowest check in the suite.
+const fullest = C.pieces(C.breakDown(C.VALUE.pallet - 1))
+let brickClash = 0
+for (let i = 0; i < fullest.bricks.length; i++) for (let j = i + 1; j < fullest.bricks.length; j++) if (overlap(fullest.bricks[i], fullest.bricks[j])) brickClash++
+check(fullest.bricks.length === C.BRICKS_PER_PALLET - 1 && brickClash === 0, `no two of a pallet's ${fullest.bricks.length} bricks pass through each other (${brickClash})`)
+
 let clash = 0, hanging = 0, sunk = 0, counted = 0
 for (const b of balances) {
   const c = C.breakDown(b), ps = C.pieces(c)
   if (ps.pallets.length !== c.pallets || ps.bricks.length !== c.bricks || ps.bundles.length !== c.bundles ||
     ps.notes.length !== c.notes || ps.change.length !== c.change.length) counted++
-  // The loose money: bricks, bundles and the top note (notes and change are a
-  // stack, so only check them against the bricks and bundles).
+  // The loose money: the bundles against the bricks and each other, and the
+  // notes and change (a stack) against both.
   const loose = [...ps.bricks, ...ps.bundles]
-  for (let i = 0; i < loose.length; i++) for (let j = i + 1; j < loose.length; j++) if (overlap(loose[i], loose[j])) clash++
+  for (const u of ps.bundles) for (const l of loose) if (u !== l && overlap(u, l)) clash++
   const stack = [...ps.notes, ...ps.change]
   for (const n of stack) for (const l of loose) if (overlap({ ...n, w: n.w * 0.9, d: n.d * 0.9 }, l)) clash++
   // Everything on the open pallet stays over it.
