@@ -126,6 +126,7 @@ const SHEET_ICONS: Record<string, string> = {
             <canvas id="stage" role="application" tabindex="0"
               aria-label="The sheet on a desk. Drag its right edge to the left to fold it, or press the right arrow key."
             ></canvas>
+            <canvas id="stage3d" aria-hidden="true"></canvas>
             <span class="grab" aria-hidden="true">
               <svg viewBox="0 0 22 12"><path d="M8 1 2.5 6 8 11M20 6H3"/></svg>
             </span>
@@ -229,6 +230,7 @@ const SHEET_ICONS: Record<string, string> = {
     thicknessAt, mm,
   } from '../lib/fold-paper'
   import { fold3d, fitCam, fitCorners } from '../lib/fold-scene'
+  import { createTable } from '../lib/fold/table'
   import { skyAt, starField, rgb, rgba, shade } from '../lib/fold-sky'
   import {
     REFS, target as scaleTarget, passed as scalePassed, worldHeight,
@@ -370,6 +372,16 @@ const SHEET_ICONS: Record<string, string> = {
     return { c, g: c.getContext('2d')!, w: 0, h: 0 }
   }
   const SKY = surf('sky'), STAGE = surf('stage')
+  /* The sheet itself, in three dimensions, over the painted stage. If there is
+     no WebGL the painted sheet (fold-scene.ts) is still there underneath. */
+  const TABLE = createTable(el('stage3d') as HTMLCanvasElement)
+  /** When the last crease was pressed down, for the squash as it lands. */
+  let pressedAt = -1e9
+  const pressNow = () => {
+    if (prefersReducedMotion) return 0
+    const k = (performance.now() - pressedAt) / 260
+    return k >= 1 || k < 0 ? 0 : Math.sin(Math.PI * Math.min(1, k * 1.6)) * (1 - k)
+  }
   const SCALE = surf('scale'), RAIL = surf('rail')
 
   function size(s: Surface) {
@@ -706,6 +718,27 @@ const SHEET_ICONS: Record<string, string> = {
     camNow.cx = lerp(camNow.cx, want.cx, kk)
     camNow.cy = lerp(camNow.cy, want.cy, kk)
     const cam = { ...BASE_CAM, yaw, f: camNow.f, cx: camNow.cx, cy: camNow.cy }
+
+    if (TABLE) {
+      drawWell(g, w, h)
+      const ok = TABLE.render({
+        look: sheet.id, halfW: a, halfD: d, height: hh, mm: norm,
+        layers: 2 ** Math.min(n, 30), u, yaw,
+        lip: n === 0 ? 'none' : mode === 'single' ? 'x' : 'z',
+        ground: sky.ground, column: imaginary ? 1 : 0, accent: sky.accent,
+        press: pressNow(),
+      }, w, h)
+      if (ok) {
+        const gp = TABLE.grip()
+        const hold = STAGE.c.parentElement as HTMLElement
+        if (gp) {
+          hold.style.setProperty('--gx', Math.round(gp.x - 4) + 'px')
+          hold.style.setProperty('--gy', Math.round(gp.y) + 'px')
+        }
+        hold.classList.toggle('show-grab', !everFolded && !dragging && !imaginary && u < 0.02)
+        return
+      }
+    }
 
     const scene = fold3d({
       halfW: a, halfD: d, height: hh, layers: 2 ** Math.min(n, 30),
@@ -1576,6 +1609,7 @@ const SHEET_ICONS: Record<string, string> = {
     everFolded = true
     n++
     u = 0
+    pressedAt = performance.now()
     geo = geoAt(n)
     // The quarter turn is what "alternate" means, and seeing it happen says so
     // better than the label on the button does.
@@ -2007,7 +2041,7 @@ const SHEET_ICONS: Record<string, string> = {
     }
     const camMoving = !!camNow && Math.abs(camNow.f - 0) >= 0 && dirty
     dirty = moved || zooming || yaw !== 0 || dragging || !!running ||
-      performance.now() < overtookUntil
+      performance.now() < overtookUntil || !!TABLE?.settling() || pressNow() > 0
     if (dirty || camMoving) loop = requestAnimationFrame(frame)
   }
 
@@ -2238,6 +2272,8 @@ const SHEET_ICONS: Record<string, string> = {
     touch-action: none; cursor: ew-resize; border-radius: 12px;
   }
   #stage:focus-visible { outline: 3px solid var(--pf-accent); outline-offset: 2px; }
+  #stage3d { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; border-radius: 12px; }
+  #stage.refuse + #stage3d { animation: refuse 360ms var(--ease); }
   /* The one piece of feedback that has to arrive without being read. */
   #stage.refuse { animation: refuse 360ms var(--ease); }
   @keyframes refuse {
