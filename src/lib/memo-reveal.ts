@@ -37,8 +37,11 @@ export class Reveal {
 
   constructor(private svg: SVGSVGElement) {}
 
-  /** Put the answer on the sheet. `instant` skips straight to the finished state. */
-  play(markup: string, instant: boolean) {
+  /**
+   * Put the answer on the sheet. `instant` skips straight to the finished
+   * state; `done` is called once the last line is down.
+   */
+  play(markup: string, instant: boolean, done?: () => void) {
     this.stop()
     this.svg.innerHTML = markup
 
@@ -69,18 +72,18 @@ export class Reveal {
     }
 
     for (const p of this.parts) this.set(p, instant ? 1 : 0)
-    if (instant) return
+    if (instant) { done?.(); return }
 
     this.t0 = performance.now()
     const step = (now: number) => {
       const t = now - this.t0
-      let done = true
+      let finished = true
       for (const p of this.parts) {
         const u = Math.min(1, Math.max(0, (t - p.start) / p.dur))
         this.set(p, u)
-        if (u < 1) done = false
+        if (u < 1) finished = false
       }
-      if (done) { this.raf = 0; return }
+      if (finished) { this.raf = 0; done?.(); return }
       this.raf = requestAnimationFrame(step)
     }
     this.raf = requestAnimationFrame(step)

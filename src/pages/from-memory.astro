@@ -48,7 +48,11 @@ import { ROUND_SIZE } from '../data/memory'
           <div class="fm-holes" aria-hidden="true"></div>
           <div class="fm-pad" id="padBox">
             <canvas id="pad" aria-label="Drawing area — draw with a mouse, pen or finger"></canvas>
-            <svg class="fm-ref" id="ref" viewBox="0 0 200 140" aria-hidden="true" hidden></svg>
+          </div>
+          <div class="fm-trace" id="trace" hidden aria-hidden="true">
+            <div class="fm-vellum"></div>
+            <svg class="fm-ref" id="ref" viewBox="0 0 200 140"></svg>
+            <i class="fm-tape fm-tape--l"></i><i class="fm-tape fm-tape--r"></i>
           </div>
         </div>
         <div class="fm-wire" aria-hidden="true"></div>
@@ -162,13 +166,14 @@ import { ROUND_SIZE } from '../data/memory'
 
 <script>
   import { createShell } from '../lib/game-shell'
-  import { roll, PLAY } from '../lib/motion'
+  import { roll, PLAY, WORLD_PLAY } from '../lib/motion'
   import { sfx, hit, unlock } from '../lib/audio'
   import { pickRound } from '../data/memory'
   import type { Item } from '../data/memory'
   import { mountSheet } from '../lib/memo/paper'
   import { deskTile } from '../lib/memo/desk'
   import { createScratch } from '../lib/memo/scratch'
+  import { createTrace } from '../lib/memo/trace'
   import { InkSurface, Nib, nibWidth, renderStrokes, REF_W, REF_H } from '../lib/memo-ink'
   import type { Pt, Stroke } from '../lib/memo-ink'
   import { Reveal } from '../lib/memo-reveal'
@@ -212,6 +217,14 @@ import { ROUND_SIZE } from '../data/memory'
      inferred: a pencil that has not moved for a moment is not sounding. */
   let hush = 0
   const reveal = new Reveal(ref)
+  // The pen inking the answer onto the tracing paper: quieter and finer than
+  // the pencil, but the same sound of something being drawn.
+  const pen = createScratch()
+  const trace = createTrace(el('trace'), ref, reveal, {
+    animate: WORLD_PLAY,
+    onTape: () => hit({ dur: 0.06, gain: 0.07, freq: 700, q: 0.8 }),
+    onInk: (on) => { if (on) { pen.start(); pen.move(0.55, 0.1) } else pen.stop() },
+  })
 
   // Paper, lit from the same relief the pencil deposits against. Painted once
   // per size and per page; it never moves.
@@ -349,9 +362,7 @@ import { ROUND_SIZE } from '../data/memory'
     el('book').hidden = false
     ink.resize()
     rebuild()
-    reveal.stop()
-    ref.toggleAttribute('hidden', true)
-    ref.innerHTML = ''
+    trace.hide()
     verdict.hidden = true
     el('tools').hidden = false
     for (const id of ['undoBtn', 'clearBtn', 'revealBtn']) (el(id) as HTMLButtonElement).disabled = false
@@ -367,7 +378,9 @@ import { ROUND_SIZE } from '../data/memory'
 
   function doReveal() {
     if (revealed || shell.paused) return
-    unlock(); sfx.sparkle()
+    unlock()
+    // A sheet of tracing paper, let fall onto the page.
+    hit({ dur: 0.4, gain: 0.05, freq: 2200, q: 0.5, sweepTo: 600 })
     const it = ROUND[i]
     revealed = true
     end()
@@ -383,14 +396,9 @@ import { ROUND_SIZE } from '../data/memory'
     el<HTMLImageElement>('attemptImage').alt = `Your drawing: ${it.prompt}`
     el('comparisonRef').innerHTML = it.svg
     el('comparisonRef').setAttribute('aria-label', `Reference: ${it.prompt}`)
-    // `hidden` is an HTMLElement property; on an <svg> assigning it only sets an
-    // expando and the attribute from the markup stays, so the answer never
-    // appeared. The attribute is the thing that has to change.
-    ref.toggleAttribute('hidden', false)
-    reveal.play(it.svg, !PLAY)
 
     const word = verdictFor(s.score)
-    verdict.className = 'fm-verdict ' + band(s.score)
+    verdict.className = 'fm-verdict fm-card ' + band(s.score)
     el('vWord').textContent = word
     el('vWhy').textContent = !strokes.length
       ? 'Nothing drawn — so here is what it actually looks like.'
@@ -408,14 +416,24 @@ import { ROUND_SIZE } from '../data/memory'
     else el('fmCrowd').replaceChildren()
     el('nextLbl').textContent = i + 1 >= ROUND.length ? 'See all ten' : 'Next drawing'
     el('tools').hidden = true
-    verdict.hidden = false
-    const scoreEl = el('vScore')
-    if (PLAY) roll(scoreEl, `${s.score}%`, { from: `${String(s.score).replace(/\d/g, '0')}%`, ms: 1100 })
-    else scoreEl.textContent = `${s.score}%`
-    if (s.score >= 60) shell.pop(verdict)
+    el('vScore').textContent = `${s.score}%`
     shell.announce(`${s.score}% likeness. ${word}.`)
     paintStrip()
     paintTally()
+    // The answer is traced over your drawing first; the card with the number
+    // on it comes once the last line is down, so the drawing is read before
+    // the score is.
+    const at = i
+    trace.show(it.svg, s.place, () => { if (i === at && revealed) showVerdict() })
+  }
+
+  /** The verdict card, put down on the desk once the tracing is done. */
+  function showVerdict() {
+    const s = scores[i]
+    verdict.hidden = false
+    const scoreEl = el('vScore')
+    if (PLAY) roll(scoreEl, `${s.score}%`, { from: `${String(s.score).replace(/\d/g, '0')}%`, ms: 1100 })
+    if (s.score >= 60) shell.pop(verdict)
     verdict.scrollIntoView({ behavior: PLAY ? 'smooth' : 'auto', block: 'nearest' })
     el('nextBtn').focus({ preventScroll: true })
   }
@@ -548,6 +566,7 @@ import { ROUND_SIZE } from '../data/memory'
     --card: #fbfcfd;
     --rule: rgba(84, 118, 178, 0.5);
     --blue-pencil: #2f4f9a;
+    --ink-blue: #1f43ad;
     --hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
     position: relative; isolation: isolate;
     display: grid;
@@ -658,10 +677,45 @@ import { ROUND_SIZE } from '../data/memory'
   .fm-pad { position: relative; z-index: 2; aspect-ratio: 200 / 140; }
   .fm-pad[hidden] { display: none; }
   #pad { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M2 30 L6.8 21.8 L25.3 3.3 L28.7 6.7 L10.2 25.2 Z' fill='%233b5a8c' stroke='%23fff' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L6.8 21.8 L25.3 3.3 L28.7 6.7 L10.2 25.2 Z' fill='%233b5a8c' stroke='%2314213a' stroke-width='0.9' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L6.8 21.8 L10.2 25.2 Z' fill='%23e2cba6' stroke='%2314213a' stroke-width='0.9' stroke-linejoin='round'/%3E%3Cpath d='M2 30 L3.9 26.8 L5.2 28.1 Z' fill='%232b2e35'/%3E%3Cpath d='M9.2 21.6 L25.9 4.9' stroke='%2386a2cc' stroke-width='1'/%3E%3C/svg%3E") 2 30, crosshair; }
+  /* The answer is inked, in a deep ultramarine, wherever it appears. */
   .fm-ref, .fm-compare svg, .fm-shot-ref {
-    fill: none; stroke: var(--t-cobalt); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--t-cobalt);
+    fill: none; stroke: var(--ink-blue); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--ink-blue);
   }
-  .fm-ref { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; pointer-events: none; }
+
+  /* ---- the tracing ---------------------------------------------------------
+     A sheet of tracing paper over the drawing area, a margin smaller than the
+     page, frosting the pencil under it; masking tape at the top corners; the
+     answer inked on top. The box is exactly the drawing area, so the ink lands
+     in the drawing's own coordinates. */
+  .fm-trace { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; aspect-ratio: 200 / 140; pointer-events: none; }
+  .fm-trace[hidden] { display: none; }
+  .fm-vellum {
+    position: absolute; inset: 2.4% 2.1% 2.9% 1.9%; border-radius: 1.5px;
+    transform: rotate(-0.3deg);
+    background-color: rgba(240, 245, 252, 0.5);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='c' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='3' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.4 -0.55'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23c)'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='f' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.35' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -0.9'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23f)'/%3E%3C/svg%3E");
+    background-size: 240px 240px, 120px 120px;
+    -webkit-backdrop-filter: blur(1.3px) brightness(1.07) saturate(0.75) contrast(0.82);
+    backdrop-filter: blur(1.3px) brightness(1.07) saturate(0.75) contrast(0.82);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+      0 0 0 0.5px rgba(130, 146, 172, 0.4),
+      1px 1.5px 2px rgba(40, 50, 70, 0.1),
+      3px 6px 12px rgba(40, 50, 70, 0.07);
+  }
+  .fm-ref { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  /* Blue masking tape: crêpe paper, torn at both ends, the colour multiplied
+     into whatever it lies on the way a translucent tape is. */
+  .fm-tape {
+    position: absolute; top: 0.2%; width: 12.5%; aspect-ratio: 3.3;
+    background:
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 2.6px),
+      linear-gradient(180deg, rgba(122, 170, 234, 0.9), rgba(96, 148, 222, 0.86));
+    clip-path: polygon(2% 0, 98% 0, 100% 12%, 97% 25%, 100% 38%, 97.5% 52%, 100% 66%, 97% 80%, 99.5% 92%, 98% 100%, 2% 100%, 0 88%, 3% 76%, 0.5% 62%, 3% 48%, 0 34%, 2.5% 20%, 0 8%);
+    mix-blend-mode: multiply;
+  }
+  .fm-tape--l { left: 0.4%; transform: rotate(-35deg); }
+  .fm-tape--r { right: 0.4%; transform: rotate(33deg); }
 
   .fm-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   .fm-compare[hidden] { display: none; }
