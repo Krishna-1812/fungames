@@ -141,7 +141,7 @@ import { SCENARIOS } from '../lib/powder-goals'
   import { POWDER_SAVE, captureExperiment, readExperiment, restoreExperiment } from '../lib/powder-scene'
   import {
     MATERIALS, REACTIONS, buildLookup, describe,
-    SAND, WATER, STONE, WOOD, GLASS, ICE, LAVA,
+    SAND, WATER, STONE, WOOD, GLASS, ICE, LAVA, PLANT, DIRT,
   } from '../lib/powder-rules'
   import {
     type World, createWorld, clearWorld, step, put, census, countAlive,
@@ -675,15 +675,55 @@ import { SCENARIOS } from '../lib/powder-goals'
     ring(px, r.top + 20, '#ffb347', 26)
   })
 
+  /* The world you open on: a small landscape, so the first thing you see is a
+     place. Bedrock with some shape to it, a lake on a sandy bed, a bank of
+     earth with a thicket on it, and a pool of lava set into the rock at the
+     far end, lighting the lot. Laid out in fractions of the grid, and kept
+     apart where they would react — no plant by the water, no sand by the
+     lava — so it sits still until you touch it. */
   function seed() {
-    for (let x = 0; x < W; x++) {
-      const h = 4 + Math.round(3 * Math.sin(x / 9))
-      for (let y = H - h; y < H; y++) put(world, x, y, STONE)
+    const fx = (u: number) => Math.round(u * W)
+    const ground = (x: number) => {
+      const u = x / W
+      return H * (0.2 + 0.04 * Math.sin(u * 7.3 + 0.6) + 0.018 * Math.sin(u * 19.1 + 2.0) + 0.009 * Math.sin(u * 47 + 1.3))
     }
-    for (let x = (W * 0.14) | 0; x < (W * 0.34) | 0; x++)
-      for (let y = H - 22; y < H - 8; y++) put(world, x, y, WATER)
-    for (let x = (W * 0.62) | 0; x < (W * 0.74) | 0; x++)
-      for (let y = H - 26; y < H - 8; y++) put(world, x, y, SAND)
+    const bowl = (x: number, c: number, w: number, d: number) => {
+      const u = (x / W - c) / w
+      return Math.abs(u) < 1 ? H * d * (1 - u * u) : 0
+    }
+    const surf = new Int32Array(W)
+    for (let x = 0; x < W; x++) {
+      const h = Math.max(6, Math.round(ground(x) - bowl(x, 0.27, 0.19, 0.17)))
+      for (let y = H - h; y < H; y++) put(world, x, y, STONE)
+      surf[x] = H - h
+    }
+    // The lake: a bed of sand, and water to just under the lower bank.
+    const level = Math.max(surf[fx(0.08)], surf[fx(0.46)]) + 3
+    for (let x = fx(0.08); x <= fx(0.46); x++) {
+      if (bowl(x, 0.27, 0.19, 0.17) <= 0) continue
+      const bed = 2 + Math.round(bowl(x, 0.27, 0.19, 0.17) * 0.05)
+      for (let y = surf[x] - bed; y < surf[x]; y++) put(world, x, y, SAND)
+      for (let y = level; y < surf[x] - bed; y++) put(world, x, y, WATER)
+    }
+    // A bank of earth, and a thicket growing on it.
+    for (let x = fx(0.54); x <= fx(0.78); x++) {
+      const u = (x / W - 0.66) / 0.12
+      const d = Math.round(H * 0.11 * Math.pow(Math.max(0, 1 - u * u), 1.4))
+      for (let y = surf[x] - d; y < surf[x]; y++) put(world, x, y, DIRT)
+      surf[x] -= d
+    }
+    for (let x = fx(0.56); x <= fx(0.76); x += 2 + ((x * 7) % 5)) {
+      const tall = 3 + ((x * 13) % 9)
+      for (let k = 0; k < 3; k++) for (let y = surf[x + k] - tall + k * 2; y < surf[x + k]; y++) put(world, x + k, y, PLANT)
+    }
+    // Lava, open to the air in a pocket of rock, its surface a cell under the
+    // lowest rim so it stays in.
+    let rim = 0
+    for (let x = fx(0.84); x <= fx(0.95); x++) rim = Math.max(rim, surf[x])
+    for (let x = fx(0.84); x <= fx(0.95); x++) {
+      const bottom = surf[x] + Math.round(bowl(x, 0.895, 0.055, 0.09))
+      for (let y = rim + 1; y < bottom; y++) put(world, x, y, LAVA)
+    }
   }
 
   document.getElementById('saveExperiment')!.addEventListener('click', () => {
