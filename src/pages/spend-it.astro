@@ -110,6 +110,7 @@ import { productSvg } from '../lib/spend-art'
   import { VAULT_FRAG } from '../lib/spend-vault'
   import { createVault } from '../lib/spend/vault'
   import { breakDown, describe } from '../lib/spend/cash'
+  import { createCashSound } from '../lib/spend/sound'
   import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
@@ -140,6 +141,7 @@ import { productSvg } from '../lib/spend-art'
     // A fortune is not given back without asking.
     onRestart: () => {
       if (items.some((i) => i.n > 0) && !confirm('Give all of it back?')) return
+      unlock(); CASH.put(BUDGET - balance())
       items.forEach((i) => (i.n = 0))
       shareCard = null
       won = false
@@ -276,8 +278,8 @@ import { productSvg } from '../lib/spend-art'
     } catch {}
   }
 
-  let comboAt = 0
-  let combo = 0
+  /** What the money sounds like as it is taken and put back (lib/spend/sound.ts). */
+  const CASH = createCashSound()
 
   function change(it, delta) {
     it.glyph.classList.remove('jump')
@@ -290,11 +292,7 @@ import { productSvg } from '../lib/spend-art'
       const got = Math.min(delta, affordable)
       it.n += got
       unlock()
-      // Rapid buying builds a rising run of notes instead of one flat click.
-      const now = performance.now()
-      combo = now - comboAt < 480 ? Math.min(combo + 1, 11) : 0
-      comboAt = now
-      sfx.pop(combo)
+      CASH.take(got * it.price)
       splashAt = performance.now()
       const r = it.el.getBoundingClientRect()
       floatText(r.left + r.width / 2, r.top + 24, '-' + usd(got * it.price), '#111318')
@@ -302,8 +300,9 @@ import { productSvg } from '../lib/spend-art'
         count: 8, colors: ['#4fe3c1', '#5b82ff'], speed: 2.6, gravity: 0.2, life: 26, size: 3,
       })
     } else {
+      const had = it.n
       it.n = Math.max(0, it.n + delta)
-      unlock(); sfx.blip(2)
+      unlock(); CASH.put((had - it.n) * it.price)
     }
     render(delta > 0 ? 'buy' : 'sell')
   }
@@ -320,7 +319,11 @@ import { productSvg } from '../lib/spend-art'
       const want = Math.max(0, Math.floor(Number(it.input.value.replace(/\D/g, '')) || 0))
       const others = BUDGET - balance() - it.n * it.price
       const max = Math.floor((BUDGET - others) / it.price)
+      const had = it.n
       it.n = Math.min(want, max)
+      unlock()
+      if (it.n > had) CASH.take((it.n - had) * it.price)
+      else if (it.n < had) CASH.put((had - it.n) * it.price)
       render()
     })
     it.input.addEventListener('blur', () => render())
