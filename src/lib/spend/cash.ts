@@ -106,7 +106,8 @@ export type Piece = Box & { key: string }
 /**
  * Every piece of what is left, with a key that stays the same for as long as
  * the piece does — so a page can tell what was taken away and what was put
- * back by comparing keys.
+ * back by comparing keys. The loose bundles and notes keep their keys when
+ * the brick under them goes, so they can be seen to settle onto the next one.
  */
 export function pieces(c: Cash) {
   const out = {
@@ -140,16 +141,16 @@ export function pieces(c: Cash) {
   const bx = p.x + slot.x, bz = p.z + slot.z
   const floor = c.bricks > 0 ? slot.y + BRICK.h / 2 : BASE.h
   for (let k = 0; k < c.bundles; k++) {
-    out.bundles.push({ key: `u${P}.${c.bricks}.${k}`, x: bx, y: floor + k * BUNDLE.h + BUNDLE.h / 2, z: bz, w: BUNDLE.w, h: BUNDLE.h, d: BUNDLE.d })
+    out.bundles.push({ key: `u${P}.${k}`, x: bx, y: floor + k * BUNDLE.h + BUNDLE.h / 2, z: bz, w: BUNDLE.w, h: BUNDLE.h, d: BUNDLE.d })
   }
   // Counted out by hand, so the notes do not line up exactly: a millimetre
   // here and there and the odd degree.
   let y = floor + c.bundles * BUNDLE.h
   for (let m = 0; m < c.notes; m++) {
-    const jx = (hash(P * 7 + c.bricks * 13 + m * 31) - 0.5) * 0.002
+    const jx = (hash(P * 7 + m * 31) - 0.5) * 0.002
     const jz = (hash(m * 17 + 5) - 0.5) * 0.0016
     const rot = (hash(m * 29 + 11) - 0.5) * 0.02
-    out.notes.push({ key: `n${P}.${c.bricks}.${c.bundles}.${m}`, x: bx + jx, y: y + NOTE.h / 2, z: bz + jz, w: NOTE.w, h: NOTE.h, d: NOTE.d, rot })
+    out.notes.push({ key: `n${P}.${m}`, x: bx + jx, y: y + NOTE.h / 2, z: bz + jz, w: NOTE.w, h: NOTE.h, d: NOTE.d, rot })
     y += NOTE.h
   }
   // The change, dropped on top, each at its own angle.
