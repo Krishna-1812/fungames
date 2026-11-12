@@ -134,7 +134,8 @@ import { SCENARIOS } from '../lib/powder-goals'
 </GameShell>
 
 <script>
-  import { sfx, unlock } from '../lib/audio'
+  import { sfx, unlock, isMuted } from '../lib/audio'
+  import { createAmbience, listen } from '../lib/powder-sound'
   import { burst, ring } from '../lib/fx'
   import { createShell } from '../lib/game-shell'
   import { createPowderRenderer } from '../lib/powder-render'
@@ -422,6 +423,14 @@ import { SCENARIOS } from '../lib/powder-goals'
 
   let paused = false
   let raining = false
+  /** The tank's own sound: fire, lava, water, sand and steam (lib/powder-sound.ts). */
+  const AMB = createAmbience()
+  /* Its own count, not the world's: frozen, the world's frame stands still. */
+  let ear = 0
+  /* Not before a touch: a browser will not start sound the visitor has not asked for. */
+  let touched = false
+  for (const ev of ['pointerdown', 'keydown'] as const) addEventListener(ev, () => { touched = true }, { once: true, capture: true })
+  document.addEventListener('visibilitychange', () => { if (document.hidden) AMB.hush() })
   let lastCount = performance.now()
 
   function tick() {
@@ -448,7 +457,7 @@ import { SCENARIOS } from '../lib/powder-goals'
         // The census is the expensive part, so it runs a few times a second
         // rather than every frame. `tickStats` above is the cheap half and has
         // to be every frame, because `justFired` is emptied by the next step.
-        if (world.frame % 6 === 0) {
+        if (++ear % 6 === 0) {
           census(world, censusBuf)
           foldCensus(stats, censusBuf)
           if (!solved && active.done(censusBuf, stats, world)) scenarioSolved()
@@ -458,6 +467,12 @@ import { SCENARIOS } from '../lib/powder-goals'
     }
     if (W) {
       renderer.draw(world.grid, world.life, world.shade, performance.now() / 1000)
+      // Listened to a few times a second; silent while muted or held still.
+      if (world.frame % 6 === 0) {
+        if (!touched) { /* nothing yet */ }
+        else if (paused || shell.paused || isMuted()) AMB.hush()
+        else AMB.update(listen(world))
+      }
       const now = performance.now()
       if (now - lastCount > 500) {
         const alive = countAlive(world)
