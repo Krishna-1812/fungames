@@ -172,9 +172,18 @@ import { SCENARIOS } from '../lib/powder-goals'
   const canvas = document.getElementById('sim') as HTMLCanvasElement
   const wrap = document.getElementById('wrap') as HTMLElement
   const surface = document.getElementById('worldSurface') as HTMLElement
-  const CELL = 4
+  /* Two grids. The sandbox is fine — two screen pixels a cell — so sand is
+     grains and a pool has a surface; it runs two steps a frame, so things
+     still fall as fast across the screen. The scenarios keep the coarser grid
+     their paint budgets were measured on. The sandbox is its own world, kept
+     while a scenario is open, so leaving one brings back what you built. */
+  const CELL = 4, FINE = 2
+  const clampI = (v: number, a: number, b: number) => Math.max(a, Math.min(b, Math.floor(v)))
   let W = 0, H = 0
   let world: World = createWorld(1, 1)
+  let sandbox: World | null = null
+  /** Cells per brush step and per meteor: twice as many on the fine grid. */
+  const fine = () => (active ? 1 : CELL / FINE)
 
   /* The simulation is untouched. This only decides how the grid is painted: a
      shaded, lit world on the GPU, or the original flat ImageData if WebGL2 is
@@ -186,9 +195,10 @@ import { SCENARIOS } from '../lib/powder-goals'
     const r = wrap.getBoundingClientRect()
     if (r.width < 8 || r.height < 8) return false
     if (!W) {
-      W = Math.max(80, Math.min(340, Math.floor(r.width / CELL)))
-      H = Math.max(60, Math.min(250, Math.floor(r.height / CELL)))
+      W = clampI(r.width / FINE, 160, 640)
+      H = clampI(r.height / FINE, 120, 420)
       world = createWorld(W, H)
+      sandbox = world
     }
     const scale = Math.min(r.width / W, r.height / H)
     surface.style.width = `${W * scale}px`; surface.style.height = `${H * scale}px`
@@ -294,7 +304,11 @@ import { SCENARIOS } from '../lib/powder-goals'
     if (!W && !build()) return
     // A new attempt puts the last result card away.
     shell.reset()
-    clearWorld(world)
+    if (!active) sandbox = world
+    const r = wrap.getBoundingClientRect()
+    world = createWorld(clampI(r.width / CELL, 80, 340), clampI(r.height / CELL, 60, 250))
+    W = world.w; H = world.h
+    build()
     active = sc
     stats = begin(world, sc)
     solved = false
@@ -328,8 +342,8 @@ import { SCENARIOS } from '../lib/powder-goals'
     bar.hidden = true
     surface.classList.remove('masked')
     paintPalette()
-    clearWorld(world)
-    seed()
+    if (sandbox) { world = sandbox; W = world.w; H = world.h; build() }
+    else { clearWorld(world); seed() }
   }
 
   /*
@@ -412,10 +426,16 @@ import { SCENARIOS } from '../lib/powder-goals'
 
   function tick() {
     if (!paused && !shell.paused && W) {
-      if (raining) for (let n = 0; n < 3; n++) put(world, (Math.random() * W) | 0, 0, WATER)
-      step(world, RX)
-      for (const id of world.justFired) discover(id)
-      if (world.bangs > 0) {
+      let bangs = 0
+      for (let sub = active ? 1 : 2; sub > 0; sub--) {
+        if (raining) for (let n = 0; n < 3; n++) put(world, (Math.random() * W) | 0, 0, WATER)
+        step(world, RX)
+        for (const id of world.justFired) discover(id)
+        bangs += world.bangs
+        // Every step, because `justFired` is emptied by the next one.
+        if (active && stats) tickStats(world, stats)
+      }
+      if (bangs > 0) {
         // One sound per frame no matter how many cells detonated at once.
         sfx.boom()
         shell.shake()
@@ -425,7 +445,6 @@ import { SCENARIOS } from '../lib/powder-goals'
         })
       }
       if (active && stats) {
-        tickStats(world, stats)
         // The census is the expensive part, so it runs a few times a second
         // rather than every frame. `tickStats` above is the cheap half and has
         // to be every frame, because `justFired` is emptied by the next step.
@@ -578,7 +597,7 @@ import { SCENARIOS } from '../lib/powder-goals'
   }
 
   function paint(cx: number, cy: number) {
-    const r = brush
+    const r = brush * fine()
     const solid = current === STONE || current === WOOD || current === GLASS || current === ICE
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
@@ -645,10 +664,10 @@ import { SCENARIOS } from '../lib/powder-goals'
   })
   document.getElementById('quakeBtn')!.addEventListener('click', () => {
     unlock(); sfx.boom(); shell.shake()
-    const cx = ((0.25 + Math.random() * 0.5) * W) | 0
-    for (let i = 0; i < 26; i++) {
-      const x = cx + (((Math.random() - 0.5) * 20) | 0)
-      for (let y = 0; y < 8; y++) put(world, x, y, Math.random() < 0.6 ? LAVA : STONE)
+    const cx = ((0.25 + Math.random() * 0.5) * W) | 0, f = fine()
+    for (let i = 0; i < 26 * f * f; i++) {
+      const x = cx + (((Math.random() - 0.5) * 20 * f) | 0)
+      for (let y = 0; y < 8 * f; y++) put(world, x, y, Math.random() < 0.6 ? LAVA : STONE)
     }
     const r = canvas.getBoundingClientRect()
     const px = r.left + (cx / W) * r.width
@@ -683,7 +702,7 @@ import { SCENARIOS } from '../lib/powder-goals'
       const scene = raw.length <= 2000000 ? readExperiment(JSON.parse(raw)) : null
       if (!scene) { toastText('That save could not be read. Your world is unchanged.'); return }
       const restored = restoreExperiment(scene)
-      stop(); world = restored; W = world.w; H = world.h
+      stop(); world = restored; sandbox = world; W = world.w; H = world.h
       paused = true; raining = false
       const pb = document.getElementById('pauseBtn')!
       pb.textContent = 'Resume'; pb.setAttribute('aria-pressed', 'true'); pb.classList.add('on')
