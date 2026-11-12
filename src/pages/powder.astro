@@ -6,11 +6,18 @@ import { SCENARIOS } from '../lib/powder-goals'
 /**
  * Powder - a falling-sand sandbox.
  *
- * A cellular automaton over typed arrays, rendered straight into an ImageData
- * buffer. Nothing here is scripted: oil floats on water because it is lighter,
- * fire makes steam because it met water, and glass appears because sand met
- * lava. All of the interesting behaviour is emergent from about forty local
- * rules, which is why it stays interesting after the novelty wears off.
+ * A cellular automaton over typed arrays (lib/powder-sim.ts). Nothing here is
+ * scripted: oil floats on water because it is lighter, fire makes steam
+ * because it met water, and glass appears because sand met lava. All of the
+ * interesting behaviour is emergent from about forty local rules, which is
+ * why it stays interesting after the novelty wears off.
+ *
+ * It is drawn as a tank (lib/powder-render.ts): every material with its own
+ * surface, pools and dunes and plumes as smooth shapes rather than the cells
+ * the simulation works in, in front of a slate back wall that whatever is
+ * burning lights. The sandbox runs on a grid twice as fine as the scenarios,
+ * two steps a frame, and opens on a small landscape with lava in it. It
+ * sounds like what is in it, too (lib/powder-sound.ts).
  *
  * In the shell the sandbox is the stage, framed rather than filling the
  * window. Score is the reactions found, Solved the scenarios, Particles how
@@ -120,8 +127,9 @@ import { SCENARIOS } from '../lib/powder-goals'
 
   <Fragment slot="howto">
     <p>
-      A falling-sand sandbox. Pick a material and draw into the grid; everything
-      after that is about forty local rules, and none of it is scripted.
+      A falling-sand sandbox in a glass tank. Pick a material and draw into it;
+      everything after that is about forty local rules, and none of it is
+      scripted. Turn the sound on: fire crackles, lava bubbles, sand hisses.
     </p>
     <ul>
       <li>Oil floats on water because it is lighter. Lava meeting sand makes glass. Fire meeting water makes steam.</li>
