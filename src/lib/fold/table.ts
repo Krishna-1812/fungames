@@ -77,7 +77,7 @@ type LookDef = {
 
 const LOOKS: Record<Look, LookDef> = {
   a4: { color: '#e9ecef', edge: '#c9cfd8', rough: 0.84, relief: 'paper', normal: 0.8, env: 0.1, tile: 24, trans: 0.85 },
-  note: { color: '#c9d3c1', edge: '#a4b19c', rough: 0.78, relief: 'paper', normal: 1.0, env: 0.1, tile: 20, trans: 0.5 },
+  note: { color: '#c9d3c1', edge: '#a4b19c', rough: 0.78, relief: 'paper', normal: 0.5, env: 0.1, tile: 20, trans: 0.5 },
   tissue: { color: '#f1f4f8', edge: '#dce1e8', rough: 0.95, relief: 'crinkle', normal: 0.8, env: 0.08, tile: 60, trans: 0.85 },
   roll: { color: '#eef0f3', edge: '#d7dce3', rough: 0.95, relief: 'quilt', normal: 0.8, env: 0.08, tile: 16, trans: 0.75 },
   pitch: { color: '#f1f4f8', edge: '#dce1e8', rough: 0.95, relief: 'crinkle', normal: 0.8, env: 0.08, tile: 60, trans: 0.85 },
