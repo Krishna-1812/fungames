@@ -52,7 +52,10 @@ import { productSvg } from '../lib/spend-art'
       {
         ITEMS.map((item, i) => (
           <li class="sp-item" data-price={item.price} data-name={item.name} data-i={i}>
-            <div class="sp-shot" aria-hidden="true" set:html={productSvg(item.name)} />
+            <div class="sp-stage">
+              <div class="sp-shot" aria-hidden="true" set:html={productSvg(item.name)} />
+              <span class="sp-have num" aria-hidden="true"></span>
+            </div>
             <div class="sp-name">{item.name}</div>
             <div class="sp-price">${item.price.toLocaleString('en-US')}</div>
             <div class="sp-controls">
@@ -133,6 +136,7 @@ import { productSvg } from '../lib/spend-art'
     sell: el.querySelector('.sp-sell'),
     buy: el.querySelector('.sp-buy'),
     glyph: el.querySelector('.sp-shot'),
+    have: el.querySelector('.sp-have'),
     n: 0,
   }))
 
@@ -247,6 +251,7 @@ import { productSvg } from '../lib/spend-art'
     for (const it of items) {
       if (document.activeElement !== it.input) it.input.value = String(it.n)
       it.el.classList.toggle('owned', it.n > 0)
+      it.have.textContent = it.n ? '×' + compact.format(it.n) : ''
       it.sell.disabled = it.n === 0
       // Mark what can no longer be afforded, so the endgame is legible. The
       // button is genuinely disabled rather than merely styled: clicking it was
@@ -554,16 +559,34 @@ import { productSvg } from '../lib/spend-art'
     /* Two across even on a phone: thirty cards one per row is a very long shop. */
     grid-template-columns: repeat(auto-fill, minmax(min(210px, calc(50% - 6px)), 1fr));
   }
-  /* The card these drawings are checked against (check-spend-art's CARD). */
+  /* A catalogue card: lifted a little off the page, the product standing on
+     its own lit backdrop. */
   .sp-item {
-    background: #fdfdfc; border-radius: var(--r); padding: 16px 14px 14px; text-align: center;
-    box-shadow: inset 0 0 0 1.5px var(--paper3);
+    background: linear-gradient(180deg, #ffffff, #f7f9fb); border-radius: var(--r);
+    padding: 10px 10px 14px; text-align: center;
+    box-shadow: 0 0 0 1px rgb(17 19 24 / 0.07), 0 1px 2px rgb(17 19 24 / 0.05), 0 12px 26px -18px rgb(17 19 24 / 0.4);
   }
-  html.play .sp-item { transition: box-shadow 160ms var(--ease), background 160ms var(--ease); }
-  .sp-item.owned { box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 4px var(--mint); }
+  html.play .sp-item { transition: box-shadow 160ms var(--ease), background 160ms var(--ease), transform 220ms var(--spring); }
+  html.play .sp-item:hover { transform: translateY(-2px); }
+  .sp-item.owned { box-shadow: 0 0 0 2px var(--mint), 0 1px 2px rgb(17 19 24 / 0.05), 0 12px 26px -16px rgb(31 140 120 / 0.45); }
+  /* A studio sweep: bright where the product stands (the colour the drawings
+     are checked against, check-spend-art's CARD), falling off to a cool grey
+     at the edges, as a seamless backdrop does under one soft light. */
+  .sp-stage {
+    position: relative; border-radius: calc(var(--r) - 4px); padding: 12px 0 4px;
+    background: radial-gradient(110% 85% at 50% 38%, #fdfdfc 0 42%, #eef2f6 78%, #e3e8ee 100%);
+  }
+  /* How many you own, on the backdrop's corner. */
+  .sp-have {
+    position: absolute; top: 8px; right: 8px; min-width: 26px; padding: 3px 8px;
+    border-radius: var(--r-pill); background: var(--ink); color: var(--mint);
+    font-size: 12.5px; font-weight: 800; line-height: 1.2;
+  }
+  .sp-have:empty { display: none; }
   /* Deliberately not opacity: that faded the card's figures under AA on the
      state whose whole job is to keep the endgame legible. */
-  .sp-item.unaffordable { background: var(--paper2); box-shadow: none; }
+  .sp-item.unaffordable { background: var(--paper2); box-shadow: 0 0 0 1px rgb(17 19 24 / 0.05); }
+  .sp-item.unaffordable .sp-stage { background: #eceff3; }
   .sp-item.unaffordable .sp-shot { filter: saturate(0.2) opacity(0.75); }
   .sp-item.unaffordable .sp-name { color: var(--ink2); }
   /* The product shot sizes itself from inside (see productSvg); a rule
@@ -573,8 +596,8 @@ import { productSvg } from '../lib/spend-art'
   html.play .sp-item:hover .sp-shot { transform: translateY(-3px) scale(1.04); }
   html.play .sp-shot.jump { animation: sp-jump 340ms var(--spring); }
   @keyframes sp-jump { 40% { transform: translateY(-9px) scale(1.09); } }
-  .sp-name { font-weight: 700; margin-top: 8px; font-size: 15px; }
-  .sp-price { color: var(--ink2); font-size: 14px; }
+  .sp-name { font-weight: 700; margin-top: 10px; font-size: 15px; }
+  .sp-price { color: var(--ink2); font-size: 14px; font-variant-numeric: tabular-nums; }
 
   .sp-controls { display: flex; gap: 6px; margin-top: 12px; }
   .sp-controls button {
@@ -613,7 +636,7 @@ import { productSvg } from '../lib/spend-art'
   .sp-report-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 
   @media (max-width: 620px) {
-    .sp-item { padding: 12px 10px; }
+    .sp-item { padding: 8px 8px 12px; }
     .sp-controls { display: grid; grid-template-columns: 1fr 1fr; }
     .sp-qty { grid-column: 1 / -1; order: -1; width: 100%; box-sizing: border-box; }
     .sp-acts { justify-self: end; }
