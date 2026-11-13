@@ -36,8 +36,10 @@
  * Twenty-one symbols cover everything this file uses.
  */
 import {
+  AddEquation,
   AdditiveBlending,
   BufferGeometry,
+  CustomBlending,
   Camera,
   Color,
   DoubleSide,
@@ -50,6 +52,7 @@ import {
   LinearSRGBColorSpace,
   Mesh,
   NormalBlending,
+  OneFactor,
   RawShaderMaterial,
   RGBAFormat,
   Scene,
@@ -62,6 +65,20 @@ import {
 } from 'three'
 import type { IUniform } from 'three'
 import { GLSL, GLSL_LIB } from './gl'
+
+/**
+ * Light that adds: colour and alpha both summed. Colour is the light; alpha is
+ * how much of the sky behind it is covered, which only a star's disc sets.
+ * (three's AdditiveBlending would multiply the colour by that alpha.)
+ */
+const LIGHT_BLEND = {
+  blending: CustomBlending,
+  blendEquation: AddEquation,
+  blendSrc: OneFactor,
+  blendDst: OneFactor,
+  blendSrcAlpha: OneFactor,
+  blendDstAlpha: OneFactor,
+} as const
 
 /** Body shaders are not fullscreen passes, so they take the library only. */
 const BODY_HEAD = `#version 300 es
@@ -143,6 +160,7 @@ uniform vec2  u_res;
 uniform float u_pad;
 uniform float u_time;
 uniform int   u_lightCount;
+uniform float u_disc;
 uniform vec2  u_lightPos[${MAX_LIGHTS}];
 uniform vec3  u_lightCol[${MAX_LIGHTS}];
 
@@ -228,37 +246,83 @@ void main() {
   fragColor = vec4(lit, cov);
 }`
 
+/*
+ * A star, as a telescope would see it.
+ *
+ * vColor is the colour of a black body at the star's temperature, already
+ * scaled by how bright it is, so a red dwarf is a dim ember and a heavy star
+ * a white-hot disc — see starLight() below.
+ *
+ * The disc is kept below the point where ACES flattens it to white, which is
+ * the whole difference between a star and a lamp: what is on it has to be
+ * visible. Limb darkening is per channel, because a star's edge is not only
+ * darker but redder — the line of sight there ends higher up, in cooler gas.
+ * Granulation is the convection cells boiling on the surface; the dark patches
+ * are spots, where magnetic field holds the heat in. Outside the disc a thin
+ * chromosphere, then a corona combed into streamers, then four faint
+ * diffraction spikes of the kind any reflecting telescope puts on a bright
+ * point — the one cue that says photographed rather than drawn.
+ */
 const STAR_FRAG = BODY_HEAD + `
 ${BODY_COMMON}
 
 void main() {
   float sr = 1.0 / u_pad;
-  float d = length(vQuad) / sr;
+  vec2 p = vQuad / sr;
+  float d = length(p);
+  // One screen pixel, in units of this star's radius.
+  float px = 1.0 / max(vRadius, 1.0);
 
   vec3 col = vec3(0.0);
 
-  if (d < 1.0) {
-    vec3 n = vec3(vQuad / sr, sqrt(max(0.0, 1.0 - d * d)));
-    // Limb darkening: a real star is measurably dimmer at its edge because the
-    // line of sight there passes through cooler upper photosphere. Without it
-    // the disc reads as a flat sticker.
-    float limb = 0.42 + 0.58 * pow(max(n.z, 0.0), 0.42);
-    // Granulation, slowly boiling.
+  if (d < 1.0 + px) {
+    vec3 n = vec3(p, sqrt(max(0.0, 1.0 - min(d * d, 1.0))));
+    float mu = n.z;
+    // The Sun's own limb darkening is about this: half as bright at mu = 0.3,
+    // and redder, because blue light darkens towards the edge faster.
+    vec3 limb = 1.0 - vec3(0.66, 0.76, 0.88) * (1.0 - mu);
     vec3 sp = spun(n, vSpin * 0.3 + vSeed * 6.283);
-    float gran = fbm3(sp * 7.0 + vec3(0.0, u_time * 0.25, 0.0), 4);
-    col += vColor * limb * (2.4 + gran * 1.3);
+    // Convection cells, slowly turning over.
+    float gran = fbm3(sp * 9.0 + vec3(0.0, u_time * 0.12, vSeed * 7.0), 3);
+    float fine = noise3(sp * 26.0 + vec3(u_time * 0.2));
+    // Spots: rare, clustered, darker in the middle than at the edge.
+    float field = fbm3(sp * 2.4 + vec3(vSeed * 13.0), 3);
+    float spot = smoothstep(0.66, 0.74, field);
+    float umbra = smoothstep(0.72, 0.78, field);
+    // Faculae: bright magnetic patches that only show near the limb.
+    float fac = smoothstep(0.55, 0.65, field) * (1.0 - spot) * pow(1.0 - mu, 2.0) * 0.6;
+    // Granulation is a few percent on a real star; this is more, so it reads at
+    // thirty pixels across, and no more, or a small star turns to orange peel.
+    float surf = (0.80 + 0.34 * gran + 0.07 * fine) * (1.0 - 0.45 * spot - 0.35 * umbra) + fac;
+    // About half the light's own level: bright enough that the bloom round it
+    // reads as blinding, dim enough that ACES leaves the surface on it.
+    // A touch more of the star's own colour than a sensor would record, so a
+    // sun reads as sunlight rather than as a grey disc after tonemapping.
+    vec3 tint = mix(vColor, vColor * vColor / max(max(vColor.r, vColor.g), vColor.b), 0.35);
+    vec3 disc = tint * limb * surf * u_disc;
+    col += disc * (1.0 - smoothstep(1.0 - px, 1.0 + px, d));
   }
+  // What the disc covers, so the sky's stars do not show through it.
+  float cover = 1.0 - smoothstep(1.0 - px, 1.0 + px, d);
 
-  // Corona. Two falloffs: a tight one that reads as the star's own light, and
-  // a wide faint one that gives the bloom something to catch.
-  float g1 = exp(-d * 3.4) * 0.85;
-  float g2 = exp(-d * 1.15) * 0.10;
-  // Faint anisotropy so the glow is not a perfect circle.
-  float ang = atan(vQuad.y, vQuad.x);
-  float rays = 1.0 + 0.16 * sin(ang * 6.0 + vSeed * 12.0);
-  col += vColor * (g1 + g2) * rays;
+  // Outside the disc, the glow starts at the brightness of the limb and falls
+  // away from it, so nothing round the star is brighter than its own edge —
+  // the mistake that makes a star look like a cut-out on a halo.
+  float r = max(d - 1.0, 0.0);
+  float outside = smoothstep(1.0 - px, 1.0 + px, d);
+  float ang = atan(p.y, p.x);
+  float streak = fbm(vec2(ang * 2.6 + vSeed * 9.0, r * 1.2 - u_time * 0.02), 4);
+  float glow = 0.26 * exp(-r * 4.0) + 0.06 * exp(-r * 1.1) * (0.5 + streak) + 0.025 * exp(-r * 0.5);
+  col += vColor * vec3(1.0, 0.92, 0.86) * u_disc * glow * outside;
 
-  fragColor = vec4(col, 1.0);
+  // Diffraction spikes: four, on the diagonals, a pixel or so wide.
+  vec2 q = mat2(0.7071, 0.7071, -0.7071, 0.7071) * p;
+  float across = min(abs(q.x), abs(q.y)) / px;
+  float along = max(abs(q.x), abs(q.y));
+  float spike = exp(-across * across * 0.7) * exp(-along * 1.5) * smoothstep(0.9, 1.3, along);
+  col += vColor * spike * 0.16;
+
+  fragColor = vec4(col, cover);
 }`
 
 /* Trails: a ribbon per body, built on the CPU from its history. aSide runs
@@ -289,7 +353,7 @@ void main() {
   float aa = max(fwidth(vSide), 1e-3);
   float edge = 1.0 - smoothstep(1.0 - aa * 1.5, 1.0, d);
   float core = exp(-d * d * 2.2);
-  fragColor = vec4(vColor.rgb * (vColor.a * core * edge), 1.0);
+  fragColor = vec4(vColor.rgb * (vColor.a * core * edge), 0.0);
 }`
 
 const FS_VERT = `#version 300 es
@@ -426,11 +490,15 @@ float hash21(vec2 p) {
 }
 
 void main() {
-  vec3 scene = texture(u_scene, vUv).rgb;
+  vec4 S = texture(u_scene, vUv);
+  vec3 scene = S.rgb;
   vec3 bloom = texture(u_bloom, vUv).rgb;
   vec3 sky = texture(u_sky, vUv).rgb;
 
-  vec3 col = sky + scene + bloom * u_bloomStrength;
+  // The scene's alpha is how much of each pixel a body covers: a planet's
+  // night side and a star's disc hide the stars behind them, where adding the
+  // sky underneath everything let them shine straight through.
+  vec3 col = sky * (1.0 - clamp(S.a, 0.0, 1.0)) + scene + bloom * u_bloomStrength;
 
   // Slight desaturation of the very brightest cores, which is what a sensor
   // does and what stops a hot star reading as a pure hue.
@@ -502,6 +570,8 @@ class GLRenderer implements Renderer {
     // also convert on the way out.
     this.renderer.outputColorSpace = LinearSRGBColorSpace
     this.renderer.autoClear = false
+    // Render targets clear to no coverage; the scene's alpha is what bodies cover.
+    this.renderer.setClearColor(0x000000, 0)
 
     // The fullscreen pass builds its triangle from gl_VertexID, so the contents
     // of this attribute are never read — but three sizes the draw call from
@@ -558,7 +628,7 @@ class GLRenderer implements Renderer {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      blending: AdditiveBlending,
+      ...LIGHT_BLEND,
       // The same Y flip as the bodies, so the same DoubleSide (see below).
       side: DoubleSide,
     })
@@ -619,12 +689,17 @@ class GLRenderer implements Renderer {
     for (const b of bodies) {
       const t = this.hist.get(b.id)
       if (!t || t.count < 2) continue
-      const c = hueToLinear(b.hue, b.star)
+      const c = b.star ? starLight(b.m).multiplyScalar(0.5) : hueToLinear(b.hue, false)
       // Stars leave a bright wake; planets a fainter one in their own colour.
       const gain = b.star ? 0.9 : 0.55
       const head = Math.min(2.2, Math.max(0.9, b.r * 0.3)) * dpr
       const n = t.count, L = t.xs.length
       const at = (i: number) => (t.head - n + i + L) % L
+      // A trail starts at the body's edge, not its centre. Under a planet it
+      // would be hidden anyway; under a star, which adds light rather than
+      // covering, a slowly drifting sun drew its own wake as a speck in the
+      // middle of its disc.
+      const hx = t.xs[at(n - 1)], hy = t.ys[at(n - 1)]
       let nx = 0, ny = 1
       const first = v
       for (let i = 0; i < n; i++) {
@@ -635,7 +710,9 @@ class GLRenderer implements Renderer {
         // 0 at the tail, 1 at the body.
         const age = i / (n - 1)
         const hw = head * (0.35 + 0.65 * age)
-        const alpha = gain * Math.pow(age, 1.6)
+        const out = Math.hypot(t.xs[p] - hx, t.ys[p] - hy) / b.r
+        const clearOf = Math.min(1, Math.max(0, (out - 0.9) / 0.6))
+        const alpha = gain * Math.pow(age, 1.6) * clearOf * clearOf * (3 - 2 * clearOf)
         const x = t.xs[p] * dpr, y = t.ys[p] * dpr
         for (let s = -1; s <= 1; s += 2) {
           pos[v * 3] = x + nx * hw * s; pos[v * 3 + 1] = y + ny * hw * s; pos[v * 3 + 2] = 0
@@ -686,6 +763,7 @@ class GLRenderer implements Renderer {
       u_pad: { value: 1.0 },
       u_time: { value: 0 },
       u_lightCount: { value: 0 },
+      u_disc: { value: 0.36 },
       u_lightPos: { value: Array.from({ length: MAX_LIGHTS }, () => new Vector2()) },
       u_lightCol: { value: Array.from({ length: MAX_LIGHTS }, () => new Vector3()) },
     }
@@ -719,9 +797,9 @@ class GLRenderer implements Renderer {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      // Stars and their coronae add light to whatever is behind them; they never
-      // occlude it.
-      blending: AdditiveBlending,
+      // Stars and their coronae add light to whatever is behind them, and their
+      // discs add coverage, so the sky is hidden behind them.
+      ...LIGHT_BLEND,
       // DoubleSide is load-bearing. The vertex shader flips Y to convert
       // screen space (Y down) to clip space (Y up), and that negation reverses
       // every triangle's winding -- so with the default FrontSide every body
@@ -822,7 +900,7 @@ class GLRenderer implements Renderer {
       // A stable per-body seed. Position would make the texture crawl, so this
       // uses mass and index, which stay put for a body's lifetime.
       const seed = ((b.m * 97.13 + i * 13.7) % 1000) / 1000
-      const col = hueToLinear(b.hue, b.star)
+      const col = b.star ? starLight(b.m) : hueToLinear(b.hue, false)
       if (b.star) {
         sPos.setXY(ns, b.x * dpr, b.y * dpr)
         sRad.setX(ns, b.r * dpr)
@@ -831,7 +909,7 @@ class GLRenderer implements Renderer {
         sSpin.setX(ns, t * 0.12)
         ns++
         if (lights.length < MAX_LIGHTS) {
-          lights.push({ x: b.x * dpr, y: b.y * dpr, c: col.clone().multiplyScalar(2.6) })
+          lights.push({ x: b.x * dpr, y: b.y * dpr, c: col.clone().multiplyScalar(1.35) })
         }
       } else {
         pPos.setXY(np, b.x * dpr, b.y * dpr)
@@ -866,7 +944,7 @@ class GLRenderer implements Renderer {
     // Planets need only a sliver of padding for the atmosphere; a star's corona
     // needs a lot, and paying that cost on every planet would be wasteful.
     this.planetMat.uniforms.u_pad.value = 1.35
-    this.starMat.uniforms.u_pad.value = 7.0
+    this.starMat.uniforms.u_pad.value = 6.0
 
     // 1. trails, then bodies -> sceneRT
     this.trailMesh.visible = trails && this.buildRibbons(bodies) > 0
@@ -931,6 +1009,38 @@ function pushTrail(t: Trail, x: number, y: number) {
   t.ys[t.head] = y
   t.head = (t.head + 1) % t.xs.length
   t.count = Math.min(t.count + 1, t.xs.length)
+}
+
+/**
+ * The colour of a black body at temperature T kelvin, in linear RGB with its
+ * brightest channel at 1. Tanner Helland's fit to the CIE data, which is good
+ * to a few percent from 1,000 K to 40,000 K — far wider than needed here.
+ */
+export function blackbody(T: number) {
+  const t = T / 100
+  const r = t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592)
+  const g = t <= 66 ? 99.4708025861 * Math.log(t) - 161.1195681661 : 288.1221695283 * Math.pow(t - 60, -0.0755148492)
+  const b = t >= 66 ? 255 : t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307
+  const lin = (c: number) => Math.pow(Math.min(255, Math.max(0, c)) / 255, 2.2)
+  const v = new Vector3(lin(r), lin(g), lin(b))
+  return v.multiplyScalar(1 / Math.max(v.x, v.y, v.z))
+}
+
+/**
+ * How a star of mass m looks: its temperature and its brightness.
+ *
+ * Heavier stars are hotter — on the main sequence the surface temperature
+ * goes as roughly the mass to the half — and far brighter. The sun of the
+ * presets is put at the Sun's 5,800 K. A launched star, a tenth of that, is a
+ * red dwarf at 3,000 K, as a tenth of a solar mass really is; the two stars
+ * of the binary are orange K dwarfs; everything collapsed into one body burns
+ * white. Brightness is compressed hard — the real range is millions to one —
+ * so a red dwarf is dim but still there.
+ */
+export function starLight(m: number) {
+  const T = Math.min(14000, Math.max(3100, 5800 * Math.pow(m / 2600, 0.4)))
+  const glow = Math.min(1.4, Math.max(0.78, Math.pow(m / 2600, 0.2)))
+  return blackbody(T).multiplyScalar(2.6 * glow)
 }
 
 /** Body hue -> linear HDR colour. Stars are emitted well above 1. */
