@@ -67,36 +67,48 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   initial={{ score: '0', level: `0 / ${LAYERS.length}`, moves: '0:00' }}
 >
   <div class="mix-body">
-  <div class="am-wrap">
-    <header class="head">
-      <p class="lede">
-        Twelve layers, all generated live in your browser. Nothing here is a
-        recording. Start with rain and see how long you last.
-      </p>
-    </header>
-
-    <div class="bar">
-      <button type="button" id="masterBtn" class="primary">Turn the sound on</button>
-      <label class="master">
-        <span>Master</span>
-        <input type="range" id="master" min="0" max="100" value="70" aria-label="Master volume" />
-      </label>
-      <button type="button" id="clearBtn" class="ghost">Silence</button>
-      <button type="button" id="shareBtn" class="ghost">Copy link</button>
+  {/* The view: a landscape the mix assembles (lib/ambient/scene-frag.ts),
+      with the transport over it and a line of narration in the corner. */}
+  <section class="am-hero">
+    <div class="view" id="view" aria-hidden="true"></div>
+    <p class="caption" id="caption" aria-hidden="true"></p>
+    <div class="hud">
+      <div class="hud-panel">
+        <button type="button" id="masterBtn" class="am-play" aria-pressed="false">
+          <svg class="i-play" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4.5 2.8v10.4a.6.6 0 0 0 .92.5l8.1-5.2a.6.6 0 0 0 0-1L5.42 2.3a.6.6 0 0 0-.92.5Z" fill="currentColor" /></svg>
+          <svg class="i-pause" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="3.5" y="2.5" width="3.2" height="11" rx="0.9" fill="currentColor" /><rect x="9.3" y="2.5" width="3.2" height="11" rx="0.9" fill="currentColor" /></svg>
+          <span class="play-label">Play</span>
+        </button>
+        <label class="master">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 6h2.2L8 3.2v9.6L4.7 10H2.5Z" fill="currentColor" /><path d="M10.6 5.4a3.6 3.6 0 0 1 0 5.2M12.4 3.6a6.2 6.2 0 0 1 0 8.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>
+          <input type="range" id="master" min="0" max="100" value="70" aria-label="Master volume" />
+        </label>
+      </div>
+      <div class="hud-side">
+        <button type="button" id="clearBtn" class="ghost">Silence</button>
+        <button type="button" id="shareBtn" class="ghost">Copy link</button>
+      </div>
     </div>
+  </section>
+
+  <div class="am-wrap">
+    <p class="lede">
+      Twelve places, each built from the physics of how it sounds: rain as
+      separate drops, thunder from the shape of its lightning, every passing
+      car Doppler-shifted. Nothing here is a recording. Start with rain and
+      see how long you last.
+    </p>
 
     {/* Twelve layers is a lot of combinations, and most of them are bad. These
         are the ones worth arriving at. */}
-    <div class="presets" role="group" aria-label="Presets">
+    <h2 class="am-label" id="presetsLabel">Start from</h2>
+    <div class="presets" role="group" aria-labelledby="presetsLabel">
       {PRESETS.map((p) => (
-        <button type="button" class="preset" data-preset={p.id} title={p.note}>
-          <b>{p.name}</b>
-          <span>{p.note}</span>
-        </button>
+        <button type="button" class="preset" data-preset={p.id} title={p.note}>{p.name}</button>
       ))}
     </div>
 
-    <div class="field" id="field" aria-hidden="true"></div>
+    <h2 class="am-label">Layers</h2>
 
     <ul class="am-grid" id="grid">
       {
@@ -159,7 +171,6 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 </GameShell>
 
 <script>
-  import { ShaderSurface } from '../lib/gl'
   import { createShell } from '../lib/game-shell'
   import { PLAY } from '../lib/motion'
   import { recordPlay } from '../lib/stats'
@@ -174,7 +185,8 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     onPause: () => { if (running && ctx) { heldByPause = true; ctx.suspend() } },
     onResume: () => { if (heldByPause && ctx) { heldByPause = false; ctx.resume() } },
   })
-  import { MIX_FRAG } from '../lib/mix-field'
+  import { createEngine } from '../lib/ambient/engine'
+  import { Scene } from '../lib/ambient/scene'
   import { LAYERS, PRESETS, encode, decode, presetById } from '../lib/mix-code'
 
   const grid = document.getElementById('grid')
@@ -184,256 +196,114 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 
   let ctx = null
   let masterGain = null
+  let engine = null
+  let enginePromise = null
   const layers = new Map()
-  let scheduler = null
 
-  /* ---- what the picture is actually made of ------------------------------
-     Everything below reads real AnalyserNode data. The cards used to bounce on
-     a CSS keyframe that moved identically for rain and for thunder, and at any
-     volume including none. */
-  /* Declared here rather than beside start(): ShaderSurface renders one frame
-     synchronously in its constructor, and that closure reads this, so leaving it
-     further down the file put it in the temporal dead zone on first paint. */
+  /* Declared before the scene: its surface draws one frame synchronously as
+     it is made, and that frame reads these. */
   let running = false
   let masterAnalyser = null
-  let masterBins = null
-  const spec = new Float32Array(32)     // smoothed, handed to the shader
-  let level = 0
 
-  const field = new ShaderSurface(document.getElementById('field'), MIX_FRAG, {
-    scale: 0.8,
-    uniforms: () => ({
-      u_spec: spec,
-      u_level: level,
-      u_live: running ? 1 : 0,
-      /* Under reduced motion the autonomous drift stops, but the response to
-         the audio does not: this is a visualiser, and a visualiser that will
-         not visualise is just a box. The motion that remains is caused by
-         sound the visitor deliberately switched on, and the Silence button and
-         the master toggle both stop it. */
-      u_motion: prefersReducedMotion ? 0 : 1,
-    }),
-  })
+  /* ---- the view -----------------------------------------------------------
+     A landscape the mix puts together: every layer adds its part of it, and
+     where a layer has a physical model the picture follows that model — the
+     waves break when the sound does, the cars are where the sound is coming
+     from, lightning flashes before its thunder. Under reduced motion it is a
+     still picture that changes as the mix does. */
+  const view = new Scene(document.getElementById('view'), () => (engine ? engine.heard() : performance.now() / 1000), prefersReducedMotion)
 
-  // ---- noise -------------------------------------------------------------
-  const buffers = {}
-  function noiseBuffer(kind) {
-    if (buffers[kind]) return buffers[kind]
-    const len = ctx.sampleRate * 4
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
-    const d = buf.getChannelData(0)
-    if (kind === 'white') {
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1
-    } else if (kind === 'pink') {
-      // Voss-McCartney approximation — cheap and close enough for texture.
-      let b0 = 0, b1 = 0, b2 = 0
-      for (let i = 0; i < len; i++) {
-        const w = Math.random() * 2 - 1
-        b0 = 0.99765 * b0 + w * 0.0990460
-        b1 = 0.96300 * b1 + w * 0.2965164
-        b2 = 0.57000 * b2 + w * 1.0526913
-        d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.22
-      }
-    } else {
-      let last = 0
-      for (let i = 0; i < len; i++) {
-        const w = Math.random() * 2 - 1
-        last = (last + 0.02 * w) / 1.02
-        d[i] = last * 3.2
-      }
+  /* ---- the sound ----------------------------------------------------------
+     Every layer is a physical model of the thing it is named after — rain as
+     drops and bubbles, thunder from the shape of its lightning, a passing car
+     with Doppler — running in an AudioWorklet (lib/ambient). The page owns
+     the knobs: one gain per layer, and the master. */
+  const recent = []
+  const caption = document.getElementById('caption')
+  let captionTimer = 0
+  let captionHold = 0
+  /** One line in the corner of the view, for a while. */
+  function say(text, ms = 6000, hold = 0) {
+    if (performance.now() < captionHold && !hold) return
+    caption.textContent = text
+    caption.classList.add('show')
+    clearTimeout(captionTimer)
+    captionTimer = setTimeout(() => caption.classList.remove('show'), ms)
+    if (hold) captionHold = performance.now() + hold
+  }
+  /* The first time each layer comes in, a line on what it is made of. Some
+     wait for the model to report a number worth quoting. */
+  const ABOUT = {
+    rain: () => 'Every drop is its own sound: a click on a leaf, or a bubble ringing in a puddle and rising in pitch.',
+    waves: () => 'Each wave builds, breaks and drains on its own schedule, every eight to thirteen seconds, bigger ones in sets.',
+    wind: (s) => s ? `Wind at ${s.speed.toFixed(0)} m/s. The wires whistle at 0.2 × speed ÷ thickness, so the pitch rises with every gust.` : '',
+    fire: () => 'Fire is mostly wood: water and sap boiling inside it until it splits with a crack.',
+    cafe: () => 'Ten synthesised voices at four tables, taking turns. No words — just what you hear from across a room.',
+    birds: () => 'Four birds close, five further off. Each sings one of its songs a few times, then switches.',
+    crickets: (s) => s ? `${Math.round(s.perMin)} chirps a minute. By Dolbear's law (1897), that makes it about ${s.temp} °C tonight.` : '',
+    traffic: () => 'Every car is heard higher coming and lower going — Doppler, worked out from where it is.',
+    clock: () => 'An escapement: two tiny impacts per tick, landing on your real seconds. It strikes the hour.',
+    thunder: () => 'Watch for the flash, then count. Sound covers a kilometre in about three seconds.',
+    mower: () => 'One cylinder at 3000 rpm: 25 firings a second, no two quite alike.',
+    dial: () => 'A real modem handshake, stage by stage. It goes quiet once it connects, as they did.',
+  }
+  const told = new Set()
+  function tell(id) {
+    if (told.has(id) || !ABOUT[id]) return
+    const line = ABOUT[id](engine?.state?.[id])
+    if (!line) { setTimeout(() => tell(id), 600); return }
+    told.add(id)
+    say(line, 7000)
+  }
+  const MODEM = ['', 'Off the hook: dial tone, 350 + 440 Hz.', 'Dialling, in touch tones.', 'Ringing the other end.', '', 'Answered: 2100 Hz, its phase flipping every 450 ms.', 'Introductions, at 300 bits a second.', 'Line probe: a chord of tones every 150 Hz.', 'Training: the hiss.', 'Training: the hiss.', 'Connected. The speaker switches off.']
+  let countdown = 0
+  function onEngineEvent(e) {
+    recent.push(e)
+    if (recent.length > 64) recent.shift()
+    const L = layers.get(e.id)
+    if (!L || !L.on) return
+    const wait = Math.max(0, (e.at - engine.heard()) * 1000)
+    if (e.kind === 'flash' && !e.far) {
+      // Shown with the flash; counted down to the thunder.
+      setTimeout(() => {
+        const arrive = e.at + Number(e.delay)
+        clearInterval(countdown)
+        const tick = () => {
+          const left = arrive - engine.heard()
+          if (left <= 0) {
+            clearInterval(countdown)
+            say(`Thunder: ${Number(e.delay).toFixed(1)} s after the flash, so it struck ${Number(e.km).toFixed(1)} km away.`, 6000, 2500)
+            return
+          }
+          say(`Lightning, ${Number(e.km).toFixed(1)} km away. Thunder in ${Math.ceil(left)} s…`, 2500, 1200)
+        }
+        tick()
+        countdown = setInterval(tick, 1000)
+      }, wait)
+    } else if (e.kind === 'modem' && MODEM[e.stage]) {
+      setTimeout(() => say(MODEM[e.stage], 4000), wait)
     }
-    buffers[kind] = buf
-    return buf
   }
 
-  function noiseSource(kind) {
-    const src = ctx.createBufferSource()
-    src.buffer = noiseBuffer(kind)
-    src.loop = true
-    src.start()
-    return src
-  }
-
-  /** A slow sine that modulates `param` between lo and hi. */
-  function lfo(param, lo, hi, hz) {
-    const osc = ctx.createOscillator()
-    const amp = ctx.createGain()
-    osc.frequency.value = hz
-    amp.gain.value = (hi - lo) / 2
-    param.value = (hi + lo) / 2
-    osc.connect(amp).connect(param)
-    osc.start()
-    return osc
-  }
-
-  // ---- layer builders ----------------------------------------------------
-  const BUILD = {
-    rain(out) {
-      const f = ctx.createBiquadFilter()
-      f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.55
-      const hp = ctx.createBiquadFilter()
-      hp.type = 'highpass'; hp.frequency.value = 500
-      noiseSource('white').connect(f).connect(hp).connect(out)
-      lfo(f.frequency, 900, 1900, 0.07)
-    },
-    waves(out) {
-      const f = ctx.createBiquadFilter()
-      f.type = 'lowpass'; f.Q.value = 0.7
-      const swell = ctx.createGain()
-      swell.gain.value = 0.6
-      noiseSource('brown').connect(f).connect(swell).connect(out)
-      lfo(f.frequency, 180, 900, 0.06)
-      lfo(swell.gain, 0.18, 1.0, 0.06)
-    },
-    wind(out) {
-      const f = ctx.createBiquadFilter()
-      f.type = 'lowpass'; f.Q.value = 2.5
-      noiseSource('brown').connect(f).connect(out)
-      lfo(f.frequency, 180, 800, 0.045)
-    },
-    fire(out) {
-      const f = ctx.createBiquadFilter()
-      f.type = 'lowpass'; f.frequency.value = 700
-      const bed = ctx.createGain(); bed.gain.value = 0.55
-      noiseSource('brown').connect(f).connect(bed).connect(out)
-      return { crackle: true }
-    },
-    cafe(out) {
-      const f = ctx.createBiquadFilter()
-      f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.45
-      const bed = ctx.createGain(); bed.gain.value = 0.75
-      noiseSource('pink').connect(f).connect(bed).connect(out)
-      lfo(f.frequency, 380, 700, 0.11)
-      return { clink: true }
-    },
-    birds() { return { chirp: true } },
-    crickets() { return { cricket: true } },
-    traffic(out) {
-      const f = ctx.createBiquadFilter()
-      f.type = 'lowpass'; f.frequency.value = 320; f.Q.value = 0.6
-      noiseSource('brown').connect(f).connect(out)
-      lfo(f.frequency, 240, 420, 0.03)
-    },
-    clock() { return { tick: true } },
-    thunder() { return { boom: true } },
-    mower(out) {
-      const osc = ctx.createOscillator()
-      osc.type = 'sawtooth'; osc.frequency.value = 92
-      const osc2 = ctx.createOscillator()
-      osc2.type = 'sawtooth'; osc2.frequency.value = 94.5
-      const f = ctx.createBiquadFilter()
-      f.type = 'lowpass'; f.frequency.value = 620; f.Q.value = 3
-      const g = ctx.createGain(); g.gain.value = 0.16
-      osc.connect(f); osc2.connect(f)
-      const grit = ctx.createBiquadFilter()
-      grit.type = 'bandpass'; grit.frequency.value = 1100
-      const gg = ctx.createGain(); gg.gain.value = 0.1
-      noiseSource('white').connect(grit).connect(gg).connect(g)
-      f.connect(g).connect(out)
-      osc.start(); osc2.start()
-      lfo(f.frequency, 480, 760, 0.7)
-    },
-    dial() { return { modem: true } },
-  }
-
-  // ---- one-shot events ---------------------------------------------------
-  function burst(out, { freq, q, dur, peak, type = 'bandpass', kind = 'white' }, at) {
-    const src = ctx.createBufferSource()
-    src.buffer = noiseBuffer(kind)
-    src.loop = true
-    const f = ctx.createBiquadFilter()
-    f.type = type; f.frequency.value = freq; f.Q.value = q
-    const g = ctx.createGain()
-    g.gain.setValueAtTime(0.0001, at)
-    g.gain.exponentialRampToValueAtTime(peak, at + Math.min(0.02, dur / 4))
-    g.gain.exponentialRampToValueAtTime(0.0001, at + dur)
-    src.connect(f).connect(g).connect(out)
-    src.start(at)
-    src.stop(at + dur + 0.05)
-  }
-
-  function tone(out, { f0, f1, dur, peak, type = 'sine' }, at) {
-    const o = ctx.createOscillator()
-    o.type = type
-    o.frequency.setValueAtTime(f0, at)
-    o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), at + dur)
-    const g = ctx.createGain()
-    g.gain.setValueAtTime(0.0001, at)
-    g.gain.exponentialRampToValueAtTime(peak, at + dur * 0.18)
-    g.gain.exponentialRampToValueAtTime(0.0001, at + dur)
-    o.connect(g).connect(out)
-    o.start(at)
-    o.stop(at + dur + 0.05)
-  }
-
-  // Event layers are driven by a lookahead scheduler so timing does not depend
-  // on how busy the main thread is.
-  const EVENTS = {
-    crackle: (L, t) => { if (Math.random() < 0.55) burst(L.out, { freq: 2200 + Math.random() * 2600, q: 3, dur: 0.05, peak: 0.5 }, t + Math.random() * 0.2) },
-    clink:   (L, t) => { if (Math.random() < 0.10) tone(L.out, { f0: 1800 + Math.random() * 1400, f1: 1400, dur: 0.28, peak: 0.09 }, t + Math.random() * 0.2) },
-    chirp:   (L, t) => {
-      if (Math.random() > 0.28) return
-      const base = 2400 + Math.random() * 1800
-      const n = 1 + Math.floor(Math.random() * 3)
-      for (let i = 0; i < n; i++) tone(L.out, { f0: base, f1: base * (1.4 + Math.random() * 0.6), dur: 0.07, peak: 0.16 }, t + i * 0.1 + Math.random() * 0.1)
-    },
-    cricket: (L, t) => { for (let i = 0; i < 3; i++) burst(L.out, { freq: 4600, q: 26, dur: 0.03, peak: 0.35 }, t + i * 0.055) },
-    tick:    (L, t) => { burst(L.out, { freq: 2600, q: 12, dur: 0.028, peak: 0.5 }, Math.ceil(t * 2) / 2) },
-    boom:    (L, t) => { if (Math.random() < 0.045) { burst(L.out, { freq: 90, q: 0.7, dur: 2.6, peak: 1.4, type: 'lowpass', kind: 'brown' }, t); burst(L.out, { freq: 300, q: 0.5, dur: 1.4, peak: 0.35, type: 'lowpass', kind: 'brown' }, t + 0.12) } },
-    modem:   (L, t) => {
-      // The handshake, roughly: two tones, a scramble, then carrier hiss.
-      if (Math.random() > 0.4) return
-      const pick = Math.random()
-      if (pick < 0.4) tone(L.out, { f0: 980 + Math.random() * 1400, f1: 980 + Math.random() * 1400, dur: 0.16, peak: 0.14, type: 'square' }, t)
-      else if (pick < 0.75) burst(L.out, { freq: 1600 + Math.random() * 900, q: 1.4, dur: 0.3, peak: 0.16 }, t)
-      else tone(L.out, { f0: 2100, f1: 1100, dur: 0.4, peak: 0.1 }, t)
-    },
-  }
-
-  // ---- wiring ------------------------------------------------------------
-  function ensureCtx() {
-    if (ctx) return
-    ctx = new (window.AudioContext || window.webkitAudioContext)()
-    masterGain = ctx.createGain()
-    masterGain.gain.value = Number(masterSlider.value) / 100
-    masterGain.connect(ctx.destination)
-
-    // A tap, not a link in the chain: an analyser with nothing connected to its
-    // output passes the signal through untouched.
-    masterAnalyser = ctx.createAnalyser()
-    masterAnalyser.fftSize = 128
-    masterAnalyser.smoothingTimeConstant = 0.75
-    masterBins = new Uint8Array(masterAnalyser.frequencyBinCount)
-    masterGain.connect(masterAnalyser)
-
+  async function ensureEngine() {
+    if (engine) return
+    if (!enginePromise) enginePromise = createEngine(LAYERS.map((l) => l.id), Number(masterSlider.value) / 100)
+    engine = await enginePromise
+    ctx = engine.ctx
+    masterGain = engine.master
+    masterAnalyser = engine.analyser
+    engine.onEvent = (e) => { onEngineEvent(e); view.event(e) }
+    // For headless checks in development only: the graph, its state, its events.
+    if (import.meta.env.DEV) (window as any).__mix = { engine, layers, recent, view }
     for (const li of grid.querySelectorAll('.layer')) {
       const id = li.dataset.id
-      const out = ctx.createGain()
-      out.gain.value = 0
-      out.connect(masterGain)
-      const an = ctx.createAnalyser()
-      an.fftSize = 64
-      an.smoothingTimeConstant = 0.7
-      out.connect(an)
-      const L = {
-        id, li, out, on: false, vol: Number(li.querySelector('.vol').value) / 100, ev: null,
-        an, bins: new Uint8Array(an.frequencyBinCount),
+      const node = engine.layers.get(id)
+      layers.set(id, {
+        id, li, out: node.gain, on: false, vol: Number(li.querySelector('.vol').value) / 100,
+        an: node.analyser, bins: new Uint8Array(node.analyser.frequencyBinCount),
         bars: [...li.querySelectorAll('.viz i')],
-      }
-      const res = BUILD[id] ? BUILD[id](out) : null
-      if (res) L.ev = Object.keys(res).find((k) => EVENTS[k])
-      layers.set(id, L)
+      })
     }
-
-    // 200 ms lookahead: enough to stay ahead of jitter, short enough that
-    // turning a layer off feels immediate.
-    scheduler = setInterval(() => {
-      const t = ctx.currentTime + 0.12
-      for (const L of layers.values()) {
-        if (!L.on || !L.ev || L.vol === 0) continue
-        EVENTS[L.ev](L, t)
-      }
-    }, 200)
   }
 
   /* ---- the knobs ----------------------------------------------------------
@@ -566,13 +436,16 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 
   function setLayer(L, on) {
     L.on = on
+    engine.setOn(L.id, on)
     if (on && running) noteHeard(L.id)
     const target = on ? L.vol : 0
+    view.setLevel(L.id, on ? Math.min(1, 0.35 + L.vol) : 0)
     L.out.gain.cancelScheduledValues(ctx.currentTime)
     L.out.gain.setTargetAtTime(target, ctx.currentTime, 0.12)
     L.li.classList.toggle('on', on)
     L.li.querySelector('.toggle').setAttribute('aria-pressed', String(on))
     paintStrip()
+    if (on && running) setTimeout(() => tell(L.id), 1200)
     if (on) {
       const scene = L.li.querySelector('.scene')
       scene.classList.remove('jump')
@@ -588,16 +461,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     meterRaf = requestAnimationFrame(meters)
     if (!masterAnalyser) return
 
-    masterAnalyser.getByteFrequencyData(masterBins)
-    // 64 bins into 32, and the top octave of an FFT is mostly empty, so the
-    // useful range is the lower three quarters.
-    let sum = 0
-    for (let i = 0; i < 32; i++) {
-      const a = masterBins[Math.min(masterBins.length - 1, Math.floor(i * 1.5))] / 255
-      spec[i] += (a - spec[i]) * 0.25
-      sum += spec[i]
-    }
-    level += (Math.min(1, sum / 32 * 2.6) - level) * 0.12
+    view.state = engine.state
 
     for (const L of layers.values()) {
       if (!L.bars.length) continue
@@ -612,21 +476,34 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
       }
     }
 
-    // The ticker is parked under reduced motion, so the field needs asking.
-    if (prefersReducedMotion) field.redraw()
+    // The ticker is parked under reduced motion: a new still now and then.
+    if (prefersReducedMotion && performance.now() - lastStill > 400) { lastStill = performance.now(); view.redraw() }
   }
+  let lastStill = 0
 
   async function start() {
-    ensureCtx()
+    await ensureEngine()
     if (ctx.state === 'suspended') await ctx.resume()
     running = true
+    // A mix that arrived in a link sets the cards before there is any sound;
+    // bring those layers in now.
+    for (const L of layers.values()) {
+      if (L.li.classList.contains('on') && !L.on) setLayer(L, true)
+    }
+    for (const L of layers.values()) if (L.on) view.setLevel(L.id, Math.min(1, 0.35 + L.vol))
     cancelAnimationFrame(meterRaf)
     meters()
-    masterBtn.textContent = 'Sound is on'
-    masterBtn.classList.add('live')
+    paintPlay(true)
     note.textContent = 'Click a card to bring that layer in. Turn its knob to set how much.'
-    // A shared mix arrives with its layers on but silent; they count once heard.
     for (const L of layers.values()) if (L.on) noteHeard(L.id)
+  }
+
+  const playLabel = masterBtn.querySelector('.play-label')
+  function paintPlay(on) {
+    masterBtn.classList.toggle('live', on)
+    masterBtn.setAttribute('aria-pressed', String(on))
+    masterBtn.setAttribute('aria-label', on ? 'Pause the mix' : 'Play the mix')
+    playLabel.textContent = on ? 'Pause' : 'Play'
   }
 
   masterBtn.addEventListener('click', async () => {
@@ -636,12 +513,10 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     heldByPause = false
     cancelAnimationFrame(meterRaf)
     // Settle everything to rest rather than freezing mid-reading.
-    spec.fill(0)
-    level = 0
     for (const L of layers.values()) for (const b of L.bars || []) b.style.setProperty('--v', '0.12')
-    if (prefersReducedMotion) field.redraw()
-    masterBtn.textContent = 'Turn the sound on'
-    masterBtn.classList.remove('live')
+    for (const L of layers.values()) view.setLevel(L.id, 0)
+    if (prefersReducedMotion) view.redraw()
+    paintPlay(false)
   })
 
   // Each layer a visitor brings in by hand, once a page.
@@ -669,7 +544,10 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     const L = layers.get(li.dataset.id)
     L.vol = Number(e.target.value) / 100
     if (!L.on) { setLayer(L, true); chose(L) }
-    else L.out.gain.setTargetAtTime(L.vol, ctx.currentTime, 0.08)
+    else {
+      L.out.gain.setTargetAtTime(L.vol, ctx.currentTime, 0.08)
+      view.setLevel(L.id, Math.min(1, 0.35 + L.vol))
+    }
   })
 
   masterSlider.addEventListener('input', () => {
@@ -807,52 +685,103 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   :global(.stage:has(> .mix-body)) { padding: 0; overflow: clip; background: #0e1b28; }
   .mix-body { color: #eaf1f7; }
 
-  .am-wrap { max-width: 900px; margin: 0 auto; padding: 30px 22px 48px; }
-  .head { text-align: center; margin-bottom: 22px; }
-  .lede { color: #a8bccd; margin: 0 auto; max-width: 46ch; font-size: 17px; }
-
-  .bar {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    justify-content: center; margin-bottom: 26px;
-    background: #16283a; border: 1px solid #24405a; border-radius: 999px;
-    padding: 10px 14px;
+  /* ---- the hero: the view, the transport over it, the narration ------- */
+  .am-hero { position: relative; }
+  .view {
+    position: relative; width: 100%; aspect-ratio: 12 / 5; max-height: 66vh;
+    overflow: hidden;
+    /* The still fallback, without WebGL: dusk over the sea. */
+    background:
+      linear-gradient(180deg, #0c1530 0%, #3a3550 48%, #7a5040 58%, #1c2a26 60%, #0e1712 100%);
   }
-  .primary {
-    border: 0; border-radius: 999px; padding: 10px 22px; font-weight: 600;
-    background: #5a9fd4; color: #06121c; cursor: pointer;
-    transition: filter 140ms var(--ease), transform 180ms var(--ease-bounce);
+  .view :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .hud {
+    position: absolute; left: 18px; right: 18px; bottom: 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    pointer-events: none;
   }
-  .primary.live { background: #7ad4a0; }
-  .primary:hover { filter: brightness(1.08); transform: translateY(-2px) scale(1.03); }
-  .primary:active { transform: scale(0.96); }
+  .hud > * { pointer-events: auto; }
+  .hud-panel, .hud-side .ghost, .caption {
+    background: rgba(7, 13, 25, 0.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25); backdrop-filter: blur(14px) saturate(1.25);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+  }
+  .hud-panel {
+    display: flex; align-items: center; gap: 14px; padding: 6px 18px 6px 6px;
+    border-radius: 999px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  }
+  .hud-side { display: flex; gap: 8px; }
+  .am-play {
+    display: inline-flex; align-items: center; gap: 9px; height: 46px; padding: 0 20px 0 17px;
+    border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-weight: 700; font-size: 15px;
+    background: #eaf3fc; color: #06121c;
+    transition: background 200ms var(--ease), transform 180ms var(--ease-bounce), box-shadow 200ms var(--ease);
+  }
+  .am-play:hover { transform: scale(1.04); }
+  .am-play:active { transform: scale(0.96); }
+  .am-play:focus-visible { outline: 2px solid #7ad4a0; outline-offset: 3px; }
+  .am-play .i-pause, .am-play.live .i-play { display: none; }
+  .am-play.live .i-pause { display: block; }
+  .am-play.live { background: #7ad4a0; box-shadow: 0 0 0 6px rgba(122, 212, 160, 0.16); }
+  .master { display: flex; align-items: center; gap: 9px; color: #c9d8e6; }
   .ghost {
-    border: 1px solid #2f5474; background: transparent; color: #cfe0ee;
-    border-radius: 999px; padding: 9px 18px; cursor: pointer;
+    border: 1px solid #2f5474; background: transparent; color: #dce8f3; font: inherit; font-size: 14px;
+    border-radius: 999px; padding: 10px 18px; cursor: pointer;
     transition: transform 180ms var(--ease-bounce), background 140ms var(--ease);
   }
-  .ghost:hover { background: rgba(255, 255, 255, 0.06); transform: scale(1.04); }
+  .ghost:hover { background: rgba(255, 255, 255, 0.1); transform: scale(1.04); }
   .ghost:active { transform: scale(0.95); }
-  .master { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #a8bccd; }
-
-  /* ---- presets --------------------------------------------------------- */
-  .presets {
-    display: grid; gap: 8px; margin-bottom: 26px;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  .caption {
+    position: absolute; left: 18px; top: 16px; margin: 0;
+    max-width: min(560px, calc(100% - 36px)); padding: 9px 15px; border-radius: 14px;
+    color: #eef4fa; font-size: 14px; line-height: 1.45;
+    opacity: 0; transform: translateY(-6px); pointer-events: none;
+    transition: opacity 420ms var(--ease), transform 420ms var(--ease);
   }
+  .caption.show { opacity: 1; transform: none; }
+
+  @media (max-width: 640px) {
+    .view { aspect-ratio: 1 / 1; max-height: none; }
+    .hud { position: static; padding: 12px 14px 0; flex-wrap: wrap; }
+    .hud-panel { flex: 1 1 100%; justify-content: space-between; }
+    .master input { width: 100%; }
+    .master { flex: 1; }
+    .hud-side { flex: 1 1 100%; }
+    .hud-side .ghost { flex: 1; }
+    .caption { left: 12px; top: 12px; max-width: calc(100% - 24px); font-size: 13px; }
+  }
+
+  .am-wrap { max-width: 1090px; margin: 0 auto; padding: 26px 22px 48px; }
+  .lede { color: #a8bccd; margin: 0 auto 26px; max-width: 60ch; font-size: 16.5px; text-align: center; line-height: 1.6; }
+  .am-label {
+    margin: 0 0 12px; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #7f99b0; text-align: center;
+  }
+
+  /* ---- presets: one row of chips ----------------------------------------- */
+  .presets {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 30px;
+  }
+  /* On a phone, one row that scrolls, fading at its ends. */
+  @media (max-width: 640px) {
+    .presets {
+      flex-wrap: nowrap; justify-content: flex-start; margin: 0 -22px 26px; padding: 2px 22px 6px;
+      overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+      mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+    }
+  }
+  .presets::-webkit-scrollbar { display: none; }
   .preset {
-    text-align: left; cursor: pointer; font: inherit; color: inherit;
-    background: #142433; border: 1px solid #24405a; border-radius: 12px;
-    padding: 10px 13px;
+    flex: none; scroll-snap-align: start; cursor: pointer; font: inherit; font-weight: 600; font-size: 14px;
+    color: #dce8f3; background: #142433; border: 1px solid #24405a; border-radius: 999px;
+    padding: 10px 17px;
     transition: border-color 140ms var(--ease), background 140ms var(--ease),
                 transform 180ms var(--ease-bounce);
   }
   .preset:hover { border-color: #5a9fd4; background: #17293a; transform: translateY(-1px); }
-  .preset:active { transform: scale(0.98); }
-  .preset.on { border-color: #5a9fd4; background: #17304a; }
-  .preset b { display: block; font-size: 13.5px; color: #eaf1f7; }
-  .preset span {
-    display: block; font-size: 12px; color: #9db3c6; margin-top: 3px; line-height: 1.5;
-  }
+  .preset:active { transform: scale(0.97); }
+  .preset.on { border-color: #7ad4a0; background: #173a35; color: #fff; }
 
   /* Geometry and behaviour are global (see global.css); a game only says what
      colour its sliders are. */
@@ -861,16 +790,6 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     --sl-a: #4f9fd6; --sl-b: #9ed8f2; --sl-track: #2b4a66;
   }
 
-  .field {
-    position: relative; height: 132px; border-radius: var(--radius);
-    overflow: hidden; margin-bottom: 22px;
-    border: 1px solid #24405a;
-    /* The still fallback: roughly what the shader settles to in silence. */
-    background:
-      radial-gradient(120% 90% at 50% 108%, #16344c 0%, transparent 62%),
-      linear-gradient(180deg, #0d1a27, #112536);
-  }
-  .field :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   .am-grid {
     list-style: none; margin: 0; padding: 0;
@@ -881,7 +800,10 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     background: #16283a; border: 1px solid #24405a; border-radius: var(--radius);
     padding: 12px; transition: border-color 200ms var(--ease), background 200ms var(--ease), transform 180ms var(--ease-bounce);
   }
-  .layer.on { border-color: #5a9fd4; background: #1b344c; }
+  .layer.on {
+    border-color: rgba(var(--moodRgb), 0.6);
+    background: linear-gradient(160deg, rgba(var(--moodRgb), 0.18), #1a3247 62%);
+  }
   .layer:hover { transform: translateY(-2px); }
   .toggle {
     display: flex; align-items: center; gap: 12px; width: 100%;
@@ -907,7 +829,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
   @keyframes jump-glyph { 40% { transform: translateY(-9px) scale(1.15); } }
   .am-meta { display: grid; flex: 1; min-width: 0; }
   .name { font-weight: 600; font-size: 15.5px; }
-  .hint { font-size: 12px; color: #7f99b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hint { font-size: 12.5px; color: #8fa8bd; line-height: 1.4; }
 
   /* Present only as an event bus for the knob below — see the script comment
      on bindKnobs() for why the audio graph, URL codec and presets still read
