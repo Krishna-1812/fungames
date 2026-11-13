@@ -4,10 +4,21 @@ import GameShell from '../layouts/GameShell.astro'
 /**
  * Ambient Mix — a soundscape mixer with no audio files at all.
  *
- * Every layer is synthesised live in the Web Audio graph: filtered noise for
- * the textures, scheduled bursts for the events. That means the page weighs a
- * few kilobytes instead of a few megabytes, nothing has to be licensed, and
- * the loops never repeat audibly because there is no loop.
+ * Every layer is a physical model of the thing it is named after, running in
+ * an AudioWorklet (lib/ambient): rain as separate drops and ringing bubbles,
+ * surf one breaking wave at a time, wind from a real speed in metres per
+ * second, a café of synthesised talkers taking turns, crickets at Dolbear's
+ * rate for the night's temperature, cars spread, absorbed, delayed and
+ * Doppler-shifted by where they are, a clock on the visitor's real second,
+ * thunder laid down from the shape of its lightning, a single-cylinder mower,
+ * and a modem's actual handshake. Nothing loops, because nothing is recorded.
+ * scripts/check-ambient-sound.mjs listens to all of it with numbers.
+ *
+ * Above the mixer is the view (lib/ambient/scene*.ts): a landscape the mix
+ * assembles, where each layer adds its part and follows its model — the
+ * waves break when the sound breaks, headlights are where the cars are heard
+ * from, the flash comes before the thunder — and the time of day comes from
+ * the mix. A line in its corner narrates the physics as it happens.
  *
  * In the shell the mixer is a dark stage. Score is how many layers are playing,
  * Heard how many of the twelve you have brought in at least once, Listened how
@@ -156,15 +167,19 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
 
   <Fragment slot="howto">
     <p>
-      A soundscape mixer with no recordings in it. Every layer — rain, waves,
-      a fire, a café, a thunderstorm, a dial-up modem — is synthesised live in
-      this tab.
+      A soundscape mixer with no recordings in it. Every layer is built from
+      the physics of how the real thing makes its sound, live in this tab:
+      rain is separate drops and bubbles, thunder is laid down from the shape
+      of a lightning bolt, every passing car is Doppler-shifted, and the
+      crickets chirp at the rate the night's temperature sets (Dolbear's law).
+      The view above puts together a landscape from whatever is playing.
     </p>
     <ul>
-      <li>Press the sound button, then click a card to bring that layer in. Click it again to take it out.</li>
+      <li>Press Play, then click a card to bring that layer in. Click it again to take it out.</li>
+      <li>Watch the view: a flash comes first and its thunder after, about three seconds for every kilometre. The line in the corner counts it down.</li>
       <li>Each card's knob sets how loud it is: drag it up or down, scroll on it, or use the arrow keys. Double-click puts it back.</li>
       <li>The presets are mixes worth arriving at. Copy link puts the whole mix in the address.</li>
-      <li>Pause suspends the mix. The Sound button up top is for the site's clicks, not for this.</li>
+      <li>Pause, on the view or up top, holds the mix. The Sound button up top is for the site's clicks, not for this.</li>
     </ul>
     <p>Bring in all twelve layers, at least once each, to finish.</p>
   </Fragment>
@@ -657,7 +672,7 @@ const KNOB_DEFAULT_P2 = knobPoint(KNOB.ptrOut, KNOB_DEFAULT_ANGLE)
     if (!mix) return false
     applyMix(mix)
     if (announce) {
-      note.textContent = 'A shared mix — press the button above to hear it.'
+      note.textContent = 'A shared mix — press Play to hear it.'
     }
     return true
   }
