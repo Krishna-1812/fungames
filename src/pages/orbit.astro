@@ -165,7 +165,6 @@ import { GOALS } from '../lib/orbit-goals'
 
 <script>
   import { sfx, unlock, tone } from '../lib/audio'
-  import { burst, ring } from '../lib/fx'
 
   import { SCENE_KEY, captureScene, readScene, sceneBodies, encodeScene, decodeScene, fitScene, type Scene } from '../lib/orbit-scene'
   import { adjustAim } from '../lib/orbit-input'
@@ -174,7 +173,7 @@ import { GOALS } from '../lib/orbit-goals'
   import { launchFrame, predict, type Path } from '../lib/orbit-predict'
   import * as presets from '../lib/orbit-presets'
   import {
-    type Body, type StepEvents,
+    type Body, type StepEvents, type Merge,
     makeBody, step, circularV, radiusFor, MAX_BODIES,
   } from '../lib/orbit-sim'
   import { GOALS, Tracker, type Progress } from '../lib/orbit-goals'
@@ -468,12 +467,13 @@ import { GOALS } from '../lib/orbit-goals'
   }
 
   let mergeSoundBudget = 0
-  function onMerge(x: number, y: number, m: number) {
-    const rect = canvas.getBoundingClientRect()
-    ring(rect.left + x * viewScale, rect.top + y * viewScale, 'hsl(38 100% 72%)', 8 + Math.cbrt(m) * 5)
-    burst(rect.left + x * viewScale, rect.top + y * viewScale, {
-      count: Math.min(24, 5 + (m | 0)), colors: ['#ffd166', '#ff9a3c', '#fff'],
-      speed: 2.6, gravity: 0, drag: 0.93, life: 30, size: 2.4,
+  /** A collision: drawn in the scene itself — hot debris, a flash, and heat
+   *  left glowing in whatever survived — not confetti over the top of it. */
+  function onMerge(e: Merge) {
+    const s = bodies.find((b) => b.id === e.survivor)
+    renderer.impact({
+      cx: e.cx, cy: e.cy, x: e.x, y: e.y, vx: s?.vx ?? 0, vy: s?.vy ?? 0,
+      total: e.total, star: e.star, m: e.m, speed: e.speed, survivor: e.survivor, absorbed: e.absorbed,
     })
     // Cap sound so a hundred simultaneous merges do not machine-gun.
     if (mergeSoundBudget > 0) {
@@ -502,7 +502,7 @@ import { GOALS } from '../lib/orbit-goals'
           ev.escaped.push(...r.events.escaped)
         }
         renderer.record(bodies)
-        for (const m of ev.merges) { merges++; onMerge(m.x, m.y, m.m) }
+        for (const m of ev.merges) { merges++; onMerge(m) }
 
         const won = tracker.observe(bodies, ev)
         if (won.length) celebrate(won)
@@ -566,10 +566,7 @@ import { GOALS } from '../lib/orbit-goals'
     flightCard.hidden = true
     const speed = Math.hypot(aim.x1 - aim.x0, aim.y1 - aim.y0) * THROW
     sfx.pop(Math.min(9, Math.round(speed * 2)))
-    const r = canvas.getBoundingClientRect()
-    burst(r.left + aim.x0 * viewScale, r.top + aim.y0 * viewScale, {
-      count: 8, colors: ['#9fd0ff', '#fff'], speed: 2, gravity: 0, drag: 0.9, life: 22, size: 2,
-    })
+    renderer.launch(aim.x0, aim.y0)
     aim = null; anchor = null; path = null
   }
   canvas.addEventListener('pointerup', () => { if (!keyboardAim) release() })

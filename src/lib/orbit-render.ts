@@ -100,13 +100,28 @@ export type RenderBody = {
 }
 export type Aim = { x0: number; y0: number; x1: number; y1: number } | null
 
+/** One collision, as the renderer needs it. */
+export type Impact = {
+  /** Contact point. */
+  cx: number; cy: number
+  /** The survivor afterwards: where, how fast, how heavy, a star or not. */
+  x: number; y: number; vx: number; vy: number; total: number; star: boolean
+  /** The body that was swallowed, and how fast the two met. */
+  m: number; speed: number
+  survivor: number; absorbed: number
+}
+
 export interface Renderer {
   resize(w: number, h: number, dpr: number): void
   /** Note where everything is. Called once per simulation tick, so a trail's
    *  length is a length of time, whatever the display's refresh rate. */
   record(bodies: RenderBody[]): void
   draw(bodies: RenderBody[], aim: Aim, trails: boolean, launchRadius: number): void
-  /** Wipe the trail history. */
+  /** A collision: hot debris, a flash, and heat left in the survivor. */
+  impact(i: Impact): void
+  /** A launch: a small puff where it left from. */
+  launch(x: number, y: number): void
+  /** Wipe the trail history, debris and heat. */
   clear(): void
   /** True when the GPU path is live, so the page can say so in the readout. */
   readonly hdr: boolean
@@ -496,6 +511,15 @@ void main() {
       lit += vec3(0.9, 0.45, 0.25) * E * exp(-abs(ndl) * 9.0) * 0.05 * S.airK * step(-0.1, ndl);
     }
     lit += S.albedo * vec3(0.006, 0.008, 0.014) + S.emit;
+    // Heat from an impact: the crust cracks and glows, and when it is hot
+    // enough the whole surface is molten. It cools over several seconds.
+    float heat = vInfo.y;
+    if (heat > 0.002) {
+      float crack = smoothstep(0.42, 0.85, ridge3(q * 3.4 + s * 9.0, 4));
+      // Molten rock is orange-red, not white: about 1,300 K at its hottest.
+      vec3 hot = mix(vec3(0.60, 0.08, 0.015), vec3(1.0, 0.36, 0.08), heat);
+      lit += hot * (heat * (0.10 + 1.25 * crack) + heat * heat * 0.45) * 0.85;
+    }
     col = mix(col, lit, edge);
     cover = mix(cover, 1.0, edge);
   } else {
@@ -634,6 +658,37 @@ void main() {
   float edge = 1.0 - smoothstep(1.0 - aa * 1.5, 1.0, d);
   float core = exp(-d * d * 2.2);
   fragColor = vec4(vColor.rgb * (vColor.a * core * edge), 0.0);
+}`
+
+/* Debris and flashes: a soft point of light each, instanced. */
+const FX_VERT = `#version 300 es
+precision highp float;
+in vec3 position;
+in vec2 iPos;
+in float iSize;
+in vec3 iColor;
+uniform vec2 u_res;
+out vec2 vQuad;
+out vec3 vColor;
+void main() {
+  vQuad = position.xy;
+  vColor = iColor;
+  vec2 px = iPos + position.xy * iSize;
+  vec2 clip = px / u_res * 2.0 - 1.0;
+  gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+}`
+
+const FX_FRAG = `#version 300 es
+precision highp float;
+in vec2 vQuad;
+in vec3 vColor;
+out vec4 fragColor;
+void main() {
+  float d2 = dot(vQuad, vQuad);
+  if (d2 > 1.0) discard;
+  // A hot core and a soft skirt, so a spark reads as a point of light.
+  float core = exp(-d2 * 18.0), skirt = exp(-d2 * 4.0) * 0.25;
+  fragColor = vec4(vColor * (core + skirt), 0.0);
 }`
 
 const FS_VERT = `#version 300 es
@@ -883,6 +938,14 @@ class GLRenderer implements Renderer {
   private trailCap = 0
   private hist = new Map<number, Trail>()
 
+  private fxGeo!: InstancedBufferGeometry
+  private fxMat!: RawShaderMaterial
+  private fxMesh!: Mesh
+  private sparks: Spark[] = []
+  private flashes: Flash[] = []
+  /** Heat left in a body by an impact, 0..1, cooling every tick. */
+  private heat = new Map<number, number>()
+
   private fsScene = new Scene()
   private fsQuad: Mesh
   private passes: Record<string, RawShaderMaterial> = {}
@@ -918,6 +981,114 @@ class GLRenderer implements Renderer {
     this.buildPasses()
     this.buildTrails()
     this.buildBodies()
+    this.buildFx()
+  }
+
+  private buildFx() {
+    const g = new InstancedBufferGeometry()
+    g.setAttribute('position', new Float32BufferAttribute(
+      [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0], 3))
+    g.setAttribute('iPos', new InstancedBufferAttribute(new Float32Array(FX_CAP * 2), 2))
+    g.setAttribute('iSize', new InstancedBufferAttribute(new Float32Array(FX_CAP), 1))
+    g.setAttribute('iColor', new InstancedBufferAttribute(new Float32Array(FX_CAP * 3), 3))
+    g.instanceCount = 0
+    g.boundingSphere = new Sphere(new Vector3(), 1e6)
+    this.fxGeo = g
+    this.fxMat = new RawShaderMaterial({
+      vertexShader: noVersion(FX_VERT),
+      fragmentShader: noVersion(FX_FRAG),
+      uniforms: { u_res: { value: new Vector2() } },
+      glslVersion: GLSL3,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      ...LIGHT_BLEND,
+      side: DoubleSide,
+    })
+    this.fxMesh = new Mesh(g, this.fxMat)
+    this.fxMesh.frustumCulled = false
+    // Over the bodies: debris thrown off a planet is in front of it.
+    this.fxMesh.renderOrder = 2
+    this.scene.add(this.fxMesh)
+  }
+
+  impact(i: Impact) {
+    // The energy of the blow, against the mass that has to soak it up.
+    const E = 0.5 * i.m * i.speed * i.speed
+    if (!i.star) {
+      const h = Math.min(1, (this.heat.get(i.survivor) ?? 0) + E / (0.6 * i.total))
+      this.heat.set(i.survivor, h)
+    }
+    this.heat.delete(i.absorbed)
+    // Debris: thrown out of the contact point, away from the survivor's
+    // centre, on top of the survivor's own motion.
+    const nx = i.cx - i.x, ny = i.cy - i.y
+    const nl = Math.hypot(nx, ny) || 1
+    const base = Math.atan2(ny / nl, nx / nl)
+    const count = Math.min(70, Math.round(4 + 3 * Math.sqrt(E)))
+    const T0 = 2600 + Math.min(1, E / 40) * 1800
+    for (let k = 0; k < count && this.sparks.length < SPARK_CAP; k++) {
+      const a = base + (Math.random() - 0.5) * 2.6
+      const v = (0.4 + 0.3 * i.speed) * (0.35 + Math.random())
+      this.sparks.push({
+        x: i.cx, y: i.cy,
+        vx: i.vx + Math.cos(a) * v, vy: i.vy + Math.sin(a) * v,
+        age: 0, life: 40 + Math.random() * 70,
+        size: 0.8 + Math.random() * 1.1, T: T0 * (0.8 + Math.random() * 0.3),
+      })
+    }
+    const size = (6 + 5 * Math.cbrt(i.m)) * (0.6 + Math.min(1, i.speed / 4))
+    this.flashes.push({ x: i.cx, y: i.cy, vx: i.vx, vy: i.vy, size, age: 0, life: 22, T: 6000, gain: 2.2 })
+  }
+
+  launch(x: number, y: number) {
+    this.flashes.push({ x, y, vx: 0, vy: 0, size: 9, age: 0, life: 14, T: 9000, gain: 0.5 })
+  }
+
+  /** Move the debris on, and cool everything a tick. */
+  private tickFx() {
+    for (const s of this.sparks) { s.x += s.vx; s.y += s.vy; s.vx *= 0.99; s.vy *= 0.99; s.age++ }
+    this.sparks = this.sparks.filter((s) => s.age < s.life)
+    for (const f of this.flashes) { f.x += f.vx; f.y += f.vy; f.age++ }
+    this.flashes = this.flashes.filter((f) => f.age < f.life)
+    // About four and a half seconds to lose half its heat.
+    for (const [id, h] of this.heat) {
+      const n = h * 0.9975 - 0.0002
+      if (n <= 0) this.heat.delete(id)
+      else this.heat.set(id, n)
+    }
+  }
+
+  private fillFx() {
+    const g = this.fxGeo, dpr = this.dpr
+    const pos = g.getAttribute('iPos') as InstancedBufferAttribute
+    const size = g.getAttribute('iSize') as InstancedBufferAttribute
+    const col = g.getAttribute('iColor') as InstancedBufferAttribute
+    let n = 0
+    for (const s of this.sparks) {
+      if (n >= FX_CAP) break
+      // Cooling: the temperature falls with age, and the light with it, as
+      // the fourth power, as a black body's does.
+      const k = s.age / s.life
+      const T = s.T * (1 - 0.7 * k)
+      const c = blackbody(T).multiplyScalar(2.2 * Math.pow(T / s.T, 4) * (1 - k))
+      pos.setXY(n, s.x * dpr, s.y * dpr)
+      size.setX(n, s.size * 2.2 * dpr)
+      col.setXYZ(n, c.x, c.y, c.z)
+      n++
+    }
+    for (const f of this.flashes) {
+      if (n >= FX_CAP) break
+      const k = f.age / f.life
+      const c = blackbody(f.T * (1 - 0.6 * k)).multiplyScalar(f.gain * (1 - k) * (1 - k))
+      pos.setXY(n, f.x * dpr, f.y * dpr)
+      size.setX(n, f.size * (0.6 + 0.8 * k) * dpr)
+      col.setXYZ(n, c.x, c.y, c.z)
+      n++
+    }
+    for (const a of [pos, size, col]) a.needsUpdate = true
+    g.instanceCount = n
+    return n
   }
 
   private pass(frag: string, uniforms: Record<string, IUniform>) {
@@ -1005,6 +1176,7 @@ class GLRenderer implements Renderer {
       pushTrail(t, b.x, b.y)
     }
     for (const id of this.hist.keys()) if (!live.has(id)) this.hist.delete(id)
+    this.tickFx()
   }
 
   /** Build every ribbon into the trail buffers. Returns the index count. */
@@ -1187,7 +1359,7 @@ class GLRenderer implements Renderer {
       this.bloomRT.push(new WebGLRenderTarget(bw, bh, opts))
     }
 
-    for (const m of [this.planetMat, this.starMat, this.trailMat]) m.uniforms.u_res.value.set(this.w, this.h)
+    for (const m of [this.planetMat, this.starMat, this.trailMat, this.fxMat]) m.uniforms.u_res.value.set(this.w, this.h)
     this.passes.composite.uniforms.u_res.value.set(this.w, this.h)
     this.passes.sky.uniforms.u_res.value.set(this.w, this.h)
     this.passes.sky.uniforms.u_dpr.value = dpr
@@ -1266,7 +1438,7 @@ class GLRenderer implements Renderer {
         pSeed.setX(np, seed)
         // Rotation rate falls with size, so big bodies feel heavy.
         pSpin.setX(np, t * (0.5 / Math.max(1, Math.cbrt(b.m))))
-        pInfo.setXYZ(np, b.m, 0, ringed(b.m, seed) ? 2.35 : 1.3)
+        pInfo.setXYZ(np, b.m, this.heat.get(b.id) ?? 0, ringed(b.m, seed) ? 2.35 : 1.3)
         np++
       }
     }
@@ -1295,8 +1467,9 @@ class GLRenderer implements Renderer {
     this.starMat.uniforms.u_pad.value = 6.0
     this.planetMat.uniforms.u_falloff.value = 420 * dpr
 
-    // 1. trails, then bodies -> sceneRT
+    // 1. trails, then bodies, then debris -> sceneRT
     this.trailMesh.visible = trails && this.buildRibbons(bodies) > 0
+    this.fxMesh.visible = this.fillFx() > 0
     this.renderer.setRenderTarget(this.sceneRT)
     this.renderer.clear(true, false, false)
     this.renderer.render(this.scene, this.cam)
@@ -1335,12 +1508,15 @@ class GLRenderer implements Renderer {
 
   clear() {
     this.hist.clear()
+    this.sparks = []
+    this.flashes = []
+    this.heat.clear()
   }
 
   dispose() {
     for (const rt of [this.sceneRT, this.skyRT, ...this.bloomRT]) rt?.dispose()
-    this.planetGeo.dispose(); this.starGeo.dispose(); this.trailGeo.dispose()
-    this.planetMat.dispose(); this.starMat.dispose(); this.trailMat.dispose()
+    this.planetGeo.dispose(); this.starGeo.dispose(); this.trailGeo.dispose(); this.fxGeo.dispose()
+    this.planetMat.dispose(); this.starMat.dispose(); this.trailMat.dispose(); this.fxMat.dispose()
     for (const k in this.passes) this.passes[k].dispose()
     this.renderer.dispose()
   }
@@ -1360,6 +1536,13 @@ const TRAIL_TICKS = 240
 const TRAIL_BUDGET = 24000
 
 type Trail = { xs: Float32Array; ys: Float32Array; head: number; count: number }
+
+/** A fleck of hot debris, cooling as it flies. */
+type Spark = { x: number; y: number; vx: number; vy: number; age: number; life: number; size: number; T: number }
+/** A flash of light at an impact or a launch. */
+type Flash = { x: number; y: number; vx: number; vy: number; size: number; age: number; life: number; T: number; gain: number }
+const SPARK_CAP = 900
+const FX_CAP = 1024
 
 function pushTrail(t: Trail, x: number, y: number) {
   t.xs[t.head] = x
@@ -1437,6 +1620,8 @@ class Canvas2DRenderer implements Renderer {
   }
 
   record() {}
+  impact() {}
+  launch() {}
 
   draw(bodies: RenderBody[], _aim: Aim, trails: boolean) {
     const ctx = this.ctx

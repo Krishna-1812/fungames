@@ -110,7 +110,15 @@ export const circularV = (M: number, r: number) =>
 export const escapeV = (M: number, r: number) =>
   Math.sqrt((2 * G * M) / Math.sqrt(r * r + SOFT * SOFT))
 
-export type Merge = { x: number; y: number; m: number; survivor: number; absorbed: number }
+export type Merge = {
+  x: number; y: number; m: number; survivor: number; absorbed: number
+  /** Closing speed of the two at the moment they touched. */
+  speed: number
+  /** Where on the survivor's surface they touched. */
+  cx: number; cy: number
+  /** The survivor's mass afterwards, and whether it is now a star. */
+  total: number; star: boolean
+}
 export type StepEvents = { merges: Merge[]; escaped: Body[] }
 
 /**
@@ -166,6 +174,9 @@ export function step(
       const big = a.m >= b.m ? a : b
       const small = big === a ? b : a
       const m = a.m + b.m
+      const speed = Math.hypot(b.vx - a.vx, b.vy - a.vy)
+      const k = big.r / (big.r + small.r)
+      const cx = big.x + (small.x - big.x) * k, cy = big.y + (small.y - big.y) * k
       big.vx = (a.vx * a.m + b.vx * b.m) / m
       big.vy = (a.vy * a.m + b.vy * b.m) / m
       big.x = (a.x * a.m + b.x * b.m) / m
@@ -179,7 +190,10 @@ export function step(
       big.mine = big.mine || small.mine
 
       bodies.splice(bodies.indexOf(small), 1)
-      events.merges.push({ x: big.x, y: big.y, m: small.m, survivor: big.id, absorbed: small.id })
+      events.merges.push({
+        x: big.x, y: big.y, m: small.m, survivor: big.id, absorbed: small.id,
+        speed, cx, cy, total: m, star: big.star,
+      })
       j--
     }
   }
