@@ -1,5 +1,5 @@
 /**
- * Orbit's eight challenges.
+ * Orbit's nine challenges.
  *
  * The sandbox was the whole game: a beautiful n-body simulation with nothing to
  * reach for. These give it something. The rule they are all written to is that
@@ -29,12 +29,18 @@
  *
  * ## What is deliberately not here
  *
- * A moon orbiting a planet orbiting the star — or rather, not until the
- * gravity was real. With 26 pixels of softening the stable satellite zone
- * round any planet this game offers was entirely inside that radius, where the
- * force had been flattened away, and a moon launched there was lost within
- * seconds. With softening gone it holds indefinitely, and the checker proves
- * it.
+ * A moon orbiting a planet orbiting the star was here for years, cut before
+ * it was written: with 26 pixels of softening the stable satellite zone round
+ * any planet this game offers was entirely inside that radius, where the force
+ * had been flattened away, and a moon launched there was lost within seconds.
+ * With the gravity made real it holds indefinitely, so it is a challenge now —
+ * "A moon of its own", below.
+ *
+ * A moon is measured the way the laps are, by the signed angle swept, but
+ * about its planet instead of the star, and only while it is genuinely the
+ * planet's: inside the planet's Hill sphere, r·∛(m/3M), and bound to it on its
+ * own account. A body that drifts out of either starts again from nothing, so
+ * a fast fly-past that happens to curl round a planet does not count.
  *
  * Most challenges require a body *you launched*. Otherwise pressing "Solar
  * system" completes the first one four seconds later, and pressing "Binary"
@@ -84,6 +90,12 @@ export const GOALS: Goal[] = [
     name: 'Binary star',
     brief: 'Have two stars of similar mass, one of them yours, orbit each other',
     note: 'Neither one is the centre. Both fall around a barycentre out in open space between them, which is what separates a binary from a star with something going round it — and it is how most of the stars you can see are arranged.',
+  },
+  {
+    id: 'moon',
+    name: 'A moon of its own',
+    brief: 'Put a body of yours in orbit round a planet, while the planet goes round the star',
+    note: 'Only inside a planet’s Hill sphere, r·∛(m/3M), does its own pull outweigh the star’s tug, and only the inner half of that keeps a moon for long. Ours sits a quarter of the way out of Earth’s.',
   },
   {
     id: 'slingshot',
@@ -160,6 +172,9 @@ type Track = {
 
 type Pair = { angle: number; swept: number; seen: boolean }
 
+/** A body going round something other than the primary. */
+type MoonTrack = { host: number; angle: number; swept: number }
+
 export type Progress = {
   /** Goal ids completed, in the order they fell. */
   done: string[]
@@ -180,6 +195,7 @@ export class Tracker {
 
   private tracks = new Map<number, Track>()
   private pairs = new Map<string, Pair>()
+  private moons = new Map<number, MoonTrack>()
   private primaryId = -1
   merges = 0
 
@@ -187,6 +203,7 @@ export class Tracker {
   reset() {
     this.tracks.clear()
     this.pairs.clear()
+    this.moons.clear()
     this.primaryId = -1
     this.merges = 0
   }
@@ -229,6 +246,7 @@ export class Tracker {
     if (!primary) {
       this.tracks.clear()
       this.pairs.clear()
+      this.moons.clear()
       return won
     }
 
@@ -237,6 +255,7 @@ export class Tracker {
       this.primaryId = primary.id
       this.tracks.clear()
       this.pairs.clear()
+      this.moons.clear()
     }
 
     const com = barycentre(bodies)
@@ -305,6 +324,7 @@ export class Tracker {
     for (const id of this.tracks.keys()) if (!seen.has(id)) this.tracks.delete(id)
 
     this.checkBinary(bodies, won)
+    this.checkMoons(bodies, primary, won)
 
     if (bodies.length === 1 && bodies[0].m >= COLLAPSE_MASS) this.win('collapse', won)
 
@@ -364,6 +384,50 @@ export class Tracker {
     // hundred frames apart with an unbound gap in between, is not one orbit.
     for (const [k, p] of this.pairs) if (!p.seen) this.pairs.delete(k)
   }
+
+  /**
+   * A body of yours going all the way round a planet. The angle is measured
+   * about the planet, not the star, so the planet's own motion round the star
+   * — which carries the moon along with it — is not counted as the moon's.
+   */
+  private checkMoons(bodies: Body[], primary: Body, won: string[]) {
+    const seen = new Set<number>()
+    for (const b of bodies) {
+      if (!b.mine || b === primary) continue
+      const host = hostOf(b, bodies, primary)
+      if (!host) continue
+      seen.add(b.id)
+      const angle = Math.atan2(b.y - host.y, b.x - host.x)
+      const t = this.moons.get(b.id)
+      if (!t || t.host !== host.id) {
+        this.moons.set(b.id, { host: host.id, angle, swept: 0 })
+        continue
+      }
+      t.swept += wrap(angle - t.angle)
+      t.angle = angle
+      if (Math.abs(t.swept) >= TAU) this.win('moon', won)
+    }
+    for (const id of this.moons.keys()) if (!seen.has(id)) this.moons.delete(id)
+  }
+}
+
+/**
+ * The planet `b` is a moon of, if any: something heavier than it and not the
+ * primary, whose Hill sphere it is inside and to which it is bound on its own.
+ * The nearest, if there is more than one.
+ */
+function hostOf(b: Body, bodies: Body[], primary: Body): Body | null {
+  let best: Body | null = null
+  let bd = Infinity
+  for (const h of bodies) {
+    if (h === b || h === primary || h.m <= b.m) continue
+    const d = Math.hypot(b.x - h.x, b.y - h.y)
+    const reach = Math.hypot(h.x - primary.x, h.y - primary.y) * Math.cbrt(h.m / (3 * primary.m))
+    if (d >= reach || d >= bd) continue
+    if (relEnergy(b, h) >= 0) continue
+    best = h; bd = d
+  }
+  return best
 }
 
 function nearestStar(of: Body, list: Body[]): Body | null {

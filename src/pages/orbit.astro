@@ -3,7 +3,7 @@ import GameShell from '../layouts/GameShell.astro'
 import { GOALS } from '../lib/orbit-goals'
 
 /**
- * Orbit - an n-body gravity sandbox, with eight things to attempt in it.
+ * Orbit - an n-body gravity sandbox, with nine things to attempt in it.
  *
  * The physics moved to lib/orbit-sim.ts and the challenges live in
  * lib/orbit-goals.ts, both of which run headlessly so scripts/check-orbit.mjs
@@ -142,7 +142,7 @@ import { GOALS } from '../lib/orbit-goals'
       </div>
       <div class="group">
         <button type="button" class="opt wide" id="goalBtn" aria-expanded="false">
-          Challenges <b id="goalCount">0/8</b>
+          Challenges <b id="goalCount">0/{GOALS.length}</b>
         </button>
       </div>
     </aside>
@@ -159,7 +159,7 @@ import { GOALS } from '../lib/orbit-goals'
       <li>Learn walks you through a first orbit. Keyboard (or K on the sky) aims a launch with the arrow keys.</li>
       <li>Freeze holds the sky without hiding it. Share scene makes a link to exactly what is on screen.</li>
     </ul>
-    <p>Eight challenges, from a first orbit to the last one standing. Only bodies you launch yourself count. Earn all eight to finish.</p>
+    <p>Nine challenges, from a first orbit to the last one standing. Only bodies you launch yourself count. Earn all nine to finish.</p>
   </Fragment>
 </GameShell>
 
@@ -243,7 +243,7 @@ import { GOALS } from '../lib/orbit-goals'
     const complete = tracker.done.size === GOALS.length
     const laps = tracker.liveLaps()
     document.getElementById('missionTitle')!.textContent = complete
-      ? 'Eight discoveries. Your universe.'
+      ? `All ${GOALS.length} discoveries. Your universe.`
       : tracker.done.has('orbit') ? `${tracker.done.size} of ${GOALS.length} discoveries` : 'Mission 01 · Your first orbit'
     document.getElementById('missionDetail')!.textContent = !tracker.done.has('orbit')
       ? `${laps > 0 ? `${Math.min(100, Math.floor(laps * 100))}% around the star` : 'Launch your own body to begin'} · Flight log ↗`

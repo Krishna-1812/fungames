@@ -403,6 +403,28 @@ console.log('\nchallenges that should be earned')
 }
 
 {
+  // A moon of its own: a body of mine round the giant, while the giant goes
+  // round the star. The same system with the moon not mine earns nothing, a
+  // moon of mine round the star alone is not one, and a fast pass that
+  // swings round the giant without being bound to it is not either.
+  const build = (mine, speed = 1) => {
+    resetIds()
+    const R = 300, M = 60, rH = R * Math.cbrt(M / (3 * 2600)), d = rH * 0.4
+    const vp = circularV(2600, R), vm = circularV(M + 1, d) * speed
+    return [makeBody(CX, CY, 0, 0, 2600), makeBody(CX + R, CY, 0, vp, M), makeBody(CX + R + d, CY, 0, vp + vm, 1, mine)]
+  }
+  const yours = run(build(true), 600)
+  report('a body of mine round a planet earns A moon of its own', yours.won.has('moon'))
+  report('...and not First orbit, which is about the star', !yours.won.has('orbit'))
+  const theirs = run(build(false), 600)
+  report('the same moon, not mine, earns nothing', theirs.won.size === 0)
+  const lone = run(twoBody(145, 1), 600)
+  report('a body round the star alone is not a moon', !lone.won.has('moon'))
+  const fast = run(build(true, 1.8), 600)
+  report('a pass too fast to be bound to the planet is not one either', !fast.won.has('moon'))
+}
+
+{
   // Ten laps. A tight orbit gets there sooner: the period grows as the radius
   // over the speed, and the speed falls off with distance, so r=90 laps in 112
   // frames while r=300 takes 644.
@@ -577,7 +599,7 @@ console.log('\nchallenges that should not be earned')
 
 console.log('\nthe list itself')
 
-report('eight challenges', GOALS.length === 8, String(GOALS.length))
+report('nine challenges', GOALS.length === 9, String(GOALS.length))
 report('ids are unique', new Set(GOAL_IDS).size === GOAL_IDS.length)
 report('all named and briefed', GOALS.every((g) => g.name.length > 3 && g.brief.length > 15))
 report('all explain themselves afterwards', GOALS.every((g) => g.note.length > 40))
