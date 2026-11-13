@@ -53,6 +53,7 @@ import {
   Mesh,
   NormalBlending,
   OneFactor,
+  OneMinusSrcAlphaFactor,
   RawShaderMaterial,
   RGBAFormat,
   Scene,
@@ -130,6 +131,10 @@ in float iRadius;
 in vec3 iColor;
 in float iSeed;
 in float iSpin;
+/* mass, heat (0..1, from a recent impact), and the quad's padding in body
+   radii — a ringed giant needs far more room than a bare moon. Zero padding
+   means "use u_pad", which is what the stars do. */
+in vec3 iInfo;
 
 uniform vec2 u_res;
 uniform float u_pad;
@@ -139,6 +144,7 @@ out vec3 vColor;
 out float vRadius;
 out float vSeed;
 out float vSpin;
+out vec3 vInfo;
 out vec2 vCentre;
 
 void main() {
@@ -147,9 +153,11 @@ void main() {
   vRadius = iRadius;
   vSeed = iSeed;
   vSpin = iSpin;
+  vInfo = iInfo;
   vCentre = iPos;
 
-  vec2 px = iPos + position.xy * iRadius * u_pad;
+  float pad = iInfo.z > 0.0 ? iInfo.z : u_pad;
+  vec2 px = iPos + position.xy * iRadius * pad;
   vec2 clip = px / u_res * 2.0 - 1.0;
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
 }`
@@ -182,68 +190,340 @@ vec3 spun(vec3 n, float a) {
 }
 `
 
+/*
+ * A planet, lit by whatever stars there are.
+ *
+ * The camera looks down on the plane everything orbits in, and the stars are
+ * in that plane, so a planet is seen side-lit: the half facing its star is
+ * day, the other half night, with the terminator straight across it. That is
+ * the look of every real photograph taken from beside a planet rather than
+ * between it and the Sun, and it is what makes these read as worlds instead
+ * of coloured dots — the terminator swings round as the planet goes round.
+ *
+ * Every body has a spin axis tipped forty to seventy degrees towards the
+ * viewer, so latitude — bands, ice caps, a ring's plane — curves across the
+ * disc the way it does in a photograph, rather than being seen pole-on.
+ *
+ * What a body is follows from its mass, as it does in nature. Under 1.5 it is
+ * a small airless moon, grey and cratered. Up to 16 it is rocky, and which
+ * kind of rocky is down to the body: an ocean world with continents, clouds
+ * and ice caps; a rust desert; a grey cratered world; an ice moon scored with
+ * cracks; or a Venus under a cream cloud deck. Up to 100 it is a giant — belted
+ * and storm-spotted, or pale gold, or an ice giant — and some giants carry
+ * rings. From 100 to the 200 that ignites a star it is a brown dwarf, a failed
+ * star glowing a dull magenta through its own cloud bands.
+ *
+ * Rings are real geometry: the ray through each pixel is intersected with the
+ * ring plane, so a ring passes in front of the planet on one side and behind
+ * it on the other, the planet casts its shadow across the ring, and the ring
+ * casts its own back across the planet.
+ */
 const PLANET_FRAG = BODY_HEAD + `
 ${BODY_COMMON}
+in vec3 vInfo;
+uniform float u_falloff;
 
-void main() {
-  // vQuad spans -1..1 across the padded quad, so the sphere itself has radius
-  // 1/u_pad within it.
-  float sr = 1.0 / u_pad;
-  vec2 p = vQuad / sr;
-  float r2 = dot(p, p);
-  if (r2 > 1.0) discard;
+vec3 axisFor(float s) {
+  float ob = 0.70 + 0.52 * fract(s * 7.13);
+  float az = fract(s * 3.71) * TAU;
+  return vec3(sin(ob) * cos(az), sin(ob) * sin(az), cos(ob));
+}
 
-  vec3 n = vec3(p, sqrt(max(0.0, 1.0 - r2)));
+/* A crater field: negative in the bowls, a bright lip at the rims. */
+float craters(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  float res = 0.0;
+  for (int z = -1; z <= 1; z++)
+  for (int y = -1; y <= 1; y++)
+  for (int x = -1; x <= 1; x++) {
+    vec3 g = vec3(float(x), float(y), float(z));
+    vec3 h = hash33(i + g) * 0.5 + 0.5;
+    float rad = 0.12 + 0.30 * h.x * h.y;
+    float d = length(g + h - f) / rad;
+    if (d < 1.4) {
+      res += d < 1.0 ? -(1.0 - d * d) * 0.55 : 0.0;
+      res += exp(-pow((d - 1.0) * 5.0, 2.0)) * 0.45;
+    }
+  }
+  return res;
+}
 
-  // Surface. Two octave sets: continents at low frequency, relief on top.
-  vec3 sp = spun(n, vSpin + vSeed * 6.283);
-  float land = fbm3(sp * 2.1 + vSeed * 31.0, 5);
-  float relief = ridge3(sp * 5.5 + vSeed * 17.0, 4);
+float ringDensity(float rho, float s) {
+  float u = (rho - 1.32) / 0.93;
+  if (u < 0.0 || u > 1.0) return 0.0;
+  float d = 0.62 + 0.22 * sin(rho * 71.0 + s * 20.0) + 0.30 * (noise(vec2(rho * 38.0, s * 13.0)) - 0.5);
+  d *= smoothstep(0.0, 0.04, u) * (1.0 - smoothstep(0.92, 1.0, u));
+  d *= mix(0.30, 1.0, smoothstep(0.12, 0.28, u));          // the faint inner ring
+  d *= 1.0 - 0.92 * exp(-pow((u - 0.70) * 36.0, 2.0));      // a Cassini division
+  return clamp(d, 0.0, 0.92);
+}
 
-  // Bands for the gas giants, latitude-only so they read as circulation.
-  float bands = sin(sp.y * 11.0 + fbm3(sp * 3.0 + vSeed * 5.0, 3) * 4.0) * 0.5 + 0.5;
-  float gas = smoothstep(0.45, 0.85, fract(vSeed * 7.31));
+/* The colour and thickness of a body's air: no noise, so it is cheap enough
+   to ask for at every pixel of the halo round it. */
+void airOf(float m, float s, out vec3 air, out float k) {
+  air = vec3(0.0); k = 0.0;
+  if (m < 1.5) return;
+  if (m < 16.0) {
+    float kind = floor(fract(s * 5.31) * 5.0);
+    if (kind < 1.0) { air = vec3(0.30, 0.55, 1.0); k = 1.0; }
+    else if (kind < 2.0) { air = vec3(0.75, 0.55, 0.42); k = 0.25; }
+    else if (kind < 3.0) { }
+    else if (kind < 4.0) { air = vec3(0.55, 0.70, 0.90); k = 0.12; }
+    else { air = vec3(0.85, 0.70, 0.45); k = 0.8; }
+    return;
+  }
+  if (m < 100.0) {
+    float g = floor(fract(s * 3.17) * 3.0);
+    k = 0.7;
+    air = g < 1.0 ? vec3(0.70, 0.62, 0.50)
+        : g < 2.0 ? vec3(0.75, 0.65, 0.48)
+        : fract(s * 13.3) < 0.4 ? vec3(0.55, 0.85, 0.90) : vec3(0.35, 0.55, 1.0);
+    return;
+  }
+  air = vec3(0.6, 0.15, 0.2); k = 0.4;
+}
 
-  vec3 rock = mix(vColor * 0.55, vColor * 1.25, smoothstep(0.35, 0.72, land));
-  rock = mix(rock, rock * 1.5, relief * 0.55);
-  vec3 giant = mix(vColor * 0.7, vColor * 1.35, bands);
-  vec3 albedo = mix(rock, giant, gas);
+struct Surf { vec3 albedo; float ocean; vec3 air; float airK; vec3 emit; };
 
-  // Ice at the poles, only on the rocky ones.
-  float ice = smoothstep(0.78, 0.95, abs(sp.y)) * (1.0 - gas);
-  albedo = mix(albedo, vec3(0.92, 0.95, 1.0), ice * 0.85);
+void surface(float m, float s, vec3 q, out Surf o) {
+  o.albedo = vec3(0.1); o.ocean = 0.0; o.emit = vec3(0.0);
+  airOf(m, s, o.air, o.airK);
+  float lat = q.z;
+  vec3 sp = q + vec3(s * 17.0, s * 31.0, s * 7.0);
 
-  vec3 lit = vec3(0.0);
-  float keyFacing = 0.0;
-  for (int i = 0; i < ${MAX_LIGHTS}; i++) {
-    if (i >= u_lightCount) break;
-    // The light is a point in the same 2D plane as the bodies. Giving it a
-    // small +z lifts it out of the plane so a planet directly between the
-    // camera and a star is not left completely unlit.
-    vec2 d = u_lightPos[i] - vCentre;
-    vec3 L = normalize(vec3(d / max(vRadius, 1.0), 2.2));
-    float ndl = dot(n, L);
-    // Wrapped diffuse. A hard terminator on a body this small aliases badly;
-    // wrapping softens it the way a real atmosphere scatters light round the
-    // edge.
-    float diff = max(0.0, (ndl + 0.22) / 1.22);
-    float atten = 1.0 / (1.0 + dot(d, d) * 0.000018);
-    lit += albedo * u_lightCol[i] * diff * atten;
-    keyFacing = max(keyFacing, ndl);
+  if (m < 1.5) {
+    // A small airless moon: grey regolith, darker lava plains, craters.
+    float base = fbm3(sp * 2.6, 4);
+    float mare = smoothstep(0.52, 0.62, fbm3(sp * 1.3 + 9.0, 3));
+    float cr = craters(sp * 4.0) + 0.5 * craters(sp * 9.0 + 3.0);
+    o.albedo = vec3(0.15, 0.145, 0.14) * (0.8 + 0.4 * base) * (1.0 - 0.45 * mare) * (1.0 + 0.35 * cr);
+    return;
   }
 
-  // Ambient from the galaxy, tinted cool so the night side is not dead black.
-  lit += albedo * vec3(0.055, 0.07, 0.11);
+  if (m < 16.0) {
+    float kind = floor(fract(s * 5.31) * 5.0);
+    if (kind < 1.0) {
+      // An ocean world.
+      float h = fbm3(sp * 1.5, 5);
+      const float sea = 0.53;
+      float land = smoothstep(sea, sea + 0.015, h);
+      vec3 ocean = mix(vec3(0.008, 0.03, 0.09), vec3(0.02, 0.10, 0.16), smoothstep(sea - 0.10, sea, h));
+      float dry = fbm3(sp * 3.2 + 5.0, 3) + (0.35 - abs(abs(lat) - 0.35)) * 0.6;
+      vec3 ground = mix(vec3(0.045, 0.09, 0.03), vec3(0.32, 0.23, 0.13), smoothstep(0.62, 0.78, dry));
+      ground = mix(ground, vec3(0.17, 0.15, 0.13), smoothstep(0.64, 0.74, h));
+      vec3 alb = mix(ocean, ground, land);
+      float ice = smoothstep(0.88, 0.92, abs(lat) + (h - 0.5) * 0.2);
+      alb = mix(alb, vec3(0.78, 0.82, 0.86), ice);
+      // Clouds turn a little faster than the ground, in bands by latitude.
+      vec3 cq = vec3(q.xy, q.z * 1.6) * 2.3 + vec3(u_time * 0.015, s * 4.0, 0.0);
+      float cl = smoothstep(0.54, 0.82, fbm3(cq, 5) + 0.10 * sin(lat * 9.0));
+      alb = mix(alb, vec3(0.80, 0.82, 0.85), cl * 0.85);
+      o.albedo = alb;
+      o.ocean = (1.0 - land) * (1.0 - ice) * (1.0 - cl);
+    } else if (kind < 2.0) {
+      // A rust desert, thin dusty air, a polar cap.
+      float h = fbm3(sp * 1.9, 5);
+      float dark = smoothstep(0.50, 0.64, fbm3(sp * 1.1 + 3.0, 4));
+      vec3 alb = mix(vec3(0.30, 0.12, 0.05), vec3(0.44, 0.23, 0.11), h);
+      alb = mix(alb, vec3(0.12, 0.06, 0.035), dark * 0.7);
+      alb *= 1.0 + 0.25 * craters(sp * 5.0);
+      alb = mix(alb, vec3(0.80, 0.80, 0.82), smoothstep(0.86, 0.9, abs(lat) + (h - 0.5) * 0.1));
+      o.albedo = alb;
+    } else if (kind < 3.0) {
+      // A grey cratered world with no air to soften anything.
+      float base = fbm3(sp * 2.2, 4);
+      float cr = craters(sp * 3.2) + 0.6 * craters(sp * 7.5 + 2.0);
+      o.albedo = vec3(0.17, 0.155, 0.14) * (0.75 + 0.5 * base) * (1.0 + 0.4 * cr);
+    } else if (kind < 4.0) {
+      // An ice moon: bright, cracked, the cracks stained.
+      float base = fbm3(sp * 2.0, 4);
+      float crack = smoothstep(0.62, 0.8, ridge3(sp * 2.4, 4));
+      vec3 alb = vec3(0.66, 0.66, 0.64) * (0.85 + 0.25 * base);
+      o.albedo = mix(alb, vec3(0.36, 0.21, 0.13), crack * 0.75);
+    } else {
+      // A world under a cream cloud deck, swirled by its winds.
+      float swirl = fbm3(vec3(q.xy * 1.6, q.z * 5.0) + vec3(u_time * 0.01, s * 3.0, 0.0), 5);
+      o.albedo = mix(vec3(0.52, 0.45, 0.31), vec3(0.68, 0.60, 0.44), swirl);
+    }
+    return;
+  }
 
-  // Atmospheric rim: brightest where the limb is still catching the key light.
-  float rim = pow(1.0 - abs(n.z), 3.0);
-  lit += vColor * rim * (0.35 + max(0.0, keyFacing) * 1.5) * 0.9;
+  if (m < 100.0) {
+    float g = floor(fract(s * 3.17) * 3.0);
+    // Belts and zones, wavering with the turbulence between them; streaks
+    // stretched along the lines of latitude.
+    float turb = fbm3(sp * 2.6 + vec3(0.0, 0.0, u_time * 0.008), 4) - 0.5;
+    float tl = lat + turb * 0.07;
+    float bands = 0.5 + 0.5 * sin(tl * 19.0 + s * 9.0);
+    float broad = 0.5 + 0.5 * sin(tl * 7.0 + s * 3.0);
+    float streak = fbm3(vec3(q.xy * 3.0, q.z * 34.0) + s * 5.0, 3);
+    vec3 alb;
+    if (g < 1.0) {
+      vec3 zone = vec3(0.66, 0.59, 0.46), belt = vec3(0.40, 0.25, 0.14);
+      alb = mix(belt, zone, smoothstep(0.25, 0.75, bands * 0.7 + broad * 0.3 + (streak - 0.5) * 0.5));
+      alb = mix(alb, vec3(0.34, 0.33, 0.33), smoothstep(0.62, 0.85, abs(lat)));
+      // A great storm: an oval in the southern belts, slowly turning.
+      vec3 c = normalize(vec3(cos(s * 40.0), sin(s * 40.0), -0.38));
+      vec3 dq = q - c;
+      float oval = length(vec2(length(dq.xy) * 0.62, dq.z * 1.5));
+      float storm = 1.0 - smoothstep(0.10, 0.16, oval);
+      alb = mix(alb, vec3(0.50, 0.20, 0.10), storm * 0.85);
+    } else if (g < 2.0) {
+      vec3 hi = vec3(0.64, 0.54, 0.35), lo = vec3(0.52, 0.42, 0.27);
+      alb = mix(lo, hi, smoothstep(0.2, 0.8, bands * 0.5 + broad * 0.5 + (streak - 0.5) * 0.3));
+      alb = mix(alb, vec3(0.42, 0.42, 0.40), smoothstep(0.75, 0.95, abs(lat)));
+    } else {
+      bool pale = fract(s * 13.3) < 0.4;
+      vec3 deep = pale ? vec3(0.36, 0.60, 0.66) : vec3(0.08, 0.18, 0.52);
+      vec3 light = pale ? vec3(0.46, 0.70, 0.74) : vec3(0.16, 0.32, 0.66);
+      alb = mix(deep, light, smoothstep(0.3, 0.8, bands * 0.4 + broad * 0.6) * (pale ? 0.4 : 1.0));
+      // High white cloud streaks.
+      alb = mix(alb, vec3(0.80, 0.84, 0.88), smoothstep(0.66, 0.8, streak) * (pale ? 0.2 : 0.7));
+    }
+    o.albedo = alb;
+    return;
+  }
 
-  // Antialias the silhouette — one pixel of coverage in quad units.
-  float px = fwidth(length(p));
-  float cov = 1.0 - smoothstep(1.0 - px, 1.0, length(p));
+  // A brown dwarf: too light to fuse, still hot from forming, glowing through
+  // its own cloud bands.
+  float turb = fbm3(sp * 2.4 + vec3(0.0, 0.0, u_time * 0.01), 4) - 0.5;
+  float bands = 0.5 + 0.5 * sin((lat + turb * 0.1) * 16.0 + s * 7.0);
+  // Mostly what the nearby star lights, in dark rust; the heat of its own
+  // only a faint glow through the gaps between the bands.
+  o.albedo = mix(vec3(0.16, 0.07, 0.06), vec3(0.26, 0.12, 0.09), bands);
+  o.emit = vec3(0.075, 0.012, 0.02) * (0.3 + 0.9 * (1.0 - bands)) * (0.8 + 0.4 * turb);
+  return;
+}
 
-  fragColor = vec4(lit, cov);
+void main() {
+  float pad = vInfo.z;
+  vec2 p = vQuad * pad;
+  float r2 = dot(p, p);
+  float rr = sqrt(r2);
+  float px = 1.0 / max(vRadius, 1.0);
+  float s = vSeed;
+  float m = vInfo.x;
+  bool ringed = pad > 2.0;
+  if (rr > (ringed ? 2.3 : 1.3)) discard;
+
+  vec3 ax = axisFor(s);
+  vec3 e1 = normalize(cross(ax, abs(ax.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+  vec3 e2 = cross(ax, e1);
+
+  // The lights, gathered once: direction (tipped a little towards the viewer,
+  // so a little more than half the disc is day) and what arrives here.
+  vec3 Ls[${MAX_LIGHTS}];
+  vec3 Es[${MAX_LIGHTS}];
+  for (int i = 0; i < ${MAX_LIGHTS}; i++) {
+    Ls[i] = vec3(0.0, 0.0, 1.0); Es[i] = vec3(0.0);
+    if (i >= u_lightCount) continue;
+    vec2 d = u_lightPos[i] - vCentre;
+    float dist = max(length(d), 1e-3);
+    Ls[i] = normalize(vec3(d / dist, 0.22));
+    Es[i] = u_lightCol[i] / (1.0 + dist * dist / (u_falloff * u_falloff));
+  }
+
+  // Premultiplied colour and coverage, built back to front.
+  vec3 col = vec3(0.0);
+  float cover = 0.0;
+
+  // ---- the ring, where the ray through this pixel crosses its plane
+  float ringA = 0.0;
+  vec3 ringC = vec3(0.0);
+  float ringZ = -1e3;
+  if (ringed && abs(ax.z) > 0.05) {
+    float z = -(p.x * ax.x + p.y * ax.y) / ax.z;
+    vec3 X = vec3(p, z);
+    float rho = length(X);
+    float dens = ringDensity(rho, s);
+    if (dens > 0.0) {
+      vec3 lit = vec3(0.0);
+      for (int i = 0; i < ${MAX_LIGHTS}; i++) {
+        if (i >= u_lightCount) break;
+        vec3 L = Ls[i];
+        // The planet's shadow across the ring.
+        float bq = dot(X, L), cq = dot(X, X) - 1.0, disc = bq * bq - cq;
+        float shade = (disc > 0.0 && -bq - sqrt(disc) > 0.0) ? 0.06 : 1.0;
+        lit += Es[i] * (0.30 + 0.70 * abs(dot(ax, L))) * shade;
+      }
+      vec3 tone = vec3(0.60, 0.54, 0.45) * (0.85 + 0.3 * noise(vec2(rho * 90.0, s)));
+      ringA = dens;
+      ringC = tone * lit + tone * vec3(0.004, 0.005, 0.008);
+      ringZ = z;
+    }
+  }
+
+  float edge = 1.0 - smoothstep(1.0 - px, 1.0 + px, rr);
+  float surfZ = sqrt(max(0.0, 1.0 - r2));
+
+  // Ring behind the planet (or with no planet in this pixel).
+  if (ringA > 0.0 && (ringZ < surfZ || edge <= 0.0)) {
+    col = ringC * ringA;
+    cover = ringA;
+  }
+
+  vec3 airC = vec3(0.0);
+  float airK = 0.0;
+  if (rr < 1.0 + px) {
+    vec3 n = vec3(p, surfZ);
+    vec3 q = vec3(dot(n, e1), dot(n, e2), dot(n, ax));
+    float sa = vSpin + s * TAU;
+    q.xy = mat2(cos(sa), sin(sa), -sin(sa), cos(sa)) * q.xy;
+    Surf S;
+    surface(m, s, q, S);
+    airC = S.air; airK = S.airK;
+
+    vec3 lit = vec3(0.0);
+    for (int i = 0; i < ${MAX_LIGHTS}; i++) {
+      if (i >= u_lightCount) break;
+      vec3 L = Ls[i], E = Es[i];
+      float ndl = dot(n, L);
+      // Air carries light a little way round onto the night side.
+      float diff = max(0.0, (ndl + 0.12 * S.airK) / (1.0 + 0.12 * S.airK));
+      // The ring's shadow on the planet.
+      float rs = 1.0;
+      if (ringed && abs(dot(L, ax)) > 1e-3) {
+        float tt = -dot(n, ax) / dot(L, ax);
+        if (tt > 0.0) rs = 1.0 - 0.85 * ringDensity(length(n + L * tt), s);
+      }
+      lit += S.albedo * E * diff * rs;
+      // Sunlight off open water.
+      vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
+      lit += E * S.ocean * pow(max(dot(n, H), 0.0), 70.0) * 0.9 * step(0.0, ndl) * rs;
+      // The lit limb glows through its atmosphere; the terminator reddens.
+      float limb = pow(1.0 - n.z, 2.5);
+      lit += S.air * E * limb * smoothstep(-0.2, 0.5, ndl) * 0.55 * S.airK;
+      lit += vec3(0.9, 0.45, 0.25) * E * exp(-abs(ndl) * 9.0) * 0.05 * S.airK * step(-0.1, ndl);
+    }
+    lit += S.albedo * vec3(0.006, 0.008, 0.014) + S.emit;
+    col = mix(col, lit, edge);
+    cover = mix(cover, 1.0, edge);
+  } else {
+    // Outside the disc only the air's colour is needed, for the halo.
+    airOf(m, s, airC, airK);
+  }
+
+  // Ring in front of the planet.
+  if (ringA > 0.0 && ringZ >= surfZ && edge > 0.0) {
+    col = col * (1.0 - ringA) + ringC * ringA;
+    cover = cover + ringA * (1.0 - cover);
+  }
+
+  // A thin halo of lit air just outside the limb: light, not cover.
+  if (airK > 0.0 && rr > 1.0) {
+    float w = max(0.06, 1.4 * px);
+    float h = exp(-(rr - 1.0) / w * 2.2) * (1.0 - edge);
+    vec2 dir = p / rr;
+    vec3 glow = vec3(0.0);
+    for (int i = 0; i < ${MAX_LIGHTS}; i++) {
+      if (i >= u_lightCount) break;
+      glow += Es[i] * smoothstep(-0.35, 0.6, dot(dir, normalize(Ls[i].xy)));
+    }
+    col += airC * glow * h * 0.35 * airK;
+  }
+
+  // Premultiplied out; the blend is set for it.
+  fragColor = vec4(col, cover);
 }`
 
 /*
@@ -752,6 +1032,7 @@ class GLRenderer implements Renderer {
     g.setAttribute('iColor', new InstancedBufferAttribute(new Float32Array(cap * 3), 3))
     g.setAttribute('iSeed', new InstancedBufferAttribute(new Float32Array(cap), 1))
     g.setAttribute('iSpin', new InstancedBufferAttribute(new Float32Array(cap), 1))
+    g.setAttribute('iInfo', new InstancedBufferAttribute(new Float32Array(cap * 3), 3))
     g.instanceCount = 0
     g.boundingSphere = new Sphere(new Vector3(), 1e6)
     return g
@@ -764,6 +1045,7 @@ class GLRenderer implements Renderer {
       u_time: { value: 0 },
       u_lightCount: { value: 0 },
       u_disc: { value: 0.36 },
+      u_falloff: { value: 420 },
       u_lightPos: { value: Array.from({ length: MAX_LIGHTS }, () => new Vector2()) },
       u_lightCol: { value: Array.from({ length: MAX_LIGHTS }, () => new Vector3()) },
     }
@@ -781,7 +1063,14 @@ class GLRenderer implements Renderer {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      blending: NormalBlending,
+      // Premultiplied: the shader composites ring, disc and halo itself, and
+      // the halo adds light without covering anything.
+      blending: CustomBlending,
+      blendEquation: AddEquation,
+      blendSrc: OneFactor,
+      blendDst: OneMinusSrcAlphaFactor,
+      blendSrcAlpha: OneFactor,
+      blendDstAlpha: OneMinusSrcAlphaFactor,
       // DoubleSide is load-bearing. The vertex shader flips Y to convert
       // screen space (Y down) to clip space (Y up), and that negation reverses
       // every triangle's winding -- so with the default FrontSide every body
@@ -887,19 +1176,21 @@ class GLRenderer implements Renderer {
     const pCol = pg.getAttribute('iColor') as InstancedBufferAttribute
     const pSeed = pg.getAttribute('iSeed') as InstancedBufferAttribute
     const pSpin = pg.getAttribute('iSpin') as InstancedBufferAttribute
+    const pInfo = pg.getAttribute('iInfo') as InstancedBufferAttribute
     const sPos = sg.getAttribute('iPos') as InstancedBufferAttribute
     const sRad = sg.getAttribute('iRadius') as InstancedBufferAttribute
     const sCol = sg.getAttribute('iColor') as InstancedBufferAttribute
     const sSeed = sg.getAttribute('iSeed') as InstancedBufferAttribute
     const sSpin = sg.getAttribute('iSpin') as InstancedBufferAttribute
+    const sInfo = sg.getAttribute('iInfo') as InstancedBufferAttribute
 
     const lights: { x: number; y: number; c: Vector3 }[] = []
 
     for (let i = 0; i < bodies.length; i++) {
       const b = bodies[i]
-      // A stable per-body seed. Position would make the texture crawl, so this
-      // uses mass and index, which stay put for a body's lifetime.
-      const seed = ((b.m * 97.13 + i * 13.7) % 1000) / 1000
+      // A stable per-body seed from its id, which survives everything but being
+      // eaten — so a planet keeps its look when the list reorders round it.
+      const seed = fract(b.id * 0.6180339887 + 0.137)
       const col = b.star ? starLight(b.m) : hueToLinear(b.hue, false)
       if (b.star) {
         sPos.setXY(ns, b.x * dpr, b.y * dpr)
@@ -907,9 +1198,12 @@ class GLRenderer implements Renderer {
         sCol.setXYZ(ns, col.x, col.y, col.z)
         sSeed.setX(ns, seed)
         sSpin.setX(ns, t * 0.12)
+        sInfo.setXYZ(ns, b.m, 0, 0)
         ns++
         if (lights.length < MAX_LIGHTS) {
-          lights.push({ x: b.x * dpr, y: b.y * dpr, c: col.clone().multiplyScalar(1.35) })
+          // What reaches a planet, not what the disc shows: a planet in full
+          // sun is a fraction as bright as the sun itself, as it should be.
+          lights.push({ x: b.x * dpr, y: b.y * dpr, c: col.clone().multiplyScalar(0.62) })
         }
       } else {
         pPos.setXY(np, b.x * dpr, b.y * dpr)
@@ -918,6 +1212,7 @@ class GLRenderer implements Renderer {
         pSeed.setX(np, seed)
         // Rotation rate falls with size, so big bodies feel heavy.
         pSpin.setX(np, t * (0.5 / Math.max(1, Math.cbrt(b.m))))
+        pInfo.setXYZ(np, b.m, 0, ringed(b.m, seed) ? 2.35 : 1.3)
         np++
       }
     }
@@ -925,11 +1220,11 @@ class GLRenderer implements Renderer {
     // With no star in the system the planets would be lit by nothing at all, so
     // a dim fill sits off-screen to keep shapes readable.
     if (!lights.length) {
-      lights.push({ x: this.w * 0.5, y: -this.h * 0.6, c: new Vector3(0.5, 0.55, 0.7) })
+      lights.push({ x: this.w * 0.5, y: -this.h * 0.6, c: new Vector3(0.35, 0.38, 0.48) })
     }
 
-    for (const a of [pPos, pRad, pCol, pSeed, pSpin]) a.needsUpdate = true
-    for (const a of [sPos, sRad, sCol, sSeed, sSpin]) a.needsUpdate = true
+    for (const a of [pPos, pRad, pCol, pSeed, pSpin, pInfo]) a.needsUpdate = true
+    for (const a of [sPos, sRad, sCol, sSeed, sSpin, sInfo]) a.needsUpdate = true
     pg.instanceCount = np
     sg.instanceCount = ns
 
@@ -941,10 +1236,10 @@ class GLRenderer implements Renderer {
         m.uniforms.u_lightCol.value[i].copy(lights[i].c)
       }
     }
-    // Planets need only a sliver of padding for the atmosphere; a star's corona
-    // needs a lot, and paying that cost on every planet would be wasteful.
-    this.planetMat.uniforms.u_pad.value = 1.35
+    // A star's corona needs a lot of room round it; each planet says how much
+    // it needs itself (iInfo.z), since only a ringed one needs much.
     this.starMat.uniforms.u_pad.value = 6.0
+    this.planetMat.uniforms.u_falloff.value = 420 * dpr
 
     // 1. trails, then bodies -> sceneRT
     this.trailMesh.visible = trails && this.buildRibbons(bodies) > 0
@@ -995,6 +1290,14 @@ class GLRenderer implements Renderer {
     for (const k in this.passes) this.passes[k].dispose()
     this.renderer.dispose()
   }
+}
+
+const fract = (x: number) => x - Math.floor(x)
+
+/** Whether a body wears rings: some giants do. Matches the shader's kinds. */
+function ringed(m: number, seed: number) {
+  if (m < 16 || m >= 100) return false
+  return Math.floor(fract(seed * 3.17) * 3) === 1 || fract(seed * 11.7) < 0.25
 }
 
 /** Ticks of history a trail keeps: four seconds at the page's sixty a second. */
