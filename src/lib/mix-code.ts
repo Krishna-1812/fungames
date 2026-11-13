@@ -42,18 +42,18 @@ export type Layer = {
 }
 
 export const LAYERS: Layer[] = [
-  { id: 'rain', name: 'Rain', icon: 'rain', hint: 'Filtered white noise', code: 'r' },
-  { id: 'waves', name: 'Waves', icon: 'waves', hint: 'Brown noise under a slow swell', code: 'w' },
-  { id: 'wind', name: 'Wind', icon: 'wind', hint: 'A drifting low-pass', code: 'i' },
-  { id: 'fire', name: 'Campfire', icon: 'fire', hint: 'Rumble plus random crackle', code: 'f' },
-  { id: 'cafe', name: 'Coffee shop', icon: 'coffee', hint: 'Murmur and occasional cups', code: 'c' },
-  { id: 'birds', name: 'Birds', icon: 'bird', hint: 'Swept sine chirps', code: 'b' },
-  { id: 'crickets', name: 'Crickets', icon: 'cricket', hint: 'Rhythmic high bursts', code: 'k' },
-  { id: 'traffic', name: 'Highway', icon: 'traffic', hint: 'Distant steady roar', code: 't' },
-  { id: 'clock', name: 'Clock', icon: 'clock', hint: 'One click per second', code: 'o' },
-  { id: 'thunder', name: 'Thunder', icon: 'thunder', hint: 'Rare, long, low', code: 'h' },
-  { id: 'mower', name: 'Lawnmower', icon: 'mower', hint: 'A neighbour, at 8am', code: 'm' },
-  { id: 'dial', name: 'Dial-up modem', icon: 'modem', hint: 'Regrettable', code: 'd' },
+  { id: 'rain', name: 'Rain', icon: 'rain', hint: 'Drops, and bubbles in puddles', code: 'r' },
+  { id: 'waves', name: 'Waves', icon: 'waves', hint: 'Every wave builds and breaks', code: 'w' },
+  { id: 'wind', name: 'Wind', icon: 'wind', hint: 'Gusts, and wires whistling', code: 'i' },
+  { id: 'fire', name: 'Campfire', icon: 'fire', hint: 'Wood cracking as sap boils', code: 'f' },
+  { id: 'cafe', name: 'Coffee shop', icon: 'coffee', hint: 'Ten voices, four tables', code: 'c' },
+  { id: 'birds', name: 'Birds', icon: 'bird', hint: 'Nine birds, each its own song', code: 'b' },
+  { id: 'crickets', name: 'Crickets', icon: 'cricket', hint: 'They chirp faster when warm', code: 'k' },
+  { id: 'traffic', name: 'Highway', icon: 'traffic', hint: 'Doppler on every car', code: 't' },
+  { id: 'clock', name: 'Clock', icon: 'clock', hint: 'On your real seconds', code: 'o' },
+  { id: 'thunder', name: 'Thunder', icon: 'thunder', hint: 'From the lightning’s shape', code: 'h' },
+  { id: 'mower', name: 'Lawnmower', icon: 'mower', hint: 'One cylinder at 3000 rpm', code: 'm' },
+  { id: 'dial', name: 'Dial-up modem', icon: 'modem', hint: 'The real handshake. Sorry.', code: 'd' },
 ]
 
 export const layerById = (id: string) => LAYERS.find((l) => l.id === id)
