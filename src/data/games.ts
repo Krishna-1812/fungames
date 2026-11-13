@@ -348,7 +348,7 @@ export const GAMES: Game[] = [
     title: 'Ambient Mix',
     blurb: 'Build a soundscape, then send it to someone',
     description:
-      'Rain, waves, a coffee shop, a distant lawnmower. Layer them into something calming, or keep going until it is unbearable. Every sound is synthesised live, and the whole mix fits in the link.',
+      'Twelve places built from the physics of their sound — rain as separate drops, thunder from the shape of its lightning, every passing car Doppler-shifted — over a landscape the mix paints. Layer them into something calming, or keep going until it is unbearable. Nothing is a recording, and the whole mix fits in the link.',
     accent: '#12283c', accent2: '#86bde0',
     category: 'fun',
     added: '2026-09-04',
