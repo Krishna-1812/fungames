@@ -117,6 +117,16 @@ import { GOALS } from '../lib/orbit-goals'
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    {/* Save, load, share and keyboard aiming: used now and then, so they wait
+        behind one button rather than taking a third of the dock. Outside the
+        dock because the dock scrolls sideways and would clip it. */}
+    <div class="scene-menu" id="sceneMenu" role="menu" aria-labelledby="sceneMenuBtn" hidden>
+      <button type="button" role="menuitem" id="saveScene">Save scene</button>
+      <button type="button" role="menuitem" id="loadScene">Load scene</button>
+      <button type="button" role="menuitem" id="shareScene">Share scene link</button>
+      <button type="button" role="menuitem" id="keyboardBtn">Aim with the keyboard</button>
+    </div>
+
     <aside class="dock">
       <div class="group" role="radiogroup" aria-label="What to launch">
         <button type="button" class="opt" data-mass="6" aria-checked="true" role="radio">Moon</button>
@@ -134,11 +144,10 @@ import { GOALS } from '../lib/orbit-goals'
         <button type="button" class="opt" id="clearBtn">Clear</button>
       </div>
       <div class="group" aria-label="Scene controls">
-        <button type="button" class="opt" id="saveScene">Save scene</button>
-        <button type="button" class="opt" id="loadScene">Load scene</button>
-        <button type="button" class="opt" id="shareScene">Share scene</button>
+        <button type="button" class="opt" id="sceneMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="sceneMenu">
+          Scene <svg aria-hidden="true" viewBox="0 0 10 10" width="9" height="9"><path d="M2 6.5 5 3.5 8 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
         <button type="button" class="opt" id="helpBtn">Learn</button>
-        <button type="button" class="opt" id="keyboardBtn">Keyboard</button>
       </div>
       <div class="group">
         <button type="button" class="opt wide" id="goalBtn" aria-expanded="false">
@@ -156,8 +165,8 @@ import { GOALS } from '../lib/orbit-goals'
     <ul>
       <li>Drag across the sky to launch a body. The drag is the throw: longer is faster, and the line shows where it goes.</li>
       <li>Pick Moon, Planet or Star for what you launch. The presets set up a solar system, a binary pair, or ninety bodies of chaos.</li>
-      <li>Learn walks you through a first orbit. Keyboard (or K on the sky) aims a launch with the arrow keys.</li>
-      <li>Freeze holds the sky without hiding it. Share scene makes a link to exactly what is on screen.</li>
+      <li>Learn walks you through a first orbit. K on the sky (or Scene, then Aim with the keyboard) aims a launch with the arrow keys.</li>
+      <li>Freeze holds the sky without hiding it. Scene saves what is on screen, or makes a link to it.</li>
     </ul>
     <p>Nine challenges, from a first orbit to the last one standing. Only bodies you launch yourself count. Earn all nine to finish.</p>
   </Fragment>
@@ -741,12 +750,39 @@ import { GOALS } from '../lib/orbit-goals'
     const ro = new ResizeObserver(() => { if (initialize()) ro.disconnect() })
     ro.observe(stage)
   }
+  // ---- the scene menu ------------------------------------------------------
+  const sceneMenu = document.getElementById('sceneMenu') as HTMLElement
+  const sceneMenuBtn = document.getElementById('sceneMenuBtn') as HTMLButtonElement
+  const menuItems = () => [...sceneMenu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+  function openMenu(open: boolean, focus = false) {
+    sceneMenu.hidden = !open
+    sceneMenuBtn.setAttribute('aria-expanded', String(open))
+    if (!open) return
+    // Above its button, inside the stage.
+    const s = stage.getBoundingClientRect(), b = sceneMenuBtn.getBoundingClientRect()
+    const w = sceneMenu.offsetWidth
+    sceneMenu.style.left = `${Math.max(8, Math.min(s.width - w - 8, b.left - s.left))}px`
+    sceneMenu.style.bottom = `${s.bottom - b.top + 10}px`
+    if (focus) menuItems()[0]?.focus()
+  }
+  sceneMenuBtn.addEventListener('click', (e) => { unlock(); sfx.click(); openMenu(sceneMenu.hidden, e.detail === 0) })
+  sceneMenu.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('[role="menuitem"]')) openMenu(false) })
+  sceneMenu.addEventListener('keydown', (e) => {
+    const items = menuItems(), i = items.indexOf(document.activeElement as HTMLButtonElement)
+    if (e.key === 'Escape') { e.preventDefault(); openMenu(false); sceneMenuBtn.focus() }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus() }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus() }
+  })
+  addEventListener('pointerdown', (e) => {
+    if (!sceneMenu.hidden && !sceneMenu.contains(e.target as Node) && !sceneMenuBtn.contains(e.target as Node)) openMenu(false)
+  })
+
   const dock = document.querySelector('.dock') as HTMLElement
   function dockEdges() {
     dock.classList.toggle('more-left', dock.scrollLeft > 2)
     dock.classList.toggle('more-right', dock.scrollLeft + dock.clientWidth < dock.scrollWidth - 2)
   }
-  dock.addEventListener('scroll', dockEdges, { passive: true })
+  dock.addEventListener('scroll', () => { dockEdges(); openMenu(false) }, { passive: true })
   dockEdges()
 
   // For headless checks: the live system, and where a body sits on screen.
@@ -855,6 +891,21 @@ import { GOALS } from '../lib/orbit-goals'
      than an attribute selector. */
   html.play .orbit-body .opt.picked { animation: pop-opt 360ms var(--ease-bounce); }
   @keyframes pop-opt { 40% { transform: scale(1.14); } }
+
+  .orbit-body .opt svg { display: inline-block; vertical-align: 1px; margin-left: 2px; transition: transform 160ms var(--ease); }
+  .orbit-body .opt[aria-expanded='true'] svg { transform: rotate(180deg); }
+  .orbit-body .scene-menu {
+    position: absolute; z-index: 9; display: grid; gap: 2px; padding: 6px; min-width: 210px;
+    background: rgba(12, 16, 34, 0.94); border: 1px solid #263058; border-radius: 16px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 18px 50px #0007;
+  }
+  .orbit-body .scene-menu[hidden] { display: none; }
+  .orbit-body .scene-menu button {
+    text-align: left; background: transparent; border: 0; color: #c9d3f2; font: inherit; font-size: 13px;
+    padding: 10px 14px; border-radius: 10px; cursor: pointer;
+  }
+  .orbit-body .scene-menu button:hover, .orbit-body .scene-menu button:focus-visible { background: #1c2447; color: #fff; outline: none; }
 
   /* ---- the challenge panel ---------------------------------------------- */
   /* Over the whole field rather than beside it: the list is eight items long
