@@ -645,40 +645,93 @@ void main() {
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`
 
-/* The starfield and nebula. Drawn once into its own target and only redrawn on
-   resize — it never changes, so re-rendering it every frame would be pure
-   waste. */
+/*
+ * The sky behind everything: what a long exposure from deep space shows.
+ *
+ * Drawn once into its own target and only redrawn on resize — it never
+ * changes, so re-rendering it every frame would be pure waste.
+ *
+ * A band of the Milky Way crosses it: the glow of stars too faint and too many
+ * to resolve, brighter towards one end where the view looks into the bulge,
+ * split down its length by dark lanes of dust. Over that, stars, counted the
+ * way real ones are — every step fainter there are several times more of
+ * them, so the sky is mostly faint stars and a handful of bright ones — and
+ * thicker in the band than out of it. Each takes a colour from a temperature,
+ * most of them near white, some orange, a few blue. The brightest few carry a
+ * small glow, as they do through any lens.
+ *
+ * Everything is placed in CSS pixels, so a star field has the same density on
+ * a phone as on a monitor, and drawn at device resolution, so it is sharp.
+ */
 const SKY_FRAG = GLSL + `
+float starLayer(vec2 css, float cell, float chance, float gain, float seed, float dens, out vec3 tint) {
+  vec2 g = css / cell;
+  vec2 id = floor(g);
+  vec2 f = fract(g);
+  float h = hash21(id + seed);
+  tint = vec3(1.0);
+  if (h > chance * dens) return 0.0;
+  vec2 at = 0.2 + 0.6 * hash22(id + seed * 1.7);
+  // Distance in device pixels, so every star is as sharp as the screen allows.
+  float d = length((f - at) * cell) * u_dpr;
+  float mag = hash21(id + seed * 3.1);
+  float bright = gain * pow(mag, 4.0) + gain * 0.06;
+  float temp = hash21(id + seed * 5.3);
+  tint = temp < 0.12 ? vec3(1.0, 0.70, 0.48)
+       : temp < 0.32 ? vec3(1.0, 0.88, 0.74)
+       : temp < 0.86 ? vec3(0.96, 0.97, 1.0)
+       :               vec3(0.70, 0.80, 1.0);
+  float core = exp(-d * d / 0.9);
+  float halo = exp(-d / (2.5 * u_dpr)) * smoothstep(0.55, 1.0, mag) * 0.06;
+  return bright * (core + halo);
+}
+
 void main() {
-  vec2 uv = vUv;
-  vec2 p = centred(uv);
+  vec2 css = vUv * u_res / u_dpr;
+  vec2 c = css - 0.5 * u_res / u_dpr;
+  float scale = 0.5 * min(u_res.x, u_res.y) / u_dpr;
 
-  // Nebula: two ridged layers, warm behind cool, both very dim.
-  float n1 = ridge(p * 1.1 + 3.0, 5);
-  float n2 = fbm(p * 0.7 - 2.0, 4);
-  vec3 neb = vec3(0.16, 0.09, 0.30) * pow(n1, 2.2) * 0.9;
-  neb += vec3(0.05, 0.12, 0.26) * pow(n2, 2.6) * 0.7;
+  // The band, at an angle, wandering a little along its length.
+  vec2 dir = normalize(vec2(1.0, 0.42));
+  vec2 nrm = vec2(-dir.y, dir.x);
+  float along = dot(c, dir) / scale;
+  float across = dot(c, nrm) / scale;
+  float wander = (fbm(vec2(along * 0.9, 4.0), 3) - 0.5) * 0.5;
+  float x = across - 0.15 + wander;
+  float band = exp(-x * x / 0.16);
+  float bulge = exp(-pow(along + 0.55, 2.0) / 0.9);
 
-  // Stars over several density layers so the field has depth rather than one
-  // uniform sprinkle.
+  // Unresolved starlight: grainy, clumped into star clouds.
+  float clouds = fbm(c * 0.010 + 7.0, 6);
+  float grain = fbm(c * 0.045 - 3.0, 4);
+  float light = band * (0.45 + 0.9 * clouds) * (0.75 + 0.5 * grain) * (0.55 + 0.9 * bulge);
+  vec3 glow = mix(vec3(0.050, 0.058, 0.080), vec3(0.075, 0.068, 0.062), bulge * 0.7) * light;
+
+  // Dust lanes down the middle of the band, ragged at the edges.
+  float lane = exp(-pow(x + 0.04 + (fbm(vec2(along * 2.4, 1.0), 3) - 0.5) * 0.12, 2.0) / 0.012);
+  float dust = smoothstep(0.38, 0.72, fbm(c * 0.006 + 13.0, 5) + lane * 0.45);
+  glow *= 1.0 - 0.82 * dust * band;
+
+  // A faint glowing cloud of hydrogen in the band, and a reflection nebula.
+  vec2 hp = c / scale - vec2(-0.55, -0.12);
+  float ha = exp(-dot(hp, hp) / 0.05) * smoothstep(0.35, 0.8, fbm(c * 0.02 + 21.0, 5));
+  glow += vec3(0.060, 0.012, 0.022) * ha * (1.0 - 0.7 * dust);
+  vec2 rp = c / scale - vec2(0.62, 0.3);
+  glow += vec3(0.010, 0.020, 0.045) * exp(-dot(rp, rp) / 0.03) * fbm(c * 0.03 + 5.0, 4);
+
+  // Stars: more of them in the band, fewer through the dust.
+  float dens = 1.0 + 2.2 * band * (1.0 - 0.8 * dust);
   vec3 stars = vec3(0.0);
-  for (int L = 0; L < 3; L++) {
-    float scale = 90.0 * pow(2.1, float(L));
-    vec2 g = uv * u_res / u_res.y * scale;
-    vec2 cell = floor(g);
-    vec2 f = fract(g);
-    vec2 jitter = hash22(cell + float(L) * 37.0);
-    float present = step(0.965 - float(L) * 0.006, hash21(cell + float(L) * 91.0));
-    float dist = length(f - jitter);
-    float mag = hash21(cell + float(L) * 13.0);
-    // Colour by a crude temperature ramp — real fields are not white.
-    vec3 tint = mix(vec3(1.0, 0.78, 0.62), vec3(0.72, 0.83, 1.0), mag);
-    float core = present * pow(max(0.0, 1.0 - dist * (7.0 + float(L) * 3.0)), 7.0);
-    stars += tint * core * (0.5 + mag * 2.4) / (1.0 + float(L));
-  }
+  vec3 tint;
+  float s;
+  // Kept well under the bodies: the sky is a backdrop, and a field this
+  // full at full strength hides a small planet among its own stars.
+  s = starLayer(css, 3.2, 0.07, 0.10, 1.0, dens, tint); stars += tint * s;
+  s = starLayer(css, 6.5, 0.11, 0.22, 2.0, dens, tint); stars += tint * s;
+  s = starLayer(css, 15.0, 0.15, 0.55, 3.0, 1.0 + 0.6 * band, tint); stars += tint * s;
+  s = starLayer(css, 42.0, 0.22, 1.50, 4.0, 1.0, tint); stars += tint * s;
 
-  vec3 col = neb + stars;
-  col += vec3(0.012, 0.014, 0.028); // deep-space floor, never pure black
+  vec3 col = vec3(0.004, 0.005, 0.009) + glow * 0.75 + stars;
   fragColor = vec4(col, 1.0);
 }`
 
@@ -1137,6 +1190,7 @@ class GLRenderer implements Renderer {
     for (const m of [this.planetMat, this.starMat, this.trailMat]) m.uniforms.u_res.value.set(this.w, this.h)
     this.passes.composite.uniforms.u_res.value.set(this.w, this.h)
     this.passes.sky.uniforms.u_res.value.set(this.w, this.h)
+    this.passes.sky.uniforms.u_dpr.value = dpr
 
     // The sky is static, so it is rendered once here rather than every frame.
     this.blit(this.passes.sky, this.skyRT)
