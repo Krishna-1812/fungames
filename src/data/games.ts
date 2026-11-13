@@ -247,7 +247,7 @@ export const GAMES: Game[] = [
     title: 'Orbit',
     blurb: 'Real gravity, and nine things to attempt in it',
     description:
-      'A real n-body gravity sandbox. Every body pulls on every other one, orbits stay stable for minutes, and collisions merge worlds while conserving momentum. Nine challenges to attempt: a circular orbit, a comet, a grazing pass, a binary star, a moon round a planet, and a genuine gravity assist.',
+      'A real n-body gravity sandbox. Every body pulls on every other one with true inverse-square gravity, so Kepler\'s laws hold, a planet can keep a moon, and collisions merge worlds while conserving momentum. Nine challenges to attempt: a circular orbit, a comet, a grazing pass, a binary star, a moon round a planet, and a genuine gravity assist.',
     accent: '#060a1e', accent2: '#4d7ce8',
     category: 'science',
     added: '2026-09-14',

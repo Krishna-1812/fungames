@@ -10,14 +10,24 @@ import { GOALS } from '../lib/orbit-goals'
  * can drive them against closed-form answers. What is left here is the page:
  * input, presentation, and the panel.
  *
- * Every body pulls on every other body with real Newtonian gravity, softened
- * at short range and integrated symplectically so orbits stay stable for
- * minutes instead of spiralling apart. Collisions merge bodies and conserve
- * momentum, so a crowded system genuinely settles into a few large survivors
- * on its own.
+ * Every body pulls on every other body with real inverse-square gravity,
+ * integrated with leapfrog, so Kepler's laws hold: ellipses close, periods go
+ * as the radius to the three halves, and a planet can keep a moon. Collisions
+ * merge bodies and conserve momentum, so a crowded system genuinely settles
+ * into a few large survivors on its own.
  *
- * Trails come from fading the canvas rather than storing history, which costs
- * one fill per frame instead of thousands of stored points.
+ * Aiming flies the launch forward and draws where it will go
+ * (lib/orbit-predict.ts), and a launch started beside a moving body is thrown
+ * in that body's frame, the way a rocket leaves a planet with the planet's
+ * speed already in hand — which is what makes a moon round a planet possible
+ * by hand.
+ *
+ * It is drawn as a long exposure from space (lib/orbit-render.ts): stars
+ * coloured by their temperature, with their surfaces on them; planets lit from
+ * the side by whatever stars there are, each a kind of world that follows from
+ * its mass, some giants ringed; trails as each body's last four seconds; a
+ * Milky Way behind; collisions as hot debris, a flash and a glowing crater.
+ * It sounds like what it shows, too (lib/orbit-sound.ts).
  *
  * In the shell the sky is the stage, framed rather than filling the window.
  * Score is the bodies in it, Collisions the merges, Challenges the eight, and
@@ -160,10 +170,12 @@ import { GOALS } from '../lib/orbit-goals'
   <Fragment slot="howto">
     <p>
       A gravity sandbox: every body pulls on every other with real Newtonian
-      gravity, and bodies that touch merge, keeping their momentum.
+      gravity, so orbits follow Kepler's laws, and bodies that touch merge,
+      keeping their momentum.
     </p>
     <ul>
-      <li>Drag across the sky to launch a body. The drag is the throw: longer is faster, and the line shows where it goes.</li>
+      <li>Drag across the sky to launch a body. The drag is the throw: longer is faster, and while you aim, a curve shows where it will go.</li>
+      <li>Start the drag beside a moving planet and the throw is added to the planet's own motion, the way a real launch is. That is how you give a planet a moon.</li>
       <li>Pick Moon, Planet or Star for what you launch. The presets set up a solar system, a binary pair, or ninety bodies of chaos.</li>
       <li>Learn walks you through a first orbit. K on the sky (or Scene, then Aim with the keyboard) aims a launch with the arrow keys.</li>
       <li>Freeze holds the sky without hiding it. Scene saves what is on screen, or makes a link to it.</li>
