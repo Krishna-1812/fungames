@@ -173,7 +173,8 @@ import { GOALS } from '../lib/orbit-goals'
 </GameShell>
 
 <script>
-  import { sfx, unlock, tone } from '../lib/audio'
+  import { sfx, unlock, isMuted } from '../lib/audio'
+  import { createOrbitSound } from '../lib/orbit-sound'
 
   import { SCENE_KEY, captureScene, readScene, sceneBodies, encodeScene, decodeScene, fitScene, type Scene } from '../lib/orbit-scene'
   import { adjustAim } from '../lib/orbit-input'
@@ -487,7 +488,7 @@ import { GOALS } from '../lib/orbit-goals'
     // Cap sound so a hundred simultaneous merges do not machine-gun.
     if (mergeSoundBudget > 0) {
       mergeSoundBudget--
-      tone({ freq: 220 + Math.random() * 160, to: 90, dur: 0.22, type: 'sine', gain: 0.16 })
+      SOUND.impact(0.5 * e.m * e.speed * e.speed, (e.cx / W) * 2 - 1, e.star)
     }
   }
 
@@ -495,8 +496,13 @@ import { GOALS } from '../lib/orbit-goals'
   let fpsFrames = 0, lastFps = performance.now()
   let savedBestLaps = tracker.bestLaps
 
+  const SOUND = createOrbitSound()
+  /** No sound is built until someone has touched the page. */
+  let touched = false
+  for (const ev of ['pointerdown', 'keydown'] as const) addEventListener(ev, () => { touched = true }, { capture: true })
+
   const clock = new FixedClock()
-  document.addEventListener('visibilitychange', () => clock.reset())
+  document.addEventListener('visibilitychange', () => { clock.reset(); if (document.hidden) SOUND.ambience(false) })
 
   function frame(now = performance.now()) {
     mergeSoundBudget = 2
@@ -521,6 +527,8 @@ import { GOALS } from '../lib/orbit-goals'
 
     fpsFrames++
     if (now - lastFps > 500) {
+      // The hum runs while the sky does, once sound has been touched into life.
+      SOUND.ambience(touched && !isMuted() && !paused && !shell.paused && !document.hidden)
       shell.setScore(String(bodies.length))
       shell.setMoves(String(merges))
       missionReadout()
@@ -574,7 +582,7 @@ import { GOALS } from '../lib/orbit-goals'
     guide = false
     flightCard.hidden = true
     const speed = Math.hypot(aim.x1 - aim.x0, aim.y1 - aim.y0) * THROW
-    sfx.pop(Math.min(9, Math.round(speed * 2)))
+    SOUND.launch(speed, launchMass > 100 ? 1 : launchMass > 10 ? 0.5 : 0, (aim.x0 / W) * 2 - 1)
     renderer.launch(aim.x0, aim.y0)
     aim = null; anchor = null; path = null
   }
