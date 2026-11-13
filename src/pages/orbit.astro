@@ -501,6 +501,7 @@ import { GOALS } from '../lib/orbit-goals'
           ev.merges.push(...r.events.merges)
           ev.escaped.push(...r.events.escaped)
         }
+        renderer.record(bodies)
         for (const m of ev.merges) { merges++; onMerge(m.x, m.y, m.m) }
 
         const won = tracker.observe(bodies, ev)

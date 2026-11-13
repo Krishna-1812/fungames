@@ -10,13 +10,15 @@
  *
  * The pipeline is HDR end to end:
  *
- *   bodies ──► scene RT ──► accumulation RT ──► bloom chain ──► ACES ──► screen
- *                              ▲     │
- *                              └─────┘  previous frame × fade = trails
+ *   trails + bodies ──► scene RT ──► bloom chain ──► ACES ──► screen
  *
- * Trails still come from feeding the previous frame back rather than storing
- * history, exactly as the 2D version did — but in linear HDR, so a bright star
- * leaves a trail that actually glows through the bloom instead of a grey smear.
+ * Trails are each body's own history — the last four seconds of where it has
+ * been, recorded once per simulation tick — drawn as a ribbon that tapers and
+ * fades towards its tail. They used to come from feeding the previous frame
+ * back at 90%, which is cheap and draws a string of beads: every frame stamped
+ * a whole disc, so a fast body left a dotted line of copies of itself and a
+ * slow one a fat smear. A ribbon is a line. It also survives a pause — the
+ * history simply stops growing — where the feedback trail faded to nothing.
  *
  * Colours are emitted well above 1.0 on purpose. Nothing clips until the ACES
  * curve at the very end, which is what stops every star core turning into the
@@ -52,6 +54,7 @@ import {
   RGBAFormat,
   Scene,
   Sphere,
+  Uint32BufferAttribute,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -75,14 +78,17 @@ precision highp float;
 const noVersion = (src: string) => src.replace(/^\s*#version[^\n]*\r?\n/, '')
 
 export type RenderBody = {
-  x: number; y: number; m: number; r: number; hue: number; star: boolean
+  id: number; x: number; y: number; m: number; r: number; hue: number; star: boolean
 }
 export type Aim = { x0: number; y0: number; x1: number; y1: number } | null
 
 export interface Renderer {
   resize(w: number, h: number, dpr: number): void
+  /** Note where everything is. Called once per simulation tick, so a trail's
+   *  length is a length of time, whatever the display's refresh rate. */
+  record(bodies: RenderBody[]): void
   draw(bodies: RenderBody[], aim: Aim, trails: boolean, launchRadius: number): void
-  /** Wipe the trail history, so Clear does not leave ghosts fading for seconds. */
+  /** Wipe the trail history. */
   clear(): void
   /** True when the GPU path is live, so the page can say so in the readout. */
   readonly hdr: boolean
@@ -255,6 +261,37 @@ void main() {
   fragColor = vec4(col, 1.0);
 }`
 
+/* Trails: a ribbon per body, built on the CPU from its history. aSide runs
+   -1..1 across the ribbon, so the fragment shader can give it a soft core and
+   an antialiased edge however thin it gets. */
+const TRAIL_VERT = `#version 300 es
+precision highp float;
+in vec3 position;
+in vec4 aColor;
+in float aSide;
+uniform vec2 u_res;
+out vec4 vColor;
+out float vSide;
+void main() {
+  vColor = aColor;
+  vSide = aSide;
+  vec2 clip = position.xy / u_res * 2.0 - 1.0;
+  gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+}`
+
+const TRAIL_FRAG = `#version 300 es
+precision highp float;
+in vec4 vColor;
+in float vSide;
+out vec4 fragColor;
+void main() {
+  float d = abs(vSide);
+  float aa = max(fwidth(vSide), 1e-3);
+  float edge = 1.0 - smoothstep(1.0 - aa * 1.5, 1.0, d);
+  float core = exp(-d * d * 2.2);
+  fragColor = vec4(vColor.rgb * (vColor.a * core * edge), 1.0);
+}`
+
 const FS_VERT = `#version 300 es
 precision highp float;
 out vec2 vUv;
@@ -299,23 +336,6 @@ void main() {
   vec3 col = neb + stars;
   col += vec3(0.012, 0.014, 0.028); // deep-space floor, never pure black
   fragColor = vec4(col, 1.0);
-}`
-
-/** accum = scene + previous × fade. */
-const ACCUM_FRAG = `#version 300 es
-precision highp float;
-in vec2 vUv;
-out vec4 fragColor;
-uniform sampler2D u_scene;
-uniform sampler2D u_prev;
-uniform float u_fade;
-void main() {
-  vec3 s = texture(u_scene, vUv).rgb;
-  vec3 p = texture(u_prev, vUv).rgb * u_fade;
-  // Floor the feedback so trails actually reach zero. Without this the last
-  // fraction of a percent lingers forever and the screen slowly greys over.
-  p = max(p - 0.004, 0.0);
-  fragColor = vec4(s + p, 1.0);
 }`
 
 const BRIGHT_FRAG = `#version 300 es
@@ -452,10 +472,15 @@ class GLRenderer implements Renderer {
   private starGeo!: InstancedBufferGeometry
 
   private sceneRT!: WebGLRenderTarget
-  private accum: WebGLRenderTarget[] = []
   private skyRT!: WebGLRenderTarget
   private bloomRT: WebGLRenderTarget[] = []
-  private cur = 0
+
+  private trailGeo = new BufferGeometry()
+  private trailMat!: RawShaderMaterial
+  private trailMesh!: Mesh
+  /** Vertices the trail buffers have room for. */
+  private trailCap = 0
+  private hist = new Map<number, Trail>()
 
   private fsScene = new Scene()
   private fsQuad: Mesh
@@ -488,6 +513,7 @@ class GLRenderer implements Renderer {
     this.fsScene.add(this.fsQuad)
 
     this.buildPasses()
+    this.buildTrails()
     this.buildBodies()
   }
 
@@ -507,9 +533,6 @@ class GLRenderer implements Renderer {
       u_time: { value: 0 }, u_res: { value: new Vector2() },
       u_pointer: { value: new Vector2(0.5, 0.5) }, u_dpr: { value: 1 },
     })
-    this.passes.accum = this.pass(ACCUM_FRAG, {
-      u_scene: { value: null }, u_prev: { value: null }, u_fade: { value: 0.86 },
-    })
     this.passes.bright = this.pass(BRIGHT_FRAG, {
       u_src: { value: null }, u_threshold: { value: 1.05 },
     })
@@ -524,6 +547,121 @@ class GLRenderer implements Renderer {
       u_res: { value: new Vector2() }, u_bloomStrength: { value: 0.34 },
       u_time: { value: 0 },
     })
+  }
+
+  private buildTrails() {
+    this.trailMat = new RawShaderMaterial({
+      vertexShader: noVersion(TRAIL_VERT),
+      fragmentShader: noVersion(TRAIL_FRAG),
+      uniforms: { u_res: { value: new Vector2() } },
+      glslVersion: GLSL3,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      // The same Y flip as the bodies, so the same DoubleSide (see below).
+      side: DoubleSide,
+    })
+    this.growTrails(8192)
+    this.trailMesh = new Mesh(this.trailGeo, this.trailMat)
+    this.trailMesh.frustumCulled = false
+    // Drawn first: a planet passing over its own wake hides it.
+    this.trailMesh.renderOrder = -1
+    this.scene.add(this.trailMesh)
+  }
+
+  private growTrails(verts: number) {
+    if (verts <= this.trailCap) return
+    this.trailCap = Math.max(verts, this.trailCap * 2)
+    const g = this.trailGeo
+    g.setAttribute('position', new Float32BufferAttribute(new Float32Array(this.trailCap * 3), 3))
+    g.setAttribute('aColor', new Float32BufferAttribute(new Float32Array(this.trailCap * 4), 4))
+    g.setAttribute('aSide', new Float32BufferAttribute(new Float32Array(this.trailCap), 1))
+    g.setIndex(new Uint32BufferAttribute(new Uint32Array(this.trailCap * 3), 1))
+    g.boundingSphere = new Sphere(new Vector3(), 1e6)
+  }
+
+  record(bodies: RenderBody[]) {
+    // Fewer points each when there are many bodies, so a crowd costs no more
+    // to draw than a solar system does.
+    const len = Math.max(48, Math.min(TRAIL_TICKS, Math.floor(TRAIL_BUDGET / Math.max(1, bodies.length))))
+    const live = new Set<number>()
+    for (const b of bodies) {
+      live.add(b.id)
+      let t = this.hist.get(b.id)
+      if (!t || t.xs.length !== len) {
+        const old = t
+        t = { xs: new Float32Array(len), ys: new Float32Array(len), head: 0, count: 0 }
+        // Keep what there was when the length changes, newest last.
+        if (old) for (let i = Math.max(0, old.count - len); i < old.count; i++) {
+          const k = (old.head - old.count + i + old.xs.length) % old.xs.length
+          pushTrail(t, old.xs[k], old.ys[k])
+        }
+        this.hist.set(b.id, t)
+      }
+      pushTrail(t, b.x, b.y)
+    }
+    for (const id of this.hist.keys()) if (!live.has(id)) this.hist.delete(id)
+  }
+
+  /** Build every ribbon into the trail buffers. Returns the index count. */
+  private buildRibbons(bodies: RenderBody[]) {
+    let need = 0
+    for (const b of bodies) need += (this.hist.get(b.id)?.count ?? 0) * 2
+    this.growTrails(need)
+    const g = this.trailGeo
+    const pos = (g.getAttribute('position') as Float32BufferAttribute).array as Float32Array
+    const col = (g.getAttribute('aColor') as Float32BufferAttribute).array as Float32Array
+    const side = (g.getAttribute('aSide') as Float32BufferAttribute).array as Float32Array
+    const idx = g.getIndex()!.array as Uint32Array
+    const dpr = this.dpr
+    let v = 0, k = 0
+    for (const b of bodies) {
+      const t = this.hist.get(b.id)
+      if (!t || t.count < 2) continue
+      const c = hueToLinear(b.hue, b.star)
+      // Stars leave a bright wake; planets a fainter one in their own colour.
+      const gain = b.star ? 0.9 : 0.55
+      const head = Math.min(2.2, Math.max(0.9, b.r * 0.3)) * dpr
+      const n = t.count, L = t.xs.length
+      const at = (i: number) => (t.head - n + i + L) % L
+      let nx = 0, ny = 1
+      const first = v
+      for (let i = 0; i < n; i++) {
+        const p = at(i), a = at(Math.max(0, i - 1)), z = at(Math.min(n - 1, i + 1))
+        const tx = t.xs[z] - t.xs[a], ty = t.ys[z] - t.ys[a]
+        const tl = Math.hypot(tx, ty)
+        if (tl > 1e-4) { nx = -ty / tl; ny = tx / tl }
+        // 0 at the tail, 1 at the body.
+        const age = i / (n - 1)
+        const hw = head * (0.35 + 0.65 * age)
+        const alpha = gain * Math.pow(age, 1.6)
+        const x = t.xs[p] * dpr, y = t.ys[p] * dpr
+        for (let s = -1; s <= 1; s += 2) {
+          pos[v * 3] = x + nx * hw * s; pos[v * 3 + 1] = y + ny * hw * s; pos[v * 3 + 2] = 0
+          col[v * 4] = c.x; col[v * 4 + 1] = c.y; col[v * 4 + 2] = c.z; col[v * 4 + 3] = alpha
+          side[v] = s
+          v++
+        }
+      }
+      for (let i = 0; i < n - 1; i++) {
+        const a = first + i * 2
+        idx[k++] = a; idx[k++] = a + 1; idx[k++] = a + 2
+        idx[k++] = a + 1; idx[k++] = a + 3; idx[k++] = a + 2
+      }
+    }
+    for (const name of ['position', 'aColor', 'aSide']) {
+      const attr = g.getAttribute(name) as Float32BufferAttribute
+      attr.clearUpdateRanges()
+      attr.addUpdateRange(0, v * attr.itemSize)
+      attr.needsUpdate = true
+    }
+    const ia = g.getIndex()!
+    ia.clearUpdateRanges()
+    ia.addUpdateRange(0, k)
+    ia.needsUpdate = true
+    g.setDrawRange(0, k)
+    return k
   }
 
   private makeGeo(cap: number) {
@@ -618,34 +756,23 @@ class GLRenderer implements Renderer {
       stencilBuffer: false,
     } as const
 
-    for (const rt of [this.sceneRT, this.skyRT, ...this.accum, ...this.bloomRT]) rt?.dispose()
-    this.accum = []
+    for (const rt of [this.sceneRT, this.skyRT, ...this.bloomRT]) rt?.dispose()
     this.bloomRT = []
 
     this.sceneRT = new WebGLRenderTarget(this.w, this.h, opts)
     this.skyRT = new WebGLRenderTarget(this.w, this.h, opts)
-    this.accum = [
-      new WebGLRenderTarget(this.w, this.h, opts),
-      new WebGLRenderTarget(this.w, this.h, opts),
-    ]
     let bw = this.w, bh = this.h
     for (let i = 0; i < BLOOM_LEVELS; i++) {
       bw = Math.max(1, bw >> 1); bh = Math.max(1, bh >> 1)
       this.bloomRT.push(new WebGLRenderTarget(bw, bh, opts))
     }
 
-    for (const m of [this.planetMat, this.starMat]) m.uniforms.u_res.value.set(this.w, this.h)
+    for (const m of [this.planetMat, this.starMat, this.trailMat]) m.uniforms.u_res.value.set(this.w, this.h)
     this.passes.composite.uniforms.u_res.value.set(this.w, this.h)
     this.passes.sky.uniforms.u_res.value.set(this.w, this.h)
 
     // The sky is static, so it is rendered once here rather than every frame.
     this.blit(this.passes.sky, this.skyRT)
-
-    // A resize invalidates the trail history; clearing avoids a stretched ghost.
-    for (const rt of this.accum) {
-      this.renderer.setRenderTarget(rt)
-      this.renderer.clear(true, false, false)
-    }
     this.renderer.setRenderTarget(null)
   }
 
@@ -741,21 +868,14 @@ class GLRenderer implements Renderer {
     this.planetMat.uniforms.u_pad.value = 1.35
     this.starMat.uniforms.u_pad.value = 7.0
 
-    // 1. bodies -> sceneRT
+    // 1. trails, then bodies -> sceneRT
+    this.trailMesh.visible = trails && this.buildRibbons(bodies) > 0
     this.renderer.setRenderTarget(this.sceneRT)
     this.renderer.clear(true, false, false)
     this.renderer.render(this.scene, this.cam)
+    const next = this.sceneRT
 
-    // 2. accumulate trails
-    const prev = this.accum[this.cur]
-    const next = this.accum[this.cur ^ 1]
-    this.passes.accum.uniforms.u_scene.value = this.sceneRT.texture
-    this.passes.accum.uniforms.u_prev.value = prev.texture
-    this.passes.accum.uniforms.u_fade.value = trails ? 0.9 : 0.0
-    this.blit(this.passes.accum, next)
-    this.cur ^= 1
-
-    // 3. bloom chain
+    // 2. bloom chain
     this.passes.bright.uniforms.u_src.value = next.texture
     this.blit(this.passes.bright, this.bloomRT[0])
     for (let i = 1; i < BLOOM_LEVELS; i++) {
@@ -776,7 +896,7 @@ class GLRenderer implements Renderer {
     }
     this.passes.up.blending = NormalBlending
 
-    // 4. composite to screen
+    // 3. composite to screen
     this.passes.composite.uniforms.u_scene.value = next.texture
     this.passes.composite.uniforms.u_bloom.value = this.bloomRT[0].texture
     this.passes.composite.uniforms.u_sky.value = this.skyRT.texture
@@ -787,21 +907,30 @@ class GLRenderer implements Renderer {
   }
 
   clear() {
-    if (!this.w) return
-    for (const rt of [...this.accum, this.sceneRT]) {
-      this.renderer.setRenderTarget(rt)
-      this.renderer.clear(true, false, false)
-    }
-    this.renderer.setRenderTarget(null)
+    this.hist.clear()
   }
 
   dispose() {
-    for (const rt of [this.sceneRT, this.skyRT, ...this.accum, ...this.bloomRT]) rt?.dispose()
-    this.planetGeo.dispose(); this.starGeo.dispose()
-    this.planetMat.dispose(); this.starMat.dispose()
+    for (const rt of [this.sceneRT, this.skyRT, ...this.bloomRT]) rt?.dispose()
+    this.planetGeo.dispose(); this.starGeo.dispose(); this.trailGeo.dispose()
+    this.planetMat.dispose(); this.starMat.dispose(); this.trailMat.dispose()
     for (const k in this.passes) this.passes[k].dispose()
     this.renderer.dispose()
   }
+}
+
+/** Ticks of history a trail keeps: four seconds at the page's sixty a second. */
+const TRAIL_TICKS = 240
+/** Points across every trail together, so a crowd does not cost more. */
+const TRAIL_BUDGET = 24000
+
+type Trail = { xs: Float32Array; ys: Float32Array; head: number; count: number }
+
+function pushTrail(t: Trail, x: number, y: number) {
+  t.xs[t.head] = x
+  t.ys[t.head] = y
+  t.head = (t.head + 1) % t.xs.length
+  t.count = Math.min(t.count + 1, t.xs.length)
 }
 
 /** Body hue -> linear HDR colour. Stars are emitted well above 1. */
@@ -839,6 +968,8 @@ class Canvas2DRenderer implements Renderer {
     this.ctx.fillStyle = '#05060f'
     this.ctx.fillRect(0, 0, w, h)
   }
+
+  record() {}
 
   draw(bodies: RenderBody[], _aim: Aim, trails: boolean) {
     const ctx = this.ctx
