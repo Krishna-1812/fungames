@@ -941,8 +941,8 @@ class GLRenderer implements Renderer {
   private fxGeo!: InstancedBufferGeometry
   private fxMat!: RawShaderMaterial
   private fxMesh!: Mesh
-  private sparks: Spark[] = []
-  private flashes: Flash[] = []
+  private readonly sparks: Spark[] = []
+  private readonly flashes: Flash[] = []
   /** Heat left in a body by an impact, 0..1, cooling every tick. */
   private heat = new Map<number, number>()
 
@@ -1048,9 +1048,9 @@ class GLRenderer implements Renderer {
   /** Move the debris on, and cool everything a tick. */
   private tickFx() {
     for (const s of this.sparks) { s.x += s.vx; s.y += s.vy; s.vx *= 0.99; s.vy *= 0.99; s.age++ }
-    this.sparks = this.sparks.filter((s) => s.age < s.life)
+    compact(this.sparks, (s) => s.age < s.life)
     for (const f of this.flashes) { f.x += f.vx; f.y += f.vy; f.age++ }
-    this.flashes = this.flashes.filter((f) => f.age < f.life)
+    compact(this.flashes, (f) => f.age < f.life)
     // About four and a half seconds to lose half its heat.
     for (const [id, h] of this.heat) {
       const n = h * 0.9975 - 0.0002
@@ -1061,6 +1061,7 @@ class GLRenderer implements Renderer {
 
   private fillFx() {
     const g = this.fxGeo, dpr = this.dpr
+    const tmp = new Vector3()
     const pos = g.getAttribute('iPos') as InstancedBufferAttribute
     const size = g.getAttribute('iSize') as InstancedBufferAttribute
     const col = g.getAttribute('iColor') as InstancedBufferAttribute
@@ -1071,7 +1072,7 @@ class GLRenderer implements Renderer {
       // the fourth power, as a black body's does.
       const k = s.age / s.life
       const T = s.T * (1 - 0.7 * k)
-      const c = blackbody(T).multiplyScalar(2.2 * Math.pow(T / s.T, 4) * (1 - k))
+      const c = blackbodyInto(T, tmp).multiplyScalar(2.2 * Math.pow(T / s.T, 4) * (1 - k))
       pos.setXY(n, s.x * dpr, s.y * dpr)
       size.setX(n, s.size * 2.2 * dpr)
       col.setXYZ(n, c.x, c.y, c.z)
@@ -1080,7 +1081,7 @@ class GLRenderer implements Renderer {
     for (const f of this.flashes) {
       if (n >= FX_CAP) break
       const k = f.age / f.life
-      const c = blackbody(f.T * (1 - 0.6 * k)).multiplyScalar(f.gain * (1 - k) * (1 - k))
+      const c = blackbodyInto(f.T * (1 - 0.6 * k), tmp).multiplyScalar(f.gain * (1 - k) * (1 - k))
       pos.setXY(n, f.x * dpr, f.y * dpr)
       size.setX(n, f.size * (0.6 + 0.8 * k) * dpr)
       col.setXYZ(n, c.x, c.y, c.z)
@@ -1508,8 +1509,8 @@ class GLRenderer implements Renderer {
 
   clear() {
     this.hist.clear()
-    this.sparks = []
-    this.flashes = []
+    this.sparks.length = 0
+    this.flashes.length = 0
     this.heat.clear()
   }
 
@@ -1566,6 +1567,35 @@ export function blackbody(T: number) {
   return v.multiplyScalar(1 / Math.max(v.x, v.y, v.z))
 }
 
+/** Black-body colours every 50 K from 500 to 15,000, for the debris, which
+ *  asks for hundreds a frame. */
+const BB_MIN = 500, BB_STEP = 50, BB_N = 291
+const BB = (() => {
+  const a = new Float32Array(BB_N * 3)
+  for (let i = 0; i < BB_N; i++) {
+    const v = blackbody(BB_MIN + i * BB_STEP)
+    a[i * 3] = v.x; a[i * 3 + 1] = v.y; a[i * 3 + 2] = v.z
+  }
+  return a
+})()
+function blackbodyInto(T: number, out: Vector3) {
+  const f = Math.min(BB_N - 1.001, Math.max(0, (T - BB_MIN) / BB_STEP))
+  const i = Math.floor(f), u = f - i
+  const a = i * 3, b = a + 3
+  return out.set(
+    BB[a] + (BB[b] - BB[a]) * u,
+    BB[a + 1] + (BB[b + 1] - BB[a + 1]) * u,
+    BB[a + 2] + (BB[b + 2] - BB[a + 2]) * u,
+  )
+}
+
+/** Remove, in place, everything that fails the test. */
+function compact<T>(list: T[], keep: (x: T) => boolean) {
+  let n = 0
+  for (let i = 0; i < list.length; i++) if (keep(list[i])) list[n++] = list[i]
+  list.length = n
+}
+
 /**
  * How a star of mass m looks: its temperature and its brightness.
  *
@@ -1580,11 +1610,20 @@ export function blackbody(T: number) {
 export function starLight(m: number) {
   const T = Math.min(14000, Math.max(3100, 5800 * Math.pow(m / 2600, 0.4)))
   const glow = Math.min(1.4, Math.max(0.78, Math.pow(m / 2600, 0.2)))
-  return blackbody(T).multiplyScalar(2.6 * glow)
+  return blackbodyInto(T, new Vector3()).multiplyScalar(2.6 * glow)
 }
 
 /** Body hue -> linear HDR colour. Stars are emitted well above 1. */
+const hueCache = new Map<number, Vector3>()
 function hueToLinear(hue: number, star: boolean) {
+  const key = star ? -1 - hue : hue
+  const hit = hueCache.get(key)
+  if (hit) return hit.clone()
+  const v = hueToLinearRaw(hue, star)
+  hueCache.set(key, v)
+  return v.clone()
+}
+function hueToLinearRaw(hue: number, star: boolean) {
   const c = new Color()
   c.setHSL(hue / 360, star ? 0.55 : 0.62, star ? 0.72 : 0.55)
   // setHSL gives sRGB; the pipeline is linear throughout.
