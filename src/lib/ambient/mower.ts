@@ -22,6 +22,10 @@
  */
 import { CR, OnePole, Saw, Svf, panL, panR, type Source, type SourceCtx } from './dsp'
 
+/** The lawn: its middle is this many metres to your right (so, to the left),
+ *  and the mower walks this far either side of it. The picture uses it too. */
+export const LAWN = { x: -15, half: 9 }
+
 export function mower(c: SourceCtx): Source {
   const { sr, rng } = c
   const crate = sr / CR
@@ -53,7 +57,7 @@ export function mower(c: SourceCtx): Source {
   let runFor = rng.range(90, 200)
   let restFor = 12
   // Where it is on the lawn (metres; you are at the origin).
-  let x = rng.range(-10, 10)
+  let x = rng.range(-LAWN.half, LAWN.half)
   let dir = rng.chance(0.5) ? 1 : -1
   let y = 22
   let turning = 0
@@ -107,14 +111,15 @@ export function mower(c: SourceCtx): Source {
           if (turning > 0) turning -= dt
           else {
             x += dir * 1.05 * dt
-            if (Math.abs(x) > 11) { dir = -dir; turning = 1.3; y += dir > 0 ? -0.5 : 0; if (y < 14) y = 26 }
+            if (Math.abs(x) > LAWN.half) { dir = -dir; turning = 1.3; y += dir > 0 ? -0.5 : 0; if (y < 14) y = 26 }
           }
         }
-        const r = Math.hypot(x, y)
+        const ax = x + LAWN.x
+        const r = Math.hypot(ax, y)
         dist = 20 / r
         air.set(Math.min(12000, 7000 * (20 / r)), sr)
-        gl = panL(x / r)
-        gr = panR(x / r)
+        gl = panL(ax / r)
+        gr = panR(ax / r)
 
         const firing = rpm / 120
         const bladeHz = (rpm / 60) * 2
