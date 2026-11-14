@@ -388,11 +388,12 @@ const buckyball: Drawing = {
 }
 
 const dna: Drawing = {
+  baked: true,
   subject: 'B-DNA seen across the helix, with its two unequal grooves',
   wm: 2.0e-9,
   // Quoted across the helix, so the frame is the helix's own width. A full
   // turn is 3.4 nm and would not fit; this is the 2 nm of it that does.
-  hm: 2.0e-9,
+  hm: 6.8e-9,
   axis: 'w',
   word: 'across',
   draw: (c, id) => {
@@ -433,6 +434,7 @@ const dna: Drawing = {
 }
 
 const influenza: Drawing = {
+  baked: true,
   subject: 'an influenza virion, with both of its spike proteins',
   wm: 9.0e-8,
   hm: 9.0e-8,
@@ -486,6 +488,7 @@ const influenza: Drawing = {
 }
 
 const ecoli: Drawing = {
+  baked: true,
   subject: 'E. coli — a rod, a nucleoid, pili and four flagella',
   wm: 2.0e-6,
   hm: 5.0e-7,
@@ -546,9 +549,10 @@ const ecoli: Drawing = {
 }
 
 const redBloodCell: Drawing = {
+  baked: true,
   subject: 'a red blood cell — the biconcave dimple, face on',
   wm: 8.0e-6,
-  hm: 8.0e-6,
+  hm: 6.6e-6,
   axis: 'w',
   word: 'across',
   draw: (c, id) => `
@@ -578,9 +582,10 @@ const redBloodCell: Drawing = {
 }
 
 const hair: Drawing = {
+  baked: true,
   subject: 'a human hair, close enough to see the cuticle scales',
   wm: 7.0e-5,
-  hm: 7.0e-5,
+  hm: 2.1e-4,
   axis: 'w',
   word: 'across',
   draw: (c, id) => {
@@ -627,6 +632,7 @@ const hair: Drawing = {
 }
 
 const sandGrain: Drawing = {
+  baked: true,
   subject: 'a grain of quartz sand — sub-angular, pitted, part translucent',
   wm: 5.0e-4,
   hm: 5.0e-4 * 0.86,
@@ -718,6 +724,7 @@ const sandGrain: Drawing = {
 /* ---- things you could hold --------------------------------------------- */
 
 const ant: Drawing = {
+  baked: true,
   subject: 'an ant, side on',
   wm: 5.0e-3,
   hm: 5.0e-3 / 3.1,
