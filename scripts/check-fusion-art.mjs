@@ -63,7 +63,7 @@ function render(markup, surface, px, { onBg = false } = {}) {
     `color="${surface.ink}">` +
     (onBg ? `<rect width="24" height="24" fill="${surface.bg}"/>` : '') +
     `${markup}</svg>`
-  const img = new Resvg(svg, { fitTo: { mode: 'width', value: px } }).render()
+  const img = new Resvg(svg, { fitTo: { mode: 'width', value: px }, font: { loadSystemFonts: false } }).render()
   // Allocating getter on the Rust side — read it once.
   return { px: img.pixels, w: img.width, h: img.height }
 }
