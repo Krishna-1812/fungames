@@ -91,7 +91,13 @@ void main() {
     t += h.x * STEP;
     if (t > 6.0) break;
   }
-  if (!hit) { o = vec4(0.0); return; }
+  // A model may add light that hangs in the air — a corona, an atmosphere, a
+  // field — as premultiplied colour gathered along the ray.
+  vec4 air = vec4(0.0);
+#ifdef FOG
+  air = fog(ro, rd, hit ? t : 6.0);
+#endif
+  if (!hit) { o = vec4(air.a > 0.0 ? air.rgb / air.a : vec3(0.0), air.a); return; }
 
   vec3 p = ro + rd * t;
   vec3 n = normalAt(p);
@@ -133,5 +139,6 @@ void main() {
   col += m.emit;
 
   col = aces(col * EXPOSURE);
+  col = col * (1.0 - air.a) + air.rgb;
   o = vec4(col, 1.0);
 }

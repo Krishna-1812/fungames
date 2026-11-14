@@ -107,3 +107,24 @@ float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k,
 float smax(float a, float b, float k) { return -smin(-a, -b, k); }
 /** Union that carries the material of the nearer surface. */
 vec2 U(vec2 a, vec2 b) { return a.x < b.x ? a : b; }
+
+/**
+ * The nearest of a scatter of roughly 4*PI*k*k points on the unit sphere:
+ * xyz is the point, w an id for it. Jittered cells in one shell, so the
+ * spacing is even enough to be spikes on a virus and uneven enough not to be
+ * a lattice.
+ */
+vec4 scatter(vec3 d, float k) {
+  vec3 g = d * k, i = floor(g);
+  float best = 9.0; vec4 res = vec4(d, 0.0);
+  for (int x = -1; x <= 1; x++) for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) {
+    vec3 c = i + vec3(float(x), float(y), float(z));
+    vec3 q = c + 0.15 + 0.7 * hash33(c);
+    float l = length(q);
+    if (abs(l - k) > 0.5) continue;
+    vec3 s = q / l;
+    float dd = dot(s - d, s - d);
+    if (dd < best) { best = dd; res = vec4(s, hash31(c + 3.1)); }
+  }
+  return res;
+}
