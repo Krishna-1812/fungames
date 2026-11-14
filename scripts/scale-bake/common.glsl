@@ -24,6 +24,7 @@ precision highp int;
 uniform vec2 u_res;   // image size in pixels
 uniform vec2 u_jit;   // sub-pixel jitter for this sample, in pixels
 uniform vec2 u_half;  // half the framed window, in model units
+uniform sampler2D u_tex;  // a model's own picture, if it has one in textures/
 out vec4 o;
 
 #define PI 3.14159265359

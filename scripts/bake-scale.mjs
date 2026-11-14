@@ -79,7 +79,7 @@ await send('Runtime.enable')
 /* ---- the darkroom, which runs in the page ------------------------------- */
 
 const DARKROOM = `
-window.bake = async (frag, W, H, half, SS) => {
+window.bake = async (frag, W, H, half, SS, texUrl) => {
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H
   const gl = cv.getContext('webgl2', { antialias: false })
   if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('no float targets')
@@ -98,6 +98,19 @@ window.bake = async (frag, W, H, half, SS) => {
   gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA16F, W, H)
   const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+  if (texUrl) {
+    const img = new Image(); img.src = texUrl; await img.decode()
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture())
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+    gl.generateMipmap(gl.TEXTURE_2D)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.uniform1i(gl.getUniformLocation(pr, 'u_tex'), 1)
+    gl.activeTexture(gl.TEXTURE0)
+  }
   gl.viewport(0, 0, W, H)
   gl.uniform2f(gl.getUniformLocation(pr, 'u_res'), W, H)
   gl.uniform2f(gl.getUniformLocation(pr, 'u_half'), half[0], half[1])
@@ -145,10 +158,17 @@ for (const slug of names) {
   const half = [(0.5 * a.wm / long) * (1 + 2 * PAD), (0.5 * a.hm / long) * (1 + 2 * PAD)]
   const k = SIZE / (2 * Math.max(half[0], half[1]))
   const W = Math.round(2 * half[0] * k), H = Math.round(2 * half[1] * k)
-  const frag = common + '\n' + fs.readFileSync(path.join(modelDir, slug + '.glsl'), 'utf8') + '\n' + studio
+  // A model may pull in a generated table (#include "name.glsl") and may have a
+  // picture of its own, textures/<slug>.png, which arrives as u_tex.
+  const texDir = path.join(here, 'scale-bake', 'textures')
+  const model = fs.readFileSync(path.join(modelDir, slug + '.glsl'), 'utf8')
+    .replace(/^#include "([\w.-]+)"$/gm, (_, f) => fs.readFileSync(path.join(texDir, f), 'utf8'))
+  const frag = common + '\n' + model + '\n' + studio
+  const texFile = path.join(texDir, slug + '.png')
+  const texUrl = fs.existsSync(texFile) ? 'data:image/png;base64,' + fs.readFileSync(texFile).toString('base64') : null
   const t0 = Date.now()
   try {
-    const b64 = await ev(`bake(${JSON.stringify(frag)}, ${W}, ${H}, ${JSON.stringify(half)}, ${SS})`)
+    const b64 = await ev(`bake(${JSON.stringify(frag)}, ${W}, ${H}, ${JSON.stringify(half)}, ${SS}, ${JSON.stringify(texUrl)})`)
     const png = Buffer.from(b64, 'base64')
     if (outDir) fs.writeFileSync(path.join(dest, slug + '.png'), png)
     else {

@@ -104,6 +104,12 @@ void main() {
   vec3 v = -rd;
   Mat m = material(h.y, p, n);
   vec3 f0 = mix(vec3(0.04), m.alb, m.metal);
+#ifdef UNLIT
+  // Something that is its own light: a star.
+  vec3 lit = aces(m.emit * EXPOSURE);
+  o = vec4(lit * (1.0 - air.a) + air.rgb, 1.0);
+  return;
+#endif
 
   // The lights live in the camera's frame, so turning the view to show an
   // object from its better side does not turn the light with it.
