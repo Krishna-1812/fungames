@@ -72,9 +72,16 @@ export type Drawing = {
   axis: 'w' | 'h'
   /** What the size chip calls that axis, in words. */
   word: 'across' | 'tall' | 'long'
+  /** True once the object has a rendered photograph in public/scale; the page
+   *  shows that and `draw` is only the picture the checker still measures. */
+  baked?: true
   /** Inner SVG on a viewBox of `0 0 1000*wm/max 1000*hm/max`. */
   draw: (c: string, id: string) => string
 }
+
+/** How much empty margin a baked picture carries on every side, as a fraction
+ *  of the object's box. The bake frames with it and the page sizes with it. */
+export const PAD = 0.04
 
 /** `Grain of sand` -> `grain-of-sand`. The id prefix for that object's defs. */
 export const slugOf = (name: string) =>
@@ -750,6 +757,7 @@ const ant: Drawing = {
 }
 
 const coin: Drawing = {
+  baked: true,
   subject: 'a coin, face up, with a milled edge',
   wm: 2.45e-2,
   hm: 2.45e-2,
