@@ -997,8 +997,9 @@ const pitch: Drawing = {
 }
 
 const eiffel: Drawing = {
+  baked: true,
   subject: 'the Eiffel Tower, latticed',
-  wm: 125,
+  wm: 139,
   hm: 330,
   axis: 'h',
   word: 'tall',
@@ -1055,6 +1056,7 @@ const eiffel: Drawing = {
 }
 
 const burj: Drawing = {
+  baked: true,
   subject: 'the Burj Khalifa, setbacks spiralling up three wings',
   wm: 100,
   hm: 828,
@@ -1106,6 +1108,7 @@ const burj: Drawing = {
 }
 
 const everest: Drawing = {
+  baked: true,
   subject: 'Everest, drawn from sea level because that is what 8,849 metres means',
   // Quoted by elevation, and the massif around it is wider than it is high.
   // Sizing this from `m` alone was the clearest case for the two-axis change.
@@ -1160,6 +1163,7 @@ const everest: Drawing = {
 }
 
 const manhattan: Drawing = {
+  baked: true,
   subject: 'Manhattan from above — the island, the park and the grid',
   wm: 21000 / 5.7,
   hm: 21000,
@@ -1209,6 +1213,7 @@ const manhattan: Drawing = {
 }
 
 const grandCanyon: Drawing = {
+  baked: true,
   subject: 'the Grand Canyon from above — a ragged hole with a river in it',
   wm: 446000,
   hm: 446000 / 4.4,
