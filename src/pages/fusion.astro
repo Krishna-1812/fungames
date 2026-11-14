@@ -24,8 +24,9 @@ const TREE = [...new Set([...SEED.map((s) => s.text), ...Object.values(LOCAL).ma
 /* Every element in the tree, drawn. Serialised into the page once rather
    than imported by the client module, because the board builds its pieces
    at runtime and needs the markup as data. */
+const toneOf = (name: string) => /fill="(#[0-9a-fA-F]{6})"/.exec(FUSION_ART[name].draw())?.[1] ?? '#8f7bd8'
 const ART_BY_NAME = Object.fromEntries(
-  Object.keys(FUSION_ART).map((name) => [name, elementSvg(name)]),
+  Object.keys(FUSION_ART).map((name) => [name, { svg: elementSvg(name), tone: toneOf(name) }]),
 )
 ---
 
@@ -38,7 +39,7 @@ const ART_BY_NAME = Object.fromEntries(
     <div class="board" id="board">
       {/* First child, so every piece appended later paints over it. */}
       <div class="field" id="field" aria-hidden="true"></div>
-      <p class="tip" id="tip">Drag one thing onto another.</p>
+      <p class="tip" id="tip">Drag one thing onto another — or throw it.</p>
     </div>
 
     <aside class="tray">
@@ -95,13 +96,14 @@ const ART_BY_NAME = Object.fromEntries(
   import { KEY, SEED, loadState, saveState, restoreState } from '../lib/fusion-state.js'
   import { FIELD_FRAG } from '../lib/fusion-field'
   import { UNKNOWN_MARK } from '../lib/fusion-art'
+  import { World } from '../lib/fusion-physics'
   const prefersReducedMotion = !PLAY
   const { API, TREE } = JSON.parse(document.getElementById('game-data')!.textContent!) as { API: string; TREE: string[] }
   // Restart tidies the board; discoveries are kept.
   const shell = createShell({
     slug: 'fusion',
     onRestart: () => {
-      for (const p of board.querySelectorAll('.piece')) p.remove()
+      for (const p of [...board.querySelectorAll('.piece')]) unspawn(p)
       seedBoard()
       tip.hidden = false
     },
@@ -109,7 +111,7 @@ const ART_BY_NAME = Object.fromEntries(
   let newThisVisit = 0
   let merges = 0
   let ended = false
-  const ART = JSON.parse(document.getElementById('art-data')!.textContent!) as Record<string, string>
+  const ART = JSON.parse(document.getElementById('art-data')!.textContent!) as Record<string, { svg: string; tone: string }>
   const UNKNOWN = UNKNOWN_MARK
 
   const board = document.getElementById('board')
@@ -172,42 +174,23 @@ const ART_BY_NAME = Object.fromEntries(
 
   /* Board-space coordinates, matching what centred() builds in the shader:
      origin at the board's centre, units of half its short axis, y upward. */
-  function fieldPos(el) {
-    const b = board.getBoundingClientRect()
-    const r = el.getBoundingClientRect()
-    const m = Math.min(b.width, b.height) || 1
-    return [
-      (2 * (r.left + r.width / 2 - b.left) - b.width) / m,
-      (b.height - 2 * (r.top + r.height / 2 - b.top)) / m,
-    ]
+  function fieldPos(b) {
+    const m = Math.min(world.w, world.h) || 1
+    return [(2 * b.x - world.w) / m, (world.h - 2 * b.y) / m]
   }
 
   let dragPos = [0, 0], dragOn = 0
   let bondPos = [0, 0], bondOn = 0
 
-  /* The nearest other piece, and how strongly the filament should pull toward
-     it.
-
-     Deliberately proximity rather than overlap. The hit test only fires once
-     two pieces are already touching, so a filament keyed to it could never be
-     longer than it was wide -- it drew a blob, not a line. Keying it to
-     distance means the link forms as you approach and goes taut as you arrive,
-     which tells you which piece you are about to land on while you can still
-     change your mind. */
-  function bondTo(el) {
-    const r = el.getBoundingClientRect()
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2
-    let best = null, bestD = Infinity
-    for (const other of board.querySelectorAll('.piece')) {
-      if (other === el || other.disabled) continue
-      const o = other.getBoundingClientRect()
-      const d = Math.hypot(o.left + o.width / 2 - cx, o.top + o.height / 2 - cy)
-      if (d < bestD) { bestD = d; best = other }
-    }
-    if (!best) return { on: 0, pos: [0, 0] }
-    // Fades in over roughly one piece-width of approach.
-    const k = Math.max(0, Math.min(1, (230 - bestD) / 130))
-    return { on: k * k * (3 - 2 * k), pos: fieldPos(best) }
+  /* The nearest other token, and how strongly the filament should pull toward
+     it. Proximity rather than overlap: the link forms as you approach and goes
+     taut as you arrive, which tells you which one you are about to land on
+     while you can still change your mind. */
+  function bondTo(b) {
+    const n = world.nearest(b)
+    if (!n) return { on: 0, pos: [0, 0] }
+    const k = Math.max(0, Math.min(1, (n.body.r * 5.5 - n.d) / (n.body.r * 3)))
+    return { on: k * k * (3 - 2 * k), pos: fieldPos(n.body) }
   }
   let flashPos = [0, 0], flashAt = -1e6, flashNew = 0
 
@@ -232,131 +215,211 @@ const ART_BY_NAME = Object.fromEntries(
      asked for the frames that matter: a drag moving, and a merge landing. */
   function nudgeField() { if (prefersReducedMotion) field.redraw() }
 
-  // ---- board pieces -------------------------------------------------------
-  let dragging = null
-  let offset = { x: 0, y: 0 }
+  // ---- the bench ------------------------------------------------------------
+  /* Every token is a body in lib/fusion-physics: a puck on an air table. The
+     page's part is the hand (pointer events), putting each element where its
+     body is once a frame, and deciding which collisions are fusions — a token
+     set down on another, or one thrown into another. A knock is only a knock. */
+  const world = new World()
+  if (prefersReducedMotion) world.drag = 9
+  const bodyOf = new Map()
+  const elOf = new Map()
+  const MAX_ON_BOARD = 40
+  const radius = () => (board.clientWidth < 560 ? 36 : board.clientWidth < 900 ? 44 : 50)
+  const sizeWorld = () => { world.resize(board.clientWidth, board.clientHeight); wake() }
+  new ResizeObserver(sizeWorld).observe(board)
+  world.resize(board.clientWidth, board.clientHeight)
+
+  const place = (el, b) => { el.style.transform = `translate3d(${(b.x - b.r).toFixed(1)}px,${(b.y - b.r).toFixed(1)}px,0)` }
 
   function spawn(item, x, y) {
+    const r = radius()
     const el = document.createElement('button')
     el.type = 'button'
     el.className = 'piece'
     // A drawing and a label, not one string with a picture character in it.
     // Unknown elements (anything a deployed pair API invents at runtime) get
     // the neutral mark rather than an emoji: see UNKNOWN_MARK in lib/fusion-art.
+    const art = ART[item.text]
     el.innerHTML =
-      `<span class="pic" aria-hidden="true">${ART[item.text] ?? UNKNOWN}</span>` +
-      `<span class="lbl"></span>`
-    el.querySelector(".lbl").textContent = item.text
+      `<span class="orb"><span class="pic" aria-hidden="true">${art?.svg ?? UNKNOWN}</span>` +
+      `<span class="lbl"></span></span>`
+    el.querySelector('.lbl').textContent = item.text
     el.dataset.text = item.text
-    el.dataset.emoji = item.emoji
-    el.style.left = x + 'px'
-    el.style.top = y + 'px'
+    el.style.setProperty('--d', r * 2 + 'px')
+    el.style.setProperty('--tone', art?.tone ?? '#8f7bd8')
+    const b = world.add(
+      Math.max(r, Math.min(world.w - r, x)), Math.max(r, Math.min(world.h - r, y)), r)
+    bodyOf.set(el, b)
+    elOf.set(b, el)
+    place(el, b)
     board.appendChild(el)
+    // A crowded bench loses its oldest token, not its newest.
+    if (bodyOf.size > MAX_ON_BOARD) {
+      const old = world.bodies.find((o) => !o.held && !o.frozen && o !== b)
+      if (old) unspawn(elOf.get(old))
+    }
+    wake()
     return el
   }
 
+  function unspawn(el) {
+    const b = bodyOf.get(el)
+    if (b) { world.remove(b); elOf.delete(b) }
+    bodyOf.delete(el)
+    if (dragging === el) dragging = null
+    el.remove()
+  }
+
+  // ---- the loop: runs while anything is moving, sleeps when the bench is still
+  let raf = 0, lastT = 0, lastKnock = 0, fusing = 0
+  function wake() {
+    if (raf) return
+    lastT = performance.now()
+    raf = requestAnimationFrame(frame)
+  }
+  function frame(now) {
+    raf = 0
+    const hits = world.advance((now - lastT) / 1000)
+    lastT = now
+    for (const h of hits) {
+      const thrower = h.a.thrown > 0 ? h.a : h.b.thrown > 0 ? h.b : null
+      if (thrower) {
+        // Thrown into something: that is a fusion, if the two will fuse.
+        thrower.thrown = 0
+        mergePieces(elOf.get(thrower), elOf.get(thrower === h.a ? h.b : h.a))
+      } else if (h.speed > 170 && now - lastKnock > 80) {
+        lastKnock = now
+        sfx.tick()
+      }
+    }
+    for (const [el, b] of bodyOf) if (!b.frozen) place(el, b)
+    if (dragging) {
+      const b = bodyOf.get(dragging)
+      dragPos = fieldPos(b)
+      const bond = bondTo(b)
+      bondOn = bond.on
+      bondPos = bond.pos
+      const u = world.under(b)
+      const t = u ? elOf.get(u) : null
+      for (const p of board.querySelectorAll('.piece.target')) if (p !== t) p.classList.remove('target')
+      if (t) t.classList.add('target')
+      nudgeField()
+    }
+    if (dragging || fusing || world.energy() > 0.4) wake()
+  }
+
+  // ---- the hand ----------------------------------------------------------------
+  let dragging = null
+  let grab = { x: 0, y: 0 }
+  const local = (e) => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
+
   board.addEventListener('pointerdown', (e) => {
     const el = e.target.closest('.piece')
-    if (!el || el.disabled) return
+    const b = el && bodyOf.get(el)
+    if (!b || b.frozen) return
     unlock(); sfx.tick()
     dragging = el
-    const r = el.getBoundingClientRect()
-    const b = board.getBoundingClientRect()
-    offset = { x: e.clientX - r.left, y: e.clientY - r.top }
+    const p = local(e)
+    grab = { x: b.x - p.x, y: b.y - p.y }
+    world.grab(b, b.x, b.y)
     // Can throw if the pointer is already gone by the time this runs, which
     // takes the whole drag down with it. Powder already guards the same call.
     try { el.setPointerCapture(e.pointerId) } catch {}
     el.classList.add('held')
+    el.classList.remove('fresh')
     dragOn = 1
-    dragPos = fieldPos(el)
-    const b0 = bondTo(el)
-    bondOn = b0.on
-    bondPos = b0.pos
-    nudgeField()
     // Raise it above its siblings while held.
     board.appendChild(el)
     tip.hidden = true
+    wake()
     e.preventDefault()
   })
 
   board.addEventListener('pointermove', (e) => {
-    if (!dragging) return
-    const b = board.getBoundingClientRect()
-    const clamp = (v, max) => Math.max(0, Math.min(max, v))
-    dragging.style.left = clamp(e.clientX - b.left - offset.x, b.width - dragging.offsetWidth) + 'px'
-    dragging.style.top = clamp(e.clientY - b.top - offset.y, b.height - dragging.offsetHeight) + 'px'
-    // Highlight whatever we are hovering over.
-    const target = hitTest(dragging)
-    board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
-    if (target) target.classList.add('target')
-
-    dragPos = fieldPos(dragging)
-    const bond = bondTo(dragging)
-    bondOn = bond.on
-    bondPos = bond.pos
-    nudgeField()
+    const b = dragging && bodyOf.get(dragging)
+    if (!b) return
+    const p = local(e)
+    b.tx = Math.max(b.r, Math.min(world.w - b.r, p.x + grab.x))
+    b.ty = Math.max(b.r, Math.min(world.h - b.r, p.y + grab.y))
+    wake()
   })
 
-  function hitTest(el) {
-    const a = el.getBoundingClientRect()
-    for (const other of board.querySelectorAll('.piece')) {
-      if (other === el || other.disabled) continue
-      const b = other.getBoundingClientRect()
-      const overlap =
-        a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
-      if (overlap) return other
-    }
-    return null
-  }
-
-  async function drop(e) {
-    if (!dragging) return
+  function letGo() {
     const el = dragging
     dragging = null
-    el.classList.remove('held')
-    dragOn = 0
-    bondOn = 0
-    nudgeField()
-    const target = hitTest(el)
+    dragOn = bondOn = 0
     board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
-    if (!target) return
-
-    await mergePieces(el, target)
+    nudgeField()
+    if (!el) return null
+    el.classList.remove('held')
+    const b = bodyOf.get(el)
+    if (b) world.release(b)
+    wake()
+    return el
   }
 
+  board.addEventListener('pointerup', () => {
+    const el = letGo()
+    const b = el && bodyOf.get(el)
+    if (!b) return
+    // Set down on another: fuse them. Otherwise it coasts, and may yet hit one.
+    const u = world.under(b)
+    if (u) { b.thrown = 0; mergePieces(el, elOf.get(u)) }
+  })
+  board.addEventListener('pointercancel', letGo)
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+
   async function mergePieces(el, target) {
-    if (el.disabled || target.disabled || el === target) return null
+    const A = el && bodyOf.get(el), B = target && bodyOf.get(target)
+    if (!A || !B || A.frozen || B.frozen || el === target) return null
 
-    const a = { text: el.dataset.text, emoji: el.dataset.emoji }
-    const b = { text: target.dataset.text, emoji: target.dataset.emoji }
-    const left = parseFloat(target.style.left)
-    const top = parseFloat(target.style.top)
-
-    el.disabled = target.disabled = true
-    target.classList.add('working')
-    const res = await combine(a, b)
+    const a = { text: el.dataset.text }
+    const b = { text: target.dataset.text }
+    // They are drawn together to where they will fuse: nearer the heavier.
+    const mx = (A.x * A.m + B.x * B.m) / (A.m + B.m), my = (A.y * A.m + B.y * B.m) / (A.m + B.m)
+    const from = { ax: A.x, ay: A.y, bx: B.x, by: B.y }
+    A.frozen = B.frozen = true
+    A.held = false
+    fusing++
+    el.classList.add('fusing')
+    target.classList.add('fusing', 'working')
+    A.x = B.x = mx; A.y = B.y = my
+    place(el, A); place(target, B)
+    const [res] = await Promise.all([combine(a, b), wait(prefersReducedMotion ? 0 : 190)])
+    fusing--
     target.classList.remove('working')
-    el.disabled = target.disabled = false
 
     if (!res) {
+      // They will not fuse: they spring apart again.
+      el.classList.remove('fusing'); target.classList.remove('fusing')
+      A.frozen = B.frozen = false
+      A.x = from.ax; A.y = from.ay; B.x = from.bx; B.y = from.by
+      const dx = A.x - B.x || 1, dy = A.y - B.y, d = Math.hypot(dx, dy) || 1
+      A.vx = (dx / d) * 260; A.vy = (dy / d) * 260
+      B.vx = (-dx / d) * 120; B.vy = (-dy / d) * 120
+      wake()
       sfx.bad()
       show(`No recipe for ${a.text} + ${b.text} yet. Try a different pair.`)
       return null
     }
 
-    el.remove()
-    target.remove()
-    const made = spawn(res, left, top)
+    unspawn(el)
+    unspawn(target)
+    const made = spawn(res, mx, my)
     made.classList.add('pop')
 
     const isNew = !state.items.some((i) => i.text.toLowerCase() === res.text.toLowerCase())
     merges++
     if (isNew) newThisVisit++
-    const br = made.getBoundingClientRect()
-    const cx = br.left + br.width / 2, cy = br.top + br.height / 2
+    // The release of energy shoves everything nearby outwards.
+    if (!prefersReducedMotion) world.blast(mx, my, isNew ? 15000 : 8000, 300, bodyOf.get(made))
+    const br = board.getBoundingClientRect()
+    const cx = br.left + mx, cy = br.top + my
 
     // The shockwave goes off where the two things actually met.
-    flashPos = fieldPos(made)
+    flashPos = fieldPos(bodyOf.get(made))
     flashNew = isNew ? 1 : 0
     flashAt = performance.now()
     nudgeField()
@@ -364,7 +427,7 @@ const ART_BY_NAME = Object.fromEntries(
       sfx.great()
       ring(cx, cy, '#4fe3c1', 22)
       burst(cx, cy, { count: 26, colors: ['#4fe3c1', '#c04cfd', '#fff'], speed: 4.5, gravity: 0.1, life: 48, size: 4 })
-      floatText(cx, cy - 26, 'new!', '#4fe3c1')
+      floatText(cx, cy - 56, 'new!', '#4fe3c1')
     } else {
       sfx.pop(state.items.length % 10)
       burst(cx, cy, { count: 10, colors: ['#c04cfd', '#fff'], speed: 3, gravity: 0.12, life: 28, size: 3 })
@@ -410,14 +473,6 @@ const ART_BY_NAME = Object.fromEntries(
       againLabel: 'Clear the board',
     })
   }
-  board.addEventListener('pointerup', drop)
-  board.addEventListener('pointercancel', () => {
-    dragging?.classList.remove('held')
-    dragging = null
-    dragOn = bondOn = 0
-    board.querySelectorAll('.piece.target').forEach((p) => p.classList.remove('target'))
-    nudgeField()
-  })
 
   // ---- tray ---------------------------------------------------------------
   function refreshIngredients() {
@@ -441,18 +496,16 @@ const ART_BY_NAME = Object.fromEntries(
     firstIngredient.disabled = secondIngredient.disabled = true
     recipeStatus.textContent = `Combining ${a.text} and ${b.text}…`
     unlock(); tip.hidden = true
-    const bounds = board.getBoundingClientRect()
-    const x = Math.max(8, bounds.width / 2 - 70), y = Math.max(8, bounds.height / 2 - 25)
-    const first = spawn(a, x, y), second = spawn(b, x, y)
+    const first = spawn(a, world.w / 2 - 30, world.h / 2), second = spawn(b, world.w / 2 + 30, world.h / 2)
     try {
       const made = await mergePieces(first, second)
       if (made) recipeStatus.textContent = `${a.text} + ${b.text} = ${made.dataset.text}. Ready for another pair.`
       else {
-        first.remove(); second.remove()
+        unspawn(first); unspawn(second)
         recipeStatus.textContent = `No recipe for ${a.text} + ${b.text} yet. Try another pair.`
       }
     } catch {
-      first.remove(); second.remove()
+      unspawn(first); unspawn(second)
       recipeStatus.textContent = 'Could not complete this combination. Please try again.'
     } finally {
       recipeBusy = false; combineButton.disabled = false
@@ -469,13 +522,17 @@ const ART_BY_NAME = Object.fromEntries(
         b.type = 'button'
         b.className = 'fu-chip'
         b.innerHTML =
-          `<span class="pic" aria-hidden="true">${ART[item.text] ?? UNKNOWN}</span>` +
+          `<span class="pic" aria-hidden="true">${ART[item.text]?.svg ?? UNKNOWN}</span>` +
           `<span class="lbl"></span>`
         b.querySelector(".lbl").textContent = item.text
         b.addEventListener('click', () => {
-          const r = board.getBoundingClientRect()
-          spawn(item, Math.random() * (r.width - 160) + 20, Math.random() * (r.height - 90) + 20)
+          // It arrives from the tray's side and drifts in.
+          const side = world.w > 620
+          const el = spawn(item, side ? world.w - 50 : world.w * (0.2 + 0.6 * Math.random()), side ? world.h * (0.2 + 0.6 * Math.random()) : world.h - 50)
+          const body = bodyOf.get(el)
+          if (!prefersReducedMotion) { body.vx = side ? -420 - 300 * Math.random() : (Math.random() - 0.5) * 300; body.vy = side ? (Math.random() - 0.5) * 300 : -420 - 300 * Math.random() }
           tip.hidden = true
+          wake()
         })
         return b
       })
@@ -496,15 +553,14 @@ const ART_BY_NAME = Object.fromEntries(
   // an empty board. Seed immediately if the board has been laid out, and
   // otherwise wait for the first resize that gives it a size.
   function seedBoard() {
-    const r = board.getBoundingClientRect()
-    if (r.width < 40 || r.height < 40) return false
-    const PIECE_W = 96
-    const usable = Math.max(PIECE_W, r.width - PIECE_W - 24)
+    if (board.clientWidth < 40 || board.clientHeight < 40) return false
+    world.resize(board.clientWidth, board.clientHeight)
+    const r = radius()
+    const gap = Math.min(r * 3.4, (world.w - r * 2 - 24) / Math.max(1, SEED.length - 1))
     SEED.forEach((s, i) => {
-      const x = 12 + (usable * i) / Math.max(1, SEED.length - 1)
-      // Stagger vertically so a cramped board does not overlap the starters.
-      const y = r.height / 2 - 20 + (i % 2 ? 34 : -34)
-      spawn(s, x, Math.max(12, y))
+      const x = world.w / 2 + (i - (SEED.length - 1) / 2) * gap
+      // Staggered, so a narrow board does not start with them touching.
+      spawn(s, x, world.h / 2 + (i % 2 ? r * 0.9 : -r * 0.9))
     })
     return true
   }
@@ -545,61 +601,71 @@ const ART_BY_NAME = Object.fromEntries(
     opacity: 0.62; font-size: 15px; margin: 0;
   }
 
+  /* A token: a glass disc with its element inside, lit in the element's own
+     colour. The button is only the body's box — it is moved every frame —
+     and the disc inside it is what scales, pops and glows. */
   .fusion-body .piece {
-    position: absolute;
-    /* A tile with a top face, rather than a rectangle with a border. */
-    background: linear-gradient(180deg, #fcfaff 0%, #e4ddf8 100%);
-    color: #1a1533;
-    border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 11px;
-    padding: 8px 14px; font-size: 15px; font-weight: 500;
-    cursor: grab; user-select: none; white-space: nowrap;
-    display: inline-flex; align-items: center; gap: 7px;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
-      inset 0 -1px 0 rgba(80, 60, 140, 0.20),
-      0 1px 2px rgba(5, 2, 20, 0.55),
-      0 7px 16px rgba(5, 2, 20, 0.34);
-    transition: transform 140ms var(--ease), box-shadow 180ms var(--ease);
+    position: absolute; left: 0; top: 0; width: var(--d); height: var(--d);
+    padding: 0; border: 0; background: none; border-radius: 50%;
+    cursor: grab; user-select: none; touch-action: none; will-change: transform;
+    color: #f4f0ff; font: inherit;
   }
-  .fusion-body .piece.held {
-    cursor: grabbing; z-index: 5;
-    transform: scale(1.06) rotate(-0.7deg);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
-      0 18px 34px rgba(0, 0, 0, 0.55),
-      0 0 0 1px rgba(192, 76, 253, 0.55);
-  }
-  /* A ring and a glow rather than a 2px outline: it has to read at a glance,
-     mid-drag, while the filament in the field is already pointing at it. */
-  .fusion-body .piece.target {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
-      0 2px 6px rgba(5, 2, 20, 0.5),
-      0 0 0 2px #c04cfd,
-      0 0 24px rgba(192, 76, 253, 0.8);
-  }
-  /* A sweep, not opacity. Fading a light tile toward a dark board takes its
-     text down with it, and this state is on screen while a request is in
-     flight -- exactly when it should still be readable. */
-  .fusion-body .piece.working {
+  .fusion-body .piece.fusing { transition: transform 190ms cubic-bezier(0.5, 0, 0.9, 0.4); pointer-events: none; }
+  .fusion-body .orb {
+    position: absolute; inset: 0; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
     background:
-      linear-gradient(100deg, transparent 36%, rgba(192, 76, 253, 0.35) 50%, transparent 64%),
-      linear-gradient(180deg, #fcfaff 0%, #e4ddf8 100%);
-    background-size: 300% 100%, 100% 100%;
-    animation: workSweep 900ms linear infinite;
-  }
-  @keyframes workSweep { from { background-position: 150% 0, 0 0; } to { background-position: -150% 0, 0 0; } }
-  .fusion-body .piece.fresh {
-    background: linear-gradient(180deg, #effff9 0%, #bff3e2 100%);
-    border-color: rgba(200, 255, 236, 0.85);
+      radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.08) 26%, transparent 46%),
+      radial-gradient(circle at 50% 118%, color-mix(in srgb, var(--tone) 70%, transparent) 0%, transparent 62%),
+      radial-gradient(circle at 50% 50%, #2c2458 0%, #1a1438 78%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
-      0 1px 2px rgba(5, 2, 20, 0.55),
-      0 7px 16px rgba(5, 2, 20, 0.34),
-      0 0 26px rgba(79, 227, 193, 0.5);
+      inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+      inset 0 -8px 18px color-mix(in srgb, var(--tone) 34%, transparent),
+      0 2px 3px rgba(4, 2, 16, 0.6),
+      0 10px 22px rgba(4, 2, 16, 0.42),
+      0 0 22px color-mix(in srgb, var(--tone) 26%, transparent);
+    transition: transform 160ms var(--ease), box-shadow 200ms var(--ease);
   }
-  .fusion-body .piece.pop { animation: fu-pop 380ms var(--ease-bounce); }
-  @keyframes fu-pop { from { transform: scale(0.6); opacity: 0; } }
+  .fusion-body .piece .pic { width: 46%; height: 46%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
+  .fusion-body .piece .lbl {
+    max-width: 88%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: clamp(11px, calc(var(--d) * 0.135), 13.5px); font-weight: 600; letter-spacing: 0.01em; line-height: 1.2;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+  .fusion-body .piece.held { cursor: grabbing; z-index: 5; }
+  .fusion-body .piece.held .orb {
+    transform: scale(1.1);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.34),
+      inset 0 -8px 18px color-mix(in srgb, var(--tone) 40%, transparent),
+      0 22px 36px rgba(0, 0, 0, 0.55),
+      0 0 30px color-mix(in srgb, var(--tone) 46%, transparent);
+  }
+  /* What you are about to land on: a ring, to read at a glance mid-drag. */
+  .fusion-body .piece.target .orb {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+      0 0 0 3px #7ad4f0,
+      0 0 30px rgba(122, 212, 240, 0.75);
+  }
+  .fusion-body .piece.fusing .orb { transform: scale(0.72); }
+  /* Waiting on an answer: a light going round the rim. */
+  .fusion-body .piece.working .orb::after {
+    content: ''; position: absolute; inset: -3px; border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 0 70%, #7ad4f0 92%, transparent 100%);
+    -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%); mask: radial-gradient(circle, transparent 62%, #000 64%);
+    animation: fu-spin 800ms linear infinite;
+  }
+  @keyframes fu-spin { to { transform: rotate(360deg); } }
+  .fusion-body .piece.fresh .orb {
+    box-shadow:
+      inset 0 0 0 1.5px rgba(160, 255, 226, 0.75),
+      inset 0 -8px 18px color-mix(in srgb, var(--tone) 34%, transparent),
+      0 10px 22px rgba(4, 2, 16, 0.42),
+      0 0 30px rgba(79, 227, 193, 0.6);
+  }
+  .fusion-body .piece.pop .orb { animation: fu-pop 420ms var(--ease-bounce); }
+  @keyframes fu-pop { from { transform: scale(0.4); opacity: 0; } }
 
   .fusion-body .tray {
     width: 260px; flex: none; display: flex; flex-direction: column;
@@ -630,6 +696,7 @@ const ART_BY_NAME = Object.fromEntries(
   /* The drawing fills whatever box it is given — see elementSvg — so the
      wrapper is the only thing that can size it. */
   .fusion-body .pic { width: 20px; height: 20px; flex: none; display: inline-block; }
+  .fusion-body .piece .pic { display: block; }
   .fusion-body .fu-chip .pic { width: 17px; height: 17px; }
   .fusion-body .lbl { display: inline-block; }
   .fusion-body .fu-chip:hover { background: #3a3170; transform: translateY(-1px) scale(1.05); }
@@ -642,9 +709,9 @@ const ART_BY_NAME = Object.fromEntries(
   }
 
   /* The site's motion setting, not only the system one. */
-  html:not(.play) .fusion-body .piece { transition: none; }
-  html:not(.play) .fusion-body .piece.working,
-  html:not(.play) .fusion-body .piece.pop { animation: none; }
+  html:not(.play) .fusion-body .piece, html:not(.play) .fusion-body .orb { transition: none; }
+  html:not(.play) .fusion-body .piece.working .orb::after,
+  html:not(.play) .fusion-body .piece.pop .orb { animation: none; }
 
   @media (max-width: 760px) {
     .fusion-body { flex-direction: column; height: clamp(600px, 88vh, 900px); }

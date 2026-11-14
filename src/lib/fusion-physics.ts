@@ -54,6 +54,8 @@ export class World {
   bodies: Body[] = []
   w = 100
   h = 100
+  /** Drag, per second. Raised under reduced motion so nothing coasts far. */
+  drag = DRAG
   private acc = 0
   private nextId = 1
 
@@ -149,7 +151,7 @@ export class World {
   }
 
   private step(dt: number, hits: Contact[]) {
-    const drag = Math.exp(-DRAG * dt)
+    const drag = Math.exp(-this.drag * dt)
     for (const b of this.bodies) {
       if (b.frozen) continue
       if (b.held) {
