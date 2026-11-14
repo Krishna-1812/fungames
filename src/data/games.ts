@@ -278,7 +278,7 @@ export const GAMES: Game[] = [
     title: 'Scale',
     blurb: 'From a quark to the whole universe',
     description:
-      'Zoom out by powers of ten, from the smallest thing physics allows to the edge of the observable universe. Twenty-two thousand pixels of pure perspective.',
+      'Zoom out by powers of ten, from a proton to the edge of the observable universe, past forty-three things at their true sizes: a virus, an ant, a whale, Everest, the Earth on its real coastline, the Milky Way from above. Each one a lit 3D model, standing beside the last.',
     accent: '#04263f', accent2: '#2b9bb3',
     category: 'science',
     added: '2026-09-11',
