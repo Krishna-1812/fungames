@@ -105,6 +105,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   <div class="hud" role="group" aria-label="Screen width">
     <div class="hud-label">the screen is</div>
     <div class="hud-value" id="hudValue">—</div>
+    <div class="hud-light" id="hudLight"></div>
     <div class="hud-bar"><div class="hud-fill" id="hudFill"></div></div>
   </div>
   </div>
@@ -156,6 +157,23 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   const sky = document.getElementById('sky')
   const hudValue = document.getElementById('hudValue')
   const hudFill = document.getElementById('hudFill')
+  const hudLight = document.getElementById('hudLight')
+
+  /** How long light takes to cross a length: the only clock that reads the
+   *  same at every one of these sizes. */
+  function lightTime(m) {
+    const s = m / 299792458
+    const units = [
+      [1e-24, 'yoctoseconds'], [1e-21, 'zeptoseconds'], [1e-18, 'attoseconds'], [1e-15, 'femtoseconds'],
+      [1e-12, 'picoseconds'], [1e-9, 'nanoseconds'], [1e-6, 'microseconds'], [1e-3, 'milliseconds'],
+      [1, 'seconds'], [60, 'minutes'], [3600, 'hours'], [86400, 'days'], [3.15576e7, 'years'],
+      [3.15576e10, 'thousand years'], [3.15576e13, 'million years'], [3.15576e16, 'billion years'],
+    ]
+    let pick = units[0]
+    for (const u of units) if (s >= u[0]) pick = u
+    const v = s / pick[0]
+    return `${Number(v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)).toLocaleString('en-US')} ${pick[1]}`
+  }
   const reel = document.querySelector('.reel')
   /** '#rrggbb' -> linear RGB, because the shader works in linear light. */
   function toLinear(hex) {
@@ -380,6 +398,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     const screenMetres = Math.pow(10, exp)
 
     hudValue.textContent = fmt(screenMetres)
+    hudLight.textContent = `light crosses it in ${lightTime(screenMetres)}`
     hudFill.style.width = `${t * 100}%`
     sky.style.background = skyAt(exp)
     root.classList.toggle('lit-sky', skyIsLight(exp))
@@ -443,22 +462,35 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     const named = things.filter((t) => t.alpha > 0.001 && t.size > lo && t.size < hi)
       .sort((a, b) => Math.abs(Math.log(a.size / prime)) - Math.abs(Math.log(b.size / prime)))
     const taken = []
+    // Solid things a caption should not be printed across. Its own body is
+    // not one of them: a thing wider than the window can only be named on
+    // itself.
+    const bodies = things.filter((t) => t.alpha > 0.5 && !t.open && t.size > 36)
     for (const t of things) t.labelOn = false
     for (const t of named) {
       const lw = t.label.offsetWidth || 240, lh = t.label.offsetHeight || 60
       // A ring's caption rides on top of the ring; a body's goes underneath.
       const under = !(t.kind >= 1 && t.kind < 1.5)
-      const tries = under ? [t.cy + t.h / 2 + 10, t.cy - t.h / 2 - lh - 10] : [t.cy - t.h / 2 - lh - 8, t.cy + t.h / 2 + 8]
-      for (const y0 of tries) {
-        const x = Math.max(-VW / 2 + lw / 2 + 8, Math.min(VW / 2 - lw / 2 - 8, t.cx))
-        const y = Math.max(-VH / 2 + 84, Math.min(VH / 2 - lh - 12, y0))
-        const hit = taken.some((r) => Math.abs(r.x - x) < (r.w + lw) / 2 + 6 && r.y < y + lh + 4 && y < r.y + r.h + 4)
-        if (hit) continue
-        taken.push({ x, y, w: lw, h: lh })
-        t.label.style.transform = `translate(-50%, 0) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`
-        t.labelOn = true
-        break
-      }
+      const below = t.cy + t.h / 2 + 10, above = t.cy - t.h / 2 - lh - 10
+      const tries = (under ? [below, above] : [above, below]).map((y0) => ({
+        x: Math.max(-VW / 2 + lw / 2 + 8, Math.min(VW / 2 - lw / 2 - 8, t.cx)),
+        y: Math.max(-VH / 2 + 100, Math.min(VH / 2 - lh - 12, y0)),
+      }))
+      // How much of the caption would lie over somebody else.
+      const covered = (c) => bodies.reduce((sum, b) => {
+        if (b === t) return sum
+        const ox = Math.min(c.x + lw / 2, b.cx + b.w / 2) - Math.max(c.x - lw / 2, b.cx - b.w / 2)
+        const oy = Math.min(c.y + lh, b.cy + b.h / 2) - Math.max(c.y, b.cy - b.h / 2)
+        return sum + (ox > 0 && oy > 0 ? ox * oy : 0)
+      }, 0) / (lw * lh)
+      const free = tries.filter((c) => !taken.some((r) => Math.abs(r.x - c.x) < (r.w + lw) / 2 + 6 && r.y < c.y + lh + 4 && c.y < r.y + r.h + 4))
+      if (!free.length) continue
+      const pick = free.map((c) => ({ c, over: covered(c) })).sort((a, b) => a.over - b.over)[0]
+      // Mostly across another object, it is better left unsaid until there is room.
+      if (pick.over > 0.45) continue
+      taken.push({ x: pick.c.x, y: pick.c.y, w: lw, h: lh })
+      t.label.style.transform = `translate(-50%, 0) translate(${pick.c.x.toFixed(1)}px, ${pick.c.y.toFixed(1)}px)`
+      t.labelOn = true
     }
     for (const t of things) {
       if (!t.visible) continue
@@ -617,6 +649,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   }
   .hud-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.78; }
   .hud-value { font-size: 17px; font-weight: 600; margin-top: 2px; }
+  .hud-light { font-size: 12px; opacity: 0.72; margin-top: 2px; word-spacing: normal; letter-spacing: 0; }
   .hud-bar { height: 3px; background: rgba(255, 255, 255, 0.18); border-radius: 2px; margin-top: 9px; }
   .hud-fill { height: 100%; width: 0; background: #fff; border-radius: 2px; }
 
