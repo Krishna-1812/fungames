@@ -1,7 +1,7 @@
 ---
 import GameShell from '../layouts/GameShell.astro'
 import { THINGS, KIND_CODE } from '../lib/scale-things'
-import { SCALE_ART, artSvg, slugOf, PAD } from '../lib/scale-art'
+import { SCALE_ART, slugOf, PAD } from '../lib/scale-art'
 
 /**
  * Scale — a continuous logarithmic zoom from a proton to the observable
@@ -14,9 +14,11 @@ import { SCALE_ART, artSvg, slugOf, PAD } from '../lib/scale-art'
  * the scroll axis itself is logarithmic, which is the honest way to cross
  * this many decades.
  *
- * What the objects are is in `lib/scale-things.ts`; what they look like is in
- * `lib/scale-art.ts`. Both are out here rather than inline because
- * `scripts/check-scale-art.mjs` renders them against this page's own sky.
+ * What the objects are is in `lib/scale-things.ts`. The solid ones are 3D
+ * models, photographed ahead of time by `scripts/bake-scale.mjs` — the page
+ * shows the photographs, sized from `lib/scale-art.ts` — and the ones with no
+ * body (a wavelength, an orbit, a nebula, a galaxy) are drawn live by the
+ * shader in `lib/scale-sky.ts`. Where each stands is `lib/scale-layout.ts`.
  *
  * In the shell the zoom is the stage. The sky and the objects are one sticky
  * backdrop inside the frame, so "the screen" is the frame's own width now,
@@ -77,7 +79,6 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
             data-hm={e.h}
             data-i={i}
             data-art={art ? '1' : null}
-            data-photo={art?.baked ? '1' : null}
             data-origin={t.at === 'origin' ? '1' : null}
             data-open={t.kind && t.kind !== 'sphere' ? '1' : null}
             data-kind={t.away ? 1.25 : KIND_CODE[t.kind ?? 'sphere']}
@@ -85,9 +86,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
             style={`--c:${t.color}`}
           >
             {art
-              ? art.baked
-                ? <img class="art photo" data-src={`/scale/${slugOf(t.name)}`} alt="" decoding="async" draggable="false" />
-                : <div class="art" set:html={artSvg(t.name, t.color)} />
+              ? <img class="art photo" data-src={`/scale/${slugOf(t.name)}`} alt="" decoding="async" draggable="false" />
               : <div class="disc" />}
             <div class="sc-label">
               <span class="name">{t.name}</span>
@@ -194,7 +193,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     art: el.dataset.art === '1',
     // A baked photograph: an <img> whose file is only fetched as it comes near,
     // and which carries a margin the drawing's box does not.
-    photo: el.dataset.photo === '1' ? el.querySelector('img') : null,
+    photo: el.querySelector('img'),
     centred: el.dataset.origin === '1',
     open: el.dataset.open === '1',
     // Where it stands relative to the zoom's origin, in pixels, this frame.
@@ -598,7 +597,6 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   /* Scoped styles do not reach set:html content, so the svg carries its own
      sizing; this is only the box it fills. Placed by a transform each frame. */
   .art, .disc { position: absolute; left: 0; top: 0; opacity: 0; will-change: transform; }
-  .art:not(.photo) { filter: drop-shadow(0 0 30px color-mix(in srgb, var(--c) 30%, transparent)); }
   /* max-width: the site caps every image at its parent, and this parent is a
      point. */
   .photo { max-width: none; user-select: none; -webkit-user-drag: none; }
