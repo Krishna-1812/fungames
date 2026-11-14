@@ -19,7 +19,7 @@ assert.equal(loadState({ getItem() { return '{broken' } }).items.length, 4)
 const cacheKey = pairKey('Fire', 'Sand')
 assert.deepEqual(restoreState({ version: 2, items: [], recipes: { [cacheKey]: discovered, '__proto__': {}, bad: discovered } }).recipes, { [cacheKey]: discovered })
 
-assert.equal(RECIPES.length, 41)
+assert.equal(RECIPES.length, 109)
 assert.equal(Object.keys(LOCAL).length, RECIPES.length, 'duplicate recipe pair')
 for (const [a, b, text] of RECIPES) {
   assert.equal(LOCAL[pairKey(a, b)].text, text)
@@ -82,4 +82,28 @@ env.AI.run = async () => ({ response: '{"result":{}}' })
 assert.equal((await request(undefined, 'Bad', 'Shape')).status, 502)
 env.AI.run = async () => { throw new Error('offline') }
 assert.equal((await request(undefined, 'No', 'Network')).status, 502)
-console.log('Fusion: 41 recipes reachable in both orders; origin, validation, cache and failure regressions passed.')
+// Hints: following them from the four starters, one at a time, finds the whole
+// tree; each is makeable when given; the count reaches zero exactly at the end;
+// and they lead outwards in order, never to something deeper than need be.
+{
+  const { within, hint, depths } = await import('../src/lib/fusion-hints.js')
+  const seed = ['Water', 'Fire', 'Earth', 'Wind']
+  const found = new Set(seed)
+  const d = depths(seed)
+  const all = new Set(RECIPES.map(([, , text]) => text.toLowerCase()))
+  assert.equal(within(found).length, 10, 'ten things are one step from the start')
+  let steps = 0, lastDepth = 0
+  for (let h = hint(found, seed); h; h = hint(found, seed)) {
+    assert.ok([...found].some((f) => f.toLowerCase() === h.a) && [...found].some((f) => f.toLowerCase() === h.b), `hint needs something not yet found: ${h.text}`)
+    assert.ok(![...found].some((f) => f.toLowerCase() === h.text.toLowerCase()), `hint for something already found: ${h.text}`)
+    assert.ok(d.get(h.text.toLowerCase()) >= lastDepth - 1, 'hints lead outwards')
+    lastDepth = Math.max(lastDepth, d.get(h.text.toLowerCase()))
+    found.add(h.text)
+    assert.ok(++steps < 500)
+  }
+  assert.equal(found.size, all.size + seed.length, 'following hints finds every element')
+  assert.equal(within(found).length, 0)
+  assert.ok(Math.max(...d.values()) >= 8, 'the tree is deep, not only wide')
+}
+
+console.log(`Fusion: ${RECIPES.length} recipes reachable in both orders; origin, validation, cache and failure regressions passed.`)
