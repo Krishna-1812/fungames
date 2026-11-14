@@ -35,7 +35,7 @@ const { SEED } = await import('../src/lib/fusion-state.js')
 
 /** The two real backgrounds, read off fusion.astro's own CSS. */
 const SURFACES = [
-  { name: 'board pill', bg: '#f0ebfb', ink: '#1a1533' },
+  { name: 'board token', bg: '#241c4a', ink: '#f4f0ff' },
   { name: 'tray chip', bg: '#2b2456', ink: '#ffffff' },
 ]
 /** The size the pill actually renders it at. */

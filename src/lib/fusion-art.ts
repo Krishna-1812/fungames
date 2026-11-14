@@ -4,9 +4,9 @@
  * Fusion shipped with emoji in every piece, and PLAN.md grandfathered them on
  * a specific argument: the tree was meant to be open-ended, so there was
  * "nothing to draw in advance." That argument does not survive contact with
- * the actual game. The recipe table is a closed set of thirty-nine elements,
+ * the actual game. The recipe table is a closed set (a hundred and twelve now),
  * all of them reachable from the four starters and all of them known at build
- * time, so there is nothing to draw in advance *except* thirty-nine things.
+ * time, so there is nothing to draw in advance *except* every one of them.
  * Every other page on this site draws its own subjects (see the doc comment at
  * the top of lib/icons.ts for why emoji are banned site-wide: they are three
  * other people's artwork depending on whose device you are holding).
@@ -498,6 +498,527 @@ export const FUSION_ART: Record<string, Element> = {
             stroke="${P.gold}" stroke-width="2.4" stroke-linecap="round" opacity="0.85"/>
       <path d="M13 15.4h7.4M15 18.4h6.4M12.4 21h6.6" stroke="currentColor" stroke-width="2.2"
             stroke-linecap="round" opacity="0.4"/>`,
+  },
+
+  /* ---- weather ---------------------------------------------------------- */
+  Cloud: {
+    subject: 'one fair-weather cloud, three bumps on a flat base',
+    draw: () => `
+      <path d="M6.6 18.6a4.6 4.6 0 0 1-.5-9.2 6.1 6.1 0 0 1 11.6-1 4.9 4.9 0 0 1 .1 10.2Z" fill="currentColor" opacity="0.96"/>`,
+  },
+  Rain: {
+    subject: 'a grey cloud with three slanting streaks of rain under it',
+    draw: () => `
+      <path d="M7 12.4a3.8 3.8 0 0 1-.4-7.6 5 5 0 0 1 9.6-.8 4 4 0 0 1 .2 8.4Z" fill="${P.slate}"/>
+      <path d="M8.4 15.4l-1.6 4.8M12.6 15.4 11 20.2M16.8 15.4l-1.6 4.8" fill="none" stroke="${P.blue}"
+            stroke-width="2.6" stroke-linecap="round"/>`,
+  },
+  Storm: {
+    subject: 'a heavy dark cloud with a small bolt dropping out of it',
+    draw: () => `
+      <path d="M5.6 13a4.4 4.4 0 0 1-.4-8.8 5.8 5.8 0 0 1 11-1 4.7 4.7 0 0 1 .2 9.8Z" fill="${P.indigo}"/>
+      <path d="M12.6 13.4 9 18.6h3l-1.4 4 4.6-5.8h-3l1.6-3.4Z" fill="${P.gold}"/>`,
+  },
+  Lightning: {
+    subject: 'a single large forked bolt, corner to corner',
+    draw: () => `
+      <path d="M14.6 1.6 5.4 13h5l-2.6 9.4L18.6 9.8h-5.2Z" fill="${P.gold}"/>
+      <path d="M19 15.6l2 1M17.4 19.4l1.6 1.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.5"/>`,
+  },
+  Snow: {
+    subject: 'a six-armed snowflake',
+    draw: () => `
+      <g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity="0.9">
+        <path d="M12 2.6v18.8M3.9 7.3l16.2 9.4M20.1 7.3 3.9 16.7"/>
+        <path d="M9.6 4.6 12 7l2.4-2.4M9.6 19.4 12 17l2.4 2.4"/>
+      </g>
+      <path d="M12 8.600 14.900 10.300v3.400L12 15.400 9.100 13.700v-3.400Z" fill="${P.blue}"/>`,
+  },
+  Ice: {
+    subject: 'a cube of ice seen from a corner, lit on top',
+    draw: () => `
+      <path d="M12 2.8 20.4 7.4 12 12 3.6 7.4Z" fill="currentColor" opacity="0.85"/>
+      <path d="M3.6 7.4 12 12v9.4l-8.4-4.6Z" fill="${P.teal}"/>
+      <path d="M20.4 7.4 12 12v9.4l8.4-4.6Z" fill="${P.blue}"/>`,
+  },
+  Glacier: {
+    subject: 'a tongue of ice coming down between two dark peaks',
+    draw: () => `
+      <path d="M1.6 20.6 8 6.4l4 7.2 3.6-5.2 6.8 12.2Z" fill="${P.slate}"/>
+      <path d="M9.4 20.6c.4-4 1.2-6.6 2.6-8.6 1.6 2 2.6 4.6 3 8.6Z" fill="currentColor" opacity="0.88"/>
+      <path d="M2 21.6h20" stroke="${P.teal}" stroke-width="2.4" stroke-linecap="round"/>`,
+  },
+  Blizzard: {
+    subject: 'two curling gusts driving snowflakes sideways',
+    draw: () => `
+      <path d="M2.4 8.4h10.2a2.8 2.8 0 1 0-2.6-3.8M2.4 14.6h14a3 3 0 1 1-2.8 4" fill="none" stroke="${P.indigo}"
+            stroke-width="2.4" stroke-linecap="round"/>
+      <g fill="currentColor" opacity="0.9"><circle cx="18.4" cy="6.4" r="1.7"/><circle cx="5.4" cy="19.6" r="1.7"/><circle cx="20" cy="11.6" r="1.4"/></g>`,
+  },
+  Snowman: {
+    subject: 'a snowman: two balls, a hat and a carrot nose',
+    draw: () => `
+      <circle cx="12" cy="16.4" r="5.6" fill="currentColor" opacity="0.88"/>
+      <circle cx="12" cy="8.6" r="3.8" fill="currentColor" opacity="0.88"/>
+      <path d="M8.4 5.4h7.2M9.8 5.2V2.2h4.4v3" fill="${P.slate}" stroke="${P.slate}" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M12 8.4l4.2 1.2-4.2.8Z" fill="${P.rust}"/>`,
+  },
+  Flood: {
+    subject: 'a roof and chimney standing out of rising water',
+    draw: () => `
+      <path d="M5 13.6 12 6.6l7 7Z" fill="${P.brick}"/>
+      <path d="M15.4 9.4V5.6h2.2v6Z" fill="${P.slate}"/>
+      <path d="M1.6 15.4c2-1.6 3.6-1.6 5.4 0s3.6 1.6 5.4 0 3.6-1.6 5.4 0 3 1.4 4.6.4V22H1.6Z" fill="${P.blue}"/>`,
+  },
+  Waterspout: {
+    subject: 'a twisting column of water rising from the sea to a cloud',
+    draw: () => `
+      <path d="M4.4 3.4h15.2c-.8 2.4-2.6 3.6-4.6 4.6-1.6 2.6-.6 5 .6 7.6l-2 3-2.4-.4c.8-3.4.2-6.2-1.8-8.6C6.8 8.2 5 6.4 4.4 3.4Z" fill="${P.blue}"/>
+      <path d="M2.4 20.6c2.2-1.6 4-1.6 6 0s4.4 1.6 6.6 0 4.2-1.4 6.6 0" fill="none" stroke="${P.teal}" stroke-width="2.6" stroke-linecap="round"/>`,
+  },
+  Smog: {
+    subject: 'two chimney stacks under a flat lid of dirty haze',
+    draw: () => `
+      <path d="M5 21.4V11.6h3.4v9.8ZM13 21.4v-7h3.6v7Z" fill="${P.slate}"/>
+      <path d="M2.4 8.6c2-2.4 4.4-3 6.6-1.8 2.2-2.6 5.6-2.8 7.8-.6 2-.4 3.8.4 4.8 2.4-2.6 1.6-5 1.2-6.8-.2-2.6 2-5.4 2-7.6.2-1.8 1-3.4 1-4.8 0Z" fill="${P.ash}"/>
+      <path d="M2 21.6h20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.3"/>`,
+  },
+
+  /* ---- growing things --------------------------------------------------- */
+  Flower: {
+    subject: 'one flower: five round petals, a gold eye, a stem with a leaf',
+    draw: () => `
+      <path d="M12 12v9.6" stroke="${P.green}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M12 18c2.6-.2 4-1.4 4.4-3.4-2.4 0-3.8 1-4.4 3.4Z" fill="${P.green}"/>
+      <g fill="${P.plum}"><circle cx="12" cy="4.4" r="2.9"/><circle cx="16.3" cy="7.6" r="2.9"/><circle cx="14.7" cy="12.4" r="2.9"/><circle cx="9.3" cy="12.4" r="2.9"/><circle cx="7.7" cy="7.6" r="2.9"/></g>
+      <circle cx="12" cy="8.6" r="2.3" fill="${P.gold}"/>`,
+  },
+  Garden: {
+    subject: 'three different flowers in a row behind a low picket fence',
+    draw: () => `
+      <path d="M5 20V12.6M12 20V10M19 20v-7.4" stroke="${P.green}" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="5" cy="10" r="3" fill="${P.brick}"/><circle cx="12" cy="7" r="3.4" fill="${P.gold}"/><circle cx="19" cy="10" r="3" fill="${P.indigo}"/>
+      <path d="M2 17.4h20M2 21h20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.45"/>
+      <path d="M8.5 15.4v6.4M15.5 15.4v6.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity="0.45"/>`,
+  },
+  Field: {
+    subject: 'ploughed rows running away to a flat horizon',
+    draw: () => `
+      <path d="M2 21.4 8.4 9h7.2L22 21.4Z" fill="${P.olive}"/>
+      <path d="M12 9v12.4M9.6 9 6.4 21.4M14.4 9l3.2 12.4" stroke="${P.green}" stroke-width="2.2"/>
+      <path d="M2 8.6h20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.4"/>
+      <circle cx="17.6" cy="4.6" r="2" fill="${P.gold}"/>`,
+  },
+  Wheat: {
+    subject: 'a single ear of wheat, grains in a herringbone up the stalk',
+    draw: () => `
+      <path d="M12 22V4" stroke="${P.gold}" stroke-width="2.2" stroke-linecap="round"/>
+      <g fill="${P.gold}">
+        <path d="M12 6.4c-3.2-.4-4.4-2-4.4-4.2 2.6.2 4.2 1.6 4.4 4.2ZM12 6.4c3.2-.4 4.4-2 4.4-4.2-2.6.2-4.2 1.6-4.4 4.2Z"/>
+        <path d="M12 11.4c-3.2-.4-4.6-2-4.6-4.2 2.6.2 4.4 1.6 4.6 4.2ZM12 11.4c3.2-.4 4.6-2 4.6-4.2-2.6.2-4.4 1.6-4.6 4.2Z"/>
+        <path d="M12 16.4c-3.2-.4-4.6-2-4.6-4.2 2.6.2 4.4 1.6 4.6 4.2ZM12 16.4c3.2-.4 4.6-2 4.6-4.2-2.6.2-4.4 1.6-4.6 4.2Z"/>
+      </g>`,
+  },
+  Flour: {
+    subject: 'a tied sack of flour with a spilt heap beside it',
+    draw: () => `
+      <path d="M6 8.6c-2 3.4-2.6 8.6-1 12.8h10c1.6-4.2 1-9.4-1-12.8Z" fill="${P.clay}"/>
+      <path d="M6.4 8.4 5 4.4h10l-1.4 4Z" fill="${P.clay}"/>
+      <path d="M5.6 8.6h8.8" stroke="${P.rust}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M14.6 21.4c.6-2.8 2-4.2 3.8-4.2s3 1.400 3.600 4.200Z" fill="currentColor" opacity="0.88"/>`,
+  },
+  Dough: {
+    subject: 'a round of dough on a board, a rolling pin behind it',
+    draw: () => `
+      <path d="M2.6 6.4h18.8" stroke="${P.clay}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M4.4 17.6c0-4.400 3.400-7.400 7.600-7.400s7.600 3 7.600 7.400Z" fill="${P.gold}"/>
+      <path d="M2.4 19.6h19.200" stroke="${P.slate}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M8.4 14.4c.8-1.200 2-1.800 3.400-1.800" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.5"/>`,
+  },
+  Bread: {
+    subject: 'a crusty loaf with three slashes across the top',
+    draw: () => `
+      <path d="M2.6 15.4c0-5 4-8.400 9.400-8.400s9.400 3.400 9.400 8.400c0 2-1.200 3.200-3 3.200H5.600c-1.800 0-3-1.200-3-3.200Z" fill="${P.rust}"/>
+      <path d="M7.400 9.600 9 13.400M11.400 8.800l1.400 4M15.600 9.400l1.200 3.800" stroke="${P.gold}" stroke-width="2.4" stroke-linecap="round"/>`,
+  },
+  Cactus: {
+    subject: 'a saguaro with two raised arms on a strip of sand',
+    draw: () => `
+      <path d="M12 21V4.400M12 14H7.800a1.600 1.600 0 0 1-1.600-1.600V9M12 11.600h4.200a1.600 1.600 0 0 0 1.600-1.600V7.400" fill="none" stroke="${P.green}"
+            stroke-width="3.6" stroke-linecap="round"/>
+      <path d="M3 21.400h18" stroke="${P.clay}" stroke-width="2.6" stroke-linecap="round"/>`,
+  },
+  Dune: {
+    subject: 'two crescent dunes, the nearer one casting a shadow',
+    draw: () => `
+      <path d="M1.600 15.400c3.400-5.400 7.400-7.400 11.400-5.400 2.400 1.200 4 3.200 5 5.400Z" fill="${P.clay}"/>
+      <path d="M4.400 21.400c3.600-6 8-8 12.400-5.600 2.200 1.200 3.800 3.200 5.200 5.600Z" fill="${P.gold}"/>
+      <circle cx="18.600" cy="5.400" r="2.400" fill="${P.rust}"/>`,
+  },
+
+  /* ---- wood, and what is made of it ------------------------------------- */
+  Wood: {
+    subject: 'a sawn log lying on its side, rings showing on the cut end',
+    draw: () => `
+      <path d="M6.400 7.400h11.200a4.600 4.600 0 0 1 0 9.200H6.400Z" fill="${P.clay}"/>
+      <ellipse cx="6.400" cy="12" rx="3.400" ry="4.600" fill="${P.gold}"/>
+      <ellipse cx="6.400" cy="12" rx="1.300" ry="1.900" fill="none" stroke="${P.rust}" stroke-width="2.200"/>
+      <path d="M12.400 10.400h5M11.400 13.600h3.600" stroke="${P.rust}" stroke-width="2.200" stroke-linecap="round"/>`,
+  },
+  Campfire: {
+    subject: 'two crossed logs with a flame rising from where they meet',
+    draw: () => `
+      <path d="M3.400 20.400 20.600 15M3.400 15l17.200 5.400" stroke="${P.clay}" stroke-width="3.400" stroke-linecap="round"/>
+      <path d="M12 2.400c3 3.800 4.800 6 4.800 8.600a4.800 4.800 0 0 1-9.600 0c0-2.600 1.800-4.800 4.800-8.600Z" fill="${P.rust}"/>
+      <path d="M12 8.600c1.400 2 2.200 3 2.200 4.200a2.200 2.200 0 0 1-4.400 0c0-1.200.8-2.200 2.200-4.200Z" fill="${P.gold}"/>`,
+  },
+  Boat: {
+    subject: 'an open rowing boat on the water, one oar out',
+    draw: () => `
+      <path d="M2.400 11.400h19.200c-.6 4-3.200 6.200-6.400 6.200H8.800c-3.200 0-5.800-2.200-6.400-6.200Z" fill="${P.clay}"/>
+      <path d="M8 11.400h8" stroke="${P.rust}" stroke-width="2.400" stroke-linecap="round"/>
+      <path d="M14.400 5 19.600 16" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.6"/>
+      <path d="M2 21c2.400-1.400 4.600-1.400 6.800 0s4.600 1.400 6.800 0 4.200-1.400 6.400-.2" fill="none" stroke="${P.blue}" stroke-width="2.400" stroke-linecap="round"/>`,
+  },
+  Sailboat: {
+    subject: 'a small boat under one tall white sail and a jib',
+    draw: () => `
+      <path d="M11.400 2.400v13.200H3.600Z" fill="currentColor" opacity="0.88"/>
+      <path d="M13.400 6v9.600h6.200Z" fill="${P.brick}"/>
+      <path d="M2.400 17.400h19.200l-2.600 4.200H5Z" fill="${P.clay}"/>`,
+  },
+  Paper: {
+    subject: 'a sheet of paper with one corner folded and three lines of writing',
+    draw: () => `
+      <path d="M5 2.400h9.600L19 6.800v14.800H5Z" fill="currentColor" opacity="0.9"/>
+      <path d="M14.600 2.400v4.400H19Z" fill="${P.slate}"/>
+      <path d="M8 11h8M8 14.400h8M8 17.800h5" stroke="${P.slate}" stroke-width="2.200" stroke-linecap="round"/>`,
+  },
+  Book: {
+    subject: 'a closed book lying flat, page edges showing, a ribbon out of it',
+    draw: () => `
+      <path d="M3 6.400 14.400 3.600 21 6v10.400L9.600 19.400 3 16.800Z" fill="${P.indigo}"/>
+      <path d="M9.600 9.200 21 6v10.400L9.600 19.400Z" fill="currentColor" opacity="0.85"/>
+      <path d="M9.600 9.200V19.400" stroke="${P.indigo}" stroke-width="2.200"/>
+      <path d="M15.400 17.400v4.200l1.400-1.200 1.400 1.200v-5" fill="${P.brick}"/>`,
+  },
+  Library: {
+    subject: 'a shelf of four books of different heights, one leaning',
+    draw: () => `
+      <path d="M3.400 19V6.400h3.400V19Z" fill="${P.brick}"/>
+      <path d="M7.800 19V4h3.600v15Z" fill="${P.teal}"/>
+      <path d="M12.400 19V8h3v11Z" fill="${P.gold}"/>
+      <path d="M16.400 19 18.800 6.600l3 .6L19.600 19Z" fill="${P.indigo}"/>
+      <path d="M2 20.600h20" stroke="${P.clay}" stroke-width="3" stroke-linecap="round"/>`,
+  },
+
+  /* ---- clay --------------------------------------------------------------- */
+  Clay: {
+    subject: 'a wet lump of clay with a thumbprint pressed into it',
+    draw: () => `
+      <path d="M3 17.600c-.6-4.600 1.600-8.400 5.600-9.600 2.400-2 6-2 8.200.2 3.400 1.400 5 5 4.200 9.400-.4 2.400-2 3.400-4.200 3.400H7c-2.200 0-3.800-1.200-4-3.400Z" fill="${P.clay}"/>
+      <ellipse cx="13" cy="12.600" rx="3.200" ry="2.200" fill="${P.rust}"/>`,
+  },
+  Pot: {
+    subject: 'a fired two-handled pot with a painted band',
+    draw: () => `
+      <path d="M8.400 3h7.200v2.600c3 1.600 4.800 4.400 4.800 7.800 0 4.600-3.400 8-8.400 8s-8.400-3.400-8.400-8c0-3.400 1.800-6.200 4.800-7.800Z" fill="${P.rust}"/>
+      <path d="M4.200 11.400h15.600" stroke="${P.gold}" stroke-width="2.600"/>
+      <path d="M7.600 2.800h8.800" stroke="${P.clay}" stroke-width="2.600" stroke-linecap="round"/>`,
+  },
+
+  /* ---- metal -------------------------------------------------------------- */
+  Rust: {
+    subject: 'an old hex nut, half eaten by orange rust',
+    draw: () => `
+      <path d="M12 2.400 20.400 7.200v9.600L12 21.600 3.600 16.800V7.200Z" fill="${P.slate}"/>
+      <path d="M12 2.400 20.400 7.200v5.400c-2.600.4-4-1-4.600-3-2 .2-3.600-.8-3.800-2.800Z" fill="${P.rust}"/>
+      <path d="M3.600 14c2 .2 3.200 1.400 3.400 3.200l2.600 2.600-6-3Z" fill="${P.rust}"/>
+      <circle cx="12" cy="12" r="3.200" fill="currentColor" opacity="0.85"/>`,
+  },
+  Engine: {
+    subject: 'a steam engine: a boiler, a piston rod and a spoked flywheel',
+    draw: () => `
+      <path d="M2.400 9.400h10.200v8H2.400Z" fill="${P.slate}"/>
+      <path d="M5 9.400V5.400h3v4" fill="${P.slate}"/>
+      <circle cx="17.400" cy="15" r="4.600" fill="none" stroke="${P.gold}" stroke-width="2.600"/>
+      <path d="M12.600 12.400 17.400 15" stroke="${P.rust}" stroke-width="2.400" stroke-linecap="round"/>
+      <path d="M2 20.600h20" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.35"/>`,
+  },
+  Steamship: {
+    subject: 'a steamer with one tall red funnel trailing a puff of steam',
+    draw: () => `
+      <path d="M1.800 14.400h20.400l-2.800 6H5Z" fill="${P.slate}"/>
+      <path d="M6 14.400v-3.600h9.400v3.600Z" fill="currentColor" opacity="0.85"/>
+      <path d="M9.600 10.800V5.400h3.400v5.400Z" fill="${P.brick}"/>
+      <circle cx="16.400" cy="4.400" r="2.200" fill="currentColor" opacity="0.6"/><circle cx="20" cy="3.400" r="1.500" fill="currentColor" opacity="0.6"/>`,
+  },
+  Train: {
+    subject: 'a steam locomotive side-on: boiler, cab, chimney and three wheels',
+    draw: () => `
+      <path d="M2.400 8.400h6.200v8.200H2.400Z" fill="${P.brick}"/>
+      <path d="M8.600 10.800h10.600a2 2 0 0 1 2 2v3.800H8.600Z" fill="${P.brick}"/>
+      <path d="M15.600 10.800V6.400h3v4.400Z" fill="${P.slate}"/>
+      <g fill="${P.slate}"><circle cx="5.600" cy="18.400" r="2.800"/><circle cx="12.400" cy="18.800" r="2.400"/><circle cx="18.200" cy="18.800" r="2.400"/></g>`,
+  },
+  Steel: {
+    subject: 'a steel I-beam end-on: two flanges and the web between them',
+    draw: () => `
+      <path d="M3 3.400h18v4.200H3ZM3 16.400h18v4.200H3Z" fill="${P.slate}"/>
+      <path d="M9.600 7.600h4.800v8.800H9.600Z" fill="${P.ash}"/>
+      <path d="M5 5.500h14" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.45"/>`,
+  },
+  Skyscraper: {
+    subject: 'one tall tower with lit windows between two shorter blocks',
+    draw: () => `
+      <path d="M2.600 21.400v-9h4.600v9ZM16.800 21.400v-12h4.600v12Z" fill="${P.slate}"/>
+      <path d="M8.200 21.400V4.400L12 2l3.800 2.400v17Z" fill="${P.indigo}"/>
+      <g fill="${P.gold}"><path d="M10.200 7h3.600v2.200h-3.600ZM10.200 11.400h3.600v2.200h-3.600ZM10.200 15.800h3.600V18h-3.600Z"/></g>`,
+  },
+  Diamond: {
+    subject: 'a cut diamond, table up, facets catching the light',
+    draw: () => `
+      <path d="M6.400 4h11.200l4 5.400L12 21.400 2.400 9.400Z" fill="${P.teal}"/>
+      <path d="M6.400 4 9 9.400h6L17.600 4Z" fill="currentColor" opacity="0.85"/>
+      <path d="M9 9.400 12 21.400l3-12Z" fill="${P.blue}"/>`,
+  },
+
+  /* ---- glass and light ---------------------------------------------------- */
+  Mirror: {
+    subject: 'an oval hand mirror in a gold frame, a glint across the glass',
+    draw: () => `
+      <ellipse cx="12" cy="9.400" rx="6.800" ry="7.400" fill="${P.gold}"/>
+      <ellipse cx="12" cy="9.400" rx="4.600" ry="5.200" fill="${P.teal}"/>
+      <path d="M9.600 8.400 13 5.600" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.8"/>
+      <path d="M12 16.800v5.200" stroke="${P.gold}" stroke-width="3" stroke-linecap="round"/>`,
+  },
+  Lens: {
+    subject: 'a convex lens edge-on, bending three rays to one point',
+    draw: () => `
+      <path d="M9 2.400c3.400 3 3.400 16.200 0 19.200-3.400-3-3.400-16.200 0-19.200Z" fill="${P.teal}"/>
+      <path d="M1.600 6h5M1.600 12h5M1.600 18h5" stroke="${P.gold}" stroke-width="2.200" stroke-linecap="round"/>
+      <path d="M11.400 6 21.400 12M11.400 12h10M11.400 18l10-6" stroke="${P.gold}" stroke-width="2.200" stroke-linecap="round"/>`,
+  },
+  Telescope: {
+    subject: 'a brass-banded telescope pointed up on a tripod',
+    draw: () => `
+      <path d="M3.400 13 17.600 3.400l3 4.400L6.400 17.400Z" fill="${P.slate}"/>
+      <path d="M14.400 5.600l3 4.400" stroke="${P.gold}" stroke-width="2.600"/>
+      <path d="M11 13.400v8.200M11 14.400 6 21.600M11 14.400l5 7.200" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.6"/>`,
+  },
+  Greenhouse: {
+    subject: 'a glasshouse in panes, with a plant growing inside it',
+    draw: () => `
+      <path d="M3 21.400V10.400L12 3.400l9 7v11Z" fill="${P.teal}" opacity="0.9"/>
+      <path d="M3 10.400h18M12 3.400v18" stroke="currentColor" stroke-width="2.200" opacity="0.75"/>
+      <path d="M7.400 21.400c-.2-3.600.6-5.600 2.600-6.600.6 2.800-.2 5-2.600 6.600Z" fill="${P.green}"/>
+      <path d="M16.400 21.400c.2-3-.4-4.800-2.200-5.800-.6 2.400 0 4.400 2.200 5.800Z" fill="${P.green}"/>`,
+  },
+  Prism: {
+    subject: 'a glass prism splitting one white ray into three colours',
+    draw: () => `
+      <path d="M12 3.400 20.400 19H3.600Z" fill="none" stroke="currentColor" stroke-width="2.400" stroke-linejoin="round" opacity="0.85"/>
+      <path d="M1.400 14.400 8.600 11.800" stroke="currentColor" stroke-width="2.400" stroke-linecap="round"/>
+      <path d="M15 10.600l7.200-1.200" stroke="${P.brick}" stroke-width="2.400" stroke-linecap="round"/>
+      <path d="M15.800 13h6.600" stroke="${P.gold}" stroke-width="2.400" stroke-linecap="round"/>
+      <path d="M16.600 15.400l5.800 1.600" stroke="${P.blue}" stroke-width="2.400" stroke-linecap="round"/>`,
+  },
+
+  /* ---- electricity -------------------------------------------------------- */
+  Electricity: {
+    subject: 'a spark jumping between two terminals',
+    draw: () => `
+      <path d="M3.600 21.400V9.400M20.400 21.400V9.400" stroke="${P.slate}" stroke-width="3.400" stroke-linecap="round"/>
+      <circle cx="3.600" cy="7" r="2.600" fill="${P.slate}"/><circle cx="20.400" cy="7" r="2.600" fill="${P.slate}"/>
+      <path d="M6.400 7l3.200-3.200 2.400 6 2.600-5.600 3 2.800" fill="none" stroke="${P.gold}" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round"/>`,
+  },
+  'Light bulb': {
+    subject: 'a lit bulb with a screw base and three rays',
+    draw: () => `
+      <path d="M12 3.400a6.400 6.400 0 0 1 3.600 11.700v2.300H8.400v-2.300A6.400 6.400 0 0 1 12 3.400Z" fill="${P.gold}"/>
+      <path d="M8.800 19.600h6.400M10 22h4" stroke="${P.slate}" stroke-width="2.400" stroke-linecap="round"/>
+      <path d="M2.400 9.600h2.200M19.400 9.600h2.200M5 3.600l1.600 1.600M19 3.600l-1.600 1.600" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.55"/>`,
+  },
+  Magnet: {
+    subject: 'a red horseshoe magnet with pale pole tips',
+    draw: () => `
+      <path d="M5 3.400v9a7 7 0 0 0 14 0v-9" fill="none" stroke="${P.brick}" stroke-width="5"/>
+      <path d="M2.500 3.400h5v3.800h-5ZM16.500 3.400h5v3.800h-5Z" fill="currentColor" opacity="0.88"/>`,
+  },
+  Compass: {
+    subject: 'a compass: a ring, a red-tipped needle, a pivot',
+    draw: () => `
+      <circle cx="12" cy="12" r="8.600" fill="none" stroke="${P.gold}" stroke-width="2.800"/>
+      <path d="M12 12 9.600 9.600 16.400 7.600Z" fill="${P.brick}"/>
+      <path d="M12 12l2.400 2.400L7.600 16.400Z" fill="currentColor" opacity="0.85"/>
+      <circle cx="12" cy="12" r="1.500" fill="${P.slate}"/>`,
+  },
+  Fulgurite: {
+    subject: 'a branching tube of fused glass running down through sand',
+    draw: () => `
+      <path d="M2 6.400h20" stroke="${P.clay}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M12 6.400v6l-4.600 3.800v4.600M12 12.400l4.600 3v5.400M12 12.400v9" fill="none" stroke="${P.teal}"
+            stroke-width="2.800" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M13.400 1.400 11 4.400" stroke="${P.gold}" stroke-width="2.400" stroke-linecap="round"/>`,
+  },
+
+  /* ---- water, at every size ----------------------------------------------- */
+  Dam: {
+    subject: 'a curved dam wall, water high behind it and a trickle below',
+    draw: () => `
+      <path d="M2 7.400h9.600v14H2Z" fill="${P.blue}"/>
+      <path d="M11 4.400h3.600l3.400 17h-7Z" fill="${P.slate}"/>
+      <path d="M18.600 21.400c1-.8 2-.8 3.400 0" fill="none" stroke="${P.blue}" stroke-width="2.400" stroke-linecap="round"/>
+      <path d="M3.400 11c1.400-1 2.600-1 4 0" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.6"/>`,
+  },
+  Beach: {
+    subject: 'a striped umbrella on sand at the edge of the sea',
+    draw: () => `
+      <path d="M2 21.400c5-5.600 12.400-7 20-4.800v4.800Z" fill="${P.gold}"/>
+      <path d="M13.600 20 10.400 8.400" stroke="${P.slate}" stroke-width="2.200" stroke-linecap="round"/>
+      <path d="M3.400 10.400c2-5.400 9.200-7.400 14.200-3.800Z" fill="${P.brick}"/>
+      <path d="M17.400 13.400c1.400-.8 3-.8 4.600 0" fill="none" stroke="${P.blue}" stroke-width="2.400" stroke-linecap="round"/>`,
+  },
+  Sea: {
+    subject: 'open water to a flat horizon, a gull over it',
+    draw: () => `
+      <path d="M1.600 9.400h20.800V22H1.600Z" fill="${P.blue}"/>
+      <path d="M4 14c1.800-1.200 3.400-1.200 5 0s3.400 1.200 5 0M11 18.400c1.800-1.200 3.400-1.200 5 0s3.200 1.200 4.600.2" fill="none" stroke="currentColor"
+            stroke-width="2.200" stroke-linecap="round" opacity="0.7"/>
+      <path d="M13 5.400c1.200-1.400 2.400-1.400 3.200 0 .8-1.400 2-1.400 3.200 0" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.7"/>`,
+  },
+  Ocean: {
+    subject: 'the flukes of a whale tail lifted clear of a deep swell',
+    draw: () => `
+      <path d="M12 15.400c-.600-2.600-.600-4.600 0-6.400C9 9 6 7.400 4.400 3.800c3.400.200 6 1.400 7.600 3.600 1.600-2.200 4.200-3.400 7.600-3.600C18 7.400 15 9 12 9c.600 1.800.600 3.800 0 6.400Z" fill="${P.slate}"/>
+      <path d="M1.600 15c2.400-1.800 4.600-1.800 6.800 0s4.800 1.800 7.200 0 4.600-1.600 6.800 0V22H1.600Z" fill="${P.indigo}"/>
+      <path d="M5 19.400c1.600-1 3-1 4.400 0" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.5"/>`,
+  },
+  Salt: {
+    subject: 'a heap of square salt crystals',
+    draw: () => `
+      <path d="M2.400 21.400c1.400-5 5-8.400 9.600-8.400s8.200 3.400 9.600 8.400Z" fill="currentColor" opacity="0.6"/>
+      <g fill="currentColor" opacity="0.92">
+        <path d="M9.400 3.400h5.200v5.200H9.400ZM4.400 10h4.400v4.400H4.400ZM15.400 9.400h4.600V14h-4.600Z"/>
+      </g>`,
+  },
+  Coral: {
+    subject: 'a branching red coral on the sea bed',
+    draw: () => `
+      <path d="M12 21.400v-8M12 15.400 6.400 11V6.400M12 13.400l5.600-4V4.400M6.400 11H3M17.600 9.400H21M12 13.400V3.400" fill="none"
+            stroke="${P.brick}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 21.600h18" stroke="${P.gold}" stroke-width="2.600" stroke-linecap="round"/>`,
+  },
+  Seaweed: {
+    subject: 'three wavering fronds of kelp rising from the bottom',
+    draw: () => `
+      <path d="M6 21.400c-2-3 2-5 0-8s2-5 0-8M12 21.400c2-3.400-2-5.600 0-9s-2-5.600 0-9M18 21.400c-2-2.600 2-4.400 0-7s2-4.400 0-6.400" fill="none"
+            stroke="${P.green}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M2.600 21.600h18.800" stroke="${P.clay}" stroke-width="2.400" stroke-linecap="round"/>`,
+  },
+  Waterfall: {
+    subject: 'water pouring over a cliff edge into a pool of spray',
+    draw: () => `
+      <path d="M2 3.400h8.400v18H2Z" fill="${P.slate}"/>
+      <path d="M10.400 3.400h5.200c1.600 0 2.600 1 2.600 2.600v12h-7.800Z" fill="${P.blue}"/>
+      <path d="M13 7.400v8M15.800 9v6" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.65"/>
+      <g fill="currentColor" opacity="0.85"><circle cx="12" cy="20" r="2.200"/><circle cx="16.400" cy="20.400" r="2.400"/><circle cx="20.400" cy="20" r="1.800"/></g>`,
+  },
+  Canyon: {
+    subject: 'a river at the bottom of a gorge between two stepped walls',
+    draw: () => `
+      <path d="M1.600 3.400h7.200v5H10.400v5H12v8.200H1.600Z" fill="${P.rust}"/>
+      <path d="M22.400 3.400h-6.200v6H14.600v5H13v7.200h9.400Z" fill="${P.clay}"/>
+      <path d="M11.400 21.600h2.200" stroke="${P.blue}" stroke-width="3.400" stroke-linecap="round"/>`,
+  },
+  Obsidian: {
+    subject: 'a sharp shard of black volcanic glass with one bright edge',
+    draw: () => `
+      <path d="M9.400 2.400 18.400 8l2.200 9.400-8.200 4.200-8.800-6Z" fill="${P.indigo}"/>
+      <path d="M9.400 2.400 12.400 21.600 3.600 15.600Z" fill="${P.slate}"/>
+      <path d="M11.400 5 17.400 9" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.8"/>`,
+  },
+
+  /* ---- life ---------------------------------------------------------------- */
+  Life: {
+    subject: 'a single cell: a membrane, a nucleus, a few specks',
+    draw: () => `
+      <path d="M12 2.800c5.200 0 9.200 3.800 9.200 8.800 0 5.400-4 9.600-9.600 9.600-5 0-8.800-3.600-8.800-8.800 0-5.400 4-9.600 9.200-9.600Z" fill="none"
+            stroke="${P.green}" stroke-width="2.800"/>
+      <circle cx="10.400" cy="11.400" r="3.400" fill="${P.plum}"/>
+      <g fill="${P.green}"><circle cx="16.400" cy="9" r="1.400"/><circle cx="15.400" cy="15.400" r="1.600"/></g>`,
+  },
+  Fish: {
+    subject: 'a fish side-on: body, forked tail, one eye',
+    draw: () => `
+      <path d="M2.400 12c3-4.600 6.600-6.400 10.400-5.400 2 .6 3.600 1.800 4.800 3.600L21.800 6v12l-4.200-4.200c-1.200 1.800-2.800 3-4.800 3.600-3.800 1-7.400-.8-10.400-5.400Z" fill="${P.blue}"/>
+      <circle cx="7.400" cy="11" r="1.400" fill="currentColor"/>
+      <path d="M11 9.400c1 1.600 1 3.600 0 5.200" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.55"/>`,
+  },
+  Bird: {
+    subject: 'a small bird perched on a twig, beak to the right',
+    draw: () => `
+      <path d="M4 15.400c0-4.600 3-7.600 7-7.600 1.400 0 2.600.4 3.600 1a3.400 3.400 0 1 1 3 5.400c-.8 3-3.400 5-6.600 5H2.400Z" fill="${P.brick}"/>
+      <path d="M20.400 10.400 23 11.400l-2.600 1Z" fill="${P.gold}"/>
+      <circle cx="17.600" cy="10.600" r="1" fill="currentColor"/>
+      <path d="M3 21.600h18" stroke="${P.clay}" stroke-width="2.400" stroke-linecap="round"/>`,
+  },
+  Egg: {
+    subject: 'one pale egg sitting in a twig nest',
+    draw: () => `
+      <path d="M12 2.800c3.400 0 6 5 6 9.200 0 3.800-2.600 6.200-6 6.200s-6-2.400-6-6.200c0-4.200 2.600-9.200 6-9.200Z" fill="currentColor" opacity="0.9"/>
+      <path d="M2.400 15.400c1.400 4 5 6.200 9.600 6.200s8.200-2.200 9.600-6.200" fill="none" stroke="${P.clay}" stroke-width="3.200" stroke-linecap="round"/>
+      <path d="M5 18.400l3.400-1.400M19 18.400l-3.400-1.400" stroke="${P.rust}" stroke-width="2.200" stroke-linecap="round"/>`,
+  },
+
+  /* ---- the sky ---------------------------------------------------------------- */
+  Star: {
+    subject: 'a five-pointed star',
+    draw: () => `
+      <path d="M12 2.400l2.900 6.300 6.900.8-5.100 4.700 1.400 6.800-6.100-3.400-6.100 3.400 1.400-6.800L2.200 9.500l6.900-.8Z" fill="${P.gold}"/>`,
+  },
+  Continent: {
+    subject: 'a landmass seen from above, with a bay and an offshore island',
+    draw: () => `
+      <path d="M5.400 4.400c3-1.800 6.600-1.400 8.400.6 2.600-.4 5 1 5.600 3.400.6 2.400-.6 4-2.600 4.800.6 3-1 5.600-4 6.400-3 .8-5.600-.4-6.600-2.800-2.600-.6-4-2.600-3.800-5.200.2-3 1.200-5.600 3-7.200Z" fill="${P.green}"/>
+      <path d="M9 9.400c1.600-.6 3-.2 3.800 1 .8 1.400.2 2.800-1.200 3.400-1.600.6-3 0-3.600-1.400-.4-1.200 0-2.400 1-3Z" fill="${P.olive}"/>
+      <circle cx="19.400" cy="18.400" r="2" fill="${P.green}"/>`,
+  },
+  Planet: {
+    subject: 'a ringed planet, the ring passing in front and behind',
+    draw: () => `
+      <circle cx="12" cy="12" r="6.400" fill="${P.teal}"/>
+      <path d="M5.800 10.400C3 11.600 1.400 13 1.800 14.200c.600 1.800 5.600 1.800 11.200 0s9.800-4.600 9.200-6.400c-.400-1.200-2.600-1.600-5.600-1.200" fill="none"
+            stroke="${P.gold}" stroke-width="2.600" stroke-linecap="round"/>
+      <path d="M8.400 9.400c.800-1.200 2-2 3.400-2.200" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.55"/>`,
+  },
+  Moon: {
+    subject: 'a crescent moon with two craters',
+    draw: () => `
+      <path d="M15.400 2.600a9.600 9.600 0 1 0 6 13.800A8.200 8.200 0 0 1 15.400 2.600Z" fill="currentColor" opacity="0.9"/>
+      <circle cx="8.400" cy="12.400" r="1.900" fill="${P.ash}"/><circle cx="12.400" cy="17.600" r="1.400" fill="${P.ash}"/>`,
+  },
+  Tide: {
+    subject: 'a small moon pulling a bulge up in the sea beneath it',
+    draw: () => `
+      <circle cx="12" cy="5.400" r="3.200" fill="currentColor" opacity="0.9"/>
+      <path d="M1.600 21.600v-4c3.400-.4 5.600-2 7-4.400 1.400-2 5.400-2 6.800 0 1.400 2.400 3.600 4 7 4.400v4Z" fill="${P.blue}"/>
+      <path d="M12 9.800v1.600" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" opacity="0.5"/>`,
+  },
+  Eclipse: {
+    subject: 'a black disc covering the sun, its corona flaring round the edge',
+    draw: () => `
+      <circle cx="12" cy="12" r="9.200" fill="${P.gold}"/>
+      <circle cx="12" cy="12" r="6.800" fill="${P.slate}"/>
+      <path d="M17.400 6.200l1.800-1.800" stroke="currentColor" stroke-width="2.400" stroke-linecap="round" opacity="0.9"/>`,
+  },
+  Galaxy: {
+    subject: 'a two-armed spiral galaxy around a bright core',
+    draw: () => `
+      <path d="M12 12c0-3 2.400-5 5.400-4.400 3 .6 4.600 3.600 3.800 6.800M12 12c0 3-2.400 5-5.400 4.400-3-.6-4.600-3.600-3.800-6.800" fill="none"
+            stroke="${P.plum}" stroke-width="2.800" stroke-linecap="round"/>
+      <path d="M12 12c-2.400-1.600-3-4.600-1.400-7M12 12c2.400 1.600 3 4.600 1.400 7" fill="none" stroke="${P.indigo}" stroke-width="2.600" stroke-linecap="round"/>
+      <circle cx="12" cy="12" r="2.600" fill="${P.gold}"/>`,
   },
 }
 
