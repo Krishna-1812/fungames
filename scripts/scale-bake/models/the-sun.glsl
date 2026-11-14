@@ -34,7 +34,7 @@ Mat material(float id, vec3 p, vec3 n) {
   vec3 v = voronoi(d * 95.0 + 0.4 * fbm(d * 40.0));
   float gran = smoothstep(0.02, 0.32, v.y - v.x) * (0.85 + 0.3 * v.z);
   float super_ = fbm(d * 12.0);
-  float I = 0.72 + 0.34 * gran + 0.12 * (super_ - 0.5);
+  float I = 0.52 + 0.56 * gran + 0.22 * (super_ - 0.5);
   float pen;
   float um = spots(d, pen);
   // a penumbra is combed outwards in filaments

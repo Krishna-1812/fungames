@@ -3,7 +3,7 @@
    kilometres up; the mountain is the last three and a half. Lhotse stands to
    its right, Nuptse's wall in front, the Khumbu glacier runs out between. */
 #define STEP 0.35
-#define VIEW_YAW 0.3
+#define VIEW_YAW 0.0
 #define VIEW_PITCH 0.2
 
 const float H = 0.526;          // 8,849 m in units of the block's width
@@ -35,15 +35,18 @@ vec2 map(vec3 p) {
   float y = -0.5 * H + H * height(p.xz);
   float d = (p.y - y) * 0.5;
   // a ragged-edged block, flat at sea level
-  float edge = max(abs(p.x) - 0.5, abs(p.z) - 0.27) + 0.0;
-  float bot = -0.5 * H - p.y;
+  float edge = max(abs(p.x) - 0.496, abs(p.z) - 0.27);
+  // Flat at sea level — and, since the block is seen from a little above, cut
+  // along the line of sight where its near foot would hang below the frame:
+  // the frame is the 8,849 metres, and nothing may stand outside it.
+  float bot = max(-0.5 * H - p.y, -0.5 * H - (cos(VIEW_PITCH) * p.y - sin(VIEW_PITCH) * p.z));
   return vec2(max(d, max(edge, bot)), 1.0);
 }
 
 Mat material(float id, vec3 p, vec3 n) {
   float alt = (p.y + 0.5 * H) / H;                       // 0 sea level .. 1 summit
   // the cut faces of the block: strata
-  if (abs(p.x) > 0.4985 || abs(p.z) > 0.2685) {
+  if (abs(p.x) > 0.4945 || abs(p.z) > 0.2685) {
     float band = fbm(vec2(p.y * 60.0 + 0.6 * fbm(p.xz * 8.0), 1.0));
     return mat(mix(hex(0x4a4038), hex(0x8a7866), band) * (0.8 + 0.3 * noise(p * 200.0)), 0.9, 0.0);
   }
