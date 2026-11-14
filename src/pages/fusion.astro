@@ -582,7 +582,7 @@ const ART_BY_NAME = Object.fromEntries(
           const side = world.w > 620
           const el = spawn(item, side ? world.w - 50 : world.w * (0.2 + 0.6 * Math.random()), side ? world.h * (0.2 + 0.6 * Math.random()) : world.h - 50)
           const body = bodyOf.get(el)
-          if (!prefersReducedMotion) { body.vx = side ? -420 - 300 * Math.random() : (Math.random() - 0.5) * 300; body.vy = side ? (Math.random() - 0.5) * 300 : -420 - 300 * Math.random() }
+          if (!prefersReducedMotion) { body.vx = side ? -420 - 300 * Math.random() : (Math.random() - 0.5) * 240; body.vy = side ? (Math.random() - 0.5) * 300 : -160 - 260 * Math.random() }
           tip.hidden = true
           wake()
         })

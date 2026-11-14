@@ -19,7 +19,7 @@
  *      could never be longer than it was wide and drew a blob instead of a
  *      line. This way it tells you what you are about to land on while you can
  *      still change your mind.
- *   4. **The merge.** A shockwave and a flash at the point of fusion, gold for
+ *   4. **The merge.** A shockwave and a flash at the point of fusion, mint for
  *      a first discovery and violet for something you already had.
  *
  * ## The luminance cap, and what is deliberately outside it
@@ -123,7 +123,7 @@ void main() {
     float core = exp(-pow(sd / wdt, 2.0));
     // Charge running from the held piece toward the target.
     float run = 0.5 + 0.5 * sin(h * 26.0 - t * 9.0);
-    vec3 bc = mix(vec3(0.55, 0.22, 1.00), vec3(1.00, 0.78, 0.35), run * 0.55);
+    vec3 bc = mix(vec3(0.55, 0.22, 1.00), vec3(0.35, 0.90, 1.00), run * 0.55);
     col += bc * core * u_bondOn * (0.55 + 0.75 * run);
     // A wider, dimmer halo so the filament has somewhere to sit.
     col += vec3(0.35, 0.15, 0.70) * exp(-pow(sd / 0.11, 2.0)) * u_bondOn * 0.14;
@@ -134,7 +134,7 @@ void main() {
     float age = max(u_flashT, 0.0);
     float fade = 1.0 - age / 1.1;
     float fd = length(p - u_flash);
-    vec3 hot = mix(vec3(0.75, 0.35, 1.0), vec3(1.0, 0.80, 0.34), u_flashNew);
+    vec3 hot = mix(vec3(0.75, 0.35, 1.0), vec3(0.31, 0.89, 0.76), u_flashNew);
 
     // The core: bright, and gone in a quarter of a second.
     col += hot * exp(-fd * fd * 26.0) * exp(-age * 11.0) * 2.6;
