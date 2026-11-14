@@ -316,9 +316,9 @@ export const GAMES: Game[] = [
   {
     slug: 'fusion',
     title: 'Fusion',
-    blurb: 'Forty-four things, and four to start with',
+    blurb: 'A hundred and twelve things, and four to start with',
     description:
-      'Water, fire, earth and wind, and forty things to make out of them — stone, glass, a blade, an hourglass, a city. Every element is drawn rather than borrowed from an emoji set, and the whole tree works offline; deploy the bundled Cloudflare Worker and it will invent new ones beyond it.',
+      'Water, fire, earth and wind, and a hundred and eight things to make out of them, the way they are really made — steam into cloud into storm into lightning, wheat into flour into bread, lightning and metal into a compass. The elements are glass tokens with weight: carry one onto another, or throw it. Every one is drawn, the whole tree works offline, and a hint is there when you are stuck.',
     accent: '#1e1a45', accent2: '#b44cf0',
     category: 'fun',
     added: '2026-09-07',
