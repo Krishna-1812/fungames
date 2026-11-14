@@ -50,10 +50,22 @@ export function layout(boxes: Box[], portrait: boolean): Place[] {
       ? [[0, -1], [0, 1], [1, 0], [-1, 0]]
       : [[1, 0], [-1, 0], [0, -1], [0, 1]]
     if (turn++ % 2) sides.splice(0, 2, sides[1], sides[0])
-    const at = (s: number[], g: number): Place => ({ x: s[0] * (g * long + b.w / 2), y: s[1] * (g * long + b.h / 2) })
+    // Something solid that sits on the origin and is not much bigger than this
+    // — the Sun, to Jupiter — has to be stood clear of, though it comes later.
+    let clear0 = 0
+    for (let j = i + 1; j < boxes.length; j++) {
+      const o = boxes[j]
+      if (o.centred && !o.open && Math.max(o.w, o.h) < long * NEAR) clear0 = Math.max(clear0, Math.max(o.w, o.h) * 0.56)
+    }
+    const at = (s: number[], g: number): Place => ({
+      x: s[0] * (Math.max(g * long, clear0) + b.w / 2),
+      y: s[1] * (Math.max(g * long, clear0) + b.h / 2),
+    })
     let best: Place | null = null
-    search: for (const g of [0.1, 0.22, 0.4, 0.7, 1.1]) {
-      for (const s of sides) {
+    // The two sides the window is long in, pushed further out if need be,
+    // before the two it is short in.
+    search: for (const pair of [sides.slice(0, 2), sides.slice(2)]) for (const g of [0.1, 0.22, 0.4, 0.7, 1.1]) {
+      for (const s of pair) {
         const p = at(s, g)
         let clear = true
         for (let j = 0; j < i && clear; j++) {
