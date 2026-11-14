@@ -812,6 +812,7 @@ const coin: Drawing = {
 }
 
 const person: Drawing = {
+  baked: true,
   subject: 'a person, standing',
   wm: 1.7 * 0.33,
   hm: 1.7,
@@ -846,6 +847,7 @@ const person: Drawing = {
 }
 
 const car: Drawing = {
+  baked: true,
   subject: 'a car, side on',
   wm: 4.5,
   hm: 4.5 / 3,
@@ -895,6 +897,7 @@ const car: Drawing = {
 /* ---- big things -------------------------------------------------------- */
 
 const blueWhale: Drawing = {
+  baked: true,
   subject: 'a blue whale — rorqual pleats, a tiny dorsal fin, notched flukes',
   wm: 30,
   hm: 30 / 5.4,
@@ -955,6 +958,7 @@ const blueWhale: Drawing = {
 }
 
 const pitch: Drawing = {
+  baked: true,
   subject: 'a football pitch from above, mown in stripes',
   wm: 105,
   hm: 68,
