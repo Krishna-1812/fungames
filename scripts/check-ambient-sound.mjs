@@ -283,10 +283,16 @@ for (const id of ['rain', 'cafe', 'thunder', 'traffic']) {
 {
   const srcs = LAYERS.map((l, i) => createSource(l.id, { sr: SR, rng: new Rng(100 + i), emit: () => {}, wall: () => 0 }))
   const L = new Float32Array(128), R = new Float32Array(128)
-  const secs = 10
-  const t0 = performance.now()
-  for (let i = 0; i < secs * SR; i += 128) for (const s of srcs) s.render(L, R, 128, i / SR)
-  const share = (performance.now() - t0) / (secs * 1000)
+  // CPU time this process used, not time on the wall, and the best of three:
+  // a laptop busy with something else must not fail this.
+  const secs = 3
+  let share = Infinity
+  for (let run = 0; run < 3; run++) {
+    const c0 = process.cpuUsage()
+    for (let i = 0; i < secs * SR; i += 128) for (const s of srcs) s.render(L, R, 128, (run * secs * SR + i) / SR)
+    const c = process.cpuUsage(c0)
+    share = Math.min(share, (c.user + c.system) / 1e6 / secs)
+  }
   report('all twelve at once render well inside real time', share < 0.5, `${(share * 100).toFixed(1)}% of real time`)
 }
 
