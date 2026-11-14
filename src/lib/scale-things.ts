@@ -21,16 +21,19 @@
  * and `KINDS` below for which is which.
  */
 export type Kind = 'sphere' | 'ring' | 'disc' | 'cloud' | 'wave'
-export type Thing = { m: number; name: string; note?: string; color: string; kind?: Kind }
+/** `at: 'origin'` is for the things that really are concentric — a proton in
+ *  its atom, the Sun in its orbits. Everything else stands beside the origin;
+ *  see `scale-layout`. */
+export type Thing = { m: number; name: string; note?: string; color: string; kind?: Kind; at?: 'origin' }
 
 // `m` is the object's real size in metres (see the header on which dimension).
 export const THINGS: Thing[] = [
-  { m: 1.7e-15, name: 'Proton', note: 'A single one, at the centre of a hydrogen atom.', color: '#ff6b8a' },
+  { m: 1.7e-15, name: 'Proton', at: 'origin', note: 'A single one, at the centre of a hydrogen atom.', color: '#ff6b8a' },
   { m: 5.0e-15, name: 'Carbon nucleus', color: '#ff8f6b' },
   { m: 1.5e-14, name: 'Uranium nucleus', note: 'The heaviest nucleus that occurs naturally.', color: '#ffb36b' },
   { m: 1.0e-12, name: 'Wavelength of a gamma ray', kind: 'wave', color: '#c6ff6b' },
   { m: 1.0e-11, name: 'Wavelength of an X-ray', kind: 'wave', color: '#8affe0' },
-  { m: 1.0e-10, name: 'Hydrogen atom', kind: 'cloud', note: 'Almost all of it is empty space.', color: '#7ec8ff' },
+  { m: 1.0e-10, name: 'Hydrogen atom', at: 'origin', kind: 'cloud', note: 'Almost all of it is empty space.', color: '#7ec8ff' },
   { m: 2.8e-10, name: 'Water molecule', color: '#6bb7ff' },
   { m: 1.0e-9, name: 'Buckyball', note: 'Sixty carbon atoms in a football.', color: '#9d8bff' },
   { m: 2.0e-9, name: 'DNA, across the helix', color: '#8affc4' },
@@ -54,20 +57,20 @@ export const THINGS: Thing[] = [
   { m: 3.474e6, name: 'The Moon', color: '#c8c4bb' },
   { m: 1.2742e7, name: 'Earth', note: 'Everything that has ever happened to anyone.', color: '#4d90d9' },
   { m: 1.3982e8, name: 'Jupiter', color: '#d9a06b' },
-  { m: 1.392e9, name: 'The Sun', note: 'You could fit 1.3 million Earths inside it.', color: '#ffcc33' },
-  { m: 2.99e11, name: "Earth's orbit", kind: 'ring', color: '#7ec8ff' },
-  { m: 9.0e12, name: "Neptune's orbit", kind: 'ring', note: 'The edge of the planets.', color: '#5f7fd4' },
-  { m: 2.4e13, name: "Voyager 1's distance", kind: 'ring', note: 'Launched in 1977 and still going.', color: '#9fb4ff' },
-  { m: 7.8e14, name: 'One light month', kind: 'ring', color: '#8f9fe8' },
-  { m: 9.461e15, name: 'One light year', kind: 'ring', color: '#a98aff' },
-  { m: 4.014e16, name: 'To Proxima Centauri', kind: 'ring', note: 'The nearest star. Four years at the speed of light.', color: '#ff8ac4' },
+  { m: 1.392e9, name: 'The Sun', at: 'origin', note: 'You could fit 1.3 million Earths inside it.', color: '#ffcc33' },
+  { m: 2.99e11, name: "Earth's orbit", at: 'origin', kind: 'ring', color: '#7ec8ff' },
+  { m: 9.0e12, name: "Neptune's orbit", at: 'origin', kind: 'ring', note: 'The edge of the planets.', color: '#5f7fd4' },
+  { m: 2.4e13, name: "Voyager 1's distance", at: 'origin', kind: 'ring', note: 'Launched in 1977 and still going.', color: '#9fb4ff' },
+  { m: 7.8e14, name: 'One light month', at: 'origin', kind: 'ring', color: '#8f9fe8' },
+  { m: 9.461e15, name: 'One light year', at: 'origin', kind: 'ring', color: '#a98aff' },
+  { m: 4.014e16, name: 'To Proxima Centauri', at: 'origin', kind: 'ring', note: 'The nearest star. Four years at the speed of light.', color: '#ff8ac4' },
   { m: 2.4e17, name: 'The Orion Nebula', kind: 'cloud', color: '#ff6bb0' },
   { m: 1.5e18, name: 'A globular cluster', kind: 'cloud', note: 'A million stars packed into a ball.', color: '#ffd28a' },
-  { m: 2.47e20, name: 'To the centre of the galaxy', kind: 'ring', color: '#b58aff' },
-  { m: 9.5e20, name: 'The Milky Way', kind: 'disc', note: 'A hundred billion stars, and this is one galaxy.', color: '#cbb6ff' },
-  { m: 9.5e22, name: 'The Local Group', kind: 'cloud', color: '#8ad4ff' },
-  { m: 5.0e24, name: 'Laniakea Supercluster', kind: 'cloud', note: 'Our galaxy is a speck inside this.', color: '#7affd8' },
-  { m: 8.8e26, name: 'The observable universe', kind: 'cloud', note: 'That is everything. There is no more scrolling.', color: '#ffffff' },
+  { m: 2.47e20, name: 'To the centre of the galaxy', at: 'origin', kind: 'ring', color: '#b58aff' },
+  { m: 9.5e20, name: 'The Milky Way', at: 'origin', kind: 'disc', note: 'A hundred billion stars, and this is one galaxy.', color: '#cbb6ff' },
+  { m: 9.5e22, name: 'The Local Group', at: 'origin', kind: 'cloud', color: '#8ad4ff' },
+  { m: 5.0e24, name: 'Laniakea Supercluster', at: 'origin', kind: 'cloud', note: 'Our galaxy is a speck inside this.', color: '#7affd8' },
+  { m: 8.8e26, name: 'The observable universe', at: 'origin', kind: 'cloud', note: 'That is everything. There is no more scrolling.', color: '#ffffff' },
 ]
 
 /** The numeric codes the shader takes; kept next to the type they encode. */

@@ -1,7 +1,7 @@
 ---
 import GameShell from '../layouts/GameShell.astro'
 import { THINGS } from '../lib/scale-things'
-import { SCALE_ART, artSvg } from '../lib/scale-art'
+import { SCALE_ART, artSvg, slugOf, PAD } from '../lib/scale-art'
 
 /**
  * Scale — a continuous logarithmic zoom from a proton to the observable
@@ -72,10 +72,17 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
             data-hm={e.h}
             data-i={i}
             data-art={art ? '1' : null}
+            data-photo={art?.baked ? '1' : null}
+            data-origin={t.at === 'origin' ? '1' : null}
+            data-open={t.kind && t.kind !== 'sphere' ? '1' : null}
             data-kind={t.kind ?? 'sphere'}
             style={`--c:${t.color}`}
           >
-            {art ? <div class="art" set:html={artSvg(t.name, t.color)} /> : <div class="disc" />}
+            {art
+              ? art.baked
+                ? <img class="art photo" data-src={`/scale/${slugOf(t.name)}`} alt="" decoding="async" draggable="false" />
+                : <div class="art" set:html={artSvg(t.name, t.color)} />
+              : <div class="disc" />}
             <div class="sc-label">
               <span class="name">{t.name}</span>
               <span class="size" data-size={t.m} data-dim={e.dim}></span>
@@ -127,15 +134,16 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
 
   {/* Data for the module below: modules cannot take define:vars, and
       modules are what let every game share one synthesiser. */}
-  <script type="application/json" id="game-data" set:html={JSON.stringify({ MIN_EXP, MAX_EXP, totalPx })} />
+  <script type="application/json" id="game-data" set:html={JSON.stringify({ MIN_EXP, MAX_EXP, totalPx, PAD })} />
 
   <script>
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
   import { SCALE_FRAG, MAX_OBJECTS } from '../lib/scale-sky'
+  import { layout } from '../lib/scale-layout'
   import { createShell } from '../lib/game-shell'
   import { recordPlay } from '../lib/stats'
-    const { MIN_EXP, MAX_EXP, totalPx } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
+    const { MIN_EXP, MAX_EXP, totalPx, PAD } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
 
   const root = document.getElementById('zoomRoot')
   const back = document.getElementById('scBack')
@@ -160,6 +168,13 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     // A drawing is its own picture of the object; letting the shader paint a
     // lit sphere underneath it would render the thing twice.
     art: el.dataset.art === '1',
+    // A baked photograph: an <img> whose file is only fetched as it comes near,
+    // and which carries a margin the drawing's box does not.
+    photo: el.dataset.photo === '1' ? el.querySelector('img') : null,
+    centred: el.dataset.origin === '1',
+    open: el.dataset.open === '1',
+    // Where it stands relative to the zoom's origin, in pixels, this frame.
+    cx: 0, cy: 0, w: 0, h: 0,
     // Kept as a number because the shader takes the whole object list as one
     // flat float array.
     kind: ({ sphere: 0, ring: 1, disc: 2, cloud: 3, wave: 4 })[el.dataset.kind] ?? 0,
@@ -177,6 +192,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
      surface fails to come up, the page renders exactly as it did before. */
   const objData = new Float32Array(MAX_OBJECTS * 4)
   const objCol = new Float32Array(MAX_OBJECTS * 3)
+  const objOff = new Float32Array(MAX_OBJECTS * 2)
   let objCount = 0
   let curExp = MIN_EXP
   const centreUv = [0.5, 0.5]
@@ -191,12 +207,19 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
       u_objN: objCount,
       u_obj: objData,
       u_objCol: objCol,
+      u_objOff: objOff,
     }),
   })
 
   // Only take the CSS discs away once the GPU path is actually live.
   const glLive = surface.canvas.isConnected
   if (glLive) root.classList.add('gl-on')
+
+  /* Where everything stands, in metres from the origin. Two arrangements,
+     because a tall window wants things above and below each other and a wide
+     one wants them side by side. */
+  const boxes = things.map((t) => ({ w: t.wm, h: t.hm, centred: t.centred, open: t.open }))
+  const places = { wide: layout(boxes, false), tall: layout(boxes, true) }
 
   /** Human-readable length across 42 decades. */
   function fmt(m) {
@@ -350,14 +373,25 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     // How many pixels one metre is worth right now.
     const px = Math.min(VW, VH) / screenMetres
 
-    for (const th of things) {
+    const place = VH > VW * 1.1 ? places.tall : places.wide
+    const far = Math.max(VW, VH) * 2.4
+    things.forEach((th, i) => {
       const w = th.wm * px
       const h = th.hm * px
-      // The long axis is what decides whether a thing is a speck or a wall,
-      // which is what the old single `size` meant when everything was square.
+      // The long axis is what decides whether a thing is a speck or a wall.
       const size = Math.max(w, h)
-      // Below 3px it is an invisible dot; above 3 screens it is just a wall.
-      const show = size > 3 && size < Math.max(VW, VH) * 3.2
+      const cx = place[i].x * px
+      const cy = -place[i].y * px
+      // Below 3px it is an invisible dot; above two screens it is a wall; and
+      // a thing that stands off to one side can simply be out of the frame.
+      const inFrame = Math.abs(cx) - w / 2 < VW / 2 + 80 && Math.abs(cy) - h / 2 < VH / 2 + 80
+      const show = size > 3 && size < far && inFrame
+      if (th.photo && !th.photo.src && size > 1.2 && size < far) {
+        // Fetched a little before it can be seen. The half-size file is plenty
+        // for a phone, where nothing is ever drawn wider than it.
+        const small = Math.max(VW, VH) * Math.min(devicePixelRatio || 1, 2) < 900
+        th.photo.src = th.photo.dataset.src + (small ? '-s.webp' : '.webp')
+      }
       if (show !== th.visible) {
         th.el.classList.toggle('on', show)
         // Chime only when something arrives, and only once it is big enough to
@@ -366,73 +400,54 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
         if (show) seen.add(th.el.dataset.i)
         th.visible = show
       }
-      if (!show) { th.alpha = 0; continue }
-      th.disc.style.width = w + 'px'
-      th.disc.style.height = h + 'px'
+      if (!show) { th.alpha = 0; return }
+      const grown = th.photo ? 1 + 2 * PAD : 1
+      th.disc.style.width = w * grown + 'px'
+      th.disc.style.height = h * grown + 'px'
+      th.disc.style.transform = `translate(-50%, -50%) translate(${cx.toFixed(1)}px, ${cy.toFixed(1)}px)`
       // Fade in as it becomes legible and out as it engulfs the screen.
-      const grow = Math.min(1, (size - 3) / 40)
-      const shrink = Math.min(1, (Math.max(VW, VH) * 3.2 - size) / 400)
-      const alpha = Math.min(grow, shrink)
-      th.el.style.opacity = String(alpha)
-      th.size = size
-      th.alpha = alpha
+      const alpha = Math.min(1, (size - 3) / 40, (far - size) / 400)
+      th.disc.style.opacity = String(alpha)
+      th.size = size; th.alpha = alpha
+      th.cx = cx; th.cy = cy; th.w = w; th.h = h
+    })
+
+    /* Captions. A thing is named while it is a readable size — bigger than a
+       thumbnail, smaller than the window — under its own body. The one nearest
+       to being the subject is placed first and anything that would print over
+       an earlier caption goes without, which is rare now that things stand
+       apart. Measured, not assumed: a note wraps differently on a phone. */
+    const lo = 64, hi = Math.min(VW, VH) * 1.7
+    const prime = Math.min(VW, VH) * 0.4
+    const named = things.filter((t) => t.alpha > 0.001 && t.size > lo && t.size < hi)
+      .sort((a, b) => Math.abs(Math.log(a.size / prime)) - Math.abs(Math.log(b.size / prime)))
+    const taken = []
+    for (const t of things) t.labelOn = false
+    for (const t of named) {
+      const lw = t.label.offsetWidth || 240, lh = t.label.offsetHeight || 60
+      // A ring's caption rides on top of the ring; a body's goes underneath.
+      const under = t.kind !== 1
+      const tries = under ? [t.cy + t.h / 2 + 10, t.cy - t.h / 2 - lh - 10] : [t.cy - t.h / 2 - lh - 8, t.cy + t.h / 2 + 8]
+      for (const y0 of tries) {
+        const x = Math.max(-VW / 2 + lw / 2 + 8, Math.min(VW / 2 - lw / 2 - 8, t.cx))
+        const y = Math.max(-VH / 2 + 84, Math.min(VH / 2 - lh - 12, y0))
+        const hit = taken.some((r) => Math.abs(r.x - x) < (r.w + lw) / 2 + 6 && r.y < y + lh + 4 && y < r.y + r.h + 4)
+        if (hit) continue
+        taken.push({ x, y, w: lw, h: lh })
+        t.label.style.transform = `translate(-50%, 0) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`
+        t.labelOn = true
+        break
+      }
+    }
+    for (const t of things) {
+      if (!t.visible) continue
+      const ramp = Math.min(1, (t.size - lo) / 50, (hi - t.size) / (hi * 0.25))
+      t.label.style.opacity = String(t.labelOn ? Math.max(0, ramp) * t.alpha : 0)
     }
 
-    /* Every object is centred on the same point, so whenever two are on screen
-       their labels printed straight on top of each other. Anything sized by a
-       clamp collides too, because both large objects hit the clamp. Distinct
-       slots is the only thing that actually separates them: the smallest sits
-       under its own body, and larger ones — which are the context, not the
-       subject — stack upwards. */
-    /* Labels are stacked against their measured heights rather than a fixed
-       step. A note wraps to four lines on a phone and to two on a desktop, so
-       any constant that clears one will collide on the other. */
+    /* Depth order: the small thing in front lands on top of the big one. */
     const vis = things.filter((t) => t.alpha > 0.001).sort((a, b) => a.size - b.size)
-    // Past the third, a label is context nobody asked for. The body keeps
-    // rendering; only its caption goes.
-    vis.forEach((t, k) => t.el.style.setProperty('--labelShow', k < 3 ? '1' : '0'))
-
-    /* Depth order. The shader composites its objects largest-first so the
-       small thing in front lands on top of the big one behind it; drawings are
-       DOM nodes and paint in registry order instead, which is ascending size —
-       exactly backwards. Without this the football pitch covers the whale
-       standing in front of it. */
     vis.forEach((t, k) => (t.el.style.zIndex = String(60 - Math.min(k, 59))))
-
-    // Stack the context labels upwards from the centre.
-    let cursor = -(VH * 0.12)
-    const placed = []
-    for (const t of vis.slice(1, 3)) {
-      const h = t.label.offsetHeight || 72
-      cursor -= h / 2
-      placed.push({ t, y: cursor, h })
-      cursor -= h / 2 + 12
-    }
-    // The gauge owns the top of the frame, so if the stack reaches into it
-    // the whole thing slides down together — clamping labels individually
-    // would just push them back into each other.
-    const top = placed[placed.length - 1]
-    if (top) {
-      const centreY = VH / 2
-      const gap = 110 - (centreY + top.y - top.h / 2)
-      if (gap > 0) for (const p of placed) p.y += gap
-    }
-    for (const p of placed) p.t.el.style.setProperty('--labelY', `${p.y}px`)
-
-    // The subject's own label goes last, because the HUD shift above may have
-    // pushed the stack down into the space it wanted.
-    if (vis[0]) {
-      const h0 = vis[0].label.offsetHeight || 72
-      // Below the object where there is room, and otherwise as low as it can
-      // go while staying wholly on screen. The old clamp was a flat 26% of the
-      // viewport, which was fine while every object was a plain ball and put
-      // the caption straight across the middle of the drawings.
-      const floor = VH / 2 - h0 / 2 - 14
-      let y0 = Math.min(vis[0].size / 2 + 26, floor)
-      const lowest = placed[0]
-      if (lowest) y0 = Math.max(y0, lowest.y + lowest.h / 2 + h0 / 2 + 12)
-      vis[0].el.style.setProperty('--labelY', `${y0}px`)
-    }
 
     if (glLive) {
       curExp = exp
@@ -449,6 +464,8 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
       objCount = shown.length
       for (let i = 0; i < shown.length; i++) {
         const t = shown[i]
+        objOff[i * 2] = t.cx / VH
+        objOff[i * 2 + 1] = -t.cy / VH
         objData[i * 4] = t.size / 2 / VH
         objData[i * 4 + 1] = t.alpha
         objData[i * 4 + 2] = t.seed
@@ -512,7 +529,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   /* The GPU draws the bodies once it is live; the CSS disc stays in the layout
      so the label keeps centring on it, but stops painting. A drawing is not
      one of the shader's shapes, so it keeps painting either way. */
-  .sc.gl-on .disc { opacity: 0; }
+  .sc.gl-on .disc { visibility: hidden; }
 
   /* Everything inside is positioned relative to the frame's centre. */
   .sc-things { position: absolute; inset: 0; pointer-events: none; }
@@ -520,34 +537,29 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
   .thing {
     position: absolute;
     left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
+    width: 0; height: 0;
     display: none;
-    place-items: center;
-    opacity: 0;
-    transition: opacity 160ms linear;
   }
-  .thing.on { display: grid; }
+  .thing.on { display: block; }
 
   /* Scoped styles do not reach set:html content, so the svg carries its own
-     sizing; this is only the box it fills. */
-  .art {
-    grid-area: 1 / 1;
-    display: block;
-    filter: drop-shadow(0 0 30px color-mix(in srgb, var(--c) 30%, transparent));
-  }
+     sizing; this is only the box it fills. Placed by a transform each frame. */
+  .art, .disc { position: absolute; left: 0; top: 0; opacity: 0; will-change: transform; }
+  .art:not(.photo) { filter: drop-shadow(0 0 30px color-mix(in srgb, var(--c) 30%, transparent)); }
+  /* max-width: the site caps every image at its parent, and this parent is a
+     point. */
+  .photo { max-width: none; user-select: none; -webkit-user-drag: none; }
 
   .disc {
     border-radius: 50%;
     background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--c) 92%, #fff), var(--c) 62%, color-mix(in srgb, var(--c) 62%, #000));
     box-shadow: 0 0 60px color-mix(in srgb, var(--c) 45%, transparent);
-    grid-area: 1 / 1;
   }
 
   .sc-label {
-    grid-area: 1 / 1;
-    position: relative;
-    transform: translateY(var(--labelY, 0px));
-    opacity: var(--labelShow, 1);
+    position: absolute; left: 0; top: 0;
+    width: max-content;
+    opacity: 0;
     transition: opacity 200ms linear;
     display: grid;
     justify-items: center;

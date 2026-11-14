@@ -34,6 +34,7 @@ uniform vec2  u_centre;   // stage centre in 0..1 uv space
 uniform float u_objN;
 uniform float u_obj[${MAX_OBJECTS * 4}];    // radius (fraction of height), alpha, seed, kind
 uniform float u_objCol[${MAX_OBJECTS * 3}];
+uniform float u_objOff[${MAX_OBJECTS * 2}];   // centre, from the stage centre, in heights
 
 /* ---------------------------------------------------------------- regimes */
 
@@ -131,8 +132,7 @@ void main() {
   // fraction of height — so nothing here has to know about DPR or the
   // surface's render scale.
   vec2 px = uv * u_res;
-  vec2 d = px - u_centre * u_res;
-  float dist = length(d);
+  vec2 d0 = px - u_centre * u_res;
 
   // One key light, fixed in screen space, so every object across the whole
   // scroll is lit from the same direction and the sequence reads as one place.
@@ -148,6 +148,8 @@ void main() {
     vec3 base = vec3(u_objCol[i * 3], u_objCol[i * 3 + 1], u_objCol[i * 3 + 2]);
 
     float kind = u_obj[i * 4 + 3];
+    vec2 d = d0 - vec2(u_objOff[i * 2], u_objOff[i * 2 + 1]) * u_res.y;
+    float dist = length(d);
     float r = dist / R;
 
     // Outer glow. Reaches well past the body and is what stops an object
