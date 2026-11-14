@@ -1,6 +1,6 @@
 ---
 import GameShell from '../layouts/GameShell.astro'
-import { THINGS } from '../lib/scale-things'
+import { THINGS, KIND_CODE } from '../lib/scale-things'
 import { SCALE_ART, artSvg, slugOf, PAD } from '../lib/scale-art'
 
 /**
@@ -40,7 +40,12 @@ const PX_PER_DECADE = 720
  */
 function extent(t: (typeof THINGS)[number]) {
   const art = SCALE_ART[t.name]
-  return art ? { w: art.wm, h: art.hm, dim: art.word } : { w: t.m, h: t.m, dim: 'across' }
+  if (art) return { w: art.wm, h: art.hm, dim: art.word }
+  // A distance is drawn as the circle at that distance, which is twice as wide.
+  if (t.away) return { w: t.m * 2, h: t.m * 2, dim: 'away' }
+  // A wave is as long as its wavelength and not nearly as tall.
+  if (t.kind === 'wave') return { w: t.m, h: t.m * 0.62, dim: 'long' }
+  return { w: t.m, h: t.m, dim: 'across' }
 }
 
 const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
@@ -75,7 +80,8 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
             data-photo={art?.baked ? '1' : null}
             data-origin={t.at === 'origin' ? '1' : null}
             data-open={t.kind && t.kind !== 'sphere' ? '1' : null}
-            data-kind={t.kind ?? 'sphere'}
+            data-kind={t.away ? 1.25 : KIND_CODE[t.kind ?? 'sphere']}
+            data-name={t.name}
             style={`--c:${t.color}`}
           >
             {art
@@ -177,7 +183,8 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     cx: 0, cy: 0, w: 0, h: 0,
     // Kept as a number because the shader takes the whole object list as one
     // flat float array.
-    kind: ({ sphere: 0, ring: 1, disc: 2, cloud: 3, wave: 4 })[el.dataset.kind] ?? 0,
+    kind: Number(el.dataset.kind),
+    name: el.dataset.name,
     rgb: toLinear(el.style.getPropertyValue('--c') || '#ffffff'),
     // Stable per-object, so a surface belongs to a thing rather than shifting
     // as it grows.
@@ -220,6 +227,17 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
      one wants them side by side. */
   const boxes = things.map((t) => ({ w: t.wm, h: t.hm, centred: t.centred, open: t.open }))
   const places = { wide: layout(boxes, false), tall: layout(boxes, true) }
+  /* One thing is neither beside the origin nor on it. We are 26,000 light
+     years from the middle of the Milky Way, so the galaxy is centred where the
+     ring that says so has its mark, and the origin — us — is out in an arm. */
+  {
+    const ring = things.findIndex((t) => t.name === 'To the centre of the galaxy')
+    const mw = things.findIndex((t) => t.name === 'The Milky Way')
+    const a = things[ring].seed * Math.PI * 2
+    const at = { x: Math.cos(a) * things[ring].m, y: Math.sin(a) * things[ring].m }
+    places.wide[mw] = at
+    places.tall[mw] = at
+  }
 
   /** Human-readable length across 42 decades. */
   function fmt(m) {
@@ -385,7 +403,10 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
       // Below 3px it is an invisible dot; above two screens it is a wall; and
       // a thing that stands off to one side can simply be out of the frame.
       const inFrame = Math.abs(cx) - w / 2 < VW / 2 + 80 && Math.abs(cy) - h / 2 < VH / 2 + 80
-      const show = size > 3 && size < far && inFrame
+      // A thing with no body — a cloud of stars, an orbit — is still there
+      // when you are inside it.
+      const limit = th.open ? far * 3.5 : far
+      const show = size > 3 && size < limit && (inFrame || th.open)
       if (th.photo && !th.photo.src && size > 1.2 && size < far) {
         // Fetched a little before it can be seen. The half-size file is plenty
         // for a phone, where nothing is ever drawn wider than it.
@@ -406,7 +427,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
       th.disc.style.height = h * grown + 'px'
       th.disc.style.transform = `translate(-50%, -50%) translate(${cx.toFixed(1)}px, ${cy.toFixed(1)}px)`
       // Fade in as it becomes legible and out as it engulfs the screen.
-      const alpha = Math.min(1, (size - 3) / 40, (far - size) / 400)
+      const alpha = Math.min(1, (size - 3) / 40, (limit - size) / (limit * 0.25))
       th.disc.style.opacity = String(alpha)
       th.size = size; th.alpha = alpha
       th.cx = cx; th.cy = cy; th.w = w; th.h = h
@@ -426,7 +447,7 @@ const totalPx = Math.round((MAX_EXP - MIN_EXP) * PX_PER_DECADE)
     for (const t of named) {
       const lw = t.label.offsetWidth || 240, lh = t.label.offsetHeight || 60
       // A ring's caption rides on top of the ring; a body's goes underneath.
-      const under = t.kind !== 1
+      const under = !(t.kind >= 1 && t.kind < 1.5)
       const tries = under ? [t.cy + t.h / 2 + 10, t.cy - t.h / 2 - lh - 10] : [t.cy - t.h / 2 - lh - 8, t.cy + t.h / 2 + 8]
       for (const y0 of tries) {
         const x = Math.max(-VW / 2 + lw / 2 + 8, Math.min(VW / 2 - lw / 2 - 8, t.cx))
