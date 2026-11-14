@@ -118,6 +118,7 @@ const limb = (id: string, cx: number, cy: number, r: number) => `
    its geometry and nothing else. --------------------------------------- */
 
 const proton: Drawing = {
+  baked: true,
   subject: 'a proton — three quarks and the gluon field holding them',
   wm: 1.7e-15,
   hm: 1.7e-15,
@@ -214,6 +215,7 @@ function nucleus(id: string, c: string, protons: number, neutrons: number, prola
 }
 
 const carbonNucleus: Drawing = {
+  baked: true,
   subject: 'a carbon nucleus — six protons and six neutrons',
   wm: 5.0e-15,
   hm: 5.0e-15,
@@ -223,6 +225,7 @@ const carbonNucleus: Drawing = {
 }
 
 const uraniumNucleus: Drawing = {
+  baked: true,
   subject: 'a uranium-238 nucleus — 92 protons, 146 neutrons, and not round',
   wm: 1.5e-14,
   // U-238 is one of the most deformed stable nuclei there is; drawing it as a
@@ -235,6 +238,7 @@ const uraniumNucleus: Drawing = {
 }
 
 const waterMolecule: Drawing = {
+  baked: true,
   subject: 'a water molecule — one oxygen, two hydrogens, bent at 104.5°',
   wm: 2.8e-10,
   // The van der Waals envelope is 3.91 A wide by 3.31 A tall. The registry
@@ -332,6 +336,7 @@ function fullerene() {
 }
 
 const buckyball: Drawing = {
+  baked: true,
   subject: 'a buckyball — sixty carbon atoms in a truncated icosahedron',
   wm: 1.0e-9,
   hm: 1.0e-9,
@@ -1352,6 +1357,7 @@ const grandCanyon: Drawing = {
    difference between a diagram and a picture. -------------------------- */
 
 const moon: Drawing = {
+  baked: true,
   subject: 'the Moon, near side — the maria and Tycho’s rays',
   wm: 3.474e6,
   hm: 3.474e6,
@@ -1416,6 +1422,7 @@ const moon: Drawing = {
 }
 
 const earth: Drawing = {
+  baked: true,
   subject: 'Earth, Africa and Europe facing you, with weather',
   wm: 1.2742e7,
   hm: 1.2742e7,
@@ -1472,9 +1479,10 @@ const earth: Drawing = {
 }
 
 const jupiter: Drawing = {
+  baked: true,
   subject: 'Jupiter — the belts, the zones and the Great Red Spot',
   wm: 1.3982e8,
-  hm: 1.3982e8,
+  hm: 1.3072e8,
   axis: 'w',
   word: 'across',
   draw: (c, id) => {
@@ -1533,6 +1541,7 @@ const jupiter: Drawing = {
 }
 
 const sun: Drawing = {
+  baked: true,
   subject: 'the Sun — granulation, spots, and a prominence off the limb',
   wm: 1.392e9,
   hm: 1.392e9,
