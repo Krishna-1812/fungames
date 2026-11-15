@@ -140,6 +140,13 @@ export type SurfaceOpts = {
   scale?: number
   /** Called after the context is lost and successfully restored. */
   onRestore?: () => void
+  /**
+   * Pictures the shader reads, as sampler name to URL. Each is mid-grey until
+   * it has loaded, then the surface redraws. They wrap east to west and clamp
+   * north to south, which is what a map of a globe wants, and are loaded the
+   * right way up: v = 1 is the top row.
+   */
+  textures?: Record<string, string>
 }
 
 /**
@@ -163,6 +170,7 @@ export class ShaderSurface {
   private h = 0
   private pointer = [0.5, 0.5]
   private frag: string
+  private texs: { name: string; tex: WebGLTexture }[] = []
 
   constructor(private host: HTMLElement, frag: string, private opts: SurfaceOpts = {}) {
     this.frag = frag
@@ -201,6 +209,7 @@ export class ShaderSurface {
 
     this.vao = gl.createVertexArray()
     gl.bindVertexArray(this.vao)
+    this.loadTextures(gl)
 
     this.canvas.addEventListener('webglcontextlost', this.onLost, false)
     this.canvas.addEventListener('webglcontextrestored', this.onRestored, false)
@@ -222,6 +231,32 @@ export class ShaderSurface {
       { rootMargin: '120px' },
     )
     this.io.observe(this.host)
+  }
+
+  private loadTextures(gl: WebGL2RenderingContext) {
+    this.texs = []
+    for (const [name, url] of Object.entries(this.opts.textures ?? {})) {
+      const tex = gl.createTexture()!
+      gl.bindTexture(gl.TEXTURE_2D, tex)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]))
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      this.texs.push({ name, tex })
+      const img = new Image()
+      img.decoding = 'async'
+      img.onload = () => {
+        // The context may have been lost and replaced while this was loading.
+        if (this.gl !== gl || gl.isContextLost()) return
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+        if (!this.running) this.redraw()
+      }
+      img.src = url
+    }
   }
 
   private onLost = (e: Event) => {
@@ -285,6 +320,14 @@ export class ShaderSurface {
     this.uniform('u_res', [this.w, this.h])
     this.uniform('u_pointer', this.pointer)
     this.uniform('u_dpr', Math.min(devicePixelRatio || 1, MAX_DPR))
+
+    this.texs.forEach(({ name, tex }, unit) => {
+      gl.activeTexture(gl.TEXTURE0 + unit)
+      gl.bindTexture(gl.TEXTURE_2D, tex)
+      if (!this.locs.has(name)) this.locs.set(name, gl.getUniformLocation(this.prog!, name))
+      const loc = this.locs.get(name)
+      if (loc) gl.uniform1i(loc, unit)
+    })
 
     const extra = this.opts.uniforms?.()
     if (extra) for (const k in extra) this.uniform(k, extra[k])
