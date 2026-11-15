@@ -148,6 +148,7 @@ const fmt = (y: number) =>
       <li>Every pixel is a fixed number of years. One scale all the way would leave the whole of human history as a single unreadable pixel, so the page zooms in five times, and each seam says by how much.</li>
       <li>Every event is at its real date: it happens when its rule reaches the line. The gauge says when you are looking at, how long a day was, how much oxygen was in the air and how bright the Sun was.</li>
       <li>The globe is the Earth at that date. The coastline of the last few million years is the real one, and the ice ages keep their real rhythm. The continents before about 200 million years ago are an impression: nobody has that map.</li>
+      <li>From seven million years ago, an event with a place is marked on the globe, which turns to show you where.</li>
     </ul>
     <p>Today is the end. Your best is the furthest you have come.</p>
   </Fragment>
@@ -335,6 +336,9 @@ const fmt = (y: number) =>
         `To fit the last 250 years in, it had to zoom in ${Math.round(first / last).toLocaleString('en-US')} times.`,
       ],
       againLabel: 'Back to the beginning',
+      // Today is on screen, lit, with the reader in front of it: the card is
+      // the next thing down, not somewhere to be taken to.
+      scroll: false,
     })
   }
 
@@ -434,6 +438,7 @@ const fmt = (y: number) =>
         // crossed while scrolling, not leapt over on the way to somewhere else
         if (!(was > im.at && years <= im.at && clamped - wasDepth < vh * 1.5)) continue
         hit = { kind: im.kind, at: performance.now() }
+        sfx.boom()
         // Chicxulub is at 89.5 degrees west, and may be round the back: bring
         // it to the sunlit front by the shorter way.
         if (im.lon !== null) face(im.lon)
