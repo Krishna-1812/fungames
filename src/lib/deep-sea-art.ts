@@ -1,10 +1,8 @@
 /**
  * The Deep Sea's twenty-two markers, drawn.
  *
- * Same three constraints as `time-art.ts`, for the same reason: these inline
- * into one document alongside the tile art, Scale's things and Deep Time's
- * events, and `check-deep-sea-art.mjs` enforces all three the same way
- * `check-time-art.mjs` does.
+ * Three constraints, because these inline into one document alongside the
+ * tile art, and `check-deep-sea-art.mjs` enforces all three.
  *
  * **No gradients, no ids, no defs.** Flat colour only — genuinely the better
  * choice at the sizes these actually render at, not just a rule to follow.

@@ -357,7 +357,7 @@ console.log('\nheadline, sub and stats keep to their own boxes')
 /* ---- 3. readable on the accent it landed on ------------------------------ */
 
 /* Under the glyphs. Measuring over the box the text sits in is the mistake
-   `check-art.mjs`, `check-icons.mjs` and `check-time-art.mjs` each made in
+   `check-art.mjs`, `check-icons.mjs` and Deep Time's old art check each made in
    turn, and it fails in a way that looks like a real result. */
 console.log('\nreadable on whatever accent the registry hands it')
 {

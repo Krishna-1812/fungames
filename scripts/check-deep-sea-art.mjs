@@ -1,9 +1,11 @@
 /**
  * check-deep-sea-art — do the Deep Sea's twenty-two scenes survive the size
- * the card actually gives them, the same way Deep Time's forty-four do?
+ * the card actually gives them?
  *
- * Same layout, same risk, same checks — see check-time-art.mjs for the long
- * version of why each one exists. In order:
+ * Cards are laid out at their true depth, so where markers cluster they are
+ * pushed into narrow lanes: a scene that reads at full width and is mush at
+ * the narrowest would look fine everywhere except the interesting places.
+ * In order:
  *
  *   1. Every marker has a scene, every scene names a real marker, no two
  *      scenes claim the same subject.
