@@ -129,8 +129,10 @@ src/
     spend-art.ts        the thirty things you can buy, drawn as products
     earth-reviews-art.ts  thirty-two phenomena drawn as product shots, plus
                         the star row every rating on that page is drawn with
-    time-events.ts      Deep Time's forty-four events and when they happened
-    time-art.ts         a scene for each, flat colour on one palette
+    time-events.ts      Deep Time's forty-four events, when they happened and
+                        (for the recent ones) where
+    time-earth.ts       the Earth at any of those dates, as a shader, and the
+                        three gauges beside it
     trolley-scene.ts    the field, the track, the tram and whoever is on it
     fold-paper.ts       Gallivan's equations, and where a real sheet gives up
     fold-scene.ts       that sheet as an object on a desk: projection, one
@@ -682,23 +684,24 @@ what you did.
 ### The rest
 
 **Deep Time** — 4.54 billion years across five zoom levels, seams shown rather
-than hidden. Colliding cards move into side lanes and shed their notes, resolved
-at runtime against measured heights. *Zero overlaps at 375, 464 and 1280 px.*
+than hidden. Colliding events move into side lanes and shed their notes, resolved
+at runtime against measured heights.
 
-The forty-four scenes were always well drawn and always shown small — a
-116px thumbnail in a flat charcoal box with a plain white hairline, the one
-picture the page had reduced to an icon. Each card is now lit by `MOOD`, a
-colour computed from that scene's own drawing (an area-weighted walk of its
-fills, six backdrop tones excluded so the sky or sea a scene happens under
-can never outvote what is actually in it) rather than a palette chosen to
-match it after the fact — so the Cambrian explosion's card glows the same
-blood-red the animal is drawn in, and cannot drift from it later. The art
-itself grew with the frame: 172px at the widest lane, up from 116, with the
-eleven major turning points bigger again and a one-shot glow the instant one
-first centres in view. *`check-time-art.mjs` walks every scene's own SVG back
-out and confirms the colour it computes is the one the page actually shows,
-and that colour is really in the drawing — not a plausible guess sitting
-next to it.*
+Beside the timeline, pinned, is the Earth itself at the year the scroll is on:
+one globe drawn live (`lib/time-earth.ts`) that is magma in its own disc of
+rubble, then struck by something the size of Mars and ringed with what
+becomes the Moon, then ocean, methane haze, rust, snowball twice, green at the
+edges, one continent, the asteroid's soot, ice sheets breathing on their real
+hundred-thousand-year rhythm, and finally lit on the night side. The
+coastline of the last few million years is the real one, read from a distance
+field of Natural Earth's (`scripts/make-time-earth.mjs`); the continents
+before about two hundred million years ago are invented, and the page says
+so. Events from the span the map is real for carry a place, and the globe
+turns to show it. The two events that are over in a pixel — the Moon-forming
+impact and the asteroid — are set off as their date crosses the line and
+played out in seconds. The gauge adds the length of the day, the oxygen in
+the air and the brightness of the Sun. *`check-time-earth.mjs` puts every
+place on the map the shader reads and fails if one is in the sea.*
 
 **The Deep Sea** — a linear scroll from the sunlit surface to Challenger Deep,
 10,935 real metres down, through the five standard oceanographic zones rather
@@ -715,9 +718,9 @@ of the real story. A single depth-driven shader carries the water column from
 bright surface cyan through a twilight blue-black to hadal black, with god rays
 that fade out exactly where the sunlight zone ends and bioluminescent sparks
 that only begin once the water is dark enough for them to be the only light
-left. Twenty-two hand-drawn scenes, one per marker, follow Deep Time's own
-rules: flat palette, no gradients, no ids — checked the same way.
-*`scripts/check-deep-sea-art.mjs` is `check-time-art.mjs`'s whole battery
+left. Twenty-two hand-drawn scenes, one per marker, keep to a flat palette,
+no gradients and no ids.
+*`scripts/check-deep-sea-art.mjs` is a whole battery
 (coverage, palette, structure at 64px, distinctness, mood) plus a data-integrity
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
@@ -1505,7 +1508,7 @@ node scripts/check-paper.mjs       # the design system held to its own rules: co
 node scripts/check-art.mjs         # the tile illustrations, rasterised and measured
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
-node scripts/check-time-art.mjs    # Deep Time's scenes, at the card's own widths
+node scripts/check-time-earth.mjs  # Deep Time's events, places, map and gauges
 node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
 node scripts/check-fold.mjs        # the paper model, against paper
 node scripts/check-fold-scene.mjs  # Paper Folds' drawing, and its sky, at every fold
@@ -1572,29 +1575,20 @@ written down here rather than in a commit message.
 `--dbg "name,name" dir` renders single objects nearly full-frame, for the part
 no measurement covers, which is whether it looks like the thing.
 
-`check-time-art.mjs` covers Deep Time's forty-four scenes. Two things make it
-different from the tile and Scale checkers. Its drawings have **no ids, no defs
-and no gradients at all** — the other modules prefix ids to keep forty-four,
-twenty-six and twenty drawings from colliding in one document, and having
-none is a guarantee rather than a convention — and every colour must come from
-one twenty-one-entry palette, which the file enforces rather than asks for.
-
-It also covers `MOOD`, the colour each scene's own card is lit by. Two
-things could make that claim quietly stop being true: a computed colour that
-does not actually appear anywhere in the scene it is meant to represent, and
-the one hand-written correction — `The steam engine`, whose frame really is
-more soil-brown by area than iron, but which is the first power in the whole
-timeline that is not muscle, water or wind and should not be lit like a barn
-— drifting out of step with a scene that has since been redrawn. Both are
-checked directly: every `MOOD` value has to be found inside its own scene's
-markup, and re-deriving the whole set from nothing has to agree with what
-the module exports everywhere except that one documented exception.
+`check-time-earth.mjs` covers Deep Time. The globe is a shader and cannot
+be run here, so it checks what goes wrong silently round it: the events are
+in order and each says something; a place is only given for a date the
+coastline is real for, and is on land on the map the globe actually reads (a
+longitude and latitude the wrong way round puts Giza in the Indian Ocean);
+the map is the size the shader expects and about 29% land; the day only
+lengthens, oxygen arrives with the Great Oxidation and peaks in the
+Carboniferous, the Sun only brightens; and the page sets every uniform the
+shader declares and none it does not.
 
 `check-deep-sea-art.mjs` covers the Deep Sea's twenty-two, and follows
-`check-time-art.mjs`'s own rules rather than the tile checker's — no ids, no
+its own rules rather than the tile checker's — no ids, no
 defs, no gradients, one thirty-one-colour palette, the same `MOOD` treatment,
-with no hand-written exception this time. It carries one battery
-`check-time-art.mjs` has no reason to: a data-integrity pass over
+with no hand-written exception. It also carries a data-integrity pass over
 `data/deep-sea.ts` itself, since every marker's depth is a real, citable fact
 rather than a chosen waypoint — it checks the markers stay sorted by real
 depth, that the five zones are contiguous with no gap or overlap between them,

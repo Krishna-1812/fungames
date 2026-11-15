@@ -268,7 +268,7 @@ export const GAMES: Game[] = [
     title: 'Deep Time',
     blurb: 'Scroll through 4.5 billion years',
     description:
-      'Every pixel you scroll is a fixed number of years. Fall through the entire history of Earth and find out how recently everything you have ever heard of happened.',
+      'Every pixel you scroll is a fixed number of years, and beside you is the Earth as it was then: magma, the impact that made the Moon, the first ocean, snowball, forests, the asteroid, ice ages, city lights. Fall through 4.54 billion years and find out how recently everything you have ever heard of happened.',
     accent: '#171132', accent2: '#7d4a9e',
     category: 'science',
     added: '2026-09-12',
