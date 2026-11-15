@@ -30,9 +30,11 @@
  * hundred million years ago are invented — nobody has a map — and only their
  * amount and their habit of gathering into one and breaking up are true.
  */
-import { glsl } from './gl'
 
-export const EARTH_FRAG = glsl(`
+/** The shader's body. The page hands it to `glsl()`, which puts the shared
+ *  noise library in front of it; kept bare here so that a check can read this
+ *  module without a browser. */
+export const EARTH_FRAG = `
 uniform float u_years;      // before present
 uniform float u_spin;       // how far the globe has turned, radians
 uniform vec3  u_globe;      // centre x, centre y (from the bottom), radius — as fractions of the height, x in the same unit
@@ -443,7 +445,7 @@ void main() {
   col = dither(col, px);
   fragColor = vec4(col, 1.0);
 }
-`)
+`
 
 /* -------------------------------------------------------------------------- */
 /* The numbers beside it                                                      */

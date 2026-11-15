@@ -160,7 +160,7 @@ const fmt = (y: number) =>
   <script>
   import { ring } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
-  import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
+  import { ShaderSurface, prefersReducedMotion, glsl } from '../lib/gl'
   import { EARTH_FRAG, dayHours, oxygenPct, sunPct } from '../lib/time-earth'
   import { createShell } from '../lib/game-shell'
   import { recordPlay } from '../lib/stats'
@@ -372,7 +372,7 @@ const fmt = (y: number) =>
   let pinIdx = -1
   let pinDir = [0, 0, 1], pinAmt = 0, pinOn = false, moonAmt = 0, moonOn = false
   const spinNow = () => 0.9 + turn + depthPx * 0.0021 + spinOff
-  const surface = new ShaderSurface(document.getElementById('skygl')!, EARTH_FRAG, {
+  const surface = new ShaderSurface(document.getElementById('skygl')!, glsl(EARTH_FRAG), {
     textures: { u_land: '/deep-time/land.webp' },
     // A dense screen has four pixels to every one of these and cannot show
     // them all: nine-sixteenths of the work for a globe that looks the same.
