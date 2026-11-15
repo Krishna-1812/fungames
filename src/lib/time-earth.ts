@@ -179,8 +179,12 @@ void main() {
   // set off by the page as the card crosses the line, so it plays in seconds
   // however fast the scroll went past it
   float hitT = u_hit.x;
-  float theiaHit = u_hit.y == 1.0 ? exp(-hitT * 0.9) : 0.0;
-  float chicHit = u_hit.y == 2.0 ? exp(-hitT * 0.7) : 0.0;
+  // ...but not if the scroll has since left for another age altogether
+  float kind = u_hit.y;
+  if (kind == 2.0 && (Ma < 57.0 || Ma > 66.5)) kind = 0.0;
+  if (kind == 1.0 && Ga < 4.44) kind = 0.0;
+  float theiaHit = kind == 1.0 ? exp(-hitT * 0.9) : 0.0;
+  float chicHit = kind == 2.0 ? exp(-hitT * 0.7) : 0.0;
   // ice: the Ordovician and Carboniferous souths, Antarctica from 34 Ma, the
   // north from 2.6 Ma — and from two million years ago, the rhythm of it
   float glacial = y > 21000.0
@@ -346,7 +350,7 @@ void main() {
     float ang = degrees(acos(clamp(dot(d, vec3(-0.9316, 0.3633, 0.0081)), -1.0, 1.0)));
     float front = 48.0 * hitT;
     float soot = kpg;
-    if (u_hit.y == 2.0 && hitT < 14.0) soot = max(kpg, exp(-hitT * 0.12)) * smoothstep(ang - 14.0, ang + 6.0, front - 6.0);
+    if (kind == 2.0 && hitT < 14.0) soot = max(kpg, exp(-hitT * 0.12)) * smoothstep(ang - 14.0, ang + 6.0, front - 6.0);
 
     /* weather */
     float cAmt = mix(0.34, 0.80, steam) * (1.0 - molten) * mix(1.0, 0.30, snow);
@@ -401,7 +405,7 @@ void main() {
       float trap = bump(ll.y, 58.0, 13.0) * smoothstep(0.50, 0.66, fbm3(d * 3.0 + 31.0, 4)) * land;
       glow += vec3(2.8, 0.7, 0.12) * dying * trap * pow(ridge3(d * 16.0, 4), 1.5) * 3.0;
     }
-    if (u_hit.y == 2.0 && hitT < 14.0) {
+    if (kind == 2.0 && hitT < 14.0) {
       // the fireball, the shock going round the world from it, and the
       // forests alight behind the shock
       float ball = ang / (5.0 + 16.0 * hitT);
@@ -421,7 +425,7 @@ void main() {
       glow += vec3(1.0, 0.72, 0.38) * lit * settled * speck * (0.10 + pop * (0.5 + 1.5 * lit)) * 3.2 * (1.0 - cl * 0.6);
     }
     // only where it is dark enough to see them — except magma, which is brighter than day
-    c += glow * mix(1.0 - day * 0.92, 1.0, max(max(molten, theiaHit), max(bomb, u_hit.y == 2.0 ? exp(-hitT * 0.25) : 0.0)));
+    c += glow * mix(1.0 - day * 0.92, 1.0, max(max(molten, theiaHit), max(bomb, kind == 2.0 ? exp(-hitT * 0.25) : 0.0)));
     // the flash itself
     c += vec3(1.0, 0.85, 0.6) * theiaHit * theiaHit * 3.0 * sat(dot(n, normalize(vec3(0.62, 0.50, 0.60))) * 1.4);
 
