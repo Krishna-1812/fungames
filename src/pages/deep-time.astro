@@ -123,8 +123,12 @@ const fmt = (y: number) =>
     }
     {
       placed.map((e) => (
-        <article class:list={['ev', `lane-${e.lane}`, { big: e.big }]} style={`top:${e.top}px`}>
-          <div class="ev-when">{fmt(e.at)}</div>
+        <article
+          class:list={['ev', `lane-${e.lane}`, { big: e.big }]}
+          style={`top:${e.top}px`}
+          data-where={e.where ? (e.where === 'moon' ? 'moon' : e.where.join(',')) : undefined}
+        >
+          <div class="ev-when">{fmt(e.at)}{e.place && <span class="ev-place"> · {e.place}</span>}</div>
           <h2>{e.title}</h2>
           {e.note && <p>{e.note}</p>}
         </article>
@@ -353,7 +357,20 @@ const fmt = (y: number) =>
   let turn = 0                      // what time alone has turned it
   let lastT = performance.now()
   let hit = { kind: 0, at: -1e9 }
-  let spinOff = 0, spinTo = 0       // an impact turns the globe to face it
+  let spinOff = 0, spinTo = 0       // an impact, or an event with a place, turns the globe to face it
+  /** Turn, by the shorter way, until this longitude is a little on the
+   *  sunlit side of the middle. The middle of the face is the meridian at
+   *  +spin, east is to the right, and the Sun is on the left. */
+  const face = (lonDeg: number) => {
+    const want = ((lonDeg + 22) * Math.PI) / 180
+    const d = ((((want - spinNow()) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+    spinTo = spinOff + d
+    if (prefersReducedMotion) spinOff = spinTo
+  }
+  // Where the event on the line happened, if it has a where.
+  const wheres = cards.map((c) => c.dataset.where ?? '')
+  let pinIdx = -1
+  let pinDir = [0, 0, 1], pinAmt = 0, pinOn = false, moonAmt = 0, moonOn = false
   const spinNow = () => 0.9 + turn + depthPx * 0.0021 + spinOff
   const surface = new ShaderSurface(document.getElementById('skygl')!, EARTH_FRAG, {
     textures: { u_land: '/deep-time/land.webp' },
@@ -364,7 +381,10 @@ const fmt = (y: number) =>
       const now = performance.now()
       const dt = Math.min(0.1, (now - lastT) / 1000)
       if (!prefersReducedMotion) turn += dt * 0.045
-      spinOff += (spinTo - spinOff) * Math.min(1, dt * 5)
+      spinOff += (spinTo - spinOff) * Math.min(1, dt * 3.5)
+      const ease = prefersReducedMotion ? 1 : Math.min(1, dt * 4)
+      pinAmt += ((pinOn ? 1 : 0) - pinAmt) * ease
+      moonAmt += ((moonOn ? 1 : 0) - moonAmt) * ease
       lastT = now
       const h = back.clientHeight || window.innerHeight
       return {
@@ -374,13 +394,15 @@ const fmt = (y: number) =>
         u_globe: [geo.cx / h, 1 - geo.cy / h, geo.R / h],
         u_moon: geo.moon,
         u_hit: [(now - hit.at) / 1000, hit.kind],
+        u_pin: [pinDir[0], pinDir[1], pinDir[2], pinAmt],
+        u_moonPin: moonAmt,
       }
     },
   })
 
   /** The two events that happen in an instant and are over in a pixel: set
    *  off as they cross the line, and played out in seconds. */
-  const IMPACTS = [{ at: 4.51e9, kind: 1, face: null }, { at: 66e6, kind: 2, face: 1.72 }]
+  const IMPACTS = [{ at: 4.51e9, kind: 1, lon: null }, { at: 66e6, kind: 2, lon: -89.5 }]
 
   let ticking = false
   let first = true
@@ -414,10 +436,7 @@ const fmt = (y: number) =>
         hit = { kind: im.kind, at: performance.now() }
         // Chicxulub is at 89.5 degrees west, and may be round the back: bring
         // it to the sunlit front by the shorter way.
-        if (im.face !== null) {
-          const d = (((im.face - spinNow()) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI
-          spinTo = spinOff + d
-        }
+        if (im.lon !== null) face(im.lon)
       }
     }
 
@@ -444,6 +463,22 @@ const fmt = (y: number) =>
             shell.pick('Event reached', cards[i].querySelector('h2')!.textContent!)
           }
         }
+      }
+    }
+
+    // The event on the line is the last one whose rule has reached it.
+    let cur = -1
+    for (let i = 0; i < tops.length && tops[i] <= clamped + 1; i++) cur = i
+    if (cur !== pinIdx) {
+      pinIdx = cur
+      const w = cur >= 0 ? wheres[cur] : ''
+      moonOn = w === 'moon'
+      pinOn = !!w && !moonOn
+      if (pinOn) {
+        const [lon, lat] = w.split(',').map((v) => (+v * Math.PI) / 180)
+        pinDir = [Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)]
+        pinAmt = 0
+        face((lon * 180) / Math.PI)
       }
     }
 
@@ -572,6 +607,7 @@ const fmt = (y: number) =>
   .ev.lane-left { width: calc(var(--col-w) * 0.485); }
   .ev.lane-right { left: calc(var(--col-l) + var(--col-w) * 0.515); width: calc(var(--col-w) * 0.485); }
   .ev-when { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.7; font-variant-numeric: tabular-nums; }
+  .ev-place { opacity: 0.85; color: #a9d4ff; }
   .ev h2 { font-size: 23px; line-height: 1.18; margin: 5px 0 0; font-weight: 650; letter-spacing: -0.01em; text-wrap: balance; }
   .ev p { margin: 6px 0 0; opacity: 0.74; font-size: 15px; line-height: 1.42; max-width: 44ch; }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 18px; }

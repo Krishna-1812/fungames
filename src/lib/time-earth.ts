@@ -38,6 +38,8 @@ uniform float u_spin;       // how far the globe has turned, radians
 uniform vec3  u_globe;      // centre x, centre y (from the bottom), radius — as fractions of the height, x in the same unit
 uniform vec2  u_moon;       // where the Moon sits, in globe radii from the centre
 uniform vec2  u_hit;        // seconds since the last impact was set off, and which (1 Theia, 2 Chicxulub)
+uniform vec4  u_pin;        // where the event on the line happened: a direction on the globe, and how strongly to mark it
+uniform float u_moonPin;    // the same, for the one that happened on the Moon
 uniform sampler2D u_land;
 
 const vec3 SUN = normalize(vec3(-0.64, 0.36, 0.56));
@@ -136,6 +138,12 @@ vec4 moon(vec2 p, float Ga, float born) {
   vec3 c = alb * max(ndl, 0.0) * 1.5 + alb * 0.012;
   c = mix(c, c * 0.25, hot);
   c += vec3(2.4, 0.6, 0.10) * pow(ridge3(n * 3.0 + 2.0, 4), 3.2) * hot * 1.6 + vec3(0.05, 0.012, 0.004) * hot;
+  if (u_moonPin > 0.0) {
+    // Tranquility Base: just north of the equator, on the eastern side
+    float dp = length(q - vec2(0.36, 0.06));
+    float beat = fract(u_time * 0.6);
+    c += vec3(0.6, 0.85, 1.0) * u_moonPin * (smoothstep(0.13, 0.04, dp) * 2.0 + bump(dp, 0.12 + 0.5 * beat, 0.05) * (1.0 - beat) * 1.5);
+  }
   float a = smoothstep(1.0, 1.0 - 2.5 / (rm * u_globe.z * u_res.y + 1.0), sqrt(r2));
   return vec4(c * a, a);
 }
@@ -414,6 +422,14 @@ void main() {
     c += glow * mix(1.0 - day * 0.92, 1.0, max(max(molten, theiaHit), max(bomb, u_hit.y == 2.0 ? exp(-hitT * 0.25) : 0.0)));
     // the flash itself
     c += vec3(1.0, 0.85, 0.6) * theiaHit * theiaHit * 3.0 * sat(dot(n, normalize(vec3(0.62, 0.50, 0.60))) * 1.4);
+
+    // where it happened: a point of light, and a ring going out from it
+    if (u_pin.w > 0.0) {
+      float pa = degrees(acos(clamp(dot(d, u_pin.xyz), -1.0, 1.0)));
+      float beat = fract(u_time * 0.6);
+      float mark = smoothstep(1.5, 0.6, pa) * 3.2 + exp(-pa * pa / 9.0) * 0.5 + bump(pa, 1.5 + 8.0 * beat, 0.5 + beat) * (1.0 - beat) * 1.1;
+      c += vec3(0.6, 0.85, 1.0) * u_pin.w * mark;
+    }
 
     // the near half of the ring crosses the face
     if (ring > 0.0 && rq.y <= 0.0) c += vec3(1.9, 0.62, 0.16) * ringI * 0.6;
