@@ -54,7 +54,7 @@ vec3 space(vec2 px, float Ga) {
   vec2 g0 = px / (u_res.y);
   float across = (g0.y - 0.62) * 0.94 + (g0.x - 0.5) * 0.34;
   float mw = exp(-across * across * 9.0);
-  c += vec3(0.020, 0.023, 0.036) * mw * (0.35 + fbm(g0 * 3.0 + 2.0, 5) * 1.1) * smoothstep(0.25, 0.75, fbm(g0 * 1.3 + 9.0, 3) + mw * 0.3);
+  c += vec3(0.020, 0.023, 0.036) * mw * (0.25 + fbm(g0 * 2.6 + 2.0, 3) * 1.2);
   for (int k = 0; k < 2; k++) {
     float size = k == 0 ? 46.0 : 17.0;
     vec2 g = px / (size * u_dpr), id = floor(g), f = fract(g) - 0.5;
@@ -99,12 +99,12 @@ float cloudCover(vec3 d, float amount, float t) {
   d.xz = rot2(t * 0.012) * d.xz;
   // Weather is stretched along the parallels and curled by itself: fronts
   // and their tails, not blobs.
-  vec3 curl = vec3(fbm3(d * 2.1 + 1.0, 3), fbm3(d * 2.1 + 6.0, 3), fbm3(d * 2.1 + 11.0, 3)) - 0.5;
-  vec3 w = (d + 0.36 * curl) * vec3(3.0, 4.6, 3.0);
+  vec3 curl = vec3(noise3(d * 2.6 + 1.0), noise3(d * 2.6 + 6.0), noise3(d * 2.6 + 11.0)) - 0.5;
+  vec3 w = (d + 0.5 * curl) * vec3(3.0, 4.6, 3.0);
   float lat = abs(asin(clamp(d.y, -1.0, 1.0)));
   float cover = amount + 0.08 * cos(lat * 6.0) - 0.10 * bump(lat, 0.42, 0.15);
-  float big = fbm3(w, 4);
-  float small = fbm3(w * 3.7 + 20.0, 5);
+  float big = fbm3(w, 3);
+  float small = fbm3(w * 3.7 + 20.0, 4);
   float c = big * 0.68 + small * 0.32;
   float body = smoothstep(0.60 - cover * 0.40, 0.74 - cover * 0.34, c);
   return body * (0.45 + 0.55 * smoothstep(0.34, 0.62, small));
@@ -181,7 +181,8 @@ void main() {
   float lit = pow(sat(1.0 - y / 145.0), 1.6);            // electric light
 
   /* -- behind everything -- */
-  vec3 col = space(px, Ga);
+  // nothing behind the planet needs drawing
+  vec3 col = r > 0.985 ? space(px, Ga) : vec3(0.0);
   // the disc the planet is still sweeping up
   float disc = smoothstep(4.46, 4.535, Ga);
   if (disc > 0.0) {
@@ -258,9 +259,9 @@ void main() {
     float land = smoothstep(0.488, 0.512, F) * ocean + (1.0 - ocean);
     float inland = sat((F - 0.5) * 2.2);
     float shelf = smoothstep(0.40, 0.5, F) * 0.55;
-    float wet = fbm3(d * 7.0 + 3.0, 4);
+    float wet = fbm3(d * 7.0 + 3.0, 3);
     float fine = fbm3(d * 28.0, 3);
-    float high = ridge3(d * 5.0 + 9.0, 4) * inland;
+    float high = ridge3(d * 5.0 + 9.0, 3) * inland;
 
     /* the sea */
     vec3 sea = mix(vec3(0.010, 0.050, 0.130), vec3(0.030, 0.200, 0.340), shelf * 0.8);
@@ -299,11 +300,11 @@ void main() {
     vec3 sunward = normalize(SUN - n * dot(SUN, n));
     vec3 ds = sunward;
     ds.xy = rot2(0.41) * ds.xy; ds.yz = rot2(0.30) * ds.yz; ds.xz = rot2(u_spin) * ds.xz;
-    float high2 = ridge3(normalize(d + ds * 0.012) * 5.0 + 9.0, 4) * inland;
+    float high2 = ridge3(normalize(d + ds * 0.012) * 5.0 + 9.0, 3) * inland;
     float slope = clamp((high2 - high) * 14.0, -1.0, 1.0);
     ground = mix(ground, vec3(0.30, 0.28, 0.26), smoothstep(0.30, 0.55, high) * 0.6 * (1.0 - molten));
     ground *= 1.0 - 0.55 * slope * land * smoothstep(0.02, 0.2, inland);
-    ground *= 0.82 + 0.36 * fbm3(d * 13.0 + 5.0, 3);
+    ground *= 0.80 + 0.40 * mix(wet, fine, 0.5);
 
     vec3 alb = mix(sea, ground, land);
     float rough = mix(0.0, 1.0, land);

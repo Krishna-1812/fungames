@@ -357,6 +357,9 @@ const fmt = (y: number) =>
   const spinNow = () => 0.9 + turn + depthPx * 0.0021 + spinOff
   const surface = new ShaderSurface(document.getElementById('skygl')!, EARTH_FRAG, {
     textures: { u_land: '/deep-time/land.webp' },
+    // A dense screen has four pixels to every one of these and cannot show
+    // them all: nine-sixteenths of the work for a globe that looks the same.
+    scale: (window.devicePixelRatio || 1) > 1.5 ? 0.75 : 1,
     uniforms: () => {
       const now = performance.now()
       const dt = Math.min(0.1, (now - lastT) / 1000)
@@ -393,7 +396,7 @@ const fmt = (y: number) =>
 
     const act = acts.find((a: any) => clamped < a.offset + a.height) ?? acts[acts.length - 1]
     const within = clamped - act.offset
-    const was = years
+    const was = years, wasDepth = depthPx
     years = Math.max(0, act.from - within * act.yearsPerPx)
     depthPx = clamped
 
@@ -406,7 +409,8 @@ const fmt = (y: number) =>
 
     if (!first && !prefersReducedMotion) {
       for (const im of IMPACTS) {
-        if (!(was > im.at && years <= im.at && was - years < im.at * 0.2)) continue
+        // crossed while scrolling, not leapt over on the way to somewhere else
+        if (!(was > im.at && years <= im.at && clamped - wasDepth < vh * 1.5)) continue
         hit = { kind: im.kind, at: performance.now() }
         // Chicxulub is at 89.5 degrees west, and may be round the back: bring
         // it to the sunlit front by the shorter way.
