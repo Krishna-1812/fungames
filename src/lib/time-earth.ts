@@ -61,10 +61,10 @@ vec3 space(vec2 px, float Ga) {
     vec2 o = hash22(id + float(k) * 91.0) - 0.5;
     float h = hash21(id * 1.7 + 3.1 + float(k) * 17.0);
     float d = length(f - o * 0.8) * size;
-    float mag = pow(h, k == 0 ? 9.0 : 20.0) * (1.0 + mw * 1.5);
+    float mag = pow(h, k == 0 ? 14.0 : 26.0) * (1.0 + mw * 1.5);
     float tw = 0.85 + 0.15 * sin(u_time * (1.0 + h * 3.0) + h * 40.0);
     vec3 tint = mix(vec3(1.0, 0.86, 0.74), vec3(0.74, 0.84, 1.0), hash21(id + 7.7));
-    c += tint * mag * tw * (k == 0 ? 2.2 : 1.6) * exp(-d * d * (k == 0 ? 0.9 : 1.6));
+    c += tint * mag * tw * (k == 0 ? 3.0 : 2.4) * exp(-d * d * (k == 0 ? 1.1 : 2.6));
   }
   return c;
 }
@@ -100,14 +100,14 @@ float cloudCover(vec3 d, float amount, float t) {
   // Weather is stretched along the parallels and curled by itself: fronts
   // and their tails, not blobs.
   vec3 curl = vec3(fbm3(d * 2.1 + 1.0, 3), fbm3(d * 2.1 + 6.0, 3), fbm3(d * 2.1 + 11.0, 3)) - 0.5;
-  vec3 w = (d + 0.55 * curl) * vec3(3.0, 5.2, 3.0);
+  vec3 w = (d + 0.36 * curl) * vec3(3.0, 4.6, 3.0);
   float lat = abs(asin(clamp(d.y, -1.0, 1.0)));
   float cover = amount + 0.08 * cos(lat * 6.0) - 0.10 * bump(lat, 0.42, 0.15);
   float big = fbm3(w, 4);
-  float small = fbm3(w * 3.7 + 20.0, 4);
+  float small = fbm3(w * 3.7 + 20.0, 5);
   float c = big * 0.68 + small * 0.32;
   float body = smoothstep(0.60 - cover * 0.40, 0.74 - cover * 0.34, c);
-  return body * (0.55 + 0.45 * smoothstep(0.35, 0.65, small));
+  return body * (0.45 + 0.55 * smoothstep(0.34, 0.62, small));
 }
 
 /** One city's worth of light: degrees east, north, and how far it spreads. */
@@ -134,7 +134,8 @@ vec4 moon(vec2 p, float Ga, float born) {
   alb = mix(alb, vec3(0.13, 0.13, 0.14), mare * 0.8);
   float ndl = dot(n, SUN);
   vec3 c = alb * max(ndl, 0.0) * 1.5 + alb * 0.012;
-  c += vec3(2.2, 0.6, 0.12) * pow(ridge3(n * 3.0 + Ga * 30.0, 4), 2.0) * hot * 2.0 + vec3(0.25, 0.06, 0.02) * hot;
+  c = mix(c, c * 0.25, hot);
+  c += vec3(2.4, 0.6, 0.10) * pow(ridge3(n * 3.0 + 2.0, 4), 3.2) * hot * 1.6 + vec3(0.05, 0.012, 0.004) * hot;
   float a = smoothstep(1.0, 1.0 - 2.5 / (rm * u_globe.z * u_res.y + 1.0), sqrt(r2));
   return vec4(c * a, a);
 }
@@ -288,12 +289,21 @@ void main() {
       veg *= 0.8 + 0.5 * fine;
       // plants take the wet edges first and the interiors only with forests
       float cover = plants * mix(smoothstep(0.42, 0.05, inland + 0.3 * wet), 1.0, forest);
-      cover *= 1.0 - 0.75 * dying - 0.5 * kpg;
+      cover *= 1.0 - 0.75 * dying - 0.5 * kpg;   // and what dies back
       ground = mix(ground, mix(veg, dry * (0.85 + 0.3 * fine), sat(desert * 1.5)), cover * (1.0 - 0.0));
       ground = mix(ground, mix(ground, dry, 0.6), sat(desert * 1.5) * (1.0 - cover));
     }
-    // mountains, greyer and then white
+    // mountains, greyer and then white — and lit from the side, which is
+    // what makes a range a range: the same height a little way towards the
+    // Sun, and the difference is the slope
+    vec3 sunward = normalize(SUN - n * dot(SUN, n));
+    vec3 ds = sunward;
+    ds.xy = rot2(0.41) * ds.xy; ds.yz = rot2(0.30) * ds.yz; ds.xz = rot2(u_spin) * ds.xz;
+    float high2 = ridge3(normalize(d + ds * 0.012) * 5.0 + 9.0, 4) * inland;
+    float slope = clamp((high2 - high) * 14.0, -1.0, 1.0);
     ground = mix(ground, vec3(0.30, 0.28, 0.26), smoothstep(0.30, 0.55, high) * 0.6 * (1.0 - molten));
+    ground *= 1.0 - 0.55 * slope * land * smoothstep(0.02, 0.2, inland);
+    ground *= 0.82 + 0.36 * fbm3(d * 13.0 + 5.0, 3);
 
     vec3 alb = mix(sea, ground, land);
     float rough = mix(0.0, 1.0, land);
@@ -320,13 +330,20 @@ void main() {
     alb = mix(alb, iceCol, ice);
     rough = mix(rough, 1.0, ice);
 
+    /* Chicxulub, 89.5 west, 21.3 north: how far round the planet this
+       point is from it, and whether the blast has got here yet */
+    float ang = degrees(acos(clamp(dot(d, vec3(-0.9316, 0.3633, 0.0081)), -1.0, 1.0)));
+    float front = 48.0 * hitT;
+    float soot = kpg;
+    if (u_hit.y == 2.0 && hitT < 14.0) soot = max(kpg, exp(-hitT * 0.12)) * smoothstep(ang - 14.0, ang + 6.0, front - 6.0);
+
     /* weather */
     float cAmt = mix(0.34, 0.80, steam) * (1.0 - molten) * mix(1.0, 0.30, snow);
-    cAmt = mix(cAmt, 0.7, max(dying * 0.6, max(kpg, chicHit)));
+    cAmt = mix(cAmt, 0.72, max(dying * 0.6, soot));
     float cl = cloudCover(d, cAmt, u_time);
     vec3 clCol = mix(vec3(0.95), vec3(0.92, 0.62, 0.34), haze * 0.75);
-    clCol = mix(clCol, vec3(0.085, 0.072, 0.066), max(max(kpg, chicHit) * 0.9, dying * 0.45));   // soot
-    alb = mix(alb, clCol, cl);
+    clCol = mix(clCol, vec3(0.045, 0.038, 0.034), max(sat(soot * 1.5), dying * 0.45));
+    alb = mix(alb, clCol * (0.80 + 0.20 * cl), cl);
     rough = mix(rough, 1.0, cl);
     // the haze itself: a Titan-coloured veil you can only just see through
     alb = mix(alb, vec3(0.74, 0.40, 0.14) * (0.8 + 0.4 * fbm3(d * 3.0 + u_time * 0.01, 3)), haze * 0.5);
@@ -334,7 +351,8 @@ void main() {
     /* light */
     vec3 c = alb * sunI * max(ndl, 0.0) * 1.55;
     vec3 hv = normalize(SUN + vec3(0.0, 0.0, 1.0));
-    c += vec3(1.0, 0.93, 0.82) * sunI * pow(max(dot(n, hv), 0.0), 260.0) * (1.0 - rough) * 1.1 * (1.0 - haze * 0.7);
+    float ndh = max(dot(n, hv), 0.0);
+    c += vec3(1.0, 0.93, 0.82) * sunI * (pow(ndh, 40.0) * 0.16 + pow(ndh, 700.0) * 0.9) * (1.0 - rough) * (1.0 - haze * 0.7);
     float rim = pow(1.0 - n.z, 3.0);
     c += airCol * airAmt * sunI * rim * (0.05 + day) * 0.85;
     c += airCol * airAmt * sunI * 0.035 * day;
@@ -348,12 +366,13 @@ void main() {
       vec3 mq = d * 2.2 + vec3(0.0, u_time * 0.004, 0.0);
       float crack = ridge3(mq, 5);
       float plate = fbm3(d * 4.0, 4);
-      vec3 crust = mix(vec3(0.030, 0.018, 0.018), vec3(0.11, 0.06, 0.05), plate);
+      vec3 crust = mix(vec3(0.012, 0.008, 0.008), vec3(0.060, 0.034, 0.028), plate);
+      crack = max(crack, 0.8 * ridge3(d * 7.0 + 3.0, 4) * (0.4 + 0.6 * crack));
       float open = sat(smoothstep(4.47, 4.54, Ga) * 0.75 + theiaHit);
-      float heat = pow(crack, mix(4.5, 1.9, open));
-      vec3 lava = vec3(3.0, 0.80, 0.12) * heat * mix(0.7, 1.25, open) + vec3(1.8, 1.25, 0.6) * pow(crack, 9.0) * 2.4;
+      float heat = pow(crack, mix(5.5, 2.8, open));
+      vec3 lava = vec3(3.0, 0.72, 0.10) * heat * mix(0.7, 1.2, open) + vec3(1.8, 1.25, 0.6) * pow(crack, 10.0) * 2.4;
       c = mix(c, crust * sunI * max(ndl, 0.0) * 1.6, m);
-      glow += (lava + vec3(0.10, 0.02, 0.005)) * m;
+      glow += (lava + vec3(0.035, 0.006, 0.002)) * m;
     }
     if (bomb > 0.0) {
       // craters that have not finished cooling, and the odd one arriving
@@ -371,12 +390,15 @@ void main() {
       float trap = bump(ll.y, 58.0, 13.0) * smoothstep(0.50, 0.66, fbm3(d * 3.0 + 31.0, 4)) * land;
       glow += vec3(2.8, 0.7, 0.12) * dying * trap * pow(ridge3(d * 16.0, 4), 1.5) * 3.0;
     }
-    if (chicHit > 0.0 || kpg > 0.0) {
-      // Chicxulub: the north coast of what will be the Yucatán
-      float t = town(ll, -89.5, 21.3, 1.0);
-      float spread = town(ll, -89.5, 21.3, 6.0 + 60.0 * (1.0 - chicHit));
-      glow += vec3(3.0, 2.4, 1.6) * chicHit * chicHit * (t * 6.0 + town(ll, -89.5, 21.3, 7.0) * 1.5);
-      glow += vec3(2.2, 0.6, 0.12) * chicHit * (1.0 - chicHit) * spread * smoothstep(0.45, 0.7, fine) * land * 2.5;  // the fires
+    if (u_hit.y == 2.0 && hitT < 14.0) {
+      // the fireball, the shock going round the world from it, and the
+      // forests alight behind the shock
+      float ball = ang / (5.0 + 16.0 * hitT);
+      glow += (vec3(3.4, 2.7, 1.9) * exp(-ball * ball * 4.0) * 9.0 + vec3(3.0, 0.9, 0.2) * exp(-ball * ball) * 3.0) * exp(-hitT * 0.9);
+      glow += vec3(2.2, 1.5, 0.9) * bump(ang, front, 1.5 + hitT * 1.2) * exp(-hitT * 0.45) * 1.3;
+      float burning = smoothstep(front, front - 12.0, ang) * exp(-hitT * 0.30) * smoothstep(0.0, 0.6, hitT);
+      float flick = smoothstep(0.52, 0.75, fbm3(d * 34.0 + vec3(0.0, u_time * 0.25, 0.0), 3));
+      glow += vec3(2.6, 0.62, 0.10) * burning * flick * land * 2.2;
     }
     if (lit > 0.0 && real > 0.5) {
       float pop = town(ll, -80.0, 39.0, 9.0) + town(ll, 5.0, 49.0, 9.0) + town(ll, 79.0, 23.0, 9.0) + town(ll, 115.0, 32.0, 9.0)
@@ -385,10 +407,10 @@ void main() {
         + town(ll, 48.0, 30.0, 6.0) + town(ll, 127.0, 37.0, 2.5) + town(ll, 37.0, 56.0, 4.0) + town(ll, -58.0, -34.0, 3.0);
       float speck = smoothstep(0.50, 0.72, fbm3(d * 70.0, 3)) * 0.8 + smoothstep(0.55, 0.8, fbm3(d * 190.0, 2));
       float settled = land * (1.0 - ice) * smoothstep(64.0, 52.0, alat);
-      glow += vec3(1.0, 0.74, 0.40) * lit * settled * speck * (0.05 + pop * (0.3 + 0.9 * lit)) * 1.6 * (1.0 - cl * 0.7);
+      glow += vec3(1.0, 0.72, 0.38) * lit * settled * speck * (0.10 + pop * (0.5 + 1.5 * lit)) * 3.2 * (1.0 - cl * 0.6);
     }
     // only where it is dark enough to see them — except magma, which is brighter than day
-    c += glow * mix(1.0 - day * 0.92, 1.0, max(max(molten, theiaHit), max(bomb, chicHit)));
+    c += glow * mix(1.0 - day * 0.92, 1.0, max(max(molten, theiaHit), max(bomb, u_hit.y == 2.0 ? exp(-hitT * 0.25) : 0.0)));
     // the flash itself
     c += vec3(1.0, 0.85, 0.6) * theiaHit * theiaHit * 3.0 * sat(dot(n, normalize(vec3(0.62, 0.50, 0.60))) * 1.4);
 

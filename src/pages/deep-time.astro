@@ -353,17 +353,21 @@ const fmt = (y: number) =>
   let turn = 0                      // what time alone has turned it
   let lastT = performance.now()
   let hit = { kind: 0, at: -1e9 }
+  let spinOff = 0, spinTo = 0       // an impact turns the globe to face it
+  const spinNow = () => 0.9 + turn + depthPx * 0.0021 + spinOff
   const surface = new ShaderSurface(document.getElementById('skygl')!, EARTH_FRAG, {
     textures: { u_land: '/deep-time/land.webp' },
     uniforms: () => {
       const now = performance.now()
-      if (!prefersReducedMotion) turn += Math.min(0.1, (now - lastT) / 1000) * 0.045
+      const dt = Math.min(0.1, (now - lastT) / 1000)
+      if (!prefersReducedMotion) turn += dt * 0.045
+      spinOff += (spinTo - spinOff) * Math.min(1, dt * 5)
       lastT = now
       const h = back.clientHeight || window.innerHeight
       return {
         u_years: years,
         // Scrolling turns it too: three thousand pixels to a revolution.
-        u_spin: 0.9 + turn + depthPx * 0.0021,
+        u_spin: spinNow(),
         u_globe: [geo.cx / h, 1 - geo.cy / h, geo.R / h],
         u_moon: geo.moon,
         u_hit: [(now - hit.at) / 1000, hit.kind],
@@ -373,7 +377,7 @@ const fmt = (y: number) =>
 
   /** The two events that happen in an instant and are over in a pixel: set
    *  off as they cross the line, and played out in seconds. */
-  const IMPACTS = [{ at: 4.51e9, kind: 1 }, { at: 66e6, kind: 2 }]
+  const IMPACTS = [{ at: 4.51e9, kind: 1, face: null }, { at: 66e6, kind: 2, face: 1.72 }]
 
   let ticking = false
   let first = true
@@ -401,7 +405,16 @@ const fmt = (y: number) =>
     fSun.textContent = `${Math.round(sunPct(years))}% of today`
 
     if (!first && !prefersReducedMotion) {
-      for (const im of IMPACTS) if (was > im.at && years <= im.at && was - years < im.at * 0.2) hit = { kind: im.kind, at: performance.now() }
+      for (const im of IMPACTS) {
+        if (!(was > im.at && years <= im.at && was - years < im.at * 0.2)) continue
+        hit = { kind: im.kind, at: performance.now() }
+        // Chicxulub is at 89.5 degrees west, and may be round the back: bring
+        // it to the sunlit front by the shorter way.
+        if (im.face !== null) {
+          const d = (((im.face - spinNow()) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI
+          spinTo = spinOff + d
+        }
+      }
     }
 
     // Narrow: cards go under the globe on their way out, so they are faded
