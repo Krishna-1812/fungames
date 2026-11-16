@@ -75,44 +75,6 @@ function at(m: Marker) {
   return { ...m, top: toReelTop(altToD(m.altitude)) }
 }
 
-// A deterministic starfield for the high-altitude end of the climb, fading
-// in from roughly the middle of the stratosphere onward — the same shape
-// the sky gradient itself darkens on, just given actual points of light
-// rather than a flat colour. In reel-space that's a band starting right
-// after the leading blank tail.
-const starRegionStartD = Math.round(zones[1].offset + zones[1].height * 0.45)
-const starRegionTop = REEL_TAIL
-const starRegionHeight = totalHeight - starRegionStartD
-const starRnd = (seed: number, k: number) => {
-  const x = Math.sin(seed * 9301 + k * 49297) * 233280
-  return x - Math.floor(x)
-}
-const stars = Array.from({ length: 160 }, (_, i) => ({
-  x: (starRnd(11, i) * 100).toFixed(1),
-  y: (starRnd(11, i + 500) * 100).toFixed(1),
-  r: (0.35 + starRnd(11, i + 900) * 1.15).toFixed(2),
-  o: (0.25 + starRnd(11, i + 1300) * 0.65).toFixed(2),
-  dur: (2.6 + starRnd(11, i + 1700) * 3.6).toFixed(2),
-  delay: (starRnd(11, i + 2100) * 4).toFixed(2),
-}))
-
-// Rain, low in the troposphere (0-3,000m) — same deterministic-seed
-// discipline as the starfield, just anchored to the ground end instead.
-const rainRegionTop = toReelTop(altToD(3_000))
-const rainRegionHeight = reelHeight - rainRegionTop
-const rainRnd = (seed: number, k: number) => {
-  const x = Math.sin(seed * 7207 + k * 15731) * 176192
-  return x - Math.floor(x)
-}
-const raindrops = Array.from({ length: 70 }, (_, i) => ({
-  x: (rainRnd(23, i) * 100).toFixed(1),
-  y: (rainRnd(23, i + 400) * 100).toFixed(1),
-  len: (14 + rainRnd(23, i + 800) * 22).toFixed(0),
-  dur: (0.7 + rainRnd(23, i + 1200) * 0.6).toFixed(2),
-  delay: (rainRnd(23, i + 1600) * 1.4).toFixed(2),
-  o: (0.18 + rainRnd(23, i + 2000) * 0.28).toFixed(2),
-}))
-
 // Markers sort ascending by altitude (the data file guarantees this), which
 // after toReelTop() is now *descending* reel-top order — reverse it back to
 // ascending-by-top for the grouping pass below, which only cares about
@@ -134,13 +96,6 @@ for (let i = 0; i < rough.length; ) {
 const rgb = (hex: string) =>
   [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')
 
-// A big layered mountain panorama behind the Everest / Mont Blanc /
-// Kilimanjaro cluster (roughly 3,500-9,200m) — one wide background band,
-// not another card, positioned the same way the starfield is.
-const panoramaTop = toReelTop(altToD(9_200))
-const panoramaBottom = toReelTop(altToD(3_500))
-const panoramaHeight = panoramaBottom - panoramaTop
-
 const HUD_DIGITS = 6
 ---
 
@@ -154,7 +109,7 @@ const HUD_DIGITS = 6
   {/* The sky, pinned to the viewport while the climb scrolls past it. */}
   <div class="se-back" aria-hidden="true">
     <div class="sky" id="sky"></div>
-    <div class="sky-grid"></div>
+    <div class="skygl" id="skygl"></div>
   </div>
 
   <div class="se-hud-pin">
@@ -219,27 +174,6 @@ const HUD_DIGITS = 6
     </div>
 
     <div class="reel" style={`height:${reelHeight}px`}>
-    <div class="starfield" style={`top:${starRegionTop}px; height:${starRegionHeight}px`} aria-hidden="true">
-      {stars.map((s) => (
-        <i class="se-star" style={`left:${s.x}%; top:${s.y}%; width:${(Number(s.r) * 2.2).toFixed(2)}px; height:${(Number(s.r) * 2.2).toFixed(2)}px; opacity:${s.o}; animation-duration:${s.dur}s; animation-delay:-${s.delay}s`} />
-      ))}
-    </div>
-
-    <div class="rain" style={`top:${rainRegionTop}px; height:${rainRegionHeight}px`} aria-hidden="true">
-      {raindrops.map((r) => (
-        <i class="se-rain" style={`left:${r.x}%; top:${r.y}%; height:${r.len}px; opacity:${r.o}; animation-duration:${r.dur}s; animation-delay:-${r.delay}s`} />
-      ))}
-    </div>
-
-    <div class="panorama" style={`top:${panoramaTop}px; height:${panoramaHeight}px`} aria-hidden="true">
-      <svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMax slice">
-        <path d="M0 620 L0 340 L140 220 L230 300 L330 170 L430 280 L520 150 L620 260 L720 190 L820 270 L900 210 L900 620Z" fill="#7f97b8" opacity="0.55"/>
-        <path d="M0 620 L0 400 L120 300 L210 360 L310 250 L410 340 L500 240 L600 330 L700 270 L800 350 L900 300 L900 620Z" fill="#5c7295" opacity="0.75"/>
-        <path d="M0 620 L0 460 L100 380 L190 430 L290 340 L390 410 L480 330 L580 400 L680 360 L780 420 L900 380 L900 620Z" fill="#3d4f70"/>
-        <path d="M140 220 L165 245 L188 226 M330 170 L352 194 L378 176 M520 150 L543 174 L568 156 M720 190 L742 212 L766 196" fill="none" stroke="#eaf3ff" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      </svg>
-    </div>
-
     {
       zones.map((z, i) =>
         i === 0 ? null : (
@@ -371,6 +305,8 @@ const HUD_DIGITS = 6
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
+  import { ShaderSurface } from '../lib/gl'
+  import { SPACE_ELEVATOR_SKY_FRAG } from '../lib/space-elevator-sky'
   import { onLeave } from '../lib/analytics/client'
 
   // The climb reads bottom-to-top — open at the ground, the bottom of the
@@ -662,6 +598,15 @@ const HUD_DIGITS = 6
     })
   }
 
+  /* The sky outside, at the altitude on the gauge. The CSS gradient under it
+     stays if the surface never comes up. */
+  let skyAlt = 0
+  const skySurface = new ShaderSurface($('skygl'), SPACE_ELEVATOR_SKY_FRAG, {
+    // Sky is soft: half resolution on a dense screen is not seen, and the frame rate is.
+    scale: devicePixelRatio > 1.5 ? 0.5 : 0.75,
+    uniforms: () => ({ u_alt: skyAlt }),
+  })
+
   let ticking = false
   function update() {
     ticking = false
@@ -696,6 +641,9 @@ const HUD_DIGITS = 6
     hudFill.style.background = zoneColor
     hud.style.setProperty('--glow', `rgba(${zoneColor.slice(4, -1)}, 0.4)`)
     sky.style.background = `linear-gradient(${zoneColor}, ${mix(zone.sky[0], zone.sky[1], Math.min(1, zt + 0.25))})`
+
+    skyAlt = metres
+    if (prefersReducedMotion) skySurface.redraw()
 
     const zoneIdx = zones.indexOf(zone)
     at = { metres, zoneIdx }
@@ -739,6 +687,8 @@ const HUD_DIGITS = 6
   /* A faint measured-graph-paper texture over the whole climb — static, no
      motion cost, and a small nod to how technical this page's numbers
      actually are. */
+  .skygl { position: absolute; inset: 0; pointer-events: none; }
+  .skygl :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .sky-grid {
     position: absolute; inset: 0; pointer-events: none; opacity: 0.5;
     background-image:
