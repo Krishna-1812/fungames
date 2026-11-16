@@ -37,7 +37,7 @@ const float EYE = 0.44;      // where level is, up the window
 
 // Cloud cover on a deck, at a place on it (metres).
 float deck(vec2 at, float cell, float cover) {
-  float n = fbm(at / cell + fbm(at / (cell * 3.1) + 9.0, 3) * 1.7, 5);
+  float n = fbm(at / cell + fbm(at / (cell * 3.1) + 9.0, 2) * 1.7, 4);
   return smoothstep(cover, cover + 0.22, n);
 }
 
@@ -93,10 +93,10 @@ void main() {
     // Where the ray lands. Flat enough near by; the horizon is its limit.
     float reach = min(h / max(tan(down), 1e-4), sqrt(2.0 * R * h + h * h) * 0.985);
     vec2 at = vec2(sin(az), cos(az)) * reach + vec2(0.0, 4.0e5);
-    float coast = fbm(at / 260000.0 + 3.0, 5);
+    float coast = fbm(at / 260000.0 + 3.0, 4);
     float land = smoothstep(0.50, 0.53, coast);
-    float rough = fbm(at / 24000.0, 5);
-    float fine = fbm(at / 2600.0, 4);
+    float rough = fbm(at / 24000.0, 4);
+    float fine = fbm(at / 2600.0, 3);
     float near = exp(-reach / 30000.0);                            // detail only shows near by
     vec3 ground = mix(vec3(0.16, 0.30, 0.13), vec3(0.42, 0.37, 0.24), smoothstep(0.42, 0.66, rough));
     ground = mix(ground, vec3(0.30, 0.34, 0.22), (fine - 0.5) * 1.2 * near + 0.0);
@@ -135,9 +135,9 @@ void main() {
       if (dist > 0.0 && dist < limit) {
         vec2 at = vec2(sin(az), cos(az)) * dist + vec2(t * 6.0, t * 2.0 + 1.0e5 * float(k));
         // Weather comes in systems hundreds of kilometres across: whole regions are clear and whole regions are not.
-        float c = deck(at, cell, cover) * thick * mix(1.0, smoothstep(0.40, 0.62, fbm(at / 210000.0 + 5.0 * float(k), 4)), smoothstep(4000.0, 20000.0, h));
+        float c = deck(at, cell, cover) * thick * mix(1.0, smoothstep(0.40, 0.62, fbm(at / 210000.0 + 5.0 * float(k), 3)), smoothstep(4000.0, 20000.0, h));
         // Lit from the Sun's side, grey underneath, lost in haze far off.
-        float lit = gap > 0.0 ? 0.62 + 0.25 * fbm(at / (cell * 0.5), 3) : 0.92 + 0.12 * fbm(at / (cell * 0.4), 3);
+        float lit = gap > 0.0 ? 0.62 + 0.25 * fbm(at / (cell * 0.5), 2) : 0.92 + 0.12 * fbm(at / (cell * 0.4), 2);
         float far = exp(-dist / (gap > 0.0 ? 60000.0 : 240000.0));
         vec3 cc = mix(vec3(0.72, 0.80, 0.92), vec3(1.0), lit) * (gap > 0.0 ? 0.92 : 1.0);
         if (gap < 0.0 && above > 0.0) c = 0.0;                     // a deck below is never seen above the horizon
