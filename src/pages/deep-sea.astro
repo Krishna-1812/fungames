@@ -123,7 +123,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
             ? `top:${m.top}px;--mood:${mood};--moodRgb:${rgb(mood)};${drift}`
             : `top:${m.top}px;${drift}`
           return (
-            <article class:list={['ev', `lane-${m.lane}`, { big: m.big, hero: m.hero }]} style={style}>
+            <article class:list={['ev', `lane-${m.lane}`, { big: m.big, hero: m.hero, dark: m.depth >= 180 }]} style={style}>
               {DEEP_SEA_ART[m.title] && <div class="ev-art" set:html={sceneSvg(m.title)} />}
               <div class="ev-text">
                 <div class="ev-when">{fmtDepth(m.depth)} down</div>
@@ -160,7 +160,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
   import { ring } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
-  import { DEEP_SEA_FRAG } from '../lib/deep-sea-sky'
+  import { DEEP_SEA_WATER_FRAG } from '../lib/deep-sea-water'
   import { createShell } from '../lib/game-shell'
   import { recordPlay } from '../lib/stats'
     const { zones, totalHeight } = JSON.parse(document.getElementById('game-data')!.textContent!) as any
@@ -323,10 +323,18 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
   /* The rendered water column. The CSS gradient underneath stays in place if
      the surface never comes up. */
   let curD = 0
-  const surface = new ShaderSurface(document.getElementById('skygl'), DEEP_SEA_FRAG, {
+  let floorUp = 0
+  let travelled = 0
+  const surface = new ShaderSurface(document.getElementById('skygl'), DEEP_SEA_WATER_FRAG, {
     scale: 0.75,
-    uniforms: () => ({ u_D: curD }),
+    uniforms: () => ({ u_D: curD, u_floor: floorUp, u_scroll: travelled }),
   })
+  // The lamp leans toward wherever the pointer is in the window.
+  surface.setPointer(0.5, 0.62)
+  addEventListener('pointermove', (e) => {
+    surface.setPointer(e.clientX / innerWidth, 1 - e.clientY / innerHeight)
+    if (prefersReducedMotion) surface.redraw()
+  }, { passive: true })
 
   let ticking = false
   function update() {
@@ -351,6 +359,9 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
     sky.style.background = `linear-gradient(${mix(zone.sky[0], zone.sky[1], t)}, ${mix(zone.sky[0], zone.sky[1], Math.min(1, t + 0.25))})`
 
     curD = metres
+    // The floor comes up into the window over the last half-screen of the descent.
+    floorUp = Math.max(0, Math.min(1, 1 - (totalHeight - clamped) / (innerHeight * 0.55))) * 0.42
+    travelled = clamped / 30
     if (prefersReducedMotion) surface.redraw()
 
     const zoneIdx = zones.indexOf(zone)
@@ -431,7 +442,7 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
 
   /* The surface is the brightest water on the page, so the opening is set in
      the deep's own navy, not in the white the rest of the dive uses. */
-  .intro { position: relative; min-height: 78vh; display: grid; place-content: center; text-align: center; gap: 12px; padding: 150px 20px 0; color: #0b2a3e; }
+  .intro { position: relative; min-height: 86vh; display: grid; place-content: center; text-align: center; gap: 12px; padding: 190px 20px 0; color: #062133; }
   .intro p { margin: 0; font-size: 19px; max-width: 32ch; margin-inline: auto; color: rgb(11 42 62 / 0.86); }
   /* After `.intro p`, and as specific: the title is a <p> too, and lost its size and colour to that rule. */
   .intro .intro-title {
@@ -486,6 +497,15 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
     0%, 100% { transform: translateY(0) rotate(0deg); }
     50% { transform: translateY(-9px) rotate(-0.5deg); }
   }
+
+  /* A shape in the water, not a drawing on it. In daylight an animal is a
+     dark shape against the bright water behind it; in the dark it is a pale
+     one, as far as the lamp reaches. The drawings keep their outlines and
+     give up their colours. */
+  .ev-art :global(svg) { filter: brightness(0) opacity(0.62); }
+  .ev.dark .ev-art :global(svg) { filter: brightness(0) invert(1) opacity(0.34); }
+  .ev-art { filter: none; }
+  .ev.dark .ev-art { filter: drop-shadow(0 0 16px rgb(140 200 230 / 0.35)); }
 
   .ev.big { width: min(92cqw, 620px); }
   .ev.big h2 { font-size: 30px; }
@@ -550,20 +570,22 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
     .ev { transition: none; }
   }
 
+  /* At the left edge, out of the middle where the animals are. */
   .seam {
-    position: absolute; left: 0; right: 0; text-align: center;
-    padding-top: 11px;
+    position: absolute; left: 0; right: 0; text-align: left;
+    padding: 11px 0 0 clamp(12px, 3cqw, 40px); pointer-events: none;
   }
   .seam::before {
-    content: ''; position: absolute; left: 9%; right: 9%; top: 0; height: 2px;
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px;
     border-radius: 2px;
     background: linear-gradient(90deg, var(--from), var(--to));
-    opacity: 0.65;
+    opacity: 0.4;
   }
+  @container (max-width: 620px) { .seam-note { display: none; } }
   .seam-name, .seam-note {
     position: relative; display: block;
     background: rgb(0 0 0 / 0.46); border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: 999px; padding: 4px 13px; margin: 0 auto 4px;
+    border-radius: 999px; padding: 4px 13px; margin: 0 0 4px;
     width: fit-content; max-width: 90%;
   }
   .seam-name { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.9; font-weight: 600; }
