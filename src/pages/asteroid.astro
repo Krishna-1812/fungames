@@ -301,6 +301,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   let rockSize = 0.06
   let rockSpin = 0.6
   const rockSurface = new ShaderSurface(el('rockGl'), ASTEROID_ROCK_FRAG, {
+    // Every pixel is a walk to the surface and another toward the Sun: three-quarter resolution on a dense screen, for the phone's sake.
+    scale: devicePixelRatio > 1.5 ? 0.75 : 1,
     uniforms: () => {
       // The surface runs its own clock; turning is slow enough to follow it directly.
       if (!prefersReducedMotion) rockSpin = 0.6 + performance.now() / 1000 * 0.16
