@@ -177,6 +177,36 @@ console.log('\ndeterminism')
   check(drift === 0, 'the shared generator is the same twice')
 }
 
+/* ---- the Earth under the borders ------------------------------------------ */
+
+console.log('\nthe Earth under the borders')
+{
+  const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8')
+  const earth = read('src/lib/every-second-earth.ts')
+  const page = read('src/pages/every-second.astro')
+  const map = read('src/lib/population-map.ts')
+  // The shader and the page have to agree on what is handed across, or a light is silently never lit.
+  const declared = [...earth.matchAll(/^uniform\s+\w+\s+(u_\w+)/gm)].map((m) => m[1]).sort()
+  const handed = [...(/uniforms: \(\) => \(\{ (u_sun:[^}]*) \}\)/.exec(page)?.[1] ?? '').matchAll(/(u_\w+):/g)].map((m) => m[1])
+  if (page.includes("textures: { u_land: '/deep-time/land.webp' }")) handed.push('u_land')
+  check(declared.length === 6 && declared.join() === handed.sort().join(), `the page hands the shader exactly what it asks for (${declared.join(', ')})`)
+  check(fs.existsSync(new URL('../public/deep-time/land.webp', import.meta.url)), 'the coastline it reads is published')
+  // Borders and Earth are two pictures of one map: both must be cut at the same latitudes.
+  const lat = /EARTH_LAT = \{ south: (-?\d+), north: (\d+) \}/.exec(map)
+  check(!!lat && page.includes('viewBox={`0 ${90 - EARTH_LAT.north} ${MAP_W} ${EARTH_LAT.north - EARTH_LAT.south}`}') && earth.includes('mix(LAT_S, LAT_N, vUv.y)'), 'the borders and the Earth are cut at the same latitudes')
+  if (lat) {
+    const [south, north] = [+lat[1], +lat[2]]
+    check(page.includes(`aspect-ratio: 360 / ${north - south};`), `and the frame is that shape (360 by ${north - south})`)
+    const { COUNTRIES } = await import('../src/data/population-live.ts')
+    const off = COUNTRIES.filter((c) => c.lat > north - 4 || c.lat < south + 4).map((c) => c.name)
+    check(!off.length, `none of the forty countries is cut off by it${off.length ? ' — ' + off.join(', ') : ''}`)
+    const slots = +(/EARTH_PLACES = (\d+)/.exec(earth)?.[1] ?? 0)
+    check(slots >= COUNTRIES.length, `there is a light for every one of them (${COUNTRIES.length} of ${slots})`)
+  }
+  // At speed only a few of the events can be shown, and they must not all be the first country's.
+  check(/Math\.random\(\) < visualBudget \/ seen/.test(page), 'the events shown at speed are drawn fairly from all of them')
+}
+
 /* ---- no emoji -------------------------------------------------------------- */
 
 console.log('\nno emoji')
