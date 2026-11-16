@@ -605,7 +605,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
 
   .weeks-body .lw-head {
     display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap;
-    margin: 0 auto clamp(12px, 1.8vw, 18px);
+    width: min(100%, 1180px); margin: 0 auto clamp(12px, 1.8vw, 18px);
   }
   .weeks-body .lw-kick { margin: 0 0 2px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--wk-ink3); }
   .weeks-body .lw-line { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(26px, 3.6vw, 40px); letter-spacing: -0.02em; line-height: 1.05; }
@@ -655,7 +655,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
 
   .weeks-body .under { width: min(100%, 1180px); margin: 12px auto 0; display: flex; justify-content: space-between; align-items: baseline; gap: 10px 24px; flex-wrap: wrap; }
   .weeks-body .inspect { margin: 0; min-height: 1.5em; display: flex; flex-wrap: wrap; gap: 2px 16px; align-items: baseline; font-size: 14px; color: var(--wk-ink2); }
-  .weeks-body .inspect b { color: #e8ecf5; font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .weeks-body .inspect b { color: #e8ecf5; font: inherit; font-weight: 700; }
   .weeks-body .inspect em { font-style: normal; color: var(--wk-old); flex-basis: 100%; }
   .weeks-body .legend { margin: 0; display: flex; gap: 6px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--wk-ink3); }
   .weeks-body .legend span { display: inline-flex; align-items: center; gap: 6px; }
