@@ -326,7 +326,8 @@ const fmtDepth = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${M
   let floorUp = 0
   let travelled = 0
   const surface = new ShaderSurface(document.getElementById('skygl'), DEEP_SEA_WATER_FRAG, {
-    scale: 0.75,
+    // Water is soft: half resolution on a dense screen costs nothing that can be seen, and buys the frame rate.
+    scale: devicePixelRatio > 1.5 ? 0.5 : 0.75,
     uniforms: () => ({ u_D: curD, u_floor: floorUp, u_scroll: travelled }),
   })
   // The lamp leans toward wherever the pointer is in the window.

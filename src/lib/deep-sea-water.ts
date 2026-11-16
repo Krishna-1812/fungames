@@ -65,7 +65,7 @@ void main() {
     // Perspective: the further up the window, the further away across the surface.
     float up = clamp((uv.y - 0.30) / 0.70, 0.0, 1.0);
     vec2 sp = vec2(p.x / (0.25 + up * 0.9), 1.6 / (0.18 + (1.0 - up)));
-    float w = ridge(sp * vec2(1.4, 0.9) + vec2(t * 0.11, t * 0.07), 4) * ridge(sp * vec2(0.9, 1.3) - vec2(t * 0.06, t * 0.09), 3);
+    float w = ridge(sp * vec2(1.4, 0.9) + vec2(t * 0.11, t * 0.07), 3) * ridge(sp * vec2(0.9, 1.3) - vec2(t * 0.06, t * 0.09), 2);
     float ceiling = smoothstep(0.35, 1.0, up) * (0.35 + 1.9 * pow(clamp(w * 2.0, 0.0, 1.0), 1.6));
     // Straight up is the bright window to the sky; off to the sides the surface is a mirror of the deep.
     float snell = exp(-pow(p.x / (0.55 * aspect), 2.0) * 1.4);
@@ -76,7 +76,7 @@ void main() {
   float shaftMask = smoothstep(0.004, 0.25, light) * smoothstep(0.1, 0.9, uv.y + 0.25);
   if (shaftMask > 0.001) {
     float lean = p.x + (uv.y - 1.0) * 0.32;
-    float sh = fbm(vec2(lean * 5.5 + t * 0.03, t * 0.05), 4) * fbm(vec2(lean * 13.0 - t * 0.04, 3.0), 3);
+    float sh = fbm(vec2(lean * 5.5 + t * 0.03, t * 0.05), 3) * fbm(vec2(lean * 13.0 - t * 0.04, 3.0), 2);
     sh = pow(clamp(sh * 3.2, 0.0, 1.0), 2.2);
     col += scatter * sh * shaftMask * 0.72;
   }
@@ -84,7 +84,7 @@ void main() {
   // Caustics, on the water's own haze close to the surface.
   float cm = smoothstep(26.0, 2.0, u_D) * (1.0 - uv.y * 0.5);
   if (cm > 0.001) {
-    float ca = ridge(p * vec2(3.4, 2.3) + vec2(t * 0.10, t * 0.05), 3) * ridge(p * vec2(2.5, 3.1) - vec2(t * 0.06, t * 0.12), 3);
+    float ca = ridge(p * vec2(3.4, 2.3) + vec2(t * 0.10, t * 0.05), 2) * ridge(p * vec2(2.5, 3.1) - vec2(t * 0.06, t * 0.12), 2);
     col += vec3(0.55, 0.9, 0.9) * pow(clamp(ca * 2.3, 0.0, 1.0), 2.5) * cm * 0.45;
   }
 
