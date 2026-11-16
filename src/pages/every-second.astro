@@ -2,7 +2,7 @@
 import GameShell from '../layouts/GameShell.astro'
 import { COUNTRIES, REST, annualBirths, annualDeaths, perSecond, globalTotals, WORLD_POPULATION } from '../data/population-live'
 import { COUNTRY_SHAPES, MAP_W, MAP_H } from '../data/population-geo'
-import { project } from '../lib/population-map'
+import { project, EARTH_LAT } from '../lib/population-map'
 
 /**
  * Every Second, Somewhere — a live simulation of real birth and death rates,
@@ -26,9 +26,14 @@ import { project } from '../lib/population-map'
  * lit up on a birth or death, the same way the real thing this is modelled
  * after does it.
  *
- * In the shell the map is a framed night scene on the stage, with the live
- * count above it and the speed below. A birth lights mint now rather than
- * gold. Score is births since you opened the page, Net is births minus
+ * Under those borders is the Earth as it looks at the instant on the page's
+ * clock (lib/every-second-earth.ts): daylight, the real edge of night for
+ * that date and hour, and lights on the dark side where the people are. A
+ * birth or a death is a point of light on it that opens into a ring. Run the
+ * clock at a day a minute and night goes round the world once a minute.
+ *
+ * In the shell the map is framed on the stage, with the live count above it
+ * and the speed below. A birth lights mint, a death blue-violet. Score is births since you opened the page, Net is births minus
  * deaths, Speed is the playback speed, Best is the most births you have
  * watched in one visit, and one whole simulated day is the ending (a minute,
  * at the fastest speed). Pausing stops the clock.
@@ -74,8 +79,8 @@ const restDps = perSecond(annualDeaths(REST))
 >
   <div class="es-scene" id="scene">
     <div class="mapwrap">
-      <svg id="map" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet">
-        <rect class="ocean" width={MAP_W} height={MAP_H} />
+      <div class="earth" id="earth" aria-hidden="true"></div>
+      <svg id="map" viewBox={`0 ${90 - EARTH_LAT.north} ${MAP_W} ${EARTH_LAT.north - EARTH_LAT.south}`} preserveAspectRatio="none">
         {
           layers.map((l) =>
             l.simIndex >= 0 ? (
@@ -108,6 +113,11 @@ const restDps = perSecond(annualDeaths(REST))
         <span class="rate net">net <b id="netCount">+0</b></span>
       </div>
       <div class="since">since you opened this page</div>
+    </div>
+
+    <div class="under" aria-hidden="true">
+      <span class="clock" id="clock"></span>
+      <span class="feed" id="feed"></span>
     </div>
 
     <div class="speed" role="radiogroup" aria-label="Playback speed">
@@ -143,12 +153,13 @@ const restDps = perSecond(annualDeaths(REST))
   <Fragment slot="howto">
     <p>
       A live simulation of the world's real birth and death rates: every birth
-      and every death in forty real countries lights up on its own border, at
-      the rate the real country has them.
+      and every death in forty real countries lights up where it happens, at
+      the rate the real country has them. The map is the Earth right now: day
+      where it is day, night where it is night.
     </p>
     <ul>
       <li>Each event is drawn from the same random process real, independent events follow, so the gaps are as uneven as the real ones.</li>
-      <li>Speed it up to watch an hour, or a whole day, go by in a minute.</li>
+      <li>Speed it up to watch an hour, or a whole day, go by in a minute. At a day a minute you can watch night cross the world.</li>
       <li>Click a country for its population and its own rates.</li>
     </ul>
     <p>A whole simulated day is the end. Your best is the most births you have watched in one visit.</p>
@@ -160,9 +171,10 @@ const restDps = perSecond(annualDeaths(REST))
   })} />
 
   <script>
-  import { ring } from '../lib/fx'
   import { nextInterval } from '../lib/population-map'
-  import { prefersReducedMotion } from '../lib/gl'
+  import { prefersReducedMotion, ShaderSurface } from '../lib/gl'
+  import { EVERY_SECOND_FRAG, EARTH_EVENTS, EARTH_PLACES } from '../lib/every-second-earth'
+  import { subsolar } from '../lib/progress-watch'
   import { unlock } from '../lib/audio'
   import { createShell } from '../lib/game-shell'
   import { recordPlay } from '../lib/stats'
@@ -189,13 +201,50 @@ const restDps = perSecond(annualDeaths(REST))
   const BIRTH_COLOR = '#4fe3c1'
   const DEATH_COLOR = '#8892e8'
 
-  function pulse(els: { country: SVGPathElement; marker: SVGCircleElement }, kind: 'birth' | 'death') {
-    const r = els.marker.getBoundingClientRect()
-    ring(r.left + r.width / 2, r.top + r.height / 2, kind === 'birth' ? BIRTH_COLOR : DEATH_COLOR, 11)
-    for (const el of [els.country, els.marker] as (SVGPathElement | SVGCircleElement)[]) {
-      el.classList.remove('flash-birth', 'flash-death')
-      void el.getBoundingClientRect() // restarts the animation even if it just fired
-      el.classList.add(kind === 'birth' ? 'flash-birth' : 'flash-death')
+  /* ---- the Earth under the borders ---------------------------------- */
+
+  // The map is 360 by 180, a degree to a unit, so a country's centre is its longitude and latitude.
+  const lonOf = (d: any) => d.cx - 180
+  const latOf = (d: any) => 90 - d.cy
+  const maxPop = Math.max(...simData.map((d: any) => d.population))
+  const places = new Float32Array(EARTH_PLACES * 3)
+  simData.slice(0, EARTH_PLACES).forEach((d: any, i: number) => { places[i * 3] = lonOf(d); places[i * 3 + 1] = latOf(d); places[i * 3 + 2] = d.population / maxPop })
+  const events = new Float32Array(EARTH_EVENTS * 4)
+  let eventAt = 0
+  const RAD = Math.PI / 180
+  const sun = [0, 0]
+  const startedAt = Date.now()
+  const clockNow = () => performance.now() / 1000
+  let drift = 0
+  const earth = new ShaderSurface(document.getElementById('earth')!, EVERY_SECOND_FRAG, {
+    textures: { u_land: '/deep-time/land.webp' },
+    uniforms: () => ({ u_sun: sun, u_now: clockNow(), u_drift: drift, u_events: events, u_places: places }),
+  })
+  // Without WebGL2 the borders are the map, as they were.
+  if (!earth.canvas.isConnected) document.getElementById('scene')!.classList.add('flat')
+  // The ticker is parked under reduced motion: a light still comes on and goes off, in a few steps and not sixty a second.
+  if (prefersReducedMotion) setInterval(() => earth.redraw(), 250)
+
+  const feed = document.getElementById('feed')!
+  let feedAt = 0
+  function pulse(c: Live, kind: 'birth' | 'death') {
+    // Somewhere in the country, not always its middle: further afield in a bigger one.
+    const reach = 0.5 + 3.2 * Math.sqrt(c.d.population / maxPop)
+    const k = eventAt++ % EARTH_EVENTS
+    events[k * 4] = lonOf(c.d) + (Math.random() - 0.5) * 2 * reach
+    events[k * 4 + 1] = latOf(c.d) + (Math.random() - 0.5) * 1.3 * reach
+    events[k * 4 + 2] = clockNow()
+    events[k * 4 + 3] = kind === 'birth' ? 1 : 2
+    const el = c.els.country
+    el.classList.remove('flash-birth', 'flash-death')
+    void el.getBoundingClientRect() // restarts the animation even if it just fired
+    el.classList.add(kind === 'birth' ? 'flash-birth' : 'flash-death')
+    // Said in words too, but no faster than it can be read.
+    const now = performance.now()
+    if (now - feedAt > 450) {
+      feedAt = now
+      feed.textContent = (kind === 'birth' ? 'A birth in ' : 'A death in ') + c.d.name
+      feed.dataset.kind = kind
     }
   }
 
@@ -263,6 +312,9 @@ const restDps = perSecond(annualDeaths(REST))
   const netCount = document.getElementById('netCount')!
 
   let hoursTold = 0
+  const clockEl = document.getElementById('clock')!
+  const clockFmt = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+  let clockMinute = -1
   shell.progress(0)
   function frame(now: number) {
     requestAnimationFrame(frame)
@@ -272,20 +324,35 @@ const restDps = perSecond(annualDeaths(REST))
     lastReal = now
     const dtSim = dtReal * speed
     simNow += dtSim
-    let visualBudget = 24 // per-frame cap on how many countries actually flash; the counters below are exact regardless.
+    // The Sun is wherever it is at the page's own instant, which runs ahead of the real one at speed.
+    const at = new Date(startedAt + simNow * 1000)
+    const ss = subsolar(at)
+    sun[0] = ss.lon * RAD
+    sun[1] = ss.lat * RAD
+    drift += dtSim / 86_400 / 9 // weather goes round far more slowly than the day does
+    const minute = Math.floor(+at / 60_000)
+    if (minute !== clockMinute) { clockMinute = minute; clockEl.textContent = clockFmt.format(at) + ' UTC' }
+    // At speed there are thousands a second: a few a frame is all that can be seen, and more is a white smear.
+    const visualBudget = speed === 1 ? 24 : speed === 60 ? 2 : 1 // per-frame cap
+    // Which ones are shown is drawn fairly from all of them, or the first country in the list would get every light.
+    const shownNow: [Live, 'birth' | 'death'][] = []
+    let seen = 0 // the counters below are exact regardless of how many are shown
 
     for (const c of live) {
       while (c.nextBirthAt <= simNow) {
         births++
-        if (visualBudget-- > 0) pulse(c.els, 'birth')
+        seen++
+        if (shownNow.length < visualBudget) shownNow.push([c, 'birth']); else if (Math.random() < visualBudget / seen) shownNow[Math.floor(Math.random() * visualBudget)] = [c, 'birth']
         c.nextBirthAt += nextInterval(c.d.bps, Math.random())
       }
       while (c.nextDeathAt <= simNow) {
         deaths++
-        if (visualBudget-- > 0) pulse(c.els, 'death')
+        seen++
+        if (shownNow.length < visualBudget) shownNow.push([c, 'death']); else if (Math.random() < visualBudget / seen) shownNow[Math.floor(Math.random() * visualBudget)] = [c, 'death']
         c.nextDeathAt += nextInterval(c.d.dps, Math.random())
       }
     }
+    for (const [c, kind] of shownNow) pulse(c, kind)
     restBirthAccum += restBps * dtSim
     restDeathAccum += restDps * dtSim
 
@@ -352,7 +419,6 @@ const restDps = perSecond(annualDeaths(REST))
   for (const [i, els] of byIndex) {
     els.country.addEventListener('click', () => openInspector(i))
     els.country.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInspector(i) } })
-    els.marker.addEventListener('click', () => openInspector(i))
   }
   document.getElementById('inspectorClose')!.addEventListener('click', () => {
     inspector.hidden = true
@@ -369,33 +435,36 @@ const restDps = perSecond(annualDeaths(REST))
     position: relative; overflow: hidden; color: #fff;
     display: grid; justify-items: center; gap: 12px;
     padding: 14px 10px 14px;
-    border: 2px solid var(--ink); border-radius: var(--r-lg); background: #060c14;
+    border: 2px solid var(--ink); border-radius: var(--r-lg); background: #04070d;
   }
 
-  .mapwrap { width: 100%; max-width: 1200px; }
-  #map { width: 100%; height: auto; display: block; overflow: visible; }
-  .ocean { fill: #0a1420; }
+  /* The Earth is a canvas under the borders; the borders are only lines over it. */
+  .mapwrap { position: relative; width: 100%; max-width: 1320px; aspect-ratio: 360 / 142; border-radius: 10px; overflow: hidden; background: #060c18; box-shadow: 0 0 0 1px rgb(140 170 220 / 0.14), 0 30px 60px -30px rgb(0 0 0 / 0.9); }
+  .earth { position: absolute; inset: 0; }
+  .earth :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-  .country {
-    fill: #16232e;
-    stroke: #223140;
-    stroke-width: 0.25;
-  }
-  .country.sim {
-    fill: #1e3345;
-    stroke: #2f4a60;
-    cursor: pointer;
-  }
-  :global(html.play) .country.sim { transition: fill 220ms ease-out; }
-  .country.sim:hover, .country.sim:focus-visible { fill: #2a4a63; outline: none; }
+  .country { fill: transparent; stroke: rgb(200 220 255 / 0.07); stroke-width: 0.18; }
+  .country.sim { stroke: rgb(200 220 255 / 0.20); stroke-width: 0.22; cursor: pointer; }
+  .country.sim:hover, .country.sim:focus-visible { fill: rgb(200 220 255 / 0.12); stroke: rgb(255 255 255 / 0.7); outline: none; }
   .country.sim.flash-birth { animation: flashCountryBirth 900ms ease-out; }
   .country.sim.flash-death { animation: flashCountryDeath 1100ms ease-out; }
   @keyframes flashCountryBirth {
-    0% { fill: #1d5a50; } 100% { fill: #1e3345; }
+    0% { fill: rgb(79 227 193 / 0.26); stroke: rgb(79 227 193 / 0.9); } 100% { fill: transparent; stroke: rgb(200 220 255 / 0.20); }
   }
   @keyframes flashCountryDeath {
-    0% { fill: #3d4270; } 100% { fill: #1e3345; }
+    0% { fill: rgb(142 152 255 / 0.26); stroke: rgb(142 152 255 / 0.9); } 100% { fill: transparent; stroke: rgb(200 220 255 / 0.20); }
   }
+  /* Without the Earth, the borders are the map, as they were. */
+  .flat .country { fill: #16232e; stroke: #223140; }
+  .flat .country.sim { fill: #1e3345; stroke: #2f4a60; }
+  .es-marker { display: none; }
+
+  .under { display: flex; gap: 6px 22px; flex-wrap: wrap; justify-content: center; align-items: baseline; font-size: 13px; min-height: 1.5em; }
+  .clock { font-variant-numeric: tabular-nums; letter-spacing: 0.06em; opacity: 0.72; }
+  .feed { opacity: 0.92; }
+  .feed[data-kind='birth'] { color: #7cf0d6; }
+  .feed[data-kind='death'] { color: #aab2ff; }
 
   .es-marker {
     fill: #6e879c;
@@ -412,12 +481,9 @@ const restDps = perSecond(annualDeaths(REST))
     0% { fill: #dfe3ff; r: 3; } 100% { fill: #6e879c; r: 1.3; }
   }
 
-  .hud {
-    order: -1; text-align: center; pointer-events: none; max-width: 100%;
-    background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 10px 20px;
-  }
-  .pop-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; }
-  .pop-value { font-size: clamp(22px, 4.4vw, 34px); font-weight: 700; }
+  .hud { order: -1; text-align: center; pointer-events: none; max-width: 100%; padding: 6px 12px 2px; }
+  .pop-label { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.7; }
+  .pop-value { font-family: var(--display); font-weight: 400; font-size: clamp(34px, 6.4vw, 64px); letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .rate-row { display: flex; gap: 14px; justify-content: center; margin-top: 6px; font-size: 13px; flex-wrap: wrap; }
   .rate i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
   .rate.birth i { background: #4fe3c1; }

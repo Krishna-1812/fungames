@@ -21,6 +21,8 @@ export const LAT_MIN = -90
 export const LAT_MAX = 90
 export const MAP_W = 360
 export const MAP_H = 180
+/** What the page shows of it. The map stops short of the poles: nobody is born on the ice, and Antarctica flattened is a third of the picture. */
+export const EARTH_LAT = { south: -58, north: 84 }
 
 /** Real latitude/longitude to map coordinates — the same projection
  *  `build-population-geo.mjs` used to draw the real country shapes, so a
