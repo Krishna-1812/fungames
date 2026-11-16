@@ -145,11 +145,11 @@ src/
                         the page stands next to the paper
     progress-time.ts    the fifteen units you are inside of, ordered by span,
                         and the date arithmetic that survives a 23-hour day
-    progress-geom.ts    where each of the dial's channels is, which one a
-                        point is in, and how dark the readout's ground may be
-    progress-dial.ts    that instrument as a fragment shader: milled channels,
-                        a knurled bezel, engine turning and a crystal
-    progress-panel.ts   the wall it is bolted to, and the one lamp above it
+    progress-watch.ts   the watch that shows them: the arithmetic the hands
+                        are set from, and the drawing
+    progress-earth.ts   the Earth in its 24-hour dial, lit by where the Sun is
+    progress-lume.ts    the colour a span glows in the register, by its rate
+    progress-panel.ts   the wall it hangs on, and the one lamp above it
     sky-forecast.ts     Meeus: seasons, moon phases, eclipses, perihelion,
                         the Moon’s distance and how much of it is lit
     robot-scene.ts      the CAPTCHA's street, in perspective, with materials,
@@ -1123,18 +1123,24 @@ throws two dozen kinds of mangled URL at the decoder, and checks a link still
 means the same thing after the layer list is reordered, added to and cut down —
 which is the failure an index-based format makes silently.*
 
-**Progress** — every unit of time you are inside, draining every frame. Fifteen
-of them, ordered by span and drawn as concentric channels milled into one dial:
-this second at the rim, the Sun's life dead centre, and each one containing the
-one outside it. The fast channels run with hot lume and the slow ones hold cold
-mineral, so a still screenshot still says which is which. *`check-progress.mjs`
+**Progress** — every unit of time you are inside, draining every frame.
+Fifteen of them, and they used to be fifteen concentric rings, which look
+alike. They are one astronomical watch now (`lib/progress-watch.ts`), each
+span shown by the thing that has always shown it: three hands for the second,
+minute and hour; a day-of-the-week dial with the weekend tinted; the Moon at
+tonight's phase; the Earth seen from over the pole, turning under a fixed Sun
+on the real coastline, with the edge of night tilting through the seasons
+(`lib/progress-earth.ts`); a pointer on a ring of dates; a dial of months in
+four quarters; the year on four drums that turn over as a decade, a century
+and a millennium run out; Unix time in thirty-two lamps; and a reserve gauge
+for the Sun. Point at a part and the plate reads it; pick a row in the
+register and its part stays lit while the rest stands back. *`check-progress.mjs`
 walks a year of instants through the date model in five timezones — including
 Lord Howe Island, whose clocks move by thirty minutes — and found that
-`setSeconds(0, 0)` does not survive the autumn change: during the repeated hour
-a local wall-clock time names two instants, and the minute came back an hour
-away from the instant inside it. `check-progress-dial.mjs` walks the radius and
-checks the ring the pointer finds is the ring the shader milled, at fifteen
-rings and at the fourteen it will have after January 2038.*
+`setSeconds(0, 0)` does not survive the autumn change. `check-progress-watch.mjs`
+sets the hands to instants worked by hand, puts the Sun over the tropics at
+the solstices, and fails if any span in the register has no part on the
+watch.*
 
 **From Memory** — draw a bicycle, then see a real one. Sixteen prompts, ten a
 sitting, deliberately not brand logos. *`scripts/check-memory.mjs` parses every
@@ -1522,7 +1528,6 @@ node scripts/check-fold.mjs        # the paper model, against paper
 node scripts/check-fold-scene.mjs  # Paper Folds' drawing, and its sky, at every fold
 node scripts/check-fold-scale.mjs  # the ladder of real things, and the silhouettes
 node scripts/check-progress.mjs    # Progress's date maths, in five timezones
-node scripts/check-progress-dial.mjs # the instrument: rings, hit test, readout
 node scripts/check-forecast.mjs    # the sky model, against Meeus and real eclipses
 node scripts/check-result-card.mjs # the share card, at every game and result shape
 node scripts/check-stats.mjs       # what the site remembers, against a hostile store
@@ -1536,7 +1541,7 @@ built homepage island in headless Chrome (see The homepage). Each exits non-zero
 `data/memory.ts`, `lib/orbit-sim.ts`, `lib/orbit-goals.ts`, `lib/powder-sim.ts`,
 `lib/powder-goals.ts`, `lib/mix-code.ts`, `lib/steady-shapes.ts`,
 `lib/tile-art.ts`, `lib/icons.ts`, `lib/progress-time.ts`,
-`lib/progress-geom.ts`, `data/historical-figures.ts`, `data/earth-reviews.ts`
+`lib/progress-watch.ts`, `data/historical-figures.ts`, `data/earth-reviews.ts`
 and `lib/scale-art.ts` is deliberately pure
 functions over plain data so it can be run this way.
 

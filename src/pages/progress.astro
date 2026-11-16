@@ -10,9 +10,7 @@ const WATCH = watchSvg()
  * All of it is computed from the visitor's own clock, so it is correct in any
  * timezone and needs no backend. The date arithmetic lives in
  * `lib/progress-time.ts` and is exercised by `scripts/check-progress.mjs`
- * across four timezones and a year of instants; the instrument's geometry
- * lives in `lib/progress-dial.ts` so that the shader and the pointer hit-test
- * cannot disagree about where a ring is.
+ * across five timezones and a year of instants.
  *
  * The page is one object: a wall panel, a watch hung on it, and a data plate
  * under that. The watch (lib/progress-watch.ts) shows each span by the thing
@@ -245,6 +243,7 @@ const WATCH = watchSvg()
     // The part of the watch that shows this span stays lit; the rest stands back.
     const id = f >= 0 ? RINGS[f].id : ''
     watch.classList.toggle('has-focus', f >= 0)
+    watch.classList.toggle('day-focus', id === 'day')
     for (const el of parts) { el.classList.toggle('on', !!id && el.dataset.u!.split(' ').includes(id)); el.classList.remove('keep') }
     // A part inside another (the weekend, inside the week) must not be dimmed by its parent.
     for (const el of parts) if (el.classList.contains('on')) for (let a = el.parentElement?.closest('.wc'); a; a = a.parentElement?.closest('.wc')) a.classList.add('keep')
@@ -568,6 +567,8 @@ const WATCH = watchSvg()
   .progress-body .watch .wc { transition: opacity 160ms var(--ease); }
   .progress-body .watch.has-focus .wc:not(.on):not(.keep) { opacity: 0.32; }
   .progress-body .watch.has-focus .keep > :not(.wc) { opacity: 0.5; }
+  .progress-body .earth { transition: opacity 160ms var(--ease); }
+  .progress-body .watch.has-focus:not(.day-focus) .earth { opacity: 0.32; }
 
   .progress-body .plate {
     position: relative;

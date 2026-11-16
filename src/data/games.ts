@@ -358,7 +358,7 @@ export const GAMES: Game[] = [
     title: 'Progress',
     blurb: 'Everything, ending, live',
     description:
-      'How much of this minute, this year, this century is already gone. Updated every frame, which does not help.',
+      'How much of this minute, this year, this century is already gone, on one watch: the Moon at tonight\'s phase, the Earth turning under the Sun, the year on rolling drums. Updated every frame, which does not help.',
     accent: '#2c1440', accent2: '#a86ede',
     category: 'fun',
     added: '2026-09-03',
