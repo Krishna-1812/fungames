@@ -533,8 +533,14 @@ const WATCH = watchSvg()
     width: min(100%, 780px, 86vh);
     aspect-ratio: 1;
     touch-action: manipulation;
-    filter: drop-shadow(0 30px 40px rgb(0 0 0 / 0.55)) drop-shadow(0 6px 10px rgb(0 0 0 / 0.5));
   }
+  /* The shadow the watch throws on the wall is its own still layer. As a filter on the watch
+     it had the whole drawing rasterised again every time a hand moved, which is every frame. */
+  .progress-body .watch::before {
+    content: ''; position: absolute; inset: 1.6%; border-radius: 50%;
+    box-shadow: 0 34px 54px rgb(0 0 0 / 0.6), 0 8px 14px rgb(0 0 0 / 0.5);
+  }
+  .progress-body .watch-base { will-change: transform; }
   .progress-body .watch-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
   .progress-body .watch-top { pointer-events: none; }
   .progress-body .earth { position: absolute; aspect-ratio: 1; border-radius: 50%; overflow: hidden; pointer-events: none; }
