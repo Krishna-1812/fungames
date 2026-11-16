@@ -69,6 +69,15 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
       <div class="lw-col">
         <h3>In your lifetime</h3>
         <ol class="lw-world" id="world"></ol>
+        <form class="lw-add" id="add">
+          <label for="mineText">Add a date of your own</label>
+          <div class="lw-add-row">
+            <input type="text" id="mineText" maxlength="48" placeholder="Moved to the city" autocomplete="off" required />
+            <input type="date" id="mineDate" aria-label="Its date" required />
+            <button type="submit" class="lw-add-btn">Add</button>
+          </div>
+          <p class="lw-add-msg" id="addMsg" role="status">Yours stay in this browser as well.</p>
+        </form>
         <p class="lw-note">Each line of fifty-two is one year of your life, birthday to birthday. So a lamp is a week and about half an hour.</p>
       </div>
     </section>
@@ -83,7 +92,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
     <ul>
       <li>Each line of fifty-two is one year of your life, starting on your birthday. The lilac lamp is this week.</li>
       <li>Point at any week, or tap it, to see its dates and how old you were. The arrow keys work too.</li>
-      <li>A lamp with a pinhole is a week the world did something in. The list under the board says what.</li>
+      <li>A lamp with a pinhole is a week the world did something in. The list under the board says what, and you can add dates of your own to it.</li>
       <li>The date stays in your browser, so the board is here next time. Nothing is sent anywhere.</li>
     </ul>
     <p>Your best is the oldest you have been on a visit here.</p>
@@ -98,7 +107,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
   import { sfx, unlock } from '../lib/audio'
   import { ShaderSurface, prefersReducedMotion } from '../lib/gl'
   import { weeksBoardFrag, BOARD_MARGIN, BOARD_PINS } from '../lib/weeks-board'
-  import { YEARS, WEEKS, TOTAL, DAY_MS, parseDay, lifeAt, cellSpan, worldFor, moonsIn, type Placed } from '../lib/weeks-life'
+  import { YEARS, WEEKS, TOTAL, DAY_MS, parseDay, lifeAt, cellSpan, cellOf, ageAt, worldFor, moonsIn, type Placed } from '../lib/weeks-life'
   import { createShell } from '../lib/game-shell'
   import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
@@ -108,6 +117,17 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
   // Restart is a reload, the default: the saved date brings the board back.
   const shell = createShell({ slug: 'life-in-weeks' })
   const KEY = 'life-in-weeks:dob'
+  /* The visitor's own dates. Like the date of birth, this key is not on the
+     list a save code carries (lib/sync.ts), so it never leaves the browser. */
+  const MINE_KEY = 'life-in-weeks:mine'
+  const MINE_MAX = 24
+  type Mine = { t: string; d: string }
+  let mine: Mine[] = []
+  try {
+    const raw = JSON.parse(localStorage.getItem(MINE_KEY) || '[]')
+    if (Array.isArray(raw)) mine = raw.filter((m) => m && typeof m.t === 'string' && typeof m.d === 'string' && parseDay(m.d)).slice(0, MINE_MAX)
+  } catch {}
+  const saveMine = () => { try { localStorage.setItem(MINE_KEY, JSON.stringify(mine)) } catch {} }
   const M = BOARD_MARGIN
   const board = el('board')
   const wrap = el('wrap')
@@ -130,7 +150,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
   let pinnedLook = false // a tap or a key holds the look; a passing mouse does not
   let head = 0
   let tall = false
-  let placed: Placed[] = []
+  let placed: (Placed & { mine?: number })[] = []
   const pins = new Float32Array(BOARD_PINS).fill(-1)
   const rest = () => (tall ? [0.5, 0.16] : [0.3, 0.2])
   const light = rest()
@@ -258,7 +278,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
     pinnedLook = hold && idx >= 0
     const shown = idx >= 0 ? idx : nowIdx
     el('inspect').innerHTML = shown >= 0 ? describe(shown) : '<span>Past the last lamp. The board ran out before you did.</span>'
-    for (const b of el('world').querySelectorAll('button')) b.classList.toggle('on', +b.dataset.idx! === idx)
+    for (const b of el('world').querySelectorAll<HTMLElement>('button[data-idx]')) b.classList.toggle('on', +b.dataset.idx! === idx)
     paint()
   }
 
@@ -326,6 +346,53 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
     return `<div class="lw-tile"><b>${value}</b><span>${label}</span></div>`
   }
 
+  /** Put the world's dates and the visitor's own on this life's board, and list them. */
+  function place() {
+    if (!dob) return
+    const now = new Date()
+    placed = worldFor(dob, now)
+    mine.forEach((m, k) => {
+      const date = parseDay(m.d)!
+      const idx = cellOf(dob!, date)
+      if (+date >= +dob! && idx < TOTAL) placed.push({ text: m.t, date, idx, age: ageAt(dob!, date), ahead: +date > +now, mine: k })
+    })
+    placed.sort((a, b) => +a.date - +b.date)
+    pins.fill(-1)
+    // If there are more than the board can mark, the visitor's own come first.
+    const marked = [...placed.filter((e) => e.mine !== undefined), ...placed.filter((e) => e.mine === undefined).reverse()].slice(0, BOARD_PINS)
+    marked.forEach((e, i) => (pins[i] = e.idx))
+    el('world').innerHTML = placed.length
+      ? placed.map((e) => {
+          const age = e.age === 0 ? (e.ahead ? 'in your first year' : 'you were a baby') : e.ahead ? `you would be ${e.age}` : `you were ${e.age}`
+          return `<li class="${e.mine !== undefined ? 'mine' : ''}"><button type="button" data-idx="${e.idx}" class="${e.ahead ? 'ahead' : ''}">` +
+            `<span class="yr">${e.date.getFullYear()}</span><span class="tx">${esc(e.text)}</span><span class="ag">${age}</span></button>` +
+            (e.mine !== undefined ? `<button type="button" class="rm" data-rm="${e.mine}" aria-label="Remove ${esc(e.text)}">&times;</button>` : '') + `</li>`
+        }).join('')
+      : '<li class="none">Nothing on the list falls inside these ninety years.</li>'
+    paint()
+  }
+
+  el('add').addEventListener('submit', (e) => {
+    e.preventDefault()
+    if (!dob) return
+    const text = (el('mineText') as HTMLInputElement).value.trim().slice(0, 48)
+    const dStr = (el('mineDate') as HTMLInputElement).value
+    const date = parseDay(dStr)
+    const msg = el('addMsg')
+    if (!text || !date) return
+    if (+date < +dob || cellOf(dob, date) >= TOTAL) { msg.textContent = 'That date is not on your board: it is before you were born, or after ninety.'; return }
+    if (mine.length >= MINE_MAX) { msg.textContent = `The board holds ${MINE_MAX} of your own. Remove one to add another.`; return }
+    mine.push({ t: text, d: dStr })
+    saveMine()
+    // Only that one was added, never what it says or when it was.
+    shell.pick('Own date', 'Added')
+    ;(el('add') as HTMLFormElement).reset()
+    msg.textContent = 'Added. It stays in this browser.'
+    place()
+    setLook(cellOf(dob, date), true)
+    sfx.tick()
+  })
+
   function show(dobStr: string) {
     const d = parseDay(dobStr)
     const now = new Date()
@@ -335,23 +402,13 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
     lived = life.lived
     nowIdx = life.inside ? life.lived : -1
 
-    placed = worldFor(d, now)
-    pins.fill(-1)
-    placed.slice(-BOARD_PINS).forEach((e, i) => (pins[i] = e.idx))
+    place()
 
     const left = life.left
     el('kick').textContent = life.inside ? `Week ${nf(lived + 1)} of ${nf(TOTAL)}` : 'Past the last lamp'
     el('headline').textContent = `${life.pct.toFixed(1)}% of ninety years`
     el('bornTxt').textContent = `Born ${bornFmt.format(d)}`
     board.setAttribute('aria-label', `Ninety years of weeks: ${nf(lived)} lived, ${nf(left.weeks)} left. Arrow keys move from week to week.`)
-
-    el('world').innerHTML = placed.length
-      ? placed.map((e) => {
-          const age = e.age === 0 ? (e.ahead ? 'in your first year' : 'you were a baby') : e.ahead ? `you would be ${e.age}` : `you were ${e.age}`
-          return `<li><button type="button" data-idx="${e.idx}" class="${e.ahead ? 'ahead' : ''}">` +
-            `<span class="yr">${e.date.getFullYear()}</span><span class="tx">${esc(e.text)}</span><span class="ag">${age}</span></button></li>`
-        }).join('')
-      : '<li class="none">Nothing on the list falls inside these ninety years.</li>'
 
     el('left').innerHTML =
       tile(nf(left.weeks), 'weeks') +
@@ -457,13 +514,21 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
   el('world').addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('button')
     if (!b) return
+    if (b.dataset.rm !== undefined) {
+      mine.splice(+b.dataset.rm, 1)
+      saveMine()
+      shell.pick('Own date', 'Removed')
+      place()
+      setLook(-1)
+      return
+    }
     const i = +b.dataset.idx!
     if (pinnedLook && look === i) setLook(-1)
     else { setLook(i, true); sfx.tick(); if (tall) board.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion ? 'auto' : 'smooth' }) }
   })
   el('world').addEventListener('pointerover', (e) => {
     const b = (e.target as HTMLElement).closest('button')
-    if (b && (e as PointerEvent).pointerType === 'mouse' && !pinnedLook) setLook(+b.dataset.idx!)
+    if (b && b.dataset.idx && (e as PointerEvent).pointerType === 'mouse' && !pinnedLook) setLook(+b.dataset.idx)
   })
   el('world').addEventListener('pointerleave', () => { if (!pinnedLook) setLook(-1) })
 
@@ -613,12 +678,18 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
     font-family: var(--display); font-weight: 400; font-size: clamp(20px, 2.2vw, 24px); letter-spacing: -0.01em;
   }
   .weeks-body .lw-world { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: clamp(28px, 5vw, 64px); }
-  .weeks-body .lw-world li { break-inside: avoid; }
+  .weeks-body .lw-world li { break-inside: avoid; display: flex; align-items: stretch; border-bottom: 1px solid rgb(120 146 200 / 0.08); }
+  .weeks-body .lw-world .mine .ag, .weeks-body .lw-world .mine .yr { color: var(--wk-now); }
+  .weeks-body .lw-world .rm {
+    flex: none; width: 40px; min-height: 40px; margin: 0 -8px 0 8px; padding: 0; display: grid; place-items: center;
+    grid-template-columns: none; font-size: 20px; line-height: 1; color: var(--wk-ink3);
+  }
+  .weeks-body .lw-world .rm:hover { color: #fff; }
   .weeks-body .tall .lw-world { columns: 1; }
   .weeks-body .lw-world li.none { color: var(--wk-ink3); font-size: 14px; padding: 8px 0; }
   .weeks-body .lw-world button {
     width: 100%; display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline;
-    background: none; border: 0; border-bottom: 1px solid rgb(120 146 200 / 0.08); color: inherit; font: inherit; text-align: left;
+    background: none; border: 0; color: inherit; font: inherit; text-align: left;
     padding: 9px 8px; margin: 0 -8px; width: calc(100% + 16px); border-radius: 6px; cursor: pointer; min-height: 40px;
     transition: background 140ms var(--ease);
   }
@@ -628,6 +699,25 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
   .weeks-body .lw-world .ag { font-size: 13px; color: var(--wk-old); white-space: nowrap; }
   .weeks-body .lw-world .ahead .tx { color: var(--wk-ink2); }
   .weeks-body .lw-world .ahead .ag { color: var(--wk-now); }
+
+  .weeks-body .lw-add { margin: 22px 0 0; max-width: 560px; }
+  .weeks-body .lw-add label { display: block; font-size: 14px; color: var(--wk-ink2); margin-bottom: 8px; }
+  .weeks-body .lw-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .weeks-body .lw-add input[type='text'] {
+    flex: 1 1 180px; min-width: 0; background: #07080e; color: #e8ecf5;
+    border: 1px solid rgb(120 146 200 / 0.26); border-radius: 10px; padding: 10px 12px; font-size: 16px; min-height: 44px;
+    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.6);
+  }
+  .weeks-body .lw-add input[type='text']::placeholder { color: #66718c; }
+  .weeks-body .lw-add input[type='text']:focus-visible { outline: none; border-color: var(--wk-now); box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.6), 0 0 0 3px rgb(184 161 255 / 0.24); }
+  .weeks-body .lw-add-btn {
+    min-height: 44px; padding: 10px 20px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 600; font-size: 15px;
+    background: rgb(120 146 200 / 0.12); color: #e8ecf5; border: 1px solid rgb(120 146 200 / 0.3);
+    transition: background 140ms var(--ease);
+  }
+  .weeks-body .lw-add-btn:hover { background: rgb(120 146 200 / 0.22); }
+  .weeks-body .lw-add-btn:focus-visible, .weeks-body .lw-world .rm:focus-visible { outline: 2px solid var(--wk-now); outline-offset: 2px; }
+  .weeks-body .lw-add-msg { margin: 8px 0 0; font-size: 12.5px; color: var(--wk-ink3); min-height: 1.4em; }
 
   .weeks-body .lw-left { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 0 clamp(18px, 3vw, 40px); }
   .weeks-body .lw-tile { padding: 12px 0; border-bottom: 1px solid rgb(120 146 200 / 0.08); }
