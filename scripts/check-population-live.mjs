@@ -204,7 +204,7 @@ console.log('\nthe Earth under the borders')
     check(slots >= COUNTRIES.length, `there is a light for every one of them (${COUNTRIES.length} of ${slots})`)
   }
   // At speed only a few of the events can be shown, and they must not all be the first country's.
-  check(/Math\.random\(\) < visualBudget \/ seen/.test(page), 'the events shown at speed are drawn fairly from all of them')
+  check(/visualBudget && Math\.random\(\) < visualBudget \/ seen/.test(page), 'the events shown at speed are drawn fairly from all of them')
 }
 
 /* ---- no emoji -------------------------------------------------------------- */

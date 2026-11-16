@@ -42,7 +42,8 @@ void main() {
   float lon = radians(lonD), lat = radians(latD);
   vec2 deg = vec2(lonD, latD);
   // One degree is this many pixels: marks keep their size on the screen, not on the map.
-  float pxPerDeg = u_res.x / 360.0;
+  // On a phone the map is drawn taller than it is wide for its degrees, so the two are measured apart.
+  vec2 pxPerDeg = u_res / vec2(360.0, LAT_N - LAT_S);
 
   float field = texture(u_land, vec2(vUv.x, latD / 180.0 + 0.5)).r;
   float land = smoothstep(0.492, 0.508, field);
@@ -116,15 +117,15 @@ void main() {
     if (age < 0.0 || age > 1.6) continue;
     vec2 dd = deg - e.xy;
     dd.x -= 360.0 * floor(dd.x / 360.0 + 0.5);
-    float dpx = length(dd) * pxPerDeg / u_dpr;   // distance in CSS pixels, so a ring is the same size on any screen
+    float dpx = length(dd * pxPerDeg) / u_dpr;   // distance in CSS pixels, so a ring is the same size on any screen
     float t = age / 1.6;
     float fade = (1.0 - t) * (1.0 - t);
-    float core = exp(-dpx * dpx / 9.0) * fade * 1.1;
-    // Smaller on a small map, or three rings cover a continent on a phone.
     float size = clamp(u_res.x / u_dpr / 1100.0, 0.42, 1.0);
+    float core = exp(-dpx * dpx / (9.0 * size)) * fade * 1.1;
+    // All of it smaller on a small map, or three rings cover a continent on a phone.
     float radius = (4.0 + 30.0 * (1.0 - (1.0 - t) * (1.0 - t))) * size;
     float ring = exp(-pow((dpx - radius) / 1.6, 2.0)) * fade;
-    float halo = exp(-dpx / 12.0) * fade * 0.22;
+    float halo = exp(-dpx / (12.0 * size)) * fade * 0.22;
     vec3 tint = e.w < 1.5 ? vec3(0.31, 0.89, 0.76) : vec3(0.56, 0.60, 1.0);
     col += tint * (ring * 0.9 + halo) + mix(tint, vec3(1.0), 0.7) * core;
   }

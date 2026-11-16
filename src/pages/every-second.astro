@@ -218,6 +218,8 @@ const restDps = perSecond(annualDeaths(REST))
   let drift = 0
   const earth = new ShaderSurface(document.getElementById('earth')!, EVERY_SECOND_FRAG, {
     textures: { u_land: '/deep-time/land.webp' },
+    // Three-quarter resolution on a dense screen: the picture is soft by nature, and the frame rate is not.
+    scale: devicePixelRatio > 1.5 ? 0.75 : 1,
     uniforms: () => ({ u_sun: sun, u_now: clockNow(), u_drift: drift, u_events: events, u_places: places }),
   })
   // Without WebGL2 the borders are the map, as they were.
@@ -312,6 +314,7 @@ const restDps = perSecond(annualDeaths(REST))
   const netCount = document.getElementById('netCount')!
 
   let hoursTold = 0
+  let lastShownAt = 0
   const clockEl = document.getElementById('clock')!
   const clockFmt = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
   let clockMinute = -1
@@ -333,7 +336,7 @@ const restDps = perSecond(annualDeaths(REST))
     const minute = Math.floor(+at / 60_000)
     if (minute !== clockMinute) { clockMinute = minute; clockEl.textContent = clockFmt.format(at) + ' UTC' }
     // At speed there are thousands a second: a few a frame is all that can be seen, and more is a white smear.
-    const visualBudget = speed === 1 ? 24 : speed === 60 ? 2 : 1 // per-frame cap
+    const visualBudget = speed === 1 ? 24 : now - lastShownAt > 85 ? 1 : 0 // per-frame cap; about a dozen a second at speed
     // Which ones are shown is drawn fairly from all of them, or the first country in the list would get every light.
     const shownNow: [Live, 'birth' | 'death'][] = []
     let seen = 0 // the counters below are exact regardless of how many are shown
@@ -342,17 +345,18 @@ const restDps = perSecond(annualDeaths(REST))
       while (c.nextBirthAt <= simNow) {
         births++
         seen++
-        if (shownNow.length < visualBudget) shownNow.push([c, 'birth']); else if (Math.random() < visualBudget / seen) shownNow[Math.floor(Math.random() * visualBudget)] = [c, 'birth']
+        if (shownNow.length < visualBudget) shownNow.push([c, 'birth']); else if (visualBudget && Math.random() < visualBudget / seen) shownNow[Math.floor(Math.random() * visualBudget)] = [c, 'birth']
         c.nextBirthAt += nextInterval(c.d.bps, Math.random())
       }
       while (c.nextDeathAt <= simNow) {
         deaths++
         seen++
-        if (shownNow.length < visualBudget) shownNow.push([c, 'death']); else if (Math.random() < visualBudget / seen) shownNow[Math.floor(Math.random() * visualBudget)] = [c, 'death']
+        if (shownNow.length < visualBudget) shownNow.push([c, 'death']); else if (visualBudget && Math.random() < visualBudget / seen) shownNow[Math.floor(Math.random() * visualBudget)] = [c, 'death']
         c.nextDeathAt += nextInterval(c.d.dps, Math.random())
       }
     }
     for (const [c, kind] of shownNow) pulse(c, kind)
+    if (shownNow.length) lastShownAt = now
     restBirthAccum += restBps * dtSim
     restDeathAccum += restDps * dtSim
 
@@ -521,6 +525,8 @@ const restDps = perSecond(annualDeaths(REST))
   .inspector .close:hover { opacity: 1; }
 
   @media (max-width: 620px) {
+    /* Taller than its degrees on a phone, or the whole world is a strip a thumb high. */
+    .mapwrap { aspect-ratio: 360 / 215; }
     .rate-row { gap: 9px; font-size: 12.5px; }
     .speed .opt { padding: 6px 9px; font-size: 12px; }
   }
