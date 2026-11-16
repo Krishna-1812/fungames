@@ -23,14 +23,14 @@
  */
 import { glsl } from './gl'
 
-export const BOARD_MARGIN = 1
+export const BOARD_MARGIN = 0.5
 export const BOARD_PINS = 48
 
 export function weeksBoardFrag(years: number, weeks: number) {
   return glsl(`
 #define YEARS ${years}.0
 #define WEEKS ${weeks}.0
-#define M ${BOARD_MARGIN}.0
+#define M ${BOARD_MARGIN.toFixed(2)}
 #define PINS ${BOARD_PINS}
 
 uniform float u_lit;    // lamps lit so far, counting up to the weeks lived

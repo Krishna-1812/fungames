@@ -139,8 +139,8 @@ console.log('\nthe board')
   const ret = /return \{ (u_lit:[^}]*) \}/.exec(page)?.[1] ?? ''
   const handed = [...ret.matchAll(/(u_\w+):/g)].map((m) => m[1]).sort()
   check(declared.length >= 6 && declared.join() === handed.join(), `the page hands over exactly what the shader asks for (${declared.join(', ')})`)
-  const margin = /BOARD_MARGIN = (\d+)/.exec(board)?.[1]
-  check(margin === '1' && page.includes('aspect-ratio: 92 / 54') && page.includes('aspect-ratio: 54 / 92'), 'the board is cut to the lamps plus the rim the shader draws')
+  const margin = /BOARD_MARGIN = ([\d.]+)/.exec(board)?.[1]
+  check(margin === '0.5' && page.includes('aspect-ratio: 91 / 53') && page.includes('aspect-ratio: 53 / 91'), 'the board is cut to the lamps plus the rim the shader draws')
   check(!fs.existsSync(path.join(root, 'src/lib/weeks-grid.ts')) && !fs.existsSync(path.join(root, 'src/lib/weeks-field.ts')), 'the old grid and backdrop are gone')
 }
 

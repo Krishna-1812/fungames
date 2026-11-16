@@ -564,7 +564,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
   .weeks-body [hidden] { display: none !important; }
 
   .weeks-body .lw-wrap {
-    position: relative; z-index: 1; max-width: 1240px; margin: 0 auto;
+    position: relative; z-index: 1; max-width: 1480px; margin: 0 auto;
     padding: clamp(20px, 3vw, 34px) clamp(12px, 2.4vw, 28px) clamp(32px, 5vw, 56px);
   }
 
@@ -621,17 +621,17 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
   /* Sized so the whole of it is on screen at once: on a wide page by the
      height left under the header, on a narrow one by the width. */
   .weeks-body .board-box {
-    --bw: clamp(min(100%, 560px), calc((100svh - 270px) * 92 / 54), 100%);
+    --bw: clamp(min(100%, 560px), calc((100svh - 270px) * 91 / 53), 100%);
     width: var(--bw); margin: 0 auto;
     display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px;
   }
   .weeks-body .tall .board-box {
-    --bw: min(100%, max(250px, calc((100svh - 190px) * 54 / 92 + 26px)));
+    --bw: min(100%, max(250px, calc((100svh - 190px) * 53 / 91 + 26px)));
     grid-template-columns: 20px minmax(0, 1fr);
   }
   .weeks-body .head-on .board-box { margin-top: 0; }
   .weeks-body .board {
-    position: relative; aspect-ratio: 92 / 54; cursor: crosshair; touch-action: pan-y;
+    position: relative; aspect-ratio: 91 / 53; cursor: crosshair; touch-action: pan-y;
     border-radius: clamp(8px, 1.2vw, 14px); overflow: hidden;
     background: #0d1019;
     box-shadow:
@@ -640,7 +640,7 @@ import { YEARS, WEEKS } from '../lib/weeks-life'
       0 40px 80px -40px rgb(0 0 0 / 0.9),
       0 12px 30px -18px rgb(0 0 0 / 0.8);
   }
-  .weeks-body .tall .board { aspect-ratio: 54 / 92; }
+  .weeks-body .tall .board { aspect-ratio: 53 / 91; }
   .weeks-body .board:focus-visible { outline: 2px solid var(--wk-now); outline-offset: 3px; }
   .weeks-body .board .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
