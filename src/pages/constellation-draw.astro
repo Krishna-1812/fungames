@@ -154,6 +154,7 @@ const ROUND = TIERS.length
 <script>
   import { STARS, starById, constellationName, starLabel, brightestIn, searchStars, CONSTELLATIONS, type Star } from '../lib/star-catalog'
   import { project, unproject, wrapRa, clampDec } from '../lib/sky-projection'
+  import { milkyWay } from '../lib/sky-milkyway'
   import { starRgb } from '../lib/star-color'
   import { encodeStrokes, decodeStrokes, colorCss, type Stroke } from '../lib/constellation-code'
   import {
@@ -490,8 +491,45 @@ const ROUND = TIERS.length
   const HALO_MAG = 4.2
   const SPIKE_MAG = 1.5
 
+  /* The Milky Way: the light of the stars the catalogue cannot hold
+     (lib/sky-milkyway.ts). Worked out on a coarse grid of directions, one
+     for every few pixels, and stretched smooth: it is a glow and has no
+     detail a finer grid would find. Kept until the view moves. */
+  const MW_STEP = 7
+  const mwCanvas = document.createElement('canvas')
+  const mwCtx = mwCanvas.getContext('2d')!
+  let mwKey = ''
+  function milkyWayLayer() {
+    const key = `${ra0.toFixed(2)}|${dec0.toFixed(2)}|${scale.toFixed(1)}|${W}|${H}`
+    if (key === mwKey) return mwCanvas
+    mwKey = key
+    const gw = Math.ceil(W / MW_STEP) + 1, gh = Math.ceil(H / MW_STEP) + 1
+    if (mwCanvas.width !== gw || mwCanvas.height !== gh) { mwCanvas.width = gw; mwCanvas.height = gh }
+    const img = mwCtx.createImageData(gw, gh)
+    const px = img.data
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const at = unproject((i * MW_STEP - W / 2) / scale, (H / 2 - j * MW_STEP) / scale, ra0, dec0)
+      const m = milkyWay(at.ra, at.dec)
+      const k = (j * gw + i) * 4
+      // Blue-white along the arms, the yellower light of old stars round the centre.
+      px[k] = 168 + 44 * m.warm
+      px[k + 1] = 186 + 12 * m.warm
+      px[k + 2] = 232 - 62 * m.warm
+      px[k + 3] = Math.round(255 * Math.pow(m.glow, 1.3) * 0.38)
+    }
+    mwCtx.putImageData(img, 0, 0)
+    return mwCanvas
+  }
+
   function drawStar(star: Star, sx: number, sy: number) {
-    const r = Math.max(0.5, 2.6 - star.mag * 0.35)
+    /* Size by how much light there is, not by the number in the catalogue:
+       each magnitude is two and a half times fainter, so the disc shrinks by
+       a ratio and not by a step. Sirius is a fat point and a sixth-magnitude
+       star is a speck, with everything in proportion between. Zooming in
+       spreads the same stars over more screen, so they grow a little too. */
+    const zoom = Math.min(1.9, Math.max(0.8, Math.pow(scale / 480, 0.22)))
+    const r = Math.max(0.42, 3.5 * Math.pow(10, -0.105 * star.mag) * zoom)
+    ctx.globalAlpha = star.mag > 4.5 ? Math.max(0.42, 1 - (star.mag - 4.5) * 0.3) : 1
     const [cr, cg, cb] = starRgb(star.ci)
     const rgb = `${cr},${cg},${cb}`
     if (star.mag < HALO_MAG) {
@@ -521,6 +559,14 @@ const ROUND = TIERS.length
     ctx.fillStyle = `rgb(${rgb})`
     ctx.arc(sx, sy, r, 0, Math.PI * 2)
     ctx.fill()
+    // The middle of a bright star is burnt out to white, whatever its colour.
+    if (star.mag < 2.5) {
+      ctx.beginPath()
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx.arc(sx, sy, r * 0.55, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
   }
 
   function strokeEdges(edges: readonly (readonly [number, number])[], colour: string, width: number, dash: number[] = []) {
@@ -596,10 +642,14 @@ const ROUND = TIERS.length
   function render() {
     ctx.clearRect(0, 0, W, H)
     const bg = ctx.createRadialGradient(W * 0.5, H * 0.35, 0, W * 0.5, H * 0.35, Math.max(W, H) * 0.8)
-    bg.addColorStop(0, '#0b1224')
-    bg.addColorStop(1, '#04060c')
+    bg.addColorStop(0, '#070b18')
+    bg.addColorStop(1, '#020308')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, W, H)
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    const mw = milkyWayLayer()
+    ctx.drawImage(mw, 0, 0, mw.width, mw.height, 0, 0, mw.width * MW_STEP, mw.height * MW_STEP)
 
     if (mode === 'free' && showReal) drawAllFigures()
     const id = figures[idx]
