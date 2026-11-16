@@ -1330,6 +1330,22 @@ either one silently matched nothing until written `:global` — the same trap
 `lib/trolley-scene.ts` hit earlier for the same reason, and a build that
 passed clean both times before someone actually opened the page and looked.
 
+**Constellation Draw**, the sky — the catalogue is every star an eye can
+pick out one at a time, and what it cannot hold is the light of the ones it
+cannot: the Milky Way. That is on the sky now (`lib/sky-milkyway.ts`), put
+where the galaxy's plane really is by the standard conversion from the
+sky's coordinates to the galaxy's: brightest and widest toward the centre
+in Sagittarius, where its light is the yellower light of old stars,
+faintest opposite in Auriga, split from Cygnus to Centaurus by the Great
+Rift, with the two Magellanic Clouds at their places. It is a model and the
+page does not pretend otherwise: where the band lies is real, the mottling
+on it is invented. The stars themselves are sized by how much light there
+is, each magnitude a ratio and not a step, so Sirius is a fat point and a
+sixth-magnitude star is a speck, and the middle of a bright one burns out
+to white. *`check-sky-milkyway.mjs` holds the conversion against the
+galactic centre, the pole, Deneb, Sirius and the anticentre, and fails if
+the band is not brighter in the plane than off it at every longitude.*
+
 **Constellation Draw** — almost 9,000 real stars, at their real position and
 real brightness, down to magnitude 6.5, the commonly-cited naked-eye limit —
 generated once by `scripts/build-star-data.mjs` from HYG v4.4 (CC BY-SA 4.0)
