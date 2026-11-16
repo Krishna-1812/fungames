@@ -126,6 +126,8 @@ src/
     scale-things.ts     what Scale draws, how big it is, and the sky behind it
     scale-art.ts        twenty-six of those drawn, with both their real axes
     deep-sea-art.ts     twenty-two cut-out subjects, no water of their own
+    deep-sea-water.ts   the water: what is left of daylight at a depth, the
+                        surface overhead, the lamp, the floor
     spend-art.ts        the thirty things you can buy, drawn as products
     earth-reviews-art.ts  thirty-two phenomena drawn as product shots, plus
                         the star row every rating on that page is drawn with
@@ -702,6 +704,21 @@ impact and the asteroid — are set off as their date crosses the line and
 played out in seconds. The gauge adds the length of the day, the oxygen in
 the air and the brightness of the Sun. *`check-time-earth.mjs` puts every
 place on the map the shader reads and fails if one is in the sea.*
+
+**The Deep Sea**, the water — what the dive goes through is drawn from how
+seawater treats light (`lib/deep-sea-water.ts`) and not from a palette. Red
+is gone in ten metres, green in a few tens, blue last, so the colour at a
+depth is what is left of daylight after that much water, and the top of the
+window is brighter than the foot of it. Near the surface the surface is
+overhead, a moving ceiling with shafts of light coming through it. As the
+day gives out a lamp comes on, visible as a beam because the water is full
+of marine snow, and it leans toward the pointer; outside it the only light
+is the animals' own, in blue. At the last half-screen the floor comes up
+into the lamp. The twenty-two drawings keep their outlines and give up
+their colours: dark shapes against bright water, pale ones in the dark.
+*`check-deep-sea-water.mjs` works the shader's three numbers through and
+fails if blue is not nearly gone where the gauge says the sunlight zone
+ends, or not wholly gone where it says there is none.*
 
 **The Deep Sea** — a linear scroll from the sunlit surface to Challenger Deep,
 10,935 real metres down, through the five standard oceanographic zones rather

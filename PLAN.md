@@ -2611,6 +2611,10 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     otherwise); each zone announces itself with the shell's level-up the
     first time you reach it; the far end is the ending.
 
+    **The Deep Sea** (later): the flat teal backdrop is water now, coloured
+    by what daylight is left at the depth, with a lamp in the dark and the
+    floor at the bottom, and the animals are shapes in it. See the README.
+
     **The Deep Sea** ends at Challenger Deep; Best is the deepest you have
     been, and Dive again goes back to the surface rather than reloading.
 

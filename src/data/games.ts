@@ -187,7 +187,7 @@ export const GAMES: Game[] = [
     title: 'The Deep Sea',
     blurb: 'Scroll to the bottom of the ocean',
     description:
-      'A real linear descent from the sunlit surface to Challenger Deep, 10,935 metres down — the deepest known point in any ocean on Earth. Every creature and every record along the way is real: a documented depth, a surveyed wreck, a dive that actually happened.',
+      'A real linear descent from the sunlit surface to Challenger Deep, 10,935 metres down — the deepest known point in any ocean on Earth. Every creature and every record along the way is real: a documented depth, a surveyed wreck, a dive that actually happened. The water loses its colours as real water does, and below the daylight there is only your lamp.',
     accent: '#0a1a28', accent2: '#4fe0c4',
     category: 'science',
     added: '2026-09-20',
