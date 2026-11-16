@@ -584,6 +584,18 @@ Four of them carry the site. The rest are one good idea each.
 
 ### The big four
 
+**Asteroid Launcher**, the rock — the builder's rock is a solid now
+(`lib/asteroid-rock.ts`), not a shaded disc with spots. Nothing that small
+is round, so it is an uneven lump, dented by a dozen craters, marched as a
+real surface and tumbling under one hard Sun with no air to soften the
+shadows; the craters shade themselves because the light is tested against
+the same surface. What it is made of changes the surface and not only the
+colour: comet ice is bright and glossy with dark dust lying on it, porous
+rock is nearly black and pitted, iron is scalloped metal, gold is gold. The
+drawn rock stays underneath for a browser that cannot do this.
+*`check-asteroid-rock.mjs` holds the shader's five materials against the
+impact model's five, in order, so "iron" cannot be drawn as ice.*
+
 **Asteroid Launcher** — pick a rock between 1 m and 20 km, a composition, a
 speed and an entry angle, then drop it on any of 4,926 real cities. The model is
 Collins, Melosh & Marcus (2005): atmospheric entry with breakup and pancake
