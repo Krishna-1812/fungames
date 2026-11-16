@@ -381,7 +381,7 @@ export const GAMES: Game[] = [
     blurb: 'Your whole life on one screen',
     description:
       'Every week of ninety years as one board of small lamps, and yours come on when you say when you were born. Look at any week, see how old you were when the world did things, add dates of your own. It all fits on one screen. That is the point.',
-    accent: '#131a30', accent2: '#5c80c7',
+    accent: '#221f1a', accent2: '#b0a68c',
     category: 'you',
     added: '2026-09-01',
   },
