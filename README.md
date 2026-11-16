@@ -889,6 +889,21 @@ every one of those captions rendered squeezed into a 30px circle regardless
 of which tile opened first. Neither is a fact a data checker can hold
 opinions about; both only exist once the thing actually renders.
 
+**How Fast Are You Moving?**, the picture — each speed used to have a small
+cartoon in a card above it. There is one picture behind the whole page now
+(`lib/speed-scenes.ts`), and it pulls back a step for each speed, because
+that is what the page is: the same you, seen from further and further away
+and moving in every view. The Earth from low orbit with a plate boundary on
+it (nothing moves: at 2.3 cm a year nothing would); the whole Earth turning
+on its real coastline; the Sun, the inner planets' paths and the Earth going
+round; the Sun sliding through the nearby stars toward Vega; the Milky Way
+from above with the Sun marked on it; the Milky Way and Andromeda closing;
+the whole sky in microwaves, hotter on the side we are heading toward; and
+galaxies leaving, redder the further off. One speed to a screen, its words
+beside the picture. The eight small drawings stay in the page for a browser
+that cannot draw this. *`check-speed-scenes.mjs` counts the page's sections
+against the shader's views, since the two are counted separately.*
+
 **How Fast Are You Moving?** — seven real, cited speeds stack live while you
 scroll: your tectonic plate drifting, the Earth turning beneath you (computed
 from your real latitude via `navigator.geolocation`, with a graceful 40°N

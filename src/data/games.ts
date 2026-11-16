@@ -147,7 +147,7 @@ export const GAMES: Game[] = [
     title: 'How Fast Are You Moving?',
     blurb: 'Seven real speeds, stacking, live',
     description:
-      'You are not standing still. Seven real, cited speeds stack live while you read: your tectonic plate drifting, the Earth turning beneath you (computed from your real latitude), its orbit around the Sun, the Sun drifting against nearby stars, its orbit around the galaxy, the Milky Way falling toward Andromeda, and the Local Group’s real, measured motion against the cosmic microwave background — out past which the observable universe itself recedes faster than light.',
+      'You are not standing still. Seven real, cited speeds stack live while you read: your tectonic plate drifting, the Earth turning beneath you (computed from your real latitude), its orbit around the Sun, the Sun drifting against nearby stars, its orbit around the galaxy, the Milky Way falling toward Andromeda, and the Local Group’s real, measured motion against the cosmic microwave background — out past which the observable universe itself recedes faster than light. Behind them, one picture pulls back from the ground to the edge of everything.',
     accent: '#0a0e1e', accent2: '#6ee7ff',
     category: 'science',
     added: '2026-09-24',
