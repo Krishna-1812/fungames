@@ -62,6 +62,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
             builder, so "made of iron" means something before a number is read. */}
         <div class="rockStage" id="rockStage" aria-hidden="true">
           <svg id="rockSvg" viewBox="0 0 200 200" set:html={INITIAL_ROCK} />
+          {/* The rock as a solid, over the drawing, where the browser can do it. */}
+          <div class="rockGl" id="rockGl"></div>
         </div>
 
         <div class="as-presets" id="presets" role="group" aria-label="Real impacts">
@@ -217,6 +219,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   import { recordPlay } from '../lib/stats'
   import { SITE } from '../site.config'
   import { rockStatic, rockFeatures, rockFeaturesInner, starField, ROCK_MATERIAL, dk } from '../lib/asteroid-art'
+  import { ShaderSurface } from '../lib/gl'
+  import { ASTEROID_ROCK_FRAG, ROCK_KINDS } from '../lib/asteroid-rock'
 
   const el = <T extends HTMLElement = HTMLElement>(id: string) =>
     document.getElementById(id) as T
@@ -291,6 +295,20 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
      in the frontmatter) so there is something to look at before this script
      even runs; from here on this owns it. */
   const rockSvg = el<SVGSVGElement & HTMLElement>('rockSvg') as unknown as SVGSVGElement
+  /* The same rock as a solid (lib/asteroid-rock.ts): a lump with craters,
+     marched as a surface and lit by one Sun. Where it comes up it covers the
+     drawing, which stays underneath as what a browser without WebGL2 shows. */
+  let rockSize = 0.06
+  let rockSpin = 0.6
+  const rockSurface = new ShaderSurface(el('rockGl'), ASTEROID_ROCK_FRAG, {
+    uniforms: () => {
+      // The surface runs its own clock; turning is slow enough to follow it directly.
+      if (!prefersReducedMotion) rockSpin = 0.6 + performance.now() / 1000 * 0.16
+      return { u_mat: ROCK_KINDS.indexOf(composition as (typeof ROCK_KINDS)[number]), u_spin: rockSpin, u_size: rockSize }
+    },
+  })
+  const rockSolid = rockSurface.canvas.isConnected
+  if (rockSolid) el('rockStage').classList.add('solid')
   const ROCK_ID = 'rock'
   const ROCK_STARS = starField(51, 60) // same seed as the server render — identical field
   let rockRotation = 0.6 // matches the server-rendered frame, so nothing jumps on hydration
@@ -304,12 +322,13 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
    *  material, so a composition change has to rebuild everything — cheap,
    *  since it only happens on a click, never per frame. */
   function drawRockFull() {
+    if (rockSolid) { rockSurface.redraw(); return }
     rockSvg.innerHTML =
       rockStatic({ id: ROCK_ID, composition, stars: ROCK_STARS }) +
       rockFeatures({ id: ROCK_ID, composition, rotation: rockRotation })
   }
 
-  if (!prefersReducedMotion) {
+  if (!prefersReducedMotion && !rockSolid) {
     let lastT = performance.now()
     const stepRock = (now: number) => {
       requestAnimationFrame(stepRock)
@@ -342,6 +361,8 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
     // the stage, not a change to the sphere's own geometry, so the craters'
     // projection math never has to know about it.
     const f = Number(inputs.diameter.value) / 1000
+    rockSize = f
+    if (rockSolid) rockSurface.redraw()
     el('rockStage').style.setProperty('--rockScale', (0.58 + f * 0.56).toFixed(3))
   }
 
@@ -1164,11 +1185,14 @@ const INITIAL_ROCK = renderRock({ id: 'rock', composition: 'rock', rotation: 0.6
   /* --rockScale follows the diameter slider (see syncReadouts): a transform on
      the stage, so the craters' projection never has to know about it. */
   .rockStage {
-    position: relative; overflow: hidden; margin-bottom: 14px; aspect-ratio: 1 / 0.84;
+    position: relative; overflow: hidden; margin-bottom: 14px; aspect-ratio: 1 / 0.92;
     display: flex; align-items: center; justify-content: center;
     border: 2px solid var(--ink); border-radius: var(--r);
     background: radial-gradient(120% 140% at 50% 18%, #16213f 0%, #0b1020 55%, #070a14 100%);
   }
+  .rockGl { position: absolute; inset: 0; }
+  .rockGl .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .rockStage.solid svg { visibility: hidden; }
   .rockStage svg {
     width: 62%; height: 62%; display: block; overflow: visible;
     transform: scale(var(--rockScale, 0.85));
