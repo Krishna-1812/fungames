@@ -742,6 +742,20 @@ no gradients and no ids.
 pass of its own: markers stay sorted by real depth, zones stay contiguous, and
 every marker actually lands inside the zone it claims to.*
 
+**Space Elevator**, the sky — what is outside the car is drawn from the two
+things that change on the way up (`lib/space-elevator-sky.ts`). The air
+thins by a scale height, and the blue of the sky is sunlight scattered by
+air, so overhead it goes from blue to indigo to black at the rate the air
+goes, while along the horizon, where the path through it is longest, the
+last of the blue is a thin bright line on the edge of the Earth. And the
+horizon drops and bends by exactly the angle it does from that height:
+next to nothing from a tower, three degrees from an airliner, ten at the
+Karman line. There are two decks of cloud to go through, overhead and then
+a floor, and stars once the sky stops outshining them. The CSS dots, the
+rain and the painted mountains that stood in for a sky are gone.
+*`check-space-elevator-sky.mjs` works the horizon's dip at three heights
+and holds the shader's air against the page's own pressure gauge.*
+
 **Space Elevator** — the same linear-scroll instrument as The Deep Sea, but
 climbing the way an actual elevator would: ground sits at the very bottom of
 the document, the Kármán line at the very top, the page opens pre-scrolled
