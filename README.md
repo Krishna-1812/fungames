@@ -993,6 +993,19 @@ approximation. The first version of this page drew its own continent blobs,
 twenty-odd guessed points per landmass; it looked exactly like what it was; it
 is gone.
 
+Under those borders, since the rebuild, is the Earth itself
+(`lib/every-second-earth.ts`), drawn at the instant on the page's own clock:
+daylight where the Sun is up, the edge of night where it really falls for
+that date and hour, lights on the dark side where the forty countries'
+people are, and weather. The borders are thin lines over it now, and a birth
+or a death is a point of light on the ground that opens into a ring. Run the
+clock at a day a minute and night crosses the world once a minute. The map
+stops at 84 north and 58 south, because Antarctica flattened was a third of
+the picture and nobody on the page is born there. At speed only a few of
+the thousands of events a second can be shown, and they are drawn fairly
+from all of them: the first version of that gave every light to China,
+which is first in the list.
+
 Forty of those real countries are seeded with their own real population and
 real published crude birth and death rate (CIA World Factbook and UN/World
 Bank, 2023–24), and run as a genuine Poisson process. A birth or a death lights

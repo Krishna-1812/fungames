@@ -2693,6 +2693,11 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
 
 52. ~~**Paper & Ink, phase 10: Every Second and Life in Weeks.**~~ **done.**
 
+    **Every Second** (later still): the flat grey countries are the Earth
+    now, at the hour on the page's clock, with the real edge of night,
+    lights where the people are, and each birth and death as a light on the
+    ground. See the README.
+
     **Every Second** was a fixed, full-window map. In the shell it is a
     framed night scene: the live count above the map, the speed below it, and
     a birth lights mint rather than gold. Score is births since you opened
