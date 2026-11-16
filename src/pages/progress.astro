@@ -1,5 +1,8 @@
 ---
 import GameShell from '../layouts/GameShell.astro'
+import { watchSvg } from '../lib/progress-watch'
+
+const WATCH = watchSvg()
 
 /**
  * Progress — every unit of time you are currently inside, draining live.
@@ -11,10 +14,12 @@ import GameShell from '../layouts/GameShell.astro'
  * lives in `lib/progress-dial.ts` so that the shader and the pointer hit-test
  * cannot disagree about where a ring is.
  *
- * The page is one object: a wall panel, a chronometer bolted to it, and a data
- * plate under that. The register at the bottom is the readout — everything the
- * dial shows, in text, which is also what a screen reader gets, since the dial
- * itself is a canvas and says nothing.
+ * The page is one object: a wall panel, a watch hung on it, and a data plate
+ * under that. The watch (lib/progress-watch.ts) shows each span by the thing
+ * that has always shown it: hands, a week dial, the Moon at its phase, the
+ * Earth turning under the Sun, the year on drums. The register at the bottom
+ * is the readout: everything the watch shows, in text, which is also what a
+ * screen reader gets.
  *
  * In the shell the wall panel is the stage, a sticky backdrop inside the frame
  * rather than fixed to the window. Score is how much of the year is gone, Day
@@ -42,32 +47,22 @@ import GameShell from '../layouts/GameShell.astro'
     </header>
 
     <div class="rig">
-      <div class="dial" id="dial">
-        <!-- The canvas is injected here. Everything it draws is also written
-             out in the register below, so it is decoration as far as assistive
-             technology is concerned. -->
-        <!-- Every channel sweeps clockwise from twelve, so one set of numerals
-             on the bezel reads all fifteen of them. -->
-        <div class="scale" aria-hidden="true">
-          <span style="--a:0deg"><i>0</i></span>
-          <span style="--a:90deg"><i>25</i></span>
-          <span style="--a:180deg"><i>50</i></span>
-          <span style="--a:270deg"><i>75</i></span>
-        </div>
-
-        <div class="aper" id="aper" aria-hidden="true">
-          <span class="ap-pct" id="apPct">—</span>
-          <span class="ap-tag" id="apTag">—</span>
-        </div>
+      <!-- Three layers: the watch up to its dials, the Earth (a canvas) set
+           into the lower one, and the hands and crystal over both. -->
+      <div class="watch" id="watch">
+        <Fragment set:html={WATCH.base} />
+        <div class="earth" id="earth" aria-hidden="true"></div>
+        <Fragment set:html={WATCH.top} />
       </div>
 
       <div class="plate" aria-hidden="true">
         <p class="pl-name" id="plName">—</p>
+        <p class="pl-pct" id="plPct">—</p>
         <p class="pl-left" id="plLeft">—</p>
         <p class="pl-clock" id="plClock">—</p>
       </div>
 
-      <p class="hint" id="hint">Fifteen channels, fastest at the rim. Point at one.</p>
+      <p class="hint" id="hint">Fifteen spans of time on one watch. Point at any part of it.</p>
     </div>
 
     <ol class="reg" id="reg"></ol>
@@ -83,11 +78,12 @@ import GameShell from '../layouts/GameShell.astro'
       already gone, worked out from your own clock.
     </p>
     <ul>
-      <li>The dial has one channel for each, fastest at the rim. Point at one, or tap it, and the middle reads it out.</li>
-      <li>The list underneath says the same thing in words. Click a row to keep its channel lit.</li>
+      <li>The watch shows every one of them: the hands, the day of the week, the Moon at tonight's phase, the Earth turning under the Sun, the date, the months, the year on rolling drums.</li>
+      <li>Point at any part of the watch, or tap it, and the plate underneath reads it out.</li>
+      <li>The list below says the same thing in words. Click a row and its part of the watch lights up.</li>
       <li>Nothing pauses. That is rather the point.</li>
     </ul>
-    <p>Read every channel to finish.</p>
+    <p>Read every one to finish.</p>
   </Fragment>
 </GameShell>
 
@@ -102,16 +98,16 @@ import GameShell from '../layouts/GameShell.astro'
   // of channels read.
   const shell = createShell({ slug: 'progress' })
   import { PANEL_FRAG } from '../lib/progress-panel'
-  import { DIAL_FRAG } from '../lib/progress-dial'
-  import { DIAL, ringAt, lumeCss } from '../lib/progress-geom'
+  import { EARTH_DISC_FRAG } from '../lib/progress-earth'
+  import { lumeCss } from '../lib/progress-lume'
+  import { EARTH_BOX, handAngles, subsolar, drums, moonPath, bits, sunArc } from '../lib/progress-watch'
   import { liveUnits, MAX_UNITS, read } from '../lib/progress-time'
 
   const el = (id: string) => document.getElementById(id)!
 
-  const dialHost = el('dial')
+  const watch = el('watch')
   const reg = el('reg')
-  const apPct = el('apPct')
-  const apTag = el('apTag')
+  const plPct = el('plPct')
   const plName = el('plName')
   const plLeft = el('plLeft')
   const plClock = el('plClock')
@@ -120,14 +116,6 @@ import GameShell from '../layouts/GameShell.astro'
   // Not UNITS: the 32-bit row stops being something you are inside of in 2038.
   const RINGS = liveUnits(now)
   const N = RINGS.length
-
-  // The aperture is sized off the same constant the shader mills it at, so a
-  // change to the dial's proportions cannot leave the readout hanging over the
-  // lip of its own recess.
-  dialHost.style.setProperty('--aper', String(DIAL.aperR))
-  // Halved twice: the shader's radii are fractions of the half-width, and CSS
-  // is offsetting from the centre by a fraction of the full width.
-  dialHost.style.setProperty('--scale-r', String((DIAL.bezelIn + DIAL.caseR) / 4))
 
   /* ------------------------------------------------------------------------
      The register. Built once, then only text and widths are touched — a frame
@@ -187,9 +175,9 @@ import GameShell from '../layouts/GameShell.astro'
   /* ------------------------------------------------------------------------
      Focus: which ring is lit, and what the aperture is reading.
 
-     Two separate things. `focus` dims the other fourteen rings and is -1 when
-     nobody is pointing at anything; `shown` is what the aperture reads and is
-     never -1, because a blank aperture on an instrument means it is broken.
+     Two separate things. `focus` dims the rest of the watch and is -1 when
+     nobody is pointing at anything; `shown` is what the plate reads and is
+     never -1, because a blank plate on an instrument means it is broken.
      ------------------------------------------------------------------------ */
 
   const DEFAULT = Math.max(0, RINGS.findIndex((u) => u.id === 'year'))
@@ -247,11 +235,19 @@ import GameShell from '../layouts/GameShell.astro'
   }
   const shown = () => { const f = focus(); return f >= 0 ? f : DEFAULT }
 
+  const parts = [...watch.querySelectorAll<SVGElement>('.wc')]
   function syncPressed() {
+    const f = focus()
     for (let i = 0; i < rows.length; i++) {
       rows[i].btn.setAttribute('aria-pressed', String(i === pinned))
-      rows[i].btn.classList.toggle('lit', i === focus())
+      rows[i].btn.classList.toggle('lit', i === f)
     }
+    // The part of the watch that shows this span stays lit; the rest stands back.
+    const id = f >= 0 ? RINGS[f].id : ''
+    watch.classList.toggle('has-focus', f >= 0)
+    for (const el of parts) { el.classList.toggle('on', !!id && el.dataset.u!.split(' ').includes(id)); el.classList.remove('keep') }
+    // A part inside another (the weekend, inside the week) must not be dimmed by its parent.
+    for (const el of parts) if (el.classList.contains('on')) for (let a = el.parentElement?.closest('.wc'); a; a = a.parentElement?.closest('.wc')) a.classList.add('keep')
   }
 
   rows.forEach((row, i) => {
@@ -268,43 +264,107 @@ import GameShell from '../layouts/GameShell.astro'
      ------------------------------------------------------------------------ */
 
   const fracs = new Float32Array(MAX_UNITS)
-  const rates = new Float32Array(MAX_UNITS)
+  const idx = new Map(RINGS.map((u, i) => [u.id, i]))
+  const WEEK = idx.get('week') ?? -1
+  const MOON = idx.get('lunation') ?? -1
+  const SUN = idx.get('sun') ?? -1
 
-  const dial = new ShaderSurface(dialHost, DIAL_FRAG, {
-    uniforms: () => ({
-      u_n: N,
-      u_frac: fracs,
-      u_rate: rates,
-      u_focus: focus(),
-      u_focusMix: focusMix,
-      u_motion: prefersReducedMotion ? 0 : 1,
-    }),
+  const handsOf = (id: string) => [...watch.querySelectorAll<SVGElement>(`[data-hand="${id}"]`)]
+  const HANDS = { second: handsOf('second'), minute: handsOf('minute'), hour: handsOf('hour'), date: handsOf('date') }
+  const weekHand = watch.querySelector<SVGElement>('#pw-week-hand')!
+  const yearHand = watch.querySelector<SVGElement>('#pw-year-hand')!
+  const moonLit = watch.querySelector<SVGElement>('#pw-moon-lit')!
+  const moonShape = watch.querySelector<SVGElement>('#pw-moon-path')!
+  const drumEls = [...watch.querySelectorAll<SVGElement>('.drum')]
+  const bitEls = [...watch.querySelectorAll<SVGElement>('.bit')]
+  const last: Record<string, number | string> = {}
+  /** Write an attribute only when what it says has changed. */
+  function put(key: string, els: SVGElement | SVGElement[], attr: string, value: string) {
+    if (last[key] === value) return
+    last[key] = value
+    for (const e of Array.isArray(els) ? els : [els]) e.setAttribute(attr, value)
+  }
+  const rot = (deg: number) => `rotate(${deg.toFixed(2)})`
+  if (SUN >= 0) watch.querySelector('#pw-sun-arc')!.setAttribute('d', sunArc(read(RINGS[SUN], now).frac))
+
+  /* The Earth: its own small surface, set into the lower dial. It moves a
+     quarter of a degree a minute, so it is drawn when the minute changes
+     and not sixty times a second. */
+  const earthHost = el('earth')
+  earthHost.style.left = (EARTH_BOX.cx - EARTH_BOX.r) * 100 + '%'
+  earthHost.style.top = (EARTH_BOX.cy - EARTH_BOX.r) * 100 + '%'
+  earthHost.style.width = EARTH_BOX.r * 200 + '%'
+  const RAD = Math.PI / 180
+  const sun = [0, 0]
+  let here = 9
+  function aimSun(d: Date) {
+    const s = subsolar(d)
+    sun[0] = s.lon * RAD
+    sun[1] = s.lat * RAD
+    // The meridian where the clocks read what this one does: about where you are.
+    const localHours = d.getHours() + d.getMinutes() / 60
+    here = sun[0] + (localHours - 12) * 15 * RAD
+  }
+  aimSun(now)
+  const earth = new ShaderSurface(earthHost, EARTH_DISC_FRAG, {
+    still: true,
+    textures: { u_land: '/deep-time/land.webp' },
+    uniforms: () => ({ u_sun: sun, u_here: here }),
   })
+  if (!earth.canvas.isConnected) earthHost.hidden = true
 
-  /* Pointing at the dial. The hit test runs on the same geometry the shader
-     mills the channels from, in the same space: origin at the centre, 1.0 at
-     the edge, y up. The flip is here and nowhere else. */
+  /** The watch, set to an instant. The fractions have just been read for the register. */
+  function setWatch(d: Date) {
+    // Under reduced motion the seconds hand steps once a second, as a quartz one does, and nothing sweeps.
+    const a = handAngles(prefersReducedMotion ? new Date(Math.floor(+d / 1000) * 1000) : d)
+    put('s', HANDS.second, 'transform', rot(a.second))
+    put('m', HANDS.minute, 'transform', rot(a.minute))
+    put('h', HANDS.hour, 'transform', rot(a.hour))
+    put('d', HANDS.date, 'transform', rot(a.date))
+    if (WEEK >= 0) put('w', weekHand, 'transform', rot(fracs[WEEK] * 360))
+    put('y', yearHand, 'transform', rot(fracs[YEAR] * 360))
+    if (MOON >= 0) {
+      const key = Math.round(fracs[MOON] * 2000)
+      if (last.moon !== key) {
+        last.moon = key
+        const m = moonPath(fracs[MOON], 58)
+        moonShape.setAttribute('d', m.d)
+        moonLit.setAttribute('transform', m.flip ? 'scale(-1 1)' : '')
+      }
+    }
+    const dr = drums(d.getFullYear(), fracs[YEAR])
+    dr.forEach((x, k) => {
+      const g = drumEls[k]
+      if (!g) return
+      if (last['dd' + k] !== x.digit) { last['dd' + k] = x.digit; g.children[0].textContent = String(x.digit); g.children[1].textContent = String(x.next) }
+      put('dr' + k, g, 'transform', `translate(0 ${(-x.roll * 46).toFixed(2)})`)
+    })
+    const sec = Math.floor(+d / 1000)
+    if (last.bits !== sec) {
+      last.bits = sec
+      const b = bits(d)
+      for (let k = 0; k < bitEls.length; k++) bitEls[k].classList.toggle('on', b[k] === '1')
+    }
+    const minute = Math.floor(+d / 60_000)
+    if (last.earth !== minute) { last.earth = minute; aimSun(d); earth.redraw() }
+  }
+
+  /* Pointing at the watch. Each part carries the span it shows; a part that
+     shows two (the track of sixty at the edge) answers for the first. */
   function aim(e: PointerEvent) {
-    const b = dialHost.getBoundingClientRect()
-    if (b.width < 1) return
-    const x = ((e.clientX - b.left) / b.width) * 2 - 1
-    const y = 1 - ((e.clientY - b.top) / b.height) * 2
-    dial.setPointer((x + 1) / 2, (y + 1) / 2)
-    const hit = ringAt(x, y, N)
+    const part = (e.target as Element).closest<SVGElement>('[data-u]')
+    let hit = -1
+    if (part) for (const id of part.dataset.u!.split(' ')) { const i = idx.get(id); if (i !== undefined) { hit = i; break } }
     if (hit !== hovered) { hovered = hit; syncPressed() }
   }
 
-  dialHost.addEventListener('pointermove', aim)
-  dialHost.addEventListener('pointerdown', (e) => {
+  watch.addEventListener('pointermove', aim)
+  watch.addEventListener('pointerdown', (e) => {
     aim(e)
     // On a touchscreen there is no hover, so the tap has to do the pinning.
     if (hovered >= 0) { pinned = pinned === hovered ? -1 : hovered; syncPressed(); markRead(hovered, 'Clicked') }
   })
-  dialHost.addEventListener('pointerleave', () => {
-    hovered = -1
-    dial.setPointer(0.5, 0.5)
-    syncPressed()
-  })
+  watch.addEventListener('pointerleave', () => { hovered = -1; syncPressed() })
 
   /* ------------------------------------------------------------------------
      The panel behind everything. Fixed to the viewport and told where the page
@@ -342,8 +402,7 @@ import GameShell from '../layouts/GameShell.astro'
   let lastSecond = -1
   let lastStripSec = -1
   const stripPct = (frac: number) => (frac * 100).toFixed(1) + '%'
-  let lastTag = ''
-  let lastApPct = ''
+  let lastPlPct = ''
   let lastPlName = ''
   let lastPlLeft = ''
   /* Under reduced motion the shared ticker never runs, so the dial has to be
@@ -371,7 +430,6 @@ import GameShell from '../layouts/GameShell.astro'
       if (i === s) sv = v
 
       fracs[i] = v.frac
-      rates[i] = v.rate
 
       if (v.name !== row.lastName) { row.lastName = v.name; row.name.textContent = v.name }
 
@@ -402,23 +460,12 @@ import GameShell from '../layouts/GameShell.astro'
 
     // The aperture and the plate read whichever ring is under the pointer.
     if (sv) {
-      if (sv.pct !== lastApPct) { lastApPct = sv.pct; apPct.textContent = sv.pct }
-      const tag = String(s + 1).padStart(2, '0')
-      if (tag !== lastTag) { lastTag = tag; apTag.textContent = tag }
+      if (sv.pct !== lastPlPct) { lastPlPct = sv.pct; plPct.textContent = sv.pct }
       if (sv.name !== lastPlName) { lastPlName = sv.name; plName.textContent = sv.name }
       if (sv.left !== lastPlLeft) { lastPlLeft = sv.left; plLeft.textContent = sv.left }
     }
 
-    // Focus fades rather than snaps: fifteen rings going dark in one frame
-    // reads as a bug, and over 150ms it reads as an instrument.
-    const want = focus() >= 0 ? 1 : 0
-    if (focusMix !== want) {
-      focusMix = prefersReducedMotion ? want : focusMix + (want - focusMix) * 0.18
-      if (Math.abs(focusMix - want) < 0.004) focusMix = want
-      dirty = true
-    }
-
-    if (prefersReducedMotion && dirty) { dirty = false; dial.redraw() }
+    setWatch(d)
     requestAnimationFrame(frame)
   }
 
@@ -426,14 +473,10 @@ import GameShell from '../layouts/GameShell.astro'
   shell.setLevel(`0 / ${N}`)
   frame()
 
-  /* The count is written from the count. It says fifteen today and will say
-     fourteen in 2038, and touch has no hover, so the invitation also has to
-     name the thing that actually works there. */
-  const WORDS = ['', '', '', '', '', '', '', '', '', '', '', 'Eleven', 'Twelve',
-    'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen']
+  /* Touch has no hover, so the invitation has to name the thing that works there. */
   el('hint').textContent =
-    `${WORDS[N] ?? N} channels, fastest at the rim. ` +
-    (matchMedia('(hover: none)').matches ? 'Tap one.' : 'Point at one.')
+    `${N} spans of time on one watch. ` +
+    (matchMedia('(hover: none)').matches ? 'Tap any part of it.' : 'Point at any part of it.')
 </script>
 
 <style is:global>
@@ -461,7 +504,7 @@ import GameShell from '../layouts/GameShell.astro'
       linear-gradient(180deg, #190c28, #120817 58%, #0d0512);
   }
   .progress-body .pg-panel .gl-surface,
-  .progress-body .dial .gl-surface {
+  .progress-body .earth .gl-surface {
     position: absolute; inset: 0; width: 100%; height: 100%; display: block;
   }
 
@@ -482,100 +525,49 @@ import GameShell from '../layouts/GameShell.astro'
      the dial at 100% of it, past the edge of the frame. */
   .progress-body .rig { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; margin: 26px 0 34px; }
 
-  .progress-body .dial {
-    /* 100%, not 96vw: the wrap has 22px of padding either side, and a viewport
-       measure walks straight through it — on a 390px phone the dial started at
-       the left padding and ran six pixels off the right of the page.
-       The 76vh is not belt and braces either. This thing is square, and in a
-       short laptop window a 700px dial is taller than the viewport, so the
-       instrument and its own readout can never be on screen together. */
-    --aper: 0.285;
-    --scale-r: 0.4445;
+  .progress-body .watch {
+    /* 100%, not a viewport measure: the wrap has padding either side and a
+       viewport width walks straight through it. The 86vh keeps the whole
+       watch on screen at once in a short window, which is the only reason
+       to draw one round. */
     position: relative;
-    /* 100%, not a viewport measure: the wrap has 22px of padding either side
-       and `96vw` walks straight through it — on a 390px phone the dial started
-       at the left padding and ran six pixels off the right of the page. The
-       88vh is not belt and braces either: this thing is square, and a dial
-       taller than the viewport cannot be read at a glance, which is the only
-       reason to draw one as a circle. It is the cap that usually binds — 76vh
-       was the first try and it made the instrument feel small in any window
-       that was not tall, which is most of them.
-
-       The width is written here rather than kept in a custom property, and
-       everything inside sizes off `cqw` or a percentage of this box. A custom
-       property holding `min(100%, …)` looks reusable and is a trap: a
-       percentage means the container's width in `width`, the parent's font
-       size in `font-size`, and the element's own height in `translateY`. It
-       collapsed the dial to zero and then rendered the readout at 0.688px. */
-    width: min(100%, 880px, 88vh);
+    width: min(100%, 780px, 86vh);
     aspect-ratio: 1;
-    container-type: inline-size;
-    /* The channels are the control; the pointer has to be able to find them. */
     touch-action: manipulation;
+    filter: drop-shadow(0 30px 40px rgb(0 0 0 / 0.55)) drop-shadow(0 6px 10px rgb(0 0 0 / 0.5));
   }
+  .progress-body .watch-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+  .progress-body .watch-top { pointer-events: none; }
+  .progress-body .earth { position: absolute; aspect-ratio: 1; border-radius: 50%; overflow: hidden; pointer-events: none; }
 
-  /* Numerals stamped into the bezel.
-     Each is a full-size overlay rotated about the dial's centre, with the glyph
-     pushed out to the bezel by padding. Padding percentages resolve against the
-     containing block's *width* — the dial — which is the only percentage basis
-     here that unambiguously means what it says. Offsetting with a translate
-     was the obvious way to write this and it silently measured the numeral's
-     own 14px box instead, stacking all four on top of each other. */
-  .progress-body .scale span {
-    position: absolute; inset: 0;
-    display: flex; justify-content: center; align-items: flex-start;
-    padding-top: calc((0.5 - var(--scale-r)) * 100%);
-    transform: rotate(var(--a));
-    pointer-events: none;
-  }
-  /* Counter-rotated, so you read a gauge without tilting your head. */
-  .progress-body .scale i {
-    transform: rotate(calc(-1 * var(--a)));
-    margin-top: -0.6em;
-    font-family: var(--mono); font-style: normal;
-    font-size: 12px; font-weight: 500; letter-spacing: 0.06em;
-    color: #cfc3e2;
-    text-shadow: 0 -1px 1px rgb(0 0 0 / 0.8);
-  }
+  .progress-body .watch text { text-anchor: middle; dominant-baseline: central; font-family: var(--mono); fill: #c9cbe6; user-select: none; }
+  .progress-body .watch .t-date { font-size: 17px; font-weight: 500; }
+  .progress-body .watch .t-sub { font-size: 19px; font-weight: 600; fill: #e6e8f6; }
+  .progress-body .watch .t-mo { font-size: 15px; }
+  .progress-body .watch .t-we { fill: #cdbcff; }
+  .progress-body .watch .t-24 { font-size: 12px; font-weight: 600; fill: #e6e8f6; paint-order: stroke; stroke: #07061a; stroke-width: 4px; }
+  .progress-body .watch .t-cap { font-size: 11px; letter-spacing: 0.3em; fill: #9a9cc4; }
+  .progress-body .watch .t-name { font-family: var(--display); font-size: 31px; letter-spacing: -0.01em; fill: #f1eefc; }
+  .progress-body .watch .t-drum { font-size: 31px; font-weight: 600; fill: #14122b; }
 
-  /* Above the canvas. ShaderSurface appends its canvas to the host, so without
-     this everything printed on the dial is painted over by the dial. */
-  .progress-body .aper,
-  .progress-body .scale span { z-index: 2; }
+  .progress-body .watch .bit { fill: #1d1b40; transition: fill 120ms linear; }
+  .progress-body .watch .bit.on { fill: #4fe3c1; }
 
-  .progress-body .aper {
-    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    /* 1.8 rather than 2: type inside a circle gets the chord, not the diameter,
-       or the ends of a wide number sit under the lip of the recess. */
-    width: calc(var(--aper) * 1.8 * 100%);
-    display: grid; justify-items: center; gap: 2px;
-    pointer-events: none;
-  }
-  .progress-body .ap-pct {
-    font-family: var(--mono);
-   
-    /* Sized off the aperture, not off taste. The widest thing this can ever
-       read is "100.0000%" — nine characters at 0.6em each in Plex Mono — and
-       at 5.8cqw that was 117px of number in a 92px recess on a phone. */
-    font-size: 4.3cqw;
-    font-weight: 500;
-    letter-spacing: -0.02em;
-    color: #f6efff;
-    /* Lumed, not printed: a dark hairline above the glyph and a soft bloom
-       around it, which is what a filled engraving does under one light. */
-    text-shadow: 0 -1px 0 rgb(0 0 0 / 0.85), 0 0 16px rgb(186 120 255 / 0.34);
-  }
-  .progress-body .ap-tag {
-    font-family: var(--mono); font-size: 12px; font-weight: 500;
-    letter-spacing: 0.28em; text-indent: 0.28em;
-    /* Not a quieter violet. The aperture's luminance cap is a guarantee, and
-       the guarantee only holds down to L = 0.288; anything dimmer passes
-       against what the recess actually renders today and fails against what
-       the shader is allowed to render tomorrow. */
-    color: var(--ink3);
-  }
+  .progress-body .watch .h-main { fill: url(#pw-hand); stroke: #2a2c40; stroke-width: 1; }
+  .progress-body .watch .h-lume { fill: #bff5e6; }
+  .progress-body .watch .h-sec { fill: #4fe3c1; }
+  .progress-body .watch .h-date { fill: #b8a1ff; }
+  .progress-body .watch .sh { fill: #000; opacity: 0.34; }
+  .progress-body .watch .hand-shadow .hit { display: none; }
 
-  /* -------------------------------------------------------------- plate -- */
+  /* What can be pointed at. Invisible, and wider than the thing it stands for. */
+  .progress-body .watch .hit { fill: transparent; stroke: transparent; pointer-events: all; cursor: pointer; }
+  .progress-body .watch .hit[fill='none'] { fill: none; pointer-events: stroke; }
+  .progress-body .watch .hand .hit { stroke-width: 30px; }
+
+  .progress-body .watch .wc { transition: opacity 160ms var(--ease); }
+  .progress-body .watch.has-focus .wc:not(.on):not(.keep) { opacity: 0.32; }
+  .progress-body .watch.has-focus .keep > :not(.wc) { opacity: 0.5; }
 
   .progress-body .plate {
     position: relative;
@@ -606,6 +598,7 @@ import GameShell from '../layouts/GameShell.astro'
     letter-spacing: 0.18em; text-indent: 0.18em; text-transform: uppercase;
     color: var(--ink);
   }
+  .progress-body .pl-pct { font-family: var(--mono); font-size: 26px; font-weight: 500; color: var(--ink); margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
   .progress-body .pl-left {
     font-family: var(--mono);
     font-size: 13px; color: var(--ink2); margin-top: 3px;
@@ -765,7 +758,7 @@ import GameShell from '../layouts/GameShell.astro'
       grid-template-columns: 2.1rem minmax(0, 1fr) 4.6rem;
       grid-template-areas: 'i n p' 'i r r' 'i l l';
     }
-    .progress-body .dial { width: min(100%, 560px, 90vh); }
+    .progress-body .watch { width: min(100%, 560px, 90vh); }
   }
 
   /* The site's motion setting, not only the system one. */
