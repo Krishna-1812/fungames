@@ -1142,15 +1142,22 @@ coordinate of every reference and checks it lands inside the box it is drawn
 over, arcs included — a wrong bounding box there is invisible in the source and
 obvious on screen.*
 
-**Life in Weeks** — ninety years as 4,680 squares from one typed date. The
-grid's own claim — cool at birth, warm as the years go by, and one square that
-still breathes — used to sit inside a page of plain flat cards. The stat tiles,
-the ask form and the facts list now share one plate each, built from the exact
-five colours the shader mixes with rather than a matching palette invented
-beside it, and the "weeks lived" / "weeks left" tiles carry a hairline bar each
-that always sums to a full width between them. The one thing that reaches
-past the grid: a warm horizon at the foot of the page that grows with how much
-of ninety years is behind you, nothing before a date is typed.
+**Life in Weeks** — ninety years as 4,680 small glass lamps on one board
+(`lib/weeks-board.ts`), lit from one typed date. The board lies whichever way
+the screen does (years across on a wide one, down on a phone) and is sized
+so all of it is on screen at once, which is the page's whole claim and used
+not to be true on a desktop. A line of fifty-two is a year from birthday to
+birthday (`lib/weeks-life.ts`), where it used to be 364 days and drifted. It
+is there, dark, before a date is given; the date counts the lived weeks on
+from birth. After that any week can be looked at with a pointer, a tap or
+the arrow keys: its dates, the age it belongs to, how far it is from now.
+The weeks the world did something in carry a pinhole, with a list under the
+board saying how old you were (or would be: Halley's comet is on it), and
+dates of your own can be added to the same list. Those, like the date of
+birth, stay in the browser. The light over the board follows the pointer,
+so the unlit lamps are glass too. *`check-weeks.mjs` puts every day of
+ninety years in exactly one square for five birthdays, a leap day among
+them.*
 
 **The Auction Game** — fourteen lots, five rivals with their own money and their
 own bad habits, and £12,000. Real bidding increments, a real 25% buyer's premium,
@@ -1509,6 +1516,7 @@ node scripts/check-art.mjs         # the tile illustrations, rasterised and meas
 node scripts/check-icons.mjs       # the in-game icons, at the size they render
 node scripts/check-scale-art.mjs   # Scale's objects, over Scale's own sky
 node scripts/check-time-earth.mjs  # Deep Time's events, places, map and gauges
+node scripts/check-weeks.mjs       # Life in Weeks' squares, dates and privacy
 node scripts/check-trolley-scene.mjs # Trolley's picture, against what it claims
 node scripts/check-fold.mjs        # the paper model, against paper
 node scripts/check-fold-scene.mjs  # Paper Folds' drawing, and its sky, at every fold
@@ -1574,6 +1582,15 @@ written down here rather than in a commit message.
 `--sheet out.png` lays all twenty-six out on the sky each one appears over;
 `--dbg "name,name" dir` renders single objects nearly full-frame, for the part
 no measurement covers, which is whether it looks like the thing.
+
+`check-weeks.mjs` covers Life in Weeks. For five birthdays it walks all
+4,680 squares: each starts where the last ended, is a week give or take a
+day, owns its own first and last day, and every fifty-second one starts on a
+birthday. It works the "still ahead" counts against a case done by hand,
+puts each of the world's dates on its own week for births from 1936 to 2026,
+and reads the page for the two things that must stay true: that a save code
+carries neither the date of birth nor the visitor's own dates, and that
+analytics is only ever handed fixed phrases.
 
 `check-time-earth.mjs` covers Deep Time. The globe is a shader and cannot
 be run here, so it checks what goes wrong silently round it: the events are
