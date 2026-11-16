@@ -34,7 +34,7 @@ import { withBase } from '../lib/base'
   initial={{ score: '0 m', level: '0 / 7', moves: '0s' }}
 >
   <div class="speed-body">
-  <div class="sp-bg" aria-hidden="true"></div>
+  <div class="sp-bg" id="spBg" aria-hidden="true"></div>
 
   <div class="sp-hud" id="hud">
     <div class="sp-hud-inner">
@@ -459,6 +459,8 @@ import { withBase } from '../lib/base'
   import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
+  import { ShaderSurface } from '../lib/gl'
+  import { SPEED_SCENES_FRAG } from '../lib/speed-scenes'
   import { PLAY } from '../lib/motion'
 
   const prefersReducedMotion = !PLAY
@@ -721,13 +723,45 @@ import { withBase } from '../lib/base'
   /* Under reduced motion every speed counts from the start, but reaching the
      edge still has to end the piece, so the scroll check runs either way. */
   if (prefersReducedMotion) { activeCount = STAGE_IDS.length; paintLevel(activeCount) }
+  /* The picture behind the page (lib/speed-scenes.ts): one view for each
+     speed, pulled back a step at a time, and which one is showing follows
+     whichever section is in the middle of the window. Where it comes up the
+     small drawings are put away; without WebGL2 they are the page, as before. */
+  const body = document.querySelector<HTMLElement>('.speed-body')!
+  const scenes = [...document.querySelectorAll<HTMLElement>('.sp-stage')]
+  let scene = 0
+  const off = [0, 0]
+  const picture = new ShaderSurface($('spBg'), SPEED_SCENES_FRAG, {
+    scale: devicePixelRatio > 1.5 ? 0.66 : 1,
+    textures: { u_land: '/deep-time/land.webp' },
+    uniforms: () => ({ u_scene: scene, u_off: off }),
+  })
+  const live = picture.canvas.isConnected
+  if (live) body.classList.add('live')
+  function aimPicture() {
+    if (!live) return
+    // Beside the words on a wide window, above them on a narrow one.
+    const wide = body.clientWidth >= 860
+    off[0] = wide ? 0.21 * (innerWidth / innerHeight) : 0
+    off[1] = wide ? 0 : 0.27
+    const mid = innerHeight / 2
+    const at = scenes.map((s) => { const r = s.getBoundingClientRect(); return r.top + r.height / 2 })
+    let s = 0
+    if (mid >= at[at.length - 1]) s = at.length - 1
+    else for (let i = 0; i < at.length - 1; i++) if (mid >= at[i] && mid < at[i + 1]) { s = i + (mid - at[i]) / (at[i + 1] - at[i]); break }
+    scene = s
+    if (prefersReducedMotion) picture.redraw()
+  }
+
   let ticking = false
   addEventListener('scroll', () => {
     if (ticking) return
     ticking = true
-    requestAnimationFrame(() => { ticking = false; checkStages() })
+    requestAnimationFrame(() => { ticking = false; checkStages(); aimPicture() })
   }, { passive: true })
+  addEventListener('resize', aimPicture, { passive: true })
   checkStages()
+  aimPicture()
 </script>
 
 <style is:global>
@@ -744,7 +778,27 @@ import { withBase } from '../lib/base'
       radial-gradient(70vmax 70vmax at 20% -10%, rgba(110, 231, 255, 0.08), transparent 70%),
       radial-gradient(70vmax 70vmax at 85% 105%, rgba(143, 123, 255, 0.09), transparent 70%);
   }
+  .sp-bg .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .speed-body > :not(.sp-bg) { position: relative; z-index: 1; }
+
+  /* With the picture up: one speed to a screen, its words beside the picture
+     on a wide window and under it on a narrow one, and no card round anything. */
+  .speed-body.live .sp-art { display: none; }
+  .speed-body.live .sp-head { min-height: 46vh; display: grid; align-content: center; margin-top: 0; }
+  .speed-body.live .sp-body-content { max-width: none; margin: 0; padding: 0 clamp(20px, 6vw, 96px); }
+  .speed-body.live .sp-stage {
+    min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
+    border-top: 0; padding: 14vh 0;
+  }
+  .speed-body.live .sp-stage > * { max-width: 430px; }
+  .speed-body.live .sp-stage h2 { font-size: clamp(26px, 3.4vw, 40px); line-height: 1.08; }
+  .speed-body.live .sp-stage > p, .speed-body.live .sp-stage h2 { text-shadow: 0 1px 12px rgb(2 3 10 / 0.9), 0 0 30px rgb(2 3 10 / 0.7); }
+  @media (max-width: 859px) {
+    .speed-body.live .sp-stage { justify-content: flex-end; padding: 56vh 0 9vh; }
+    .speed-body.live .sp-stage > * { max-width: none; }
+    /* The words are over the foot of the picture here, so the foot of it is darkened for them. */
+    .speed-body.live .sp-bg::after { content: ''; position: absolute; inset: 46% 0 0 0; background: linear-gradient(transparent, rgb(3 4 12 / 0.88) 30%); }
+  }
   .speed-body > .sp-hud { position: sticky; z-index: 5; }
 
   /* ---- the live HUD: the page's one persistent, undeniable fact ---------- */
