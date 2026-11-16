@@ -132,8 +132,8 @@ void main() {
     bloom += lifeColour(nyw.x / (YEARS - 1.0)) * litOf(nyw.x * WEEKS + nyw.y) * exp(-dot(dv, dv) / 1.3);
   }
   bloom /= 4.08;
-  panel += bloom * 0.20;
-  tile += bloom * mix(0.13, 0.04, on);
+  panel += bloom * 0.30;
+  tile += bloom * mix(0.20, 0.04, on);
 
   // This week: the one lamp that is still being lived, and it breathes.
   float nowOn = step(0.0, u_now) * clamp(u_lit - u_now + 1.0, 0.0, 1.0);
