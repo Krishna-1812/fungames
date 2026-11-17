@@ -15,7 +15,7 @@
  * drawing one safe line. scripts/check-constellation-trace.mjs checks both.
  */
 import { STARS, CONSTELLATIONS, nearestStar, constellationName, type Star } from './star-catalog'
-import { project, angularSeparationDeg } from './sky-projection'
+import { project, skyToScreen, angularSeparationDeg } from './sky-projection'
 
 export type Edge = readonly [number, number]
 
@@ -176,9 +176,9 @@ export function pickStar(cx: number, cy: number, v: View): Star | null {
   for (const s of STARS) {
     const p = project(s.ra, s.dec, v.ra0, v.dec0)
     if (!p.visible) continue
-    const sx = v.W / 2 + p.x * v.scale
+    const [sx, sy] = skyToScreen(p.x, p.y, v)
     if (Math.abs(sx - cx) > PICK_RADIUS) continue
-    const d = Math.hypot(sx - cx, v.H / 2 - p.y * v.scale - cy)
+    const d = Math.hypot(sx - cx, sy - cy)
     if (d > PICK_RADIUS) continue
     const cost = d + s.mag * PICK_MAG_WEIGHT
     if (cost < bestCost) { best = s; bestCost = cost }

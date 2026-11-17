@@ -153,7 +153,7 @@ const ROUND = TIERS.length
 
 <script>
   import { STARS, starById, constellationName, starLabel, brightestIn, searchStars, CONSTELLATIONS, type Star } from '../lib/star-catalog'
-  import { project, unproject, wrapRa, clampDec } from '../lib/sky-projection'
+  import { project, unproject, skyToScreen, screenToSky, wrapRa, clampDec } from '../lib/sky-projection'
   import { milkyWay } from '../lib/sky-milkyway'
   import { starRgb } from '../lib/star-color'
   import { encodeStrokes, decodeStrokes, colorCss, type Stroke } from '../lib/constellation-code'
@@ -194,7 +194,10 @@ const ROUND = TIERS.length
   const SCALE_MIN = 120
   const SCALE_MAX = 6400
 
-  const toScreen = (x: number, y: number): [number, number] => [W / 2 + x * scale, H / 2 - y * scale]
+  // North up and east to the left, as the sky is from underneath it. Every
+  // pixel-to-sky conversion goes through skyFrame() too, so none can disagree.
+  const skyFrame = () => ({ scale, W, H })
+  const toScreen = (x: number, y: number): [number, number] => skyToScreen(x, y, skyFrame())
   function screenOf(ra: number, dec: number, pad = 40) {
     const p = project(ra, dec, ra0, dec0)
     if (!p.visible) return null
@@ -437,7 +440,8 @@ const ROUND = TIERS.length
       const s = starById(id)
       if (!s) continue
       const p = project(s.ra, s.dec, view.ra, view.dec)
-      if (p.visible) pts.set(id, [p.x, -p.y])
+      // East to the left and north up, the same way round as the sky above.
+      if (p.visible) pts.set(id, [-p.x, -p.y])
     }
     const xs = [...pts.values()].map((p) => p[0]), ys = [...pts.values()].map((p) => p[1])
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
@@ -507,8 +511,10 @@ const ROUND = TIERS.length
     if (mwCanvas.width !== gw || mwCanvas.height !== gh) { mwCanvas.width = gw; mwCanvas.height = gh }
     const img = mwCtx.createImageData(gw, gh)
     const px = img.data
+    const f = skyFrame()
     for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
-      const at = unproject((i * MW_STEP - W / 2) / scale, (H / 2 - j * MW_STEP) / scale, ra0, dec0)
+      const [tx, ty] = screenToSky(i * MW_STEP, j * MW_STEP, f)
+      const at = unproject(tx, ty, ra0, dec0)
       const m = milkyWay(at.ra, at.dec)
       const k = (j * gw + i) * 4
       // Blue-white along the arms, the yellower light of old stars round the centre.
@@ -761,7 +767,10 @@ const ROUND = TIERS.length
     if (!dragMoved && Math.hypot(dx, dy) > 5) dragMoved = true
     if (!dragMoved) return
     fly = null
-    const moved = unproject(-dx / scale, dy / scale, dragStart.ra0, dragStart.dec0)
+    // The sky goes with the pointer, so the new centre is whatever was under
+    // the point the pointer has moved away from: the old centre minus the drag.
+    const [tx, ty] = screenToSky(W / 2 - dx, H / 2 - dy, skyFrame())
+    const moved = unproject(tx, ty, dragStart.ra0, dragStart.dec0)
     ra0 = wrapRa(moved.ra)
     dec0 = clampDec(moved.dec)
     invalidate()

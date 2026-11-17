@@ -20,7 +20,7 @@ register('./resolve-ts.mjs', import.meta.url)
 
 const T = await import('../src/lib/constellation-trace.ts')
 const { starById } = await import('../src/lib/star-catalog.ts')
-const { project } = await import('../src/lib/sky-projection.ts')
+const { project, skyToScreen } = await import('../src/lib/sky-projection.ts')
 
 let failures = 0
 const fail = (m) => { failures++; console.log(`  FAIL  ${m}`) }
@@ -61,7 +61,7 @@ console.log('\nclicking a figure\'s star picks that star, at any size of sky')
         const s = starById(sid)
         const p = project(s.ra, s.dec, v.ra0, v.dec0)
         total++
-        const got = T.pickStar(W / 2 + p.x * v.scale, H / 2 - p.y * v.scale, v)
+        const got = T.pickStar(...skyToScreen(p.x, p.y, v), v)
         if (got?.id !== sid) bad.push(`${T.figureName(id)}: ${sid}→${got?.id}`)
       }
     }
