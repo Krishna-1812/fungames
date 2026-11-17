@@ -1409,7 +1409,9 @@ plain white pixel. *`scripts/check-sky-projection.mjs` checks the
 projection against the geometry it has to satisfy regardless of formula
 (the view centre always projects to the origin, real angular separation
 matches projected Cartesian distance, nothing over 90° from the look
-direction is visible); `check-star-catalog.mjs` and `check-star-color.mjs`
+direction is visible) and that the sky lands on screen the way round it is
+from underneath it — north up, east to the left, so Betelgeuse is up and
+left of Rigel; it was drawn in mirror image until that was pinned; `check-star-catalog.mjs` and `check-star-color.mjs`
 check the data and the colour pipeline against real, independently-known
 facts — Sirius's real position, Vega's historically-defined B-V of
 0.00, Betelgeuse rendering redder than Rigel.*

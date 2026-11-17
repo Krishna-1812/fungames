@@ -1938,7 +1938,10 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     reason being that a flat RA/Dec map (this site's own Every Second,
     Somewhere among others) warps constellations badly near the poles, and
     a page whose entire subject is real constellation shapes cannot afford
-    that. Each star's colour comes from its own real B-V index via
+    that. It is drawn north up and east to the LEFT, as the sky is from
+    underneath (`skyToScreen`/`screenToSky`); until 2026-11-17 it drew +RA
+    to the right, which put every figure in mirror image, Betelgeuse on
+    Orion's right shoulder, and no round-trip check could notice. Each star's colour comes from its own real B-V index via
     Ballesteros' 2012 temperature formula and a real blackbody-to-RGB
     approximation, not a flat white dot.
 
