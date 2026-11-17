@@ -15,7 +15,8 @@
  * to satisfy regardless of formula: the view centre always projects to the
  * origin, a real spherical-law-of-cosines separation matches the Cartesian
  * distance between two projected nearby points, and nothing behind the
- * viewer is reported visible.
+ * viewer is reported visible. It also pins which way round the sky comes out
+ * on screen, against stars whose places nobody disputes.
  */
 
 const D2R = Math.PI / 180
@@ -44,8 +45,11 @@ export interface Projected {
  * Gnomonic (tangent-plane) projection of (ra, dec) as seen looking at
  * (ra0, dec0), in units of radians of arc at the tangent point — multiply by
  * a pixels-per-radian scale to place it on screen. +x is toward increasing
- * RA, +y is toward increasing Dec, both as they'd appear to an observer
- * looking up (not mirrored for an external "looking at a globe" view).
+ * RA, which is east, and +y is toward increasing Dec, which is north. These
+ * are the standard coordinates of astrometry and they are NOT screen
+ * coordinates: looking up at the sky with north at the top, east is on the
+ * left, so +x has to be drawn leftward. `skyToScreen` below does that, and
+ * is the only place that should.
  */
 export function project(ra: number, dec: number, ra0: number, dec0: number): Projected {
   const d = dec * D2R
@@ -74,6 +78,34 @@ export function unproject(x: number, y: number, ra0: number, dec0: number): { ra
   const dec = Math.asin(cosC * Math.sin(d0) + (y * sinC * Math.cos(d0)) / rho)
   const ra = ra0 * D2R + Math.atan2(x * sinC, rho * Math.cos(d0) * cosC - y * Math.sin(d0) * sinC)
   return { ra: (((ra * R2D) % 360) + 360) % 360, dec: dec * R2D }
+}
+
+/** What a sky is drawn into: pixels per radian at the tangent point, and the
+ *  size of the canvas, whose middle is the look direction. */
+export interface SkyFrame {
+  scale: number
+  W: number
+  H: number
+}
+
+/**
+ * Tangent plane to canvas pixels, the way round the sky is from underneath
+ * it: north up and east to the LEFT. A map of the ground has east on the
+ * right because it is looked down on; the sky is looked up at, which flips
+ * it, and that is why right ascension runs right to left across every star
+ * chart. Drawing +x to the right instead gives the sky as it would look from
+ * outside the celestial sphere, every constellation in mirror image: Orion
+ * with Betelgeuse at the top right, where it has never been.
+ */
+export function skyToScreen(x: number, y: number, f: SkyFrame): [number, number] {
+  return [f.W / 2 - x * f.scale, f.H / 2 - y * f.scale]
+}
+
+/** The inverse of `skyToScreen`: the tangent-plane point under a canvas
+ *  pixel, ready for `unproject`. Anything that turns a pointer position or a
+ *  pixel back into sky goes through this, so the two cannot disagree. */
+export function screenToSky(sx: number, sy: number, f: SkyFrame): [number, number] {
+  return [(f.W / 2 - sx) / f.scale, (f.H / 2 - sy) / f.scale]
 }
 
 /** Wrap a right ascension into [0, 360). */
