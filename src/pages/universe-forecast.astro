@@ -1249,7 +1249,7 @@ import GameShell from '../layouts/GameShell.astro'
     for (const lat of [23.44, -23.44]) {
       const y = cy - Math.sin((lat * Math.PI) / 180) * R
       const w = Math.cos((lat * Math.PI) / 180) * R
-      g.strokeStyle = 'rgba(255,217,138,0.34)'
+      g.strokeStyle = 'rgba(190,214,255,0.34)'
       g.setLineDash([3, 4]); g.lineWidth = 1
       g.beginPath(); g.ellipse(cx, y, w, w * 0.16, 0, 0, 7); g.stroke()
       g.setLineDash([])
@@ -1869,7 +1869,7 @@ import GameShell from '../layouts/GameShell.astro'
   /* ------------------------------------------------------------------------ */
 
   const KIND_COLOUR: Record<string, string> = {
-    eclipse: '#ffd98a', phase: '#aebeff', season: '#7fe0c0',
+    eclipse: '#f3f6ff', phase: '#93a6ff', season: '#7fe0c0',
     shower: '#ff9fd0', apsis: '#b8a1ff',
   }
   const KIND_LABEL: Record<string, string> = {
@@ -1948,10 +1948,10 @@ import GameShell from '../layouts/GameShell.astro'
     // January. A ring that started in January would need a hand that moved,
     // and would put the interesting half behind you.
     const [nx, ny] = pt(-Math.PI / 2, R - BAND)
-    s += `<line x1="${CX}" y1="${CY}" x2="${nx}" y2="${ny}" stroke="rgba(255,217,138,0.5)" stroke-width="1.2" stroke-dasharray="3 4"/>`
+    s += `<line x1="${CX}" y1="${CY}" x2="${nx}" y2="${ny}" stroke="rgba(79,227,193,0.55)" stroke-width="1.2" stroke-dasharray="3 4"/>`
     s += `<g class="wcentre" role="button" tabindex="0"><title>Back to the next big event</title>` +
       `<circle cx="${CX}" cy="${CY}" r="26" fill="transparent"/>` +
-      `<circle class="wcentre-dot" cx="${CX}" cy="${CY}" r="4" fill="#ffd98a"/>` +
+      `<circle class="wcentre-dot" cx="${CX}" cy="${CY}" r="4" fill="#4fe3c1"/>` +
       `<text x="${CX}" y="${CY + 22}" class="wnow" text-anchor="middle">tonight</text></g>`
     s += '</svg>'
     $('wheel').innerHTML = s
@@ -2792,7 +2792,7 @@ import GameShell from '../layouts/GameShell.astro'
   /* Each kind has its own colour, and it is carried by the glow behind the
      drawing rather than by a stripe — one fewer graphic element, and it lands
      on the thing you are meant to look at. */
-  .sky-body .ev.k-eclipse { --rail: #ffd98a; }
+  .sky-body .ev.k-eclipse { --rail: #dfe7ff; }
   .sky-body .ev.k-phase { --rail: #aebeff; }
   .sky-body .ev.k-season { --rail: #7fe0c0; }
   .sky-body .ev.k-shower { --rail: #ff9fd0; }
