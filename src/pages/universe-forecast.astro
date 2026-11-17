@@ -12,10 +12,18 @@ import GameShell from '../layouts/GameShell.astro'
  * The same rule applies to the drawings, which is the part that took the
  * longest. Nothing on this page is an illustration of an eclipse. The hero is
  * the actual geometry — the Moon's disc at the size it will really be, on the
- * chord it will really take, over a Sun dimmed by the area it will really
- * cover — and the lunar ones are drawn from the actual radius of the Earth's
- * shadow at the Moon's distance that night. An icon would have been an
- * afternoon's work and would have been the same picture every time.
+ * chord it will really take — and the lunar ones are drawn from the actual
+ * radius of the Earth's shadow at the Moon's distance that night. An icon
+ * would have been an afternoon's work and would have been the same picture
+ * every time.
+ *
+ * And the light. The stage is lit (lib/forecast-stage.ts): the Sun with its
+ * corona at the brightness it is measured to have, the Earth's shadow with
+ * the penumbra it must have, the Moon's real near side with shadows in its
+ * craters, the Earth on its real coastline at the minute of a solstice, the
+ * real stars behind a meteor shower. One small shader to a scene, built when
+ * the scene is first shown. The flat drawings it replaced are still here,
+ * for a browser without WebGL2.
  *
  * Rendered on the client rather than at build time for the same reason as the
  * dates. A static build would freeze "next" to whatever was true the morning it
@@ -58,7 +66,15 @@ import GameShell from '../layouts/GameShell.astro'
            real clock, because a lunar eclipse happens at one instant for
            everybody. A solar one does not, so it gets no clock. -->
       <div class="hero-stage">
-        <canvas id="stage" class="stage-canvas"></canvas>
+        <!-- Three layers. The canvas is the drawing a browser without WebGL2
+             keeps, and under a meteor shower it is the real sky the meteors
+             fall across. Over it, the lit picture (lib/forecast-stage.ts).
+             Over that, the few words a picture needs. -->
+        <div class="stage-pic" id="stagePic">
+          <canvas id="stage" class="stage-canvas"></canvas>
+          <div class="stage-gl" id="stageGl"></div>
+          <div class="stage-marks" id="stageMarks" aria-hidden="true"></div>
+        </div>
         <div class="stage-foot">
           <div class="stage-bar">
             <button type="button" class="stage-play" id="stagePlay" aria-label="Pause">
@@ -148,11 +164,28 @@ import GameShell from '../layouts/GameShell.astro'
           say for itself.
         </p>
         <p>
-          It also means the pictures are real. The hero is not an icon of an
-          eclipse — the Moon's disc is drawn at the size it will actually be
-          against the Sun that day, following the path it will actually take, and
-          the sky dims by the area actually covered. On an annular eclipse the
-          ring is as thin as it is going to be.
+          It also means the pictures are real. The big one is not an icon of an
+          eclipse — the Moon's disc is the size it will actually be against the
+          Sun that day, on the path it will actually take, and on an annular
+          eclipse the ring is as thin as it is going to be.
+        </p>
+        <p>
+          The light in it is worked out too. A solar eclipse is shown the way a
+          camera would see it, exposed for whatever Sun is left: the Sun's own
+          face on a black sky until the last sliver, then, as that goes, an
+          exposure hundreds of thousands of times longer, and the corona — which
+          falls away from the Sun at the rate it has been measured to — is
+          suddenly there. In a lunar eclipse the grey edge of the Earth's
+          shadow is, at each point, the fraction of the Sun still showing past
+          the Earth, and the red inside is every sunset on Earth at once.
+        </p>
+        <p class="how-caveat">
+          What nobody can know ahead of time is made up, and differs from one
+          event to the next: where the sunspots and prominences are, which way
+          the corona's streamers point. The Moon's seas and bright craters are
+          where they are and as big as they are, with invented shorelines and
+          small craters. The Earth's coastline is real; its clouds and city
+          lights are not.
         </p>
         <p>
           Times are UTC and good to about a minute. The limit is not the orbits —
@@ -178,7 +211,7 @@ import GameShell from '../layouts/GameShell.astro'
       all worked out in this tab from the orbits themselves.
     </p>
     <ul>
-      <li>The big picture at the top is drawn to scale for the day. Play it, pause it, or drag through the event.</li>
+      <li>The big picture at the top is to scale for the day, and lit the way it would be. Play it, pause it, or drag through the event.</li>
       <li>Every picture in the list is a button: tap one and it is drawn big at the top. The wheel shows the whole year at once.</li>
       <li>Drag the Moon a fortnight either way to see it on another day.</li>
     </ul>
@@ -197,6 +230,12 @@ import GameShell from '../layouts/GameShell.astro'
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
   import { PLAY } from '../lib/motion'
+  import { ShaderSurface } from '../lib/gl'
+  import { FORECAST_STAGE, SHOWER_SLOTS, SHOWER_TURN, type StageScene } from '../lib/forecast-stage'
+  import { sunLeft, moonLevel, GLINTS } from '../lib/forecast-light'
+  import { moonMap } from '../lib/forecast-moon'
+  import { project } from '../lib/sky-projection'
+  import { starRgb } from '../lib/star-color'
 
   const prefersReducedMotion = !PLAY
   // Restart is a reload, the default: the forecast is worked out afresh.
@@ -206,7 +245,11 @@ import GameShell from '../layouts/GameShell.astro'
 
   /* Two years is enough to guarantee at least four eclipses and two of every
      season in the list, without making the page a scroll through a century. */
-  const now = new Date()
+  /* `?from=2028-12-01` starts the two years on another day. The arithmetic
+     does not care what day it is asked about, and some of the best things it
+     can draw (a total eclipse of the Moon) can be more than two years off. */
+  const asked = new Date((new URLSearchParams(location.search).get('from') ?? '') + 'T00:00:00Z')
+  const now = isNaN(+asked) ? new Date() : asked
   const HORIZON = new Date(+now + 2 * 365.25 * 86400_000)
   const events = forecast(now, HORIZON)
 
@@ -488,14 +531,95 @@ import GameShell from '../layouts/GameShell.astro'
      which is the check that would have caught the mistake they were written
      to fix — the printed constants read at face value, making the shadow and
      the Moon each about twice their real size. */
-  const solarGeom = (e: Eclipse, when: Date) => {
-    const t = transitGeometry(e, when)
-    return { ...t, span: (1 + t.ratio) * 1.16 }
+  /* Remembered per eclipse. Each is a run through the Moon's and the Sun's
+     distance series, and the stage asks sixty times a second for an answer
+     that does not change while it is on. */
+  type SolarGeom = ReturnType<typeof transitGeometry> & { span: number }
+  type LunarGeom = ReturnType<typeof shadowGeometry> & { span: number }
+  const solarKept = new WeakMap<Eclipse, SolarGeom>()
+  const lunarKept = new WeakMap<Eclipse, LunarGeom>()
+  const solarGeom = (e: Eclipse, when: Date): SolarGeom => {
+    let g = solarKept.get(e)
+    if (!g) {
+      const t = transitGeometry(e, when)
+      g = { ...t, span: (1 + t.ratio) * 1.16 }
+      solarKept.set(e, g)
+    }
+    return g
   }
 
-  const lunarGeom = (e: Eclipse) => {
-    const s = shadowGeometry(e)
-    return { ...s, span: (s.penumbra + s.moon) * 1.1 }
+  const lunarGeom = (e: Eclipse): LunarGeom => {
+    let g = lunarKept.get(e)
+    if (!g) {
+      const s = shadowGeometry(e)
+      g = { ...s, span: (s.penumbra + s.moon) * 1.1 }
+      lunarKept.set(e, g)
+    }
+    return g
+  }
+
+  /* Where a solar eclipse has got to at a position on the scrubber, and what
+     to say about it. Both drawings of it, the lit one and the flat one, start
+     from this, so they cannot disagree about when totality is.
+
+     Linear in t, because t is a position on a scrubber the reader can drag,
+     and a scrubber whose middle is stretched is a lie about time. The dwell
+     near greatest eclipse lives in the playback clock instead.
+
+     No clock in the label: a solar eclipse does not have one. Its contact
+     times are different in every town the shadow crosses, so a single time
+     printed here would be a time for nowhere. */
+  function solarAt(e: Eclipse, when: Date, t: number) {
+    const geo = solarGeom(e, when)
+    const x = geo.span * (t * 2 - 1)
+    const sep = Math.hypot(x, geo.sMin)
+    const obs = obscuration(sep, geo.ratio)
+    const total = e.central && geo.ratio >= 1
+    const covered = sep <= Math.abs(geo.ratio - 1)
+    const ring = e.central && geo.ratio < 1 && sep < 1 - geo.ratio
+    const label = total && covered ? 'totality'
+      : ring ? 'the ring, complete'
+      : obs <= 0 ? 'the discs are clear of each other'
+      : `${(obs * 100).toFixed(obs > 0.995 ? 0 : 1)}% of the Sun covered`
+    return { geo, x, sep, obs, total, covered, ring, label }
+  }
+
+  /* The same for a lunar eclipse, which does have a clock, and the same one
+     for everybody who can see the Moon. The Moon crosses the shadow at a
+     steady rate, so x is in Earth radii, it moves `perHour` of them an hour,
+     and a position on the scrubber converts straight into a time: the ends of
+     the track are first and last contact, to the minute. */
+  function lunarAt(e: Eclipse, t: number) {
+    const geo = lunarGeom(e)
+    const x = geo.span * (t * 2 - 1)
+    const sep = Math.hypot(x, geo.gamma)
+    // The same formula the model's magnitude is defined by, so the picture
+    // and the number cannot come apart.
+    const depth = (geo.umbra + geo.moon - sep) / (2 * geo.moon)
+    const mins = (x / (e.timing?.perHour ?? 0.55)) * 60
+    const at = new Date(+tdToUtc(e.jde) + mins * 60000)
+    const clock = `${pad2(at.getUTCHours())}:${pad2(at.getUTCMinutes())} UTC`
+    const state = depth >= 1 ? 'totality'
+      : depth > 0 ? `${(depth * 100).toFixed(0)}% into the shadow`
+      : sep < geo.penumbra + geo.moon ? 'in the penumbra only'
+      : 'clear of the shadow'
+    return { geo, x, sep, depth, label: `${clock} · ${state}` }
+  }
+
+  /* Where the Sun is overhead through the day of a solstice or an equinox.
+     The latitude is the event: the equator, or a tropic. The longitude is
+     wherever it is noon, which is the clock, less the few minutes the Sun
+     runs fast or slow at that time of year (the equation of time). */
+  const SEASON_DECL: Record<string, number> = { march: 0, june: 23.44, september: 0, december: -23.44 }
+  const SEASON_EOT_MIN: Record<string, number> = { march: -7.4, june: -1.8, september: 7.5, december: 1.6 }
+  function seasonAt(ev: SkyEvent, t: number) {
+    const at = new Date(+ev.when + (t - 0.5) * 86400_000)
+    const hours = at.getUTCHours() + at.getUTCMinutes() / 60 + at.getUTCSeconds() / 3600
+    let lon = -15 * (hours - 12 + SEASON_EOT_MIN[ev.season!] / 60)
+    lon = ((lon + 540) % 360) - 180
+    const decl = SEASON_DECL[ev.season!]
+    const where = `${decl === 0 ? 'the equator' : `${Math.abs(decl).toFixed(1)}°${decl > 0 ? 'N' : 'S'}`}, ${Math.abs(lon).toFixed(0)}°${lon < 0 ? 'W' : 'E'}`
+    return { decl, lon, label: `${pad2(at.getUTCHours())}:${pad2(at.getUTCMinutes())} UTC · the Sun overhead at ${where}` }
   }
 
   /* ------------------------------------------------------------------------ */
@@ -531,6 +655,239 @@ import GameShell from '../layouts/GameShell.astro'
     sctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
+  /* The lit stage (lib/forecast-stage.ts). Everything it is told is a number
+     the model already had: where the Moon is against the Sun and how big,
+     how wide the Earth's shadow is that night, where the Sun stands. It is
+     drawn when this page says so and not on a clock of its own, because the
+     scrubber is the clock. */
+  const look = {
+    scene: 'solar' as StageScene, frame: [0, 0, 0.2], moon: [0, 0, 1], shadow: [0.7, 1.3], sun: [0, 0, 1],
+    spin: 0, k: 1, rain: [0, 0, 0, 0], seed: 1, clock: 0,
+    open: 1, glint: new Float32Array(GLINTS * 3), level: 1,
+  }
+  const dense = (window.devicePixelRatio || 1) > 1.5
+  const sceneOf = (ev: SkyEvent): StageScene =>
+    ev.eclipse ? (ev.eclipse.kind === 'solar' ? 'solar' : 'lunar')
+      : ev.kind === 'season' ? 'season' : ev.kind === 'apsis' ? 'apsis' : ev.kind === 'shower' ? 'shower' : 'moon'
+
+  /* One program to a scene, built when that scene takes the stage and thrown
+     away when another does. All six in one program took a browser over a
+     minute to compile, with the page frozen; one at a time is a fraction of a
+     second, and only for the kind of event actually looked at. */
+  /* The near side of the Moon as a picture the shaders look places up in:
+     made once, the first time a Moon takes the stage, out of the table of
+     seas and craters in lib/forecast-moon.ts. */
+  let moonUrl = ''
+  function moonMapUrl(): string {
+    if (moonUrl) return moonUrl
+    const size = 384
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    c.getContext('2d')!.putImageData(new ImageData(moonMap(size), size, size), 0, 0)
+    return (moonUrl = c.toDataURL('image/png'))
+  }
+
+  let surface: ShaderSurface | null = null
+  let surfaceScene: StageScene | null = null
+  function surfaceFor(scene: StageScene): ShaderSurface {
+    if (surface && surfaceScene === scene) return surface
+    surface?.dispose()
+    surfaceScene = scene
+    surface = new ShaderSurface($('stageGl'), FORECAST_STAGE[scene], {
+      still: true,
+      scale: dense ? 0.66 : 1,
+      // The coastline for the one scene with the Earth in it; the near side for the two with the Moon.
+      textures: scene === 'season' ? { u_land: '/deep-time/land.webp' }
+        : scene === 'lunar' || scene === 'moon' ? { u_moonmap: moonMapUrl() } : undefined,
+      uniforms: () => ({
+        u_frame: look.frame, u_moon: look.moon, u_shadow: look.shadow, u_sun: look.sun,
+        u_spin: look.spin, u_k: look.k, u_rain: look.rain, u_seed: look.seed, u_t: look.clock,
+        u_open: look.open, u_glint: look.glint, u_level: look.level,
+      }),
+    })
+    return surface
+  }
+  /* False without WebGL2, and then the canvas underneath is the whole stage.
+     Asked with a throwaway context and not by building the first scene: a
+     scene takes a few tenths of a second to compile, and that is better
+     spent after the page has been seen than before. It goes false later if
+     a scene will not build on this machine. */
+  let lit = (() => {
+    try {
+      const gl = document.createElement('canvas').getContext('webgl2')
+      gl?.getExtension('WEBGL_lose_context')?.loseContext()
+      return !!gl
+    } catch { return false }
+  })()
+  $('stagePic').classList.toggle('lit', lit)
+
+  /** Where the radiant sits in the frame, as fractions across and down. */
+  const RADIANT_AT = [0.66, 0.3]
+  /** How long the shower's loop is, in seconds: a whole number of meteor turns, so it joins up. */
+  const SHOWER_LOOP = SHOWER_TURN * 16
+  /** A minute of the stage is an hour of the night. */
+  const showerChance = (zhr: number) => Math.min(1, (zhr * (SHOWER_LOOP / 60)) / (SHOWER_SLOTS * 16))
+
+  /**
+   * Set the lit stage up for an event at a position on the scrubber, draw
+   * it, and say what the scrubber should read. The flat drawScene below is
+   * the same decision made for a 2D canvas.
+   */
+  function lightScene(ev: SkyEvent, t: number): string {
+    const asp = sw / sh
+    // One number for the day, so the parts nobody can know (which way the
+    // corona's streamers point, where the spots are) differ between events
+    // and hold still for one.
+    look.seed = 1 + ((Math.floor(+ev.when / 86400_000) * 7919) % 1000) / 37
+    look.clock = (performance.now() / 1000) % 900
+    let label = ''
+    if (ev.eclipse?.kind === 'solar') {
+      const s = solarAt(ev.eclipse, ev.when, t)
+      // Room for the corona on a central eclipse; room for the Moon, which
+      // rides high on a shallow partial one.
+      // Close in on the Sun while there is Sun to look at; back off for the
+      // corona as the last tenth of it goes.
+      const u = Math.max(0, Math.min(1, (s.obs - 0.9) / 0.1))
+      const wide = s.total ? u * u * (3 - 2 * u) : 0
+      const R = Math.min(0.24 - 0.1 * wide, 0.44 / (s.geo.sMin + s.geo.ratio + 0.2), asp * 0.24)
+      look.scene = 'solar'
+      look.frame = [0, -s.geo.sMin * R * 0.5, R]
+      look.moon = [s.x, s.geo.sMin, s.geo.ratio]
+      look.k = 1 - s.obs
+      // What is left of the Sun, and where: the exposure and the glare both come from it.
+      const left = sunLeft(s.x, s.geo.sMin, s.geo.ratio)
+      look.open = left.open
+      look.glint = left.glints
+      label = s.label
+    } else if (ev.eclipse) {
+      const s = lunarAt(ev.eclipse, t)
+      const g = s.geo
+      // Tall enough for the whole umbra and for the Moon, wherever it crosses:
+      // the Moon is the subject, so the penumbra is let run off the frame.
+      const top = Math.max(g.umbra, g.gamma + g.moon) + 0.08, bottom = g.umbra + 0.08
+      const S = 1 / (top + bottom)
+      // On a wide stage the whole crossing fits. On a narrow one the frame
+      // follows the Moon part of the way, so the Moon is not made a speck to
+      // fit a path three times its shadow wide.
+      const fit = Math.min(1, (asp / 2) / (g.span * S * 1.02))
+      look.scene = 'lunar'
+      look.frame = [-s.x * S * (1 - fit), ((bottom - top) / 2) * S, S]
+      look.moon = [s.x, g.gamma, g.moon]
+      look.shadow = [g.umbra, g.penumbra]
+      look.level = moonLevel(s.x, g.gamma, g.moon, g.umbra, g.penumbra)
+      label = s.label
+    } else if (ev.kind === 'season') {
+      const s = seasonAt(ev, t)
+      // Seen from over the sunset line, a little round toward the day side:
+      // the edge of night is nearly edge on, and leans by the declination.
+      const A = 76 * Math.PI / 180, d = s.decl * Math.PI / 180
+      look.scene = 'season'
+      look.frame = [0, 0, 0.37]
+      look.sun = [-Math.sin(A) * Math.cos(d), Math.sin(d), Math.cos(A) * Math.cos(d)]
+      look.spin = s.lon * Math.PI / 180 + A
+      label = s.label
+    } else if (ev.kind === 'apsis') {
+      const other = new Date(+ev.when + 182.6 * 86400_000)
+      look.scene = 'apsis'
+      look.frame = [0, 0, 0.365]
+      look.k = sunDistanceAu(ev.when) / sunDistanceAu(other)
+      label = ev.apsis === 'perihelion' ? 'nearest the Sun' : 'furthest from the Sun'
+    } else if (ev.kind === 'shower') {
+      look.scene = 'shower'
+      look.rain = [(RADIANT_AT[0] - 0.5) * asp, 0.5 - RADIANT_AT[1], showerChance(ev.shower?.zhr ?? 20), ((ev.shower?.speed ?? 50) - 35) / 36]
+      look.clock = t * SHOWER_LOOP
+      label = `up to ${ev.shower?.zhr} an hour, under a dark sky`
+    } else {
+      const ill = moonIllumination(ev.when)
+      const i = ill.phaseAngle * Math.PI / 180
+      look.scene = 'moon'
+      look.frame = [0, 0, 0.36]
+      look.sun = [(ill.waxing ? 1 : -1) * Math.sin(i), 0, Math.cos(i)]
+      look.k = ill.fraction
+      label = `${(ill.fraction * 100).toFixed(0)}% lit`
+    }
+    const s = surfaceFor(look.scene)
+    if (!s.canvas.isConnected) {
+      // It would not build here. The flat drawing takes over for good.
+      lit = false
+      $('stagePic').classList.remove('lit')
+      $('stageMarks').innerHTML = ''
+      return drawScene(sctx, ev, t)
+    }
+    s.redraw()
+    return label
+  }
+
+  /* Under the lit stage, the flat canvas has one job left: the sky a meteor
+     shower falls across. That is the real one. The stars are the catalogue's,
+     projected round the place on the sky the shower comes from, with the
+     constellation it is named for joined up; the meteors are the shader's,
+     and its sky is clear so these show through. Drawn once per event and per
+     size, not per frame. The catalogue is half a megabyte, so it is fetched
+     the first time a shower takes the stage and not before. */
+  type SkyData = typeof import('../lib/star-catalog')
+  let skyData: SkyData | null = null
+  let skyAsked = false
+  function paintUnderlay() {
+    if (!lit) return
+    const g = sctx
+    g.clearRect(0, 0, sw, sh)
+    if (lead?.kind !== 'shower' || !lead.shower) return
+    const sky = g.createLinearGradient(0, 0, 0, sh)
+    sky.addColorStop(0, '#02040b'); sky.addColorStop(0.72, '#060a18'); sky.addColorStop(1, '#0c1424')
+    g.fillStyle = sky
+    g.fillRect(0, 0, sw, sh)
+    if (!skyData) {
+      if (!skyAsked) {
+        skyAsked = true
+        import('../lib/star-catalog').then((m) => { skyData = m; paintUnderlay() })
+      }
+      return
+    }
+    const [ra0, dec0] = lead.shower.radiant
+    // A tangent-plane view with the radiant at its place in the frame, north
+    // up and east to the left, as the sky is. The frame is about 55° tall.
+    const S = sh * 0.96
+    const rx = sw * RADIANT_AT[0], ry = sh * RADIANT_AT[1]
+    const at = (ra: number, dec: number): [number, number] | null => {
+      const p = project(ra, dec, ra0, dec0)
+      return p.visible ? [rx - p.x * S, ry - p.y * S] : null
+    }
+    const fig = skyData.CONSTELLATIONS.find((c) => c.id === lead!.shower!.con)
+    if (fig) {
+      g.strokeStyle = 'rgba(150,172,240,0.22)'
+      g.lineWidth = 1
+      g.lineJoin = 'round'
+      for (const seg of fig.segments) {
+        g.beginPath()
+        let pen = false
+        for (const [ra, dec] of seg) {
+          const q = at(ra, dec)
+          if (!q) { pen = false; continue }
+          if (pen) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1])
+          pen = true
+        }
+        g.stroke()
+      }
+    }
+    for (const s of skyData.STARS) {
+      if (s.mag > 6.2) break   // brightest first
+      const q = at(s.ra, s.dec)
+      if (!q || q[0] < -4 || q[0] > sw + 4 || q[1] < -4 || q[1] > sh + 4) continue
+      // Sized by light, as on the star map: each magnitude a ratio.
+      const r = Math.max(0.45, 3.3 * Math.pow(10, -0.105 * s.mag))
+      const [cr, cg, cb] = starRgb(s.ci)
+      g.globalAlpha = s.mag > 4.5 ? Math.max(0.4, 1 - (s.mag - 4.5) * 0.32) : 1
+      g.fillStyle = `rgb(${cr},${cg},${cb})`
+      g.beginPath(); g.arc(q[0], q[1], r, 0, 7); g.fill()
+      if (s.mag < 2.2) {
+        g.fillStyle = 'rgba(255,255,255,0.85)'
+        g.beginPath(); g.arc(q[0], q[1], r * 0.55, 0, 7); g.fill()
+      }
+    }
+    g.globalAlpha = 1
+  }
+
   /** A cheap deterministic hash, for corona streamers that stay put. */
   const hash = (i: number) => {
     const x = Math.sin(i * 127.1 + 311.7) * 43758.5453
@@ -564,14 +921,7 @@ import GameShell from '../layouts/GameShell.astro'
   }
 
   function drawSolar(g: CanvasRenderingContext2D, e: Eclipse, when: Date, t: number) {
-    const geo = solarGeom(e, when)
-    /* Linear in t, because t is now a position on a scrubber the reader can
-       drag, and a scrubber whose middle is stretched is a lie about time. The
-       dwell near greatest eclipse moved into the playback clock instead, which
-       advances t slowly through the middle and quickly at the ends. */
-    const x = geo.span * (t * 2 - 1)
-    const sep = Math.hypot(x, geo.sMin)
-    const obs = obscuration(sep, geo.ratio)
+    const { geo, x, sep, obs, total, covered, label } = solarAt(e, when, t)
 
     const cx = sw / 2
     const cy = sh * 0.46
@@ -608,9 +958,6 @@ import GameShell from '../layouts/GameShell.astro'
     }
 
     drawHorizon(g, dark)
-
-    const total = e.central && geo.ratio >= 1
-    const covered = sep <= Math.abs(geo.ratio - 1)
 
     // The Sun's own glow, shrinking as it is eaten.
     if (!(total && covered)) {
@@ -721,23 +1068,11 @@ import GameShell from '../layouts/GameShell.astro'
       g.beginPath(); g.arc(dx, dy, R * 0.7 * k, 0, 7); g.fill()
     }
 
-    /* What the scrubber says at this position. No clock: a solar eclipse does
-       not have one. Its contact times are different in every town the shadow
-       crosses, so a single time printed here would be a time for nowhere. */
-    const label = total && covered ? 'totality'
-      : e.central && geo.ratio < 1 && sep < 1 - geo.ratio ? 'the ring, complete'
-      : obs <= 0 ? 'the discs are clear of each other'
-      : `${(obs * 100).toFixed(obs > 0.995 ? 0 : 1)}% of the Sun covered`
     return { label, obs, sep, ratio: geo.ratio, total: total && covered }
   }
 
   function drawLunar(g: CanvasRenderingContext2D, e: Eclipse, t: number) {
-    const geo = lunarGeom(e)
-    // Linear, and here it is more than a convention: the Moon really does
-    // cross the shadow at a steady rate, so x is proportional to the clock and
-    // the scrubber's position is a time.
-    const x = geo.span * (t * 2 - 1)
-    const sep = Math.hypot(x, geo.gamma)
+    const { geo, x, sep, depth, label } = lunarAt(e, t)
 
     const cx = sw / 2
     const cy = sh * 0.52
@@ -819,22 +1154,7 @@ import GameShell from '../layouts/GameShell.astro'
     g.beginPath(); g.arc(cx, cy, geo.penumbra * S, 0, 7); g.fill()
     g.restore()
 
-    // The same formula the model's magnitude is defined by, so the picture
-    // and the number cannot come apart.
-    const depth = (geo.umbra + geo.moon - sep) / (2 * geo.moon)
-    /* A lunar eclipse does have a clock, and it is the same clock for everyone
-       who can see the Moon. x is in Earth radii and the Moon crosses at
-       `perHour` of them an hour, so the position on the scrubber converts
-       straight into a time — and the ends of the track are first and last
-       contact, to the minute. */
-    const mins = (x / (e.timing?.perHour ?? 0.55)) * 60
-    const at = new Date(+tdToUtc(e.jde) + mins * 60000)
-    const clock = `${pad2(at.getUTCHours())}:${pad2(at.getUTCMinutes())} UTC`
-    const state = depth >= 1 ? 'totality'
-      : depth > 0 ? `${(depth * 100).toFixed(0)}% into the shadow`
-      : sep < geo.penumbra + geo.moon ? 'in the penumbra only'
-      : 'clear of the shadow'
-    return { label: `${clock} · ${state}`, depth, sep, ratio: 0, total: depth >= 1 }
+    return { label, depth, sep, ratio: 0, total: depth >= 1 }
   }
 
   /**
@@ -1258,12 +1578,38 @@ import GameShell from '../layouts/GameShell.astro'
     ]
   }
 
-  const STAGE_CAP: Record<string, string> = {
+  const STAGE_CAP: Record<string, string> = lit ? {
+    eclipse: 'To scale, from the distances and angles for that day',
+    phase: 'The near side, lit from where the Sun will be that night',
+    season: 'The Earth at that minute, from over the sunset line — drag through the day',
+    apsis: 'Half the Sun that day against half of it six months on, at one scale',
+    shower: 'An hour of the peak in each minute, across the real stars',
+  } : {
     eclipse: 'Drawn to scale, from the distances and angles for that day',
     phase: 'The terminator as it will actually fall that night',
     season: 'The Earth’s shadow, tilted by where the Sun stands overhead',
     apsis: 'The Sun that day, magnified at the limb — dashed is six months later',
     shower: 'One streak per few an hour, from the rate observers count',
+  }
+
+  const CON_NAME: Record<string, string> = {
+    Boo: 'Boötes', Lyr: 'Lyra', Aqr: 'Aquarius', Per: 'Perseus', Ori: 'Orion', Leo: 'Leo', Gem: 'Gemini',
+  }
+  /** The few words the lit picture carries: only what cannot be seen in it. */
+  function stageMarks(ev: SkyEvent): string {
+    const dayOf = (d: Date) => `${d.getUTCDate()} ${MONTH_SHORT[d.getUTCMonth()]}`
+    if (ev.kind === 'apsis') {
+      const other = new Date(+ev.when + 182.6 * 86400_000)
+      // The Sun's width in the sky: twice 959.63 arcseconds at one astronomical unit.
+      const across = (d: Date) => `${((2 * 959.63) / sunDistanceAu(d) / 60).toFixed(2)}′ across`
+      return `<p class="sm sm-l"><b>${dayOf(ev.when)}</b>${across(ev.when)}</p>` +
+        `<p class="sm sm-r"><b>${dayOf(other)}</b>${across(other)}</p>`
+    }
+    if (ev.kind === 'shower' && ev.shower) {
+      return `<p class="sm sm-at" style="left:${RADIANT_AT[0] * 100}%;top:${RADIANT_AT[1] * 100}%"><i></i>the radiant${CON_NAME[ev.shower.con] ? `, in ${CON_NAME[ev.shower.con]}` : ''}</p>`
+    }
+    if (ev.kind === 'season') return '<p class="sm sm-l"><b>day</b></p><p class="sm sm-r"><b>night</b></p>'
+    return ''
   }
 
   function paintHero() {
@@ -1284,6 +1630,7 @@ import GameShell from '../layouts/GameShell.astro'
        ${facts.length ? `<ul class="hl-facts">${facts.map((f) => `<li>${f}</li>`).join('')}</ul>` : ''}
        ${lead === defaultLead ? '' : '<button type="button" class="hl-back" id="hlBack">Back to the next big one</button>'}`
     stageCap.textContent = STAGE_CAP[lead.kind] ?? ''
+    $('stageMarks').innerHTML = lit ? stageMarks(lead) : ''
     document.getElementById('hlBack')?.addEventListener('click', () => select(defaultLead!))
   }
 
@@ -1302,7 +1649,7 @@ import GameShell from '../layouts/GameShell.astro'
   let playing = !prefersReducedMotion
 
   function frame(t: number) {
-    const label = drawScene(sctx, lead!, t)
+    const label = lit ? lightScene(lead!, t) : drawScene(sctx, lead!, t)
     readOut.textContent = label
     scrub.value = String(Math.round(t * 1000))
     scrub.style.setProperty('--fill', (t * 100).toFixed(1) + '%')
@@ -1317,19 +1664,31 @@ import GameShell from '../layouts/GameShell.astro'
   function runStage() {
     sizeStage()
     if (!lead) return
-    if (!playing) { frame(tLin); return }
-    const PERIOD = lead.eclipse?.kind === 'lunar' ? 22000 : lead.kind === 'shower' ? 9000 : 18000
+    paintUnderlay()
+    /* The Moon on a night and the two halves of the Sun are one picture each:
+       nothing in them moves, so there is nothing to play or to drag, and no
+       reason to draw them sixty times a second. */
+    const still = lead.kind === 'phase' || lead.kind === 'apsis'
+    $('hero').classList.toggle('is-still', still)
+    if (!playing || still) { frame(tLin); return }
+    /* An eclipse dwells: the clock crawls through the middle of the event and
+       hurries the empty ends, while the scrubber underneath stays honestly
+       linear. A day of the turning Earth and a minute of meteors run at one
+       speed, and their ends join up. */
+    const dwell = !!lead.eclipse
+    const PERIOD = lead.eclipse?.kind === 'lunar' ? 22000
+      : lead.kind === 'shower' ? (lit ? SHOWER_LOOP * 1000 : 9000)
+      : lead.kind === 'season' ? 26000 : 18000
     // Start the loop where the scrubber was left, so pressing play does not
     // jump back to first contact.
-    const t0 = performance.now() - inversePhase(tLin) * PERIOD
+    const t0 = performance.now() - (dwell ? inversePhase(tLin) : tLin) * PERIOD
     const tick = (now: number) => {
       if (!playing) { raf = 0; return }
       const phase = (((now - t0) % PERIOD) + PERIOD) % PERIOD / PERIOD
-      /* The dwell that used to live inside the drawing lives here instead: the
-         clock crawls through the middle of the event and hurries the empty
-         ends, while the scrubber underneath stays honestly linear. */
-      const q = phase * 2 - 1
-      tLin = 0.5 + 0.5 * Math.sign(q) * Math.pow(Math.abs(q), 1.7)
+      if (dwell) {
+        const q = phase * 2 - 1
+        tLin = 0.5 + 0.5 * Math.sign(q) * Math.pow(Math.abs(q), 1.7)
+      } else tLin = phase
       frame(tLin)
       raf = requestAnimationFrame(tick)
     }
@@ -1418,34 +1777,67 @@ import GameShell from '../layouts/GameShell.astro'
   /** Days away from now that the Moon panel is showing. */
   let moonOffset = 0
 
-  function paintMoon() {
-    const host = $('moonArt')
-    const size = 168
-    let c = host.querySelector('canvas')
-    if (!c) {
-      c = document.createElement('canvas')
-      c.style.width = size + 'px'
-      c.style.height = size + 'px'
-      host.appendChild(c)
-    }
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
-    c.width = size * dpr
-    c.height = size * dpr
-    const g = c.getContext('2d')!
-    g.setTransform(dpr, 0, 0, dpr, 0, 0)
+  /* The Moon in its own panel is the stage's Moon: the same shader, asked for
+     the one scene, in a second small surface. */
+  const moonLook = { sun: [0, 0, 1], k: 1 }
+  let moonSurface: ShaderSurface | null = null
+  let moonLit = false
+  // Built when the panel is nearly in view, not while the page is opening.
+  let moonPending = lit
+  $('moonArt').classList.toggle('lit', lit)
+  if (lit) {
+    const near = new IntersectionObserver((rows) => {
+      if (!rows.some((r) => r.isIntersecting)) return
+      near.disconnect()
+      moonSurface = new ShaderSurface($('moonArt'), FORECAST_STAGE.moon, {
+        still: true,
+        textures: { u_moonmap: moonMapUrl() },
+        uniforms: () => ({ u_frame: [0, 0, 0.43], u_sun: moonLook.sun, u_k: moonLook.k, u_seed: 3 }),
+      })
+      moonLit = moonSurface.canvas.isConnected
+      moonPending = false
+      $('moonArt').classList.toggle('lit', moonLit)
+      paintMoon()
+    }, { rootMargin: '500px' })
+    near.observe($('moonArt'))
+  }
 
+  function paintMoon() {
     const t = new Date(+new Date() + moonOffset * 86400_000)
     const ill = moonIllumination(t)
     const d = discs(t)
 
-    // A soft halo, so a nearly-new Moon is not a black hole in the layout.
-    const halo = g.createRadialGradient(size / 2, size / 2, size * 0.3, size / 2, size / 2, size * 0.5)
-    halo.addColorStop(0, 'rgba(150,175,255,0.14)')
-    halo.addColorStop(1, 'rgba(150,175,255,0)')
-    g.fillStyle = halo
-    g.fillRect(0, 0, size, size)
+    if (moonLit) {
+      // The same Moon the stage draws, lit from where the Sun is at that moment.
+      const i = ill.phaseAngle * Math.PI / 180
+      moonLook.sun = [(ill.waxing ? 1 : -1) * Math.sin(i), 0, Math.cos(i)]
+      moonLook.k = ill.fraction
+      moonSurface!.redraw()
+    } else if (!moonPending) {
+      const host = $('moonArt')
+      const size = 168
+      let c = host.querySelector('canvas')
+      if (!c) {
+        c = document.createElement('canvas')
+        c.style.width = size + 'px'
+        c.style.height = size + 'px'
+        host.appendChild(c)
+      }
+      const dpr = Math.min(2, window.devicePixelRatio || 1)
+      c.width = size * dpr
+      c.height = size * dpr
+      const g = c.getContext('2d')!
+      g.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-    drawMoonFace(g, size / 2, size / 2, size * 0.39, ill.fraction, ill.waxing, ill.phaseAngle)
+      // A soft halo, so a nearly-new Moon is not a black hole in the layout.
+      const halo = g.createRadialGradient(size / 2, size / 2, size * 0.3, size / 2, size / 2, size * 0.5)
+      halo.addColorStop(0, 'rgba(150,175,255,0.14)')
+      halo.addColorStop(1, 'rgba(150,175,255,0)')
+      g.fillStyle = halo
+      g.fillRect(0, 0, size, size)
+
+      drawMoonFace(g, size / 2, size / 2, size * 0.39, ill.fraction, ill.waxing, ill.phaseAngle)
+    }
 
     // Mean geocentric semidiameter is 932"; the swing either side of it is the
     // whole "supermoon" business, and it is under a tenth.
@@ -2094,7 +2486,7 @@ import GameShell from '../layouts/GameShell.astro'
 
   .sky-body .uf-wrap {
     position: relative; z-index: 1;
-    max-width: 860px; margin: 0 auto; padding: 40px 20px 80px;
+    max-width: 1120px; margin: 0 auto; padding: 40px 20px 80px;
   }
   .uf-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
@@ -2124,7 +2516,7 @@ import GameShell from '../layouts/GameShell.astro'
 
   .sky-body .uf-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
     background: linear-gradient(168deg, rgba(20, 29, 71, 0.9), rgba(9, 13, 38, 0.92));
     border: 1px solid var(--line);
@@ -2140,9 +2532,48 @@ import GameShell from '../layouts/GameShell.astro'
     0%, 100% { box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(180, 200, 255, 0.08), 0 0 0 rgba(160, 140, 255, 0); }
     50%      { box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(180, 200, 255, 0.08), 0 0 52px rgba(160, 140, 255, 0.24); }
   }
-  .sky-body .hero-stage { position: relative; min-height: 300px; background: #05081c; }
-  .sky-body .stage-canvas { display: block; width: 100%; height: 100%; min-height: 300px; }
-  .sky-body .hero-text { padding: 26px 26px 28px; align-self: center; }
+  .sky-body .hero-stage { position: relative; background: #02030a; }
+  /* The picture is the page. Two to one on a desk, where it is most of the
+     first screen; square on a phone, where two to one would be a letterbox. */
+  .sky-body .stage-pic {
+    position: relative; aspect-ratio: 2 / 1; min-height: 280px; overflow: hidden;
+    background: #02030a; cursor: pointer;
+  }
+  .sky-body .stage-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+  .sky-body .stage-gl { position: absolute; inset: 0; pointer-events: none; }
+  .sky-body .stage-gl .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* The few words a picture needs, and only for the pictures that need them. */
+  .sky-body .stage-marks { position: absolute; inset: 0; pointer-events: none; }
+  .sky-body .sm {
+    position: absolute; margin: 0; font-size: 12.5px; line-height: 1.4; color: #b9c6f5;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
+  }
+  .sky-body .sm b {
+    display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #e9edff;
+  }
+  .sky-body .sm-l { left: 20px; bottom: 16px; }
+  .sky-body .sm-r { right: 20px; bottom: 16px; text-align: right; }
+  .sky-body .sm-at {
+    transform: translate(16px, -50%); font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #9aa8dd; white-space: nowrap;
+  }
+  .sky-body .sm-at i {
+    position: absolute; left: -22px; top: 50%; width: 12px; height: 12px; margin-top: -6px;
+    border: 1px solid rgba(185, 198, 245, 0.6); border-radius: 50%;
+  }
+  /* Under the picture: what it is and when on the left, its numbers on the right. */
+  .sky-body .hero-text {
+    padding: 26px 30px 30px;
+    display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); column-gap: 44px; align-items: start;
+  }
+  .sky-body .hero-text > * { grid-column: 1; }
+  .sky-body .hero-text > .loading { grid-column: 1 / -1; }
+  .sky-body .hero-text > .hl-facts {
+    grid-column: 2; grid-row: 1 / span 6; align-self: center;
+    margin: 0; padding: 4px 0 4px 30px; border-top: 0; border-left: 1px solid var(--line);
+    font-size: 13.5px; gap: 10px;
+  }
   .sky-body .loading { color: #8593c9; margin: 0; }
   .sky-body .hl-kicker {
     margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.18em;
@@ -2197,6 +2628,14 @@ import GameShell from '../layouts/GameShell.astro'
     flex: none; line-height: 0;
     filter: drop-shadow(0 0 28px rgba(180, 196, 255, 0.22)) drop-shadow(0 0 70px rgba(120, 150, 255, 0.14));
   }
+  /* Lit, it is a window on to the same sky the stage has, faded out at its
+     edge so there is no window to see. */
+  .sky-body .moon-art.lit {
+    position: relative; width: 236px; height: 236px; filter: none;
+    -webkit-mask-image: radial-gradient(circle, #000 58%, transparent 71%);
+    mask-image: radial-gradient(circle, #000 58%, transparent 71%);
+  }
+  .sky-body .moon-art.lit .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .sky-body .moon-facts { margin: 0; flex: 1 1 190px; min-width: 0; display: grid; gap: 7px; }
   .sky-body .mf {
     display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
@@ -2501,7 +2940,6 @@ import GameShell from '../layouts/GameShell.astro'
   /* --- the stage's own controls ------------------------------------------ */
 
   .sky-body .hero-stage { display: flex; flex-direction: column; }
-  .sky-body .stage-canvas { flex: 1; }
   .sky-body .stage-foot {
     border-top: 1px solid rgba(126, 146, 226, 0.14);
     background: rgba(5, 8, 26, 0.6);
@@ -2529,6 +2967,10 @@ import GameShell from '../layouts/GameShell.astro'
     font-size: 12.5px; color: #b9c6f5;
     letter-spacing: 0.01em;
   }
+  /* A picture with nothing to play has no player. */
+  .sky-body .is-still .stage-play, .sky-body .is-still .stage-scrub { display: none; }
+  .sky-body .is-still .stage-read { flex: 1; text-align: center; }
+  .sky-body .is-still .stage-pic { cursor: default; }
   .sky-body .stage-caption {
     margin: 7px 0 0; text-align: center;
     font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -2619,12 +3061,30 @@ import GameShell from '../layouts/GameShell.astro'
   .sky-body .ev-name:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   .sky-body .ev:hover .ev-node { border-color: var(--rail, #6d7fd8); }
 
+  /* The stage has the width of the frame; the reading keeps a measure. Last,
+     and in longhand, so it is the one rule about their sides. */
+  .sky-body .head, .sky-body .panels, .sky-body .controls, .sky-body .feed-hint,
+  .sky-body .feed, .sky-body .foot, .sky-body .how {
+    max-width: 820px; margin-left: auto; margin-right: auto;
+  }
+
   /* --- narrow ------------------------------------------------------------ */
 
   @media (max-width: 760px) {
     .sky-body .uf-hero { grid-template-columns: minmax(0, 1fr); }
-    .sky-body .hero-stage { min-height: 250px; }
-    .sky-body .stage-canvas { min-height: 250px; }
+    .sky-body .stage-pic { aspect-ratio: 1 / 1; min-height: 0; }
+    .sky-body .hero-text { display: block; padding: 22px 20px 24px; }
+    .sky-body .hero-text > .hl-facts {
+      margin: 16px 0 0; padding: 14px 0 0; border-left: 0; border-top: 1px solid var(--line);
+      font-size: 12.5px; gap: 7px;
+    }
+    /* What the scrubber reads gets its own line: a clock and a place is a
+       long thing to put beside a slider on a phone. */
+    .sky-body .stage-bar { flex-wrap: wrap; }
+    .sky-body .stage-read { flex: 1 0 100%; min-width: 0; text-align: center; }
+    .sky-body .sm { font-size: 11.5px; }
+    .sky-body .sm-l { left: 12px; bottom: 10px; }
+    .sky-body .sm-r { right: 12px; bottom: 10px; }
     .sky-body .panels { grid-template-columns: 1fr; }
   }
   @media (max-width: 480px) {
