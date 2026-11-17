@@ -197,7 +197,7 @@ export const GAMES: Game[] = [
     title: 'Universe Forecast',
     blurb: 'The weather, for the sky',
     description:
-      'Every eclipse, solstice, full moon and meteor shower for the next two years, worked out in your browser from the orbits themselves rather than looked up. It can tell a total eclipse from a ring, and it will still be right in 2400.',
+      'Every eclipse, solstice, full moon and meteor shower for the next two years, worked out in your browser from the orbits themselves rather than looked up. It can tell a total eclipse from a ring, and it will still be right in 2400. The pictures are lit the way the real thing is: the corona comes up as the last of the Sun goes.',
     accent: '#0b1030', accent2: '#ffd98a',
     category: 'science',
     added: '2026-09-19',

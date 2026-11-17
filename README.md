@@ -1330,6 +1330,50 @@ either one silently matched nothing until written `:global` — the same trap
 `lib/trolley-scene.ts` hit earlier for the same reason, and a build that
 passed clean both times before someone actually opened the page and looked.
 
+**Universe Forecast**, the light — the page has always worked its dates and
+its geometry out of the orbits, and then drew them flat: a yellow circle, a
+black one, a blue ball, in the left half of a card. The geometry is the same.
+The picture is now the width of the frame and lit (`lib/forecast-stage.ts`).
+A solar eclipse is one camera exposing for whatever Sun is left: the Sun's
+own face on a black sky until the last sliver, then an exposure hundreds of
+thousands of times longer, and the corona at the brightness it is measured to
+have (Baumbach's fit), with the beads the Moon's mountains make of the last
+of the light. In a lunar one the penumbra is, at each point, the fraction of
+the Sun still showing past the Earth, and the red of the umbra only shows
+once the lit part of the Moon has gone, because that is when an eye could
+see it. The Moon is its real near side (`lib/forecast-moon.ts`: thirty-three
+seas and ten rayed craters where they are and as big as they are), lit the
+way dust is lit, with shadows in its craters at the edge of the light and
+earthshine on the dark part of a thin one. A solstice is the Earth on its
+real coastline with the Sun over the place it is over at that minute, and
+the scrubber is the clock for the day. The two ends of the orbit are half
+the Sun that day against half of it six months on. A meteor shower falls
+across the catalogue's real stars, out of the constellation it is named for,
+at the speed its dust arrives. *Invented, and the page says so: the sunspots,
+the prominences and which way the corona's streamers point (they differ from
+one event to the next and hold still for one); the Moon's shorelines and
+small craters; the Earth's clouds and city lights. The orientation of the
+Moon's face and of the sky behind a shower is north up, not as it would
+stand over any one place.*
+
+It is six small shaders and not one. As one it took a browser over a minute
+to compile with the page frozen, because the compiler on Windows writes a
+loop's body out once for every turn it can count and a function once for
+every call. So each scene is its own program, built when it is first shown;
+loops run to a count the compiler cannot see; noise is asked for in batches
+that one loop fills; and the Moon's table is a small picture made once
+(`moonMap`) and looked up, not forty rows asked of every pixel. A scene now
+builds in a fifth to a half of a second and draws in 2 to 7 ms. The sums
+that are the same for every pixel of a frame (how much Sun is left and
+where, how bright the Moon is in the shadow) are done on the page
+(`lib/forecast-light.ts`), where a check can read them.
+*`check-forecast-stage.mjs` holds the Moon's face to where its seas are,
+the corona and the Earth's shadow to their numbers, the Sun to the longitude
+it is over by the clock and each shower to its constellation, and reads the
+shaders for the things that made them slow to build.* `?from=2028-06-01`
+starts the two years on another day, which is how to see a total eclipse of
+the Moon while the next one is more than two years off.
+
 **Constellation Draw**, the sky — the catalogue is every star an eye can
 pick out one at a time, and what it cannot hold is the light of the ones it
 cannot: the Milky Way. That is on the sky now (`lib/sky-milkyway.ts`), put

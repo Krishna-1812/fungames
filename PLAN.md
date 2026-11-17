@@ -2734,6 +2734,14 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     leaves no real work at all, which it always did; the card now says so in
     words rather than "0.0h".)
 
+    **Universe Forecast** (later): the flat drawings in half a card are a
+    lit stage the width of the frame: the eclipse through its own exposure
+    with the corona at its measured brightness, the Earth's shadow with the
+    penumbra it must have, the Moon's real near side, the Earth at the
+    minute of a solstice, the real stars behind a shower. One small shader
+    to a scene, because one for all six took over a minute to compile. See
+    the README.
+
     **Universe Forecast** keeps its night: the sky is a sticky backdrop
     inside the stage, and its sticky filter bar sits at the top of the
     viewport rather than 48px down for a chrome bar that is gone. It had no
