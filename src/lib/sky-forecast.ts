@@ -776,35 +776,51 @@ export type Shower = {
   zhr: number
   parent: string
   note: string
+  /**
+   * Where on the sky they seem to come from at the peak: right ascension and
+   * declination, degrees (the IMO working list's values), and the
+   * constellation that puts it in, by its IAU abbreviation.
+   */
+  radiant: [number, number]
+  con: string
+  /** How fast the dust meets the air, km/s. The Leonids come in head on; the Geminids catch us up. */
+  speed: number
 }
 
 export const SHOWERS: Shower[] = [
   {
     name: 'Quadrantids', peak: [1, 3], zhr: 110, parent: 'asteroid 2003 EH1',
+    radiant: [230.1, 48.5], con: 'Boo', speed: 41,
     note: 'The sharpest peak of the year — a few hours wide, and easy to miss entirely.',
   },
   {
     name: 'Lyrids', peak: [4, 22], zhr: 18, parent: 'comet Thatcher',
+    radiant: [271.4, 33.6], con: 'Lyr', speed: 49,
     note: 'Observed for 2,700 years. The Chinese record of 687 BC is the oldest of any shower.',
   },
   {
     name: 'Eta Aquariids', peak: [5, 6], zhr: 50, parent: "comet Halley",
+    radiant: [338.0, -1.0], con: 'Aqr', speed: 66,
     note: 'Debris from Halley, arriving very fast and low. Better from the south.',
   },
   {
     name: 'Perseids', peak: [8, 12], zhr: 100, parent: 'comet Swift–Tuttle',
+    radiant: [48.0, 58.0], con: 'Per', speed: 59,
     note: 'The one everybody knows, and warm enough at night to actually sit through.',
   },
   {
     name: 'Orionids', peak: [10, 21], zhr: 20, parent: 'comet Halley',
+    radiant: [95.0, 16.0], con: 'Ori', speed: 66,
     note: 'Halley again, from the other side of its orbit. The same comet twice a year.',
   },
   {
     name: 'Leonids', peak: [11, 17], zhr: 15, parent: 'comet Tempel–Tuttle',
+    radiant: [152.0, 22.0], con: 'Leo', speed: 71,
     note: 'Usually modest. About every 33 years it produces a storm instead.',
   },
   {
     name: 'Geminids', peak: [12, 14], zhr: 150, parent: 'asteroid 3200 Phaethon',
+    radiant: [112.0, 33.0], con: 'Gem', speed: 35,
     note: 'The richest shower there is, and the only major one from a rock rather than a comet.',
   },
 ]
