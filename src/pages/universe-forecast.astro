@@ -232,7 +232,7 @@ import GameShell from '../layouts/GameShell.astro'
   import { PLAY } from '../lib/motion'
   import { ShaderSurface } from '../lib/gl'
   import { FORECAST_STAGE, SHOWER_SLOTS, SHOWER_TURN, type StageScene } from '../lib/forecast-stage'
-  import { sunLeft, moonLevel, GLINTS } from '../lib/forecast-light'
+  import { sunLeft, moonLevel, sunOverhead, GLINTS } from '../lib/forecast-light'
   import { moonMap } from '../lib/forecast-moon'
   import { project } from '../lib/sky-projection'
   import { starRgb } from '../lib/star-color'
@@ -610,14 +610,9 @@ import GameShell from '../layouts/GameShell.astro'
      The latitude is the event: the equator, or a tropic. The longitude is
      wherever it is noon, which is the clock, less the few minutes the Sun
      runs fast or slow at that time of year (the equation of time). */
-  const SEASON_DECL: Record<string, number> = { march: 0, june: 23.44, september: 0, december: -23.44 }
-  const SEASON_EOT_MIN: Record<string, number> = { march: -7.4, june: -1.8, september: 7.5, december: 1.6 }
   function seasonAt(ev: SkyEvent, t: number) {
     const at = new Date(+ev.when + (t - 0.5) * 86400_000)
-    const hours = at.getUTCHours() + at.getUTCMinutes() / 60 + at.getUTCSeconds() / 3600
-    let lon = -15 * (hours - 12 + SEASON_EOT_MIN[ev.season!] / 60)
-    lon = ((lon + 540) % 360) - 180
-    const decl = SEASON_DECL[ev.season!]
+    const { lat: decl, lon } = sunOverhead(ev.season!, at)
     const where = `${decl === 0 ? 'the equator' : `${Math.abs(decl).toFixed(1)}°${decl > 0 ? 'N' : 'S'}`}, ${Math.abs(lon).toFixed(0)}°${lon < 0 ? 'W' : 'E'}`
     return { decl, lon, label: `${pad2(at.getUTCHours())}:${pad2(at.getUTCMinutes())} UTC · the Sun overhead at ${where}` }
   }

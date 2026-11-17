@@ -217,3 +217,33 @@ export function moonLevel(mx: number, my: number, mr: number, umbra: number, pen
   }
   return mean + (top - mean) * 0.6
 }
+
+/* -------------------------------------------------------------------------- */
+/* Where the Sun stands at a solstice or an equinox                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The latitude the Sun is over at each of the four (which is what the event
+ * is: the equator, or a tropic, the tilt of the Earth's axis), and how many
+ * minutes a sundial runs ahead of a clock at that time of year (the equation
+ * of time), which is the only other thing needed to say where it is noon.
+ */
+export const SEASON_SUN: Record<string, { lat: number; sundial: number }> = {
+  march: { lat: 0, sundial: -7.4 },
+  june: { lat: 23.44, sundial: -1.8 },
+  september: { lat: 0, sundial: 7.5 },
+  december: { lat: -23.44, sundial: 1.6 },
+}
+
+/**
+ * Where on the Earth the Sun is straight overhead at an instant on the day
+ * of one of the four: degrees north, and degrees east in -180..180. It is
+ * noon by the Sun where the clock, the longitude and the sundial's error add
+ * up to twelve.
+ */
+export function sunOverhead(season: string, at: Date): { lat: number; lon: number } {
+  const s = SEASON_SUN[season]
+  const hours = at.getUTCHours() + at.getUTCMinutes() / 60 + at.getUTCSeconds() / 3600
+  const lon = -15 * (hours - 12 + s.sundial / 60)
+  return { lat: s.lat, lon: ((lon % 360) + 540) % 360 - 180 }
+}
