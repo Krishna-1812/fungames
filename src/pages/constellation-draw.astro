@@ -159,7 +159,7 @@ const ROUND = TIERS.length
   import { encodeStrokes, decodeStrokes, colorCss, type Stroke } from '../lib/constellation-code'
   import {
     figureEdges, figureStars, figureView, figureName, chainsToEdges, traceScore, withPeeks,
-    pickRound, memoMs, verdictFor, edgeKey, fitView, pickStar, PEEK_COST, type Trace,
+    pickRound, memoMs, verdictFor, edgeKey, fitView, pickStar, isLineStar, PEEK_COST, type Trace,
   } from '../lib/constellation-trace'
   import { createShell } from '../lib/game-shell'
   import { PLAY } from '../lib/motion'
@@ -1010,6 +1010,10 @@ const ROUND = TIERS.length
   /* ---- boot: a shared drawing opens the free sky, anything else the round ---- */
 
   newRound()
+  // pickStar favours the stars the 88 figures are drawn through; finding
+  // them all takes a moment, so do it while nothing is happening rather than
+  // on the first click.
+  ;(window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300)))(() => isLineStar(0))
   {
     const params = new URLSearchParams(location.search)
     const loaded = decodeStrokes(params.get('c') ?? '')

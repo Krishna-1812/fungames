@@ -163,12 +163,29 @@ export type View = { ra0: number; dec0: number; scale: number; W: number; H: num
 
 export const PICK_RADIUS = 18
 const PICK_MAG_WEIGHT = 1.2
+/** What being a star some figure is drawn through is worth, in pixels. */
+const PICK_LINE_BONUS = 3
+
+let lineStars: Set<number> | null = null
+/** Every star any of the 88 figures is drawn through: the stars people join. */
+export function isLineStar(id: number): boolean {
+  lineStars ??= new Set(CONSTELLATIONS.flatMap((c) => figureStars(c.id)))
+  return lineStars.has(id)
+}
 
 /**
  * The star under a click at (cx, cy) in canvas pixels. Brighter stars win
  * near-ties: the stars a figure is made of are the bright ones, and at a wide
  * view a faint one a pixel nearer should not steal the click from the one you
  * were obviously aiming at.
+ *
+ * Brightness alone cannot settle two stars of about the same magnitude a
+ * pixel or two apart, which on a phone is one dot: ε Lyrae's double double,
+ * the Hyades in Taurus. A click a pixel off took the neighbour, and a line of
+ * the figure became impossible to draw. So a star that any of the 88 figures
+ * is drawn through gets a few pixels' head start as well. Every figure's
+ * stars get it alike, so it does not point at the one being drawn; it only
+ * decides which of two stars that look like one was meant.
  */
 export function pickStar(cx: number, cy: number, v: View): Star | null {
   let best: Star | null = null
@@ -180,7 +197,7 @@ export function pickStar(cx: number, cy: number, v: View): Star | null {
     if (Math.abs(sx - cx) > PICK_RADIUS) continue
     const d = Math.hypot(sx - cx, sy - cy)
     if (d > PICK_RADIUS) continue
-    const cost = d + s.mag * PICK_MAG_WEIGHT
+    const cost = d + s.mag * PICK_MAG_WEIGHT - (isLineStar(s.id) ? PICK_LINE_BONUS : 0)
     if (cost < bestCost) { best = s; bestCost = cost }
   }
   return best

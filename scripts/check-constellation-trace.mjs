@@ -19,8 +19,8 @@ import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
 const T = await import('../src/lib/constellation-trace.ts')
-const { starById } = await import('../src/lib/star-catalog.ts')
-const { project, skyToScreen } = await import('../src/lib/sky-projection.ts')
+const { starById, STARS } = await import('../src/lib/star-catalog.ts')
+const { project, skyToScreen, angularSeparationDeg } = await import('../src/lib/sky-projection.ts')
 
 let failures = 0
 const fail = (m) => { failures++; console.log(`  FAIL  ${m}`) }
@@ -48,11 +48,17 @@ console.log('every figure a round can draw is real, visible, and the tiers grow'
   check(r.length === T.TIERS.length && new Set(r).size === r.length, `a round is ${r.length} different figures, one per tier`)
 }
 
-console.log('\nclicking a figure\'s star picks that star, at any size of sky')
+console.log('\nclicking a figure\'s star picks that star, even a little off, at any size of sky')
 {
   // Faint figure stars sit next to brighter ones and inside double stars; if a
-  // click on one lands on a neighbour, that line can never be drawn.
-  for (const [W, H] of [[340, 380], [620, 480], [1280, 760]]) {
+  // click on one lands on a neighbour, that line can never be drawn. Aiming
+  // exactly at the middle is not enough: a click arrives in whole pixels and
+  // the canvas rarely starts on one, so on a phone a click aimed at 10 Tau
+  // landed a pixel toward ξ Tau and took it. Every click within SLIP of the
+  // star has to pick it.
+  const SLIP = 2
+  const ring = [[0, 0], ...Array.from({ length: 8 }, (_, a) => [SLIP * Math.cos(a * Math.PI / 4), SLIP * Math.sin(a * Math.PI / 4)])]
+  for (const [W, H] of [[340, 380], [362, 519], [620, 480], [1280, 760]]) {
     const bad = []
     let total = 0
     for (const id of T.TIERS.flat()) {
@@ -60,13 +66,36 @@ console.log('\nclicking a figure\'s star picks that star, at any size of sky')
       for (const sid of T.figureStars(id)) {
         const s = starById(sid)
         const p = project(s.ra, s.dec, v.ra0, v.dec0)
+        const [sx, sy] = skyToScreen(p.x, p.y, v)
         total++
-        const got = T.pickStar(...skyToScreen(p.x, p.y, v), v)
-        if (got?.id !== sid) bad.push(`${T.figureName(id)}: ${sid}→${got?.id}`)
+        for (const [ox, oy] of ring) {
+          const got = T.pickStar(sx + ox, sy + oy, v)
+          if (got?.id !== sid) { bad.push(`${T.figureName(id)}: ${s.name || sid}→${got?.name || got?.id} at ${Math.hypot(ox, oy).toFixed(0)}px`); break }
+        }
       }
     }
-    check(!bad.length, `${W}×${H}: all ${total} figure stars pick themselves${bad.length ? ' — ' + bad.join(', ') : ''}`)
+    check(!bad.length, `${W}×${H}: all ${total} figure stars pick themselves within ${SLIP}px${bad.length ? ' — ' + bad.join(', ') : ''}`)
   }
+  // The head start line stars get must not make the rest unreachable. In the
+  // free sky you can join any star: every naked-eye-bright one that no figure
+  // uses is still picked when clicked dead on, zoomed all the way in. (At the
+  // opening zoom θ¹ Tau and θ² Tau are a pixel apart and one of them has to
+  // win; it is now the one Taurus is drawn through.) The only exceptions are
+  // doubles a few arcseconds apart, which are one point at any zoom and never
+  // could be picked apart.
+  const SCALE_MAX = 6400
+  const UNRESOLVED_ARCSEC = 30
+  const off = STARS.filter((s) => s.mag < 4 && !T.isLineStar(s.id))
+  const lost = []
+  let doubles = 0
+  for (const s of off) {
+    const v = { ra0: s.ra, dec0: s.dec, scale: SCALE_MAX, W: 390, H: 600 }
+    const got = T.pickStar(v.W / 2, v.H / 2, v)
+    if (got?.id === s.id) continue
+    if (got && angularSeparationDeg(s.ra, s.dec, got.ra, got.dec) * 3600 < UNRESOLVED_ARCSEC) doubles++
+    else lost.push(`${s.name || s.id}→${got?.name || got?.id}`)
+  }
+  check(!lost.length, `all ${off.length - doubles} stars brighter than 4 that no figure uses are picked dead on, zoomed in (${doubles} unresolvable doubles aside)${lost.length ? ' — not: ' + lost.join(', ') : ''}`)
 }
 
 console.log('\na perfect drawing is 100 however it was drawn')
