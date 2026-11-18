@@ -716,9 +716,12 @@ const ROUND = TIERS.length
   }
 
   function resize() {
-    const r = scene.getBoundingClientRect()
-    W = Math.max(1, Math.round(r.width))
-    H = Math.max(1, Math.round(r.height))
+    // The canvas's own box, not the scene's: the scene has a border, and
+    // sizing the drawing to the outside of it squeezed the whole sky a
+    // percent to fit inside, blurred every star, and put clicks up to two
+    // pixels off the stars they were aimed at, toward the edges.
+    W = Math.max(1, canvas.clientWidth)
+    H = Math.max(1, canvas.clientHeight)
     dpr = Math.min(devicePixelRatio || 1, 2)
     canvas.width = Math.round(W * dpr)
     canvas.height = Math.round(H * dpr)
