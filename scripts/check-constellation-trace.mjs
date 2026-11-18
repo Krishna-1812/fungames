@@ -75,6 +75,18 @@ console.log('\nclicking a figure\'s star picks that star, even a little off, at 
       }
     }
     check(!bad.length, `${W}×${H}: all ${total} figure stars pick themselves within ${SLIP}px${bad.length ? ' — ' + bad.join(', ') : ''}`)
+    // And none is under the zoom buttons, where a tap zooms instead.
+    const hidden = []
+    for (const id of T.TIERS.flat()) {
+      const v = T.fitView(id, W, H)
+      for (const sid of T.figureStars(id)) {
+        const s = starById(sid)
+        const p = project(s.ra, s.dec, v.ra0, v.dec0)
+        const [sx, sy] = skyToScreen(p.x, p.y, v)
+        if (sx > W - T.ZOOM_CORNER.w && sy > H - T.ZOOM_CORNER.h) hidden.push(`${T.figureName(id)}: ${s.name || sid}`)
+      }
+    }
+    check(!hidden.length, `${W}×${H}: no figure star is under the zoom buttons${hidden.length ? ' — ' + hidden.join(', ') : ''}`)
   }
   // The head start line stars get must not make the rest unreachable. In the
   // free sky you can join any star: every naked-eye-bright one that no figure

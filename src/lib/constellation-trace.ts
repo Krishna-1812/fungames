@@ -203,10 +203,21 @@ export function pickStar(cx: number, cy: number, v: View): Star | null {
   return best
 }
 
+/**
+ * The zoom buttons' corner of the sky, in pixels from the right and bottom
+ * edges (`.cd-zoom`: 14px in, two 40px buttons 6px apart), plus a little
+ * room. A star under them cannot be clicked: the tap zooms instead.
+ */
+export const ZOOM_CORNER = { w: 14 + 40 + 8, h: 14 + 40 + 6 + 40 + 8 }
+
 /** The view that shows a whole figure in a canvas of this size. */
 export function fitView(id: string, W: number, H: number, min = 120, max = 6400): View {
   const f = figureView(id)
-  const scale = Math.max(min, Math.min(max, Math.min((W * 0.36) / Math.max(f.halfW, 0.01), (H * 0.34) / Math.max(f.halfH, 0.01))))
+  // About three quarters of the width, but on a phone that reaches the zoom
+  // buttons and put Aquila's tail under them, so never closer to the side
+  // than they come.
+  const halfW = Math.min(W * 0.36, W / 2 - ZOOM_CORNER.w)
+  const scale = Math.max(min, Math.min(max, Math.min(halfW / Math.max(f.halfW, 0.01), (H * 0.34) / Math.max(f.halfH, 0.01))))
   return { ra0: f.ra, dec0: f.dec, scale, W, H }
 }
 
