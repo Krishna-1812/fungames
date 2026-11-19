@@ -230,6 +230,28 @@ const DRUM_CELLS = 30
     </div>
   </section>
 
+  <!-- ---- the map ------------------------------------------------------- -->
+  <!-- Where the people alive that year were: the Earth at night, a light for
+       each of them (lib/who-map.ts). Drawn on the client; without a canvas
+       the readout and the chart below say the same thing. -->
+  <section class="wa-map" aria-labelledby="wa-map-h">
+    <h2 class="wa-sr" id="wa-map-h">Where they were</h2>
+    <div class="wa-map-pic" id="waMap">
+      <div class="wm-labels" id="waMapLabels" aria-hidden="true"></div>
+      <p class="wm-year" aria-hidden="true" data-keep-clear><b id="waMapYear">{formatYear(START_YEAR)}</b><span id="waMapCount">{startAlive.length} alive</span></p>
+      <p class="wm-empty" id="waMapEmpty" aria-hidden="true" hidden>Nobody in this record was alive then.</p>
+      <div class="wm-tip" id="waMapTip" aria-hidden="true" hidden>
+        <p class="wm-tip-name" id="waMapTipName"></p>
+        <p class="wm-tip-meta" id="waMapTipMeta"></p>
+      </div>
+    </div>
+    <p class="wa-map-note">
+      Each light is where somebody alive that year was born — or, if they made
+      their life in another country, where they made it, with a dotted line
+      back to where they started.
+    </p>
+  </section>
+
   <!-- ---- the readout --------------------------------------------------- -->
   <section class="wa-readout">
     <div aria-live="polite" aria-atomic="true">
@@ -254,6 +276,15 @@ const DRUM_CELLS = 30
       Nobody in this record was alive then.
       <button type="button" id="waNearest">Go to the nearest year that has somebody</button>
     </p>
+  </section>
+
+  <!-- ---- their lives, side by side ---------------------------------------
+       The people alive in the year, each drawn as their whole life on one
+       scale that holds all of them, with the year standing through the
+       middle and each one's age where it crosses. The big chart below is the
+       proof that the record is honest; this is the reading of one year. -->
+  <section class="wa-lives-wrap" aria-hidden="true">
+    <div class="wa-lives" id="waLives"></div>
   </section>
 
   <!-- ---- the chart ----------------------------------------------------- -->
@@ -487,6 +518,8 @@ const DRUM_CELLS = 30
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
   import { PLAY } from '../lib/motion'
+  import { WhoMap, type Light } from '../lib/who-map'
+  import { whereabouts } from '../lib/who-places'
 
   const prefersReducedMotion = !PLAY
 
@@ -548,6 +581,114 @@ const DRUM_CELLS = 30
 
   const px = (y: number) => D.x0 + ((toAxis(y) - D.dom0) / (D.dom1 - D.dom0)) * (D.x1 - D.x0)
 
+  /* ---- the map ------------------------------------------------------------
+   * One light per person, made once. The colours are the chart's, read off
+   * the bars, so the map and the chart cannot disagree about who is what. */
+  const lightOf = new Map<string, Light>()
+  byBirth.forEach((p, i) => {
+    const w = whereabouts(p.name)
+    if (!w) return
+    lightOf.set(p.name, {
+      key: p.name, name: p.name, colour: bars[i].dataset.colour!,
+      born: w.born, bornAt: w.bornAt, later: w.later, laterAt: w.laterAt,
+      at: w.later ?? w.born,
+    })
+  })
+  let map: WhoMap | null = null
+  try {
+    map = new WhoMap($('waMap'), $('waMapLabels'), { reduce: prefersReducedMotion })
+  } catch { map = null }
+  /* Told at most every 150 ms while the year is moving, and always once it
+     stops: a wheel spun through a century would otherwise rebuild the
+     close-up and re-frame the map a hundred times for nobody to see. */
+  let mapT = 0, mapAt = 0, mapYear = NaN
+  function paintMap(y: number) {
+    $('waMapYear').textContent = formatYear(y)
+    clearTimeout(mapT)
+    const run = () => {
+      mapAt = performance.now()
+      if (y === mapYear) return
+      mapYear = y
+      const alive = peopleAliveIn(y)
+      paintLives(y)
+      $('waMapCount').textContent = alive.length === 1 ? '1 alive' : `${alive.length} alive`
+      $('waMapEmpty').hidden = alive.length > 0
+      map?.show(alive.map((p) => lightOf.get(p.name)!).filter(Boolean))
+    }
+    const wait = 150 - (performance.now() - mapAt)
+    if (wait <= 0) run()
+    else mapT = window.setTimeout(run, wait)
+  }
+
+  /* ---- their lives, side by side ---------------------------------------- */
+
+  const livesBox = $('waLives')
+  const colourOf = new Map(byBirth.map((p, i) => [p.name, bars[i].dataset.colour!]))
+  /** Round years for the scale's ticks: as few as say where you are. */
+  function tickStep(years: number) {
+    for (const s of [10, 20, 25, 50, 100]) if (years / s <= 9) return s
+    return 200
+  }
+  function paintLives(y: number) {
+    const alive = peopleAliveIn(y).sort((a, b) => a.birth - b.birth || a.name.localeCompare(b.name))
+    if (!alive.length) { livesBox.innerHTML = ''; return }
+    // One scale for all of them: from the earliest birth to the latest end, never under a century.
+    let lo = Math.min(...alive.map((p) => toAxis(p.birth)))
+    let hi = Math.max(...alive.map((p) => toAxis(p.death ?? D.maxYear)))
+    const need = Math.max(0, 100 - (hi - lo))
+    lo -= need / 2 + 4; hi += need / 2 + 4
+    const pct = (yy: number) => (((toAxis(yy) - lo) / (hi - lo)) * 100).toFixed(2) + '%'
+    const step = tickStep(hi - lo)
+    let ticks = ''
+    for (let a = Math.ceil(lo / step) * step; a <= hi; a += step) {
+      const yy = a <= 0 ? a - 1 : a
+      ticks += `<span class="wl-tick" style="left:${pct(yy)}"><i>${formatYear(yy)}</i></span>`
+    }
+    let rowsHtml = ''
+    for (const p of alive) {
+      const end = p.death ?? D.maxYear
+      const left = ((toAxis(p.birth) - lo) / (hi - lo)) * 100
+      const width = ((toAxis(end) - toAxis(p.birth)) / (hi - lo)) * 100
+      // The name rides inside a long bar, and beside a short one, on whichever side has room.
+      const inside = width > 26
+      const after = left + width < 62
+      const name = p.name.replace(/ \(.*\)$/, '')
+      // Inside a bar the name keeps to the longer side of the year, so the age tag never sits on it.
+      const f = (toAxis(y) - toAxis(p.birth)) / Math.max(1, toAxis(end) - toAxis(p.birth))
+      const fit = f < 0.5 ? `padding-left:calc(${(f * 100).toFixed(1)}% + 20px);width:100%` : `max-width:calc(${(f * 100).toFixed(1)}% - 16px)`
+      rowsHtml += `<div class="wl-row" style="--c:${colourOf.get(p.name)}">` +
+        `<span class="wl-bar${p.death === null ? ' is-living' : ''}" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%">` +
+        (inside ? `<b class="wl-name" style="${fit}">${name}</b>` : '') + `</span>` +
+        (inside ? '' : `<b class="wl-name wl-out ${after ? 'is-after' : 'is-before'}" style="${after ? `left:calc(${(left + width).toFixed(2)}% + 8px)` : `right:calc(${(100 - left).toFixed(2)}% + 8px)`}">${name}</b>`) +
+        `<span class="wl-age" style="left:${pct(y)}">${yearsBetween(p.birth, y)}</span>` +
+        `</div>`
+    }
+    livesBox.innerHTML =
+      `<div class="wl-scale">${ticks}</div>` +
+      `<div class="wl-rows">${rowsHtml}<span class="wl-now" style="left:${pct(y)}"><i>${formatYear(y)}</i></span></div>` +
+      `<p class="wl-key">Each bar is a whole life. The number on the line is how old they were in ${formatYear(y)}.</p>`
+  }
+
+  /* Pointing at a light names it, and says where they were born and went. */
+  const mapPic = $('waMap'), mapTip = $('waMapTip')
+  const ageThen = (name: string) => { const p = byBirth.find((q) => q.name === name)!; return yearsBetween(p.birth, year) }
+  function tipAt(e: PointerEvent) {
+    if (!map) return
+    const r = mapPic.getBoundingClientRect()
+    const x = e.clientX - r.left, y = e.clientY - r.top
+    const l = map.hit(x, y)
+    mapTip.hidden = !l
+    mapPic.classList.toggle('is-pointing', !!l)
+    if (!l) return
+    $('waMapTipName').textContent = `${l.name}, ${ageThen(l.name)}`
+    $('waMapTipMeta').textContent = l.laterAt ? `Born in ${l.bornAt} · lived in ${l.laterAt}` : `Born in ${l.bornAt}`
+    const tw = mapTip.offsetWidth, th = mapTip.offsetHeight
+    mapTip.style.transform = `translate(${Math.min(r.width - tw - 8, Math.max(8, l.x - tw / 2)).toFixed(0)}px, ${(l.y - th - 16 < 8 ? l.y + 16 : l.y - th - 16).toFixed(0)}px)`
+  }
+  mapPic.addEventListener('pointermove', tipAt)
+  mapPic.addEventListener('pointerdown', tipAt)
+  mapPic.addEventListener('pointerleave', () => { mapTip.hidden = true; mapPic.classList.remove('is-pointing') })
+
   let year = D.startYear
   let lastTick = 0
 
@@ -593,6 +734,7 @@ const DRUM_CELLS = 30
   function paint(y: number, { quiet = false } = {}) {
     year = y
     paintCounter(y)
+    paintMap(y)
 
     wheel.setAttribute('aria-valuenow', String(y))
     wheel.setAttribute('aria-valuetext', formatYear(y))
@@ -659,6 +801,8 @@ const DRUM_CELLS = 30
       $('waOldestAge').textContent = String(oldest.age)
       $('waYoungest').textContent = youngest.person.name
       $('waYoungestAge').textContent = String(youngest.age)
+      $('waOldestAge').classList.toggle('is-one', oldest.age === 1)
+      $('waYoungestAge').classList.toggle('is-one', youngest.age === 1)
     }
 
     if (!quiet) {
@@ -729,6 +873,7 @@ const DRUM_CELLS = 30
 
   const PX_PER_YEAR = 2.4
   let dragFrom: { x: number; year: number } | null = null
+  function dragging() { return !!dragFrom }
 
   wheel.addEventListener('pointerdown', (e) => {
     unlock()
@@ -1108,6 +1253,59 @@ const DRUM_CELLS = 30
 
   /* ---- the readout, engraved on its own plate ---------------------------- */
 
+  /* ---- the map: wider than the reading column, as wide as the frame allows ---- */
+
+  .wa-map { max-width: 1120px; margin: 4vh auto 0; padding: 0 22px; }
+  .wa-map-pic {
+    position: relative; aspect-ratio: 2 / 1; overflow: hidden;
+    border-radius: 18px; background: #06101f;
+    box-shadow: 0 30px 60px -34px rgba(6, 12, 24, 0.7), inset 0 0 0 1px rgba(150, 175, 220, 0.12);
+    touch-action: pan-y;
+  }
+  .wa-map-pic.is-pointing { cursor: pointer; }
+  .wa-map-pic.is-dragging { cursor: grabbing; }
+  /* People off the edge of the map: how many, and a way to them. */
+  .wm-edge {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
+    min-width: 44px; height: 44px; padding: 0 12px; border: 0; border-radius: 22px;
+    font: inherit; font-size: 14px; font-weight: 700; color: #e8eef8; cursor: pointer;
+    background: rgba(12, 20, 36, 0.82); box-shadow: inset 0 0 0 1px rgba(150, 175, 220, 0.28), 0 6px 18px rgba(0, 0, 0, 0.4);
+  }
+  .wm-edge:hover { background: rgba(24, 36, 62, 0.92); }
+  .wm-edge:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+  .wm-edge-left { left: 10px; }
+  .wm-edge-right { right: 10px; }
+  .wa-map-pic .wm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .wm-labels { position: absolute; inset: 0; pointer-events: none; }
+  .wm-label {
+    position: absolute; left: 0; top: 0; white-space: nowrap;
+    font-size: 12px; font-weight: 600; line-height: 1.25; letter-spacing: 0.01em;
+    color: #e8eef8; text-shadow: 0 1px 2px rgba(2, 6, 14, 0.95), 0 0 8px rgba(2, 6, 14, 0.9);
+    transition: opacity 200ms linear;
+  }
+  .wm-label i { font-style: normal; font-weight: 500; color: #9fb2d6; }
+  /* The year, written on the map where a chart would put its title. */
+  .wm-year {
+    position: absolute; left: 22px; top: 18px; margin: 0; pointer-events: none;
+    display: flex; flex-direction: column; gap: 2px; color: #e8eef8;
+    text-shadow: 0 1px 10px rgba(2, 6, 14, 0.9);
+  }
+  .wm-year b { font-family: var(--display); font-variation-settings: var(--display-axes); font-size: clamp(30px, 4.4vw, 46px); font-weight: 400; line-height: 1; letter-spacing: -0.01em; }
+  .wm-year span { font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #9fb2d6; }
+  .wm-empty {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0;
+    font-size: 15px; color: #9fb2d6; text-align: center; pointer-events: none;
+    text-shadow: 0 1px 10px rgba(2, 6, 14, 0.9);
+  }
+  .wm-tip {
+    position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2;
+    max-width: 260px; padding: 8px 12px; border-radius: 9px;
+    background: rgba(10, 16, 28, 0.94); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(150, 175, 220, 0.18);
+  }
+  .wm-tip-name { margin: 0; font-size: 13.5px; font-weight: 700; color: #f3f5f8; }
+  .wm-tip-meta { margin: 2px 0 0; font-size: 12px; color: rgba(225, 233, 245, 0.75); }
+  .wa-map-note { max-width: 62ch; margin: 12px auto 0; font-size: 13px; line-height: 1.55; color: var(--wa-ink-soft); text-align: center; }
+
   .wa-readout {
     max-width: 680px; margin: 26px auto 0; padding: 20px 22px;
     border-top: 2px solid var(--wa-walnut); border-bottom: 1px solid var(--wa-rule);
@@ -1135,6 +1333,7 @@ const DRUM_CELLS = 30
     background: var(--wa-walnut); border-radius: 999px; padding: 2px 9px;
   }
   .wa-ends dd span::after { content: ' yrs'; opacity: 0.7; }
+  .wa-ends dd span.is-one::after { content: ' yr'; }
   .wa-ends[hidden] { display: none; }
 
   .wa-nobody { margin: 6px 0 0; font-size: 15px; color: var(--wa-ink-soft); }
@@ -1143,6 +1342,50 @@ const DRUM_CELLS = 30
     margin-left: 6px; border: 0; background: none; cursor: pointer; padding: 4px 2px;
     color: var(--t-cobalt); font: inherit; text-decoration: underline; text-underline-offset: 3px;
   }
+
+  /* ---- their lives, side by side --------------------------------------------- */
+
+  .wa-lives-wrap { max-width: 940px; margin: 30px auto 0; padding: 0 22px; }
+  .wa-lives:empty { display: none; }
+  .wl-scale { position: relative; height: 22px; margin: 0 0 6px; border-bottom: 1px solid var(--wa-rule); }
+  .wl-tick { position: absolute; bottom: 0; height: 6px; border-left: 1px solid var(--ink3, #9aa3b2); }
+  .wl-tick i {
+    position: absolute; bottom: 8px; left: 0; transform: translateX(-50%);
+    font-style: normal; font-size: 11px; color: var(--ink2); white-space: nowrap;
+  }
+  .wl-rows { position: relative; padding: 4px 0 6px; }
+  .wl-row { position: relative; height: 30px; }
+  .wl-row:nth-child(even)::before {
+    content: ''; position: absolute; inset: 0; background: var(--paper2, rgba(20, 30, 50, 0.03)); border-radius: 4px;
+  }
+  .wl-bar {
+    position: absolute; top: 5px; height: 20px; border-radius: 10px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--c) 82%, white), var(--c));
+    box-shadow: 0 1px 2px rgba(10, 16, 28, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    display: flex; align-items: center; overflow: hidden;
+    animation: wl-in 380ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+  /* Still alive: the bar runs out to the edge of now and fades, not stops. */
+  .wl-bar.is-living { border-radius: 10px 2px 2px 10px; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  @keyframes wl-in { from { opacity: 0; transform: scaleX(0.96); } }
+  .wl-name { font-size: 12.5px; font-weight: 700; white-space: nowrap; line-height: 1; }
+  .wl-bar .wl-name { box-sizing: border-box; padding: 0 10px; flex: none; color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); overflow: hidden; text-overflow: ellipsis; }
+  .wl-out { position: absolute; top: 9px; color: var(--ink); }
+  /* How old, where the year crosses: a tag on the line. */
+  .wl-age {
+    position: absolute; top: 7px; transform: translateX(-50%); z-index: 2;
+    min-width: 24px; height: 16px; padding: 0 5px; border-radius: 8px;
+    font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center;
+    background: var(--wa-walnut); color: #f3f5f8; box-shadow: 0 0 0 2px var(--card, #fff);
+  }
+  .wl-now { position: absolute; top: -6px; bottom: 0; width: 0; border-left: 2px solid var(--t-cobalt); z-index: 1; }
+  .wl-now i {
+    position: absolute; top: -22px; left: 0; transform: translateX(-50%);
+    font-style: normal; font-size: 11px; font-weight: 700; color: var(--t-cobalt); white-space: nowrap;
+    background: var(--card, #fff); padding: 0 4px;
+  }
+  .wl-key { margin: 10px 0 0; font-size: 12.5px; color: var(--ink2); }
+  @media (prefers-reduced-motion: reduce) { .wl-bar { animation: none; } }
 
   /* ---- the chart ---------------------------------------------------------- */
 
@@ -1364,6 +1607,13 @@ const DRUM_CELLS = 30
   }
 
   @media (max-width: 620px) {
+    .wa-map { padding: 0 12px; }
+    .wa-map-pic { aspect-ratio: 5 / 4; border-radius: 14px; }
+    .wm-year { left: 14px; top: 12px; }
+    .wm-label { font-size: 11px; }
+    .wa-lives-wrap { padding: 0 12px; }
+    .wl-row { height: 28px; }
+    .wl-name { font-size: 11.5px; }
     .wa-row {
       grid-template-columns: 1fr auto;
       grid-template-areas: 'name age' 'years place' 'blurb blurb';
