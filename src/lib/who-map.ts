@@ -17,6 +17,13 @@
  * where most of them are, the map goes round, it can be dragged sideways,
  * and the people off either edge are counted at that edge.
  *
+ * The land is the expensive part: a path of thousands of points, filled,
+ * clipped and stroked eight times over. So it is drawn once into a picture
+ * of the whole world, and while the view is moving each frame is that
+ * picture, scaled; once the view settles it is drawn again from the path,
+ * sharp, and kept until the view moves. The lights and names go on top of
+ * whichever it is, every frame.
+ *
  * Drawn with a 2D canvas and not a shader on purpose: the coastline is a
  * vector path, so it is sharp at any zoom, which a coastline texture is not
  * once the view is the size of Italy.
@@ -79,6 +86,13 @@ export class WhoMap {
   private ruler = document.createElement('canvas').getContext('2d')!
   private labelFont = ''
   private labelH = 15
+  /** The whole world's land, drawn once, for frames while the view moves. */
+  private atlas: HTMLCanvasElement | null = null
+  /** The sea and land for the view as it last settled, and which view that was. */
+  private base = document.createElement('canvas')
+  private baseKey = ''
+  /** True while the camera is gliding or being dragged. */
+  private gliding = false
   private reduce: boolean
   /** Called after each frame, with where the lights ended up. */
   onFrame?: () => void
@@ -114,13 +128,24 @@ export class WhoMap {
       if (!this.drag.moved) { this.drag.moved = true; host.setPointerCapture(e.pointerId); host.classList.add('is-dragging') }
       const k = this.h / this.view.span
       this.view = this.from = this.to = { ...this.view, lon: this.drag.lon - dx / k }
+      this.gliding = true
       if (!this.moving) this.draw()
     })
-    const end = () => { this.drag = null; host.classList.remove('is-dragging') }
+    const end = () => {
+      const was = this.drag?.moved
+      this.drag = null
+      host.classList.remove('is-dragging')
+      // Let go: drawn sharp again where it came to rest.
+      if (was) { this.gliding = false; if (!this.moving) this.draw() }
+    }
     host.addEventListener('pointerup', end)
     host.addEventListener('pointercancel', end)
     new ResizeObserver(() => this.resize()).observe(host)
     this.resize()
+    // The world's picture takes a tenth of a second to make: made while nothing else is happening, not on the first turn of the wheel.
+    const idle = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback
+    const make = () => { this.atlas ??= this.makeAtlas() }
+    if (idle) idle(make, { timeout: 2500 }); else setTimeout(make, 1200)
   }
 
   /** Turn the world so the people off one edge come into the middle. */
@@ -220,6 +245,7 @@ export class WhoMap {
 
   private step = (now: number) => {
     const t = Math.min(1, (now - this.t0) / 900)
+    this.gliding = t < 1
     const e = ease(t)
     // Zoomed in the log of the span, so the camera moves at an even pace through scale.
     this.view = {
@@ -248,6 +274,41 @@ export class WhoMap {
       if (d < bd) { bd = d; best = l }
     }
     return best
+  }
+
+  /** The world's land as one picture, `W` pixels across, equirectangular. */
+  private makeAtlas(): HTMLCanvasElement {
+    const W = (window.devicePixelRatio || 1) > 1.5 ? 4096 : 3200
+    const c = document.createElement('canvas')
+    c.width = W; c.height = W / 2
+    const g = c.getContext('2d')!
+    const s = W / MAP_W
+    // Its strokes are sized for a view about eight pixels to the degree, the middle of the range.
+    const css = (W / 360) / 8
+    const at = () => g.setTransform(s, 0, 0, s, 0, 0)
+    at()
+    g.lineJoin = 'round'
+    for (const [wid, a] of [[30, 0.03], [16, 0.045], [7, 0.07]] as const) {
+      g.lineWidth = (wid * css) / s
+      g.strokeStyle = `rgba(60,120,200,${a})`
+      g.stroke(this.land)
+    }
+    const ground = g.createLinearGradient(0, 0, 0, MAP_H)
+    ground.addColorStop(0, '#1b2330'); ground.addColorStop(0.45, '#151c27'); ground.addColorStop(1, '#10161f')
+    g.fillStyle = ground
+    g.fill(this.land)
+    g.save()
+    g.clip(this.land)
+    for (const [wid, a] of [[12, 0.035], [5, 0.055], [2, 0.09]] as const) {
+      g.lineWidth = (wid * css) / s
+      g.strokeStyle = `rgba(150,180,230,${a})`
+      g.stroke(this.land)
+    }
+    g.restore()
+    g.lineWidth = (0.85 * css) / s
+    g.strokeStyle = 'rgba(186,206,240,0.5)'
+    g.stroke(this.land)
+    return c
   }
 
   /** One copy of the world's land, `s` CSS pixels to a map unit, its corner at (tx, ty) device pixels. */
@@ -293,9 +354,9 @@ export class WhoMap {
     g.restore()
   }
 
-  private draw() {
-    const { g, w, h, dpr, view: v } = this
-    if (!w || !h) return
+  /** Sea, lines and land for a view, onto `g`: from the path if `sharp`, from the atlas if not. */
+  private drawBase(g: CanvasRenderingContext2D, v: View, sharp: boolean) {
+    const { w, h, dpr } = this
     g.setTransform(dpr, 0, 0, dpr, 0, 0)
     g.globalCompositeOperation = 'source-over'
     g.globalAlpha = 1
@@ -309,7 +370,7 @@ export class WhoMap {
     g.fillStyle = sea
     g.fillRect(0, 0, w, h)
 
-    /* ---- the lines of latitude and longitude, every fifteen degrees ---- */
+    /* ---- the lines of latitude and longitude ---- */
     g.lineWidth = 1
     const step = v.span > 70 ? 30 : 15
     g.strokeStyle = 'rgba(120,150,210,0.07)'
@@ -334,7 +395,7 @@ export class WhoMap {
       g.stroke()
     }
 
-    /* ---- the land, from the map's own units ---- */
+    /* ---- the land ---- */
     const s = (360 / MAP_W) * k
     // The world goes round: as many copies of it as the view can see.
     const copies: number[] = []
@@ -342,7 +403,37 @@ export class WhoMap {
       const x0 = w / 2 + (-180 + 360 * c - v.lon) * k
       if (x0 < w && x0 + 360 * k > 0) copies.push(c)
     }
-    for (const c of copies) this.drawLand(g, s, dpr * (w / 2 - (180 - 360 * c + v.lon) * k), dpr * (h / 2 - (90 - v.lat) * k))
+    if (sharp) {
+      for (const c of copies) this.drawLand(g, s, dpr * (w / 2 - (180 - 360 * c + v.lon) * k), dpr * (h / 2 - (90 - v.lat) * k))
+    } else {
+      this.atlas ??= this.makeAtlas()
+      g.imageSmoothingEnabled = true
+      g.imageSmoothingQuality = 'high'
+      for (const c of copies) g.drawImage(this.atlas, w / 2 + (-180 + 360 * c - v.lon) * k, h / 2 - (90 - v.lat) * k, 360 * k, 180 * k)
+    }
+  }
+
+  private draw() {
+    const { g, w, h, dpr, view: v } = this
+    if (!w || !h) return
+    const k = h / v.span
+    if (this.gliding) this.drawBase(g, v, false)
+    else {
+      const key = `${v.lon.toFixed(4)}|${v.lat.toFixed(4)}|${v.span.toFixed(4)}|${w}|${h}|${dpr}`
+      if (key !== this.baseKey) {
+        if (this.base.width !== this.canvas.width || this.base.height !== this.canvas.height) {
+          this.base.width = this.canvas.width; this.base.height = this.canvas.height
+        }
+        this.drawBase(this.base.getContext('2d')!, v, true)
+        this.baseKey = key
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0)
+      g.globalCompositeOperation = 'copy'
+      g.drawImage(this.base, 0, 0)
+    }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0)
+    g.globalCompositeOperation = 'source-over'
+    g.globalAlpha = 1
 
     /* ---- where each light is, a crowd spread a little round its place ---- */
     const groups = new Map<string, Lit[]>()
@@ -464,20 +555,6 @@ export class WhoMap {
        out once a frame and not once for every label. Measuring each label
        straight after writing it cost more than drawing the whole map. */
     this.ruler.font = this.labelFont
-    const sizes: [number, number][] = []
-    const els = clusters.map((c, i) => {
-      const names = c.who.map((l) => l.name.replace(/ \(.*\)$/, ''))
-      const head = names.slice(0, max).join(', '), more = names.length > max ? ` +${names.length - max}` : ''
-      sizes.push([Math.ceil(this.ruler.measureText(head + more).width) + 2, this.labelH])
-      const el = this.labelPool[i] ?? this.labels.appendChild(Object.assign(document.createElement('span'), { className: 'wm-label' }))
-      this.labelPool[i] = el
-      el.textContent = head
-      if (more) el.insertAdjacentHTML('beforeend', `<i>${more}</i>`)
-      el.style.opacity = String(Math.min(...c.who.map((l) => l.a)))
-      el.hidden = false
-      return el
-    })
-    for (let i = clusters.length; i < this.labelPool.length; i++) this.labelPool[i].hidden = true
     // The dots themselves are not to be written over, nor anything the page marks to keep clear.
     for (const l of shown) placed.push({ x0: l.x - 5, y0: l.y - 5, x1: l.x + 5, y1: l.y + 5 })
     placed.push(...this.keepClear)
@@ -487,26 +564,48 @@ export class WhoMap {
       const x0 = side ? this.w - 74 : 0
       placed.push({ x0, y0: this.h / 2 - 28, x1: x0 + 74, y1: this.h / 2 + 28 })
     }
-    clusters.forEach((c, i) => {
-      const el = els[i]
-      const [bw, bh] = sizes[i]
+    /* Measured on a canvas, not by the page, so a frame never makes the page
+       lay itself out. A label that will not fit anywhere is tried shorter:
+       first with fewer names and "+n", then as one name and "+n", then not
+       at all; pointing at a light still names it. */
+    const fits = (x: number, y: number, bw: number, bh: number) => {
+      if (x < 4 || y < 4 || x + bw > this.w - 4 || y + bh > this.h - 4) return null
+      const r = { x0: x - 3, y0: y - 2, x1: x + bw + 3, y1: y + bh + 2 }
+      return placed.some((p) => r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0) ? null : r
+    }
+    let used = 0
+    for (const c of clusters) {
+      const names = c.who.map((l) => l.name.replace(/ \(.*\)$/, ''))
       const left = Math.min(...c.who.map((l) => l.x)), right = Math.max(...c.who.map((l) => l.x))
       const top = Math.min(...c.who.map((l) => l.y)), bottom = Math.max(...c.who.map((l) => l.y))
-      const tries: [number, number][] = [
-        [right + 12, c.y - bh / 2], [left - 12 - bw, c.y - bh / 2],
-        [c.x - bw / 2, top - 12 - bh], [c.x - bw / 2, bottom + 12],
-        [right + 12, top - bh - 2], [left - 12 - bw, bottom + 2],
-      ]
-      let spot: [number, number] | null = null
-      for (const [x, y] of tries) {
-        if (x < 4 || y < 4 || x + bw > this.w - 4 || y + bh > this.h - 4) continue
-        const r = { x0: x - 3, y0: y - 2, x1: x + bw + 3, y1: y + bh + 2 }
-        if (placed.some((p) => r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0)) continue
-        spot = [x, y]; placed.push(r); break
+      const bh = this.labelH
+      let chosen: { head: string; more: string; x: number; y: number } | null = null
+      for (const keep of [...new Set([Math.min(max, names.length), 1])]) {
+        const head = names.slice(0, keep).join(', '), more = names.length > keep ? ` +${names.length - keep}` : ''
+        const bw = Math.ceil(this.ruler.measureText(head + more).width) + 2
+        const tries: [number, number][] = [
+          [right + 12, c.y - bh / 2], [left - 12 - bw, c.y - bh / 2],
+          [c.x - bw / 2, top - 12 - bh], [c.x - bw / 2, bottom + 12],
+          [right + 12, top - bh - 2], [left - 12 - bw, bottom + 2],
+          [right + 12, bottom + 2], [left - 12 - bw, top - bh - 2],
+          [c.x - bw / 2, top - 26 - bh], [c.x - bw / 2, bottom + 26],
+        ]
+        for (const [x, y] of tries) {
+          const r = fits(x, y, bw, bh)
+          if (r) { placed.push(r); chosen = { head, more, x, y }; break }
+        }
+        if (chosen) break
       }
-      // No room: left unnamed here. Pointing at the light names it.
-      if (!spot) { el.hidden = true; return }
-      el.style.transform = `translate(${spot[0].toFixed(1)}px, ${spot[1].toFixed(1)}px)`
-    })
+      // No room even for one name: left unnamed here.
+      if (!chosen) continue
+      const el = this.labelPool[used] ?? this.labels.appendChild(Object.assign(document.createElement('span'), { className: 'wm-label' }))
+      this.labelPool[used++] = el
+      el.textContent = chosen.head
+      if (chosen.more) el.insertAdjacentHTML('beforeend', `<i>${chosen.more}</i>`)
+      el.style.opacity = String(Math.min(...c.who.map((l) => l.a)))
+      el.style.transform = `translate(${chosen.x.toFixed(1)}px, ${chosen.y.toFixed(1)}px)`
+      el.hidden = false
+    }
+    for (let k = used; k < this.labelPool.length; k++) this.labelPool[k].hidden = true
   }
 }
