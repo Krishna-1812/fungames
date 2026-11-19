@@ -1,58 +1,32 @@
 /**
  * Days Since Incident — the live loader.
  *
- * Runs entirely in the visitor's own browser, against three real feeds:
+ * Runs in the visitor's own browser, against two of this site's own cached
+ * routes:
  *
- *  - USGS's earthquake catalogue search, which already answers "the single
- *    most recent event at or above magnitude X" directly — one small request
- *    per tier, each at a tier-appropriate lookback window (see
+ *  - /api/quakes/ — USGS's earthquake catalogue search, which already answers
+ *    "the single most recent event at or above magnitude X" directly: one
+ *    small request per tier, each at a tier-appropriate lookback window (see
  *    `QUAKE_FAST_LOOKBACK_DAYS` below for why that window can't just be
  *    "since forever" for every tier).
- *  - NASA DONKI's flare/storm/shock logs, which only answer "everything in
- *    this date range" — no magnitude filter, no "most recent" mode. A ten-year
- *    request there is ~1.5MB and took 27 seconds when timed against the real
- *    endpoint while building this. So the load is staged: a fast 400-day pull
- *    renders the page immediately, and only a category still unresolved after
- *    that (the rarest tiers — X10 flares, G5 storms) triggers one further,
- *    slower pull for *that source alone*, reaching back five years.
+ *  - /api/space-weather/ — every flare, storm and shock row in one answer,
+ *    merged on the server from NOAA SWPC, GFZ Potsdam and NASA DONKI with
+ *    what it remembers and a seed read from the full records
+ *    (lib/space-weather.ts), along with the X-ray and Kp traces the page
+ *    draws.
  *
- * Every network call is wrapped so a genuine failure (the shared DEMO_KEY
- * rate limit, a timeout, the visitor being offline) renders as "the feed
- * didn't answer" rather than as "nothing has ever happened" — those are
- * different facts and the page must not confuse them.
+ * Every network call is wrapped so a genuine failure (a timeout, the visitor
+ * being offline) renders as "the feed didn't answer" rather than as
+ * "nothing has ever happened" — those are different facts and the page must
+ * not confuse them.
  */
 import { withBase } from './base'
-import {
-  EARTHQUAKE_CATEGORIES,
-  FLARE_CATEGORIES,
-  STORM_CATEGORIES,
-  SHOCK_CATEGORIES,
-  parseUsgsFeature,
-  parseDonkiFlare,
-  parseDonkiStorm,
-  parseDonkiShock,
-  type IncidentEvent,
-  type IncidentCategory,
-} from './incident-model'
+import { EARTHQUAKE_CATEGORIES, parseUsgsFeature, type IncidentEvent } from './incident-model'
+import type { Latest } from './space-weather'
 
-export type DonkiKind = 'FLR' | 'GST' | 'IPS'
-
-const FAST_DAYS = 400
-const DEEP_DAYS = 365 * 5
 const DAY_MS = 86_400_000
 /** USGS's catalogue is complete for anything this page cares about well before this. */
 const EARTHQUAKE_START = '1950-01-01'
-
-const CATEGORIES_BY_KIND: Record<DonkiKind, IncidentCategory[]> = {
-  FLR: FLARE_CATEGORIES,
-  GST: STORM_CATEGORIES,
-  IPS: SHOCK_CATEGORIES,
-}
-const PARSE_BY_KIND: Record<DonkiKind, (raw: any) => IncidentEvent | null> = {
-  FLR: parseDonkiFlare,
-  GST: parseDonkiStorm,
-  IPS: parseDonkiShock,
-}
 
 const iso = (epochMs: number) => new Date(epochMs).toISOString().slice(0, 10)
 
@@ -86,16 +60,25 @@ export interface SourceResult {
   ok: boolean
 }
 
-async function fetchDonkiRange(kind: DonkiKind, startEpoch: number, endEpoch: number): Promise<SourceResult> {
+/** The instruments' recent traces, as the route sends them: log10 W/m² for X-rays, Kp for the field. */
+export type Trace = { t0: number; step: number; v: (number | null)[] }
+export interface SpaceAnswer {
+  now: number
+  seedAsOf: number
+  latest: Latest
+  heard: Record<string, number>
+  answered: Record<string, boolean>
+  xray: Trace | null
+  kp: Trace | null
+  marks: { flares: { time: number; cls: string }[]; shocks: number[] }
+}
+
+async function fetchSpace(): Promise<SpaceAnswer | null> {
   try {
-    // Through the site's own cached route (pages/api/donki.ts), not straight to NASA from every browser.
-    const url = withBase(`/api/donki/?kind=${kind}&start=${iso(startEpoch)}&end=${iso(endEpoch)}`)
-    const raw = await getJSON(url, 45_000)
-    if (!Array.isArray(raw)) return { events: [], ok: false }
-    const events = raw.map(PARSE_BY_KIND[kind]).filter((e): e is IncidentEvent => e != null)
-    return { events, ok: true }
+    const j = await getJSON(withBase('/api/space-weather/'), 30_000)
+    return j && typeof j === 'object' && j.latest ? (j as SpaceAnswer) : null
   } catch {
-    return { events: [], ok: false }
+    return null
   }
 }
 
@@ -131,26 +114,20 @@ export interface FastLoad {
   flr: SourceResult
   gst: SourceResult
   ips: SourceResult
+  space: SpaceAnswer | null
 }
 
-/** The immediate pass: fast per-tier earthquake lookups, plus a 400-day DONKI window. */
+/** Everything at once: per-tier earthquake lookups, and the space-weather answer. */
 export async function loadFast(now: number): Promise<FastLoad> {
-  const [quakes, flr, gst, ips] = await Promise.all([
-    fetchQuakes(now),
-    fetchDonkiRange('FLR', now - FAST_DAYS * DAY_MS, now),
-    fetchDonkiRange('GST', now - FAST_DAYS * DAY_MS, now),
-    fetchDonkiRange('IPS', now - FAST_DAYS * DAY_MS, now),
-  ])
-  return { quakes, flr, gst, ips }
-}
-
-/** The one-shot deeper pull for a single DONKI source, reaching back to five years. Non-overlapping with loadFast's own window. */
-export async function loadDeep(kind: DonkiKind, now: number): Promise<SourceResult> {
-  return fetchDonkiRange(kind, now - DEEP_DAYS * DAY_MS, now - FAST_DAYS * DAY_MS)
-}
-
-export function categoriesFor(kind: DonkiKind): IncidentCategory[] {
-  return CATEGORIES_BY_KIND[kind]
+  const [quakes, space] = await Promise.all([fetchQuakes(now), fetchSpace()])
+  const of = (kind: IncidentEvent['kind']): SourceResult => ({
+    events: Object.values(space?.latest ?? {}).filter((e): e is IncidentEvent & { src: string } => !!e && e.kind === kind),
+    ok: !!space,
+  })
+  const ips = of('shock')
+  // A shock row with nothing to show and DONKI silent is a feed that did not answer, not a quiet Sun.
+  if (space && !ips.events.length && !space.answered['NASA DONKI']) ips.ok = false
+  return { quakes, flr: of('flare'), gst: of('storm'), ips, space }
 }
 
 /* ---- a light, session-scoped cache ---------------------------------------
@@ -160,7 +137,7 @@ export function categoriesFor(kind: DonkiKind): IncidentCategory[] {
  * lives here rather than growing stats.ts a feed-caching feature no other
  * game needs. */
 
-const CACHE_KEY = 'funsite:days-since-incident:v1'
+const CACHE_KEY = 'funsite:days-since-incident:v2'
 const CACHE_TTL_MS = 15 * 60 * 1000
 
 interface CacheShape {
@@ -169,7 +146,7 @@ interface CacheShape {
   flr: SourceResult
   gst: SourceResult
   ips: SourceResult
-  deep: Partial<Record<DonkiKind, SourceResult>>
+  space: SpaceAnswer | null
 }
 
 export function readCache(now: number): CacheShape | null {
@@ -180,7 +157,7 @@ export function readCache(now: number): CacheShape | null {
     if (typeof parsed?.at !== 'number' || now - parsed.at > CACHE_TTL_MS) return null
     if (!Array.isArray(parsed.quakes) || !parsed.flr || !parsed.gst || !parsed.ips) return null
     // A feed that failed is asked again, not remembered: the page says "try reloading", so reloading must try.
-    if (!parsed.flr.ok || !parsed.gst.ok || !parsed.ips.ok || parsed.quakes.some(([, r]) => !r?.ok)) return null
+    if (!parsed.flr.ok || !parsed.gst.ok || !parsed.space || parsed.quakes.some(([, r]) => !r?.ok)) return null
     return parsed
   } catch {
     return null

@@ -238,7 +238,7 @@ const INFO: Record<string, InfoContent> = {
     mostRecentQualifying, daysSince, elapsedParts,
     type IncidentEvent, type IncidentCategory,
   } from '../lib/incident-model'
-  import { loadFast, loadDeep, readCache, writeCache, type SourceResult, type DonkiKind } from '../lib/incident-fetch'
+  import { loadFast, readCache, writeCache, type SourceResult, type SpaceAnswer } from '../lib/incident-fetch'
   import { segmentsFor, fitWidth, SEGMENT_KEYS } from '../lib/seven-segment'
   import { createShell } from '../lib/game-shell'
   import { PLAY } from '../lib/motion'
@@ -292,17 +292,20 @@ const INFO: Record<string, InfoContent> = {
 
     if (!s.ok) {
       setOdometer(fig, ALL_DASHES) // the feed itself failed
-      // Say whose feed it is: NASA's space-weather log has whole days down, which reloading will not fix.
-      const nasa = !cat.id.startsWith('eq-')
+      // Say whose feed it is: NASA's shock log has whole days down, which reloading will not fix.
       sr.textContent = 'The feed for this row did not answer.'
-      detail.textContent = nasa ? "NASA's space-weather log is down right now. This row fills in when it is back." : 'USGS did not answer in time. Try reloading in a minute.'
+      detail.textContent = cat.kind === 'shock'
+        ? "NASA's shock log has not answered yet, and no sudden impulse has been reported. This row fills in when one does."
+        : cat.kind === 'quake' ? 'USGS did not answer in time. Try reloading in a minute.' : 'The space-weather feeds did not answer in time. Try reloading in a minute.'
       return
     }
     if (s.event) {
       const days = daysSince(Date.now(), s.event.time)
       setOdometer(fig, String(days))
       sr.textContent = `${days} days.`
-      detail.textContent = `Last: ${s.event.detail}, ${new Date(s.event.time).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
+      // Space weather is told in UTC ("peaking 20:41 UTC"), so its date is the UTC one too.
+      const tz = cat.kind === 'quake' ? undefined : 'UTC'
+      detail.textContent = `Last: ${s.event.detail}, ${new Date(s.event.time).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: tz })}`
       return
     }
     if (s.pending) {
@@ -423,20 +426,21 @@ const INFO: Record<string, InfoContent> = {
     let flr: SourceResult
     let gst: SourceResult
     let ips: SourceResult
-    const deep: Partial<Record<DonkiKind, SourceResult>> = {}
+    let space: SpaceAnswer | null
 
     if (cached) {
       quakes = new Map(cached.quakes)
       flr = cached.flr
       gst = cached.gst
       ips = cached.ips
-      Object.assign(deep, cached.deep)
+      space = cached.space
     } else {
       const fast = await loadFast(now)
       quakes = fast.quakes
       flr = fast.flr
       gst = fast.gst
       ips = fast.ips
+      space = fast.space
     }
 
     for (const cat of EARTHQUAKE_CATEGORIES) {
@@ -444,49 +448,17 @@ const INFO: Record<string, InfoContent> = {
       applyResult(cat, r?.events[0] ?? null, r?.ok ?? false, false)
     }
 
-    const eventsByKind: Record<DonkiKind, IncidentEvent[]> = {
-      FLR: [...flr.events, ...(deep.FLR?.events ?? [])],
-      GST: [...gst.events, ...(deep.GST?.events ?? [])],
-      IPS: [...ips.events, ...(deep.IPS?.events ?? [])],
+    // The space-weather answer already holds the most recent event at every
+    // level, from every source and the full records; nothing is left to search.
+    for (const [list, src] of [[FLARE_CATEGORIES, flr], [STORM_CATEGORIES, gst], [SHOCK_CATEGORIES, ips]] as const) {
+      for (const cat of list) applyResult(cat, mostRecentQualifying(src.events, cat), src.ok, false)
     }
-    const okByKind: Record<DonkiKind, boolean> = { FLR: flr.ok, GST: gst.ok, IPS: ips.ok }
-
-    function paintKind(kind: DonkiKind, pending: boolean) {
-      const list = { FLR: FLARE_CATEGORIES, GST: STORM_CATEGORIES, IPS: SHOCK_CATEGORIES }[kind]
-      for (const cat of list) {
-        const found = mostRecentQualifying(eventsByKind[kind], cat)
-        applyResult(cat, found, okByKind[kind], pending && !found)
-      }
-    }
-
-    paintKind('FLR', !cached)
-    paintKind('GST', !cached)
-    paintKind('IPS', !cached)
     recomputeHero()
     heroPending = false
     tickHero()
     maybeReport()
 
-    if (!cached) {
-      writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, deep }, now)
-    }
-
-    // A background pass, per source, only for a kind that still has an
-    // unresolved tier — the rare-tier cost from the file header, paid once.
-    for (const kind of ['FLR', 'GST', 'IPS'] as const) {
-      const list = { FLR: FLARE_CATEGORIES, GST: STORM_CATEGORIES, IPS: SHOCK_CATEGORIES }[kind]
-      const unresolved = okByKind[kind] && list.some((c) => !mostRecentQualifying(eventsByKind[kind], c))
-      if (!unresolved || deep[kind]) continue
-      const deeper = await loadDeep(kind, now)
-      deep[kind] = deeper
-      eventsByKind[kind] = eventsByKind[kind].concat(deeper.events)
-      okByKind[kind] = okByKind[kind] && deeper.ok
-      paintKind(kind, false)
-      recomputeHero()
-      tickHero()
-      writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, deep }, now)
-      maybeReport()
-    }
+    if (!cached && space) writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, space }, now)
   }
 
   run()
