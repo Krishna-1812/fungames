@@ -273,8 +273,12 @@ import GameShell from '../layouts/GameShell.astro'
   function buildSky() {
     const host = $('sky')
     host.textContent = ''
-    const w = Math.max(320, window.innerWidth)
-    const h = Math.max(480, window.innerHeight)
+    // The sky's own box, not the window's: in the frame on a laptop it is
+    // narrower than the window, and a window-wide bitmap stretched to 100% of
+    // it squeezed every star about 12% sideways. The window only stands in
+    // before the box is laid out.
+    const w = host.clientWidth || Math.max(320, window.innerWidth)
+    const h = host.clientHeight || Math.max(480, window.innerHeight)
     const dpr = Math.min(2, window.devicePixelRatio || 1)
 
     /* A deterministic generator, so a resize redraws the same sky rather than
