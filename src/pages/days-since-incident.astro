@@ -35,9 +35,33 @@ import { flapCellHTML } from '../lib/split-flap'
 
 const GROUPS = [
   { id: 'quake', label: 'Earthquakes', source: 'USGS', icon: 'quake', categories: EARTHQUAKE_CATEGORIES },
-  { id: 'flare', label: 'Solar Flares', source: 'NASA DONKI', icon: 'solar-flare', categories: FLARE_CATEGORIES },
-  { id: 'storm', label: 'Geomagnetic Storms', source: 'NASA DONKI', icon: 'geostorm', categories: STORM_CATEGORIES },
+  { id: 'flare', label: 'Solar Flares', source: 'NOAA SWPC', icon: 'solar-flare', categories: FLARE_CATEGORIES },
+  { id: 'storm', label: 'Geomagnetic Storms', source: 'GFZ Potsdam', icon: 'geostorm', categories: STORM_CATEGORIES },
   { id: 'shock', label: 'Interplanetary Shocks', source: 'NASA DONKI', icon: 'shock', categories: SHOCK_CATEGORIES },
+] as const
+
+/** The page in three bays, each an instrument and the rows read from it. Shocks
+ *  share the field's bay: a shock arriving is what sets a storm off, and the
+ *  Kp bars show both. */
+const BAYS = [
+  {
+    id: 'quake', label: 'Earthquakes', source: 'USGS', icon: 'quake', scope: 'map',
+    caption: 'Every earthquake of magnitude 4.5 or more in the last 30 days, sized by magnitude, coloured by depth. Nobody drew the plate edges: the earthquakes are on them. Ringed: the most recent at each record row below.',
+    legend: [['#5ee6c8', 'shallow, under 70 km'], ['#5b93ff', '70 to 300 km'], ['#b07cff', 'deep, 300 km and more']],
+    parts: [{ info: 'quake', cats: EARTHQUAKE_CATEGORIES }],
+  },
+  {
+    id: 'flare', label: 'Solar Flares', source: 'NOAA SWPC, GOES', icon: 'solar-flare', scope: 'xray',
+    caption: "The Sun's X-ray brightness for the last week, from the GOES weather satellite: each letter is ten times the one below. A flare is a spike; the M and X ones are named.",
+    legend: [],
+    parts: [{ info: 'flare', cats: FLARE_CATEGORIES }],
+  },
+  {
+    id: 'storm', label: 'Geomagnetic Storms', source: 'GFZ Potsdam, NOAA SWPC, NASA', icon: 'geostorm', scope: 'kp',
+    caption: "How disturbed the Earth's magnetic field has been, every three hours for the last 30 days (the planetary Kp index). Kp 5 is a storm; each step above is a G-level. A shock line marks a shock wave from the Sun arriving.",
+    legend: [],
+    parts: [{ info: 'storm', cats: STORM_CATEGORIES }, { info: 'shock', cats: SHOCK_CATEGORIES }],
+  },
 ] as const
 
 const ROW_DIGITS = 5
@@ -148,30 +172,48 @@ const INFO: Record<string, InfoContent> = {
     </p>
 
     <div class="groups">
-      {GROUPS.map((group) => (
-        <section class="group" aria-labelledby={`g-${group.id}`}>
-          <h2 class="group-head" id={`g-${group.id}`}>
-            <span class="group-icon" set:html={iconSvg(group.icon)} />
-            {group.label}
-            <button class="info-btn" type="button" data-info={group.id} aria-label={`What the ${group.label} scale means`}>i</button>
-            <span class="group-source">{group.source}, live</span>
+      {BAYS.map((bay) => (
+        <section class="bay" aria-labelledby={`g-${bay.id}`}>
+          <h2 class="group-head" id={`g-${bay.id}`}>
+            <span class="group-icon" set:html={iconSvg(bay.icon)} />
+            {bay.label}
+            <button class="info-btn" type="button" data-info={bay.id} aria-label={`What the ${bay.label} scale means`}>i</button>
+            <span class="group-source">{bay.source}, live</span>
           </h2>
-          <ol class="rows">
-            {group.categories.map((cat) => (
-              <li class="row" data-cat={cat.id} data-kind={group.id}>
+          <figure class="scope" data-kind={bay.scope}>
+            <div class="scope-glass">
+              <canvas class="scope-canvas" data-scope={bay.scope} role="img" aria-label={bay.caption}></canvas>
+              {bay.scope === 'map' && <i class="quake-ring" data-ring hidden aria-hidden="true"></i>}
+              <span class="scope-read" data-scope-read={bay.scope} aria-hidden="true"></span>
+              <span class="scope-wait" data-scope-wait={bay.scope}>Reading the instrument&hellip;</span>
+            </div>
+            <figcaption class="scope-cap">
+              {bay.caption}
+              {bay.legend.length > 0 && (
+                <span class="scope-legend">{bay.legend.map(([c, l]) => <span><i style={`background:${c}`}></i>{l}</span>)}</span>
+              )}
+            </figcaption>
+          </figure>
+          <ol class="rows" style={`--cols:${bay.parts.reduce((n, p) => n + p.cats.length, 0)}`}>
+            {bay.parts.map((part) => part.cats.map((cat) => (
+              <li class="row" data-cat={cat.id} data-kind={part.info}>
                 <i class="bolt bolt-tl" aria-hidden="true"></i><i class="bolt bolt-tr" aria-hidden="true"></i>
                 <div class="row-top">
-                  <span class="row-title">{cat.title}</span>
+                  <span class="row-title">
+                    {cat.title}
+                    {part.info !== bay.id && <button class="info-btn info-btn-sm" type="button" data-info={part.info} aria-label={`What an ${cat.title.toLowerCase()} is`}>i</button>}
+                  </span>
                   <span class="row-threshold">{cat.thresholdLabel}</span>
                 </div>
                 <div class="row-screen">
                   <span class="odometer" data-fig aria-hidden="true" set:html={Array.from({ length: ROW_DIGITS }, () => digitCellHTML()).join('')} />
                   <div class="screen-glass" aria-hidden="true"></div>
                 </div>
+                <span class="row-days" aria-hidden="true">days</span>
                 <p class="sr-only" data-sr>Reading the sensors.</p>
                 <p class="row-detail" data-detail>&nbsp;</p>
               </li>
-            ))}
+            )))}
           </ol>
         </section>
       ))}
@@ -180,20 +222,20 @@ const INFO: Record<string, InfoContent> = {
     <footer class="foot">
       <p>
         Earthquakes are read from <a href="https://earthquake.usgs.gov/earthquakes/feed/" target="_blank" rel="noopener">USGS's</a>
-        own catalogue search, one request per magnitude tier. Solar flares,
-        geomagnetic storms and interplanetary shocks come from
-        <a href="https://ccmc.gsfc.nasa.gov/tools/DONKI/" target="_blank" rel="noopener">NASA's DONKI</a> space-weather
-        log, reduced to NOAA's own published GOES flare classes and G-scale.
+        own catalogue search, one request per magnitude tier, and its summary
+        feed for the map. Solar flares come from NOAA SWPC's GOES flare list,
+        with HEK's copy of it for the years before; storms from the planetary
+        Kp index as <a href="https://kp.gfz.de/" target="_blank" rel="noopener">GFZ Potsdam</a> computes it, back to 1932, with
+        NOAA's estimate for the last few hours; shocks from
+        <a href="https://ccmc.gsfc.nasa.gov/tools/DONKI/" target="_blank" rel="noopener">NASA's DONKI</a> log, or NOAA's sudden-impulse
+        reports when DONKI is down. Whichever answers, the most recent event
+        wins, and each row says whose it is.
+      </p>
+      <p class="foot-small">
         Hurricanes and tsunamis are deliberately not here: the cleanest free
         feed for them labels the identical wind speed two different things
         depending which weather agency reported it, and a category built on
         data that disagrees with itself would be worse than no row at all.
-      </p>
-      <p class="foot-small">
-        A rare tier can take a few seconds longer than the rest — the
-        difference between "no X10 flare in the last year" and "keep looking
-        back until one turns up" isn't free, and this page pays it live
-        rather than pretending otherwise.
       </p>
     </footer>
   </div>
@@ -218,13 +260,13 @@ const INFO: Record<string, InfoContent> = {
   <Fragment slot="howto">
     <p>
       The "days since last accident" sign from a warehouse wall, except the
-      incidents are real: earthquakes from USGS, and solar flares, geomagnetic
-      storms and interplanetary shocks from NASA, read live from your browser.
+      incidents are real: earthquakes from USGS, solar flares and storms from
+      NOAA and GFZ Potsdam, shocks from NASA, read live.
     </p>
     <ul>
-      <li>The big counter is time since the most recent incident of any kind. Each row below is days since the last one at that strength or worse.</li>
+      <li>The sign is the time since the most recent incident of any kind. Each tile below is days since the last one at that strength or worse.</li>
+      <li>Above each row of tiles is the instrument it is read from: the month's earthquakes, the Sun's X-rays this week, the Earth's magnetic field this month.</li>
       <li>The <b>i</b> beside each group explains its scale.</li>
-      <li>A rare tier can take a few seconds longer, while the page looks further back for one.</li>
     </ul>
     <p>When every row has been read, the report is the end. Your best is the calmest stretch you have seen.</p>
   </Fragment>
@@ -245,6 +287,9 @@ const INFO: Record<string, InfoContent> = {
   import { ShaderSurface } from '../lib/gl'
   import { INCIDENT_WALL_FRAG } from '../lib/incident-wall-shader'
   import { hit } from '../lib/audio'
+  import { drawQuakeMap, drawXray, drawKp, parseQuakeFeed, shortPlace, type Quake } from '../lib/incident-scopes'
+  import { kpName } from '../lib/space-weather'
+  import { LAND_PATH } from '../data/world'
 
   const rowEls = new Map(
     Array.from(document.querySelectorAll<HTMLLIElement>('.row')).map((el) => [el.dataset.cat!, el]),
@@ -297,7 +342,7 @@ const INFO: Record<string, InfoContent> = {
       // Say whose feed it is: NASA's shock log has whole days down, which reloading will not fix.
       sr.textContent = 'The feed for this row did not answer.'
       detail.textContent = cat.kind === 'shock'
-        ? "NASA's shock log has not answered yet, and no sudden impulse has been reported. This row fills in when one does."
+        ? "NASA's shock log is not answering, and NOAA has reported no shock arriving lately."
         : cat.kind === 'quake' ? 'USGS did not answer in time. Try reloading in a minute.' : 'The space-weather feeds did not answer in time. Try reloading in a minute.'
       return
     }
@@ -307,17 +352,18 @@ const INFO: Record<string, InfoContent> = {
       sr.textContent = `${days} days.`
       // Space weather is told in UTC ("peaking 20:41 UTC"), so its date is the UTC one too.
       const tz = cat.kind === 'quake' ? undefined : 'UTC'
-      detail.textContent = `Last: ${s.event.detail}, ${new Date(s.event.time).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: tz })}`
+      const src = (s.event as IncidentEvent & { src?: string }).src
+      detail.textContent = `Last: ${s.event.detail}, ${new Date(s.event.time).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: tz })}${src ? ` (${src})` : ''}`
       return
     }
     if (s.pending) {
       setOdometer(fig, '')
       sr.textContent = 'Still searching further back.'
-      detail.textContent = 'Nothing in the last 400 days — checking the last five years…'
+      detail.textContent = 'Still reading…'
     } else {
       setOdometer(fig, ALL_DASHES)
       sr.textContent = 'None found.'
-      detail.textContent = 'No confirmed event in the last five years.'
+      detail.textContent = cat.kind === 'shock' ? "None in the last 400 days of NASA's log." : 'None on record.'
     }
   }
 
@@ -530,7 +576,87 @@ const INFO: Record<string, InfoContent> = {
     maybeReport()
 
     if (!cached && space) writeCache({ quakes: Array.from(quakes.entries()), flr, gst, ips, space }, now)
+    spaceNow = space
+    spaceAsked = true
+    drawAll()
   }
+
+  /* ---- the instruments ------------------------------------------------------ */
+
+  /* Each bay's instrument (lib/incident-scopes.ts), drawn when its data
+     arrives and when its box changes size, never on a timer. The map's
+     month of earthquakes comes straight from USGS's own summary feed, which
+     is made to be read from browsers; the X-ray and Kp traces come with the
+     space-weather answer. */
+  let spaceNow: SpaceAnswer | null = null
+  let spaceAsked = false
+  let monthQuakes: Quake[] = []
+  let quakesAsked = false
+  let land: Path2D | null = null
+  const canvasOf = (k: string) => document.querySelector<HTMLCanvasElement>(`[data-scope="${k}"]`)!
+  const readOf = (k: string) => document.querySelector<HTMLElement>(`[data-scope-read="${k}"]`)!
+  const waitOf = (k: string) => document.querySelector<HTMLElement>(`[data-scope-wait="${k}"]`)!
+  const ring = document.querySelector<HTMLElement>('[data-ring]')!
+  const ago = (ms: number) => {
+    const m = Math.max(0, Math.round(ms / 60_000))
+    if (m < 60) return `${m} min ago`
+    const h = Math.round(m / 60)
+    return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`
+  }
+
+  function drawMap() {
+    // The record rows' own quakes, ringed: the biggest tier an event answers names it.
+    const marked: Parameters<typeof drawQuakeMap>[2] = []
+    const seen = new Set<number>()
+    for (const [id, tag] of [['eq-8.0', 'Last M8+'], ['eq-7.0', 'Last M7+'], ['eq-6.0', 'Last M6+']] as const) {
+      const ev = state.get(id)?.event
+      if (!ev?.at || seen.has(ev.time)) continue
+      seen.add(ev.time)
+      marked.push({ tag, mag: ev.value, lat: ev.at.lat, lon: ev.at.lon, detail: ev.detail, days: daysSince(Date.now(), ev.time) })
+    }
+    if (!quakesAsked && !marked.length) return
+    land ??= new Path2D(LAND_PATH)
+    const { newest } = drawQuakeMap(canvasOf('map'), monthQuakes, marked, land, Date.now())
+    waitOf('map').hidden = true
+    if (newest) {
+      ring.style.left = `${newest.x}px`
+      ring.style.top = `${newest.y}px`
+      ring.hidden = false
+      readOf('map').textContent = `Latest: M${newest.q.mag.toFixed(1)}, ${shortPlace(newest.q.place)}, ${ago(Date.now() - newest.q.time)}`
+    } else if (quakesAsked) {
+      readOf('map').textContent = 'USGS\'s month of earthquakes did not load; the records are still marked.'
+    }
+  }
+  function drawXrayScope() {
+    const tr = spaceNow?.xray
+    if (!tr?.v.length) { if (spaceAsked) waitOf('xray').textContent = 'The X-ray instrument did not answer. Try reloading in a minute.'; return }
+    const cls = drawXray(canvasOf('xray'), tr, spaceNow!.marks.flares, Date.now())
+    waitOf('xray').hidden = true
+    readOf('xray').textContent = cls ? `GOES, now: ${cls}` : ''
+  }
+  function drawKpScope() {
+    const tr = spaceNow?.kp
+    if (!tr?.v.some((v) => v != null)) { if (spaceAsked) waitOf('kp').textContent = 'The Kp index did not answer. Try reloading in a minute.'; return }
+    const kp = drawKp(canvasOf('kp'), tr, spaceNow!.marks.shocks, Date.now())
+    waitOf('kp').hidden = true
+    readOf('kp').textContent = kp == null ? '' : `Kp, latest: ${kpName(kp)}`
+  }
+  function drawAll() { drawMap(); drawXrayScope(); drawKpScope() }
+
+  // Redrawn when a box changes size, once a frame at most.
+  let redrawSoon = 0
+  const ro = new ResizeObserver(() => { cancelAnimationFrame(redrawSoon); redrawSoon = requestAnimationFrame(drawAll) })
+  for (const k of ['map', 'xray', 'kp']) ro.observe(canvasOf(k))
+
+  async function loadMonth() {
+    try {
+      const r = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_month.geojson', { signal: AbortSignal.timeout(25_000) })
+      if (r.ok) monthQuakes = parseQuakeFeed(await r.json())
+    } catch { /* the map keeps the record quakes, and says so */ }
+    quakesAsked = true
+    drawMap()
+  }
+  loadMonth()
 
   run()
 
@@ -905,7 +1031,8 @@ const INFO: Record<string, InfoContent> = {
     width: 24px;
     height: 24px;
     flex: none;
-    color: var(--t-teal);
+    color: var(--ink);
+    filter: grayscale(1) brightness(0.42) contrast(1.6);
   }
   .info-btn {
     flex: none;
@@ -984,9 +1111,93 @@ const INFO: Record<string, InfoContent> = {
     .digit.flicker, .odometer.scanning .digit { animation: none; }
   }
 
-  @media (max-width: 480px) {
-    .row { grid-template-columns: 1fr; row-gap: 8px; padding-top: 20px; }
-    .row-screen { grid-column: 1; grid-row: auto; justify-self: start; }
+
+  /* ---- the bays: an instrument, and the counters read from it ---------------- */
+
+  .groups { display: flex; flex-direction: column; gap: 56px; }
+  .bay { display: flex; flex-direction: column; gap: 14px; }
+  .bay .group-head { margin: 0; }
+
+  .scope { margin: 0; }
+  /* Dark glass in a bezel: the instrument's own screen, set into the page. */
+  .scope-glass {
+    position: relative; overflow: hidden;
+    border-radius: 14px;
+    background: #04080d;
+    box-shadow:
+      0 0 0 1px rgba(150, 180, 210, 0.16),
+      0 0 0 6px #10161d,
+      0 0 0 7px rgba(255, 255, 255, 0.06),
+      0 28px 50px -30px rgba(0, 0, 0, 0.8);
+    margin: 7px;
+  }
+  .scope-glass::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background:
+      linear-gradient(160deg, rgba(255, 255, 255, 0.06), transparent 30%),
+      radial-gradient(120% 90% at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.35));
+  }
+  .scope-canvas { display: block; width: 100%; aspect-ratio: 3.4; }
+  .scope[data-kind='map'] .scope-canvas { aspect-ratio: 2.535; }
+  .scope-read {
+    position: absolute; left: 14px; top: 11px; z-index: 1; pointer-events: none;
+    font: 600 12px/1.3 var(--mono); letter-spacing: 0.02em; color: #bff3e6;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  }
+  .scope-wait {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font: 600 13px var(--mono); color: #6f8597;
+  }
+  .scope-wait[hidden] { display: none; }
+  .scope-cap {
+    margin: 12px 10px 0; max-width: 62em;
+    font-size: 13.5px; line-height: 1.55; color: var(--ink2);
+  }
+  .scope-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12.5px; color: var(--ink3); }
+  .scope-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .scope-legend i { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25); }
+  /* The newest earthquake: a ring going out from it, as the waves did. */
+  .quake-ring {
+    position: absolute; z-index: 1; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+    border: 1.5px solid #e9fbff; pointer-events: none;
+  }
+  .quake-ring[hidden] { display: none; }
+  :global(html.play) .quake-ring { animation: quake-ring 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite; }
+  @keyframes quake-ring {
+    0% { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(5.5); opacity: 0; }
+  }
+
+  /* The counters, as a row of tiles under the instrument. */
+  .bay .rows {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;
+  }
+  @media (min-width: 1100px) { .bay .rows { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 10px; } }
+  .bay .row { grid-template-columns: 1fr; align-content: start; row-gap: 8px; padding: 18px 16px 14px; }
+  .bay .row-top { grid-column: 1; }
+  .bay .row-screen { grid-column: 1; grid-row: auto; justify-self: start; display: inline-flex; align-items: center; }
+  .bay .row-days {
+    grid-column: 1; margin-top: -4px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #7e8a9a;
+  }
+  .bay .row-detail { grid-column: 1; margin: 0; }
+  .info-btn-sm { width: 19px; height: 19px; margin-left: 7px; font-size: 11px; vertical-align: 1px; border-color: #8a93a3; background: transparent; color: #cfd6df; }
+  .info-btn-sm:hover { background: #cfd6df; color: #13151b; }
+
+  @media (max-width: 640px) {
+    .groups { gap: 44px; }
+    .bay .group-head { flex-wrap: wrap; row-gap: 4px; }
+    .bay .group-source { flex-basis: 100%; margin-left: 33px; }
+    .scope-glass { margin: 5px; border-radius: 10px; box-shadow: 0 0 0 1px rgba(150, 180, 210, 0.16), 0 0 0 4px #10161d, 0 18px 34px -24px rgba(0, 0, 0, 0.8); }
+    .scope-canvas { aspect-ratio: 1.7; }
+    .scope[data-kind='map'] .scope-canvas { aspect-ratio: 2.535; }
+    .scope-read { left: 10px; top: 8px; font-size: 11px; }
+    .scope-cap { margin: 10px 4px 0; font-size: 13px; }
+    .bay .rows { grid-template-columns: 1fr; gap: 10px; }
+    .bay .row { grid-template-columns: 1fr auto; row-gap: 4px; padding: 16px 14px 12px; }
+    .bay .row-screen { grid-column: 2; grid-row: 1 / 3; justify-self: end; }
+    .bay .row-days { grid-column: 2; grid-row: 3; justify-self: end; margin-top: 0; }
+    .bay .row-detail { grid-column: 1 / -1; }
   }
 
   /* ---- the info dialog ------------------------------------------------------ */
@@ -1001,7 +1212,7 @@ const INFO: Record<string, InfoContent> = {
   :global(.info-table td) {
     padding: 7px 4px 7px 10px;
     border-top: 1px solid var(--paper3);
-    border-left: 3px solid color-mix(in oklab, #d4302e calc(var(--tier, 0) * 20%), #6fae2e);
+    border-left: 3px solid color-mix(in oklab, #e45cff calc(var(--tier, 0) * 20%), #2fbf9f);
     vertical-align: top;
   }
   :global(.info-range) { white-space: nowrap; font-weight: 700; color: var(--ink); padding-right: 12px !important; }

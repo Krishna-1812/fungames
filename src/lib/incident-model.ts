@@ -32,6 +32,8 @@ export interface IncidentEvent {
   detail: string
   /** The number a threshold is measured against: magnitude, X-ray flux (W/m^2), or Kp. */
   value: number
+  /** Where an earthquake was: its epicentre, and its depth in km. */
+  at?: { lat: number; lon: number; depth: number }
 }
 
 export interface IncidentCategory {
@@ -131,10 +133,14 @@ export function peakKp(allKpIndex: { kpIndex: number; observedTime: string }[] |
 
 export interface UsgsFeature {
   properties: { mag: number; place: string; time: number; title: string; tsunami?: number }
+  geometry?: { coordinates?: number[] }
 }
 export function parseUsgsFeature(f: UsgsFeature): IncidentEvent {
   const p = f.properties
-  return { kind: 'quake', time: p.time, value: p.mag, detail: p.title }
+  // GeoJSON order: longitude, latitude, depth in km.
+  const c = f.geometry?.coordinates
+  const at = c && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]) ? { lon: c[0], lat: c[1], depth: Number.isFinite(c[2]) ? c[2] : 0 } : undefined
+  return { kind: 'quake', time: p.time, value: p.mag, detail: p.title, ...(at ? { at } : {}) }
 }
 
 export interface DonkiFlare {

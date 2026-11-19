@@ -105,6 +105,9 @@ console.log('\nreal USGS and DONKI response shapes parse into the fields the pag
   const q = parseUsgsFeature(usgs)
   check(q.kind === 'quake' && close(q.value, 6.5) && q.time === 1789161835907, 'USGS feature parses to a quake event with the right magnitude and epoch time')
   check(q.detail === 'M 6.5 - 126 km NNE of Teluknaga, Indonesia', 'the USGS title is used verbatim as the human-readable detail')
+  const placed = parseUsgsFeature({ ...usgs, geometry: { type: 'Point', coordinates: [106.9, -4.9, 12.3] } })
+  check(placed.at && placed.at.lon === 106.9 && placed.at.lat === -4.9 && placed.at.depth === 12.3, 'its epicentre is read in GeoJSON\'s order, longitude first, with the depth in km')
+  check(q.at === undefined, 'and a feature without one is placed nowhere, not at 0, 0')
 
   // Captured live from api.nasa.gov/DONKI/FLR.
   const flare = {
