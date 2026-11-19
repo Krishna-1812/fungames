@@ -78,18 +78,30 @@ export function cardsBetween(from: string, to: string): string[] {
   return out
 }
 
-const cardHTML = (ch: string) => `<i>${ch === ' ' ? '&nbsp;' : ch}</i>`
+/** A blank card still holds its line, so the halves keep their height. */
+const NBSP = String.fromCharCode(160)
+const face = (ch: string) => (ch === ' ' ? NBSP : ch)
 
-/** Static markup for one flap digit, blank. */
+/**
+ * Static markup for one flap digit, blank: the top half of the card in
+ * front, the bottom half of the card below, and the one card that falls,
+ * which shows the old top half on its way down to level and the new bottom
+ * half from there to the stack. One element, turned with its own
+ * perspective, not a two-faced card in a 3D scene: a browser composites
+ * that far more cheaply, and it looks the same.
+ */
 export function flapCellHTML(): string {
   return '<span class="sf" data-v=" ">' +
-    `<span class="sf-h sf-t">${cardHTML(' ')}</span>` +
-    `<span class="sf-h sf-b">${cardHTML(' ')}</span>` +
-    `<span class="sf-flap"><span class="sf-h sf-t sf-front">${cardHTML(' ')}</span><span class="sf-h sf-b sf-back">${cardHTML(' ')}</span></span>` +
+    '<span class="sf-h sf-t"><i>&nbsp;</i></span>' +
+    '<span class="sf-h sf-b"><i>&nbsp;</i></span>' +
+    '<span class="sf-h sf-flap"><i>&nbsp;</i><b class="sf-shade"></b></span>' +
     '<span class="sf-axle"></span></span>'
 }
 
-type Cell = { el: HTMLElement; shown: string; queue: string[]; fall: Fall | null }
+type Cell = {
+  el: HTMLElement; top: HTMLElement; bot: HTMLElement; flap: HTMLElement; card: HTMLElement; shade: HTMLElement
+  from: string; shown: string; queue: string[]; fall: Fall | null; down: boolean; depth: number
+}
 
 /**
  * Drives the flap cells inside `host`. `set` asks for a value; each cell
@@ -105,7 +117,13 @@ export class FlapBoard {
   constructor(host: HTMLElement, still = false, onLand?: (strength: number) => void) {
     this.still = still
     this.onLand = onLand
-    this.cells = Array.from(host.querySelectorAll<HTMLElement>('.sf')).map((el) => ({ el, shown: el.dataset.v ?? ' ', queue: [], fall: null }))
+    this.cells = Array.from(host.querySelectorAll<HTMLElement>('.sf')).map((el) => {
+      const [top, bot, card] = Array.from(el.querySelectorAll<HTMLElement>('i'))
+      return {
+        el, top, bot, card, flap: el.querySelector<HTMLElement>('.sf-flap')!, shade: el.querySelector<HTMLElement>('.sf-shade')!,
+        from: el.dataset.v ?? ' ', shown: el.dataset.v ?? ' ', queue: [], fall: null, down: false, depth: 0,
+      }
+    })
   }
 
   /** Show `value`, right-aligned, blank-padded; `pad` pads with zeros instead (for hours, minutes, seconds). */
@@ -116,27 +134,34 @@ export class FlapBoard {
       const target = v[i]
       const end = c.queue.length ? c.queue[c.queue.length - 1] : c.shown
       if (end === target) return
-      if (this.still) { c.queue = []; c.fall = null; this.paint(c, target, target); c.shown = target; this.face(c, 0); return }
+      if (this.still) { c.queue = []; c.fall = null; c.shown = c.from = target; this.rest(c); return }
       c.queue.push(...cardsBetween(end, target))
     })
     if (!this.still && !this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame(this.frame) }
   }
 
-  private paint(c: Cell, from: string, to: string) {
-    const [top, bot, front, back] = c.el.querySelectorAll('i')
-    top.innerHTML = to === ' ' ? '&nbsp;' : to
-    bot.innerHTML = from === ' ' ? '&nbsp;' : from
-    front.innerHTML = from === ' ' ? '&nbsp;' : from
-    back.innerHTML = to === ' ' ? '&nbsp;' : to
-    c.el.dataset.v = to
+  /** At rest: both halves and the card all show one digit. */
+  private rest(c: Cell) {
+    c.top.textContent = c.bot.textContent = c.card.textContent = face(c.shown)
+    c.el.dataset.v = c.shown
+    this.turn(c, 0)
   }
 
-  /** The card's angle, and its light: lit from above, its face darkens as it turns away and the back brightens as it comes down. */
-  private face(c: Cell, theta: number) {
-    c.el.style.setProperty('--a', `${(-theta * 180) / Math.PI}deg`)
-    c.el.style.setProperty('--lf', (0.55 + 0.45 * Math.cos(Math.min(theta, Math.PI / 2))).toFixed(3))
-    c.el.style.setProperty('--lb', (0.6 + 0.4 * Math.max(0, -Math.cos(theta))).toFixed(3))
-    c.el.classList.toggle('turning', theta > 0 && theta < Math.PI)
+  /**
+   * The card at angle θ: hinged at the axle, its old top half facing us until
+   * it is edge-on, then its back, the new bottom half, coming down onto the
+   * stack. Lit from above, it darkens as it turns from the light.
+   */
+  private turn(c: Cell, theta: number) {
+    const down = theta > Math.PI / 2
+    if (down !== c.down) {
+      c.down = down
+      c.flap.classList.toggle('down', down)
+      c.card.textContent = face(down ? c.shown : c.from)
+    }
+    const deg = down ? ((Math.PI - theta) * 180) / Math.PI : (-theta * 180) / Math.PI
+    c.flap.style.transform = theta ? `perspective(${c.depth}px) rotateX(${deg.toFixed(2)}deg)` : ''
+    c.shade.style.opacity = (down ? 0.42 * Math.sin(theta) : 0.5 * (1 - Math.cos(theta))).toFixed(3)
   }
 
   private frame = (now: number) => {
@@ -146,9 +171,14 @@ export class FlapBoard {
     let busy = false
     for (const c of this.cells) {
       if (!c.fall && c.queue.length) {
-        const next = c.queue.shift()!
-        this.paint(c, c.shown, next)
-        c.shown = next
+        // The next card: the new digit's top is uncovered behind it, the old bottom still shows below.
+        c.from = c.shown
+        c.shown = c.queue.shift()!
+        c.top.textContent = face(c.shown)
+        c.bot.textContent = face(c.from)
+        c.card.textContent = face(c.from)
+        c.el.dataset.v = c.shown
+        c.depth ||= Math.max(200, c.el.offsetHeight * 4)
         c.fall = startFall()
         // A drum spinning through many cards runs its motor faster.
         if (c.queue.length > 2) c.fall.omega *= 2.2
@@ -158,12 +188,7 @@ export class FlapBoard {
       const hitsBefore = c.fall.hits
       c.fall = stepFall(c.fall, dt)
       if (c.fall.hits > hitsBefore && c.fall.hits === 1) this.onLand?.(c.queue.length ? 0.4 : 1)
-      this.face(c, c.fall.done ? 0 : c.fall.theta)
-      if (c.fall.done) {
-        // Down: the old card is behind the new one; the static halves both show the new digit.
-        c.fall = null
-        this.paint(c, c.shown, c.shown)
-      }
+      if (c.fall.done) { c.fall = null; c.from = c.shown; this.rest(c) } else this.turn(c, c.fall.theta)
     }
     this.raf = busy || this.cells.some((c) => c.queue.length) ? requestAnimationFrame(this.frame) : 0
   }

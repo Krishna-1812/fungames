@@ -444,6 +444,31 @@ const INFO: Record<string, InfoContent> = {
     plate = [(r.left - s.left) * k, H - (r.bottom - s.top) * k, (r.right - s.left) * k, H - (r.top - s.top) * k]
     pxPerMm = ((r.right - r.left) * k) / 900
     wall.redraw()
+    bake()
+  }
+  /* Nothing on a wall moves, so once drawn it is kept as a picture behind
+     the sign and the live canvas is hidden: a falling card then has only
+     itself to composite, not a WebGL layer under a blended sign. The frame
+     is copied straight after it is drawn, while the canvas still holds it. */
+  let baked = ''
+  function bake() {
+    if (!wall) return
+    const src = wall.canvas
+    const copy = document.createElement('canvas')
+    copy.width = src.width; copy.height = src.height
+    copy.getContext('2d')?.drawImage(src, 0, 0)
+    copy.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const img = new Image()
+      img.onload = () => {
+        scene.style.backgroundImage = `url("${url}")`
+        scene.classList.add('baked')
+        if (baked) URL.revokeObjectURL(baked)
+        baked = url
+      }
+      img.src = url
+    }, 'image/jpeg', 0.93)
   }
   // Built once the page has been seen: compiling the wall's shader is a few hundred milliseconds of work.
   function buildWall() {
@@ -574,6 +599,9 @@ const INFO: Record<string, InfoContent> = {
     box-shadow: 0 40px 80px -46px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   }
   .scene :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: -1; }
+  /* Once the wall is kept as a picture (see bake() in the script), the canvas only waits for a resize. */
+  .scene.baked { background-size: 100% 100%; background-position: 0 0; background-repeat: no-repeat; }
+  .scene.baked :global(.gl-surface) { visibility: hidden; }
 
   /* A vitreous-enamel sign on steel, 900 mm across: white face, safety-green
      band and frame line, four chrome screws. The face is lit like the wall —
@@ -581,7 +609,8 @@ const INFO: Record<string, InfoContent> = {
      laid over everything printed on it. */
   .sign {
     --green: #0b5a3a;
-    position: relative; width: min(760px, 100%);
+    /* Its own blending group: the light laid over the sign blends with the sign, not with the wall behind it. */
+    position: relative; isolation: isolate; width: min(760px, 100%);
     padding: 0 0 18px;
     border-radius: 12px;
     background: linear-gradient(180deg, #f6f8f8, #eef1f2 60%, #e7ebec);
@@ -700,21 +729,22 @@ const INFO: Record<string, InfoContent> = {
   .flaps :global(.sf-h i) { position: absolute; left: 0; right: 0; height: 200%; font-style: normal; text-align: center; }
   .flaps :global(.sf-t i) { top: 0; }
   .flaps :global(.sf-b i) { bottom: 0; }
-  /* The card that falls: hinged on the axle, its face the old top half, its back the new bottom half. */
-  .flaps :global(.sf-flap) {
-    position: absolute; left: 0; right: 0; top: 0; height: 50%; z-index: 2;
-    transform-origin: 50% 100%; transform: rotateX(var(--a, 0deg)); transform-style: preserve-3d;
+  /* The card that falls, hinged on the axle: the old top half on its way to
+     level, then the new bottom half from there down onto the stack. */
+  .flaps :global(.sf-flap) { z-index: 2; top: 0; transform-origin: 50% 100%; will-change: transform; }
+  .flaps :global(.sf-flap i) { top: 0; }
+  .flaps :global(.sf-flap.down) {
+    top: 50%; transform-origin: 50% 0;
+    background: linear-gradient(180deg, #181b1f, #23272c); border-radius: 0 0 4px 4px;
   }
-  .flaps :global(.sf-flap .sf-h) { height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-  .flaps :global(.sf-front) { filter: brightness(var(--lf, 1)); }
-  .flaps :global(.sf-back) { transform: rotateX(180deg); filter: brightness(var(--lb, 1)); }
+  .flaps :global(.sf-flap.down i) { top: auto; bottom: 0; }
+  /* Lit from above: the card darkens as it turns from the light. */
+  .flaps :global(.sf-shade) { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
   /* The gap between the cards, and the axle pins at each side. */
   .flaps :global(.sf-axle) {
     position: absolute; left: -3px; right: -3px; top: 50%; height: 2px; margin-top: -1px; z-index: 3;
     background: linear-gradient(90deg, #6d757c 0 3px, #050607 3px calc(100% - 3px), #6d757c calc(100% - 3px));
   }
-  /* A card in flight shades the card beneath it. */
-  .flaps :global(.sf.turning .sf-b) { box-shadow: inset 0 14px 16px -10px rgba(0, 0, 0, 0.7); }
 
   @media (max-width: 640px) {
     .scene { min-height: 0; padding: 46px 14px 70px; }

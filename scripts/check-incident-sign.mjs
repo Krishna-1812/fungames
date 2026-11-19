@@ -63,7 +63,7 @@ console.log('\nturning the drum')
   check(eq(F.cardsBetween('7', '2'), ['8', '9', '0', '1', '2']), '7 to 2 goes forward round the drum, never backward')
   check(eq(F.cardsBetween(' ', '2'), ['0', '1', '2']) && eq(F.cardsBetween('5', ' '), [' ']) && eq(F.cardsBetween('4', '4'), []), 'a blank drum turns up from 0; blanking is one card; staying put is none')
   const cell = F.flapCellHTML()
-  check((cell.match(/<i>/g) || []).length === 4 && /sf-flap/.test(cell) && /sf-axle/.test(cell), 'each cell has the two still halves, a falling card with a face and a back, and the axle')
+  check((cell.match(/<i>/g) || []).length === 3 && /sf-flap/.test(cell) && /sf-axle/.test(cell) && !/preserve-3d|backface/.test(cell), 'each cell has the two still halves, the one card that falls, and the axle')
 }
 
 /* -------------------------------------------------------------------------- */
