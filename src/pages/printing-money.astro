@@ -5,7 +5,7 @@ import {
   TIERS, dollarsPerHour, billCount, billStripLengthM, LITERAL_RENDER_MAX_BILLS,
   nearestComparison, describeComparison, formatMoney,
 } from '../lib/printing-money'
-import { billDataUri, BILL_W, BILL_H } from '../lib/bill-art'
+import { billDataUri } from '../lib/bill-art'
 import { digitCellHTML } from '../lib/seven-segment'
 
 /**
@@ -39,8 +39,6 @@ import { digitCellHTML } from '../lib/seven-segment'
  * debt clock and the bills keep their own dark ground, as the pictures.
  */
 
-const BILL_PX_W = 132
-const BILL_PX_H = Math.round((BILL_PX_W * BILL_H) / BILL_W)
 const BILL_URI = billDataUri()
 
 /** The hero odometer: a real debt-clock shape, $99,999,999,999 at the
@@ -60,6 +58,14 @@ const rows = TIERS.map((t) => {
 })
 
 const spending = rows.find((r) => r.tier.id === 'spending')!
+
+/* Bills laid by hand are not tiles: each sits a little turned, a little high
+   or low, and a little older or newer than its neighbour. The same for every
+   build, so the page does not reshuffle on each deploy. */
+function billLie(i: number, seed: number) {
+  const h = (k: number) => { const x = Math.sin((i + 1) * 127.1 + seed * 311.7 + k * 74.7) * 43758.5453; return x - Math.floor(x) }
+  return `--r:${((h(1) - 0.5) * 2.2).toFixed(2)}deg;--y:${((h(2) - 0.5) * 5).toFixed(1)}px;--age:${(h(3) * 0.9).toFixed(2)};--x:${(-(h(4) * 6)).toFixed(1)}px`
+}
 ---
 
 <GameShell
@@ -68,7 +74,20 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   initial={{ score: '$0', level: `0 / ${TIERS.length}`, moves: '0:00' }}
 >
   <div class="pm">
-  {/* The live counter first: the money being printed is the thing to see, the words come after it. */}
+  {/* The live counter first: the money being printed is the thing to see, the
+      words come after it. It sits over the world, where the bills it counts
+      are being laid (lib/money-globe.ts). */}
+  <section class="pm-world" aria-labelledby="pmWorldH">
+    <h2 class="sr-only" id="pmWorldH">The government's spending since you opened this page, as dollar bills laid end to end round the world</h2>
+    <div class="pm-globe" id="pmGlobe" aria-hidden="true">
+      <span class="pg-mark pg-start" id="pgStart"><i></i>The Capitol</span>
+      <span class="pg-mark pg-head" id="pgHead"><i></i><b id="pgHeadKm">0 km</b></span>
+    </div>
+    <p class="pm-world-cap" id="pmWorldCap" aria-live="off">
+      Every dollar the US government has spent since you opened this page, as
+      one-dollar bills laid end to end from the Capitol, heading east. They
+      go round the Earth in about twenty minutes.
+    </p>
   <section class="pm-hero" aria-label="Live counter">
     <i class="bolt bolt-tl" aria-hidden="true"></i><i class="bolt bolt-tr" aria-hidden="true"></i>
     <i class="bolt bolt-bl" aria-hidden="true"></i><i class="bolt bolt-br" aria-hidden="true"></i>
@@ -97,6 +116,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     </div>
     <p class="pm-hero-ref" id="heroRef"></p>
   </section>
+  </section>
 
   <header class="pm-head">
     <p class="label meta pm-eyebrow">Nine real rates, one dollar bill at a time</p>
@@ -124,11 +144,9 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
           </p>
           {r.literal ? (
             <div class="pm-strip-wrap">
-              <div
-                class="pm-strip"
-                style={`width:${r.bills * BILL_PX_W}px;height:${BILL_PX_H}px;background-image:url("${BILL_URI}");background-size:${BILL_PX_W}px ${BILL_PX_H}px`}
-                title={`${r.bills.toLocaleString('en-US')} one-dollar bills`}
-              />
+              <div class="pm-strip" title={`${r.bills.toLocaleString('en-US')} one-dollar bills`} style={`--bill:url("${BILL_URI}")`}>
+                {Array.from({ length: r.bills }, (_, k) => <i class="pm-bill" style={billLie(k, i)} />)}
+              </div>
               <p class="pm-strip-caption">
                 {r.bills.toLocaleString('en-US')} bills, {r.lengthM.toFixed(1)}m of them end to end — scroll to see them all →
               </p>
@@ -255,7 +273,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
 
 {/* Data for the module below: modules cannot take define:vars, and modules
     are what let every game share one synthesiser. */}
-<script type="application/json" id="pm-data" set:html={JSON.stringify({ BILL_PX_W, BILL_PX_H, billUri: BILL_URI })} />
+<script type="application/json" id="pm-data" set:html={JSON.stringify({ billUri: BILL_URI })} />
 
 <script>
   import {
@@ -267,9 +285,16 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   import { SITE } from '../site.config'
   import { createShell } from '../lib/game-shell'
   import { PLAY } from '../lib/motion'
+  import { ShaderSurface } from '../lib/gl'
+  import {
+    START, HEADING, along, angleOf, viewFor, project, subsolar, dirOf, worldPicture,
+    EARTH_CIRCUMFERENCE_KM, type GlobeView,
+  } from '../lib/money-globe'
+  import { MONEY_GLOBE_FRAG } from '../lib/money-globe-shader'
+  import { LAND_PATH, MAP_W, MAP_H, CITIES } from '../data/world'
 
-  const { BILL_PX_W, BILL_PX_H, billUri } = JSON.parse(document.getElementById('pm-data')!.textContent!) as {
-    BILL_PX_W: number; BILL_PX_H: number; billUri: string
+  const { billUri } = JSON.parse(document.getElementById('pm-data')!.textContent!) as {
+    billUri: string
   }
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -341,6 +366,99 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   }
   requestAnimationFrame(paintHeroBar)
 
+  // ---- the world the bills are laid round ---------------------------------
+  /* The strip's length is the counter's, in bills: `billStripLengthM` of the
+     dollars spent, the same arithmetic as everything else on the page. The
+     globe draws it; the camera eases toward a frame that holds it; the two
+     marks are put where the arithmetic says, without asking the page to lay
+     itself out. */
+  const globeHost = $('pmGlobe')
+  const stripKm = () => billStripLengthM(billCount((spendingRate / 3600) * ((performance.now() - t0) / 1000))) / 1000
+  let globeView: GlobeView | null = null
+  let sunDir = (() => { const s = subsolar(new Date()); return dirOf(s.lat, s.lon) })()
+  let globeReady = 0
+  let globe: ShaderSurface | null = null
+  const aspectOf = () => globeHost.clientWidth / Math.max(1, globeHost.clientHeight)
+  let aspect = aspectOf()
+  new ResizeObserver(() => { aspect = aspectOf() }).observe(globeHost)
+
+  function stepView() {
+    const target = viewFor(angleOf(stripKm()), aspect)
+    if (!globeView || prefersReducedMotion) { globeView = target; return }
+    // Eased, and the short way round the world.
+    const k = 0.045
+    let dLon = target.lon - globeView.lon
+    dLon -= 360 * Math.round(dLon / 360)
+    globeView = {
+      lat: globeView.lat + (target.lat - globeView.lat) * k,
+      lon: globeView.lon + dLon * k,
+      scale: Math.exp(Math.log(globeView.scale) + (Math.log(target.scale) - Math.log(globeView.scale)) * k),
+    }
+  }
+
+  const startMark = $('pgStart'), headMark = $('pgHead'), headKm = $('pgHeadKm')
+  const kmFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+  function placeMarks() {
+    if (!globeView) return
+    const w = globeHost.clientWidth, h = globeHost.clientHeight
+    const at = (el: HTMLElement, p: [number, number, number]) => {
+      const q = project(globeView!, p)
+      el.hidden = !q.front || Math.abs(q.x) > aspect || Math.abs(q.y) > 1
+      const x = ((q.x / aspect) * 0.5 + 0.5) * w
+      // Near the right edge the words go on the left of the mark, not off the picture.
+      el.classList.toggle('is-left', x > w - 130)
+      if (!el.hidden) el.style.transform = `translate(${x}px, ${(0.5 - q.y * 0.5) * h}px)`
+    }
+    const km = stripKm()
+    const laps = Math.floor(km / EARTH_CIRCUMFERENCE_KM)
+    headKm.textContent = laps ? `${kmFmt.format(km)} km · round ${laps + 1}` : `${kmFmt.format(km)} km`
+    at(startMark, START)
+    at(headMark, along(angleOf(km)))
+    // Close together at the start: the distance only, not both on top of each other.
+    const a = project(globeView, START), b = project(globeView, along(angleOf(km)))
+    if (Math.hypot((a.x - b.x) / aspect * w * 0.5, (a.y - b.y) * h * 0.5) < 90) startMark.hidden = true
+  }
+
+  /* The picture of the world is painted here from the site's own coastline
+     and cities, then handed to the shader. A browser without WebGL2 keeps
+     the dark stage and the clock. */
+  function startGlobe() {
+    const pic = worldPicture((window.devicePixelRatio || 1) > 1.5 ? 4096 : 3072, LAND_PATH, MAP_W, MAP_H, CITIES)
+    pic.toBlob((blob) => {
+      if (!blob) return
+      globe = new ShaderSurface(globeHost, MONEY_GLOBE_FRAG, {
+        scale: (window.devicePixelRatio || 1) > 1.5 ? 0.75 : 1,
+        textures: { u_world: URL.createObjectURL(blob) },
+        uniforms: () => {
+          stepView()
+          placeMarks()
+          const v = globeView!
+          return {
+            u_cam: [v.lat * Math.PI / 180, v.lon * Math.PI / 180, v.scale],
+            u_sun: sunDir, u_start: START, u_heading: HEADING,
+            u_s: angleOf(stripKm()), u_ready: globeReady,
+          }
+        },
+      })
+      globeHost.prepend(globe.canvas)
+      globeHost.classList.toggle('lit', globe.canvas.isConnected)
+      // The picture arrives a frame or two later; the land fades in rather than snapping.
+      const img = new Image()
+      img.onload = () => {
+        const t1 = performance.now()
+        const fade = () => { globeReady = Math.min(1, (performance.now() - t1) / 500); globe?.redraw(); if (globeReady < 1) requestAnimationFrame(fade) }
+        requestAnimationFrame(fade)
+      }
+      img.src = URL.createObjectURL(blob)
+    }, 'image/png')
+  }
+  const idle = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback
+  if (idle) idle(startGlobe, { timeout: 600 }); else setTimeout(startGlobe, 50)
+  // The Sun moves a quarter of a degree a minute; the night side with it.
+  setInterval(() => { const s = subsolar(new Date()); sunDir = dirOf(s.lat, s.lon) }, 30_000)
+  // Held still, it still has to show the strip growing: once a second is enough.
+  if (prefersReducedMotion) setInterval(() => globe?.redraw(), 1000)
+
   // ---- your own wage --------------------------------------------------------
   const wageBox = $<HTMLInputElement>('wageBox')
   const wageOut = $('wageOut')
@@ -378,10 +496,17 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
     const bills = billCount(hourly)
     if (bills <= LITERAL_RENDER_MAX_BILLS) {
       stripWrap.hidden = false
-      strip.style.width = `${bills * BILL_PX_W}px`
-      strip.style.height = `${BILL_PX_H}px`
-      strip.style.backgroundImage = `url("${billUri}")`
-      strip.style.backgroundSize = `${BILL_PX_W}px ${BILL_PX_H}px`
+      strip.style.setProperty('--bill', `url("${billUri}")`)
+      // Only as many new bills as are needed: typing a wage a digit at a time rebuilds nothing it already has.
+      while (strip.children.length < bills) {
+        const k = strip.children.length
+        const h = (n: number) => { const x = Math.sin((k + 1) * 127.1 + 9 * 311.7 + n * 74.7) * 43758.5453; return x - Math.floor(x) }
+        const b = document.createElement('i')
+        b.className = 'pm-bill'
+        b.style.cssText = `--r:${((h(1) - 0.5) * 2.2).toFixed(2)}deg;--y:${((h(2) - 0.5) * 5).toFixed(1)}px;--age:${(h(3) * 0.9).toFixed(2)};--x:${(-(h(4) * 6)).toFixed(1)}px`
+        strip.appendChild(b)
+      }
+      while (strip.children.length > bills) strip.lastElementChild!.remove()
       stripCaption.textContent = `${bills.toLocaleString('en-US')} bills, ${billStripLengthM(bills).toFixed(2)}m of them end to end.`
     } else {
       stripWrap.hidden = true
@@ -522,6 +647,53 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   .pm-lead { font-size: var(--fs-lead); line-height: 1.6; color: var(--ink2); max-width: 56ch; margin: 0 auto; }
 
   /* ---- the hero: a real debt-clock signboard, bolted to the page --------- */
+  /* ---- the world, with the clock over it ---- */
+  .pm-world {
+    position: relative; max-width: 1180px; margin: 0 auto;
+    border-radius: var(--r-lg); overflow: hidden; background: #020409;
+    box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(150, 175, 220, 0.1);
+  }
+  .pm-globe { position: relative; aspect-ratio: 16 / 9; overflow: hidden; }
+  .pm-globe .gl-surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .pg-mark {
+    position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
+    font-size: 12px; font-weight: 600; color: #e8eef8; letter-spacing: 0.01em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.9);
+  }
+  .pg-mark i {
+    position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid rgba(220, 240, 225, 0.9);
+  }
+  .pg-start { display: inline-block; margin: 0; }
+  .pg-start::before { content: ''; }
+  .pg-start { padding: 10px 0 0 4px; transform-origin: 0 0; }
+  .pg-start i { left: -5px; top: -5px; }
+  .pg-head b { display: inline-block; margin: -26px 0 0 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pg-head.is-left b { position: absolute; right: 12px; margin: -26px 0 0; }
+  .pg-start.is-left { transform-origin: 0 0; }
+  .pg-head i { border-color: rgba(200, 255, 215, 0.95); box-shadow: 0 0 12px rgba(150, 255, 190, 0.6); }
+  .pm-world-cap {
+    position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 40px 24px 16px;
+    font-size: 13px; line-height: 1.55; color: rgba(225, 233, 245, 0.78); text-align: center;
+    background: linear-gradient(transparent, rgba(2, 4, 9, 0.85)); pointer-events: none;
+  }
+  /* The clock floats in the top corner of the world, a smaller instrument than it was. */
+  .pm-world .pm-hero {
+    position: absolute; top: 18px; left: 18px; margin: 0; max-width: 430px; padding: 22px 22px 18px;
+    background: linear-gradient(175deg, rgba(26, 29, 36, 0.92), rgba(9, 10, 13, 0.92));
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .pm-world .hero-odo { font-size: clamp(20px, 2.6vw, 30px); }
+  .pm-world .pm-hero-note { margin-top: 12px; font-size: 12px; }
+  @media (max-width: 760px) {
+    /* On a phone the clock comes first, then the world under it. */
+    .pm-world { display: flex; flex-direction: column; }
+    .pm-world .pm-hero { order: -1; }
+    .pm-globe { aspect-ratio: 4 / 5; }
+    .pm-world .pm-hero { position: relative; top: 0; left: 0; max-width: none; border-radius: 0; border-width: 0 0 2px; }
+    .pm-world-cap { position: relative; background: none; padding: 12px 16px 18px; }
+  }
+
   .pm-hero {
     position: relative; max-width: 640px; margin: 1vh auto 0; padding: 30px clamp(14px, 4vw, 30px) 26px;
     border-radius: var(--r-lg); text-align: center; color: #eef1f5;
@@ -640,17 +812,40 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
 
   /* ---- the literal strip: a real tiled wall of bills, on its own felt ---- */
   .pm-strip-wrap {
-    border-radius: var(--r); overflow: hidden; padding: 18px 0; color: #eef1f5;
+    border-radius: var(--r); overflow: hidden; padding: 10px 0 18px; color: #eef1f5;
     background:
-      radial-gradient(120% 160% at 50% -30%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.35) 100%),
-      linear-gradient(180deg, #0e2417, #081712);
+      radial-gradient(70% 120% at 30% 0%, rgba(120, 190, 150, 0.12), transparent 60%),
+      radial-gradient(120% 160% at 50% -30%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.4) 100%),
+      linear-gradient(180deg, #102a1b, #081712);
     border: 1px solid rgba(111, 207, 135, 0.14);
     box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
   }
+  /* The bills on a dark baize table, lit from above and to the left. Each is
+     its own sheet: turned a degree or so, nudged up or down, overlapping its
+     neighbour by a few pixels, its paper a little greyer or creamier, with a
+     soft shadow under it and the light falling across its face. */
   .pm-strip {
-    overflow: hidden; background-repeat: repeat-x; background-position: left center; max-width: 100%; overflow-x: auto;
-    margin: 0 18px; border-radius: 4px;
-    filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.55));
+    --bw: 168px; --bh: 71px;
+    display: flex; align-items: center; max-width: 100%; overflow-x: auto; overflow-y: hidden;
+    padding: 16px 22px 20px; margin: 0;
+    scrollbar-width: thin; scrollbar-color: rgba(200, 230, 210, 0.25) transparent;
+  }
+  .pm-bill {
+    flex: none; position: relative; width: var(--bw); height: var(--bh);
+    margin-left: var(--x); transform: translateY(var(--y)) rotate(var(--r));
+    background: var(--bill) center / 100% 100% no-repeat;
+    border-radius: 2px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35), 0 6px 14px -4px rgba(0, 0, 0, 0.6);
+    filter: sepia(calc(var(--age) * 0.22)) brightness(calc(1 - var(--age) * 0.07));
+  }
+  .pm-bill:first-child { margin-left: 0; }
+  /* The light across the paper, and the faint fold every real note has. */
+  .pm-bill::after {
+    content: ''; position: absolute; inset: 0; border-radius: 2px; pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent 49.4%, rgba(0, 0, 0, 0.06) 50%, rgba(255, 255, 255, 0.07) 50.6%, transparent 52%),
+      linear-gradient(118deg, rgba(255, 255, 255, 0.16), transparent 42%, rgba(0, 0, 0, 0.1));
+    mix-blend-mode: soft-light;
   }
   .pm-strip-caption { margin: 12px 18px 0; font-size: 12px; opacity: 0.55; }
 
@@ -700,7 +895,7 @@ const spending = rows.find((r) => r.tier.id === 'spending')!
   .how code { font-size: 13px; background: var(--paper2); padding: 1px 5px; border-radius: 4px; }
 
   @media (max-width: 560px) {
-    .pm-strip { margin: 0 12px; }
+    .pm-strip { --bw: 132px; --bh: 56px; padding: 12px 14px 16px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .digit.flicker { animation: none; }
