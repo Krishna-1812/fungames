@@ -1336,9 +1336,11 @@ class GLRenderer implements Renderer {
     this.h = Math.max(1, Math.round(h * dpr))
     // Let three own the drawing buffer. Setting canvas.width by hand after
     // setSize leaves three's viewport at the CSS size while the buffer is at
-    // the device size, so everything renders into a corner.
-    this.renderer.setPixelRatio(dpr)
-    this.renderer.setSize(w, h, false)
+    // the device size, so everything renders into a corner. And give it the
+    // device size itself, at a ratio of 1: setSize floors a fractional CSS
+    // width times the ratio (1131.91 came out 1131), a pixel short of the
+    // render targets, the aim layer and the box, so the sky was resampled soft.
+    this.renderer.setDrawingBufferSize(this.w, this.h, 1)
 
     const opts = {
       type: HalfFloatType,
