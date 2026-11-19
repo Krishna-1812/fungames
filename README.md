@@ -944,6 +944,26 @@ first version of `computeDay` let the day grow past 24 hours whenever a
 carved-out slice (say, an implausibly long morning routine) didn't fit inside
 the block it was supposed to come from, in 184 of 500 random trials.*
 
+**Printing Money**, the world — the hero was a red counter of what the US
+government has spent since you opened the page, and a bar creeping toward
+the Moon. The counter is still there; under it now is the Earth, and the
+same dollars laid end to end on it as bills, from the Capitol, due east on
+a great circle (`lib/money-globe.ts`). At $214,000 a second that is 33 km
+a second: across the Atlantic in three minutes, round the world and back to
+the Capitol in twenty, and the camera follows it out from the US coast to
+the whole planet and then round. The globe is the Earth at the minute you
+are looking (`lib/money-globe-shader.ts`): day and night from the clock,
+the real coastline and the lights of the 4,926 real cities the site already
+carries, painted into one picture in the browser; the clouds are invented,
+and the strip is drawn thousands of times wider than its 6.6 cm, which the
+page says. The rates small enough to draw were one tiled picture each; they
+are bills on a baize table now, each turned a little, offset, aged a little
+differently, lit across and shadowed. *`check-money-globe.mjs` holds the
+line to the Capitol and back, the rate to twenty minutes a lap, the camera
+to keeping both ends of the strip in the picture while it fits, the Sun to
+the tropics at the solstices and the equator at the equinoxes, and the
+shader to having no loop a compiler on Windows would unroll.*
+
 **Printing Money** — nine real rates of earning, from the US federal minimum
 wage to the US federal government's own hourly rate of spending, each reduced
 to the one thing that makes them comparable: how many one-dollar bills that
