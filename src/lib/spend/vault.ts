@@ -348,8 +348,13 @@ float joint(vec2 p, float every, float width) {
   const corners = Array.from({ length: 8 }, () => new Vector3())
   function frame(w: number, h: number, pad = 0) {
     if (w < 2 || h < 2) return false
-    renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1))
-    renderer.setSize(w, h, false)
+    // The buffer in device pixels, rounded, at a ratio of 1: setSize floors a
+    // fractional CSS width times the ratio (543.66 came out 543), a pixel
+    // short of the box, so the whole vault was resampled soft. Only on a
+    // change, since resizing a canvas, even to its own size, clears it.
+    const r = Math.min(2, devicePixelRatio || 1)
+    const bw = Math.max(1, Math.round(w * r)), bh = Math.max(1, Math.round(h * r))
+    if (canvas.width !== bw || canvas.height !== bh) renderer.setDrawingBufferSize(bw, bh, 1)
     // The picture is framed in the part above the caption and runs on under it.
     const fh = Math.max(h * 0.5, h - pad)
     camera.aspect = w / fh
