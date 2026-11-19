@@ -3,6 +3,7 @@ import GameShell from '../layouts/GameShell.astro'
 import { iconSvg } from '../lib/icons'
 import { EARTHQUAKE_CATEGORIES, FLARE_CATEGORIES, STORM_CATEGORIES, SHOCK_CATEGORIES } from '../lib/incident-model'
 import { digitCellHTML } from '../lib/seven-segment'
+import { flapCellHTML } from '../lib/split-flap'
 
 /**
  * Days Since Incident — the workplace "days since last accident" sign,
@@ -41,7 +42,6 @@ const GROUPS = [
 
 const ROW_DIGITS = 5
 const HERO_DAY_DIGITS = 3
-const HERO_UNIT_DIGITS = 2
 
 /** Real classification-scale content behind each group's info button — the
  *  same real, cited tables neal.fun's own info icons open, restated rather
@@ -106,48 +106,46 @@ const INFO: Record<string, InfoContent> = {
   initial={{ score: '—', level: `0 / ${GROUPS.length}`, moves: `0 / ${GROUPS.reduce((n, g) => n + g.categories.length, 0)}` }}
 >
   <div class="dsi">
-    <div class="tape" aria-hidden="true"></div>
-
-    <header class="head">
-      <p class="lede">
-        The sign from a warehouse wall, except the incidents are real. Every
-        number below is read <em>right now</em> from a live feed — not a
-        drill, and nobody typed it in.
-      </p>
-    </header>
-
-    <section class="hero" aria-live="polite" aria-label="Time since the most recent incident of any kind">
-      <i class="bolt bolt-tl" aria-hidden="true"></i><i class="bolt bolt-tr" aria-hidden="true"></i>
-      <i class="bolt bolt-bl" aria-hidden="true"></i><i class="bolt bolt-br" aria-hidden="true"></i>
-      <p class="hero-label"><i class="live-dot" aria-hidden="true"></i>Safe for</p>
-      <div class="hero-screen">
-        <div class="hero-clock">
-          <div class="hero-fig">
-            <span class="odometer hero-odo" data-hero="days" set:html={Array.from({ length: HERO_DAY_DIGITS }, () => digitCellHTML()).join('')} />
-            <span class="hero-u">days</span>
+    {/* The sign, on the wall it is screwed to. The wall is a shader
+        (lib/incident-wall-shader.ts) that knows only where the sign is, to
+        light the blocks and cast its shadow; the sign is markup, so its words
+        stay sharp, and its counters are split-flap drums that fall card by
+        card (lib/split-flap.ts). */}
+    <section class="scene" id="dsiScene" aria-labelledby="signH">
+      <div class="sign" id="dsiSign">
+        <i class="screw" style="--sx:0;--sy:0;--rot:22deg" aria-hidden="true"></i><i class="screw" style="--sx:1;--sy:0;--rot:-31deg" aria-hidden="true"></i>
+        <i class="screw" style="--sx:0;--sy:1;--rot:64deg" aria-hidden="true"></i><i class="screw" style="--sx:1;--sy:1;--rot:8deg" aria-hidden="true"></i>
+        <header class="sign-band">
+          <span class="sign-cross" aria-hidden="true"></span>
+          <h2 id="signH">Safety record <span class="sign-band-sub">Planet Earth</span></h2>
+        </header>
+        <div class="sign-body" aria-hidden="true">
+          <p class="sign-line">This planet has gone</p>
+          <div class="sign-days">
+            <span class="flaps flaps-big" data-flap="days" set:html={Array.from({ length: HERO_DAY_DIGITS }, () => flapCellHTML()).join('')} />
+            <span class="sign-unit">days</span>
           </div>
-          <span class="hero-sep" aria-hidden="true">:</span>
-          <div class="hero-fig">
-            <span class="odometer hero-odo" data-hero="hours" set:html={Array.from({ length: HERO_UNIT_DIGITS }, () => digitCellHTML()).join('')} />
-            <span class="hero-u">hrs</span>
+          <div class="sign-hms">
+            <span class="hms-part"><span class="flaps flaps-small" data-flap="hours" set:html={flapCellHTML() + flapCellHTML()} /><span class="hms-u">hrs</span></span>
+            <b class="sign-colon">:</b>
+            <span class="hms-part"><span class="flaps flaps-small" data-flap="minutes" set:html={flapCellHTML() + flapCellHTML()} /><span class="hms-u">min</span></span>
+            <b class="sign-colon">:</b>
+            <span class="hms-part"><span class="flaps flaps-small" data-flap="seconds" set:html={flapCellHTML() + flapCellHTML()} /><span class="hms-u">sec</span></span>
           </div>
-          <span class="hero-sep" aria-hidden="true">:</span>
-          <div class="hero-fig">
-            <span class="odometer hero-odo" data-hero="minutes" set:html={Array.from({ length: HERO_UNIT_DIGITS }, () => digitCellHTML()).join('')} />
-            <span class="hero-u">min</span>
-          </div>
-          <span class="hero-sep" aria-hidden="true">:</span>
-          <div class="hero-fig">
-            <span class="odometer hero-odo" data-hero="seconds" set:html={Array.from({ length: HERO_UNIT_DIGITS }, () => digitCellHTML()).join('')} />
-            <span class="hero-u">sec</span>
-          </div>
+          <p class="sign-line">without an incident</p>
         </div>
-        <div class="screen-glass" aria-hidden="true"></div>
+        <footer class="sign-foot"><i class="live-dot" aria-hidden="true"></i><span data-hero-caption>Reading the sensors&hellip;</span></footer>
+        <i class="sign-light" aria-hidden="true"></i>
       </div>
-      <p class="hero-caption" data-hero-caption>Reading the sensors&hellip;</p>
+      <p class="sr-only" aria-live="polite" data-hero-sr>Reading the sensors.</p>
     </section>
 
-    <div class="tape" aria-hidden="true"></div>
+    <p class="lede">
+      The sign from a warehouse wall, except the incidents are real. Every
+      number on this page is read <em>right now</em> from a live feed: USGS for
+      earthquakes, NOAA, GFZ Potsdam and NASA for the Sun and the Earth's
+      magnetic field. Nobody typed any of it in.
+    </p>
 
     <div class="groups">
       {GROUPS.map((group) => (
@@ -243,6 +241,10 @@ const INFO: Record<string, InfoContent> = {
   import { createShell } from '../lib/game-shell'
   import { PLAY } from '../lib/motion'
   import { recordPlay } from '../lib/stats'
+  import { FlapBoard } from '../lib/split-flap'
+  import { ShaderSurface } from '../lib/gl'
+  import { INCIDENT_WALL_FRAG } from '../lib/incident-wall-shader'
+  import { hit } from '../lib/audio'
 
   const rowEls = new Map(
     Array.from(document.querySelectorAll<HTMLLIElement>('.row')).map((el) => [el.dataset.cat!, el]),
@@ -397,6 +399,14 @@ const INFO: Record<string, InfoContent> = {
     }
     heroEvent = best
   }
+  /* The sign's drums. Each card that lands clacks, quietly, if sound is on;
+     a drum spinning through cards to be set clacks softer. */
+  const clack = (strength: number) => hit({ dur: 0.028, gain: 0.05 * strength, freq: 1500 + Math.random() * 700, q: 2.5 })
+  const flapOf = (k: string) => new FlapBoard(document.querySelector<HTMLElement>(`[data-flap="${k}"]`)!, prefersReducedMotion, clack)
+  const board = { days: flapOf('days'), hours: flapOf('hours'), minutes: flapOf('minutes'), seconds: flapOf('seconds') }
+  const heroSr = document.querySelector<HTMLElement>('[data-hero-sr]')!
+  let srMinute = -1
+
   function tickHero() {
     const capEl = document.querySelector<HTMLElement>('[data-hero-caption]')!
     if (!heroEvent) {
@@ -405,14 +415,50 @@ const INFO: Record<string, InfoContent> = {
     }
     const { days, hours, minutes } = elapsedParts(Date.now(), heroEvent.time)
     const seconds = Math.floor((Date.now() - heroEvent.time) / 1000) % 60
-    setOdometer(document.querySelector('[data-hero="days"]')!, String(Math.max(0, days)))
-    setOdometer(document.querySelector('[data-hero="hours"]')!, String(hours).padStart(2, '0'))
-    setOdometer(document.querySelector('[data-hero="minutes"]')!, String(minutes).padStart(2, '0'))
-    setOdometer(document.querySelector('[data-hero="seconds"]')!, String(Math.max(0, seconds)).padStart(2, '0'))
-    capEl.textContent = `Last: ${heroEvent.detail}`
+    board.days.set(String(Math.max(0, days)))
+    board.hours.set(String(hours), true)
+    board.minutes.set(String(minutes), true)
+    board.seconds.set(String(Math.max(0, seconds)), true)
+    capEl.textContent = `Last incident: ${heroEvent.detail}`
+    // Read aloud once a minute, not every second.
+    if (minutes !== srMinute) {
+      srMinute = minutes
+      heroSr.textContent = `This planet has gone ${inWords(Date.now() - heroEvent.time)} without an incident. Last incident: ${heroEvent.detail}.`
+    }
     // The tile only changes once a minute, so it is fine to tell it every tick.
     shell.setScore(safeFor(Date.now() - heroEvent.time))
   }
+
+  /* ---- the wall ------------------------------------------------------------ */
+
+  const scene = document.getElementById('dsiScene')!
+  const sign = document.getElementById('dsiSign')!
+  /** The sign is 900 mm across; where it is on the wall, in the canvas's own pixels, y up. */
+  let plate = [0, 0, 1, 1], pxPerMm = 1
+  let wall: ShaderSurface | null = null
+  function placePlate() {
+    if (!wall) return
+    const s = scene.getBoundingClientRect(), r = sign.getBoundingClientRect()
+    const k = wall.canvas.width / Math.max(1, s.width)
+    const H = wall.canvas.height
+    plate = [(r.left - s.left) * k, H - (r.bottom - s.top) * k, (r.right - s.left) * k, H - (r.top - s.top) * k]
+    pxPerMm = ((r.right - r.left) * k) / 900
+    wall.redraw()
+  }
+  // Built once the page has been seen: compiling the wall's shader is a few hundred milliseconds of work.
+  function buildWall() {
+    wall = new ShaderSurface(scene, INCIDENT_WALL_FRAG, {
+      still: true,
+      uniforms: () => ({ u_plate: plate, u_mm: pxPerMm }),
+    })
+    scene.prepend(wall.canvas)
+    scene.classList.toggle('lit', wall.canvas.isConnected)
+    // The canvas takes its size a frame after it is placed; measure then, and on every resize.
+    requestAnimationFrame(placePlate)
+    new ResizeObserver(() => requestAnimationFrame(placePlate)).observe(scene)
+  }
+  const idle = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback
+  if (idle) idle(buildWall, { timeout: 500 }); else setTimeout(buildWall, 60)
   setInterval(tickHero, 1000)
   tickHero()
 
@@ -512,22 +558,185 @@ const INFO: Record<string, InfoContent> = {
 <style>
   /* The sign sits on paper. The plates keep their dark screens — they are
      the picture — and the page around them is the design system's. */
-  .dsi { max-width: 780px; margin: 0 auto; }
+  .dsi { max-width: 1180px; margin: 0 auto; }
+  .dsi > :not(.scene):not(.groups) { max-width: 780px; margin-left: auto; margin-right: auto; }
 
-  .tape {
-    height: 13px;
-    margin: 0 0 22px;
-    border-radius: 3px;
-    background: repeating-linear-gradient(45deg, var(--cobalt) 0 10px, var(--ink) 10px 20px);
-    box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.7), inset 0 -2px 3px rgba(0, 0, 0, 0.25);
+  /* ---- the wall and the sign ------------------------------------------------ */
+
+  /* The wall is the shader; until it has drawn (or where there is no WebGL)
+     it is a plain painted wall, and the sign casts its own CSS shadow. */
+  .scene {
+    position: relative; overflow: hidden; isolation: isolate;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 600px; padding: 84px 24px 120px;
+    border-radius: var(--r-lg);
+    background: radial-gradient(90% 70% at 50% 0%, #8a949c, #59636b 60%, #2b3238);
+    box-shadow: 0 40px 80px -46px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   }
-  .head + .hero { margin-top: 0; }
-  .hero + .tape { margin-top: 26px; }
+  .scene :global(.gl-surface) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: -1; }
 
-  .head { text-align: center; padding: 4px 0 22px; }
+  /* A vitreous-enamel sign on steel, 900 mm across: white face, safety-green
+     band and frame line, four chrome screws. The face is lit like the wall —
+     brightest under the tube, a soft sheen across its top — by .sign-light,
+     laid over everything printed on it. */
+  .sign {
+    --green: #0b5a3a;
+    position: relative; width: min(760px, 100%);
+    padding: 0 0 18px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #f6f8f8, #eef1f2 60%, #e7ebec);
+    color: #14181c;
+    font-family: var(--font);
+    text-align: center;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+      0 1px 0 #b9c1c6, 0 2px 0 #8d969c, 0 3px 1px rgba(0, 0, 0, 0.35);
+  }
+  .scene:not(.lit) .sign { box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.55), 0 2px 0 #8d969c; }
+  /* The printed frame line, inset from the edge as every safety sign has. */
+  .sign::before {
+    content: ''; position: absolute; inset: 9px; border: 2.5px solid var(--green); border-radius: 7px; pointer-events: none;
+  }
+  .sign-band {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    margin: 9px 9px 0; padding: 15px 20px 14px;
+    border-radius: 7px 7px 0 0;
+    background: linear-gradient(180deg, #0f6743, var(--green));
+    color: #fff;
+  }
+  .sign-band h2 {
+    margin: 0; font-family: var(--font); font-size: clamp(17px, 2.6vw, 25px); font-weight: 800;
+    letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.1; color: #fff;
+  }
+  .sign-band-sub { font-weight: 600; opacity: 0.8; margin-left: 0.5em; }
+  /* The safe-condition mark: a white cross on the green, in a white ring. */
+  .sign-cross {
+    position: relative; flex: none; width: 34px; height: 34px; border-radius: 50%;
+    background: #fff;
+  }
+  .sign-cross::before, .sign-cross::after {
+    content: ''; position: absolute; left: 50%; top: 50%; background: var(--green);
+    transform: translate(-50%, -50%);
+  }
+  .sign-cross::before { width: 20px; height: 6px; }
+  .sign-cross::after { width: 6px; height: 20px; }
+  .sign-body { padding: 22px 26px 6px; }
+  .sign-line {
+    margin: 0; font-size: clamp(15px, 2.2vw, 21px); font-weight: 800;
+    letter-spacing: 0.14em; text-transform: uppercase; color: #1b2025;
+  }
+  .sign-days { display: flex; align-items: flex-end; justify-content: center; gap: 16px; margin: 16px 0 14px; }
+  .sign-unit { font-size: clamp(22px, 3.4vw, 34px); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding-bottom: 6px; }
+  .sign-hms { display: flex; align-items: flex-start; justify-content: center; gap: 8px; margin: 0 0 18px; }
+  .hms-part { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .hms-u { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #4a5560; }
+  .sign-colon { font-size: 30px; line-height: 64px; color: #1b2025; }
+  .sign-foot {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 4px 34px 0; padding: 12px 0 4px;
+    border-top: 1.5px solid rgba(11, 90, 58, 0.35);
+    font-size: 13.5px; font-weight: 600; color: #2b333b; min-height: 1.5em;
+  }
+  .sign-foot .live-dot { flex: none; }
+
+  /* Chrome pan-head screws, each turned however it was left. */
+  .screw {
+    position: absolute; z-index: 2; width: 15px; height: 15px; border-radius: 50%;
+    left: calc(var(--sx) * (100% - 15px) + (1 - 2 * var(--sx)) * 15px);
+    top: calc(var(--sy) * (100% - 15px) + (1 - 2 * var(--sy)) * 15px);
+    background: radial-gradient(circle at 35% 30%, #ffffff, #c9d0d6 32%, #7d868e 70%, #454c53);
+    box-shadow: 0 1.5px 1.5px rgba(0, 0, 0, 0.45), inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+    transform: rotate(var(--rot));
+  }
+  .screw::before, .screw::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 2px; margin: -1px 0 0 -4.5px;
+    border-radius: 1px; background: #3a4046; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+  .screw::after { transform: rotate(90deg); }
+
+  /* The light on the enamel: brightest under the tube, falling off to the
+     lower corners, and the tube's own reflection as a soft band near the top. */
+  .sign-light {
+    position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+    background: radial-gradient(130% 110% at 50% -30%, rgba(255, 255, 255, 0) 45%, rgba(48, 62, 78, 0.28) 100%);
+    mix-blend-mode: multiply;
+  }
+  .sign-light::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(176deg, transparent 6%, rgba(255, 255, 255, 0.2) 12%, transparent 24%);
+    mix-blend-mode: screen;
+  }
+
+  /* ---- the split-flap drums --------------------------------------------------- */
+
+  /* Built by flapCellHTML() as a string, so every rule that reaches inside a
+     cell is :global (the set:html trap noted for the odometer below). */
+  .flaps {
+    --w: 70px; --h: 104px; --fs: 86px;
+    display: inline-flex; gap: 5px; padding: 7px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #08090b, #121418);
+    box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.8), 0 -1px 0 rgba(0, 0, 0, 0.25);
+  }
+  .flaps-small { --w: 38px; --h: 54px; --fs: 44px; gap: 3px; padding: 5px; border-radius: 6px; }
+  .flaps :global(.sf) {
+    position: relative; width: var(--w); height: var(--h); perspective: calc(var(--h) * 4);
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: var(--fs); line-height: var(--h); font-variant-numeric: tabular-nums; color: #eef1f4;
+  }
+  .flaps :global(.sf-h) {
+    position: absolute; left: 0; right: 0; height: 50%; overflow: hidden;
+    background: linear-gradient(180deg, #2c3036, #1f2328);
+    border-radius: 4px 4px 0 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  .flaps :global(.sf-b) {
+    background: linear-gradient(180deg, #181b1f, #23272c);
+    border-radius: 0 0 4px 4px;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  }
+  .flaps :global(.sf-t) { top: 0; }
+  .flaps :global(.sf-b) { bottom: 0; }
+  .flaps :global(.sf-h i) { position: absolute; left: 0; right: 0; height: 200%; font-style: normal; text-align: center; }
+  .flaps :global(.sf-t i) { top: 0; }
+  .flaps :global(.sf-b i) { bottom: 0; }
+  /* The card that falls: hinged on the axle, its face the old top half, its back the new bottom half. */
+  .flaps :global(.sf-flap) {
+    position: absolute; left: 0; right: 0; top: 0; height: 50%; z-index: 2;
+    transform-origin: 50% 100%; transform: rotateX(var(--a, 0deg)); transform-style: preserve-3d;
+  }
+  .flaps :global(.sf-flap .sf-h) { height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .flaps :global(.sf-front) { filter: brightness(var(--lf, 1)); }
+  .flaps :global(.sf-back) { transform: rotateX(180deg); filter: brightness(var(--lb, 1)); }
+  /* The gap between the cards, and the axle pins at each side. */
+  .flaps :global(.sf-axle) {
+    position: absolute; left: -3px; right: -3px; top: 50%; height: 2px; margin-top: -1px; z-index: 3;
+    background: linear-gradient(90deg, #6d757c 0 3px, #050607 3px calc(100% - 3px), #6d757c calc(100% - 3px));
+  }
+  /* A card in flight shades the card beneath it. */
+  .flaps :global(.sf.turning .sf-b) { box-shadow: inset 0 14px 16px -10px rgba(0, 0, 0, 0.7); }
+
+  @media (max-width: 640px) {
+    .scene { min-height: 0; padding: 46px 14px 70px; }
+    .sign-body { padding: 18px 14px 4px; }
+    .sign-band { gap: 10px; padding: 12px 14px 11px; }
+    .sign-cross { width: 26px; height: 26px; }
+    .sign-cross::before { width: 15px; height: 5px; }
+    .sign-cross::after { width: 5px; height: 15px; }
+    .sign-band-sub { display: block; margin: 3px 0 0; font-size: 0.7em; }
+    .flaps { --w: 50px; --h: 74px; --fs: 60px; gap: 4px; padding: 5px; }
+    .flaps-small { --w: 30px; --h: 42px; --fs: 34px; gap: 2px; padding: 4px; }
+    .sign-days { gap: 10px; margin: 12px 0 12px; }
+    .sign-colon { font-size: 22px; line-height: 50px; }
+    .sign { padding-bottom: 24px; }
+    .sign-foot { margin: 2px 30px 0; font-size: 12.5px; text-align: left; align-items: flex-start; }
+    .sign-foot .live-dot { margin-top: 6px; }
+  }
+
   .lede {
-    margin: 0 auto;
+    margin: 26px auto 34px;
     max-width: 46em;
+    text-align: center;
     font-size: var(--fs-lead);
     line-height: 1.55;
     color: var(--ink2);
@@ -562,7 +771,7 @@ const INFO: Record<string, InfoContent> = {
   /* The recessed "screen" the odometer sits inside, and the glass over it —
      shared between the hero and every row so one texture reads as one
      material throughout the sign rather than a different fake per size. */
-  .hero-screen, .row-screen { position: relative; overflow: hidden; border-radius: 8px; }
+  .row-screen { position: relative; overflow: hidden; border-radius: 8px; }
   .screen-glass {
     position: absolute;
     inset: 0;
@@ -572,32 +781,6 @@ const INFO: Record<string, InfoContent> = {
       repeating-linear-gradient(rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
   }
 
-  /* ---- hero --------------------------------------------------------------- */
-
-  .hero {
-    position: relative;
-    text-align: center;
-    padding: 26px 18px 24px;
-    border-radius: var(--r-lg);
-    background: linear-gradient(180deg, #1a1d24, #0e1015);
-    border: 2px solid var(--ink);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 22px 46px -24px rgba(0, 0, 0, 0.85),
-      0 1px 0 rgba(255, 255, 255, 0.02);
-  }
-  .hero-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    margin: 0 0 12px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: #aab6c8;
-  }
   .live-dot {
     width: 7px;
     height: 7px;
@@ -610,42 +793,6 @@ const INFO: Record<string, InfoContent> = {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
   }
-  .hero-screen {
-    display: inline-block;
-    padding: 14px clamp(10px, 3vw, 22px);
-    background: #05060a;
-    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(79, 227, 193, 0.08);
-  }
-  .hero-clock {
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    gap: clamp(4px, 1.6vw, 12px);
-    flex-wrap: wrap;
-  }
-  .hero-fig { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .hero-odo { font-size: clamp(26px, 8vw, 46px); }
-  .hero-sep {
-    align-self: center;
-    margin-bottom: 0.5em;
-    font-size: clamp(20px, 6vw, 34px);
-    color: rgba(79, 227, 193, 0.35);
-  }
-  .hero-u {
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: #8a93a3;
-  }
-  .hero-caption {
-    margin: 16px 0 0;
-    font-size: 14px;
-    color: #b7c0cd;
-    min-height: 1.4em;
-  }
-
   /* ---- the odometer: a real seven-segment display -------------------------- */
 
   /* `digitCellHTML()` builds these nodes as a raw HTML string, inserted via
