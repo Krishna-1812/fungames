@@ -408,7 +408,8 @@ export class WhoMap {
     } else {
       this.atlas ??= this.makeAtlas()
       g.imageSmoothingEnabled = true
-      g.imageSmoothingQuality = 'high'
+      // Plain smoothing: the best quality is resampled from scratch every frame, and cost the page a dropped frame in twenty while the wheel turned. The frame it settles on is drawn sharp anyway.
+      g.imageSmoothingQuality = 'low'
       for (const c of copies) g.drawImage(this.atlas, w / 2 + (-180 + 360 * c - v.lon) * k, h / 2 - (90 - v.lat) * k, 360 * k, 180 * k)
     }
   }
