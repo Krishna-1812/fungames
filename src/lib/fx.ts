@@ -33,13 +33,21 @@ function ensure() {
   ctx = canvas.getContext('2d')
   size()
   addEventListener('resize', size, { passive: true })
+  // A scrollbar coming or going changes the canvas's box with no resize event.
+  if ('ResizeObserver' in window) new ResizeObserver(size).observe(canvas)
 }
 
+/**
+ * The bitmap is the canvas's own box, not the window's: innerWidth counts a
+ * desktop scrollbar the canvas does not cover, and a bitmap 15px wider than
+ * its box drew every spark squeezed and up to 15px left of where it was thrown.
+ */
 function size() {
   if (!canvas || !ctx) return
   dpr = Math.min(devicePixelRatio || 1, 2)
-  canvas.width = Math.round(innerWidth * dpr)
-  canvas.height = Math.round(innerHeight * dpr)
+  const w = Math.round((canvas.clientWidth || innerWidth) * dpr)
+  const h = Math.round((canvas.clientHeight || innerHeight) * dpr)
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 }
 
