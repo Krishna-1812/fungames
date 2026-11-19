@@ -2690,6 +2690,11 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     last G5 storm, 868 days before). The info panels are the shell's own
     paper dialogs.
 
+    **Who Was Alive** (later): a map of where the people alive in the year
+    were, on the real coastline, with arcs for the ones who moved abroad and
+    a camera that frames them; and a close-up of their whole lives side by
+    side under the count. See the README.
+
     **Who Was Alive** had no goal, so it has one: meet everyone. Moves counts
     the people you have seen alive in some year you set; all 89 is the
     ending, and clicking a bar goes to that person's birth year, so nobody

@@ -97,7 +97,7 @@ export const GAMES: Game[] = [
     title: 'Who Was Alive',
     blurb: 'Pick a year and see who was walking around in it',
     description:
-      'Eighty-nine people whose birth and death years are settled fact, drawn as eighty-nine bars on one shared timeline from 551 BC to now. Roll the brass year counter to anywhere between 700 BC and today — or jump straight to the year you were born — and every life that reached that year lights up, with the oldest and youngest of them named. Shakespeare and Galileo were born in the same year; Newton and Louis XIV shared seventy-three of them. The overlaps are the point, and the seven centuries in the middle where this record holds nobody at all are stated rather than quietly skipped.',
+      'Eighty-nine people whose birth and death years are settled fact, drawn as eighty-nine bars on one shared timeline from 551 BC to now. Roll the brass year counter to anywhere between 700 BC and today — or jump straight to the year you were born — and every life that reached that year lights up, with the oldest and youngest of them named. Shakespeare and Galileo were born in the same year; Newton and Louis XIV shared seventy-three of them. The overlaps are the point, and the seven centuries in the middle where this record holds nobody at all are stated rather than quietly skipped. A map lights up where each of them was, and their whole lives are laid side by side.',
     accent: '#3a2b18', accent2: '#efe0bd',
     category: 'you',
     added: '2026-09-29',

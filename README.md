@@ -963,6 +963,34 @@ gave "$1,000.00 million" instead of promoting to "$1.00 billion," because the
 formatter never checked whether its own rounding had just pushed the value
 into the next unit up.*
 
+**Who Was Alive**, the map and the close-up — the page always had the
+right numbers and showed them as eighty-nine thin bars on a 2,600-year axis,
+which is honest and too small to read: in 1600 the seven people alive are
+seven slivers in the last inch of it. Two things now stand between the
+counter and that chart. A map (`lib/who-map.ts`): the Earth at night on its
+real coastline (Natural Earth, drawn from the vector path so it is sharp at
+any zoom), a light for each person alive in the year at the town they were
+born in, and, for the twenty-seven who made their life in another country,
+a dotted arc to where they made it (`lib/who-places.ts`: Einstein from Ulm
+to Princeton, Mercury from Stone Town to London, Napoleon from Ajaccio to
+Saint Helena). It frames whoever is alive and glides as the wheel turns, so
+spinning from 300 BC to now is a camera crossing from the Mediterranean and
+the Yellow River to Europe to the whole world; on a phone, where the world
+does not fit across, it centres on where most of them are, goes round the
+date line, can be dragged, and counts the people off each edge. And under
+the count, a close-up: everyone alive that year drawn as their whole life
+on one scale, with the year through the middle and each one's age where it
+crosses, so Shakespeare and Galileo both being 36 in 1600 is something you
+see. The land is painted once into a picture of the whole world and copied
+while the view moves, and drawn sharp again when it settles, because
+stroking a coastline of thousands of points eight times a frame took the
+page's slowest frames from 18 ms to 60-100 while the wheel turned.
+*`check-who-places.mjs` puts every birthplace on land by the coastline the
+globes here use, inside the country the record names (both countries, for
+the twenty-seven), and, for every year from 600 BC to now, checks that a
+wide map frames everybody alive and a phone's frames as many as any frame
+that wide could.*
+
 **Who Was Alive** — type a year and see who was walking around in it.
 Eighty-nine people whose birth and death years are settled fact, and nobody
 whose dates a scholar would put a *c.* in front of — which is why the first
