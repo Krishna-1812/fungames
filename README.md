@@ -1326,6 +1326,31 @@ CAPTCHAs infuriating. The street is baked to a JPEG at build time by
 nine copies of a drawing, and because the artefacts of lossy compression are
 themselves part of what a real tile looks like.
 
+**Days Since Incident**, the wall — eleven of the sixteen rows had gone
+blank: they all came from NASA's DONKI log on the shared DEMO_KEY, which
+other people's apps spend before ours asks, on a host that goes quiet for
+days. One cached route now answers every space-weather row from whoever
+answers (`lib/space-weather.ts`, `pages/api/space-weather.ts`): NOAA
+SWPC's GOES flare list, the Kp index from GFZ Potsdam (back to 1932) and
+SWPC, DONKI's shock log or SWPC's sudden-impulse reports, what the route
+has remembered, and a seed read from the full records at build time
+(`scripts/build-incident-seed.mjs`); the most recent event per row wins,
+and each row says whose it is. The hero is a vitreous-enamel safety sign
+screwed to a painted concrete-block wall: a shader lays the blocks, tooled
+joints and paint and lights them from a fluorescent tube above the sign
+(`lib/incident-wall-shader.ts`), drawn once and kept as a picture; the
+days, hours, minutes and seconds are split-flap drums whose cards fall
+under gravity, strike the stack and settle (`lib/split-flap.ts`). Under the
+sign each group of counters sits below the instrument it is read from
+(`lib/incident-scopes.ts`): the month's M4.5+ earthquakes on a
+Pacific-centred map, where the Ring of Fire appears without being drawn;
+GOES's X-ray trace for the week, its M and X flares named; and thirty days
+of Kp bars coloured by G-level, with shocks marked. *`check-space-weather`
+holds every source's reading to the same flare class and G-level, and the
+route to never remembering an estimate; `check-incident-sign` holds the
+cards to falling like cards; `check-incident-scopes` holds the coast and
+the quakes to one projection and the colours to cool.*
+
 **Days Since Incident** — the "days since last accident" sign from a
 warehouse wall, except the incidents are real and every counter is live.
 Sixteen rows across four real feeds: five earthquake magnitude tiers from

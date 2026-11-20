@@ -127,7 +127,7 @@ export const GAMES: Game[] = [
     title: 'Days Since Incident',
     blurb: 'A live safety sign for the whole planet',
     description:
-      'The "days since last incident" sign from a warehouse wall, except the incidents are real and the counters are live: the most recent earthquake at five real magnitude thresholds, the most recent solar flare at five real GOES X-ray classes, the most recent geomagnetic storm at all five of NOAA’s own G-scale levels, and the most recent interplanetary shock — read straight off USGS’s earthquake catalogue and NASA’s DONKI space-weather log in your own browser, not a number anyone typed in.',
+      'The “days since last incident” sign from a warehouse wall, screwed to a lit block wall with split-flap counters, except the incidents are real and live: the most recent earthquake at five magnitudes, solar flare at five GOES classes, geomagnetic storm at all five of NOAA’s G-levels, and interplanetary shock, each row under the instrument it is read from — the month’s earthquakes on a map, the Sun’s X-rays this week, the Earth’s magnetic field this month — from USGS, NOAA, GFZ Potsdam and NASA, not a number anyone typed in.',
     accent: '#0e1004', accent2: '#d4ff3d',
     category: 'science',
     added: '2026-09-26',

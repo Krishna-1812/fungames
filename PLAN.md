@@ -2690,6 +2690,12 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     last G5 storm, 868 days before). The info panels are the shell's own
     paper dialogs.
 
+    **Days Since Incident** (later): every space-weather row from whoever
+    answers (NOAA, GFZ, NASA, a remembered answer, a seed from the full
+    records); the sign is enamel on a lit block wall with split-flap drums,
+    and each row of counters sits under its instrument: the month's quakes
+    on a map, the week's X-rays, the month's Kp. See the README.
+
     **Printing Money** (later): the spending counter sits over a live globe,
     the same dollars laid as bills east from the Capitol round the world, a
     lap every twenty minutes; the drawn rates are bills on a table. See the
