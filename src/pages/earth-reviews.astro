@@ -9,6 +9,7 @@ import {
 } from '../data/earth-reviews'
 import { moodOf, rgbTriplet, spriteSvg, starsSvg, symbolId } from '../lib/earth-reviews-art'
 import { withBase } from '../lib/base'
+import { packPhoto } from '../lib/earth-reviews-packs'
 
 /**
  * Earth Reviews — a consumer-reviews site for thirty-two real natural
@@ -65,6 +66,8 @@ const tiles = sortPhenomena(PHENOMENA, 'reviewed').map((p) => {
     stars: starsSvg(avg, 15, `${avg} out of 5 stars`),
     mood: rgbTriplet(moodOf(p.id)),
     href: symbolId(p.id),
+    photo: withBase('/' + packPhoto(p.id, true)),
+    photoBig: withBase('/' + packPhoto(p.id)),
   }
 })
 
@@ -170,10 +173,9 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
                   data-hay={`${t.p.name} ${t.p.department} ${t.p.tagline}`.toLowerCase()}
                 >
                   <a class="er-tilelink" href={`#${t.p.id}`}>
-                    <span class="er-shot" style={`--mood:${t.mood}`}>
-                      <svg class="er-shotart" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-                        <use href={`#${t.href}`} />
-                      </svg>
+                    <span class="er-shot">
+                      <img class="er-photo" src={t.photo} srcset={`${t.photo} 600w, ${t.photoBig} 1200w`} sizes="(max-width: 560px) 46vw, 240px"
+                        width="600" height="600" alt={`${t.p.name}, in its packaging`} loading="lazy" decoding="async" />
                     </span>
                     <span class="er-tilebody">
                       <span class="er-tiledept">{t.p.department}</span>
@@ -256,6 +258,8 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   import { averageRating, ratingDistribution, sortReviews, STARS } from '../data/earth-reviews'
   import type { Review, ReviewSort } from '../data/earth-reviews'
   import { starsSvg, symbolId } from '../lib/earth-reviews-art'
+  import { packPhoto } from '../lib/earth-reviews-packs'
+  import { withBase } from '../lib/base'
   import { burst } from '../lib/fx'
   import { sfx, unlock } from '../lib/audio'
   import { createShell } from '../lib/game-shell'
@@ -297,6 +301,10 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
 
   const esc = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+  const photo = (id: string, small = false) => withBase('/' + packPhoto(id, small))
+  /** A reviewer's avatar colour, from their name: always the same, always cool. */
+  const avatarHue = (name: string) => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return 165 + (h % 120) }
 
   const initials = (name: string) =>
     name.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
@@ -429,7 +437,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     return (
       `<li><article class="er-review">` +
       `<header class="er-rhead">` +
-      `<span class="er-avatar" aria-hidden="true">${esc(initials(r.name))}</span>` +
+      `<span class="er-avatar" aria-hidden="true" style="--h:${avatarHue(r.name)}">${esc(initials(r.name))}</span>` +
       `<span class="er-rname">${esc(r.name)}</span>` +
       `</header>` +
       `<p class="er-rtitle">${starsSvg(r.rating, 16, `${r.rating} out of 5 stars`)}<b>${esc(r.title)}</b></p>` +
@@ -458,10 +466,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
           const avg = averageRating(o)
           return (
             `<li><a class="er-crosslink" href="#${o.id}">` +
-            `<span class="er-crossshot" style="--mood:${o.mood}">` +
-            `<svg class="er-shotart" viewBox="0 0 120 120" aria-hidden="true" focusable="false"><use href="#${symbolId(
-              o.id,
-            )}"/></svg></span>` +
+            `<span class="er-crossshot"><img src="${photo(o.id, true)}" width="600" height="600" alt="" loading="lazy" decoding="async"></span>` +
             `<span class="er-crossmeta"><b>${esc(o.name)}</b>` +
             `<span class="er-crossrate">${starsSvg(avg, 13, `${avg} out of 5 stars`)}<span>${avg.toFixed(
               1,
@@ -498,11 +503,17 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
       `<li aria-current="page">${esc(item.name)}</li>` +
       `</ol></nav>` +
       `<div class="er-product">` +
-      `<div class="er-hero" style="--mood:${item.mood}">` +
-      `<svg class="er-heroart" viewBox="0 0 120 120" role="img" aria-label="An illustration of ${esc(
-        item.name,
-      )}"><use href="#${symbolId(item.id)}"/></svg>` +
+      // The gallery: the packshot, and the illustration printed on its label, as a second view.
+      `<div class="er-gallery">` +
+      `<div class="er-hero" data-zoom style="--mood:${item.mood}">` +
+      `<img class="er-heroimg" src="${photo(item.id)}" width="1200" height="1200" alt="${esc(item.name)}, in its packaging: a product photograph" decoding="async">` +
+      `<svg class="er-heroart" viewBox="0 0 120 120" role="img" aria-label="The illustration on the label of ${esc(item.name)}" hidden><use href="#${symbolId(item.id)}"/></svg>` +
+      `<span class="er-zoomhint" aria-hidden="true">Roll over the picture to zoom in</span>` +
       `</div>` +
+      `<div class="er-thumbs" role="group" aria-label="Pictures of ${esc(item.name)}">` +
+      `<button type="button" class="er-thumb" data-view="photo" aria-pressed="true" aria-label="The packaging"><img src="${photo(item.id, true)}" alt="" width="600" height="600"></button>` +
+      `<button type="button" class="er-thumb er-thumb-art" data-view="art" aria-pressed="false" aria-label="The illustration" style="--mood:${item.mood}"><svg viewBox="0 0 120 120" aria-hidden="true" focusable="false"><use href="#${symbolId(item.id)}"/></svg></button>` +
+      `</div></div>` +
       `<div class="er-buy">` +
       `<h2 id="er-pname" tabindex="-1">${esc(item.name)}</h2>` +
       `<p class="er-ptag">${esc(item.tagline)}</p>` +
@@ -512,7 +523,12 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
       `<span>${total} global rating${total === 1 ? '' : 's'}</span></span>` +
       `</div>` +
       barsHtml(item) +
+      `<div class="er-buybox">` +
+      `<p class="er-price"><span>Price</span><b>Free</b><small>Payment is taken in other ways.</small></p>` +
       `<p class="er-stock">In stock. Cannot be cancelled, returned, or opted out of.</p>` +
+      `<button type="button" class="er-basket" data-basket>Add to basket</button>` +
+      `<p class="er-basketnote" role="status" aria-live="polite"></p>` +
+      `</div>` +
       `</div></div>` +
       `<section class="er-reviews">` +
       `<div class="er-reviewhead"><h3>${total} review${total === 1 ? '' : 's'}</h3>` +
@@ -603,6 +619,30 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
       return
     }
 
+    const thumb = t.closest<HTMLButtonElement>('[data-view]')
+    if (thumb) {
+      const art = thumb.dataset.view === 'art'
+      const hero = product.querySelector<HTMLElement>('.er-hero')!
+      hero.classList.toggle('er-showart', art)
+      ;(hero.querySelector('.er-heroimg') as HTMLElement).hidden = art
+      ;(hero.querySelector('.er-heroart') as SVGElement).toggleAttribute('hidden', !art)
+      for (const b of product.querySelectorAll<HTMLButtonElement>('[data-view]')) b.setAttribute('aria-pressed', String(b === thumb))
+      sfx.tick()
+      return
+    }
+
+    const basket = t.closest<HTMLButtonElement>('[data-basket]')
+    if (basket && currentId) {
+      const item = BY_ID.get(currentId)!
+      const note = product.querySelector<HTMLElement>('.er-basketnote')!
+      note.textContent = BASKET_LINES[(basketTries++) % BASKET_LINES.length].replace('{name}', item.name)
+      basket.textContent = 'Already in your basket'
+      basket.disabled = true
+      sfx.blip(2)
+      shell.pick('Tried to buy', item.name)
+      return
+    }
+
     const cross = t.closest<HTMLAnchorElement>('.er-crosslink')
     if (cross) shell.pick('"Also regretted" link followed', BY_ID.get(cross.hash.slice(1))?.name ?? '?')
 
@@ -634,6 +674,29 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
     }
   })
 
+  /* Nobody can buy what everybody already has. */
+  const BASKET_LINES = [
+    '{name} is already in your basket. It has been since you were born.',
+    'Added. It was already there; it is now there twice, which changes nothing.',
+    'Your basket already contains {name}, and everything else on this site.',
+    'Checkout is not available. Delivery has already happened.',
+  ]
+  let basketTries = 0
+
+  /* Zoom: the picture follows the pointer at twice the size, as a shop's does. */
+  product.addEventListener('pointermove', (e) => {
+    const hero = (e.target as HTMLElement).closest<HTMLElement>('[data-zoom]')
+    if (!hero || e.pointerType !== 'mouse' || hero.classList.contains('er-showart')) return
+    const r = hero.getBoundingClientRect()
+    hero.style.setProperty('--zx', `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`)
+    hero.style.setProperty('--zy', `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`)
+    hero.classList.add('er-zoomed')
+  })
+  product.addEventListener('pointerout', (e) => {
+    const hero = (e.target as HTMLElement).closest<HTMLElement>('[data-zoom]')
+    if (hero && !hero.contains(e.relatedTarget as Node)) hero.classList.remove('er-zoomed')
+  })
+
   fromHash(false)
   paintStrip()
 </script>
@@ -655,7 +718,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-spot-a { top: -26vmax; left: -14vmax; background: radial-gradient(circle, #8ccbff, transparent 70%); opacity: 0.11; }
   .er-spot-b { bottom: -30vmax; right: -18vmax; background: radial-gradient(circle, #b8a1ff, transparent 70%); opacity: 0.1; }
 
-  .er-shell { position: relative; z-index: 1; max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  .er-shell { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0 20px; }
   .er-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
   /* ---- above the browser window ------------------------------------------ */
@@ -706,8 +769,8 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-site {
     --er-ink: #20242b;
     --er-mute: #5b6169;
-    --er-line: #e2ddd4;
-    --er-page: #f4f2ee;
+    --er-line: #dde2e8;
+    --er-page: #f3f5f7;
     background: var(--er-page); color: var(--er-ink);
     font-size: 15px; line-height: 1.5;
   }
@@ -759,7 +822,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   /* ---- the grid ----------------------------------------------------------- */
   .er-grid {
     list-style: none; margin: 0; padding: 0; display: grid; gap: 14px;
-    grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(214px, 1fr));
   }
   .er-tile { display: flex; }
   .er-tile[hidden] { display: none; }
@@ -772,24 +835,12 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-tilelink:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -16px rgba(0, 0, 0, 0.45); border-color: #c9c0b1; }
   .er-tilelink:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
 
-  /* The product shot. Dark, lit by the drawing's own dominant colour, and the
-     drawing bleeds past the panel's edges rather than sitting boxed inside it
-     with room to spare — the failure this site has now corrected five times. */
+  /* The packshot: the studio's own paper behind it, so the tile and the photograph are one surface. */
   .er-shot {
-    position: relative; display: block; aspect-ratio: 5 / 4; overflow: hidden;
-    /* Two layers, not one. A single gradient whose stops are all `rgba` has
-       nothing behind it but the white card, so every mood composited against
-       white and twenty-two product shots came out as pale haloes. The solid
-       colour underneath is what makes the glow read as light in a dark box. */
-    background:
-      radial-gradient(circle at 50% 46%, rgba(var(--mood), 0.5), rgba(var(--mood), 0.12) 56%, rgba(var(--mood), 0) 78%),
-      #14110d;
+    position: relative; display: block; aspect-ratio: 1 / 1; overflow: hidden; background: #a3acb6;
   }
-  .er-shotart {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    transform: scale(1.08);
-    filter: drop-shadow(0 6px 18px rgba(var(--mood), 0.5));
-  }
+  .er-photo { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 420ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+  .er-tilelink:hover .er-photo { transform: scale(1.045); }
   .er-tilebody { display: flex; flex-direction: column; gap: 3px; padding: 11px 12px 13px; }
   .er-tiledept { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--er-mute); font-weight: 600; }
   .er-tilename { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
@@ -804,17 +855,42 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
 
   /* ---- a product ---------------------------------------------------------- */
   .er-product { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 22px; align-items: start; }
+  .er-gallery { display: flex; flex-direction: column; gap: 10px; }
   .er-hero {
-    position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden;
+    position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; cursor: zoom-in;
+    --zx: 50%; --zy: 50%;
+  }
+  .er-heroimg { display: block; width: 100%; height: 100%; object-fit: cover; transform-origin: var(--zx) var(--zy); transition: transform 260ms ease; }
+  .er-hero.er-zoomed .er-heroimg { transform: scale(2.1); transition: none; }
+  .er-hero.er-showart { cursor: default;
     background:
       radial-gradient(circle at 50% 46%, rgba(var(--mood), 0.54), rgba(var(--mood), 0.13) 56%, rgba(var(--mood), 0) 78%),
       #14110d;
   }
+  .er-zoomhint {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); pointer-events: none;
+    font-size: 11.5px; font-weight: 600; color: #26303b; background: rgba(255, 255, 255, 0.78);
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap; transition: opacity 200ms;
+  }
+  .er-hero.er-zoomed .er-zoomhint, .er-hero.er-showart .er-zoomhint { opacity: 0; }
+  @media (hover: none) { .er-zoomhint { display: none; } }
+  .er-thumbs { display: flex; gap: 10px; }
+  .er-thumb {
+    width: 68px; height: 68px; padding: 0; border-radius: 9px; overflow: hidden; cursor: pointer;
+    border: 2px solid transparent; background: #a3acb6; box-shadow: 0 0 0 1px var(--er-line);
+  }
+  .er-thumb img, .er-thumb svg { display: block; width: 100%; height: 100%; }
+  .er-thumb-art { background: radial-gradient(circle at 50% 46%, rgba(var(--mood), 0.5), rgba(var(--mood), 0.12) 58%, rgba(var(--mood), 0) 80%), #10141a; }
+  .er-thumb[aria-pressed='true'] { border-color: #14213d; }
+  .er-thumb:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
+  .er-heroart[hidden] { display: none; }
   .er-heroart {
     position: absolute; inset: 0; width: 100%; height: 100%; transform: scale(1.06);
     filter: drop-shadow(0 10px 26px rgba(var(--mood), 0.55));
   }
   .er-buy h2 { margin: 0 0 4px; font-size: clamp(24px, 3.4vw, 32px); }
+  /* Focus lands here for screen readers when a product opens; a heading is not a control, so it shows no ring. */
+  .er-buy h2:focus { outline: none; }
   .er-ptag { margin: 0 0 14px; color: var(--er-mute); font-size: 14.5px; max-width: 48ch; }
   .er-summary { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--er-line); }
   .er-big { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
@@ -823,10 +899,25 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-bars { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
   .er-bar { display: grid; grid-template-columns: 52px 1fr 22px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--er-mute); }
   .er-barlabel { white-space: nowrap; }
-  .er-bartrack { height: 12px; border-radius: 3px; background: #e6e1d8; overflow: hidden; border: 1px solid #d8d2c6; }
+  .er-bartrack { height: 12px; border-radius: 3px; background: #e5e9ee; overflow: hidden; border: 1px solid #d3d9e0; }
   .er-bartrack i { display: block; height: 100%; background: linear-gradient(180deg, #6eebcf, #23b893); transition: width 420ms cubic-bezier(0.2, 0.9, 0.3, 1); }
   .er-barn { text-align: right; color: var(--er-ink); }
-  .er-stock { margin: 14px 0 0; font-size: 13px; color: #1f6b4a; font-weight: 600; }
+  .er-stock { margin: 8px 0 0; font-size: 13px; color: #1f6b4a; font-weight: 600; }
+  .er-buybox { margin-top: 16px; padding: 14px 16px 16px; border: 1px solid var(--er-line); border-radius: 12px; background: #fff; }
+  .er-price { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0; }
+  .er-price span { font-size: 13px; color: var(--er-mute); }
+  .er-price b { font-size: 26px; letter-spacing: -0.02em; }
+  .er-price small { font-size: 12.5px; color: var(--er-mute); }
+  .er-basket {
+    margin-top: 12px; width: 100%; font: inherit; font-weight: 700; font-size: 14.5px; padding: 11px 16px;
+    border-radius: 999px; border: 0; cursor: pointer; color: #ffffff; background: linear-gradient(180deg, #1f6fd1, #1557ad);
+    box-shadow: 0 6px 14px -8px rgba(21, 87, 173, 0.8);
+  }
+  .er-basket:hover:not(:disabled) { filter: brightness(1.08); }
+  .er-basket:disabled { cursor: default; color: #3a4654; background: #e3e8ee; box-shadow: none; }
+  .er-basket:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
+  .er-basketnote { margin: 10px 0 0; font-size: 13px; color: var(--er-ink); min-height: 0; }
+  .er-basketnote:empty { display: none; }
 
   /* ---- reviews ------------------------------------------------------------ */
   .er-reviews { margin-top: 30px; border-top: 1px solid var(--er-line); padding-top: 18px; }
@@ -846,20 +937,20 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   .er-rhead { display: flex; align-items: center; gap: 9px; margin: 0 0 7px; }
   .er-avatar {
     width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center;
-    background: #e7e0d3; color: #4a4036; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+    background: hsl(var(--h, 200) 45% 86%); color: hsl(var(--h, 200) 40% 26%); font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
   }
   .er-rname { font-size: 13.5px; font-weight: 600; }
   .er-rtitle { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; flex-wrap: wrap; }
   .er-rtitle b { font-size: 15px; }
   .er-rmeta { margin: 0 0 8px; font-size: 12.5px; color: var(--er-mute); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .er-verified { display: inline-flex; align-items: center; gap: 4px; color: #8a5300; font-weight: 700; font-size: 12px; }
+  .er-verified { display: inline-flex; align-items: center; gap: 4px; color: #0b7663; font-weight: 700; font-size: 12px; }
   .er-rbody { margin: 0 0 10px; font-size: 14.5px; line-height: 1.58; max-width: 72ch; }
   .er-helpful {
     display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 12.5px; font-weight: 600;
     padding: 6px 13px; border-radius: 999px; border: 1px solid var(--er-line); background: #fff;
     color: var(--er-mute); cursor: pointer; transition: background 140ms ease, color 140ms ease, transform 140ms ease;
   }
-  .er-helpful:hover { background: #f0ebe1; color: var(--er-ink); }
+  .er-helpful:hover { background: #eef2f6; color: var(--er-ink); }
   .er-helpful:active { transform: scale(0.96); }
   .er-helpful:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
   .er-helpful[aria-pressed='true'] { background: #14213d; border-color: #14213d; color: #dffaf3; }
@@ -875,12 +966,8 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   }
   .er-crosslink:hover { transform: translateY(-2px); border-color: #c9c0b1; }
   .er-crosslink:focus-visible { outline: 3px solid #0b7663; outline-offset: 2px; }
-  .er-crossshot {
-    position: relative; width: 62px; height: 62px; flex: none; border-radius: 8px; overflow: hidden;
-    background:
-      radial-gradient(circle at 50% 46%, rgba(var(--mood), 0.5), rgba(var(--mood), 0.12) 58%, rgba(var(--mood), 0) 80%),
-      #14110d;
-  }
+  .er-crossshot { position: relative; width: 72px; height: 72px; flex: none; border-radius: 8px; overflow: hidden; background: #a3acb6; }
+  .er-crossshot img { display: block; width: 100%; height: 100%; }
   .er-crossmeta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .er-crossmeta b { font-size: 14.5px; }
   .er-crossrate { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--er-mute); }
@@ -894,7 +981,7 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
 
   @media (max-width: 760px) {
     .er-product { grid-template-columns: 1fr; gap: 16px; }
-    .er-hero { aspect-ratio: 16 / 11; }
+    .er-hero { aspect-ratio: 1 / 1; }
   }
   @media (max-width: 560px) {
     .er-shell { padding: 0 12px; }
@@ -914,4 +1001,6 @@ const lowest = sortPhenomena(PHENOMENA, 'lowest')[0]
   html:not(.play) .er-tilelink:hover,
   html:not(.play) .er-crosslink:hover { transform: none; }
   html:not(.play) .er-bartrack i { transition: none; }
+  html:not(.play) .er-photo, html:not(.play) .er-heroimg { transition: none; }
+  html:not(.play) .er-tilelink:hover .er-photo { transform: none; }
 </style>
