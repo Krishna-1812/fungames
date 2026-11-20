@@ -1326,6 +1326,24 @@ CAPTCHAs infuriating. The street is baked to a JPEG at build time by
 nine copies of a drawing, and because the artefacts of lossy compression are
 themselves part of what a real tile looks like.
 
+**Earth Reviews**, the packshots — the shop's products were flat drawings
+on dark tiles inside a small browser window. A shop photographs what it
+sells, and there is no photograph of Mondays, so every product is now shot
+the way a shop shoots anything: in its packaging. Each phenomenon has a
+carton, a tin or a glass jar (`lib/earth-reviews-packs.ts`), its label
+printed from the drawing the shop already had, its name, its real star
+average and its net contents ("NET WT 9.81 m/s²", "52 PER YEAR · NO PAUSE
+OPTION"), and a studio shader photographs it on a seamless sweep under a
+softbox (`scripts/bake-earth-reviews.mjs`, `scripts/earth-reviews-bake/`):
+the Ocean is water with a surface in a jar, the Sun a light, Lightning a
+forked bolt in a bottled storm, Mosquitoes a swarm, Fog fog. The pictures
+are committed; the page only shows them. The grid's tiles are the
+packshots, a product page has the photograph with zoom that follows the
+pointer and the drawing as a second view, and a price box whose basket
+says you already have it. *`check-earth-reviews-packs.mjs` holds every
+product to a pack and two square pictures, no label to orange or yellow,
+and the page to showing them.*
+
 **Days Since Incident**, the wall — eleven of the sixteen rows had gone
 blank: they all came from NASA's DONKI log on the shared DEMO_KEY, which
 other people's apps spend before ours asks, on a host that goes quiet for

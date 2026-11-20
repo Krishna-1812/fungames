@@ -2690,6 +2690,11 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     last G5 storm, 868 days before). The info panels are the shell's own
     paper dialogs.
 
+    **Earth Reviews** (later): every product photographed in its packaging —
+    a carton, tin or glass jar with its contents showing, the label printed
+    from its drawing — by an offline studio bake; the shop is wider, with a
+    zoomable gallery and a basket that is already full. See the README.
+
     **Days Since Incident** (later): every space-weather row from whoever
     answers (NOAA, GFZ, NASA, a remembered answer, a seed from the full
     records); the sign is enamel on a lit block wall with split-flap drums,
