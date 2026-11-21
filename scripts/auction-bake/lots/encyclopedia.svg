@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="1000" viewBox="0 0 1200 1000">
+  <!-- The six spines of the encyclopedia, side by side, each 200 wide and
+       1000 tall (the spine's own proportions). Channels are masks, not
+       colours: red is gilt, green is the red morocco title label, blue is
+       the black lettering-piece. Gilt on a label keeps the label's channel
+       too, so its edges blend into the label and not into the calf. Bands
+       sit at y = 150, 290, 430, 570 and 710, as in encyclopedia.glsl. -->
+  <defs>
+    <!-- A small flower tool: four petals, four leaves and a centre. -->
+    <symbol id="fleuron" viewBox="-30 -30 60 60" overflow="visible">
+      <g fill="#ff0000">
+        <ellipse cx="0" cy="-13" rx="5.2" ry="11"/>
+        <ellipse cx="0" cy="13" rx="5.2" ry="11"/>
+        <ellipse cx="-13" cy="0" rx="11" ry="5.2"/>
+        <ellipse cx="13" cy="0" rx="11" ry="5.2"/>
+        <ellipse cx="0" cy="-10" rx="4" ry="8" transform="rotate(45)"/>
+        <ellipse cx="0" cy="-10" rx="4" ry="8" transform="rotate(135)"/>
+        <ellipse cx="0" cy="-10" rx="4" ry="8" transform="rotate(225)"/>
+        <ellipse cx="0" cy="-10" rx="4" ry="8" transform="rotate(315)"/>
+        <circle cx="0" cy="-27" r="2.6"/>
+        <circle cx="0" cy="27" r="2.6"/>
+        <circle cx="-27" cy="0" r="2.6"/>
+        <circle cx="27" cy="0" r="2.6"/>
+      </g>
+      <circle cx="0" cy="0" r="4.6" fill="#000000"/>
+      <circle cx="0" cy="0" r="2.6" fill="#ff0000"/>
+    </symbol>
+    <!-- A corner tool: a small sprig pointing into the panel's corner. -->
+    <symbol id="corner" viewBox="-10 -10 20 20" overflow="visible">
+      <g fill="#ff0000">
+        <ellipse cx="0" cy="-5" rx="2.2" ry="5.5" transform="rotate(-45)"/>
+        <circle cx="0" cy="0" r="2"/>
+        <ellipse cx="0" cy="-4" rx="1.6" ry="4" transform="rotate(-90)"/>
+        <ellipse cx="0" cy="-4" rx="1.6" ry="4"/>
+      </g>
+    </symbol>
+    <!-- The roll run along each band: a row of short hatchings. -->
+    <pattern id="hatch" width="9" height="20" patternUnits="userSpaceOnUse">
+      <rect x="2.5" y="4" width="3.4" height="12" fill="#ff0000" transform="skewX(-18)"/>
+    </pattern>
+    <!-- The decoration every spine shares. -->
+    <g id="spine">
+      <!-- At the head and the tail: a broad roll between two fillets. -->
+      <rect x="8" y="10" width="184" height="3" fill="#ff0000"/>
+      <rect x="8" y="17" width="184" height="9" fill="url(#hatch)"/>
+      <rect x="8" y="29" width="184" height="2.2" fill="#ff0000"/>
+      <rect x="8" y="972" width="184" height="2.2" fill="#ff0000"/>
+      <rect x="8" y="977" width="184" height="9" fill="url(#hatch)"/>
+      <rect x="8" y="989" width="184" height="3" fill="#ff0000"/>
+      <!-- Each band: the roll on its crown, a fillet either side. -->
+      <g id="band">
+        <rect x="6" y="143" width="188" height="14" fill="url(#hatch)"/>
+        <rect x="6" y="134" width="188" height="2.4" fill="#ff0000"/>
+        <rect x="6" y="164" width="188" height="2.4" fill="#ff0000"/>
+      </g>
+      <use xlink:href="#band" y="140"/>
+      <use xlink:href="#band" y="280"/>
+      <use xlink:href="#band" y="420"/>
+      <use xlink:href="#band" y="560"/>
+      <!-- A ruled panel in each of the plain compartments, tooled at the
+           corners, with the flower in its middle. -->
+      <g id="panel1">
+        <rect x="22" y="48" width="156" height="76" fill="none" stroke="#ff0000" stroke-width="2"/>
+        <use xlink:href="#corner" x="30" y="56" width="20" height="20" transform="translate(-10 -10)"/>
+        <use xlink:href="#corner" x="170" y="56" width="20" height="20" transform="translate(-10 -10) rotate(90 180 66)"/>
+        <use xlink:href="#corner" x="30" y="116" width="20" height="20" transform="translate(-10 -10) rotate(-90 40 126)"/>
+        <use xlink:href="#corner" x="170" y="116" width="20" height="20" transform="translate(-10 -10) rotate(180 180 126)"/>
+        <use xlink:href="#fleuron" x="70" y="56" width="60" height="60"/>
+      </g>
+      <use xlink:href="#panel1" y="554"/>
+      <g>
+        <rect x="22" y="748" width="156" height="200" fill="none" stroke="#ff0000" stroke-width="2"/>
+        <rect x="28" y="754" width="144" height="188" fill="none" stroke="#ff0000" stroke-width="1"/>
+        <use xlink:href="#fleuron" x="70" y="790" width="60" height="60"/>
+        <circle cx="100" cy="872" r="2.6" fill="#ff0000"/>
+        <circle cx="88" cy="872" r="1.8" fill="#ff0000"/>
+        <circle cx="112" cy="872" r="1.8" fill="#ff0000"/>
+      </g>
+      <!-- The title label (red) and the lettering-piece (black). -->
+      <rect x="13" y="174" width="174" height="108" rx="2" fill="#00ff00"/>
+      <rect x="18" y="179" width="164" height="98" fill="none" stroke="#ffff00" stroke-width="1.6"/>
+      <rect x="13" y="314" width="174" height="108" rx="2" fill="#0000ff"/>
+      <rect x="18" y="319" width="164" height="98" fill="none" stroke="#ff00ff" stroke-width="1.6"/>
+      <g font-family="Times New Roman" font-weight="bold" text-anchor="middle" fill="#ffff00">
+        <text x="100" y="212" font-size="23" letter-spacing="1.5">THE</text>
+        <text x="100" y="240" font-size="23" letter-spacing="1.2">NATIONAL</text>
+        <text x="100" y="267" font-size="20" letter-spacing="0.6">CYCLOPÆDIA</text>
+      </g>
+      <text x="100" y="485" font-family="Times New Roman" font-size="17" letter-spacing="3" text-anchor="middle" fill="#ff0000">VOL.</text>
+    </g>
+  </defs>
+
+  <rect width="1200" height="1000" fill="#000000"/>
+
+  <g font-family="Times New Roman" font-weight="bold" text-anchor="middle" fill="#ff00ff">
+    <g transform="translate(0 0)">
+      <use xlink:href="#spine"/>
+      <text x="100" y="356" font-size="25" letter-spacing="1.5">A</text>
+      <text x="100" y="377" font-size="17">TO</text>
+      <text x="100" y="405" font-size="22" letter-spacing="1">ANTWERP</text>
+      <text x="100" y="545" font-size="64" fill="#ff0000">I</text>
+    </g>
+    <g transform="translate(200 0)">
+      <use xlink:href="#spine"/>
+      <text x="100" y="356" font-size="22" letter-spacing="1">ANUBIS</text>
+      <text x="100" y="377" font-size="17">TO</text>
+      <text x="100" y="405" font-size="22" letter-spacing="1">BEDOUIN</text>
+      <text x="100" y="545" font-size="64" fill="#ff0000">II</text>
+    </g>
+    <g transform="translate(400 0)">
+      <use xlink:href="#spine"/>
+      <text x="100" y="356" font-size="22" letter-spacing="1">BEECH</text>
+      <text x="100" y="377" font-size="17">TO</text>
+      <text x="100" y="405" font-size="22" letter-spacing="1">BRAZIL</text>
+      <text x="100" y="545" font-size="64" fill="#ff0000">III</text>
+    </g>
+    <g transform="translate(600 0)">
+      <use xlink:href="#spine"/>
+      <text x="100" y="356" font-size="22" letter-spacing="1">BREAD</text>
+      <text x="100" y="377" font-size="17">TO</text>
+      <text x="100" y="405" font-size="22" letter-spacing="1">CHARIOT</text>
+      <text x="100" y="545" font-size="64" fill="#ff0000">IV</text>
+    </g>
+    <g transform="translate(800 0)">
+      <use xlink:href="#spine"/>
+      <text x="100" y="356" font-size="22" letter-spacing="1">SALT</text>
+      <text x="100" y="377" font-size="17">TO</text>
+      <text x="100" y="405" font-size="19" letter-spacing="0.4">TELEGRAPH</text>
+      <text x="100" y="545" font-size="56" fill="#ff0000">VIII</text>
+    </g>
+    <g transform="translate(1000 0)">
+      <use xlink:href="#spine"/>
+      <text x="100" y="356" font-size="19" letter-spacing="0.4">TELEPHONE</text>
+      <text x="100" y="377" font-size="17">TO</text>
+      <text x="100" y="405" font-size="22" letter-spacing="1">ZYMOTIC</text>
+      <text x="100" y="545" font-size="64" fill="#ff0000">IX</text>
+    </g>
+  </g>
+</svg>

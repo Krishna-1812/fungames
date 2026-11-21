@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="100" viewBox="0 0 880 100">
+  <rect width="880" height="100" fill="#000"/>
+  <g fill="#fff" font-family="Georgia, 'Times New Roman', serif" text-anchor="middle">
+    <text x="440" y="56" font-size="40" letter-spacing="7">HALLORAN &amp; SONS</text>
+    <text x="440" y="82" font-size="13" letter-spacing="9">LONDON · BY APPOINTMENT</text>
+  </g>
+  <g stroke="#fff" stroke-width="1.6" fill="none">
+    <path d="M246 76 h96 M538 76 h96"/>
+    <path d="M232 76 q7 -6 14 0 q-7 6 -14 0 M648 76 q-7 -6 -14 0 q7 6 14 0"/>
+  </g>
+</svg>

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 2048 2048">
+  <!-- The certificate card, rows 0-1408 (the card is 0.80 x 0.55). Red is
+       what was printed (a stationer's blank), green is what was written in
+       on it with a ballpoint, including the signature. -->
+  <rect width="2048" height="2048" fill="#000"/>
+  <g fill="none" stroke="#f00">
+    <rect x="70" y="70" width="1908" height="1268" stroke-width="14"/>
+    <rect x="100" y="100" width="1848" height="1208" stroke-width="4"/>
+  </g>
+  <g fill="#f00" font-family="Times New Roman, Georgia, serif" text-anchor="middle">
+    <text x="1024" y="250" font-size="118" letter-spacing="10" font-weight="bold">CERTIFICATE</text>
+    <text x="1024" y="330" font-size="56" letter-spacing="16">OF AUTHENTICITY</text>
+    <rect x="824" y="370" width="400" height="5"/>
+  </g>
+  <g fill="#f00" font-family="Times New Roman, Georgia, serif" font-size="54" font-weight="bold">
+    <text x="190" y="520">Item</text>
+    <text x="190" y="660">Description</text>
+    <text x="190" y="800">Origin</text>
+    <text x="190" y="1110">Authenticated by</text>
+    <rect x="460" y="532" width="1400" height="3"/>
+    <rect x="520" y="672" width="1340" height="3"/>
+    <rect x="390" y="812" width="1470" height="3"/>
+    <rect x="390" y="952" width="1470" height="3"/>
+    <rect x="590" y="1122" width="1270" height="3"/>
+  </g>
+  <g fill="#0f0" stroke="#0f0" stroke-width="2.5" font-family="Segoe Print, Ink Free, cursive">
+    <text x="480" y="512" font-size="78" transform="rotate(-1 480 512)">METEORITE (Genuine)</text>
+    <text x="540" y="652" font-size="66" transform="rotate(-0.8 540 652)">Iron, from space. Very rare.</text>
+    <text x="410" y="790" font-size="66" transform="rotate(-1.2 410 790)">Outer Space, landed in field</text>
+    <text x="410" y="930" font-size="66" transform="rotate(-0.6 410 930)">behind the garage, approx 1987</text>
+    <text x="1500" y="1250" font-size="58" transform="rotate(-2 1500 1250)">100% CERTAIN</text>
+  </g>
+  <!-- The signature: far too large for the line it was given. -->
+  <g fill="#0f0" stroke="#0f0">
+    <text x="600" y="1150" font-family="Mistral, Freestyle Script, cursive" font-size="210" stroke="none" transform="rotate(-6 600 1150)">Dr. R. Fenwick-Hale</text>
+    <path d="M 610 1190 C 900 1150, 1300 1120, 1640 1070 C 1720 1058, 1700 1120, 1560 1140 C 1300 1180, 900 1230, 640 1236" fill="none" stroke-width="9"/>
+    <path d="M 1490 1290 C 1560 1284, 1700 1274, 1830 1262" fill="none" stroke-width="6"/>
+  </g>
+</svg>

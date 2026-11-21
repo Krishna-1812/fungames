@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <!-- The maker's label, pasted in the silk of the lid. Transparent round it:
+       the alpha is the paper. Laid out 1000 x 560 in the middle. -->
+  <defs>
+    <filter id="rough" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.75" result="m"/>
+      <feComposite in="SourceGraphic" in2="m" operator="in"/>
+    </filter>
+  </defs>
+  <rect x="58" y="226" width="884" height="548" rx="10" fill="#e9e5da"/>
+  <g filter="url(#rough)" fill="#26282c" stroke="none" font-family="Times New Roman, Times, serif" text-anchor="middle">
+    <rect x="86" y="254" width="828" height="492" fill="none" stroke="#26282c" stroke-width="7"/>
+    <rect x="102" y="270" width="796" height="460" fill="none" stroke="#26282c" stroke-width="2.4"/>
+    <text x="500" y="350" font-size="40" letter-spacing="9" font-style="italic">Artificial Teeth</text>
+    <text x="500" y="438" font-size="60" letter-spacing="5" font-weight="bold">T. W. ASHBEE &amp; SON</text>
+    <path d="M330 470 H460 M540 470 H670" stroke="#26282c" stroke-width="3"/>
+    <circle cx="500" cy="470" r="7"/>
+    <text x="500" y="535" font-size="42" letter-spacing="7">SURGEON-DENTISTS</text>
+    <text x="500" y="590" font-size="27" letter-spacing="3" font-style="italic">Mechanical Dentistry in all its Branches</text>
+    <text x="500" y="668" font-size="33" letter-spacing="5">41, WIMPOLE STREET, LONDON, W.</text>
+    <text x="500" y="712" font-size="22" letter-spacing="4">No. 2186</text>
+  </g>
+</svg>

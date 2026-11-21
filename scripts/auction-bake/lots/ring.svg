@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 2048 2048">
+  <!-- Ink, white on black. Rows 0-1100: the inside of the note's lower half,
+       the fold at the top edge, written in a hurry with a fountain pen.
+       Rows 1150-1550: the jeweller's stamp in the lid's lining. -->
+  <rect width="2048" height="2048" fill="#000"/>
+  <g fill="#fff" font-family="Bradley Hand ITC, Segoe Script, cursive" font-size="104">
+    <text x="150" y="150" transform="rotate(-1.2 150 150)">than I could ever say, and I kept it</text>
+    <text x="120" y="290" transform="rotate(-0.6 120 290)">in the drawer for longer than I should</text>
+    <text x="140" y="430" transform="rotate(-1.5 140 430)">have. It was always meant to be worn.</text>
+    <text x="130" y="570" transform="rotate(-0.8 130 570)">Please do not try to find me, or him.</text>
+    <text x="160" y="710" transform="rotate(-1.8 160 710)">I hope whoever has it now is kinder</text>
+    <text x="140" y="850" transform="rotate(-1.0 140 850)">with it than we were with each other.</text>
+    <text x="1180" y="1010" transform="rotate(-3 1180 1010)" font-size="120">M.</text>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Times New Roman, Georgia, serif">
+    <ellipse cx="1024" cy="1350" rx="280" ry="170" fill="none" stroke="#fff" stroke-width="10"/>
+    <ellipse cx="1024" cy="1350" rx="262" ry="152" fill="none" stroke="#fff" stroke-width="4"/>
+    <text x="1024" y="1312" font-size="44" letter-spacing="4">J. HOLLOWAY &amp; SON</text>
+    <text x="1024" y="1376" font-size="40" letter-spacing="10">GOLDSMITHS</text>
+    <text x="1024" y="1432" font-size="44" letter-spacing="14">LONDON</text>
+  </g>
+</svg>

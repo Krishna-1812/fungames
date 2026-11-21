@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <!-- The service's underglaze-blue transfer print, as one mask (white is
+       cobalt). Top half (y 0..500): the band wrapped round the hollow wares,
+       rim at the top, foot at the bottom; it repeats left to right. Bottom
+       left (x 0..500, y 500..1000): the flatware design, centred on
+       (250, 750), rim at radius 246. Engraved-and-transferred work is lines
+       and hatching, not flat colour, so the fills here are hatched. -->
+  <defs>
+    <pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <rect x="0" y="0" width="1.9" height="5" fill="#ffffff"/>
+    </pattern>
+    <pattern id="hatch2" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
+      <rect x="0" y="0" width="1.5" height="4" fill="#ffffff"/>
+    </pattern>
+    <pattern id="ohatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <rect x="0" y="0" width="5" height="5" fill="#000000"/>
+      <rect x="0" y="0" width="1.9" height="5" fill="#ffffff"/>
+    </pattern>
+    <pattern id="ohatch2" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
+      <rect x="0" y="0" width="4" height="4" fill="#000000"/>
+      <rect x="0" y="0" width="1.4" height="4" fill="#ffffff"/>
+    </pattern>
+    <pattern id="stipple" width="6" height="6" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.1" fill="#ffffff"/>
+      <circle cx="4.5" cy="4.5" r="1.1" fill="#ffffff"/>
+    </pattern>
+    <pattern id="diaper" width="14" height="14" patternUnits="userSpaceOnUse">
+      <path d="M0 0 L14 14 M14 0 L0 14" stroke="#ffffff" stroke-width="1.6"/>
+      <circle cx="7" cy="1.2" r="1.5" fill="#ffffff"/>
+      <circle cx="7" cy="12.8" r="1.5" fill="#ffffff"/>
+    </pattern>
+
+    <!-- A leaf: hatched, outlined, with a midrib. Points along +x, 46 long. -->
+    <g id="leaf">
+      <path d="M0 0 C 10 -11, 32 -12, 46 0 C 32 11, 10 11, 0 0 Z" fill="url(#ohatch)" stroke="#ffffff" stroke-width="2.4"/>
+      <path d="M1 0 C 16 -2, 30 -1, 44 0" fill="none" stroke="#ffffff" stroke-width="1.6"/>
+    </g>
+    <!-- A full-blown rose: two rings of petals, a stippled heart. -->
+    <g id="rose">
+      <!-- outer petals, each a cupped shape shaded at its base -->
+      <path id="petal" d="M0 -6 C -16 -10, -22 -30, -10 -40 C -4 -44, 4 -44, 10 -40 C 22 -30, 16 -10, 0 -6 Z" fill="#000000" stroke="#ffffff" stroke-width="2.4"/>
+      <path id="pshade" d="M0 -6 C -12 -9, -16 -20, -12 -28 C -4 -24, 4 -24, 12 -28 C 16 -20, 12 -9, 0 -6 Z" fill="url(#hatch2)"/>
+      <use xlink:href="#petal" transform="rotate(72)"/><use xlink:href="#pshade" transform="rotate(72)"/>
+      <use xlink:href="#petal" transform="rotate(144)"/><use xlink:href="#pshade" transform="rotate(144)"/>
+      <use xlink:href="#petal" transform="rotate(216)"/><use xlink:href="#pshade" transform="rotate(216)"/>
+      <use xlink:href="#petal" transform="rotate(288)"/><use xlink:href="#pshade" transform="rotate(288)"/>
+      <use xlink:href="#pshade"/>
+      <!-- the cupped heart: three petals folded over each other -->
+      <path d="M-18 2 C -20 -14, -8 -22, 2 -20 C 10 -18, 16 -10, 14 -2 C 6 -8, -8 -6, -18 2 Z" fill="url(#ohatch2)" stroke="#ffffff" stroke-width="2.2"/>
+      <path d="M-16 4 C -8 -4, 8 -6, 16 0 C 14 10, 4 16, -4 14 C -12 12, -16 8, -16 4 Z" fill="#000000" stroke="#ffffff" stroke-width="2.2"/>
+      <path d="M-10 6 C -4 2, 6 2, 10 6" fill="none" stroke="#ffffff" stroke-width="1.6"/>
+      <path d="M-8 10 C -2 7, 4 7, 8 10" fill="none" stroke="#ffffff" stroke-width="1.4"/>
+      <circle cx="0" cy="-9" r="4.5" fill="url(#stipple)" stroke="#ffffff" stroke-width="1.6"/>
+    </g>
+    <!-- A small five-petalled flower. -->
+    <g id="floret">
+      <g fill="#ffffff">
+        <circle cx="0" cy="-6" r="4.2"/><circle cx="5.7" cy="-1.9" r="4.2"/><circle cx="3.5" cy="4.9" r="4.2"/>
+        <circle cx="-3.5" cy="4.9" r="4.2"/><circle cx="-5.7" cy="-1.9" r="4.2"/>
+      </g>
+      <circle r="2.4" fill="#000000"/>
+    </g>
+    <!-- A bud on its stalk. -->
+    <g id="bud">
+      <path d="M0 0 C 2 -10, 4 -16, 2 -24" fill="none" stroke="#ffffff" stroke-width="2.4"/>
+      <path d="M2 -24 C -8 -30, -6 -44, 2 -50 C 10 -44, 12 -30, 2 -24 Z" fill="url(#hatch2)" stroke="#ffffff" stroke-width="2.2"/>
+      <path d="M2 -24 C -6 -26, -9 -32, -8 -36 M2 -24 C 10 -26, 13 -32, 12 -36" fill="none" stroke="#ffffff" stroke-width="1.8"/>
+    </g>
+    <!-- A spray: a rose, a bud, leaves and florets on a curving stem. -->
+    <g id="spray">
+      <path d="M10 170 C 40 140, 70 120, 96 92" fill="none" stroke="#ffffff" stroke-width="3.6"/>
+      <path d="M52 132 C 34 116, 26 96, 30 70" fill="none" stroke="#ffffff" stroke-width="2.6"/>
+      <path d="M70 116 C 96 118, 126 128, 150 150" fill="none" stroke="#ffffff" stroke-width="2.6"/>
+      <use xlink:href="#leaf" transform="translate(40 146) rotate(-160)"/>
+      <use xlink:href="#leaf" transform="translate(58 128) rotate(-120) scale(0.9)"/>
+      <use xlink:href="#leaf" transform="translate(88 122) rotate(20) scale(0.85)"/>
+      <use xlink:href="#leaf" transform="translate(120 132) rotate(55) scale(0.8)"/>
+      <use xlink:href="#leaf" transform="translate(36 100) rotate(-80) scale(0.75)"/>
+      <use xlink:href="#rose" transform="translate(104 80) scale(1.25)"/>
+      <use xlink:href="#bud" transform="translate(30 72) rotate(-15)"/>
+      <use xlink:href="#floret" transform="translate(150 150)"/>
+      <use xlink:href="#floret" transform="translate(140 166) scale(0.8)"/>
+      <use xlink:href="#floret" transform="translate(162 136) scale(0.7)"/>
+      <circle cx="148" cy="122" r="2.2" fill="#ffffff"/><circle cx="156" cy="128" r="1.8" fill="#ffffff"/>
+      <circle cx="18" cy="60" r="2" fill="#ffffff"/><circle cx="12" cy="70" r="1.6" fill="#ffffff"/>
+    </g>
+    <!-- A sprig: two leaves, a floret and a bud. -->
+    <g id="sprig">
+      <path d="M0 60 C 10 40, 24 26, 40 14" fill="none" stroke="#ffffff" stroke-width="2.6"/>
+      <use xlink:href="#leaf" transform="translate(12 40) rotate(-150) scale(0.7)"/>
+      <use xlink:href="#leaf" transform="translate(24 28) rotate(-20) scale(0.65)"/>
+      <use xlink:href="#floret" transform="translate(42 12) scale(1.2)"/>
+      <use xlink:href="#bud" transform="translate(8 50) rotate(-50) scale(0.6)"/>
+    </g>
+    <!-- The border: a fillet, a diaper band, a fillet, a row of scallops with
+         a dot hung in each. 100 wide, repeated. -->
+    <g id="borderUnit">
+      <path d="M0 50 A 12.5 12.5 0 0 0 25 50 A 12.5 12.5 0 0 0 50 50 A 12.5 12.5 0 0 0 75 50 A 12.5 12.5 0 0 0 100 50" fill="none" stroke="#ffffff" stroke-width="2.6"/>
+      <circle cx="12.5" cy="56" r="3" fill="#ffffff"/><circle cx="37.5" cy="56" r="3" fill="#ffffff"/>
+      <circle cx="62.5" cy="56" r="3" fill="#ffffff"/><circle cx="87.5" cy="56" r="3" fill="#ffffff"/>
+      <path d="M0 50 L 0 64 M25 50 L 25 68 M50 50 L 50 64 M75 50 L 75 68 M100 50 L 100 64" stroke="#ffffff" stroke-width="1.6"/>
+    </g>
+  </defs>
+
+  <rect width="1000" height="1000" fill="#000000"/>
+
+  <!-- ===== The band for the hollow wares ===== -->
+  <rect x="0" y="6" width="1000" height="5" fill="#ffffff"/>
+  <rect x="0" y="16" width="1000" height="26" fill="url(#diaper)"/>
+  <rect x="0" y="44" width="1000" height="3.5" fill="#ffffff"/>
+  <use xlink:href="#borderUnit" x="0" y="-2"/>
+  <use xlink:href="#borderUnit" x="100" y="-2"/>
+  <use xlink:href="#borderUnit" x="200" y="-2"/>
+  <use xlink:href="#borderUnit" x="300" y="-2"/>
+  <use xlink:href="#borderUnit" x="400" y="-2"/>
+  <use xlink:href="#borderUnit" x="500" y="-2"/>
+  <use xlink:href="#borderUnit" x="600" y="-2"/>
+  <use xlink:href="#borderUnit" x="700" y="-2"/>
+  <use xlink:href="#borderUnit" x="800" y="-2"/>
+  <use xlink:href="#borderUnit" x="900" y="-2"/>
+  <!-- Two sprays and two sprigs, a half-turn each. -->
+  <use xlink:href="#spray" transform="translate(40 130) scale(1.55)"/>
+  <use xlink:href="#sprig" transform="translate(330 190) scale(1.5)"/>
+  <use xlink:href="#spray" transform="translate(560 120) scale(1.55) translate(180 0) scale(-1 1)"/>
+  <use xlink:href="#sprig" transform="translate(860 210) scale(1.35)"/>
+  <use xlink:href="#floret" transform="translate(300 380) scale(1.1)"/>
+  <use xlink:href="#floret" transform="translate(820 400) scale(1.1)"/>
+  <use xlink:href="#floret" transform="translate(470 110) scale(0.9)"/>
+  <use xlink:href="#floret" transform="translate(975 120) scale(0.9)"/>
+  <!-- A narrow band at the foot. -->
+  <rect x="0" y="462" width="1000" height="3.5" fill="#ffffff"/>
+  <rect x="0" y="472" width="1000" height="9" fill="url(#hatch)"/>
+  <rect x="0" y="486" width="1000" height="2.5" fill="#ffffff"/>
+
+  <!-- ===== The flatware: rim border, a ring at the well, a bouquet ===== -->
+  <g transform="translate(250 750)">
+    <circle r="243" fill="none" stroke="#ffffff" stroke-width="4"/>
+    <path d="M0 -238 A 238 238 0 1 0 0.01 -238 Z M0 -214 A 214 214 0 1 1 -0.01 -214 Z" fill="url(#diaper)" fill-rule="evenodd"/>
+    <circle r="212" fill="none" stroke="#ffffff" stroke-width="3"/>
+    <!-- scallops hung inwards from the border, twenty-four of them -->
+    <g transform="rotate(0)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(15)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(30)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(45)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(60)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(75)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(90)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(105)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(120)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(135)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(150)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(165)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(180)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(195)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(210)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(225)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(240)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(255)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(270)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(285)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(300)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(315)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(330)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <g transform="rotate(345)"><path d="M-27.8 -211 A 28 28 0 0 0 27.8 -211" fill="none" stroke="#ffffff" stroke-width="2.4"/><circle cx="0" cy="-198" r="3.2" fill="#ffffff"/></g>
+    <!-- three sprigs scattered in the cavetto -->
+    <use xlink:href="#sprig" transform="rotate(20) translate(-20 -185) scale(0.9)"/>
+    <use xlink:href="#sprig" transform="rotate(140) translate(-20 -185) scale(0.9)"/>
+    <use xlink:href="#sprig" transform="rotate(260) translate(-20 -185) scale(0.9)"/>
+    <!-- the well: a fine double ring, and the bouquet in the middle -->
+    <circle r="132" fill="none" stroke="#ffffff" stroke-width="2.6"/>
+    <circle r="125" fill="none" stroke="#ffffff" stroke-width="1.4"/>
+    <use xlink:href="#spray" transform="translate(-98 -95) scale(1.05)"/>
+    <use xlink:href="#sprig" transform="translate(10 20) rotate(30) scale(1.1)"/>
+    <use xlink:href="#floret" transform="translate(-70 70) scale(1.2)"/>
+    <use xlink:href="#floret" transform="translate(70 -70) scale(1.0)"/>
+  </g>
+
+  <!-- ===== Spare: the bouquet alone, for the bottom of a cup ===== -->
+  <g transform="translate(750 750)">
+    <circle r="120" fill="none" stroke="#ffffff" stroke-width="3"/>
+    <use xlink:href="#spray" transform="translate(-98 -95) scale(1.05)"/>
+    <use xlink:href="#floret" transform="translate(60 60) scale(1.2)"/>
+  </g>
+</svg>

@@ -72,7 +72,11 @@ vec3 camR, camU, camF;
 vec3 toWorld(vec3 c) { return normalize(c.x * camR + c.y * camU - c.z * camF); }
 vec3 toCam(vec3 w) { return vec3(dot(w, camR), dot(w, camU), -dot(w, camF)); }
 
-float map1(vec3 p) { return map(p).x; }
+/* Nothing is nearer than the lot's own box (with room to spare), whatever a
+   model's distance says: a model that underestimates far away would
+   otherwise shadow the whole sweep, and every ray would crawl. */
+float boxDist(vec3 p) { return sdBox(p - CENTRE, BOUND * 1.08 + 0.02 * SC); }
+float map1(vec3 p) { return max(map(p).x, boxDist(p)); }
 
 vec3 normalAt(vec3 p) {
   vec2 e = vec2(1.0, -1.0) * 0.00025 * SC;
@@ -195,6 +199,7 @@ void main() {
   t = max(0.0, D - 2.0 * length(BOUND));
   for (int i = 0; i < 480; i++) {
     h = map(ro + rd * t);
+    h.x = max(h.x, boxDist(ro + rd * t));
     if (h.x < 0.00012 * SC * (1.0 + t / D)) { hit = true; break; }
     t += h.x * STEP;
     if (t > tmax) break;
@@ -216,7 +221,10 @@ void main() {
       float sr = shadow(p + vec3(0.0, 0.001 * SC, 0.0), rim);
       float ao = occlusion(p, vec3(0.0, 1.0, 0.0), SC * 0.9);
       float lit = (0.56 * sk + 0.12 * sr + 0.32) * mix(0.25, 1.0, ao);
-      bg *= lit;
+      // Shadows let go towards the frame, so the picture's edge is always
+      // exactly the stage's colour.
+      float rimEdge = max(abs(uv.x), abs(uv.y));
+      bg *= mix(lit, 1.0, smoothstep(0.8, 0.98, rimEdge));
     }
     o = vec4(unSrgb(bg), 1.0);
     return;
