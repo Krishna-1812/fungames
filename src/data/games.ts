@@ -167,7 +167,7 @@ export const GAMES: Game[] = [
     title: 'Dark Patterns',
     blurb: 'Eleven tricks, live, done to you',
     description:
-      'Eleven manipulative UI patterns — sneaking items into your basket, a countdown that never runs out, a cancellation flow built to exhaust you — reproduced as working fake websites so you feel each one rather than just read about it. Every trick is named the way researchers actually catalogue it.',
+      'Eleven manipulative design tricks, each built into a working fake website you use in a browser window — a shop whose bag fills itself, a countdown that never runs out, a cancellation flow built to exhaust you, a download page fenced in by adverts dressed as buttons. Every site looks like the real kind of site, down to the photographed products, so you feel each trick rather than read about it, and every one is named the way the researchers who catalogue them name it.',
     accent: '#1a1206', accent2: '#ffb020',
     category: 'you',
     added: '2026-09-22',

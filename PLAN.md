@@ -2690,6 +2690,11 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     last G5 storm, 868 days before). The info panels are the shell's own
     paper dialogs.
 
+    **Dark Patterns** (later): eleven sites each built like the real kind
+    of site, in one browser window with a tab, an address bar and a load
+    bar; the shops' products modelled and photographed in a white packshot
+    studio. Every mount and citation kept. See the README.
+
     **The Auction Game** (later): every lot a 3D model photographed in a
     catalogue studio, offline; the page a dark saleroom with a currency
     board at the day's ECB rates, paddles for the room, a telephone and an

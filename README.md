@@ -1326,6 +1326,28 @@ CAPTCHAs infuriating. The street is baked to a JPEG at build time by
 nine copies of a drawing, and because the artefacts of lossy compression are
 themselves part of what a real tile looks like.
 
+**Dark Patterns**, the websites — the eleven fake sites were one paper card
+with the colour swapped: a brand bar, a heading and two buttons. A trick only
+works on you when the place it lives in looks real, so every site is now
+built the way that kind of site is built, in its own type, colour and voice:
+a homeware shop whose bag slides in from the right with two extras already
+ticked, a coffee blog with an article to read and a newsletter modal over it,
+a streaming service's dark account page and its retention screens, a deals
+page whose hours-minutes-seconds clock reaches zero and starts again, a
+download portal fenced in by adverts dressed as buttons, a ticket site whose
+fees hide behind "incl. fees", a software checkout, a settings screen, a
+social network's welcome wizard, a fashion store's product page with its
+sales pop-ups, a newspaper whose notification prompt keeps coming back. They
+open in one browser window — a tab with the site's favicon and title, an
+address bar whose path follows you deeper into a site, a load bar — and the
+pages scroll, with modals, drawers and pop-ups over the page, not in it. The
+products in the shops are photographed, not drawn: five models in
+`scripts/shop-bake/` shot in the Auction studio's new white packshot room
+(`node scripts/bake-auction.mjs --set shop`). *`check-dark-patterns.mjs` now
+also holds every site to a tab, every product to a model and two photographs
+whose corners are the shop tile's colour, and the pretend card to being
+read-only.*
+
 **The Auction Game**, the saleroom — the lots were flat drawings in a white
 card and the rivals were cartoon faces. A saleroom sells from photographs,
 so every lot is now photographed the way a catalogue is shot: each of the
