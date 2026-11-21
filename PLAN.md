@@ -2690,6 +2690,11 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     last G5 storm, 868 days before). The info panels are the shell's own
     paper dialogs.
 
+    **I'm Not a Robot** (later): the street and the hands photographed
+    (rendered offline, scripts/bake-robot.mjs), the traffic light's squares
+    measured from a mask render of the same scene, and the box placed in a
+    real checkout page that dims only when the challenge opens. See the README.
+
     **Dark Patterns** (later): eleven sites each built like the real kind
     of site, in one browser window with a tab, an address bar and a load
     bar; the shops' products modelled and photographed in a white packshot

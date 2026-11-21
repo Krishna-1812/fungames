@@ -1314,17 +1314,24 @@ keystroke rhythm, hand drift while holding still, and the isoperimetric quotient
 of a freehand circle. The report card reads your own numbers back. *The
 thresholds are invented for the joke and the page says so; the maths is checked
 by `scripts/check-telemetry.mjs` against a ruler-straight path, a unit zigzag, a
-square and a 64-gon, all with answers worked out by hand.* The street is a
-drawing, and which of its squares hold the traffic light is derived from where
-the light is rather than written down beside it: `scripts/check-robot-scene.mjs`
-renders the scene with the light and without it, and checks that the squares
-whose pixels moved are the squares the arithmetic named. There are two keys,
-because the signal head is a fact and the pole under it is a judgement, and
-grading a judgement as though it were a fact is the single thing that makes real
-CAPTCHAs infuriating. The street is baked to a JPEG at build time by
-`pages/street.jpg.ts`, because the tiles are crops of one picture rather than
-nine copies of a drawing, and because the artefacts of lossy compression are
-themselves part of what a real tile looks like.
+square and a 64-gon, all with answers worked out by hand.* The street is a photograph, rendered: a road between sidewalks, a zebra
+crossing, a mast-arm signal with its red lit, blocks of flats down both
+sides, parked cars, trees and a lamp, under an afternoon sun that throws the
+left-hand blocks' shadow across the road (`scripts/robot-bake/street.glsl`,
+baked by `node scripts/bake-robot.mjs` to a 900px JPEG, because a real
+challenge's tiles are JPEG crops of one picture). Which squares hold the
+traffic light is measured from that picture rather than written down beside
+it: the same scene is rendered again as a mask of the signal head and of the
+arm holding it up, and the share of each square each one covers is written
+to `src/data/robot-street-key.ts`. There are two keys, because the signal
+head is a fact and the arm is a judgement, and grading a judgement as though
+it were a fact is the single thing that makes real CAPTCHAs infuriating; the
+checker insists no square has the head only grazing it. The four hands are
+one model photographed four times in the Auction studio's white room, three
+times with the wrong number of fingers or thumbs. And the box sits where the
+real one does, in a form: the ticket site from Dark Patterns, half way
+through buying two tickets, which greys out behind the challenge only once
+you tick it.
 
 **Dark Patterns**, the websites — the eleven fake sites were one paper card
 with the colour swapped: a brand bar, a heading and two buttons. A trick only
