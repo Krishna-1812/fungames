@@ -15,6 +15,10 @@
  *   --size 750 --ss 2                               a quick draft
  *
  * A name starting zz- is a scratch model (a test view) and needs no lot.
+ *
+ * --set shop shoots Dark Patterns' products instead: the models in
+ * scripts/shop-bake/, in the studio's white packshot room (WHITE_CYC),
+ * square, to public/dark-patterns/<id>.webp (1200) and -s.webp (600).
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -33,17 +37,18 @@ const argv = process.argv.slice(2)
 const flag = (n) => argv.includes(n)
 const opt = (n) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : null)
 const outDir = opt('--out')
-const W = Number(opt('--size')) || 1500
-const H = Math.round(W * 2 / 3)
+const SHOP = opt('--set') === 'shop'
+const W = Number(opt('--size')) || (SHOP ? 1200 : 1500)
+const H = SHOP ? W : Math.round(W * 2 / 3)
 const SS = Number(opt('--ss')) || 4
 
-const lotDir = path.join(here, 'auction-bake', 'lots')
+const lotDir = SHOP ? path.join(here, 'shop-bake') : path.join(here, 'auction-bake', 'lots')
 const have = fs.readdirSync(lotDir).filter((f) => f.endsWith('.glsl')).map((f) => f.slice(0, -5))
-const names = flag('--all') ? have.filter((n) => !n.startsWith('zz-')) : argv.filter((a, i) => !a.startsWith('--') && !['--out', '--size', '--ss'].includes(argv[i - 1]))
+const names = flag('--all') ? have.filter((n) => !n.startsWith('zz-')) : argv.filter((a, i) => !a.startsWith('--') && !['--out', '--size', '--ss', '--set'].includes(argv[i - 1]))
 if (!names.length) { console.log('nothing to bake: name a lot or pass --all'); process.exit(1) }
 for (const n of names) {
   if (!have.includes(n)) { console.log(`no model ${n}.glsl`); process.exit(1) }
-  if (!n.startsWith('zz-') && !CATALOGUE.some((l) => l.id === n)) { console.log(`${n}.glsl is not a lot in data/lots.ts`); process.exit(1) }
+  if (!SHOP && !n.startsWith('zz-') && !CATALOGUE.some((l) => l.id === n)) { console.log(`${n}.glsl is not a lot in data/lots.ts`); process.exit(1) }
 }
 
 /* ---- a browser ---------------------------------------------------------- */
@@ -150,7 +155,7 @@ await ev(DARKROOM)
 
 const common = fs.readFileSync(path.join(here, 'scale-bake', 'common.glsl'), 'utf8')
 const studio = fs.readFileSync(path.join(here, 'auction-bake', 'studio.glsl'), 'utf8')
-const dest = outDir ?? path.join(root, 'public', 'auction')
+const dest = outDir ?? path.join(root, 'public', SHOP ? 'dark-patterns' : 'auction')
 fs.mkdirSync(dest, { recursive: true })
 
 let failed = 0
@@ -162,7 +167,7 @@ for (const id of names) {
   const texBuf = fs.existsSync(svg) ? await sharp(svg, { density: 300 }).resize(2048, 2048, { fit: 'fill' }).png().toBuffer()
     : fs.existsSync(pngTex) ? fs.readFileSync(pngTex) : null
   const texUrl = texBuf ? 'data:image/png;base64,' + texBuf.toString('base64') : null
-  const frag = common + '\n' + model + '\n' + studio
+  const frag = common + '\n' + (SHOP ? '#define WHITE_CYC\n' : '') + model + '\n' + studio
   const t0 = Date.now()
   try {
     const b64 = await ev(`bake(${JSON.stringify(frag)}, ${W}, ${H}, [1, 1], ${SS}, ${JSON.stringify(texUrl)})`)

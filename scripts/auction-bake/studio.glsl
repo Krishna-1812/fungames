@@ -22,6 +22,10 @@
  * right and climbs), FILL (how much of the frame the lot's box fills), STEP,
  * EXPOSURE, COAT(id) (0..1 of a varnish or lacquer over the material),
  * GEM (the id of a cut stone) and SHEEN(id) (0..1 of a velvet or fur edge).
+ *
+ * With WHITE_CYC defined first it is a shop's packshot studio instead: a
+ * white room, a pale sweep falling to the product tile's #f1f1ef, and the
+ * light, open floor shadow a web shop's photographs have (Dark Patterns).
  */
 
 #ifndef VIEW_YAW
@@ -59,8 +63,15 @@
 
 /* The sweep, in display colour: the pool of light behind the lot and the
    colour it falls to, which is the rostrum's own (#151b22). */
+#ifdef WHITE_CYC
+const vec3 EDGE = vec3(0.9451, 0.9451, 0.9373);
+const vec3 POOL = vec3(0.992, 0.992, 0.988);
+const vec3 ROOM_LO = vec3(0.30, 0.30, 0.31), ROOM_HI = vec3(0.62, 0.63, 0.64), AMB_TOP = vec3(0.42, 0.43, 0.44);
+#else
 const vec3 EDGE = vec3(0.0823, 0.1059, 0.1333);
 const vec3 POOL = vec3(0.415, 0.462, 0.522);
+const vec3 ROOM_LO = vec3(0.010, 0.013, 0.017), ROOM_HI = vec3(0.06, 0.07, 0.085), AMB_TOP = vec3(0.16, 0.18, 0.21);
+#endif
 
 /* Lights in the camera's frame (x right, y up, z towards the camera), so a
    turned view keeps the same lighting. */
@@ -106,7 +117,7 @@ float occlusion(vec3 p, vec3 n, float reach) {
 
 /* The studio as reflections see it, in the camera's frame. */
 vec3 env(vec3 d) {
-  vec3 c = mix(vec3(0.010, 0.013, 0.017), vec3(0.06, 0.07, 0.085), smoothstep(-0.4, 0.8, d.y));
+  vec3 c = mix(ROOM_LO, ROOM_HI, smoothstep(-0.4, 0.8, d.y));
   // The sweep below and behind: the lit pool.
   c += pow(POOL, vec3(2.2)) * 0.5 * smoothstep(0.1, -0.5, d.y);
   // The softbox: a big rectangle, bright and slightly cool-white.
@@ -220,7 +231,11 @@ void main() {
       float sk = shadow(p + vec3(0.0, 0.001 * SC, 0.0), key);
       float sr = shadow(p + vec3(0.0, 0.001 * SC, 0.0), rim);
       float ao = occlusion(p, vec3(0.0, 1.0, 0.0), SC * 0.9);
+#ifdef WHITE_CYC
+      float lit = (0.26 * sk + 0.06 * sr + 0.68) * mix(0.5, 1.0, ao);
+#else
       float lit = (0.56 * sk + 0.12 * sr + 0.32) * mix(0.25, 1.0, ao);
+#endif
       // Shadows let go towards the frame, so the picture's edge is always
       // exactly the stage's colour.
       float rimEdge = max(abs(uv.x), abs(uv.y));
@@ -262,7 +277,7 @@ void main() {
   // The sweep lights everything gently from below and behind; the dark room
   // from everywhere else.
   float up = n.y * 0.5 + 0.5;
-  vec3 amb = mix(pow(POOL, vec3(2.2)) * 0.55, vec3(0.16, 0.18, 0.21), up);
+  vec3 amb = mix(pow(POOL, vec3(2.2)) * 0.55, AMB_TOP, up);
   col += m.alb * (1.0 - m.metal) * amb * ao;
 
   // The studio in the surface.
