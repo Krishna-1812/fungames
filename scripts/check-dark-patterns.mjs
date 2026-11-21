@@ -16,10 +16,17 @@
  *   5. The game is wired into the registry: games.ts has the slug, tile-art.ts
  *      has a drawing for it.
  *   6. No emoji anywhere in the three files this game owns.
+ *   7. The browser and the shops: every site has a tab (a title, a favicon,
+ *      a path); every product the page shows has a model in
+ *      scripts/shop-bake/ and two square photographs whose corners are the
+ *      product tile's #f1f1ef; the overlay layer never paints its site's
+ *      page colour over the page; no card field can be typed into.
  *
  *   node scripts/check-dark-patterns.mjs
  */
 import fs from 'node:fs'
+import sharp from 'sharp'
+import { fileURLToPath } from 'node:url'
 
 const { PATTERNS } = await import('../src/lib/dark-patterns.ts')
 const { GAMES } = await import('../src/data/games.ts')
@@ -130,6 +137,35 @@ console.log('\nno emoji')
     const text = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8').replace(/[✓✗]/g, '')
     check(!EMOJI.test(text), `${f} has no emoji`)
   }
+}
+
+/* ---- 7. the browser and the shops ------------------------------------------ */
+console.log('\nthe browser and the shops')
+{
+  const tabs = PAGE.match(/const TABS[^=]*=\s*\{([\s\S]*?)\n  \}/)?.[1] ?? ''
+  const tabRe = (id) => new RegExp(`\\n\\s{4}${id}: \\{ title: '[^']+', fav: \\['#[0-9a-f]{6}', '#[0-9a-f]{6}', '.'\\], path: '/[^']*' \\}`)
+  const missing = PATTERNS.filter((p) => !tabRe(p.id).test(tabs))
+  check(!missing.length, `every site has a tab: a title, a favicon and a path${missing.length ? ' — not ' + missing.map((p) => p.id).join(', ') : ''}`)
+  const used = [...new Set([...PAGE.matchAll(/(?:api\.img\(|\bimg: )'([a-z]+)'/g)].map((m) => m[1]))]
+  const models = fs.readdirSync(new URL('./shop-bake/', import.meta.url)).filter((x) => x.endsWith('.glsl')).map((x) => x.slice(0, -5))
+  check(used.length >= 5 && used.every((u) => models.includes(u)) && models.every((m) => used.includes(m)), `every product shown has a model, and every model is shown (${used.join(', ')})`)
+  const bad = []
+  for (const id of models) for (const [suf, w] of [['', 1200], ['-s', 600]]) {
+    const file = new URL(`../public/dark-patterns/${id}${suf}.webp`, import.meta.url)
+    if (!fs.existsSync(file)) { bad.push(`${id}${suf} missing`); continue }
+    const { data, info } = await sharp(fileURLToPath(file)).raw().toBuffer({ resolveWithObject: true })
+    if (info.width !== w || info.height !== w) bad.push(`${id}${suf} is ${info.width}x${info.height}`)
+    for (const [x, y] of [[2, 2], [w - 3, 2], [2, w - 3], [w - 3, w - 3]]) {
+      const i = (y * w + x) * info.channels
+      if (Math.max(Math.abs(data[i] - 0xf1), Math.abs(data[i + 1] - 0xf1), Math.abs(data[i + 2] - 0xef)) > 4) bad.push(`${id}${suf} corner ${x},${y}`)
+    }
+  }
+  check(!bad.length, `both photographs of all ${models.length} products, square, their corners the tile's #f1f1ef${bad.length ? ' — ' + bad.slice(0, 4).join('; ') : ''}`)
+  check(/\.bx-layer\.sx \{ background: none;/.test(PAGE), 'the overlay layer never paints its site’s page colour over the page')
+  const cardInputs = [...PAGE.matchAll(/<input[^>]*value="[\d ]{12,}"[^>]*>/g)].map((m) => m[0])
+  check(cardInputs.length > 0 && cardInputs.every((x) => /\breadonly\b/.test(x)), 'the pretend card is filled in and read-only: nobody is asked to type a card number')
+  const allow = fs.readFileSync(new URL('./check-public-boundary.mjs', import.meta.url), 'utf8')
+  check(allow.includes("'dark-patterns'"), 'public/dark-patterns is on the deploy allowlist')
 }
 
 console.log(failures ? `\n${failures} failed.` : '\nAll dark-patterns checks passed.')
