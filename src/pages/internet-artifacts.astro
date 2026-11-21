@@ -2,7 +2,8 @@
 import GameShell from '../layouts/GameShell.astro'
 import { ZONES, MARKERS } from '../data/internet-artifacts'
 import type { Marker } from '../data/internet-artifacts'
-import { INTERNET_ARTIFACTS_ART, MOOD, sceneSvg } from '../lib/internet-artifacts-art'
+import { PHOTOS } from '../lib/internet-artifacts-art'
+import { withBase } from '../lib/base'
 import { digitCellHTML } from '../lib/seven-segment'
 
 /**
@@ -69,6 +70,10 @@ for (let i = 0; i < rough.length; ) {
   }
   i = j
 }
+
+const photoDir = withBase('/internet-artifacts/')
+/** Which era a moment falls in, for the colour of the light it stands in. */
+const zoneOf = (year: number) => zones.find((z) => year >= z.from && year <= z.to) ?? zones[zones.length - 1]
 
 const rgb = (hex: string) =>
   [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')
@@ -180,6 +185,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
         <p class="intro-name" aria-hidden="true">Internet Artifacts<span class="cursor">_</span></p>
       </div>
       <p>Twenty-five real, dated moments from the internet's own history — from the first message ever sent between two computers to a cat made of Pop-Tart.</p>
+      <p class="intro-small">Each one has an object beside it, photographed for this page. None of them is the original.</p>
       <div class="arrow">&#8595;</div>
       <p class="scroll-hint">Scroll down!</p>
     </div>
@@ -206,14 +212,19 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     }
     {
       placed.map((m) => {
-        const mood = MOOD[m.title]
-        const drift = `--drift:${-((Math.round(m.year * 1000) * 7919) % 1100) / 100}s`
-        const style = mood
-          ? `top:${m.top}px;--mood:${mood};--moodRgb:${rgb(mood)};${drift}`
-          : `top:${m.top}px;${drift}`
+        const photo = PHOTOS[m.title]
+        const glow = GLYPH_COLOR[zoneOf(m.year).id] ?? '#7cfc8a'
+        const src = photo ? photoDir + photo.slug : ''
         return (
-          <article class:list={['ev', `lane-${m.lane}`, { big: m.big }]} style={style}>
-            {INTERNET_ARTIFACTS_ART[m.title] && <div class="ev-art" set:html={sceneSvg(m.title)} />}
+          <article class:list={['ev', `lane-${m.lane}`, { big: m.big }]} style={`top:${m.top}px;--glowRgb:${rgb(glow)}`}>
+            {photo && (
+              <figure class="ev-art">
+                <img src={src + '.webp'} srcset={`${src}-s.webp 480w, ${src}.webp 960w`}
+                  sizes="(max-width: 620px) 92vw, 520px" width="960" height="960"
+                  alt={photo.caption} loading="lazy" decoding="async" />
+                <figcaption aria-hidden="true">{photo.caption}</figcaption>
+              </figure>
+            )}
             <div class="ev-text">
               <div class="ev-when">{m.date}</div>
               <h2>{m.title}</h2>
@@ -724,6 +735,7 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   :global(html:not(.play)) .intro .intro-name { animation: none; }
   :global(html:not(.play)) .intro .intro-name .cursor { animation: none; opacity: 1; }
   .intro p { opacity: 0.85; margin: 0; font-size: 18px; max-width: 34ch; margin-inline: auto; position: relative; z-index: 2; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4); }
+  .intro p.intro-small { font-size: 14px; opacity: 0.6; max-width: 40ch; }
   .scroll-hint { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
   .arrow { font-size: 30px; opacity: 0.7; animation: bob 1.8s ease-in-out infinite; position: relative; z-index: 2; }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -768,65 +780,66 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
   }
   :global(html:not(.play)) .rail-dot { animation: none; transition: none; }
 
-  /* Cut-outs, same contract as Deep Sea and Space Elevator: the drawing is
-     the element, not an icon pinned above a text column — it fills the
-     card's own width, learned first-time here rather than fixed after
-     shipping. */
+  /* Each moment stands in a pool of light with its object: a photograph cut
+     out of its studio (public/internet-artifacts/), so the object and its own
+     floor shadow lie straight on the era's sky. Nothing floats or glows: a
+     photographed thing that bobbed about would stop looking photographed.
+     The pool is the era's colour, faint, like a vitrine lamp on a dark wall. */
   .ev {
     position: absolute; left: 50%; transform: translateX(-50%); z-index: 2;
     width: min(88cqw, 480px);
     display: grid; justify-items: center;
-    gap: 12px; text-align: center;
-    --moodRgb: 234, 243, 255;
+    gap: 6px; text-align: center;
+    --glowRgb: 124, 252, 138;
   }
-  .ev.lane-left { left: 50%; transform: translateX(-104%); width: min(44cqw, 320px); }
-  .ev.lane-right { left: 50%; transform: translateX(4%); width: min(44cqw, 320px); }
+  .ev.lane-left { left: 50%; transform: translateX(-102%); width: min(46cqw, 400px); }
+  .ev.lane-right { left: 50%; transform: translateX(2%); width: min(46cqw, 400px); }
   .ev.lane-left h2, .ev.lane-right h2 { font-size: 18px; }
+  .ev.lane-left .ev-art, .ev.lane-right .ev-art { width: min(100%, 340px); }
   .ev.lane-left p, .ev.lane-right p { font-size: 13.5px; }
 
   .ev-art {
-    width: min(100%, 260px); aspect-ratio: 1 / 1;
-    filter:
-      drop-shadow(0 0 20px rgba(var(--moodRgb), 0.55))
-      drop-shadow(0 0 56px rgba(var(--moodRgb), 0.32));
-    animation: ev-drift 12s ease-in-out infinite;
-    animation-delay: var(--drift, 0s);
+    position: relative; margin: 0;
+    width: min(100%, 440px);
+    display: grid; justify-items: center;
   }
-  @keyframes ev-drift {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-8px) rotate(0.6deg); }
+  .ev-art::before {
+    content: ''; position: absolute; z-index: -1; left: 50%; top: 52%;
+    width: 120%; aspect-ratio: 1.5; transform: translate(-50%, -50%);
+    background: radial-gradient(closest-side, rgba(var(--glowRgb), 0.16), rgba(var(--glowRgb), 0.06) 55%, transparent);
+    transition: opacity 900ms ease;
+    opacity: 0.8;
   }
-  .ev-art svg { display: block; width: 100%; height: 100%; }
+  .ev-art img { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; }
+  .ev-art figcaption {
+    margin-top: -4%;
+    font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-size: 11px; letter-spacing: 0.02em; line-height: 1.4;
+    color: rgb(var(--glowRgb)); opacity: 0.75; max-width: 36ch;
+    text-shadow: 0 1px 8px rgb(0 0 0 / 0.9);
+  }
+  .ev.focused .ev-art::before { opacity: 1; }
 
   .ev.big { width: min(92cqw, 560px); }
   .ev.big h2 { font-size: 27px; }
-  .ev.big .ev-art { width: min(100%, 340px); filter: drop-shadow(0 0 26px rgba(var(--moodRgb), 0.7)) drop-shadow(0 0 74px rgba(var(--moodRgb), 0.42)); }
+  .ev.big .ev-art { width: min(100%, 520px); }
   .ev.lane-left.big h2, .ev.lane-right.big h2 { font-size: 19px; }
+  .ev.lane-left.big .ev-art, .ev.lane-right.big .ev-art { width: min(100%, 340px); }
 
-  @keyframes seen-pulse {
-    0%   { filter: drop-shadow(0 0 8px rgba(var(--moodRgb), 0.3)); }
-    45%  { filter: drop-shadow(0 0 30px rgba(var(--moodRgb), 1)) drop-shadow(0 0 70px rgba(var(--moodRgb), 0.75)); }
-    100% { filter: drop-shadow(0 0 16px rgba(var(--moodRgb), 0.65)) drop-shadow(0 0 50px rgba(var(--moodRgb), 0.4)); }
-  }
-  .ev.big.focused .ev-art { animation: seen-pulse 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-
+  /* Squeezed by its neighbours, a moment loses its note first and then its
+     date, never its object: the photograph is the point of it. */
   .ev.compact p { display: none; }
-  .ev.compact { width: min(46cqw, 220px); }
-  .ev.compact .ev-art { width: 104px; }
-  /* A turning point stays visually a little heavier than the trivia next to
-     it even when the cluster forces it to compact — the same reasoning as
-     `.ev.big`'s own larger glow, just surviving the squeeze. */
-  .ev.big.compact { width: min(52cqw, 260px); }
-  .ev.big.compact .ev-art { width: 136px; }
-  .ev.compact-hard .ev-when { display: none; }
-  .ev.compact-hard .ev-art { display: none; }
+  .ev.compact .ev-art { width: 72%; }
+  .ev.compact-hard .ev-when, .ev.compact-hard figcaption { display: none; }
+  .ev.compact-hard .ev-art { width: 56%; }
   @container (max-width: 620px) {
-    .ev { width: min(92cqw, 360px); }
+    .ev { width: min(92cqw, 400px); }
     .ev.lane-left, .ev.lane-right { width: min(48cqw, 240px); }
-    .ev.big { width: min(94cqw, 400px); }
+    .ev.big { width: min(94cqw, 420px); }
     /* A big card in a side lane keeps the lane's width: .ev.big comes later
        and would otherwise stretch it past the edge of the frame. */
     .ev.lane-left.big, .ev.lane-right.big { width: min(48cqw, 240px); }
+    .ev.lane-left figcaption, .ev.lane-right figcaption { font-size: 10px; }
   }
   .ev-when {
     font-family: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
@@ -844,9 +857,8 @@ const introGlyphs = Array.from({ length: 22 }, (_, i) => ({
     text-shadow: 0 1px 10px rgb(0 0 0 / 0.9), 0 0 22px rgb(0 0 0 / 0.7);
   }
 
-  :global(html:not(.play)) .ev.big.focused .ev-art,
-  :global(html:not(.play)) .ev-art,
   :global(html:not(.play)) .arrow { animation: none; }
+  :global(html:not(.play)) .ev-art::before { transition: none; }
 
   .seam { position: absolute; left: 0; right: 0; z-index: 1; text-align: center; padding-top: 8px; }
   .seam::before {

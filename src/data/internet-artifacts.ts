@@ -57,31 +57,31 @@ export type Zone = {
 export const ZONES: Zone[] = [
   {
     id: 'arpanet', label: 'The ARPANET era',
-    from: 1969, to: 1983, pxPerYear: 220,
+    from: 1969, to: 1983, pxPerYear: 250,
     sky: ['#0b2b12', '#03110a'],
     note: 'Networked computers existed, but almost nobody outside a handful of universities and defence contractors had ever touched one.',
   },
   {
     id: 'early-internet', label: 'Before the Web',
-    from: 1983, to: 1991, pxPerYear: 150,
+    from: 1983, to: 1991, pxPerYear: 250,
     sky: ['#132a3d', '#081420'],
     note: 'Email and bulletin boards were the internet’s whole social life — there was no web to browse yet.',
   },
   {
     id: 'world-wide-web', label: 'The Web goes public',
-    from: 1991, to: 1995, pxPerYear: 300,
+    from: 1991, to: 1995, pxPerYear: 680,
     sky: ['#0e3b45', '#06181d'],
     note: 'Tim Berners-Lee’s web software went from an internal CERN tool to something anyone with a browser could read.',
   },
   {
     id: 'dot-com', label: 'The dot-com years',
-    from: 1995, to: 2001, pxPerYear: 200,
+    from: 1995, to: 2001, pxPerYear: 540,
     sky: ['#2a1245', '#150822'],
     note: 'The web became a place you could actually buy something, search for something, or lose an afternoon to.',
   },
   {
     id: 'web-two', label: 'Web 2.0 and viral video',
-    from: 2001, to: 2012, pxPerYear: 170,
+    from: 2001, to: 2012, pxPerYear: 500,
     sky: ['#3d0f2e', '#1c0716'],
     note: 'Video, and the crowd, took over — anyone with a webcam could reach more people than a TV network.',
   },
