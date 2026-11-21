@@ -1,5 +1,8 @@
 ---
 import GameShell from '../layouts/GameShell.astro'
+import { CATALOGUE } from '../data/lots'
+import { lotPhoto, paddleSvg, YOUR_PADDLE, BOARD, FALLBACK_RATES, rateDate } from '../lib/auction-room'
+import { withBase } from '../lib/base'
 
 /**
  * The Auction Game — fourteen lots, five rivals, twelve thousand pounds.
@@ -9,11 +12,22 @@ import GameShell from '../layouts/GameShell.astro'
  * winner's curse are all checked by scripts/check-auction.mjs over thousands
  * of simulated sales rather than eyeballed once.
  *
+ * The page is a saleroom: each lot's catalogue photograph on the rostrum
+ * (baked by scripts/bake-auction.mjs, its backdrop falling away to the
+ * stage's own colour), the catalogue entry beside it, the currency board the
+ * auctioneer's bids appear on in six currencies at the day's ECB rates, and
+ * the room — five rivals with their paddles, one on the telephone, one online.
+ *
  * In the shell: the Score tile is your funds (the only number that is honest
  * to show mid-sale — what a lot is really worth is the appraisal, and that
  * stays sealed until the ledger), Lot is progress through the fourteen,
  * Moves are bids, and Best is the best finish you have ever had.
  */
+const photos = Object.fromEntries(CATALOGUE.map((l) => [l.id, {
+  big: withBase('/' + lotPhoto(l.id)),
+  small: withBase('/' + lotPhoto(l.id, true)),
+}]))
+const first = photos[CATALOGUE[0].id]
 ---
 
 <GameShell
@@ -21,53 +35,79 @@ import GameShell from '../layouts/GameShell.astro'
   labels={{ score: 'Funds', best: 'Best finish', level: 'Lot', moves: 'Bids' }}
   initial={{ score: '£12,000', level: '0 / 14', moves: '0' }}
 >
-  <div class="au">
+  <div class="au on-ink" data-photos={JSON.stringify(photos)}>
     <section class="au-rostrum" aria-label="The rostrum">
-      <article class="au-lot is-intro" id="card">
-        <div class="au-art" id="lotArt" aria-hidden="true"></div>
-        <p class="label au-cat" id="cat">Curiosities</p>
+      <figure class="au-photo" aria-hidden="true">
+        <img class="au-img is-shown" id="imgA" src={first.small} srcset={`${first.small} 750w, ${first.big} 1500w`}
+          sizes="(min-width: 960px) 60vw, 100vw" width="1500" height="1000" alt="" decoding="async" />
+        <img class="au-img" id="imgB" alt="" width="1500" height="1000" decoding="async" />
+      </figure>
+      <article class="au-entry is-intro" id="card">
+        <p class="au-lotno"><span>Lot</span> <b id="lotNo">1</b><span class="au-of"> of 14</span></p>
+        <p class="au-cat" id="cat">Sale 4471 · Fourteen lots</p>
         <h2 class="au-title" id="title">The Auction Game</h2>
         <p class="au-blurb" id="blurb">
           Fourteen lots. Five rivals with their own money and their own bad
           habits. The hammer price is not what you pay.
         </p>
-        <p class="au-est"><span class="label">Estimate</span><span class="num" id="est">£300 – £500</span></p>
+        <dl class="au-terms">
+          <div class="au-est"><dt>Estimate</dt><dd class="num" id="est">£300 – £500</dd></div>
+          <div><dt>Buyer’s premium</dt><dd>25% on the hammer</dd></div>
+          <div><dt>Reserve</dt><dd>Not disclosed</dd></div>
+        </dl>
       </article>
-
-      <div class="au-block" id="block" hidden>
-        <p class="label" id="priceLbl">Current bid</p>
-        <p class="au-price">
-          <span class="num" id="price">£180</span>
-          <span class="au-holder" id="holder">no bids yet</span>
-        </p>
-        <p class="au-calls" id="calls" aria-live="polite"></p>
-        <p class="au-update" id="bidUpdate" role="status"></p>
-        <div class="au-acts">
-          <button class="pill pill--hero au-bid" type="button" id="bid">
-            <span id="bidAmt">Bid £200</span>
-          </button>
-          <button class="pill pill--line" type="button" id="letgo"><span>Let it go</span></button>
-        </div>
-        <p class="au-cost" id="bidCost">costs you £250</p>
-        <p class="au-keys"><kbd>B</kbd> bid · <kbd>L</kbd> let it go · <kbd>P</kbd> pause</p>
-      </div>
-
-      <div class="au-open" id="openActs">
-        <div class="au-crowd" id="lotCrowd" aria-live="polite"></div>
-        <button class="pill pill--hero" type="button" id="start">
-          <span id="startLbl">Start the sale</span><span class="arrow" aria-hidden="true">→</span>
-        </button>
-        <p class="au-keys"><kbd>N</kbd> or <kbd>Enter</kbd> for the next lot</p>
-      </div>
-
-      <ol class="au-log" id="log" aria-label="The auctioneer"></ol>
     </section>
 
-    <aside class="au-room" aria-label="The room">
-      <p class="label">The room</p>
+    <section class="au-floor">
+      <div class="au-board" role="group" aria-label="The currency board">
+        <div class="au-board-top">
+          <span>Lot <b id="bLot">—</b></span>
+          <span id="bState">Sale about to begin</span>
+        </div>
+        <div class="au-led-glow"><p class="au-led" id="board"><span class="au-led-cur">£</span><span id="price">0</span></p></div>
+        <ul class="au-fx" id="fx">
+          {BOARD.map((c) => <li><span>{c.sign}</span><b data-fx={c.code}>0</b></li>)}
+        </ul>
+        <p class="au-board-note" id="fxNote">Converted at ECB reference rates of {rateDate(FALLBACK_RATES.date)} · for guidance only</p>
+      </div>
+
+      <div class="au-desk">
+        <div class="au-block" id="block" hidden>
+          <p class="au-holder" id="holder">no bids yet</p>
+          <p class="au-calls" id="calls" aria-live="polite"></p>
+          <p class="au-update" id="bidUpdate" role="status"></p>
+          <div class="au-acts">
+            <button class="au-bid" type="button" id="bid">
+              <span class="au-mypaddle" aria-hidden="true" set:html={paddleSvg(YOUR_PADDLE, true)} />
+              <span class="au-bid-txt"><span class="au-bid-k">Raise paddle {YOUR_PADDLE}</span><span id="bidAmt">Bid £200</span></span>
+            </button>
+            <button class="pill pill--line au-letgo" type="button" id="letgo"><span>Let it go</span></button>
+          </div>
+          <p class="au-cost" id="bidCost">costs you £250</p>
+          <p class="au-keys"><kbd>B</kbd> bid · <kbd>L</kbd> let it go · <kbd>P</kbd> pause</p>
+        </div>
+
+        <div class="au-open" id="openActs">
+          <div class="au-crowd" id="lotCrowd" aria-live="polite"></div>
+          <p class="au-yours">You are paddle <b>{YOUR_PADDLE}</b>, with <b>£12,000</b> to spend.</p>
+          <button class="pill pill--hero" type="button" id="start">
+            <span id="startLbl">Start the sale</span><span class="arrow" aria-hidden="true">→</span>
+          </button>
+          <p class="au-keys"><kbd>N</kbd> or <kbd>Enter</kbd> for the next lot</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="au-room" aria-label="The room">
+      <p class="au-label">The room</p>
       <ul id="rivals" role="list"></ul>
       <p class="au-note">Their money runs out too. The two with the worst discipline have the least of it.</p>
-    </aside>
+    </section>
+
+    <section class="au-transcript" aria-label="The auctioneer">
+      <p class="au-label">From the rostrum</p>
+      <ol class="au-log" id="log"></ol>
+    </section>
   </div>
 
   <Fragment slot="howto">
@@ -77,8 +117,9 @@ import GameShell from '../layouts/GameShell.astro'
     </p>
     <ul>
       <li><b>The hammer price is not what you pay.</b> A 25% buyer's premium goes on top of every lot you win — the button always shows the real cost.</li>
-      <li>Each rival values lots by their own taste and bids in their own style. Some snipe at the last second.</li>
+      <li>Each rival values lots by their own taste and bids in their own style. Some snipe at the last second; one is on the telephone, one online.</li>
       <li>Sometimes the auctioneer takes a bid "off the wall" — from nobody — to reach the reserve. This is legal.</li>
+      <li>The board on the wall converts every bid at the day's European Central Bank rates, for guidance only, as a saleroom's does.</li>
       <li>At the end, what you bought is appraised. Finish <b>up</b> on the appraisal and you have beaten the room.</li>
     </ul>
     <p>Keys: <kbd>B</kbd> bid, <kbd>L</kbd> let it go, <kbd>N</kbd> next lot.</p>
@@ -105,13 +146,19 @@ import GameShell from '../layouts/GameShell.astro'
       disproportionately the one who most overrated it.
       <code>scripts/check-auction.mjs</code> measures it emerging from the model.
     </p>
+    <p>
+      <b>The currency board</b> is real too: London salerooms hang one beside
+      the rostrum. This one fetches the European Central Bank's reference rates
+      for the day and falls back to a fixed day's rates if it cannot.
+      <b>The photographs</b> are not: every lot is a 3D model, lit and shot in
+      a virtual studio the way a saleroom shoots its catalogue.
+    </p>
   </details>
 </GameShell>
 
 <script>
   import { createShell } from '../lib/game-shell'
-  import { roll, PLAY } from '../lib/motion'
-  import { sfx, unlock, tone } from '../lib/audio'
+    import { sfx, unlock, tone, hit } from '../lib/audio'
   import { dealLots } from '../data/lots'
   import {
     makeRivals, mulberry32, openLot, step, placeBid, commit,
@@ -119,8 +166,9 @@ import GameShell from '../layouts/GameShell.astro'
   } from '../lib/auction'
   import type { Bidder, LotState, LotOutcome } from '../lib/auction'
   import type { Lot } from '../data/lots'
-  import { lotArt } from '../lib/auction-art'
-  import { bidderPortrait } from '../lib/auction-bidders'
+  import {
+    SEATS, YOUR_PADDLE, BOARD, FALLBACK_RATES, RATES_URL, parseRates, convert, grouped, rateDate, paddleSvg,
+  } from '../lib/auction-room'
   import { recordPlay } from '../lib/stats'
   import { dailyFor } from '../data/game-meta'
   import { loadCrowd, fillCrowd, clearCrowd, share, people, FEW } from '../lib/crowd'
@@ -131,6 +179,9 @@ import GameShell from '../layouts/GameShell.astro'
 
   const START_FUNDS = 12_000
   const BEAT = 950
+
+  const root = document.querySelector('.au') as HTMLElement
+  const photos: Record<string, { big: string; small: string }> = JSON.parse(root.dataset.photos ?? '{}')
 
   const rng = mulberry32((Date.now() ^ (Math.random() * 2 ** 32)) >>> 0)
   const lots: Lot[] = dealLots(rng)
@@ -157,46 +208,111 @@ import GameShell from '../layouts/GameShell.astro'
     onResume: () => { if (state && !state.over) tick() },
   })
 
-  $('lotArt').innerHTML = lotArt('fox')
   loadCrowd('auction')
+
+  /* ---- the photograph ------------------------------------------------ */
+
+  // Two pictures stacked, so a new lot fades in over the last one instead of
+  // the rostrum going blank while it loads.
+  let front = $('imgA') as HTMLImageElement, back = $('imgB') as HTMLImageElement
+  function showPhoto(id: string) {
+    const p = photos[id]
+    if (!p) return
+    back.srcset = `${p.small} 750w, ${p.big} 1500w`
+    back.sizes = front.sizes
+    back.src = p.small
+    const swap = () => {
+      back.classList.add('is-shown'); front.classList.remove('is-shown')
+      ;[front, back] = [back, front]
+    }
+    if (back.complete && back.naturalWidth) swap()
+    else back.decode().then(swap, swap)
+  }
+  /** The next lot's picture, fetched while this one is being sold. */
+  function preload(id?: string) {
+    const p = id && photos[id]
+    if (!p) return
+    const i = new Image(); i.sizes = front.sizes; i.srcset = `${p.small} 750w, ${p.big} 1500w`; i.src = p.small
+  }
+
+  /* ---- the currency board ------------------------------------------- */
+
+  let rates = FALLBACK_RATES.rates
+  fetch(RATES_URL).then((r) => (r.ok ? r.json() : null)).then((j) => {
+    const got = parseRates(j)
+    if (!got) return
+    rates = got.rates
+    $('fxNote').textContent = `Converted at ECB reference rates of ${rateDate(got.date)} · for guidance only`
+    paintBoard(lastBoard, true)
+  }).catch(() => {})
+
+  let lastBoard = 0
+  function paintBoard(gbp: number, quiet = false) {
+    lastBoard = gbp
+    for (const c of BOARD) {
+      const el = document.querySelector(`[data-fx="${c.code}"]`) as HTMLElement
+      el.textContent = grouped(convert(gbp, rates[c.code], c.step))
+    }
+    if (!quiet) { const b = $('board'); b.classList.remove('is-new'); void b.offsetWidth; b.classList.add('is-new') }
+  }
+  function boardState(text: string, cls = '') {
+    $('bState').textContent = text
+    $('bState').className = cls
+  }
 
   /* ---- the room ---------------------------------------------------- */
 
-  $('rivals').innerHTML = rivals.map((b) =>
-    `<li class="au-rival" data-id="${b.id}">
-       <div class="au-face" aria-hidden="true">${bidderPortrait(b.id)}</div>
-       <div class="au-who"><b>${b.name}</b><span class="au-chip" data-chip="${b.id}"></span></div>
-       <p class="au-react" data-reaction="${b.id}">Taking their seat</p>
+  $('rivals').innerHTML = rivals.map((b) => {
+    const seat = SEATS[b.id]
+    return `<li class="au-seat" data-id="${b.id}" data-via="${seat.via}">
+       <div class="au-paddle" aria-hidden="true">${paddleSvg(seat.paddle)}</div>
+       <div class="au-who"><b>${b.name}</b><span class="au-where">${seat.where}</span></div>
        <div class="au-purse" aria-hidden="true"><i data-purse="${b.id}"></i></div>
+       <p class="au-chip" data-chip="${b.id}"></p>
+       <p class="au-react" data-reaction="${b.id}">Taking their seat</p>
        <details class="au-habit"><summary>Bidding style</summary><p>${b.note}</p></details>
-     </li>`).join('')
+     </li>`
+  }).join('')
 
   function paintRoom() {
     const ask = state && !state.over ? askingPrice(state) : 0
     for (const b of rivals) {
       const bar = document.querySelector(`[data-purse="${b.id}"]`) as HTMLElement
       const chip = document.querySelector(`[data-chip="${b.id}"]`) as HTMLElement
-      const li = document.querySelector(`.au-rival[data-id="${b.id}"]`) as HTMLElement
+      const li = document.querySelector(`.au-seat[data-id="${b.id}"]`) as HTMLElement
       bar.style.transform = `scaleX(${Math.max(0, b.budget / startingBudgets.get(b.id)!)})`
       const broke = affordableHammer(b.budget) < ask
       const leading = state?.leader === b.id
-      chip.textContent = leading ? (state?.over ? (state.sold ? '✓ Won' : 'Unsold') : '↑ Holding') : broke && ask ? '✗ Out' : money(b.budget)
+      chip.textContent = leading ? (state?.over ? (state.sold ? '✓ Bought it' : 'Unsold') : '↑ Holding the bid') : broke && ask ? '✗ Out of money' : `${money(b.budget)} left`
       li.classList.toggle('is-leading', !!leading)
       li.classList.toggle('is-out', broke && !!ask && !leading)
       const reaction = document.querySelector(`[data-reaction="${b.id}"]`)!
       reaction.textContent = state?.over
         ? state.sold && state.leader === b.id ? 'This lot is theirs' : 'Waiting for the next lot'
-        : leading ? 'Paddle raised · leading'
+        : leading ? (SEATS[b.id].via === 'phone' ? 'The house’s phone paddle is up' : SEATS[b.id].via === 'online' ? 'Leading online' : 'Paddle up · leading')
         : broke && ask ? 'Cannot cover the next bid'
         : ask ? (b.style === 'sniper' ? 'Waiting for the hammer' : 'Watching the bidding')
         : 'Ready for the sale'
     }
   }
 
+  /** A paddle goes up for a moment when its owner bids, even if outbid at once. */
+  function flashPaddle(id?: string | null) {
+    const li = id && document.querySelector(`.au-seat[data-id="${id}"]`)
+    if (!li) return
+    li.classList.remove('is-bidding'); void (li as HTMLElement).offsetWidth; li.classList.add('is-bidding')
+  }
+
   /* ---- the log ------------------------------------------------------ */
 
   const nameOf = (id?: string | null) =>
     id === 'you' ? 'You' : rivals.find((b) => b.id === id)?.name ?? 'the auctioneer'
+  /** Where a bid came from, the way an auctioneer says it. */
+  const fromWhere = (id?: string | null) => {
+    if (id === 'you') return `paddle ${YOUR_PADDLE}, in the room`
+    const s = id ? SEATS[id] : null
+    return !s ? 'off the wall' : s.via === 'phone' ? 'on the telephone' : s.via === 'online' ? 'online' : `paddle ${s.paddle}, in the room`
+  }
 
   function say(text: string, cls = '') {
     const li = document.createElement('li')
@@ -215,7 +331,9 @@ import GameShell from '../layouts/GameShell.astro'
   }
 
   function showCard(lot: Lot) {
-    $('lotArt').innerHTML = lotArt(lot.id)
+    showPhoto(lot.id)
+    $('lotNo').textContent = String(idx + 1)
+    $('bLot').textContent = String(idx + 1)
     $('cat').textContent = lot.category
     $('title').textContent = lot.title
     $('blurb').textContent = lot.blurb
@@ -230,12 +348,14 @@ import GameShell from '../layouts/GameShell.astro'
     clearCrowd($('lotCrowd'))
     $('card').classList.remove('is-intro')
     showCard(lot)
+    preload(lots[idx + 1]?.id)
     $('log').innerHTML = ''
     state = openLot(lot, rivals, rng)
     fast = false
     $('block').hidden = false
     $('openActs').hidden = true
     $('calls').textContent = ''
+    boardState('Bidding', 'is-live')
     say(`Lot ${idx + 1}. ${lot.title}. I have ${money(state.current)} to start.`, 'auctioneer')
     shell.levelUp(`Lot ${idx + 1}`)
     shell.progress(idx + 1)
@@ -256,22 +376,22 @@ import GameShell from '../layouts/GameShell.astro'
       : state.leader ? `${nameOf(state.leader)} leads. You can bid or let this one go.`
       : opening ? 'The room is open. Your total includes a 25% buyer’s premium.' : 'The auctioneer is bidding toward the reserve.'
     if ($('bidUpdate').textContent !== update) $('bidUpdate').textContent = update
-    $('priceLbl').textContent = opening ? 'Opening at' : 'Current bid'
-    const p = money(state.current)
+    const p = grouped(state.current)
     if (p !== lastPrice) {
-      if (first || fast || !PLAY) $('price').textContent = p
-      else roll($('price'), p, { ms: 520 })
+      // A dot-matrix board switches; it does not roll. The flicker is paintBoard's.
+      $('price').textContent = p
       lastPrice = p
+      paintBoard(state.current, first || fast)
     }
-    $('holder').textContent =
-      state.leader === 'you' ? '✓ yours' :
-      state.leader ? `with ${nameOf(state.leader)}` :
-      opening ? 'no bids yet' : 'off the wall'
-    $('holder').className = 'au-holder' + (state.leader === 'you' ? ' is-yours' : '')
+    $('holder').innerHTML =
+      state.leader === 'you' ? `<span class="is-yours">✓ The bid is yours</span> · paddle ${YOUR_PADDLE}` :
+      state.leader ? `The bid is with <b>${nameOf(state.leader)}</b> · ${fromWhere(state.leader)}` :
+      opening ? `Opening at <b>${money(state.current)}</b> · no bids yet` : `<b>${money(state.current)}</b> off the wall · the auctioneer’s own`
 
     const canAfford = ask <= affordableHammer(you.budget)
     const btn = $('bid') as HTMLButtonElement
     btn.disabled = state.leader === 'you' || !canAfford || state.over
+    btn.classList.toggle('is-mine', state.leader === 'you')
     $('bidAmt').textContent = state.leader === 'you' ? 'You hold the bid' : `Bid ${money(ask)}`
     $('bidCost').textContent =
       state.leader === 'you' ? `${money(withPremium(state.current))} with the premium if it lands`
@@ -301,23 +421,36 @@ import GameShell from '../layouts/GameShell.astro'
     if (!ev || !state) return
     switch (ev.kind) {
       case 'bid':
-        say(`${nameOf(ev.by)} bids ${money(ev.amount!)}.`)
+        say(`${money(ev.amount!)}, ${fromWhere(ev.by)} — ${nameOf(ev.by)}.`)
+        flashPaddle(ev.by)
+        boardState('Bidding', 'is-live')
         if (!fast) sfx.tick()
         break
       case 'jump':
-        say(`${nameOf(ev.by)} jumps straight to ${money(ev.amount!)}.`, 'jump')
+        say(`${nameOf(ev.by)} jumps straight to ${money(ev.amount!)}, ${fromWhere(ev.by)}.`, 'jump')
+        flashPaddle(ev.by)
+        boardState('Bidding', 'is-live')
         if (!fast) sfx.blip(5)
         break
       case 'chandelier':
         say(`The auctioneer takes ${money(ev.amount!)} off the wall.`, 'wall')
+        boardState('Bidding', 'is-live')
         if (!fast) sfx.drip()
         break
       case 'call':
-        $('calls').textContent = ev.call === 1 ? 'Going once…' : 'Going twice…'
-        say(ev.call === 1 ? 'Going once.' : 'Going twice.', 'auctioneer')
+        $('calls').textContent = ev.call === 1 ? 'Going once…' : 'Fair warning. Going twice…'
+        boardState(ev.call === 1 ? 'Going once' : 'Going twice', 'is-warn')
+        say(ev.call === 1 ? 'Going once.' : 'Fair warning. Going twice.', 'auctioneer')
         if (!fast) tone({ freq: ev.call === 1 ? 420 : 340, dur: 0.16, type: 'triangle', gain: 0.14 })
         break
     }
+  }
+
+  /** The hammer: a hard knock of wood on a sound block, and its ring. */
+  function gavel() {
+    hit({ dur: 0.05, gain: 0.55, freq: 1500, q: 2.2 })
+    tone({ freq: 210, to: 120, dur: 0.14, type: 'sine', gain: 0.42 })
+    hit({ dur: 0.18, gain: 0.12, freq: 640, q: 9, delay: 0.01 })
   }
 
   function endLot() {
@@ -343,15 +476,19 @@ import GameShell from '../layouts/GameShell.astro'
     })
     if (wasYours) shell.pick('Paid vs worth on each lot (%)', Math.round((withPremium(out.hammer) / lot.value - 1) * 100), lot.title)
     if (!out.sold) {
-      say('Not sold. It did not reach the reserve.', 'auctioneer')
+      say('Not sold. It did not reach the reserve. Passed.', 'auctioneer')
+      boardState('Passed · unsold', 'is-pass')
       sfx.bad()
     } else if (wasYours) {
-      say(`✓ Sold to you at ${money(out.hammer)} — ${money(withPremium(out.hammer))} with the premium.`, 'won')
-      sfx.great()
+      say(`Sold, to paddle ${YOUR_PADDLE} — you — at ${money(out.hammer)}. ${money(withPremium(out.hammer))} with the premium.`, 'won')
+      boardState(`Sold · paddle ${YOUR_PADDLE}`, 'is-sold')
+      gavel()
+      setTimeout(() => sfx.great(), 160)
       shell.pop($('card'))
     } else {
-      say(`Sold to ${nameOf(out.winner)} at ${money(out.hammer)}.`, 'auctioneer')
-      sfx.thud()
+      say(`Sold, ${fromWhere(out.winner)}, at ${money(out.hammer)}. ${nameOf(out.winner)}.`, 'auctioneer')
+      boardState(`Sold · ${SEATS[out.winner!]?.via === 'phone' ? 'telephone' : SEATS[out.winner!]?.via === 'online' ? 'online' : 'paddle ' + SEATS[out.winner!]?.paddle}`, 'is-sold')
+      gavel()
     }
     paintStrip()
     paintRoom()
@@ -371,9 +508,10 @@ import GameShell from '../layouts/GameShell.astro'
     if (ask > affordableHammer(you.budget) || state.leader === 'you') { shell.shake($('bid')); return }
     if (placeBid(state, 'you', ask)) {
       bids++
-      say(`You bid ${money(ask)}.`, 'you')
+      say(`${money(ask)}, paddle ${YOUR_PADDLE}, in the room — you.`, 'you')
+      boardState('Bidding', 'is-live')
       sfx.pop(3)
-      shell.pop($('price'))
+      shell.pop($('board'))
       paintStrip()
       paintPrice()
       paintRoom()
@@ -411,6 +549,7 @@ import GameShell from '../layouts/GameShell.astro'
   function finish() {
     finished = true
     $('openActs').hidden = true
+    boardState('Sale closed', 'is-pass')
     const byId = new Map(lots.map((l) => [l.id, l]))
     const mine = outcomes.filter((o) => o.winner === 'you')
     let hammer = 0, worth = 0, cursed = 0, wall = 0
@@ -493,93 +632,189 @@ import GameShell from '../layouts/GameShell.astro'
 
   paintStrip()
   paintRoom()
+  paintBoard(0, true)
 </script>
 
 <style is:global>
-  /* The room, the log and the ledger are built by the script, so their
-     styles are global on purpose: scoped styles never reach those nodes. */
-  .au { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); gap: clamp(16px, 2.4vw, 32px); align-items: start; }
-  @media (max-width: 860px) { .au { grid-template-columns: minmax(0, 1fr); } }
-
-  .au-lot { display: grid; gap: 8px; }
-  .au-art {
-    height: clamp(200px, 28vw, 320px);
-    border-radius: var(--r);
-    background: var(--ink);
-    overflow: hidden;
-    margin-bottom: 10px;
+  /* The saleroom. The room, the log and the ledger are built by the script,
+     so these styles are global on purpose: scoped styles never reach those
+     nodes. The stage is the colour each photograph's backdrop falls away to
+     (scripts/auction-bake/studio.glsl, EDGE), so a lot has no frame. */
+  .stage:has(> .au) { padding: 0; overflow: clip; background: #151b22; }
+  .au {
+    --au-bg: #151b22;
+    --au-ink: #e9eef3;
+    --au-ink2: #aab5c1;
+    --au-ink3: #7d8996;
+    --au-line: rgba(200, 214, 230, 0.14);
+    --au-ice: #cfe8ff;
+    --au-sea: #6fd9c0;
+    --au-rose: #ff8d9b;
+    color: var(--au-ink);
+    color-scheme: dark;
+    padding: clamp(14px, 2.6vw, 36px);
+    display: grid;
+    gap: clamp(18px, 2.6vw, 30px);
   }
-  .au-art svg { width: 100%; height: 100%; display: block; }
-  .au-lot.is-intro .au-cat, .au-lot.is-intro .au-est { display: none; }
-  .au-cat { color: var(--ink3); }
-  .au-title { font-size: var(--fs-h3); }
-  .au-blurb { color: var(--ink2); max-width: 58ch; }
-  .au-est { display: flex; align-items: baseline; gap: 12px; margin-top: 4px; }
-  .au-est .label { color: var(--ink3); }
-  .au-est .num { font-size: 20px; }
+  .au-label { font: 700 12px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--au-ink3); }
 
-  .au-block, .au-open {
-    margin-top: 18px;
-    padding: 20px;
-    border-radius: var(--r-lg);
-    background: var(--mint);
-    color: var(--ink);
+  /* The rostrum: the photograph, and the catalogue entry beside it. */
+  .au-rostrum { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(270px, 1fr); gap: clamp(16px, 3vw, 44px); align-items: center; }
+  @media (max-width: 900px) { .au-rostrum { grid-template-columns: minmax(0, 1fr); } }
+  .au-photo { position: relative; margin: 0; aspect-ratio: 3 / 2; }
+  @media (max-width: 900px) { .au-photo { margin: calc(-1 * clamp(14px, 2.6vw, 36px)) calc(-1 * clamp(14px, 2.6vw, 36px)) 0; } }
+  .au-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0;
+    -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%);
+    mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%);
   }
-  .au-open { background: var(--paper2); }
-  .au-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-top: 6px; }
-  .au-price .num { font-size: clamp(44px, 6vw, 72px); }
-  .au-holder { font-weight: 600; }
-  .au-holder.is-yours { background: var(--ink); color: var(--ink-paper); padding: 4px 12px; border-radius: var(--r-pill); }
-  .au-calls { min-height: 1.3em; margin-top: 6px; font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: 22px; font-style: italic; }
-  .au-update { margin-top: 4px; font-size: 15px; font-weight: 500; }
-  .au-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-  .au-bid { min-width: 210px; }
-  .au-cost { margin-top: 10px; font-size: 14px; font-weight: 600; }
-  .au-keys { margin-top: 10px; font-size: 13px; color: var(--ink2); }
-  .au-block .au-keys { color: var(--ink); }
+  .au-img.is-shown { opacity: 1; }
+  html.play .au-img { transition: opacity 520ms var(--glide, ease); }
+
+  .au-entry { display: grid; gap: 10px; align-content: center; }
+  .au-lotno { display: flex; align-items: baseline; gap: 8px; color: var(--au-ink3); font: 700 12px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; }
+  .au-lotno b { font: 400 clamp(40px, 5vw, 64px)/0.9 var(--display); font-variation-settings: var(--display-axes); color: var(--au-ink); letter-spacing: -0.02em; text-transform: none; }
+  .au-entry.is-intro .au-lotno, .au-entry.is-intro .au-terms { display: none; }
+  .au-cat { font: 700 12px/1.2 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--au-ice); }
+  .au-title { font-size: clamp(26px, 2.8vw, 38px); line-height: 1.08; color: var(--au-ink); text-wrap: balance; }
+  .au-blurb { color: var(--au-ink2); max-width: 46ch; font-size: 16px; line-height: 1.55; }
+  .au-terms { display: grid; gap: 6px; margin: 6px 0 0; padding-top: 12px; border-top: 1px solid var(--au-line); }
+  .au-terms div { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+  .au-terms dt { font-size: 13px; color: var(--au-ink3); }
+  .au-terms dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--au-ink2); }
+  .au-terms .au-est dd { font-size: 20px; color: var(--au-ink); }
+
+  /* The floor: the board on the wall, and your desk. */
+  .au-floor { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(14px, 2.4vw, 28px); align-items: stretch; }
+  @media (max-width: 820px) { .au-floor { grid-template-columns: minmax(0, 1fr); } }
+
+  /* A saleroom currency board: black glass, a grid of unlit dots, the bid in
+     lit ones. The dots are a mask over ordinary type. */
+  .au-board {
+    position: relative;
+    padding: 16px clamp(14px, 2vw, 22px) 14px;
+    border-radius: 10px;
+    background:
+      radial-gradient(circle, #1b232c 0 1px, transparent 1.3px) 0 0 / 4px 4px,
+      linear-gradient(#07090c, #0a0d11);
+    box-shadow: inset 0 0 0 1px #2a3440, inset 0 0 0 5px #0c1015, inset 0 0 0 6px #333e4a, 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  }
+  .au-board-top { display: flex; justify-content: space-between; gap: 12px; font: 700 12px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: #8ea4b8; }
+  .au-board-top b { color: var(--au-ice); }
+  #bState.is-live { color: var(--au-ice); }
+  #bState.is-warn { color: #ffffff; }
+  #bState.is-sold { color: var(--au-sea); }
+  #bState.is-pass { color: #8ea4b8; }
+  .au-led-glow { filter: drop-shadow(0 0 5px rgba(150, 205, 255, 0.55)) drop-shadow(0 0 18px rgba(110, 170, 240, 0.25)); }
+  .au-led {
+    display: flex; align-items: baseline; gap: 0.12em;
+    margin: 10px 0 8px;
+    font: 800 clamp(54px, 7.4vw, 96px)/1 "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    color: #eef7ff;
+    -webkit-mask: radial-gradient(circle, #000 0 1.35px, transparent 1.75px) 0 0 / 4px 4px;
+    mask: radial-gradient(circle, #000 0 1.35px, transparent 1.75px) 0 0 / 4px 4px;
+  }
+  .au-led-cur { font-size: 0.62em; }
+  .au-led.is-new { animation: au-led 360ms steps(3) 1; }
+  @keyframes au-led { 0% { opacity: 0.25; } 100% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .au-led.is-new { animation: none; } }
+  .au-fx { list-style: none; margin: 0; padding: 10px 0 0; border-top: 1px solid #1f2933; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px 14px; }
+  @media (max-width: 520px) { .au-fx { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .au-fx li { display: grid; gap: 2px; font: 700 11.5px/1.2 var(--sans); color: #7f95aa; letter-spacing: 0.1em; min-width: 0; }
+  .au-fx b { font: 800 clamp(16px, 1.5vw, 19px)/1.2 "Helvetica Neue", Arial, sans-serif; color: #dcecfb; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; text-shadow: 0 0 8px rgba(140, 200, 255, 0.45); white-space: nowrap; }
+  .au-board-note { margin-top: 10px; font-size: 11.5px; color: #6c7f92; letter-spacing: 0.02em; }
+
+  .au-desk { display: grid; align-content: center; }
+  .au-block, .au-open { display: grid; gap: 8px; }
+  .au-holder { font-size: 15px; color: var(--au-ink2); }
+  .au-holder b { color: var(--au-ink); }
+  .au-holder .is-yours { color: var(--au-sea); font-weight: 700; }
+  .au-calls { min-height: 1.25em; font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 500; font-size: clamp(24px, 2.6vw, 32px); font-style: italic; color: #fff; }
+  .au-update { font-size: 14.5px; color: var(--au-ink2); }
+  .au-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; align-items: center; }
+  .au-bid {
+    display: inline-flex; align-items: center; gap: 12px;
+    min-height: 68px; padding: 6px 22px 6px 10px;
+    border: 0; border-radius: 16px; cursor: pointer;
+    background: linear-gradient(#f4f8fb, #dfe7ee);
+    color: #0f1820;
+    box-shadow: 0 1px 0 #fff inset, 0 10px 24px -12px rgba(0, 0, 0, 0.7);
+    font: inherit;
+  }
+  .au-bid:not([disabled]):hover { background: linear-gradient(#ffffff, #e8f2fb); }
+  .au-bid:focus-visible { outline: 3px solid var(--au-ice); outline-offset: 3px; }
+  .au-bid[disabled] { cursor: not-allowed; opacity: 0.55; }
+  .au-bid.is-mine { opacity: 1; background: linear-gradient(#d9f5ec, #b8e6d8); }
+  .au-mypaddle { width: 34px; height: 56px; flex: none; transform: rotate(-8deg); }
+  html.play .au-mypaddle { transition: transform 260ms var(--glide, ease); }
+  .au-bid:not([disabled]):hover .au-mypaddle { transform: translateY(-4px) rotate(-12deg); }
+  .au-mypaddle svg { width: 100%; height: 100%; display: block; }
+  .au-bid-txt { display: grid; text-align: left; gap: 2px; }
+  .au-bid-k { font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #4b5c6c; }
+  #bidAmt { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  .au-letgo { min-height: 52px; }
+  .au-cost { font-size: 14px; font-weight: 600; color: var(--au-ink); }
+  .au-keys { font-size: 13px; color: var(--au-ink3); }
   .au-keys kbd, .au-real kbd {
     display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 6px;
     border: 1.5px solid currentColor; font: 700 12px/1.5 var(--sans); text-align: center;
   }
-  .au-open .au-keys { margin-top: 12px; }
-  .au-crowd:not(:empty) { margin-bottom: 14px; }
+  .au-yours { color: var(--au-ink2); font-size: 15px; }
+  .au-yours b { color: var(--au-ink); }
+  .au-open .pill { justify-self: start; }
+  .au-crowd { color: var(--au-ink2); font-size: 14.5px; }
+  .au-crowd b { color: var(--au-ink); }
+  .au-crowd:empty { display: none; }
 
-  .au-log { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 2px; max-height: 230px; overflow-y: auto; }
-  .au-log li { padding: 8px 12px; border-radius: 10px; background: var(--paper2); font-size: 14px; }
-  .au-log li.auctioneer { background: transparent; font-style: italic; color: var(--ink2); padding-left: 2px; }
-  .au-log li.you { background: var(--ink); color: var(--ink-paper); font-weight: 600; }
-  .au-log li.won { background: var(--sky); font-weight: 700; }
-  .au-log li.jump { background: var(--cobalt); }
-  .au-log li.wall { background: var(--red); }
-
-  .au-room { position: sticky; top: 16px; }
-  .au-room > .label { color: var(--ink3); }
-  #rivals { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 2px; }
-  .au-rival {
-    display: grid;
-    grid-template-columns: 56px minmax(0, 1fr);
-    column-gap: 12px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    background: var(--paper2);
+  /* The room: five seats, each with a paddle that goes up when they bid. */
+  .au-room { display: grid; gap: 12px; }
+  #rivals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 1000px) { #rivals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 620px) { #rivals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .au-seat {
+    position: relative;
+    display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; align-content: start;
+    padding: 12px 12px 10px;
+    border-radius: 12px;
+    background: linear-gradient(rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+    box-shadow: inset 0 0 0 1px var(--au-line);
   }
-  .au-rival.is-leading { background: var(--mint); }
-  .au-rival.is-out { opacity: 0.62; }
-  .au-rival.is-out .au-face { filter: grayscale(1); }
-  .au-face { grid-row: 1 / span 4; width: 56px; height: 56px; }
-  .au-face svg { width: 100%; height: 100%; display: block; }
-  .au-who { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .au-who b { font-size: 15px; }
-  .au-chip { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
-  .au-react { font-size: 12.5px; color: var(--ink2); margin-top: 2px; min-height: 2.4em; line-height: 1.3; }
-  .au-rival.is-leading .au-react { color: var(--ink); }
-  .au-purse { height: 5px; border-radius: 3px; background: var(--paper3); overflow: hidden; margin-top: 4px; }
-  .au-purse i { display: block; height: 100%; background: var(--ink); transform-origin: left center; }
-  html.play .au-purse i { transition: transform 420ms var(--glide); }
-  .au-habit { margin-top: 6px; font-size: 12.5px; }
+  .au-seat.is-leading { background: linear-gradient(rgba(140, 200, 255, 0.16), rgba(140, 200, 255, 0.05)); box-shadow: inset 0 0 0 1px rgba(170, 215, 255, 0.45); }
+  .au-seat.is-out { opacity: 0.55; }
+  .au-paddle { grid-row: 1 / span 3; width: 40px; height: 64px; transform-origin: 50% 95%; transform: translateY(6px) rotate(-3deg); }
+  html.play .au-paddle { transition: transform 300ms var(--glide, ease); }
+  .au-seat.is-leading .au-paddle { transform: translateY(-6px) rotate(-8deg); }
+  .au-seat.is-bidding .au-paddle { animation: au-paddle 700ms var(--glide, ease) 1; }
+  @keyframes au-paddle { 0% { transform: translateY(6px) rotate(-3deg); } 30% { transform: translateY(-10px) rotate(-10deg); } 100% { transform: translateY(-6px) rotate(-8deg); } }
+  @media (prefers-reduced-motion: reduce) { .au-seat.is-bidding .au-paddle { animation: none; } }
+  .au-paddle svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .au-who { display: grid; gap: 1px; min-width: 0; }
+  .au-who b { font-size: 14.5px; color: var(--au-ink); line-height: 1.2; }
+  .au-where { font-size: 12px; color: var(--au-ink3); line-height: 1.3; }
+  .au-purse { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; align-self: center; }
+  .au-purse i { display: block; height: 100%; background: linear-gradient(90deg, #7fb6e6, var(--au-ice)); transform-origin: left center; }
+  html.play .au-purse i { transition: transform 420ms var(--glide, ease); }
+  .au-chip { font-size: 12.5px; font-weight: 700; color: var(--au-ink2); }
+  .au-seat.is-leading .au-chip { color: var(--au-ice); }
+  .au-react { grid-column: 1 / -1; font-size: 12.5px; color: var(--au-ink3); min-height: 2.5em; line-height: 1.3; margin-top: 4px; }
+  .au-seat.is-leading .au-react { color: var(--au-ink); }
+  .au-habit { grid-column: 1 / -1; font-size: 12.5px; color: var(--au-ink2); }
   .au-habit summary { cursor: pointer; font-weight: 600; }
-  .au-habit p { margin-top: 4px; color: var(--ink2); }
-  .au-note { margin-top: 12px; font-size: 13px; color: var(--ink2); }
+  .au-habit p { margin-top: 4px; color: var(--au-ink3); }
+  .au-note { font-size: 13px; color: var(--au-ink3); }
+
+  /* What the auctioneer says, newest first. */
+  .au-transcript { display: grid; gap: 10px; }
+  .au-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 220px; overflow-y: auto; }
+  .au-log:empty::before { content: 'The auctioneer has not started.'; font-style: italic; color: var(--au-ink3); font-size: 14px; }
+  .au-log li { padding: 7px 12px; border-radius: 8px; font-size: 14px; color: var(--au-ink2); background: rgba(255, 255, 255, 0.03); }
+  .au-log li.auctioneer { background: transparent; font-family: var(--display); font-variation-settings: var(--display-axes); font-style: italic; font-size: 15.5px; color: var(--au-ink); padding-left: 2px; }
+  .au-log li.you { background: rgba(160, 210, 255, 0.14); color: #fff; font-weight: 600; }
+  .au-log li.won { background: rgba(111, 217, 192, 0.16); color: #e6fff8; font-weight: 700; }
+  .au-log li.jump { background: rgba(120, 140, 255, 0.14); color: #e3e6ff; }
+  .au-log li.wall { background: rgba(255, 120, 140, 0.13); color: #ffdbe0; }
 
   /* The ledger sits inside the ink result card. */
   .au-ledger { display: grid; gap: 14px; }

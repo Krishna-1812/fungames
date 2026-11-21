@@ -10,7 +10,7 @@
  *
  * Two existing contracts, both deliberately:
  *
- *  - **The cut-out contract** from `ambient-art.ts` / `auction-art.ts` /
+ *  - **The cut-out contract** from `ambient-art.ts` / the Auction Game's old lot drawings /
  *    `deep-sea-art.ts`: no card box, no painted backdrop of its own, bled to
  *    the tile's own edges, and a `dominantMood` colour computed from the
  *    drawing's own fills by drawn area so a tile's glow is the thing's own
@@ -1005,7 +1005,7 @@ export const ART: Record<string, Drawing> = {
  * Which colour a phenomenon's tile glows with: its own dominant fill, weighted
  * by drawn area.
  *
- * Lifted deliberately from `auction-art.ts` rather than reinvented — a lot of
+ * Lifted deliberately from the Auction Game's old lot drawings rather than reinvented — a lot of
  * this site's art now agrees that a card's light should come out of the
  * drawing rather than out of a palette chosen to sit beside it. `fill="none"`
  * and `fill="url(#…)"` are skipped: a gradient has no single colour to be, and
