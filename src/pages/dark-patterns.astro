@@ -868,7 +868,18 @@ const img = withBase('/dark-patterns/')
     scroller.focus({ preventScroll: true })
   }
 
+  /** The shops' photographs, fetched as the first site opens, so no
+   *  product tile is ever blank when a later site loads. */
+  const PHOTOS = ['notebook', 'lamp', 'mug', 'headphones', 'duffel']
+  let preloaded = false
+  function preload() {
+    if (preloaded) return
+    preloaded = true
+    for (const n of PHOTOS) for (const s of [false, true]) { const im = new Image(); im.src = api.img(n, s) }
+  }
+
   function begin() {
+    preload()
     unlock()
     sfx.click()
     intro.hidden = true
