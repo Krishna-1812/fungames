@@ -48,20 +48,19 @@ const photoBase = withBase('/')
       the dimming behind it is half of why it reads as one. */}
   <div class="host" aria-hidden="true">
     <div class="host-page">
-      <div class="host-nav">
-        <i style="width:78px;height:14px"></i><b></b>
-        <i style="width:46px"></i><i style="width:58px"></i><i style="width:40px"></i>
-      </div>
-      <div class="host-hero">
-        <i style="width:62%;height:26px"></i>
-        <i style="width:84%"></i><i style="width:76%"></i><i style="width:44%"></i>
-      </div>
-      <div class="host-form">
-        <i style="width:38%;height:11px"></i>
-        <u></u>
-        <i style="width:30%;height:11px"></i>
-        <u></u>
-        <s></s>
+      <div class="hp-head"><b class="hp-logo">ticketloop</b><span class="hp-search">Artists, venues, events</span><span class="hp-in">Sign in</span></div>
+      <p class="hp-hold">We're holding your tickets for <b>7:42</b></p>
+      <div class="hp-card">
+        <p class="hp-kick">Checkout</p>
+        <p class="hp-title">The Weather Station</p>
+        <p class="hp-sub">Fri 28 Nov · The Assembly Rooms</p>
+        <p class="hp-line"><span>General admission × 2</span><b>$90.00</b></p>
+        <p class="hp-line"><span>Fees</span><b>$37.50</b></p>
+        <p class="hp-line hp-total"><span>Total</span><b>$127.50</b></p>
+        <p class="hp-verify">Before you pay, confirm you're a person</p>
+        <div class="hp-gap"></div>
+        <p class="hp-pay">Pay $127.50</p>
+        <p class="hp-fine">Tickets are released if they are not paid for within ten minutes.</p>
       </div>
     </div>
   </div>
@@ -1203,6 +1202,7 @@ const photoBase = withBase('/')
       sfx.blip(3)
       setTimeout(() => {
         rc.hidden = false
+        $('scene').classList.add('is-open')
         rc.classList.add('in')
         show(0)
       }, prefersReducedMotion ? 0 : 260)
@@ -1210,7 +1210,7 @@ const photoBase = withBase('/')
   })
 
   // Development only: jump to a check, so each one can be looked at alone.
-  if (import.meta.env.DEV) (window as any).__nr = { show: (i: number) => { rc.hidden = false; rc.classList.add('in'); anchor.classList.add('is-done'); show(i) } }
+  if (import.meta.env.DEV) (window as any).__nr = { show: (i: number) => { rc.hidden = false; $('scene').classList.add('is-open'); rc.classList.add('in'); anchor.classList.add('is-done'); show(i) } }
 
   /* ------------------------------------------------------------------ */
   /* The three buttons a real one has                                    */
@@ -1392,34 +1392,47 @@ const photoBase = withBase('/')
 
   /* --- the page it is sitting on top of -------------------------------- */
 
-  /* A verification dialog never appears on its own. It appears over something
-     you were in the middle of, greyed out and slightly out of focus, and that
-     dimming is half of the reason the thing on top reads as a dialog. */
+  /* The box is always on something you were in the middle of: here, paying
+     for two concert tickets on the ticket site from Dark Patterns. Until you
+     tick it, it sits in the checkout form above the Pay button like the real
+     one does; once the challenge opens, the page greys out and goes slightly
+     out of focus behind it, and that dimming is half of why the thing on top
+     reads as a dialog. The page's rows are laid out on a fixed rhythm so the
+     gap the box sits in is where .column puts it (--hp-gap). */
+  .nr-scene { --hp-gap: 322px; }
   .host { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
   .host-page {
-    position: absolute; inset: -30px;
-    background: #eceef2; filter: blur(4px) saturate(0.35);
-    padding: 66px 8vw 0;
+    position: absolute; inset: 0;
+    background: #f6f5fa; color: #14112b;
+    font: 400 14px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    transition: filter 420ms var(--ease);
   }
-  .host-nav { display: flex; align-items: center; gap: 18px; margin-bottom: 52px; }
-  .host-nav b { flex: 1; }
-  .host-hero { max-width: 460px; margin-bottom: 46px; }
-  .host-form {
-    max-width: 380px; background: #fff; border-radius: 6px; padding: 22px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  }
-  .host i, .host u, .host s {
-    display: block; height: 9px; border-radius: 3px; background: #c8ccd4;
-    margin-bottom: 12px; text-decoration: none;
-  }
-  .host-hero i:first-child { background: #9aa1ad; margin-bottom: 18px; }
-  .host u { height: 30px; background: #e2e5ea; margin-bottom: 18px; }
-  .host s { height: 34px; width: 116px; background: #b6bcc6; margin: 22px 0 0; }
+  .nr-scene.is-open .host-page { filter: blur(3px) saturate(0.5); }
+  .hp-head { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0 clamp(14px, 3vw, 28px); background: #fff; border-bottom: 1px solid #ebe9f3; }
+  .hp-logo { font: 800 20px/1 system-ui, sans-serif; letter-spacing: -0.05em; color: #5b3df5; }
+  .hp-search { flex: 1; max-width: 340px; height: 34px; display: flex; align-items: center; padding: 0 14px; border-radius: 17px; background: #f1eff8; color: #8a86a3; font-size: 13px; }
+  .hp-in { margin-left: auto; font-weight: 600; font-size: 13px; }
+  .hp-hold { height: 34px; display: flex; align-items: center; justify-content: center; gap: 4px; background: #ece7ff; color: #3d2ba8; font-size: 12px; }
+  .hp-card { width: min(360px, calc(100% - 24px)); margin: 24px auto 0; padding: 20px 22px 18px; border-radius: 14px; background: #fff; box-shadow: 0 10px 30px -14px rgba(20, 17, 43, 0.25), 0 0 0 1px #ebe9f3; }
+  .hp-kick { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #7a74a0; }
+  .hp-title { margin-top: 4px; font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+  .hp-sub { font-size: 12px; color: #7a74a0; margin-bottom: 8px; }
+  .hp-line { display: flex; justify-content: space-between; height: 28px; align-items: center; font-size: 13px; border-top: 1px solid #f1eff8; }
+  .hp-total { font-weight: 800; font-size: 15px; }
+  .hp-verify { margin-top: 10px; font-size: 12px; color: #5b5772; }
+  .hp-gap { height: 84px; }
+  .hp-pay { height: 46px; display: grid; place-items: center; border-radius: 23px; background: #c9c1f5; color: #fff; font-weight: 700; }
+  .hp-fine { margin-top: 10px; font-size: 11px; color: #8a86a3; text-align: center; }
   .nr-scene.is-unmasked .host { opacity: 0; transition: opacity 800ms var(--ease); }
   .host::after {
-    content: ''; position: absolute; inset: 0;
-    background: radial-gradient(120% 90% at 50% 34%, rgba(12, 14, 20, 0.6), rgba(8, 9, 13, 0.9));
+    content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity 420ms var(--ease);
+    background: radial-gradient(120% 90% at 50% 34%, rgba(12, 14, 20, 0.55), rgba(8, 9, 13, 0.85));
   }
+  .nr-scene.is-open .host::after { opacity: 1; }
+  /* Until it opens, the box sits in the form's gap; the line under it is the
+     page's, not the widget's. */
+  .nr-scene:not(.is-open):not(.is-unmasked) .column { padding-top: calc(var(--hp-gap) - clamp(28px, 5vw, 56px)); }
+  .nr-scene:not(.is-open) .stepline { visibility: hidden; }
 
   /* --- layout ----------------------------------------------------------- */
 
@@ -1805,7 +1818,6 @@ const photoBase = withBase('/')
   @media (max-width: 460px) {
     .rc-target { font-size: 21px; }
     .hands { gap: 3px; }
-    .host-page { padding-top: 40px; }
     .nr-scene { min-height: 560px; padding-inline: 8px; }
   }
 </style>
