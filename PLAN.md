@@ -2690,6 +2690,11 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     last G5 storm, 868 days before). The info panels are the shell's own
     paper dialogs.
 
+    **The Auction Game** (later): every lot a 3D model photographed in a
+    catalogue studio, offline; the page a dark saleroom with a currency
+    board at the day's ECB rates, paddles for the room, a telephone and an
+    online bidder, and a gavel. The engine is untouched. See the README.
+
     **Earth Reviews** (later): every product photographed in its packaging —
     a carton, tin or glass jar with its contents showing, the label printed
     from its drawing — by an offline studio bake; the shop is wider, with a

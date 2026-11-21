@@ -207,7 +207,7 @@ export const GAMES: Game[] = [
     title: 'The Auction Game',
     blurb: 'Fourteen lots. You will overpay.',
     description:
-      'Bid against five rivals with their own money and their own bad habits. Real bidding increments, a real 25% buyer’s premium, a secret reserve, and bids the auctioneer takes off the wall. At the end it shows you exactly how you were parted from your money.',
+      'Bid in a saleroom against five rivals with their own money and their own bad habits — one on the telephone, one online — with every lot photographed for the catalogue and every bid on the currency board at today’s exchange rates. Real bidding increments, a real 25% buyer’s premium, a secret reserve, and bids the auctioneer takes off the wall. At the end it shows you exactly how you were parted from your money.',
     accent: '#2b1418', accent2: '#c8894a',
     category: 'money',
     added: '2026-09-18',

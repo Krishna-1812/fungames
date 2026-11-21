@@ -1326,6 +1326,28 @@ CAPTCHAs infuriating. The street is baked to a JPEG at build time by
 nine copies of a drawing, and because the artefacts of lossy compression are
 themselves part of what a real tile looks like.
 
+**The Auction Game**, the saleroom — the lots were flat drawings in a white
+card and the rivals were cartoon faces. A saleroom sells from photographs,
+so every lot is now photographed the way a catalogue is shot: each of the
+fourteen is a 3D model (`scripts/auction-bake/lots/`) lit in a studio with a
+softbox, a strip light and a seamless sweep (`scripts/auction-bake/studio.glsl`,
+rendered offline by `scripts/bake-auction.mjs` at sixteen samples a pixel,
+the key moved across the softbox for each so the shadows are really soft) —
+the chronometer stopped at 4:11 with its Roman numerals and blued hands, the
+diamond cut from facets, the paintings painted and then given canvas,
+impasto and cracked varnish. The sweep falls away to the stage's own colour,
+so a lot sits in the room with no frame. Round it is a saleroom
+(`lib/auction-room.ts`): a currency board of lit dots that shows every bid in
+six currencies at the day's European Central Bank rates (and a real day's
+rates if the service does not answer), "for guidance only", as London
+boards say; five rivals with numbered paddles that go up when they bid, one
+of them on the telephone and one online, and the auctioneer saying where
+each bid is from; your own paddle on the bid button; and a gavel that
+knocks. *`check-auction-room.mjs` holds every lot to a model and two
+photographs whose corners are the stage's colour, every rival to a seat and
+a paddle of their own, and the board's arithmetic and its refusal of a
+broken rates answer.*
+
 **Earth Reviews**, the packshots — the shop's products were flat drawings
 on dark tiles inside a small browser window. A shop photographs what it
 sells, and there is no photograph of Mondays, so every product is now shot
