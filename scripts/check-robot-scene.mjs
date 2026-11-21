@@ -1,33 +1,21 @@
 /**
- * check-robot-scene — is the answer key true of the picture?
+ * check-robot-scene — is the answer key true of the picture, and are the
+ * pictures I'm Not a Robot shows you actually there?
  *
- * src/lib/robot-scene.ts works out which squares contain the traffic light
- * from a handful of bounding boxes. That is arithmetic on numbers I typed, and
- * numbers I typed are exactly the thing that goes stale when the drawing
- * moves. So this asks the same question a completely different way: render the
- * street twice, once with the light and once without, and see which squares
- * changed. Pixels do not care what the boxes say.
+ *   1. The street (public/not-a-robot/street.jpg) is the 900 x 900 JPEG the
+ *      page cuts its nine squares from, in budget, and not a blank frame.
+ *   2. The key (src/data/robot-street-key.ts) is measured, not typed: it is
+ *      written by bake-robot.mjs from a mask render of the signal head and
+ *      its pole. Here it is held to being a key a person can be fairly marked
+ *      against: the head is in at least one square, no square has the head
+ *      only grazing it, every square you must tick is one you may tick, and
+ *      at least one square is a judgement call (the arm), which is the joke.
+ *   3. mark() grades the obvious answers the way a person would expect.
+ *   4. The distorted text: deterministic, seeded, legible, actually warped.
+ *   5. The hands: four photographs, square, exactly one with five digits and
+ *      one thumb, and each wrong one able to say what is wrong with it.
  *
- * If the two ever disagree, one of them is wrong and the picture is lying to
- * the player about what the right answer was.
- *
- * It also checks the things a screenshot answers badly:
- *
- *   - Is the subject actually visible, or merely present? A traffic light at
- *     4% opacity satisfies every bounding box in the file and cannot be seen.
- *   - Does the answer turn on the coverage threshold? If some square sat at
- *     4.6% against a 4.5% cut, the key would be one nudge from changing, and
- *     nothing would say so.
- *   - Is the scene a photograph or a diagram? Several ways: how many distinct
- *     tones there are, how much of the frame is perfectly flat, whether the
- *     far end is softer than the near end, and whether the sunlit side of the
- *     street is actually brighter than the shaded side. These are measured on
- *     the encoded JPEG the page really loads, not on the SVG it came from.
- *   - Is the distorted text distorted, and still all there?
- *   - Do the four hands have the number of fingers they say they have, and is
- *     exactly one of them right?
- *
- *   node scripts/check-robot-scene.mjs [--png dir]
+ *   node scripts/check-robot-scene.mjs
  */
 import { Resvg } from '@resvg/resvg-js'
 import sharp from 'sharp'
@@ -35,247 +23,78 @@ import fs from 'node:fs'
 import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
-const {
-  STREET, MIN_COVER, answerCells, coreCells, mark, coverage, cellBox, sceneSvg, warpedText, ALPHABET,
-  STREET_JPEG,
-  hands, HAND_DEFS,
-} = await import('../src/lib/robot-scene.ts')
+const { STREET_KEY, HEAD_MIN, SEEN_MIN, answerCells, coreCells, mark, warpedText, ALPHABET, hands, HAND_SHOTS } =
+  await import('../src/lib/robot-scene.ts')
 
 let failed = 0
 const fail = (msg) => { console.error('  FAIL ' + msg); failed++ }
 const ok = (msg) => console.log('  ok   ' + msg)
+const pub = (p) => new URL('../public/' + p, import.meta.url)
 
-/** Render at 3x so a one-unit pole is three pixels and cannot vanish. */
-const SCALE = 3
 function raster(svg, size) {
-  const img = new Resvg(svg, { fitTo: { mode: 'width', value: size * SCALE } }).render()
+  const img = new Resvg(svg, { fitTo: { mode: 'width', value: size * 3 } }).render()
   return { px: img.pixels, w: img.width, h: img.height }
 }
 
-const SCENES = [['the street', STREET]]
-
 /* ------------------------------------------------------------------------ */
-console.log('\nBounding boxes')
+console.log('\nThe street')
 /* ------------------------------------------------------------------------ */
-
-for (const [name, scene] of SCENES) {
-  // coverage() adds the boxes up, so two that overlap would count their shared
-  // area twice and could push a square over the line on its own.
-  let clash = 0
-  for (let i = 0; i < scene.bounds.length; i++)
-    for (let j = i + 1; j < scene.bounds.length; j++) {
-      const a = scene.bounds[i], b = scene.bounds[j]
-      const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
-      const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
-      if (w > 0 && h > 0) clash += w * h
-    }
-  if (clash > 0) fail(name + ': subject boxes overlap by ' + clash.toFixed(1) + ' square units')
-  else ok(name + ': ' + scene.bounds.length + ' subject boxes, none overlapping')
-
-  const key = answerCells(scene)
-  if (key.length === 0) fail(name + ': nothing to find')
-  else if (key.length === 9) fail(name + ': every square is the answer, which is not a question')
-  else ok(name + ': the answer is ' + key.length + ' of 9 squares — ' + key.join(', '))
-}
-
-/* ------------------------------------------------------------------------ */
-console.log('\nThe answer key against the pixels')
-/* ------------------------------------------------------------------------ */
-
-/**
- * A square counts as changed if enough of its pixels moved by enough. Both
- * numbers are loose on purpose: the question is "did the light land here",
- * not "by how much", and a threshold tuned finely enough to matter would be
- * measuring itself.
- */
-const DELTA = 12          // per-channel difference that counts as a change
-const CHANGED_MIN = 0.02  // fraction of a square's pixels that must have moved
-
-for (const [name, scene] of SCENES) {
-  const withIt = raster(sceneSvg(scene, true), scene.size)
-  const without = raster(sceneSvg(scene, false), scene.size)
-  if (withIt.w !== without.w || withIt.h !== without.h) {
-    fail(name + ': the two renders are different sizes')
-    continue
-  }
-
-  const n = 3
-  const cell = withIt.w / n
-  const moved = new Array(n * n).fill(0)
-  for (let y = 0; y < withIt.h; y++)
-    for (let x = 0; x < withIt.w; x++) {
-      const o = (y * withIt.w + x) * 4
-      const d = Math.max(
-        Math.abs(withIt.px[o] - without.px[o]),
-        Math.abs(withIt.px[o + 1] - without.px[o + 1]),
-        Math.abs(withIt.px[o + 2] - without.px[o + 2]),
-      )
-      if (d >= DELTA) moved[Math.floor(y / cell) * n + Math.floor(x / cell)]++
-    }
-
-  const perCell = cell * cell
-  const seen = []
-  for (let i = 0; i < 9; i++) if (moved[i] / perCell >= CHANGED_MIN) seen.push(i)
-  const key = answerCells(scene)
-
-  if (seen.join(',') !== key.join(',')) {
-    fail(name + ': the boxes say ' + JSON.stringify(key) + ' but the pixels say ' + JSON.stringify(seen))
-    for (let i = 0; i < 9; i++)
-      console.error('       square ' + i + ': boxes ' + (coverage(scene, 3, i) * 100).toFixed(1) +
-        '%, pixels ' + ((moved[i] / perCell) * 100).toFixed(1) + '%')
-  } else {
-    ok(name + ': both methods name the same squares — ' + key.join(', '))
-  }
-
-  // Present is not the same as visible. Every answer square has to have been
-  // properly repainted, not grazed.
-  for (const i of key) {
-    const f = moved[i] / perCell
-    if (f < 0.05) fail(name + ': square ' + i + ' is an answer but only ' + (f * 100).toFixed(1) +
-      '% of it changed — the subject is there but you cannot see it')
-  }
-  ok(name + ': every answer square is at least 5% repainted (worst ' +
-    (Math.min(...key.map((i) => moved[i] / perCell)) * 100).toFixed(1) + '%)')
-
-  // And the key must not sit near the cut.
-  let closest = 1
-  for (let i = 0; i < 9; i++) closest = Math.min(closest, Math.abs(coverage(scene, 3, i) - MIN_COVER))
-  if (closest < 0.02)
-    fail(name + ': a square sits ' + (closest * 100).toFixed(2) +
-      ' points from the ' + (MIN_COVER * 100) + '% cut — the key turns on the threshold')
-  else
-    ok(name + ': nearest square is ' + (closest * 100).toFixed(1) + ' points clear of the cut')
-}
-
-/* ------------------------------------------------------------------------ */
-console.log('\nDoes it look like a photograph')
-/* ------------------------------------------------------------------------ */
-
-/**
- * Everything below is measured on the JPEG the browser downloads, encoded
- * exactly as src/pages/street.jpg.ts encodes it. Checking the SVG instead
- * would be checking something nobody ever sees: the encoder softens the flat
- * areas and rings the hard edges, and both of those change the answers.
- */
 {
-  const png = new Resvg(sceneSvg(STREET, true), {
-    fitTo: { mode: 'width', value: STREET_JPEG.width },
-  }).render().asPng()
-  const jpg = await sharp(png)
-    .jpeg({ quality: STREET_JPEG.quality, mozjpeg: true, chromaSubsampling: '4:2:0' })
-    .toBuffer()
-
-  if (jpg.length > STREET_JPEG.maxBytes)
-    fail('the street is ' + (jpg.length / 1024).toFixed(0) + 'KB, over the ' +
-      (STREET_JPEG.maxBytes / 1024).toFixed(0) + 'KB budget')
-  else
-    ok('the street ships as ' + (jpg.length / 1024).toFixed(0) + 'KB of JPEG at ' +
-      STREET_JPEG.width + 'px')
-
-  const dec = await sharp(jpg).raw().toBuffer({ resolveWithObject: true })
-  const px = dec.data, W = dec.info.width, H = dec.info.height, CH = dec.info.channels
-  const lum = (x, y) => {
-    const o = (y * W + x) * CH
-    return 0.2126 * px[o] + 0.7152 * px[o + 1] + 0.0722 * px[o + 2]
+  const f = pub('not-a-robot/street.jpg')
+  if (!fs.existsSync(f)) fail('public/not-a-robot/street.jpg is missing: run node scripts/bake-robot.mjs street')
+  else {
+    const buf = fs.readFileSync(f)
+    const m = await sharp(buf).metadata()
+    if (m.format !== 'jpeg' || m.width !== 900 || m.height !== 900) fail(`street.jpg is ${m.format} ${m.width}x${m.height}, not a 900 x 900 JPEG`)
+    else ok('a 900 x 900 JPEG, 300 pixels a square')
+    if (buf.length > 140_000) fail(`street.jpg is ${(buf.length / 1024).toFixed(0)}KB, over 140KB`)
+    else ok(`${(buf.length / 1024).toFixed(0)}KB`)
+    const s = await sharp(buf).stats()
+    if (s.channels.every((c) => c.stdev < 20)) fail('street.jpg is close to a flat frame')
+    else ok('a picture, not a flat frame')
   }
-
-  // A drawing made of flat fills has a handful of colours in it. A photograph
-  // has thousands, because every surface is textured and nothing is even.
-  const tones = new Set()
-  for (let o = 0; o < px.length; o += CH)
-    tones.add((px[o] >> 3) * 1024 + (px[o + 1] >> 3) * 32 + (px[o + 2] >> 3))
-  if (tones.size < 900) fail('only ' + tones.size + ' distinct tones — that is a diagram')
-  else ok(tones.size + ' distinct tones')
-
-  /**
-   * The one that actually separates the two. A photograph has no perfectly
-   * even patches anywhere in it — sensor noise alone guarantees that — and
-   * vector art is nothing but perfectly even patches. Counted as the fraction
-   * of the frame whose three-by-three neighbourhood is completely uniform.
-   */
-  let flat = 0, total = 0
-  for (let y = 1; y < H - 1; y += 2)
-    for (let x = 1; x < W - 1; x += 2) {
-      total++
-      const c = lum(x, y)
-      let same = true
-      for (let dy = -1; dy <= 1 && same; dy++)
-        for (let dx = -1; dx <= 1; dx++)
-          if (Math.abs(lum(x + dx, y + dy) - c) > 0.5) { same = false; break }
-      if (same) flat++
-    }
-  const flatPct = (flat / total) * 100
-  if (flatPct > 8) fail(flatPct.toFixed(1) + '% of the frame is perfectly flat — that reads as rendered')
-  else ok(flatPct.toFixed(1) + '% of the frame is perfectly flat')
-
-  /**
-   * Depth, as haze washing out contrast with distance.
-   *
-   * The first version of this compared a band near the horizon against a band
-   * near the bottom and failed, because the horizon band is full of windows
-   * and the bottom band is empty road: it was measuring how much is going on
-   * at each height, not how sharp any of it is. Both samples now sit on the
-   * same material — shaded asphalt — at two distances.
-   *
-   * And it is relative contrast, not absolute. The near band is deeper in the
-   * building's shadow and therefore darker, so the same texture there produces
-   * smaller absolute differences; dividing by the local mean is what makes the
-   * two numbers comparable, and it is what the eye is doing anyway.
-   */
-  const grit = (y0, y1, x0, x1) => {
-    let e = 0, m = 0, n = 0
-    for (let y = y0; y < y1; y++)
-      for (let x = x0; x < x1 - 1; x++) { e += Math.abs(lum(x, y) - lum(x + 1, y)); m += lum(x, y); n++ }
-    return (e / n) / Math.max(1, m / n) * 100
-  }
-  const xa = Math.round(W * 0.6), xb = Math.round(W * 0.7)
-  const far = grit(Math.round(H * 0.545), Math.round(H * 0.585), xa, xb)
-  const near = grit(Math.round(H * 0.8), Math.round(H * 0.855), xa, xb)
-  if (far >= near)
-    fail('road grit does not fall off with distance (' + far.toFixed(2) + ' far vs ' +
-      near.toFixed(2) + ' near) — there is no air in this picture')
-  else ok('road grit falls from ' + near.toFixed(2) + '% contrast underfoot to ' + far.toFixed(2) + '% up the street')
-
-  // The sun is somewhere. Sampled across the road at one height, the lit side
-  // has to be brighter than the shaded side — if the cast shadow ever stops
-  // being drawn, this is what says so.
-  const rowAvg = (y, x0, x1) => {
-    let a = 0
-    for (let x = x0; x < x1; x++) a += lum(x, y)
-    return a / (x1 - x0)
-  }
-  const y = Math.round(H * 0.8)
-  const litSide = rowAvg(y, Math.round(W * 0.06), Math.round(W * 0.22))
-  const shadeSide = rowAvg(y, Math.round(W * 0.74), Math.round(W * 0.9))
-  if (litSide - shadeSide < 8)
-    fail('the two sides of the street differ by only ' + (litSide - shadeSide).toFixed(1) +
-      ' levels — there is no sun in this picture')
-  else ok('the sunlit side is ' + (litSide - shadeSide).toFixed(0) + ' levels brighter than the shade')
-
-  // Every square has to carry something. A tile that is one flat colour looks
-  // like a loading failure, and there are nine chances to ship one.
-  for (let i = 0; i < 9; i++) {
-    const b = cellBox(W, 3, i)
-    let min = 255, max = 0
-    for (let yy = b.y; yy < b.y + b.h; yy++)
-      for (let xx = b.x; xx < b.x + b.w; xx++) {
-        const l = lum(xx, yy)
-        if (l < min) min = l
-        if (l > max) max = l
-      }
-    if (max - min < 40)
-      fail('square ' + i + ' spans only ' + (max - min).toFixed(0) + ' levels — it is blank')
-  }
-  ok('no square is flat')
-
-  // The corners of a photograph are darker than the middle.
-  const e = 8
-  const corner = (lum(e, e) + lum(W - e, e)) / 2
-  const middle = lum(Math.floor(W / 2), e)
-  if (corner >= middle) fail('the top corners are not darker than the top middle')
-  else ok('corners sit ' + (middle - corner).toFixed(0) + ' levels under the middle')
 }
 
+/* ------------------------------------------------------------------------ */
+console.log('\nThe key, measured from the picture')
+/* ------------------------------------------------------------------------ */
+{
+  const K = STREET_KEY
+  if (K.grid !== 3 || K.head.length !== 9 || K.pole.length !== 9 || K.size !== 900) fail('the key is not a 3 x 3 measurement of the 900px street')
+  else ok('a share for every one of the nine squares, measured at 900px')
+  const core = coreCells(), answer = answerCells()
+  if (!core.length) fail('the signal head is in no square at all')
+  else ok(`you must tick ${core.map((i) => i + 1).join(', ')}; you may also tick ${answer.filter((i) => !core.includes(i)).map((i) => i + 1).join(', ') || 'nothing else'}`)
+  const grazing = K.head.map((h, i) => [h, i]).filter(([h]) => h > 0 && h < HEAD_MIN * 2)
+  if (grazing.length) fail('the head only grazes square ' + grazing.map(([h, i]) => `${i + 1} (${(h * 100).toFixed(1)}%)`).join(', ') + ': not fair to mark either way')
+  else ok('no square has the head only grazing it: each clearly has it or clearly does not')
+  const sliver = K.head.map((h, i) => [h + K.pole[i], i]).filter(([v]) => v > 0 && v < SEEN_MIN * 1.5)
+  if (sliver.length) fail('the pole barely touches square ' + sliver.map(([, i]) => i + 1).join(', '))
+  else ok('nothing touches a square by a sliver')
+  if (!core.every((i) => answer.includes(i))) fail('a square you must tick is not one you may tick')
+  else ok('every square you must tick is one you may tick')
+  if (answer.length === core.length) fail('there is no judgement call: the arm reaches no square of its own')
+  else ok('at least one square is yours to decide')
+}
+
+/* ------------------------------------------------------------------------ */
+console.log('\nMarking')
+/* ------------------------------------------------------------------------ */
+{
+  const core = coreCells(), answer = answerCells()
+  const others = [...Array(9).keys()].filter((i) => !answer.includes(i))
+  if (!mark(core).ok) fail('ticking exactly the head is marked wrong')
+  else ok('ticking exactly the head passes')
+  if (!mark(answer).ok) fail('ticking the head and the arm is marked wrong')
+  else ok('ticking the head and the arm passes too')
+  if (core.length > 1 && mark(core.slice(1)).ok) fail('missing a head square passes')
+  if (mark([]).ok) fail('ticking nothing passes')
+  else ok('ticking nothing fails')
+  if (others.length && mark([...core, others[0]]).ok) fail('ticking an empty square passes')
+  else ok('ticking a square with no traffic light in it fails')
+}
+
+/* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 console.log('\nThe distorted text')
 /* ------------------------------------------------------------------------ */
@@ -325,84 +144,27 @@ console.log('\nThe distorted text')
 }
 
 /* ------------------------------------------------------------------------ */
-
-/* ------------------------------------------------------------------------ */
 console.log('\nThe hands')
 /* ------------------------------------------------------------------------ */
-
-const HAND_SVG = (h) =>
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140" width="120" height="140">' +
-  '<defs>' + HAND_DEFS + '</defs>' + h.svg + '</svg>'
-
 {
-  const list = hands()
+  const list = hands('/')
+  if (list.length !== 4) fail(`${list.length} hands, not four`)
   const right = list.filter((h) => h.ok)
-  if (right.length !== 1) fail(right.length + ' of the four hands are correct, not one')
-  else ok('exactly one of the four has five digits')
-
-  // The count comes out of the loop that draws them, so a hand cannot say four
-  // and be drawn with five. This checks the counts are the ones intended.
-  const got = list.map((h) => h.digits).join(',')
-  if (got !== '5,6,4,6') fail('digit counts are ' + got + ', expected 5,6,4,6')
-  else ok('digit counts drawn: ' + got)
-
-  for (const h of list) if (!h.ok && !h.why) fail('a wrong hand does not say why it is wrong')
-  ok('every wrong hand says what is wrong with it')
-
-  // Four pictures that are nearly the same picture is not a question. Rendered
-  // and compared, because "I moved a rectangle" is not evidence of difference.
-  const imgs = list.map((h) => raster(HAND_SVG(h), 120))
-  for (let i = 0; i < imgs.length; i++)
-    for (let j = i + 1; j < imgs.length; j++) {
-      let moved = 0
-      for (let o = 0; o < imgs[i].px.length; o += 4)
-        if (Math.abs(imgs[i].px[o] - imgs[j].px[o]) > 14) moved++
-      const f = moved / (imgs[i].px.length / 4)
-      if (f < 0.015) fail('hands ' + i + ' and ' + j + ' differ in only ' + (f * 100).toFixed(1) + '% of pixels')
-    }
-  ok('all six pairs are visibly different from each other')
-
-  // And each one has to be a hand on a ground, not a ground.
-  for (let i = 0; i < imgs.length; i++) {
-    const img = imgs[i]
-    let skin = 0
-    for (let o = 0; o < img.px.length; o += 4) {
-      const [r, g, b] = [img.px[o], img.px[o + 1], img.px[o + 2]]
-      if (r > 150 && r - b > 30 && g > b) skin++
-    }
-    const f = skin / (img.px.length / 4)
-    if (f < 0.12) fail('hand ' + i + ' covers only ' + (f * 100).toFixed(1) + '% of its frame')
+  if (right.length !== 1) fail(`${right.length} hands have five digits and one thumb, not exactly one`)
+  else ok(`exactly one hand is right: ${right[0].fingers} fingers and a thumb`)
+  if (list.some((h) => !h.ok && !h.why)) fail('a wrong hand cannot say what is wrong with it')
+  else ok('every wrong hand says what is wrong: ' + list.filter((h) => !h.ok).map((h) => h.why).join(' '))
+  for (const [f, t] of HAND_SHOTS) {
+    const file = pub(`not-a-robot/hand-${f}-${t}.webp`)
+    if (!fs.existsSync(file)) { fail(`hand-${f}-${t}.webp is missing: run node scripts/bake-robot.mjs hands`); continue }
+    const m = await sharp(fs.readFileSync(file)).metadata()
+    if (m.width !== 600 || m.height !== 600) fail(`hand-${f}-${t}.webp is ${m.width}x${m.height}`)
   }
-  ok('every hand fills at least 12% of its frame')
-
-  const tones = new Set()
-  for (let o = 0; o < imgs[0].px.length; o += 4)
-    tones.add((imgs[0].px[o] >> 3) * 1024 + (imgs[0].px[o + 1] >> 3) * 32 + (imgs[0].px[o + 2] >> 3))
-  if (tones.size < 150) fail('a hand has only ' + tones.size + ' distinct tones — that is an outline')
-  else ok('the correct hand has ' + tones.size + ' distinct tones')
-}
-
-const dir = process.argv.indexOf('--png') >= 0 ? process.argv[process.argv.indexOf('--png') + 1] : null
-if (dir) {
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(dir + '/street.png',
-    new Resvg(sceneSvg(STREET, true), { fitTo: { mode: 'width', value: 600 } }).render().asPng())
-  fs.writeFileSync(dir + '/street.jpg', await sharp(
-    new Resvg(sceneSvg(STREET, true), { fitTo: { mode: 'width', value: STREET_JPEG.width } })
-      .render().asPng())
-    .jpeg({ quality: STREET_JPEG.quality, mozjpeg: true, chromaSubsampling: '4:2:0' }).toBuffer())
-  fs.writeFileSync(dir + '/street-nolight.png',
-    new Resvg(sceneSvg(STREET, false), { fitTo: { mode: 'width', value: 600 } }).render().asPng())
-  const sheet = hands().map((h, i) =>
-    '<g transform="translate(' + i * 120 + ' 0)">' + h.svg + '</g>').join('')
-  fs.writeFileSync(dir + '/hands.png', new Resvg(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 140" width="480" height="140">' +
-    '<defs>' + HAND_DEFS + '</defs>' + sheet + '</svg>',
-    { fitTo: { mode: 'width', value: 720 } }).render().asPng())
-  fs.writeFileSync(dir + '/text.png',
-    new Resvg(warpedText('K4WBP', 7).svg, { fitTo: { mode: 'width', value: 528 } }).render().asPng())
-  console.log('\nwrote ' + dir)
+  ok('all four photographs are there, 600 square')
+  const allow = fs.readFileSync(new URL('./check-public-boundary.mjs', import.meta.url), 'utf8')
+  if (!allow.includes("'not-a-robot'")) fail('public/not-a-robot is not on the deploy allowlist')
+  else ok('public/not-a-robot is on the deploy allowlist')
 }
 
 console.log(failed ? '\n' + failed + ' failed.' : '\nAll good.')
-process.exitCode = failed ? 1 : 0
+process.exit(failed ? 1 : 0)

@@ -1,6 +1,5 @@
 ---
 import GameShell from '../layouts/GameShell.astro'
-import { HAND_DEFS } from '../lib/robot-scene'
 import { withBase } from '../lib/base'
 
 /**
@@ -33,7 +32,7 @@ import { withBase } from '../lib/base'
  * Moves are rejections, and Best is the most human you have ever looked.
  */
 
-const sceneDefs = HAND_DEFS
+const photoBase = withBase('/')
 ---
 
 <GameShell
@@ -42,7 +41,7 @@ const sceneDefs = HAND_DEFS
   initial={{ score: '—', level: '0 / 12', moves: '0' }}
   fonts={['Roboto:wght@400;500;700']}
 >
-  <div class="nr" id="nr">
+  <div class="nr" id="nr" data-photos={photoBase} style={`--street: url('${photoBase}not-a-robot/street.jpg')`}>
   <div class="nr-scene" id="scene">
   {/* The page the challenge is sitting on top of. A verification dialog never
       appears on its own — it appears over something you were trying to do, and
@@ -67,12 +66,8 @@ const sceneDefs = HAND_DEFS
     </div>
   </div>
 
-{/* The hands are drawn in the browser and share one set of gradients. The
-      street is not: it is baked to /street.png at build time, because nine
-      tiles of one filtered drawing means nine runs of the filter stack. */}
-  <svg class="scene-src" width="0" height="0" aria-hidden="true" focusable="false">
-    <defs set:html={sceneDefs} />
-  </svg>
+{/* The street and the hands are photographs, rendered offline by
+      scripts/bake-robot.mjs into public/not-a-robot/. */}
 
     <div class="column">
       <section class="rc" id="rc" hidden aria-label="Verification challenge">
@@ -326,7 +321,7 @@ const sceneDefs = HAND_DEFS
   import { Profiler, circleStats, variation, gaps, report } from '../lib/telemetry'
   import { recordPlay } from '../lib/stats'
   import { dailyFor, dailyTarget } from '../data/game-meta'
-  import { STREET, ALPHABET, coreCells, mark, warpedText, hands } from '../lib/robot-scene'
+  import { ALPHABET, coreCells, mark, warpedText, hands } from '../lib/robot-scene'
 
   const prefersReducedMotion = !PLAY
   // Restart reloads: the profiler has been listening to the whole page since
@@ -334,6 +329,7 @@ const sceneDefs = HAND_DEFS
   const shell = createShell({ slug: 'not-a-robot' })
 
   const $ = (id: string) => document.getElementById(id)!
+  const PHOTO_BASE = (document.getElementById('nr') as HTMLElement).dataset.photos || '/'
   const rc = $('rc'), slot = $('slot')
   const leadEl = $('rcLead'), targetEl = $('rcTarget'), tailEl = $('rcTail')
   const statusEl = $('status'), actionBtn = $('action') as HTMLButtonElement
@@ -471,11 +467,11 @@ const sceneDefs = HAND_DEFS
         const chosen = wireTiles(host)
         api.action('Verify', () => {
           if (!chosen.size) return api.reject('Please select all matching images.')
-          const m = mark(STREET, chosen)
+          const m = mark(chosen)
           if (m.ok) {
-            const extra = chosen.size - coreCells(STREET).length
+            const extra = chosen.size - coreCells().length
             api.pass(extra > 0
-              ? `${chosen.size} squares — you counted the pole. So would I.`
+              ? `${chosen.size} squares — you counted the arm. So would I.`
               : `${chosen.size} squares. The head, and nothing else.`)
           } else if (m.missed.length) {
             api.reject('Please select all matching images.')
@@ -831,11 +827,11 @@ const sceneDefs = HAND_DEFS
       mount(host, api) {
         // Two by two, which is the other shape a real image challenge comes in,
         // and four times the room to count fingers in.
-        const OPTIONS = hands().sort(() => Math.random() - 0.5)
+        const OPTIONS = hands(PHOTO_BASE).sort(() => Math.random() - 0.5)
         host.innerHTML = `<div class="hands" role="group" aria-label="Four pictures of a hand">${
           OPTIONS.map((o, i) =>
             `<button type="button" class="handbtn" data-i="${i}">
-               <svg viewBox="0 0 120 140" aria-hidden="true">${o.svg}</svg>
+               <img src="${o.src}" alt="" width="600" height="600" draggable="false">
                <span class="sr-only">Hand ${i + 1}</span>
              </button>`).join('')}</div>`
         host.querySelectorAll<HTMLButtonElement>('.handbtn').forEach((b) =>
@@ -1212,6 +1208,9 @@ const sceneDefs = HAND_DEFS
       }, prefersReducedMotion ? 0 : 260)
     }, prefersReducedMotion ? 200 : 950)
   })
+
+  // Development only: jump to a check, so each one can be looked at alone.
+  if (import.meta.env.DEV) (window as any).__nr = { show: (i: number) => { rc.hidden = false; rc.classList.add('in'); anchor.classList.add('is-done'); show(i) } }
 
   /* ------------------------------------------------------------------ */
   /* The three buttons a real one has                                    */
@@ -1610,7 +1609,7 @@ const sceneDefs = HAND_DEFS
     transition: transform 280ms cubic-bezier(0.2, 0.75, 0.3, 1);
   }
   .tile-img svg { display: block; width: 100%; height: 100%; }
-  .tile-img.street { background-image: url('/street.jpg'); background-size: 300% 300%; }
+  .tile-img.street { background-image: var(--street); background-size: 300% 300%; }
   .tile[aria-pressed='true'] .tile-img { transform: scale(0.72); }
   .tile:hover .tile-img { filter: brightness(1.07); }
   .tile:focus-visible { outline: 3px solid var(--rc-blue-d); outline-offset: -3px; }
@@ -1701,8 +1700,8 @@ const sceneDefs = HAND_DEFS
     position: relative; background: #fff; border: 0; padding: 0; overflow: hidden;
     cursor: pointer; line-height: 0;
   }
-  .handbtn svg { width: 100%; height: auto; display: block; transition: filter 140ms var(--ease); }
-  .handbtn:hover svg { filter: brightness(1.06); }
+  .handbtn img { width: 100%; height: auto; display: block; aspect-ratio: 1; transition: filter 140ms var(--ease); }
+  .handbtn:hover img { filter: brightness(1.04); }
   .handbtn:focus-visible { outline: 3px solid var(--rc-blue-d); outline-offset: -3px; }
   .handbtn.right { box-shadow: inset 0 0 0 4px #188038; }
   .handbtn.wrong { box-shadow: inset 0 0 0 4px var(--rc-err); }
