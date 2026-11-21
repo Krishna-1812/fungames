@@ -2695,6 +2695,12 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     measured from a mask render of the same scene, and the box placed in a
     real checkout page that dims only when the challenge opens. See the README.
 
+    **Internet Artifacts** (later): an object for every moment, modelled and
+    photographed cut out (scripts/bake-artifacts.mjs, a studio with no
+    backdrop that sees through glass), standing in a faint pool of its era's
+    light; the eras made denser so no card hides its photograph. See the
+    README.
+
     **Dark Patterns** (later): eleven sites each built like the real kind
     of site, in one browser window with a tab, an address bar and a load
     bar; the shops' products modelled and photographed in a white packshot

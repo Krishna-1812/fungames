@@ -835,26 +835,33 @@ each card is independent of the `year` float used to position it, so
 precision can never accidentally get rounded up for the sake of a tidier
 layout. A small "play dial-up modem sound" toggle loops a handshake warble
 through the shared `tone()` synth, and a blinking terminal-cursor dot travels
-a rail down the left edge in place of Space Elevator's cable car. Twenty-five
-scenes were drawn by four parallel agents from one written contract and three
-exemplars (a CRT terminal mid-crash, a recovered bulletin-board smiley, Nyan
-Cat), each real gradient-shaded rather than a flat cut-out, none reproducing
-an actual company trademark — an original search-and-garage motif for
-Google's founding, an original bird for the first tweet, no real Twitter or
-YouTube wordmark anywhere. *`scripts/check-internet-artifacts.mjs` checks
-that every `date` string matches a recognised precision format and that a
-handful of headline facts (the Web's public announcement, Google's
-incorporation date rather than its earlier domain registration, the first
-Wikipedia edit landing the day after launch) are pinned to their real,
-sourced values; `scripts/check-internet-artifacts-art.mjs` is
-`check-space-elevator-art.mjs`'s whole battery again, and caught the same
-class of bug Space Elevator shipped with — raising each scene from a small
-fixed-size badge to art that fills its own card made the four densest real
-years (1991-1995, six artifacts) too tall for their own zone's pixel
-density, silently pushing markers past even the compact fallback into
-text-only. Re-tuning each era's `pxPerYear` against its own tightest real
-gap, not just its artifact count, fixed it without shrinking anything back
-down.*
+a rail down the left edge in place of Space Elevator's cable car. Beside each
+moment is an object, photographed for the page the way a museum shoots its
+collection: the lab log book the first message was written down in, a
+teleprinter keyboard with QWERTYUIOP on its top row, the green-bar printout
+of the first spam, the badge people wore after flag day, the black cube with
+its "DO NOT POWER IT DOWN!!" label, the Trojan Room's coffee pot a third
+full, a broken laser pointer, a drive enclosure built of toy bricks, a flip
+phone reading "just setting up my twttr", a frosted toaster pastry. Each is a
+signed-distance model (`scripts/artifact-bake/<slug>.glsl`, its print or
+screen drawn in `<slug>.svg`) shot by `node scripts/bake-artifacts.mjs` in
+`artifact-bake/studio.glsl`, the Auction's lights with the backdrop taken
+away: the picture is transparent but for the object and the shadow it
+throws, so it lies on its era's sky as though it stood there, and glass is
+seen through rather than painted (the coffee shows through the carafe, and
+the page through both). None of them is the original, and the page says so;
+nothing carries a real maker's mark. The eras got denser to make room, so no
+moment ever loses its photograph to a crowd of neighbours: squeezed, a card
+drops its note and then its date, never its object.
+*`scripts/check-internet-artifacts.mjs` checks that every `date` string
+matches a recognised precision format and that a handful of headline facts
+(the Web's public announcement, Google's incorporation date rather than its
+earlier domain registration, the first Wikipedia edit landing the day after
+launch) are pinned to their real, sourced values;
+`scripts/check-internet-artifacts-art.mjs` checks that every moment has its
+photograph, at both sizes with alpha, cut out cleanly (a transparent border,
+so nothing is cropped), filling a fair share of the frame, with highlights
+bright enough to read on a dark sky.*
 
 **Share This Page** — one typed message, thirty ways to send it, in a grid of
 tiles rather than a scroll. Seventeen are genuine, checkable encodings run
