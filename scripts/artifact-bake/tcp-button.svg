@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The printed face of the button, edge to edge: the outer ring is the
+       part that wraps round the crimped rim. -->
+  <rect width="1024" height="1024" fill="#f4f1e8"/>
+  <circle cx="512" cy="512" r="512" fill="#1c3f78"/>
+  <circle cx="512" cy="512" r="430" fill="#f4f1e8"/>
+  <circle cx="512" cy="512" r="414" fill="none" stroke="#1c3f78" stroke-width="6"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#1c3f78" text-anchor="middle">
+    <text x="512" y="352" font-size="92" letter-spacing="4">I SURVIVED</text>
+    <text x="512" y="448" font-size="62" letter-spacing="10">THE</text>
+    <text x="512" y="592" font-size="168" letter-spacing="8" fill="#b3202a">TCP</text>
+    <text x="512" y="700" font-size="80" letter-spacing="3">TRANSITION</text>
+  </g>
+  <text x="512" y="790" font-family="Arial, Helvetica, sans-serif" font-size="34" fill="#1c3f78" text-anchor="middle" letter-spacing="6">1 JANUARY 1983</text>
+</svg>
