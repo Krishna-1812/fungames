@@ -7,29 +7,32 @@ import { withBase } from '../lib/base'
  * Dark Patterns — eleven manipulative UI tricks, reproduced as working fake
  * websites rather than described in a bullet list.
  *
- * Every one of these is a documented pattern, not an invented vibe — see
+ * Every one is a documented pattern, not an invented vibe — see
  * src/lib/dark-patterns.ts for the citation attached to each — and every
- * fake site is its own small, convincing lie: its own name, its own brand
- * colour, its own voice, so this reads as eleven places rather than one
- * template with the copy swapped. The one thing they all share on purpose is
- * the visual grammar: the trick is always the site's loudest pill; the honest
- * way through is always the small, quiet line of text. That contrast is the
- * actual lesson, and eleven repetitions of it are what make it recognisable
- * afterwards, on a real site, without this page open next to it.
+ * fake site is built the way that kind of site is really built, because a
+ * trick only works on you when the place it lives in looks real: a homeware
+ * shop with a bag that slides in from the right, a coffee blog with an
+ * article to read and a newsletter modal over it, a streaming service's dark
+ * account page, a download portal fenced in by adverts, a ticket site, a
+ * software checkout, a settings screen, a social network's welcome wizard, a
+ * fashion store's product page with its sales pop-ups, a newspaper. Each has
+ * its own type, colour, voice and furniture, and they all open in one
+ * browser window — tab, address bar, padlock, load bar — whose address and
+ * title move as you go deeper into a site. The products in the shops are
+ * photographed (scripts/shop-bake/, baked in the Auction studio's white
+ * room), not drawn.
  *
- * The pattern's name is not shown until you have acted. The old page printed
- * "Confirmshaming" above the confirmshaming widget, which is a spoiler for
- * the only thing the widget is testing.
+ * The pattern's name is not shown until you have acted: "Confirmshaming"
+ * over the confirmshaming modal would be a spoiler for the only thing it
+ * tests. Score is how many you dodged, Site is progress through the eleven,
+ * Moves are the ones you fell for, Best is your best run.
  *
- * In the shell: Score is how many you dodged, Site is progress through the
- * eleven, Moves are the ones you fell for, Best is your best run.
- *
- * Nothing here is graded on cleverness. `resolve('dodged' | 'fell', note)` is
- * the whole verdict, and it is never hidden behind a puzzle — every pattern
- * can be beaten the first time by anyone who happens to look closely, the
- * same way the real ones can.
+ * `resolve('dodged' | 'fell', note)` is the whole verdict, and it is never
+ * hidden behind a puzzle — every pattern can be beaten the first time by
+ * anyone who looks closely, the same way the real ones can.
  */
 const total = PATTERNS.length
+const img = withBase('/dark-patterns/')
 ---
 
 <GameShell
@@ -37,76 +40,89 @@ const total = PATTERNS.length
   labels={{ score: 'Dodged', best: 'Best run', level: 'Site', moves: 'Fell for' }}
   initial={{ score: '0', level: `0 / ${total}`, moves: '0' }}
 >
-  <div class="dp-intro" id="intro">
-    <p class="label meta">Eleven websites · one lesson</p>
-    <h2 class="dp-intro-title">Every one of these sites wants <em class="wonk">something</em> from you.</h2>
-    <p class="lead">
-      Each is built around a trick the people who study this for a living have
-      catalogued and named. Do the ordinary errand each site gives you. Look
-      closely. Some are genuinely hard to beat.
-    </p>
-    <button type="button" class="pill pill--hero" id="begin">
-      <span>Open the first site</span><span class="arrow" aria-hidden="true">→</span>
-    </button>
-    <ul class="dp-domains" aria-label="The eleven sites">
-      {PATTERNS.map((p) => <li class="tag">{p.site}</li>)}
-    </ul>
-  </div>
-
-  <div class="dp-play" id="play" hidden>
-    <div class="dp-window" id="window" data-brand="lilac">
-      <div class="dp-chrome">
-        <span class="dp-lights" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="dp-addr">
-          <i class="dp-favicon" id="favicon" aria-hidden="true">F</i>
-          <span class="dp-url" id="url">example.com</span>
-        </span>
-      </div>
-      <i class="dp-load" id="load" aria-hidden="true"></i>
-      <div class="dp-site" id="site" tabindex="-1" aria-label="The website">
-        <div class="dp-brandbar">
-          <p class="dp-wordmark" id="wordmark">Site</p>
-          <span class="dp-nav" aria-hidden="true"><span>Shop</span><span>About</span><span>Help</span></span>
-        </div>
-        <div class="dp-body" id="slot"></div>
-      </div>
+  <div class="dpx" data-img={img}>
+    <div class="dp-intro" id="intro">
+      <p class="label meta">Eleven websites · one lesson</p>
+      <h2 class="dp-intro-title">Every one of these sites wants <em class="wonk">something</em> from you.</h2>
+      <p class="lead">
+        Each is built around a trick the people who study this for a living have
+        catalogued and named. Do the ordinary errand each site gives you. Look
+        closely. Some are genuinely hard to beat.
+      </p>
+      <button type="button" class="pill pill--hero" id="begin">
+        <span>Open the first site</span><span class="arrow" aria-hidden="true">→</span>
+      </button>
+      <ul class="dp-domains" aria-label="The eleven sites">
+        {PATTERNS.map((p) => <li class="tag">{p.site}</li>)}
+      </ul>
     </div>
 
-    <div class="dp-notes">
-      <div class="dp-brief">
-        <p class="label meta" id="siteNo">Site 1 of {total}</p>
-        <p class="label dp-errand-lbl">Your errand</p>
-        <p class="dp-errand" id="lede">—</p>
-        <ol class="dp-tally" id="tally" aria-label="Your record so far">
-          {PATTERNS.map(() => <li><span class="sr-only">Not yet</span></li>)}
-        </ol>
+    <div class="dp-play" id="play" hidden>
+      <div class="bx" id="window">
+        <div class="bx-tabs" aria-hidden="true">
+          <div class="bx-tab"><i class="bx-fav" id="bxFav">F</i><span id="tabTitle">New tab</span>
+            <svg viewBox="0 0 16 16" width="14" height="14"><path d="M4.5 4.5l7 7m0-7l-7 7" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg></div>
+          <span class="bx-plus"><svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <span class="bx-win">
+            <i><svg viewBox="0 0 12 12" width="11" height="11"><path d="M1 6h10" stroke="currentColor"/></svg></i>
+            <i><svg viewBox="0 0 12 12" width="11" height="11"><rect x="1.5" y="1.5" width="9" height="9" stroke="currentColor" fill="none"/></svg></i>
+            <i><svg viewBox="0 0 12 12" width="11" height="11"><path d="M1.5 1.5l9 9m0-9l-9 9" stroke="currentColor"/></svg></i>
+          </span>
+        </div>
+        <div class="bx-bar">
+          <span class="bx-ico" aria-hidden="true"><svg viewBox="0 0 20 20" width="18" height="18"><path d="M16 10H4.5m5-5.5L4 10l5.5 5.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="bx-ico is-off" aria-hidden="true"><svg viewBox="0 0 20 20" width="18" height="18"><path d="M4 10h11.5m-5-5.5L16 10l-5.5 5.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="bx-ico bx-reload" aria-hidden="true"><svg viewBox="0 0 20 20" width="18" height="18"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M15.5 3.5v3.2h-3.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <div class="bx-omni">
+            <svg class="bx-lock" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 5h6m3 0h1M3 11h1m3 0h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10.5" cy="5" r="1.6" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="5.5" cy="11" r="1.6" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
+            <span class="bx-url"><span class="sr-only">Address: </span><b id="host">example.com</b><span id="path"></span></span>
+            <svg class="bx-star" viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><path d="M10 3l2.1 4.4 4.8.6-3.5 3.3.9 4.8L10 13.8 5.7 16.1l.9-4.8L3.1 8l4.8-.6z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>
+          </div>
+          <span class="bx-me" aria-hidden="true"><i></i><svg viewBox="0 0 4 16" width="4" height="16"><circle cx="2" cy="3" r="1.4"/><circle cx="2" cy="8" r="1.4"/><circle cx="2" cy="13" r="1.4"/></svg></span>
+          <i class="bx-load" id="load" aria-hidden="true"></i>
+        </div>
+        <div class="bx-view">
+          <div class="bx-scroll" id="scroll" tabindex="-1" aria-label="The website"><div id="slot"></div></div>
+          <div class="bx-layer" id="layer"></div>
+        </div>
       </div>
 
-      <div class="dp-verdict" id="verdict" hidden tabindex="-1">
-        <p class="label dp-v-head"><span class="dp-v-sign" id="vSign" aria-hidden="true">✓</span><span id="vHead">You spotted it</span></p>
-        <h3 class="dp-v-title" id="vTitle">Pattern</h3>
-        <p class="dp-v-note" id="vNote"></p>
-        <p class="dp-v-reveal" id="vReveal"></p>
-        <p class="dp-v-cite" id="vCite"></p>
-        <div class="dp-v-crowd" id="vCrowd" aria-live="polite"></div>
-        <button type="button" class="pill pill--ink" id="next">
-          <span id="nextLbl">Next site</span><span aria-hidden="true">→</span>
-        </button>
-        <p class="dp-keys"><kbd>N</kbd> or <kbd>Enter</kbd></p>
+      <div class="dp-notes">
+        <div class="dp-brief">
+          <p class="label meta" id="siteNo">Site 1 of {total}</p>
+          <p class="label dp-errand-lbl">Your errand</p>
+          <p class="dp-errand" id="lede">—</p>
+          <ol class="dp-tally" id="tally" aria-label="Your record so far">
+            {PATTERNS.map(() => <li><span class="sr-only">Not yet</span></li>)}
+          </ol>
+        </div>
+
+        <div class="dp-verdict" id="verdict" hidden tabindex="-1">
+          <p class="label dp-v-head"><span class="dp-v-sign" id="vSign" aria-hidden="true">✓</span><span id="vHead">You spotted it</span></p>
+          <h3 class="dp-v-title" id="vTitle">Pattern</h3>
+          <p class="dp-v-note" id="vNote"></p>
+          <p class="dp-v-reveal" id="vReveal"></p>
+          <p class="dp-v-cite" id="vCite"></p>
+          <div class="dp-v-crowd" id="vCrowd" aria-live="polite"></div>
+          <button type="button" class="pill pill--ink" id="next">
+            <span id="nextLbl">Next site</span><span aria-hidden="true">→</span>
+          </button>
+          <p class="dp-keys"><kbd>N</kbd> or <kbd>Enter</kbd></p>
+        </div>
       </div>
     </div>
   </div>
 
   <Fragment slot="howto">
     <p>
-      Eleven fake websites, one at a time. Each gives you an ordinary errand —
-      buy a thing, cancel a thing, change a setting. Each is built around a
-      real, catalogued manipulation.
+      Eleven fake websites, one at a time, each in its own browser tab. Each
+      gives you an ordinary errand — buy a thing, cancel a thing, change a
+      setting. Each is built around a real, catalogued manipulation.
     </p>
     <ul>
-      <li><b>The trick is always the loudest button.</b> The honest way through is usually small, plain text.</li>
-      <li>Read every sentence twice, especially checkboxes. Sometimes the right answer is to wait.</li>
-      <li>After each site you will see what the trick was called and who named it.</li>
+      <li><b>The trick is usually the loudest button.</b> The honest way through is usually small, plain text.</li>
+      <li>Read every sentence twice, especially checkboxes and totals. Sometimes the right answer is to wait.</li>
+      <li>The sites scroll, like real ones. After each you will see what the trick was called and who named it.</li>
     </ul>
     <p>Dodge as many as you can. Your best is your highest number dodged.</p>
   </Fragment>
@@ -125,7 +141,9 @@ const total = PATTERNS.length
       Brignull's original 2010 list — he coined the term "dark pattern"
       cataloguing exactly these — and the newer ones from a 2019 Princeton/CHI
       study that scraped eleven thousand shopping sites looking for them, or
-      the FTC's 2022 report to Congress on the same subject.
+      the FTC's 2022 report to Congress on the same subject. The eleven
+      companies here are invented; the shop's products were modelled and
+      photographed for this page.
     </p>
     <p>Related: <a href={withBase('/not-a-robot/')}>I'm Not a Robot</a> is the other page here built out of real interface conventions rather than a metaphor for them.</p>
   </details>
@@ -143,31 +161,29 @@ const total = PATTERNS.length
   type Pattern = { id: string; title: string; site: string; real: string; lede: string; reveal: string }
   const PATTERNS = JSON.parse(document.getElementById('game-data')!.textContent!) as Pattern[]
   const TOTAL = PATTERNS.length
+  const IMG = (document.querySelector('.dpx') as HTMLElement).dataset.img!
 
   const $ = (id: string) => document.getElementById(id)!
   const intro = $('intro'), play = $('play')
-  const win = $('window'), site = $('site'), slot = $('slot')
+  const win = $('window'), scroller = $('scroll'), slot = $('slot'), layer = $('layer')
   const verdict = $('verdict')
   const tally = [...$('tally').children] as HTMLLIElement[]
 
-  /**
-   * Each fake site's brand. One block colour each (the system has five and
-   * ink, so some repeat — the voice of the wordmark is what keeps two sky
-   * sites apart), and the trap button always wears it.
-   */
-  type Brand = { name: string; block: 'cobalt' | 'mint' | 'sky' | 'red' | 'lilac' | 'ink'; voice: 'serif' | 'sans' | 'shout' | 'lower' }
-  const BRANDS: Record<string, Brand> = {
-    basket: { name: 'Fenwick & Oates', block: 'lilac', voice: 'serif' },
-    confirmshame: { name: 'The Daily Brew', block: 'mint', voice: 'serif' },
-    roach: { name: 'Chorus+', block: 'red', voice: 'sans' },
-    urgency: { name: 'GET IT NOW', block: 'cobalt', voice: 'shout' },
-    ads: { name: 'Freeware Depot', block: 'sky', voice: 'sans' },
-    drip: { name: 'ticketloop', block: 'mint', voice: 'lower' },
-    continuity: { name: 'Loomline', block: 'sky', voice: 'serif' },
-    trick: { name: 'Account settings', block: 'ink', voice: 'sans' },
-    zuckering: { name: 'frennet', block: 'sky', voice: 'lower' },
-    social: { name: 'NIMBUS', block: 'cobalt', voice: 'shout' },
-    nagging: { name: 'The Daily Briefing', block: 'red', voice: 'serif' },
+  /** Each site's tab: its title, its favicon (background, letter colour,
+   *  letter) and the path it opens on. */
+  type Tab = { title: string; fav: [string, string, string]; path: string }
+  const TABS: Record<string, Tab> = {
+    basket: { title: 'Fenwick & Oates — Three things, made well', fav: ['#1d1f22', '#f1efe9', 'F'], path: '/' },
+    confirmshame: { title: 'Why your morning coffee tastes flat · The Daily Brew', fav: ['#1f4d4a', '#ffffff', 'D'], path: '/brewing/flat-coffee' },
+    roach: { title: 'Account · Chorus+', fav: ['#0e1015', '#9d8cff', '+'], path: '/account' },
+    urgency: { title: 'Auralis Q7 Headphones, 60% off today | GET IT NOW', fav: ['#d8102b', '#ffffff', 'G'], path: '/deal/auralis-q7' },
+    ads: { title: 'Download PhotoTrim 4 for Windows — Free — Freeware Depot', fav: ['#2456a8', '#ffffff', 'F'], path: '/windows/photo-design/phototrim' },
+    drip: { title: 'The Weather Station · The Assembly Rooms | ticketloop', fav: ['#16112e', '#c9bdff', 't'], path: '/event/the-weather-station' },
+    continuity: { title: 'Start your free trial · Loomline', fav: ['#0f766e', '#ffffff', 'L'], path: '/checkout/pro' },
+    trick: { title: 'Privacy & data · Account settings', fav: ['#111827', '#ffffff', 'A'], path: '/settings/privacy' },
+    zuckering: { title: 'Welcome to frennet', fav: ['#1d6ff2', '#ffffff', 'f'], path: '/welcome' },
+    social: { title: 'The Weekender — NIMBUS', fav: ['#111111', '#ffffff', 'N'], path: '/products/the-weekender' },
+    nagging: { title: 'Markets open higher as rates hold | The Daily Briefing', fav: ['#111111', '#ffffff', 'B'], path: '/business/markets-open-higher' },
   }
 
   type Outcome = 'dodged' | 'fell'
@@ -175,8 +191,15 @@ const total = PATTERNS.length
     resolve: (outcome: Outcome, note: string) => void
     /** An interval that stops while the game is paused and dies with the site. */
     every: (fn: () => void, ms: number) => void
+    /** A timeout that dies with the site. */
+    later: (fn: () => void, ms: number) => void
     /** A small knock — a new wall arriving, not a wrong answer. */
     knock: () => void
+    /** A new page on the same site: the address, the tab and the load bar. */
+    go: (path: string, title?: string) => void
+    /** Over the page and not scrolled with it: modals, drawers, pop-ups. */
+    layer: HTMLElement
+    img: (name: string, small?: boolean) => string
   }
   type Mount = (host: HTMLElement, api: Api) => void
   type Result = { id: string; title: string; real: string; outcome: Outcome; note: string }
@@ -186,53 +209,141 @@ const total = PATTERNS.length
   let resolved = false
   let shownAt = 0
   let timers: number[] = []
-  const clearTimers = () => { timers.forEach(clearInterval); timers = [] }
+  let outs: number[] = []
+  const clearTimers = () => { timers.forEach(clearInterval); outs.forEach(clearTimeout); timers = []; outs = [] }
 
   const shell = createShell({ slug: 'dark-patterns', onRestart: restart })
   loadCrowd('dark-patterns')
 
   /* ---------------------------------------------------------------------- */
+  /* Shared furniture                                                        */
+  /* ---------------------------------------------------------------------- */
+
+  const on = (root: HTMLElement, sel: string, fn: (e: Event) => void) =>
+    root.querySelector(sel)!.addEventListener('click', fn)
+
+  /** A site's footer: its own columns and its own small print. */
+  const footer = (k: string, cols: string[][], small: string) => `
+    <footer class="${k}-foot sx-foot">
+      <div class="sx-cols">${cols.map((c) => `<ul><li><b>${c[0]}</b></li>${c.slice(1).map((x) => `<li>${x}</li>`).join('')}</ul>`).join('')}</div>
+      <p class="sx-small">${small}</p>
+    </footer>`
+
+  const ICON = {
+    bag: '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 7h12l-1 10H5zM7 7V5.5a3 3 0 0 1 6 0V7" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>',
+    search: '<svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    user: '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="7" r="3.2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M3.5 17c1.2-3.2 3.6-4.6 6.5-4.6s5.3 1.4 6.5 4.6" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>',
+    close: '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    check: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>',
+    down: '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3v10m-4.5-4.5L10 13l4.5-4.5M4 16.5h12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  }
+
+  /** Review stars, drawn: n filled of five. */
+  const stars = (n: number) => `<span class="sx-stars" aria-hidden="true">${[0, 1, 2, 3, 4].map((k) => `<svg viewBox="0 0 20 20" width="14" height="14"><path d="M10 1.8l2.5 5.3 5.8.7-4.3 4 1.1 5.7L10 14.7l-5.1 2.8 1.1-5.7-4.3-4 5.8-.7z" fill="${k < n ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>`).join('')}</span>`
+
+  /** A seeded scatter, so a drawing comes out the same every time. */
+  const seeded = (s: number) => () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646
+
+  /** The gig's poster: a stage in haze, three beams, the crowd's heads and
+   *  hands in silhouette against it. */
+  function stageArt() {
+    const r = seeded(7)
+    let crowd = ''
+    for (let i = 0; i < 46; i++) {
+      const x = i * 13.4 + r() * 8 - 4, y = 196 + r() * 16, s = 7 + r() * 4
+      crowd += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${s.toFixed(1)}"/><rect x="${(x - s * 1.5).toFixed(1)}" y="${(y + s * 0.6).toFixed(1)}" width="${(s * 3).toFixed(1)}" height="40" rx="${s.toFixed(1)}"/>`
+      if (r() < 0.22) { const hx = x + (r() - 0.5) * 10; crowd += `<path d="M${x.toFixed(1)} ${(y + 6).toFixed(1)} L${hx.toFixed(1)} ${(y - 30 - r() * 14).toFixed(1)}" stroke-width="5" stroke-linecap="round"/>` }
+    }
+    return `<svg class="tl-svg" viewBox="0 0 600 240" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <defs>
+        <radialGradient id="tlHaze" cx="50%" cy="38%" r="60%"><stop offset="0" stop-color="#8f6bff" stop-opacity=".55"/><stop offset=".55" stop-color="#3a2a8a" stop-opacity=".35"/><stop offset="1" stop-color="#0b0820" stop-opacity="0"/></radialGradient>
+        <linearGradient id="tlBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7e0ff" stop-opacity=".75"/><stop offset="1" stop-color="#7b5cff" stop-opacity="0"/></linearGradient>
+      </defs>
+      <rect width="600" height="240" fill="#0b0820"/>
+      <rect width="600" height="240" fill="url(#tlHaze)"/>
+      <path d="M300 0 L210 240 L390 240Z" fill="url(#tlBeam)" opacity=".5"/>
+      <path d="M120 0 L40 240 L190 240Z" fill="url(#tlBeam)" opacity=".35"/>
+      <path d="M480 0 L410 240 L560 240Z" fill="url(#tlBeam)" opacity=".35"/>
+      <rect x="0" y="150" width="600" height="6" fill="#1b1540"/>
+      <g fill="#05040d" stroke="#05040d">${crowd}</g>
+    </svg>`
+  }
+
+  /** The markets story's chart: an index line through the first hour. */
+  function chartArt() {
+    const r = seeded(11)
+    let v = 60, pts = ''
+    for (let i = 0; i <= 60; i++) { v += (r() - 0.42) * 6; pts += `${(i * 10).toFixed(0)},${(150 - v).toFixed(1)} ` }
+    return `<svg viewBox="0 0 600 170" aria-hidden="true">
+      <g stroke="#e3e3e3" stroke-width="1">${[30, 70, 110, 150].map((y) => `<path d="M0 ${y}H600"/>`).join('')}</g>
+      <g fill="#767676" font-family="Arial, sans-serif" font-size="11">${['9:30', '9:45', '10:00', '10:15', '10:30'].map((t, i) => `<text x="${i * 145 + 4}" y="166">${t}</text>`).join('')}</g>
+      <polyline points="${pts}" fill="none" stroke="#0b6b4f" stroke-width="2.4" stroke-linejoin="round"/>
+    </svg>`
+  }
+
+  /* ---------------------------------------------------------------------- */
   /* The eleven sites                                                        */
   /* ---------------------------------------------------------------------- */
 
-  const on = (host: HTMLElement, sel: string, fn: (e: Event) => void) =>
-    host.querySelector(sel)!.addEventListener('click', fn)
-
   const MOUNTS: Record<string, Mount> = {
     basket(host, api) {
-      const items = [['Wool scarf', 28], ['Reading lamp', 44], ['Ceramic mug', 14]] as const
+      const items = [
+        { name: 'Leather notebook', maker: 'Bound in Leicester', price: 28, img: 'notebook' },
+        { name: 'Reading lamp', maker: 'Spun in Sheffield', price: 44, img: 'lamp' },
+        { name: 'Ceramic mug', maker: 'Thrown in Stoke', price: 14, img: 'mug' },
+      ]
       host.innerHTML = `
-        <p class="dp-kicker">New this week</p>
-        <h3 class="dp-h">Three things, made well.</h3>
-        <div class="dp-products">
-          ${items.map(([name, price]) => `
-            <div class="dp-product">
-              <b>${name}</b><span class="dp-price">$${price}</span>
-              <button type="button" class="dp-trap dp-buy" data-item="${name}" data-price="${price}">Add to basket</button>
-            </div>`).join('')}
-        </div>`
-      host.querySelectorAll<HTMLButtonElement>('.dp-buy').forEach((btn) =>
+        <p class="fo-ann">Free delivery over $60 · Thirty-day returns</p>
+        <header class="fo-head">
+          <nav class="fo-nav"><span>Shop</span><span>Home</span><span>Kitchen</span><span>Journal</span></nav>
+          <p class="fo-logo">Fenwick <i>&amp;</i> Oates</p>
+          <nav class="fo-tools">${ICON.search}${ICON.user}<span class="fo-bag">${ICON.bag}<b id="bagN">0</b></span></nav>
+        </header>
+        <section class="fo-hero">
+          <p class="fo-eyebrow">New this week</p>
+          <h1>Three things, made well.</h1>
+          <p>Small runs from workshops we know by name.</p>
+        </section>
+        <div class="fo-grid">${items.map((it, k) => `
+          <article class="fo-card">
+            <div class="fo-img"><img src="${api.img(it.img, true)}" alt="${it.name}" width="600" height="600"></div>
+            <div class="fo-meta"><h3>${it.name}</h3><p>${it.maker}</p><b>$${it.price}</b></div>
+            <button type="button" class="fo-add" data-k="${k}">Add to bag</button>
+          </article>`).join('')}
+        </div>
+        <section class="fo-story"><h2>Made to be used, then used again.</h2><p>We work with eleven workshops, none more than a day’s drive from our warehouse. Everything is made in small batches, so when it’s gone, it’s gone for a few weeks.</p></section>
+        ${footer('fo', [['Shop', 'New this week', 'Home', 'Kitchen', 'Gift cards'], ['Help', 'Delivery', 'Returns', 'Contact us'], ['Fenwick & Oates', 'Our workshops', 'Journal', 'Stockists']], '© Fenwick &amp; Oates Ltd. Prices include sales tax.')}`
+      host.querySelectorAll<HTMLButtonElement>('.fo-add').forEach((btn) =>
         btn.addEventListener('click', () => {
           sfx.tick()
-          const item = btn.dataset.item!
-          const price = Number(btn.dataset.price)
-          host.innerHTML = `
-            <h3 class="dp-h">Your basket</h3>
-            <label class="dp-line"><input type="checkbox" checked disabled><span>${item}</span><b>$${price.toFixed(2)}</b></label>
-            <label class="dp-line"><input type="checkbox" checked class="extra" data-p="4.99"><span>Extended protection plan</span><b>$4.99</b></label>
-            <label class="dp-line"><input type="checkbox" checked class="extra" data-p="2.99"><span>Fenwick Rewards membership</span><b>$2.99</b></label>
-            <p class="dp-total"><span>Total</span><b id="total"></b></p>
-            <button type="button" class="dp-trap" id="checkout">Complete purchase</button>`
+          const it = items[Number(btn.dataset.k)]
+          host.querySelector('#bagN')!.textContent = '1'
+          btn.textContent = 'Added'
+          api.layer.innerHTML = `
+            <div class="fo-scrim"></div>
+            <aside class="fo-drawer" role="dialog" aria-label="Your bag">
+              <header><h2>Your bag</h2><span>1 item</span></header>
+              <div class="fo-line"><img src="${api.img(it.img, true)}" alt=""><div><b>${it.name}</b><span>${it.maker} · Qty 1</span></div><b>$${it.price.toFixed(2)}</b></div>
+              <label class="fo-addon"><input type="checkbox" checked class="extra" data-p="4.99"><span><b>Fenwick Care</b> Two years’ cover for accidents</span><em>$4.99</em></label>
+              <label class="fo-addon"><input type="checkbox" checked class="extra" data-p="2.99"><span><b>Fenwick Rewards</b> Members’ prices, renews monthly</span><em>$2.99</em></label>
+              <div class="fo-sum"><span>Subtotal</span><b id="total"></b></div>
+              <p class="fo-small">Delivery and taxes calculated at checkout.</p>
+              <button type="button" class="fo-checkout" id="checkout">Check out</button>
+              <p class="fo-small fo-pay">Secure checkout · Visa · Mastercard · Amex</p>
+            </aside>`
           api.knock()
           const paint = () => {
-            const extra = [...host.querySelectorAll<HTMLInputElement>('.extra:checked')].reduce((n, x) => n + Number(x.dataset.p), 0)
-            host.querySelector('#total')!.textContent = `$${(price + extra).toFixed(2)}`
+            const extra = [...api.layer.querySelectorAll<HTMLInputElement>('.extra:checked')].reduce((n, x) => n + Number(x.dataset.p), 0)
+            const t = `$${(it.price + extra).toFixed(2)}`
+            api.layer.querySelector('#total')!.textContent = t
+            api.layer.querySelector('#checkout')!.textContent = `Check out · ${t}`
           }
-          host.querySelectorAll('.extra').forEach((x) => x.addEventListener('change', paint))
+          api.layer.querySelectorAll('.extra').forEach((x) => x.addEventListener('change', () => { sfx.tick(); paint() }))
           paint()
-          on(host, '#checkout', () => {
-            const extras = host.querySelectorAll<HTMLInputElement>('.extra:checked').length
-            if (extras === 0) api.resolve('dodged', 'You unchecked both extras before paying for anything you never chose.')
+          on(api.layer, '#checkout', () => {
+            const extras = api.layer.querySelectorAll<HTMLInputElement>('.extra:checked').length
+            if (extras === 0) api.resolve('dodged', 'You unticked both extras before paying for anything you never chose.')
             else api.resolve('fell', `You paid for ${extras} thing${extras > 1 ? 's' : ''} that rode along with your actual order.`)
           })
         }),
@@ -241,137 +352,218 @@ const total = PATTERNS.length
 
     confirmshame(host, api) {
       host.innerHTML = `
-        <div class="dp-behind" aria-hidden="true">
-          <p class="dp-h">Why your morning coffee tastes flat</p>
-          <i></i><i></i><i class="short"></i><i></i><i class="short"></i>
-        </div>
-        <div class="dp-modal" role="dialog" aria-label="Newsletter">
-          <p class="dp-kicker">Before you go</p>
-          <p class="dp-modal-q">Join the Brew Circle for 15% off your next bag?</p>
-          <div class="dp-acts">
-            <button type="button" class="dp-trap" id="yes">Yes, sign me up</button>
-            <button type="button" class="dp-honest" id="no">No thanks, I like paying full price</button>
-          </div>
-        </div>`
-      on(host, '#yes', () => api.resolve('fell', 'You signed up rather than click a sentence written to make declining feel foolish.'))
-      on(host, '#no', () => api.resolve('dodged', 'You clicked past the guilt trip without it changing your answer.'))
+        <header class="db-head"><p class="db-logo">The Daily Brew</p><nav><span>Brewing</span><span>Beans</span><span>Gear</span><span>Shop</span></nav></header>
+        <article class="db-post">
+          <p class="db-cat">Brewing · 6 min read</p>
+          <h1>Why your morning coffee tastes flat</h1>
+          <p class="db-by"><i class="db-av">ME</i><span><b>Mara Ellison</b> · 14 March</span></p>
+          <figure class="db-fig"><img src="${api.img('mug')}" alt="A stoneware mug on a white table"><figcaption>Your mug is not the problem. Probably.</figcaption></figure>
+          <p class="db-lede">It is almost never the beans. A cup that tastes of nothing in particular — not bitter, not sour, just beige — is usually telling you about the three things that happen after the bag is opened: how long ago, how hot the water was, and how fine you ground it.</p>
+          <h2>Stale is a matter of days</h2>
+          <p>Roasted coffee gives up most of its aroma within a fortnight of the bag being opened. Buy smaller bags, fold the top down tight, and keep them out of the fridge, where every opening of the door condenses a little water onto the beans.</p>
+          <h2>Water just off the boil</h2>
+          <p>Somewhere between 92 and 96 degrees pulls out the sweetness without the harshness. With no thermometer, let the kettle sit for thirty seconds after it clicks off.</p>
+          <p>And grind finer than you think. Flat coffee is very often under-extracted coffee: water that ran past the grounds too quickly to take anything with it.</p>
+        </article>
+        ${footer('db', [['The Daily Brew', 'About', 'Newsletter', 'Write for us'], ['Read', 'Brewing', 'Beans', 'Gear']], '© The Daily Brew. We may earn a commission from links on this page.')}`
+      api.later(() => {
+        api.layer.innerHTML = `
+          <div class="db-scrim"></div>
+          <div class="db-modal" role="dialog" aria-label="Newsletter">
+            <button type="button" class="db-x" id="x" aria-label="Close">${ICON.close}</button>
+            <div class="db-mimg"><img src="${api.img('mug', true)}" alt=""></div>
+            <div class="db-mbody">
+              <p class="db-kick">Before you go</p>
+              <h2>Join the Brew Circle and take 15% off your next bag</h2>
+              <p>Brewing guides every Friday, and first pick of the small-lot roasts.</p>
+              <label class="db-field"><span class="sr-only">Email (this is a pretend site; nothing is sent anywhere)</span><input type="text" placeholder="Email address" autocomplete="off" spellcheck="false"></label>
+              <button type="button" class="db-yes" id="yes">Get my 15% off</button>
+              <button type="button" class="db-no" id="no">No thanks, I like paying full price</button>
+            </div>
+          </div>`
+        sfx.whoosh()
+        on(api.layer, '#yes', () => api.resolve('fell', 'You signed up rather than click a sentence written to make declining feel foolish.'))
+        on(api.layer, '#no', () => api.resolve('dodged', 'You clicked past the guilt trip without it changing your answer.'))
+        on(api.layer, '#x', () => api.resolve('dodged', 'You closed it at the little cross, and never had to say the sentence at all.'))
+      }, 1500)
     },
 
     roach(host, api) {
+      const POSTERS = [['The Long Quiet', '#1b2a4a', '#6f8fd0'], ['Saltmarsh', '#0f3b3a', '#58b3a6'], ['Night Shift', '#24103a', '#9a62e6'], ['Paper Moons', '#3a1730', '#d0668e'], ['Kestrel', '#1d2a1d', '#7aa866'], ['Second City', '#1d2129', '#98a2b6']]
       const step0 = () => {
         host.innerHTML = `
-          <h3 class="dp-h">Manage your plan</h3>
-          <p class="dp-line is-plain"><span>Chorus+ Premium</span><b>$17.99 / month</b></p>
-          <p class="dp-small">Renews on the 3rd. You can cancel at any time.</p>
-          <button type="button" class="dp-trap" id="cancel">Cancel subscription</button>`
+          <header class="ch-head"><p class="ch-logo">Chorus<b>+</b></p><nav><span>Home</span><span>Series</span><span>Films</span><span>My list</span></nav><i class="ch-av">A</i></header>
+          <main class="ch-acct">
+            <h1>Account</h1>
+            <p class="ch-since">Member since March 2023</p>
+            <section class="ch-card">
+              <div class="ch-plan"><div><p class="ch-lbl">Membership</p><h2>Premium</h2><p>4K and HDR · Four screens at once · Downloads</p></div><p class="ch-price"><b>$17.99</b><span>/month</span></p></div>
+              <p class="ch-next">Next payment 3 December · Card ending 4242</p>
+              <div class="ch-acts"><button type="button" class="ch-btn">Change plan</button><button type="button" class="ch-ghost" id="cancel">Cancel membership</button></div>
+            </section>
+            <section class="ch-card ch-rows"><p><span>Email</span><b>a••••@example.com</b></p><p><span>Password</span><b>••••••••••</b></p><p><span>Profiles</span><b>3</b></p></section>
+          </main>`
         on(host, '#cancel', () => { sfx.click(); step1() })
       }
-      const wall = (text: string, trap: string, honest: string, onTrap: () => void, onHonest: () => void) => {
+      const wall = (path: string, body: string, trap: string, honest: string, onTrap: () => void, onHonest: () => void) => {
+        api.go(path, 'Cancel membership · Chorus+')
         api.knock()
         host.innerHTML = `
-          <div class="dp-stall">
-            <p class="dp-kicker">Wait —</p>
-            <p class="dp-modal-q">${text}</p>
-            <div class="dp-acts">
-              ${trap ? `<button type="button" class="dp-trap" id="trap">${trap}</button>` : ''}
-              <button type="button" class="dp-honest" id="honest">${honest}</button>
+          <header class="ch-head"><p class="ch-logo">Chorus<b>+</b></p><i class="ch-av">A</i></header>
+          <main class="ch-wall">${body}
+            <div class="ch-wacts">
+              ${trap ? `<button type="button" class="ch-btn ch-big" id="trap">${trap}</button>` : ''}
+              <button type="button" class="ch-link" id="honest">${honest}</button>
             </div>
-          </div>`
+          </main>`
         if (trap) on(host, '#trap', onTrap)
         on(host, '#honest', onHonest)
       }
-      const step1 = () => wall(
-        'Before you go, here is 50% off for the next three months.', 'Keep my discount', 'No, cancel anyway',
+      const step1 = () => wall('/account/cancel',
+        `<p class="ch-kick">Wait — before you go</p><h1>Have half off, on us</h1>
+         <div class="ch-offer"><p><b>$8.99</b><span>/month for your next three months</span></p><s>$17.99</s></div>
+         <p class="ch-p">Nothing to do: the discount starts on your next bill.</p>`,
+        'Keep my discount', 'No thanks, continue cancelling',
         () => api.resolve('fell', 'The first retention offer was enough to keep the subscription running.'),
         () => { sfx.tick(); step2() })
-      const step2 = () => wall(
-        'You will lose offline downloads, 4K streaming, and a watchlist of 214 titles.', 'Stay subscribed', 'Continue cancelling',
+      const step2 = () => wall('/account/cancel/confirm',
+        `<h1>You’ll lose all of this</h1><p class="ch-p">214 titles on your list, downloads on two devices, and 4K on every screen.</p>
+         <div class="ch-row">${POSTERS.map(([t, a, b]) => `<div class="ch-poster" style="--a:${a};--b:${b}"><span>Chorus+ original</span><b>${t}</b></div>`).join('')}</div>`,
+        'Keep watching', 'Continue cancelling',
         () => api.resolve('fell', 'The list of what you would lose was the second wall, and it worked.'),
         () => { sfx.tick(); step3() })
-      const step3 = () => wall(
-        'Final step: call 1-800-555-0199, Monday to Friday, 9am to 5pm, to complete your cancellation.', '', '…that is the final step?',
+      const step3 = () => wall('/account/cancel/final',
+        `<h1>One last step</h1><p class="ch-p">To finish cancelling, call our membership team.</p>
+         <p class="ch-phone">1-800-555-0199</p><p class="ch-p ch-dim">Monday to Friday, 9am to 5pm Eastern. Average wait: 38 minutes.</p>`,
+        '', 'Fine. I’ll call them.',
         () => {},
         () => api.resolve('dodged', 'You made it through every wall, including the one that demands a phone call during business hours.'))
       step0()
     },
 
     urgency(host, api) {
-      let remaining = 12
+      let remaining = 9
       let resets = 0
       host.innerHTML = `
-        <p class="dp-kicker">Flash sale · noise-cancelling headphones</p>
-        <p class="dp-deal"><s>$249</s> <b>$99</b></p>
-        <p class="dp-clock-line">Sale ends in <b class="dp-clock" id="clock">00:12</b></p>
-        <div class="dp-acts is-stacked">
-          <button type="button" class="dp-trap" id="buy">Buy now before it ends</button>
-          <button type="button" class="dp-honest" id="watch">Just watch the clock</button>
-        </div>
-        <p class="dp-small" id="note" aria-live="polite"></p>`
+        <p class="gn-strip">Deal of the day · Free next-day delivery on everything</p>
+        <header class="gn-head"><p class="gn-logo">GET IT <b>NOW</b></p><p class="gn-search">${ICON.search}<span>Search 2 million deals</span></p><span class="gn-cart">${ICON.bag}Cart</span></header>
+        <nav class="gn-cats"><span class="is-on">Today’s deals</span><span>Audio</span><span>Home</span><span>Kitchen</span><span>Outdoor</span><span>Toys</span></nav>
+        <section class="gn-deal">
+          <div class="gn-img"><img src="${api.img('headphones')}" alt="Auralis Q7 headphones" width="1200" height="1200"><span class="gn-off">−60%</span></div>
+          <div class="gn-info">
+            <p class="gn-brand">Auralis</p>
+            <h1>Auralis Q7 Wireless Noise-Cancelling Over-Ear Headphones, Graphite</h1>
+            <p class="gn-stars">${stars(4)} 4.4 · 2,381 ratings</p>
+            <p class="gn-price"><b>$99</b><s>$249</s><em>Save $150</em></p>
+            <div class="gn-timer"><span>Deal ends in</span><b id="clock"></b></div>
+            <div class="gn-claim"><i style="width:87%"></i></div><p class="gn-claimed">87% claimed</p>
+            <button type="button" class="gn-buy" id="buy">Buy now before it ends</button>
+            <button type="button" class="gn-save" id="save">Save for later</button>
+            <p class="gn-note" id="note" aria-live="polite"></p>
+            <ul class="gn-bul"><li>Up to 30 hours of battery</li><li>Adaptive noise cancelling</li><li>Folds flat into its case</li></ul>
+          </div>
+        </section>`
       const clock = host.querySelector('#clock') as HTMLElement
       const note = host.querySelector('#note')!
+      const paint = () => {
+        const h = Math.floor(remaining / 3600), m = Math.floor(remaining / 60) % 60, s = remaining % 60
+        clock.innerHTML = [h, m, s].map((v) => `<i>${String(v).padStart(2, '0')}</i>`).join('<u>:</u>')
+      }
+      paint()
       api.every(() => {
         remaining--
         if (remaining < 0) {
-          remaining = 12
+          // The deadline arrives, and quietly becomes a new one.
+          remaining = 14 * 60 + 59
           resets++
           clock.classList.add('is-reset')
-          setTimeout(() => clock.classList.remove('is-reset'), 260)
+          api.later(() => clock.classList.remove('is-reset'), 600)
         }
-        clock.textContent = `00:${String(remaining).padStart(2, '0')}`
-      }, 260)
+        paint()
+      }, 1000)
       on(host, '#buy', () => {
         if (resets > 0) api.resolve('dodged', `You waited long enough to see the clock reset ${resets} time${resets > 1 ? 's' : ''} before buying anything.`)
-        else api.resolve('fell', 'You bought before the clock ever finished a single lap — the exact window this pattern is built for.')
+        else api.resolve('fell', 'You bought before the clock ever reached zero — the exact window this pattern is built for.')
       })
-      on(host, '#watch', () => {
-        if (resets > 0) api.resolve('dodged', `You watched it reset ${resets} time${resets > 1 ? 's' : ''} instead of buying under the clock.`)
-        else { sfx.tick(); note.textContent = 'Keep watching…' }
+      on(host, '#save', () => {
+        if (resets > 0) api.resolve('dodged', `You saved it for later after watching the clock reset ${resets} time${resets > 1 ? 's' : ''}, instead of buying under it.`)
+        else { sfx.tick(); note.textContent = 'Saved. The clock is still running.' }
       })
     },
 
     ads(host, api) {
-      const decoys = [['DirectDownload Pro', 'cobalt'], ['FastGet Installer', 'lilac'], ['SafeFile Setup', 'sky']] as const
+      const ad = (k: number, label: string, sub: string) => `
+        <div class="fw-ad fw-ad${k}"><span class="fw-adtag">Ad <i>i</i> <i>x</i></span>
+          <button type="button" class="fw-decoy" data-k="${k}">${ICON.down}<span>${label}</span></button>
+          <small>${sub}</small></div>`
       host.innerHTML = `
-        <p class="dp-kicker">PhotoTrim 4 · free · 2.1 MB</p>
-        <h3 class="dp-h">Download PhotoTrim 4</h3>
-        <div class="dp-dlgrid">
-          ${decoys.map(([d, c]) => `<button type="button" class="dp-trap dp-decoy" data-c="${c}"><span>${d}</span><small>Advertisement</small></button>`).join('')}
-          <button type="button" class="dp-real-dl" id="real"><span>Download</span><small>PhotoTrim 4 · 2.1 MB</small></button>
-        </div>`
-      host.querySelectorAll<HTMLButtonElement>('.dp-decoy').forEach((b) =>
-        b.addEventListener('click', () => api.resolve('fell', 'That button was an advertisement styled to match the download you actually came for.')))
-      on(host, '#real', () => api.resolve('dodged', 'You found the real, plainest button on the page, sitting last and smallest.'))
+        <header class="fw-head"><p class="fw-logo">Freeware<b>Depot</b></p><p class="fw-search">Search software…</p><nav><span>Windows</span><span>Mac</span><span>Android</span><span>Games</span></nav></header>
+        <p class="fw-crumbs">Home › Windows › Photo &amp; Design › <b>PhotoTrim</b></p>
+        <div class="fw-main">
+          <div class="fw-col">
+            <section class="fw-app">
+              <svg class="fw-icon" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="#1c64d8"/><path d="M14 9v25h25M9 14h25v25" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round"/></svg>
+              <div><h1>PhotoTrim 4</h1><p>Crop, straighten and resize photos in seconds.</p><p class="fw-meta"><span>v4.0.2</span><span>2.1 MB</span><span>Windows 10/11</span><span>Free</span></p></div>
+            </section>
+            ${ad(0, 'Download', 'DirectDownload Pro · Fast &amp; secure')}
+            <table class="fw-spec"><tbody>
+              <tr><th>Developer</th><td>Kitefield Software</td></tr><tr><th>Licence</th><td>Freeware</td></tr>
+              <tr><th>Updated</th><td>Two weeks ago</td></tr><tr><th>Downloads</th><td>184,220</td></tr></tbody></table>
+            ${ad(1, 'Start Download', 'FastGet Installer · Recommended')}
+            <section class="fw-get"><h2>Download PhotoTrim 4</h2><p>Direct from the developer. Scanned by three antivirus engines.</p>
+              <button type="button" class="fw-link" id="real">PhotoTrim4_setup.exe (2.1 MB)</button></section>
+          </div>
+          <aside class="fw-side">${ad(2, 'DOWNLOAD NOW', 'Your file is ready · SafeFile Setup')}
+            <div class="fw-pop"><h3>Popular this week</h3><ol><li>ZipNest</li><li>ClipKeeper</li><li>FontFolio</li><li>Quietbar</li><li>TabTamer</li></ol></div></aside>
+        </div>
+        ${footer('fw', [['Freeware Depot', 'About', 'Submit software', 'Advertise'], ['Browse', 'Windows', 'Mac', 'Android']], '© Freeware Depot. Downloads are provided as-is.')}`
+      host.querySelectorAll<HTMLButtonElement>('.fw-decoy').forEach((b) =>
+        b.addEventListener('click', () => api.resolve('fell', 'That button was an advertisement styled to look like the download you actually came for.')))
+      on(host, '#real', () => api.resolve('dodged', 'You found the real download: a plain line of text near the bottom, under two adverts dressed as buttons.'))
     },
 
     drip(host, api) {
       let peeked = false
       host.innerHTML = `
-        <p class="dp-kicker">Friday · doors 7pm</p>
-        <h3 class="dp-h">The Weather Station, live</h3>
-        <p class="dp-line is-plain"><span>General admission</span><b class="dp-big">$45.00</b></p>
-        <button type="button" class="dp-trap" id="continue">Continue</button>`
+        <header class="tl-head"><p class="tl-logo">ticketloop</p><p class="tl-search">${ICON.search}<span>Artists, venues, events</span></p><span class="tl-in">Sign in</span></header>
+        <section class="tl-hero">${stageArt()}<div class="tl-ev"><p class="tl-date">Fri 28 Nov · 7:00 pm</p><h1>The Weather Station</h1><p>The Assembly Rooms · Doors 7:00 pm · 14+</p></div></section>
+        <section class="tl-tix"><h2>Tickets</h2>
+          <div class="tl-tier"><div><b>General admission</b><span>Standing</span></div><b class="tl-p">$45.00</b><span class="tl-qty"><i>−</i><b>1</b><i>+</i></span></div>
+          <div class="tl-tier is-gone"><div><b>Balcony</b><span>Seated</span></div><b class="tl-p">Sold out</b></div>
+          <button type="button" class="tl-go" id="continue">Get tickets</button>
+        </section>
+        ${footer('tl', [['ticketloop', 'Help', 'Sell tickets', 'Gift cards']], '© ticketloop. Prices are set by the event organiser.')}`
       on(host, '#continue', () => {
         sfx.tick()
+        api.go('/checkout', 'Checkout | ticketloop')
         api.knock()
+        let hold = 599
         host.innerHTML = `
-          <h3 class="dp-h">Order review</h3>
-          <p class="dp-row"><span>Ticket</span><b>$45.00</b></p>
-          <p class="dp-row"><span>Service fee</span><b>$9.50</b></p>
-          <p class="dp-row"><span>Facility fee</span><b>$6.00</b></p>
-          <p class="dp-row"><span>Order processing fee</span><b>$3.25</b></p>
-          <p class="dp-total"><span>Total</span><b>$63.75</b></p>
-          <div class="dp-acts">
-            <button type="button" class="dp-trap" id="confirm">Confirm $63.75</button>
-            <button type="button" class="dp-honest" id="peek">Wait, let me check that</button>
-          </div>`
+          <header class="tl-head"><p class="tl-logo">ticketloop</p></header>
+          <p class="tl-hold">We’re holding your tickets for <b id="hold">9:59</b></p>
+          <section class="tl-co"><h1>Checkout</h1>
+            <p class="tl-evline">The Weather Station · Fri 28 Nov · The Assembly Rooms</p>
+            <div class="tl-sum">
+              <p class="tl-line"><span>General admission × 1</span><b>$45.00</b></p>
+              <div class="tl-fees" id="fees" hidden>
+                <p class="tl-line"><span>Service fee</span><b>$9.50</b></p><p class="tl-line"><span>Facility fee</span><b>$6.00</b></p><p class="tl-line"><span>Order processing fee</span><b>$3.25</b></p>
+              </div>
+              <p class="tl-line tl-total"><span>Total <small>incl. fees</small></span><b>$63.75</b></p>
+              <button type="button" class="tl-peek" id="peek">Show price breakdown</button>
+            </div>
+            <button type="button" class="tl-go" id="confirm">Pay $63.75</button>
+            <p class="tl-fine">By paying you agree to the terms of sale. All sales are final.</p>
+          </section>`
+        api.every(() => { hold = Math.max(0, hold - 1); host.querySelector('#hold')!.textContent = `${Math.floor(hold / 60)}:${String(hold % 60).padStart(2, '0')}` }, 1000)
         on(host, '#peek', (e) => {
           peeked = true
           sfx.tick()
-          ;(e.currentTarget as HTMLButtonElement).textContent = 'That is 42% more than the price you compared.'
+          ;(host.querySelector('#fees') as HTMLElement).hidden = false
+          ;(e.currentTarget as HTMLButtonElement).textContent = 'That is 42% more than the $45 on the event page.'
         })
         on(host, '#confirm', () => {
-          if (peeked) api.resolve('dodged', 'You stopped to add up the fees before confirming anything.')
-          else api.resolve('fell', 'You confirmed a total 42% above the price you started with, without adding it up first.')
+          if (peeked) api.resolve('dodged', 'You opened the breakdown and added up the fees before paying anything.')
+          else api.resolve('fell', 'You paid a total 42% above the price you started with, without opening the breakdown.')
         })
       })
     },
@@ -379,67 +571,84 @@ const total = PATTERNS.length
     continuity(host, api) {
       let expanded = false
       host.innerHTML = `
-        <p class="dp-kicker">Loomline Pro · 14 days free</p>
-        <h3 class="dp-h">Start your free trial</h3>
-        <label class="dp-field"><span class="sr-only">Card number (this is a fake site: type anything or nothing)</span>
-          <input type="text" placeholder="Card number" inputmode="numeric" autocomplete="off"></label>
-        <button type="button" class="dp-honest dp-fine" id="fine">+ after your trial ends…</button>
-        <label class="dp-line"><input type="checkbox" checked disabled><span>I agree to the trial terms</span></label>
-        <button type="button" class="dp-trap" id="start">Start free trial</button>`
+        <header class="lm-head"><p class="lm-logo"><i aria-hidden="true"></i>Loomline</p><nav><span>Product</span><span>Pricing</span><span>Teams</span></nav><span class="lm-in">Sign in</span></header>
+        <section class="lm-co">
+          <div class="lm-pitch">
+            <p class="lm-kick">Loomline Pro</p>
+            <h1>Start your 14-day free trial</h1>
+            <ul>${['Unlimited pattern files', 'Colourway exports at print resolution', 'Version history and comments'].map((x) => `<li>${ICON.check}${x}</li>`).join('')}</ul>
+            <p class="lm-due"><span>Due today</span><b>$0.00</b></p>
+          </div>
+          <div class="lm-form">
+            <p class="lm-ftitle">Payment details</p>
+            <label>Card number<input readonly value="4242 4242 4242 4242" aria-label="Card number (a pretend card, already filled in)"></label>
+            <div class="lm-2"><label>Expiry<input readonly value="12 / 29"></label><label>CVC<input readonly value="123"></label></div>
+            <label class="lm-check"><input type="checkbox" checked disabled><span>I agree to the trial terms</span></label>
+            <button type="button" class="lm-go" id="start">Start free trial</button>
+            <button type="button" class="lm-fine" id="fine">After your trial ends…</button>
+          </div>
+        </section>`
       on(host, '#fine', (e) => {
         expanded = true
         sfx.tick()
-        ;(e.currentTarget as HTMLButtonElement).textContent = '$89.99 a month, automatically, unless cancelled first.'
+        ;(e.currentTarget as HTMLButtonElement).textContent = 'After your trial ends, Loomline Pro is $89.99 a month, charged automatically to this card until you cancel.'
       })
       on(host, '#start', () => {
-        if (expanded) api.resolve('dodged', 'You opened the fine print before handing over a card number.')
+        if (expanded) api.resolve('dodged', 'You opened the small print before handing over a card number.')
         else api.resolve('fell', 'You started the trial without reading what it quietly turns into.')
       })
     },
 
     trick(host, api) {
       host.innerHTML = `
-        <h3 class="dp-h">Privacy</h3>
-        <p class="dp-small">Update your preferences, then save.</p>
-        <label class="dp-line"><input type="checkbox" id="a" checked><span>Don't disable anonymous usage tracking</span></label>
-        <label class="dp-line"><input type="checkbox" id="b"><span>Send me occasional product emails</span></label>
-        <button type="button" class="dp-trap" id="save">Save settings</button>`
+        <div class="as-app">
+          <aside class="as-side"><p class="as-brand">Account</p><span>Profile</span><span>Security</span><span class="is-on">Privacy &amp; data</span><span>Notifications</span><span>Billing</span></aside>
+          <main class="as-main">
+            <h1>Privacy &amp; data</h1><p class="as-sub">Choose how we use your information.</p>
+            <section class="as-card"><h2>Usage data</h2>
+              <label class="as-row"><input type="checkbox" id="a" checked><span><b>Don’t disable anonymous usage tracking</b><small>Helps us understand which features people use.</small></span></label>
+              <label class="as-row"><input type="checkbox" id="c"><span><b>Do not exclude me from personalised offers</b><small>Offers chosen from how you use the product.</small></span></label>
+            </section>
+            <section class="as-card"><h2>Email</h2>
+              <label class="as-row"><input type="checkbox" id="b"><span><b>Send me occasional product emails</b><small>About once a month.</small></span></label>
+            </section>
+            <div class="as-foot"><button type="button" class="as-save" id="save">Save changes</button><button type="button" class="as-cancel">Cancel</button></div>
+          </main>
+        </div>`
+      host.querySelectorAll('input').forEach((x) => x.addEventListener('change', () => sfx.tick()))
       on(host, '#save', () => {
         const stillOn = (host.querySelector('#a') as HTMLInputElement).checked
-        if (!stillOn) api.resolve('dodged', 'Unchecking "don’t disable" is what actually disables it, and you worked that out.')
-        else api.resolve('fell', 'The box stayed checked — read literally, "don’t disable" checked means tracking stayed on.')
+        if (!stillOn) api.resolve('dodged', 'Unticking “don’t disable” is what actually disables it, and you worked that out.')
+        else api.resolve('fell', 'The box stayed ticked — read literally, “don’t disable” ticked means tracking stayed on.')
       })
     },
 
     zuckering(host, api) {
       host.innerHTML = `
-        <p class="dp-kicker">Welcome to frennet</p>
-        <h3 class="dp-h">Choose your privacy</h3>
-        <button type="button" class="dp-trap is-big" id="shareall">Share everything (recommended)</button>
-        <p class="dp-center"><button type="button" class="dp-honest" id="custom">Customise individual settings</button></p>`
-      on(host, '#shareall', () => { sfx.tick(); confirmA() })
-      on(host, '#custom', () => api.resolve('dodged', 'You went straight past the big button to the grey link that actually does what you want.'))
+        <header class="fn-head"><p class="fn-logo">frennet</p><p class="fn-search">${ICON.search}<span>Search frennet</span></p><i class="fn-av"></i></header>
+        <div class="fn-feed" aria-hidden="true">${[0, 1, 2].map((k) => `
+          <div class="fn-post"><p class="fn-who"><i style="--h:${200 + k * 50}"></i><b></b></p><p class="fn-txt"></p><p class="fn-txt is-short"></p><div class="fn-pic" style="--h:${190 + k * 40}"></div></div>`).join('')}
+        </div>`
+      const card = (html: string) => { api.layer.innerHTML = `<div class="fn-scrim"></div><div class="fn-card" role="dialog" aria-label="Privacy">${html}</div>` }
+      card(`<p class="fn-step">Step 2 of 3</p><h2>Choose your privacy</h2><p>Your friends are already here. Help them find you.</p>
+        <ul class="fn-list"><li>Your profile, posts and photos</li><li>People you may know</li><li>Activity from apps you connect</li></ul>
+        <button type="button" class="fn-big" id="shareall">Share with everyone (recommended)</button>
+        <button type="button" class="fn-link" id="custom">Customise individual settings</button>`)
+      on(api.layer, '#shareall', () => { sfx.tick(); confirmA() })
+      on(api.layer, '#custom', () => api.resolve('dodged', 'You went straight past the big button to the grey link that actually does what you want.'))
       function confirmA() {
         api.knock()
-        host.innerHTML = `
-          <h3 class="dp-h">Also share your contacts, so we can find your friends?</h3>
-          <div class="dp-acts">
-            <button type="button" class="dp-trap" id="y1">Yes, share contacts</button>
-            <button type="button" class="dp-honest" id="n1">Ask me later</button>
-          </div>`
-        on(host, '#y1', () => { sfx.tick(); confirmB() })
-        on(host, '#n1', () => api.resolve('fell', 'You still ended up on "Share everything" — declining one follow-up does not undo the button already pressed.'))
+        card(`<p class="fn-step">Step 3 of 3</p><h2>Find your friends faster</h2><p>Share your contacts so we can show you who is already on frennet.</p>
+          <button type="button" class="fn-big" id="y1">Share contacts</button><button type="button" class="fn-link" id="n1">Ask me later</button>`)
+        on(api.layer, '#y1', () => { sfx.tick(); confirmB() })
+        on(api.layer, '#n1', () => api.resolve('fell', 'You still ended up on “Share with everyone” — declining one follow-up does not undo the button already pressed.'))
       }
       function confirmB() {
         api.knock()
-        host.innerHTML = `
-          <h3 class="dp-h">Last thing — share your activity with advertising partners too?</h3>
-          <div class="dp-acts">
-            <button type="button" class="dp-trap" id="y2">Yes, share activity</button>
-            <button type="button" class="dp-honest" id="n2">Ask me later</button>
-          </div>`
+        card(`<p class="fn-step">Almost done</p><h2>See ads that matter to you</h2><p>Share your activity with our advertising partners too.</p>
+          <button type="button" class="fn-big" id="y2">Share activity</button><button type="button" class="fn-link" id="n2">Ask me later</button>`)
         for (const id of ['#y2', '#n2'])
-          on(host, id, () => api.resolve('fell', 'Every path out of "Share everything" turned out to be another version of yes.'))
+          on(api.layer, id, () => api.resolve('fell', 'Every path out of “Share with everyone” turned out to be another version of yes.'))
       }
     },
 
@@ -447,64 +656,83 @@ const total = PATTERNS.length
       const names = ['Jordan in Austin', 'Casey in Denver', 'Morgan in Miami']
       let count = 0
       host.innerHTML = `
-        <p class="dp-kicker">Only 3 left</p>
-        <h3 class="dp-h">The Weekender duffel</h3>
-        <p class="dp-line is-plain"><span>Waxed canvas, brass fittings</span><b class="dp-big">$68</b></p>
-        <div class="dp-acts is-stacked">
-          <button type="button" class="dp-trap" id="buy">Buy now — almost gone</button>
-          <button type="button" class="dp-honest" id="watch">Just watch the corner for a bit</button>
-        </div>
-        <div class="dp-toasts" aria-live="polite"></div>`
-      const layer = host.querySelector('.dp-toasts')!
-      on(host, '#watch', (e) => {
-        const btn = e.currentTarget as HTMLButtonElement
-        btn.disabled = true
-        btn.textContent = 'Watching…'
+        <p class="nb-ann">Complimentary shipping and returns</p>
+        <header class="nb-head"><nav><span>New</span><span>Bags</span><span>Travel</span><span>Journal</span></nav><p class="nb-logo">NIMBUS</p><nav class="nb-tools">${ICON.search}${ICON.bag}</nav></header>
+        <section class="nb-pdp">
+          <div class="nb-gal">
+            <div class="nb-main"><img src="${api.img('duffel')}" alt="The Weekender duffel in slate" width="1200" height="1200"></div>
+            <div class="nb-thumbs"><img class="is-on" src="${api.img('duffel', true)}" alt=""><img class="z1" src="${api.img('duffel', true)}" alt=""><img class="z2" src="${api.img('duffel', true)}" alt=""></div>
+          </div>
+          <div class="nb-info">
+            <p class="nb-crumb">Bags / Travel</p>
+            <h1>The Weekender</h1>
+            <p class="nb-price">$68</p>
+            <p class="nb-stars">${stars(5)} 128 reviews</p>
+            <p class="nb-desc">Waxed canvas, bridle leather and solid brass. Big enough for three days, small enough for the overhead rack.</p>
+            <p class="nb-opt">Colour <b>Slate</b></p>
+            <div class="nb-sw"><i class="is-on" style="--c:#2f353a"></i><i style="--c:#4b4f3a"></i><i style="--c:#151617"></i></div>
+            <p class="nb-stock"><i></i>Only 3 left</p>
+            <button type="button" class="nb-buy" id="buy">Buy now — almost gone</button>
+            <button type="button" class="nb-wish" id="wish">Add to wishlist</button>
+            <p class="nb-fine">Free delivery in 2–4 days. Made in Portugal.</p>
+          </div>
+        </section>
+        ${footer('nb', [['NIMBUS', 'Stores', 'Care guide', 'Contact']], '© NIMBUS')}`
+      on(host, '#wish', (e) => { sfx.tick(); (e.currentTarget as HTMLButtonElement).textContent = 'Saved to wishlist' })
+      on(host, '#buy', () => api.resolve('fell', 'You bought under the pressure of activity that was never real.'))
+      // The sales pop: bottom-left, small, a thumbnail and a timestamp.
+      const toasts = document.createElement('div')
+      toasts.className = 'nb-toasts'
+      toasts.setAttribute('aria-live', 'polite')
+      api.layer.append(toasts)
+      api.later(() => {
         api.every(() => {
           count++
-          const el = document.createElement('p')
-          el.className = 'dp-toast'
-          el.textContent = `${names[count % names.length]} just bought this · 2 minutes ago`
-          layer.prepend(el)
-          while (layer.children.length > 2) layer.lastElementChild!.remove()
+          toasts.innerHTML = `<div class="nb-toast"><img src="${api.img('duffel', true)}" alt=""><p><b>${names[count % names.length]}</b> just bought <i>The Weekender</i><small>${ICON.check}2 minutes ago</small></p></div>`
           sfx.tick()
           if (count >= 6)
-            api.resolve('dodged', `You watched ${count} of them cycle through the same three names and the same three cities, always "2 minutes ago".`)
-        }, 650)
-      })
-      on(host, '#buy', () => api.resolve('fell', 'You bought under the pressure of activity that was never real.'))
+            api.resolve('dodged', `You watched ${count} of them cycle through the same three names and the same three cities, always “2 minutes ago”.`)
+        }, 1300)
+      }, 900)
     },
 
     nagging(host, api) {
       let asks = 0
       const MAX = 3
-      const prompt = (last: boolean) => `
-        <div class="dp-behind" aria-hidden="true">
-          <p class="dp-h">Markets open higher as rates hold</p>
-          <i></i><i class="short"></i><i></i><i></i><i class="short"></i>
-        </div>
-        <div class="dp-prompt" role="dialog" aria-label="Notification request">
-          <p><b>dailybriefing.news</b> wants to</p>
-          <p class="dp-small">Show notifications${asks > 1 ? ` · asked ${asks} times` : ''}</p>
-          <div class="dp-acts">
-            <button type="button" class="dp-trap" id="allow">Allow</button>
-            <button type="button" class="dp-honest" id="not">${last ? 'Never ask again' : 'Not now'}</button>
-          </div>
-        </div>`
+      const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      host.innerHTML = `
+        <header class="br-mast"><p class="br-date">${today}</p><p class="br-logo">The Daily Briefing</p>
+          <nav><span>World</span><span>Business</span><span class="is-on">Markets</span><span>Politics</span><span>Science</span><span>Culture</span><span>Opinion</span></nav></header>
+        <article class="br-art">
+          <p class="br-kick">Markets</p>
+          <h1>Markets open higher as rates hold</h1>
+          <p class="br-deck">Shares rose in early trading after the central bank left its benchmark rate unchanged for a third meeting in a row.</p>
+          <p class="br-by">By Tomas Okafor · 8:42 am</p>
+          <figure class="br-fig">${chartArt()}<figcaption>The index through the first hour of trading.</figcaption></figure>
+          <p>Stocks climbed at the open on Friday, extending a week of gains, as investors read the decision as a sign that the next move in rates is more likely to be down than up.</p>
+          <p>Banks and housebuilders led the rise. Bond yields slipped, and the currency was little changed against the dollar.</p>
+          <p>“Nobody expected a cut this month,” one fund manager said. “What the market wanted was not to be surprised, and it wasn’t.”</p>
+        </article>
+        ${footer('br', [['The Daily Briefing', 'Subscribe', 'Newsletters', 'Corrections']], '© The Daily Briefing')}`
       const render = () => {
         asks++
         const last = asks > MAX
-        host.innerHTML = prompt(last)
-        if (asks > 1) api.knock()
-        on(host, '#allow', () => api.resolve('fell', last
+        api.layer.innerHTML = `
+          <div class="br-ask" role="dialog" aria-label="Notifications">
+            <i class="br-bell">${ICON.bell}</i>
+            <div><b>Never miss a story</b><p>Turn on notifications for breaking news from The Daily Briefing.</p>
+              <div class="br-acts"><button type="button" class="br-yes" id="allow">Turn on</button><button type="button" class="br-no" id="not">${last ? 'Never ask again' : 'Not now'}</button></div></div>
+          </div>`
+        if (asks > 1) sfx.whoosh()
+        on(api.layer, '#allow', () => api.resolve('fell', last
           ? `You said no ${MAX} times, and said yes the moment it finally offered to stop asking.`
           : `You gave in on ask number ${asks}.`))
-        on(host, '#not', () => {
+        on(api.layer, '#not', () => {
           if (last) api.resolve('dodged', `You said no ${MAX + 1} times in a row rather than give in.`)
-          else { sfx.tick(); setTimeout(render, 480) }
+          else { sfx.tick(); api.layer.innerHTML = ''; api.later(render, 1100) }
         })
       }
-      render()
+      api.later(render, 900)
     },
   }
 
@@ -531,12 +759,22 @@ const total = PATTERNS.length
     })
   }
 
+  function loadBar() {
+    const el = $('load')
+    el.classList.remove('is-loading')
+    void el.offsetWidth
+    el.classList.add('is-loading')
+  }
+
   const api: Api = {
+    layer,
+    img: (name, small) => `${IMG}${name}${small ? '-s' : ''}.webp`,
     resolve(outcome, note) {
       if (resolved) return
       resolved = true
       clearTimers()
       slot.inert = true
+      layer.inert = true
       const p = PATTERNS[idx]
       results.push({ id: p.id, title: p.title, real: p.real, outcome, note })
       shell.pick('Fell for each pattern', outcome === 'fell', p.title)
@@ -559,6 +797,7 @@ const total = PATTERNS.length
       })
       $('nextLbl').textContent = idx + 1 >= TOTAL ? 'See how you did' : 'Next site'
       verdict.hidden = false
+      win.classList.add('is-done')
       if (good) { sfx.good(); shell.pop(verdict) }
       else { sfx.bad(); shell.shake(win) }
       shell.announce(`${good ? 'You spotted it' : 'You fell for it'}: ${p.title}.`)
@@ -570,10 +809,23 @@ const total = PATTERNS.length
     every(fn, ms) {
       timers.push(window.setInterval(() => { if (!shell.paused && !resolved) fn() }, ms))
     },
+    later(fn, ms) {
+      // Paused time does not count: wait it out, then run.
+      const run = () => { if (resolved) return; if (shell.paused) outs.push(window.setTimeout(run, 250)); else fn() }
+      outs.push(window.setTimeout(run, ms))
+    },
     knock() {
-      site.classList.remove('is-knock')
-      void site.offsetWidth
-      site.classList.add('is-knock')
+      for (const el of [slot, layer]) {
+        el.classList.remove('is-knock')
+        void el.offsetWidth
+        el.classList.add('is-knock')
+      }
+    },
+    go(path, title) {
+      $('path').textContent = path === '/' ? '' : path
+      if (title) $('tabTitle').textContent = title
+      scroller.scrollTop = 0
+      loadBar()
     },
   }
 
@@ -583,24 +835,29 @@ const total = PATTERNS.length
     idx = i
     resolved = false
     const p = PATTERNS[i]
-    const brand = BRANDS[p.id]
-    win.dataset.brand = brand.block
-    win.dataset.voice = brand.voice
-    $('url').textContent = p.site
-    $('favicon').textContent = brand.name.replace(/^the /i, '')[0].toUpperCase()
-    $('wordmark').textContent = brand.name
+    const tab = TABS[p.id]
+    $('host').textContent = p.site
+    $('path').textContent = tab.path === '/' ? '' : tab.path
+    $('tabTitle').textContent = tab.title
+    const fav = $('bxFav')
+    fav.textContent = tab.fav[2]
+    fav.style.background = tab.fav[0]
+    fav.style.color = tab.fav[1]
     $('siteNo').textContent = `Site ${i + 1} of ${TOTAL}`
     $('lede').textContent = p.lede
     verdict.hidden = true
+    win.classList.remove('is-done')
     slot.inert = false
+    layer.inert = false
+    slot.className = 'sx s-' + p.id
+    layer.className = 'bx-layer sx s-' + p.id
     slot.innerHTML = ''
-    // A new site: the load bar runs and the page wipes in from the top — the
-    // small tell that this is a different place loading, not a relabel.
-    for (const el of [$('load'), site]) {
-      el.classList.remove('is-loading')
-      void (el as HTMLElement).offsetWidth
-      el.classList.add('is-loading')
-    }
+    layer.innerHTML = ''
+    scroller.scrollTop = 0
+    // A new site: the load bar runs and the page fades up — the small tell
+    // that this is a different place loading, not a relabel.
+    loadBar()
+    slot.classList.add('is-loading')
     MOUNTS[p.id](slot, api)
     shell.progress(i + 1)
     shownAt = performance.now()
@@ -608,7 +865,7 @@ const total = PATTERNS.length
     paintStrip()
     paintTally()
     if (i === TOTAL - 1) shell.levelUp('Last one.')
-    site.focus({ preventScroll: true })
+    scroller.focus({ preventScroll: true })
   }
 
   function begin() {
@@ -687,180 +944,446 @@ const total = PATTERNS.length
 
 <style is:global>
   /* The sites are built by the script, so these rules are global on purpose:
-     scoped styles never reach runtime-built nodes. Everything is prefixed. */
+     scoped styles never reach runtime-built nodes. Everything is prefixed:
+     dp- is this page, bx- the browser, and each site its own two letters. */
+
+  /* ---- the stage: a desk the browser sits on ------------------------- */
+  .stage:has(> .dpx) { padding: 0; overflow: clip; background: linear-gradient(180deg, #eef1f5 0%, #e2e7ee 100%); }
+  .dpx { padding: clamp(14px, 2.6vw, 36px); }
 
   /* ---- intro --------------------------------------------------------- */
-  .dp-intro { display: grid; justify-items: start; gap: 18px; padding: clamp(8px, 3vw, 40px) 0; max-width: 820px; }
+  .dp-intro { display: grid; justify-items: start; gap: 18px; padding: clamp(8px, 3vw, 40px) clamp(0px, 1vw, 12px); max-width: 820px; }
   .dp-intro-title { font-size: var(--fs-h2); line-height: 0.98; max-width: 16ch; }
   .dp-intro .lead { max-width: 52ch; }
   .dp-domains { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-  .dp-domains .tag { color: var(--ink2); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; }
+  .dp-domains .tag { color: var(--ink2); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; background: rgba(255, 255, 255, 0.6); }
 
   /* ---- layout -------------------------------------------------------- */
-  .dp-play { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: clamp(16px, 2.6vw, 36px); align-items: start; }
-  @media (max-width: 900px) { .dp-play { grid-template-columns: minmax(0, 1fr); } }
+  .dp-play { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); gap: clamp(16px, 2.4vw, 32px); align-items: start; }
+  @media (max-width: 980px) { .dp-play { grid-template-columns: minmax(0, 1fr); } }
 
-  /* ---- the browser window -------------------------------------------- */
-  .dp-window {
-    --brand: var(--lilac);
-    --brand-ink: var(--ink);
-    position: relative;
-    border: 2px solid var(--ink);
-    border-radius: var(--r-lg);
-    overflow: hidden;
-    background: var(--card);
+  /* ---- the browser ---------------------------------------------------- */
+  .bx {
+    --ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    display: flex; flex-direction: column;
+    height: clamp(540px, 76vh, 780px);
+    border-radius: 12px; overflow: hidden; background: #fff;
+    box-shadow: 0 0 0 1px rgba(23, 32, 46, 0.16), 0 2px 6px rgba(23, 32, 46, 0.08), 0 30px 70px -18px rgba(23, 32, 46, 0.42);
+    font-family: var(--ui);
   }
-  .dp-window[data-brand='cobalt'] { --brand: var(--cobalt); }
-  .dp-window[data-brand='mint'] { --brand: var(--mint); }
-  .dp-window[data-brand='sky'] { --brand: var(--sky); }
-  .dp-window[data-brand='red'] { --brand: var(--red); }
-  .dp-window[data-brand='lilac'] { --brand: var(--lilac); }
-  .dp-window[data-brand='ink'] { --brand: var(--ink); --brand-ink: var(--ink-paper); }
-
-  .dp-chrome { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--paper2); border-bottom: 2px solid var(--ink); }
-  .dp-lights { display: flex; gap: 6px; }
-  .dp-lights i { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--card); }
-  .dp-addr {
-    flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
-    height: 32px; padding: 0 14px; border-radius: var(--r-pill);
-    background: var(--card); border: 1.5px solid var(--paper3);
+  .bx-tabs { flex: none; display: flex; align-items: flex-end; gap: 4px; height: 40px; padding-left: 10px; background: #dee3ea; color: #1f2328; }
+  .bx-tab { display: flex; align-items: center; gap: 8px; width: min(250px, 62%); height: 32px; padding: 0 8px 0 12px; border-radius: 9px 9px 0 0; background: #fff; font-size: 12px; }
+  .bx-tab span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bx-tab svg { flex: none; color: #5b616a; }
+  .bx-fav { flex: none; width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; font: 800 10px/1 var(--ui); font-style: normal; }
+  .bx-plus { display: grid; place-items: center; width: 28px; height: 28px; margin: 0 0 3px; color: #474c55; }
+  .bx-win { margin-left: auto; display: flex; align-self: stretch; color: #3c4047; }
+  .bx-win i { width: 44px; display: grid; place-items: center; }
+  .bx-bar { position: relative; flex: none; display: flex; align-items: center; gap: 4px; height: 46px; padding: 0 8px; background: #fff; border-bottom: 1px solid #e3e6eb; color: #474c55; }
+  .bx-ico { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; }
+  .bx-ico.is-off { color: #b9bdc4; }
+  .bx-omni { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 34px; margin: 0 6px; padding: 0 12px; border-radius: 17px; background: #edf0f4; color: #1f2328; font-size: 14px; }
+  .bx-lock { flex: none; color: #4a4f57; }
+  .bx-url { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bx-url b { font-weight: 400; color: #1f2328; }
+  .bx-url #path { color: #6b717a; }
+  .bx-star { flex: none; color: #5b616a; }
+  .bx-me { flex: none; display: flex; align-items: center; gap: 12px; padding: 0 6px 0 2px; color: #474c55; fill: currentColor; }
+  .bx-me i { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #8aa4c8, #4d6a94); }
+  .bx-load { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: #2f6fe4; transform-origin: left center; transform: scaleX(0); opacity: 0; pointer-events: none; }
+  .bx-view { position: relative; flex: 1; min-height: 0; }
+  .bx-scroll { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; background: #fff; outline: none; container: site / inline-size; scrollbar-width: thin; }
+  .bx-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; container: over / inline-size; }
+  .bx-layer > * { pointer-events: auto; }
+  /* The layer wears its site's class for the type, never its page colour. */
+  .bx-layer.sx { background: none; min-height: 0; }
+  .bx.is-done .bx-view { filter: saturate(0.85); }
+  @media (max-width: 640px) {
+    .bx { height: min(76vh, 660px); border-radius: 14px; }
+    .bx-tabs, .bx-ico, .bx-star, .bx-me svg { display: none; }
+    .bx-bar { height: 52px; padding: 0 8px 0 4px; }
+    .bx-omni { height: 38px; border-radius: 19px; font-size: 15px; }
   }
-  .dp-favicon {
-    flex: none; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center;
-    background: var(--brand); color: var(--brand-ink); font: 800 10px/1 var(--sans); font-style: normal;
+
+  /* Inside the window, nothing of this site's own type or spacing leaks in:
+     every fake site starts from a plain browser default and dresses itself. */
+  .sx { font: 400 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #16181b; letter-spacing: 0; text-transform: none; }
+  .sx :where(h1, h2, h3, p, ul, ol, figure, table) { margin: 0; padding: 0; }
+  .sx :where(h1, h2, h3) { font: inherit; font-weight: 700; letter-spacing: 0; line-height: 1.2; }
+  .sx :where(ul, ol) { list-style: none; }
+  .sx :where(button) { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; text-align: inherit; letter-spacing: inherit; text-transform: none; }
+  .sx :where(img) { display: block; max-width: 100%; height: auto; }
+  .sx :where(input) { font: inherit; }
+  .sx :where(svg) { flex: none; }
+  .sx-stars { display: inline-flex; gap: 1px; }
+  .sx-foot { margin-top: 48px; padding: 32px clamp(18px, 4cqi, 40px) 28px; border-top: 1px solid rgba(0, 0, 0, 0.1); font-size: 13px; }
+  .sx-cols { display: flex; flex-wrap: wrap; gap: 20px 56px; }
+  .sx-cols li { padding: 3px 0; opacity: 0.75; }
+  .sx-cols li:first-child { opacity: 1; padding-bottom: 8px; }
+  .sx-small { margin-top: 26px; font-size: 12px; opacity: 0.6; }
+
+  /* ---- 1 · Fenwick & Oates: a quiet homeware shop --------------------- */
+  .s-basket { --fo-serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1d1f22; background: #fff; }
+  .fo-ann { padding: 9px 16px; background: #1d1f22; color: #eceae4; font-size: 12px; letter-spacing: 0.04em; text-align: center; }
+  .fo-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 18px clamp(16px, 4cqi, 40px); border-bottom: 1px solid #ebe9e4; }
+  .fo-nav { display: flex; gap: 22px; font-size: 13px; }
+  .fo-logo { font: 400 26px/1 var(--fo-serif); letter-spacing: 0.01em; }
+  .fo-logo i { font-style: italic; }
+  .fo-tools { display: flex; justify-content: flex-end; align-items: center; gap: 16px; }
+  .fo-bag { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+  .fo-hero { padding: clamp(30px, 6cqi, 56px) clamp(16px, 4cqi, 40px) 26px; text-align: center; }
+  .fo-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #6d6a63; }
+  .fo-hero h1 { margin: 10px 0 8px; font: 400 clamp(30px, 5.4cqi, 46px)/1.05 var(--fo-serif); letter-spacing: -0.01em; }
+  .fo-hero > p:last-child { color: #5d5a54; }
+  .fo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 2.4cqi, 24px); padding: 0 clamp(16px, 4cqi, 40px); }
+  .fo-card { display: grid; grid-template-rows: auto 1fr auto; gap: 12px; }
+  .fo-img { aspect-ratio: 4 / 5; overflow: hidden; background: #f1f1ef; }
+  .fo-img img { width: 100%; height: 100%; object-fit: contain; }
+  .fo-meta { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .fo-meta h3 { font: 400 17px/1.25 var(--fo-serif); }
+  .fo-meta p { grid-row: 2; font-size: 12px; color: #77736b; }
+  .fo-meta b { grid-row: 1; grid-column: 2; font-weight: 400; font-size: 15px; }
+  .fo-add { height: 44px; border: 1px solid #1d1f22; font-size: 13px; letter-spacing: 0.04em; text-align: center; transition: background 0.15s, color 0.15s; }
+  .fo-add:hover { background: #1d1f22; color: #fff; }
+  .fo-story { max-width: 560px; margin: 56px auto 0; padding: 0 20px; text-align: center; }
+  .fo-story h2 { font: 400 26px/1.15 var(--fo-serif); margin-bottom: 10px; }
+  .fo-story p { color: #5d5a54; }
+  @container site (max-width: 620px) {
+    .fo-nav { display: none; }
+    .fo-head { grid-template-columns: auto 1fr; }
+    .fo-logo { font-size: 21px; }
+    .fo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .fo-card:last-child { grid-column: span 2; }
+    .fo-card:last-child .fo-img { aspect-ratio: 16 / 10; }
   }
-  .dp-url { font-size: 13px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dp-load { position: absolute; left: 0; right: 0; height: 3px; margin-top: -1px; background: var(--brand); transform-origin: left center; transform: scaleX(0); opacity: 0; pointer-events: none; }
-
-  .dp-site { outline: none; }
-  .dp-brandbar {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 16px clamp(16px, 3vw, 28px);
-    background: var(--brand); color: var(--brand-ink);
+  .fo-scrim { position: absolute; inset: 0; background: rgba(20, 22, 26, 0.38); }
+  .fo-drawer {
+    position: absolute; top: 0; right: 0; bottom: 0; width: min(400px, 92%);
+    display: flex; flex-direction: column; gap: 14px; padding: 22px 22px 18px;
+    background: #fff; color: #1d1f22; box-shadow: -18px 0 50px rgba(0, 0, 0, 0.18);
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; overflow: auto;
   }
-  .dp-wordmark { font: 800 22px/1 var(--sans); letter-spacing: -0.03em; }
-  .dp-window[data-voice='serif'] .dp-wordmark { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-style: italic; font-size: 26px; letter-spacing: -0.02em; }
-  .dp-window[data-voice='shout'] .dp-wordmark { font-weight: 900; letter-spacing: 0.08em; font-size: 19px; }
-  .dp-window[data-voice='lower'] .dp-wordmark { font-weight: 700; letter-spacing: -0.05em; font-size: 26px; }
-  .dp-nav { display: flex; gap: 16px; font-size: 13px; font-weight: 600; }
-  @media (max-width: 480px) { .dp-nav { display: none; } }
+  .fo-drawer header { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid #ebe9e4; }
+  .fo-drawer h2 { font: 400 22px/1 'Iowan Old Style', 'Palatino Linotype', Georgia, serif; }
+  .fo-drawer header span { font-size: 12px; color: #77736b; }
+  .fo-line { display: grid; grid-template-columns: 72px 1fr auto; gap: 14px; align-items: center; }
+  .fo-line img { width: 72px; height: 88px; object-fit: cover; background: #f1f1ef; }
+  .fo-line div { display: grid; gap: 4px; font-size: 14px; }
+  .fo-line div span { font-size: 12px; color: #77736b; }
+  .fo-line > b { font-weight: 400; font-size: 14px; }
+  .fo-addon { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; font-size: 12px; color: #5d5a54; cursor: pointer; }
+  .fo-addon input { width: 14px; height: 14px; margin: 1px 0 0; accent-color: #1d1f22; }
+  .fo-addon b { font-weight: 500; color: #1d1f22; }
+  .fo-addon em { font-style: normal; color: #1d1f22; }
+  .fo-sum { display: flex; justify-content: space-between; margin-top: auto; padding-top: 14px; border-top: 1px solid #ebe9e4; font-size: 15px; }
+  .fo-sum b { font-weight: 500; }
+  .fo-small { font-size: 11px; color: #8a867e; }
+  .fo-checkout { height: 52px; background: #1d1f22; color: #fff; font-size: 14px; letter-spacing: 0.06em; text-align: center; text-transform: uppercase; }
+  .fo-pay { text-align: center; }
 
-  .dp-body { position: relative; padding: clamp(18px, 3vw, 30px) clamp(16px, 3vw, 28px) clamp(22px, 3.4vw, 34px); min-height: 300px; display: grid; align-content: start; gap: 12px; }
-  .dp-kicker { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
-  .dp-h { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: clamp(22px, 2.4vw, 30px); line-height: 1.05; letter-spacing: -0.02em; max-width: 24ch; }
-  .dp-small { font-size: 14px; color: var(--ink2); }
-  .dp-center { text-align: center; }
-
-  /* The two voices every site shares: the loud trap, the quiet way out. */
-  .dp-trap {
-    justify-self: start;
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    min-height: 54px; padding: 0 26px;
-    border: 2px solid var(--ink); border-radius: var(--r-pill);
-    background: var(--brand); color: var(--brand-ink);
-    font: 800 15px/1.15 var(--sans); letter-spacing: 0; text-align: center;
-    box-shadow: var(--shadow-pill);
-    cursor: pointer;
+  /* ---- 2 · The Daily Brew: a coffee blog ------------------------------ */
+  .s-confirmshame { font-family: Georgia, 'Times New Roman', serif; color: #22201d; background: #fbfaf7; }
+  .db-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px clamp(16px, 4cqi, 40px); border-bottom: 1px solid #e8e3da; font-family: 'Helvetica Neue', Arial, sans-serif; }
+  .db-logo { font: 700 20px/1 Georgia, serif; letter-spacing: -0.02em; color: #1f4d4a; }
+  .db-head nav { display: flex; gap: 18px; font-size: 13px; color: #5a554d; }
+  .db-post { max-width: 660px; margin: 0 auto; padding: 34px 20px 0; display: grid; gap: 16px; font-size: 17px; line-height: 1.7; }
+  .db-cat { font: 600 12px/1 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #1f6b66; }
+  .db-post h1 { font: 700 clamp(28px, 5cqi, 40px)/1.12 Georgia, serif; letter-spacing: -0.015em; }
+  .db-by { display: flex; align-items: center; gap: 10px; font: 400 13px/1 'Helvetica Neue', Arial, sans-serif; color: #6a645b; }
+  .db-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #d7e3df; color: #1f4d4a; font: 700 11px/1 Arial, sans-serif; font-style: normal; }
+  .db-fig { margin: 6px 0; }
+  .db-fig img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: 50% 45%; background: #f1f1ef; }
+  .db-fig figcaption { margin-top: 8px; font: italic 13px/1.4 Georgia, serif; color: #7a746a; }
+  .db-lede::first-letter { float: left; font-size: 3.4em; line-height: 0.85; padding: 6px 8px 0 0; color: #1f4d4a; }
+  .db-post h2 { margin-top: 10px; font: 700 22px/1.2 Georgia, serif; }
+  .s-confirmshame .sx-foot { font-family: 'Helvetica Neue', Arial, sans-serif; }
+  .db-scrim { position: absolute; inset: 0; background: rgba(18, 22, 22, 0.55); }
+  .db-modal {
+    position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: min(640px, 92%);
+    display: grid; grid-template-columns: 0.85fr 1fr; overflow: hidden;
+    background: #fbfaf7; color: #22201d; border-radius: 4px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
   }
-  .dp-honest {
-    justify-self: start;
-    min-height: 44px; padding: 8px 4px;
-    border: 0; background: none; cursor: pointer;
-    font: 500 13px/1.3 var(--sans); color: var(--ink3); text-align: left;
-    text-decoration: underline; text-decoration-color: var(--paper3); text-underline-offset: 3px;
-  }
-  .dp-honest:hover { color: var(--ink); text-decoration-color: currentColor; }
-  .dp-honest:disabled { cursor: default; }
-  .dp-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 6px; }
-  .dp-acts.is-stacked { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .db-mimg { background: #f1f1ef; }
+  .db-mimg img { width: 100%; height: 100%; object-fit: cover; }
+  .db-mbody { display: grid; gap: 12px; align-content: center; padding: 34px 28px 26px; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; color: #4a453e; }
+  .db-kick { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #1f6b66; }
+  .db-mbody h2 { font: 700 24px/1.15 Georgia, serif; color: #22201d; }
+  .db-field input { width: 100%; height: 44px; padding: 0 14px; border: 1px solid #cfc8bb; border-radius: 2px; background: #fff; font-size: 14px; }
+  .db-yes { height: 46px; background: #1f4d4a; color: #fff; font-weight: 600; font-size: 14px; text-align: center; border-radius: 2px; }
+  .db-no { justify-self: center; font-size: 12px; color: #7a746a; text-decoration: underline; text-underline-offset: 2px; }
+  .db-x { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; display: grid; place-items: center; color: #9a948a; }
+  @container over (max-width: 560px) { .db-modal { grid-template-columns: 1fr; } .db-mimg { height: 130px; } .db-mbody { padding: 22px 20px 18px; } .db-mbody h2 { font-size: 20px; } }
 
-  .dp-line {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px; border-radius: var(--r);
-    background: var(--paper2); font-size: 15px; cursor: pointer;
-  }
-  .dp-line.is-plain { cursor: default; }
-  .dp-line span { flex: 1; }
-  .dp-line input { width: 20px; height: 20px; flex: none; accent-color: var(--ink); }
-  .dp-line b { font-weight: 700; }
-  .dp-big { font-size: 24px; letter-spacing: -0.03em; }
-  .dp-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1.5px solid var(--paper3); font-size: 15px; }
-  .dp-total { display: flex; justify-content: space-between; gap: 12px; padding: 12px 2px 4px; border-top: 2px solid var(--ink); font-size: 18px; font-weight: 800; }
+  /* ---- 3 · Chorus+: a streaming service's account page --------------- */
+  .s-roach { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0d0f14; color: #e9eaf0; min-height: 100%; }
+  #slot.s-roach { min-height: 100%; }
+  .ch-head { display: flex; align-items: center; gap: 28px; padding: 18px clamp(16px, 4cqi, 40px); background: linear-gradient(#0a0b0f, rgba(10, 11, 15, 0)); }
+  .ch-logo { font: 800 24px/1 system-ui, sans-serif; letter-spacing: -0.04em; }
+  .ch-logo b { color: #8f7bff; }
+  .ch-head nav { display: flex; gap: 20px; font-size: 14px; color: #a3a6b4; }
+  .ch-av { margin-left: auto; width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; background: linear-gradient(135deg, #5b8def, #8f7bff); font: 700 13px/1 system-ui; font-style: normal; color: #fff; }
+  .ch-acct { max-width: 720px; margin: 0 auto; padding: 22px 20px 60px; display: grid; gap: 16px; }
+  .ch-acct h1 { font-size: 32px; letter-spacing: -0.02em; }
+  .ch-since { color: #8b8fa0; font-size: 13px; margin-top: -10px; }
+  .ch-card { display: grid; gap: 14px; padding: 22px; border-radius: 12px; background: #171a22; border: 1px solid #242836; }
+  .ch-plan { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .ch-lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #8f7bff; }
+  .ch-plan h2 { font-size: 22px; margin: 4px 0; }
+  .ch-plan p:not(.ch-lbl) { font-size: 13px; color: #a3a6b4; }
+  .ch-price b { font-size: 22px; } .ch-price span { font-size: 13px; color: #8b8fa0; }
+  .ch-next { font-size: 13px; color: #a3a6b4; padding-top: 12px; border-top: 1px solid #242836; }
+  .ch-acts { display: flex; flex-wrap: wrap; gap: 10px; }
+  .ch-btn { height: 42px; padding: 0 20px; border-radius: 8px; background: #8f7bff; color: #0d0f14; font-weight: 700; font-size: 14px; text-align: center; }
+  .ch-ghost { height: 42px; padding: 0 18px; border-radius: 8px; border: 1px solid #3a3f52; color: #e9eaf0; font-size: 14px; }
+  .ch-rows p { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; }
+  .ch-rows span { color: #8b8fa0; } .ch-rows b { font-weight: 500; }
+  .ch-wall { max-width: 640px; margin: 0 auto; padding: 36px 20px 60px; display: grid; gap: 16px; justify-items: center; text-align: center; }
+  .ch-kick { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8f7bff; }
+  .ch-wall h1 { font-size: clamp(28px, 5cqi, 40px); letter-spacing: -0.025em; }
+  .ch-p { color: #b5b8c6; max-width: 44ch; }
+  .ch-dim { color: #80849a; font-size: 13px; }
+  .ch-offer { display: grid; gap: 6px; justify-items: center; padding: 24px 34px; border-radius: 16px; background: radial-gradient(120% 140% at 50% 0%, #3b2f8c, #171a22 70%); border: 1px solid #3d3478; }
+  .ch-offer b { font-size: 44px; letter-spacing: -0.03em; } .ch-offer span { color: #c9c4ff; font-size: 14px; } .ch-offer s { color: #80849a; }
+  .ch-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; width: 100%; margin: 8px 0; }
+  .ch-poster { aspect-ratio: 2 / 3; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; padding: 10px 8px; border-radius: 6px; text-align: left; background: radial-gradient(90% 60% at 60% 30%, var(--b), transparent 70%), linear-gradient(160deg, var(--a), #07080b); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+  .ch-poster span { font-size: 8px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+  .ch-poster b { font: 800 13px/1.05 system-ui, sans-serif; letter-spacing: -0.01em; }
+  @container site (max-width: 560px) { .ch-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ch-head nav { display: none; } }
+  .ch-wacts { display: grid; gap: 12px; justify-items: center; margin-top: 8px; }
+  .ch-big { height: 50px; padding: 0 34px; font-size: 15px; }
+  .ch-link { font-size: 13px; color: #8b8fa0; text-decoration: underline; text-underline-offset: 3px; }
+  .ch-phone { font-size: 30px; font-weight: 700; letter-spacing: 0.02em; }
 
-  /* Sneak into Basket */
-  .dp-products { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  @media (max-width: 620px) { .dp-products { grid-template-columns: minmax(0, 1fr); } }
-  .dp-product { display: grid; gap: 6px; align-content: start; padding: 16px; border-radius: var(--r); background: var(--paper2); }
-  .dp-product .dp-price { color: var(--ink2); font-weight: 600; }
-  .dp-product .dp-trap { margin-top: 8px; min-height: 46px; padding: 0 18px; font-size: 14px; }
+  /* ---- 4 · GET IT NOW: a deals site ------------------------------------ */
+  .s-urgency { font-family: Arial, Helvetica, sans-serif; color: #111; background: #f3f4f6; }
+  .gn-strip { padding: 8px 16px; background: #0b1a3a; color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
+  .gn-head { display: flex; align-items: center; gap: 18px; padding: 12px clamp(14px, 3cqi, 28px); background: #d8102b; color: #fff; }
+  .gn-logo { font: 900 22px/1 'Arial Black', Arial, sans-serif; letter-spacing: -0.03em; white-space: nowrap; }
+  .gn-logo b { color: #0b1a3a; background: #fff; padding: 0 5px; margin-left: 3px; }
+  .gn-search { flex: 1; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-radius: 4px; background: #fff; color: #6b7280; font-size: 14px; }
+  .gn-cart { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; }
+  .gn-cats { display: flex; gap: 20px; padding: 10px clamp(14px, 3cqi, 28px); background: #fff; border-bottom: 1px solid #e5e7eb; font-size: 13px; overflow: hidden; white-space: nowrap; }
+  .gn-cats .is-on { color: #d8102b; font-weight: 700; }
+  .gn-deal { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px, 3cqi, 32px); margin: 18px clamp(12px, 3cqi, 28px); padding: clamp(14px, 3cqi, 28px); background: #fff; border-radius: 6px; }
+  .gn-img { position: relative; background: #f1f1ef; align-self: start; }
+  .gn-img img { width: 100%; }
+  .gn-off { position: absolute; top: 12px; left: 12px; padding: 6px 10px; border-radius: 4px; background: #d8102b; color: #fff; font-weight: 900; font-size: 16px; }
+  .gn-info { display: grid; gap: 10px; align-content: start; }
+  .gn-brand { font-size: 13px; color: #2456a8; font-weight: 700; }
+  .gn-info h1 { font-size: clamp(19px, 2.8cqi, 24px); line-height: 1.25; font-weight: 700; }
+  .gn-stars { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4b5563; } .gn-stars .sx-stars { color: #0b1a3a; }
+  .gn-price { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .gn-price b { font-size: 40px; font-weight: 900; color: #d8102b; letter-spacing: -0.02em; }
+  .gn-price s { color: #6b7280; } .gn-price em { font-style: normal; font-size: 13px; font-weight: 700; color: #fff; background: #0b1a3a; padding: 3px 8px; border-radius: 3px; }
+  .gn-timer { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 6px; background: #fff1f2; color: #9f0d22; font-weight: 700; font-size: 13px; }
+  .gn-timer b { display: flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
+  .gn-timer i { display: grid; place-items: center; min-width: 36px; height: 34px; border-radius: 4px; background: #0b1a3a; color: #fff; font: 900 19px/1 'Arial Black', Arial, sans-serif; font-style: normal; }
+  .gn-timer u { text-decoration: none; color: #0b1a3a; }
+  .gn-timer b.is-reset i { background: #d8102b; }
+  .gn-claim { height: 8px; border-radius: 4px; background: #e5e7eb; overflow: hidden; } .gn-claim i { display: block; height: 100%; background: linear-gradient(90deg, #f43f5e, #d8102b); }
+  .gn-claimed { font-size: 12px; font-weight: 700; color: #9f0d22; margin-top: -4px; }
+  .gn-buy { height: 52px; border-radius: 26px; background: #d8102b; color: #fff; font-weight: 900; font-size: 16px; text-align: center; box-shadow: 0 6px 16px rgba(216, 16, 43, 0.3); }
+  .gn-save { height: 40px; border-radius: 20px; border: 1px solid #d1d5db; font-size: 13px; color: #374151; text-align: center; }
+  .gn-note { font-size: 12px; color: #4b5563; min-height: 1em; }
+  .gn-bul { display: grid; gap: 4px; font-size: 13px; color: #374151; } .gn-bul li::before { content: '· '; }
+  @container site (max-width: 600px) { .gn-deal { grid-template-columns: 1fr; } .gn-search span { display: none; } .gn-search { flex: 0 0 38px; justify-content: center; padding: 0; } .gn-head { justify-content: space-between; } }
 
-  /* The faux page behind a modal: grey text lines, nothing to read. */
-  .dp-behind { display: grid; gap: 10px; opacity: 0.5; }
-  .dp-behind i { display: block; height: 10px; border-radius: 5px; background: var(--paper3); }
-  .dp-behind i.short { width: 62%; }
-  .dp-modal, .dp-prompt {
-    position: relative; z-index: 1;
-    margin-top: -64px;
-    display: grid; gap: 10px;
-    padding: 22px; border: 2px solid var(--ink); border-radius: var(--r-lg);
-    background: var(--card); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16);
-  }
-  .dp-prompt { max-width: 360px; margin-top: -100px; padding: 18px; border-radius: var(--r); }
-  .dp-modal-q { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: clamp(20px, 2vw, 26px); line-height: 1.1; letter-spacing: -0.02em; max-width: 26ch; }
-  .dp-stall { display: grid; gap: 10px; }
+  /* ---- 5 · Freeware Depot: a download portal --------------------------- */
+  .s-ads { font: 13px/1.45 Verdana, Tahoma, Geneva, sans-serif; color: #222; background: #eef0f3; }
+  .fw-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px clamp(12px, 3cqi, 24px); background: #2456a8; color: #fff; }
+  .fw-logo { font: 700 20px/1 Tahoma, Verdana, sans-serif; } .fw-logo b { color: #9fd0ff; }
+  .fw-search { flex: 1; min-width: 140px; height: 30px; padding: 0 10px; display: flex; align-items: center; border-radius: 2px; background: #fff; color: #888; }
+  .fw-head nav { display: flex; gap: 14px; font-weight: 700; font-size: 12px; }
+  .fw-crumbs { padding: 8px clamp(12px, 3cqi, 24px); font-size: 11px; color: #555; background: #fff; border-bottom: 1px solid #d9dde3; }
+  .fw-main { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 14px; padding: 14px clamp(12px, 3cqi, 24px); }
+  .fw-col, .fw-side { display: grid; gap: 14px; align-content: start; }
+  .fw-app { display: flex; gap: 14px; padding: 14px; background: #fff; border: 1px solid #d9dde3; }
+  .fw-icon { width: 56px; height: 56px; }
+  .fw-app h1 { font: 700 22px/1.2 Tahoma, Verdana, sans-serif; }
+  .fw-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 11px; color: #666; }
+  .fw-ad { position: relative; display: grid; justify-items: center; gap: 6px; padding: 22px 14px 14px; background: #fafafa; border: 1px solid #e2e2e2; }
+  .fw-adtag { position: absolute; top: 3px; right: 4px; display: flex; gap: 3px; font: 10px/1 Arial, sans-serif; color: #888; }
+  .fw-adtag i { display: grid; place-items: center; width: 12px; height: 12px; border: 1px solid #aaa; border-radius: 2px; font-size: 8px; font-style: normal; }
+  .fw-decoy { display: flex; align-items: center; justify-content: center; gap: 10px; width: min(100%, 420px); height: 58px; border-radius: 5px; color: #fff; font: 700 20px/1 Arial, sans-serif; text-align: center; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); }
+  .fw-ad0 .fw-decoy { background: linear-gradient(#3dbb4c, #22912f); box-shadow: 0 3px 0 #1a6f24; }
+  .fw-ad1 .fw-decoy { background: linear-gradient(#3a8df0, #1d63c7); box-shadow: 0 3px 0 #164c99; height: 50px; font-size: 18px; }
+  .fw-ad2 { padding-top: 28px; background: linear-gradient(#ffffff, #eef6ee); }
+  .fw-ad2 .fw-decoy { height: 64px; flex-direction: column; gap: 2px; font-size: 17px; background: linear-gradient(#3dbb4c, #22912f); box-shadow: 0 3px 0 #1a6f24; }
+  .fw-ad small { font: 11px/1.3 Arial, sans-serif; color: #777; }
+  .fw-spec { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9dde3; }
+  .fw-spec th, .fw-spec td { padding: 7px 12px; border-bottom: 1px solid #eceef1; text-align: left; font-size: 12px; }
+  .fw-spec th { width: 34%; color: #666; font-weight: 400; background: #f7f8fa; }
+  .fw-get { padding: 14px; background: #fff; border: 1px solid #d9dde3; display: grid; gap: 6px; }
+  .fw-get h2 { font: 700 15px/1.2 Tahoma, Verdana, sans-serif; } .fw-get p { font-size: 11px; color: #666; }
+  .fw-link { justify-self: start; color: #1a4fb5; text-decoration: underline; font-size: 12px; }
+  .fw-pop { padding: 12px 14px; background: #fff; border: 1px solid #d9dde3; }
+  .fw-pop h3 { font: 700 13px/1 Tahoma, sans-serif; margin-bottom: 8px; }
+  .fw-pop ol { list-style: decimal inside; display: grid; gap: 5px; color: #1a4fb5; font-size: 12px; }
+  @container site (max-width: 640px) { .fw-main { grid-template-columns: 1fr; } .fw-head nav { display: none; } }
 
-  /* False Urgency */
-  .dp-deal { font-size: 18px; }
-  .dp-deal s { color: var(--ink3); }
-  .dp-deal b { font-size: 40px; letter-spacing: -0.04em; }
-  .dp-clock-line { font-size: 16px; font-weight: 600; }
-  .dp-clock { display: inline-block; min-width: 3.4em; font-size: 26px; letter-spacing: -0.02em; }
-  .dp-clock.is-reset { color: var(--t-red); }
+  /* ---- 6 · ticketloop: a ticket site ------------------------------------ */
+  .s-drip { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #fff; color: #14112b; }
+  .tl-head { display: flex; align-items: center; gap: 18px; padding: 14px clamp(16px, 4cqi, 36px); border-bottom: 1px solid #ebe9f3; }
+  .tl-logo { font: 800 22px/1 system-ui, sans-serif; letter-spacing: -0.05em; color: #5b3df5; }
+  .tl-search { flex: 1; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 19px; background: #f3f2f8; color: #77738f; font-size: 14px; }
+  .tl-in { font-size: 14px; font-weight: 600; }
+  .tl-hero { position: relative; height: clamp(220px, 34cqi, 300px); overflow: hidden; background: #0b0820; }
+  .tl-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .tl-ev { position: absolute; left: 0; right: 0; bottom: 0; padding: 60px clamp(16px, 4cqi, 36px) 20px; background: linear-gradient(transparent, rgba(5, 4, 13, 0.9)); color: #fff; }
+  .tl-date { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #c9bdff; }
+  .tl-ev h1 { margin: 6px 0 4px; font-size: clamp(28px, 5cqi, 42px); letter-spacing: -0.03em; }
+  .tl-ev p:last-child { font-size: 14px; color: #d6d2ea; }
+  .tl-tix, .tl-co { max-width: 620px; margin: 0 auto; padding: 24px 20px 0; display: grid; gap: 12px; }
+  .tl-tix h2, .tl-co h1 { font-size: 22px; letter-spacing: -0.02em; }
+  .tl-tier { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid #e4e1f0; border-radius: 12px; }
+  .tl-tier div { flex: 1; display: grid; gap: 2px; } .tl-tier div span { font-size: 13px; color: #77738f; }
+  .tl-p { font-size: 17px; }
+  .tl-qty { display: flex; align-items: center; gap: 12px; } .tl-qty i { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #d5d1e6; display: grid; place-items: center; font-style: normal; color: #5b3df5; }
+  .tl-tier.is-gone { opacity: 0.5; }
+  .tl-go { height: 52px; border-radius: 26px; background: #5b3df5; color: #fff; font-weight: 700; font-size: 16px; text-align: center; }
+  .tl-hold { padding: 10px 16px; background: #f3f0ff; color: #3d2ba8; font-size: 13px; text-align: center; }
+  .tl-evline { font-size: 14px; color: #77738f; margin-top: -6px; }
+  .tl-sum { display: grid; gap: 2px; padding: 16px; border: 1px solid #e4e1f0; border-radius: 12px; }
+  .tl-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 15px; }
+  .tl-fees .tl-line { color: #5b5772; font-size: 14px; }
+  .tl-total { margin-top: 6px; padding-top: 12px; border-top: 1px solid #e4e1f0; font-weight: 800; font-size: 18px; }
+  .tl-total small { font-weight: 400; font-size: 12px; color: #77738f; }
+  .tl-peek { justify-self: start; font-size: 13px; color: #5b3df5; text-decoration: underline; text-underline-offset: 3px; }
+  .tl-fine { font-size: 12px; color: #77738f; text-align: center; }
+  @container site (max-width: 560px) { .tl-search span { display: none; } .tl-search { flex: 0 0 38px; justify-content: center; padding: 0; } .tl-head { justify-content: space-between; } }
 
-  /* Disguised Ads */
-  .dp-dlgrid { display: grid; gap: 10px; }
-  .dp-decoy, .dp-real-dl { display: grid; justify-items: center; gap: 3px; width: 100%; padding: 12px 20px; }
-  .dp-decoy { justify-self: stretch; }
-  .dp-decoy[data-c='cobalt'] { background: var(--cobalt); }
-  .dp-decoy[data-c='lilac'] { background: var(--lilac); }
-  .dp-decoy[data-c='sky'] { background: var(--sky); }
-  .dp-decoy small, .dp-real-dl small { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
-  .dp-real-dl {
-    min-height: 48px; border: 1.5px dashed var(--ink3); border-radius: var(--r);
-    background: transparent; color: var(--ink2); font: 600 14px/1.2 var(--sans); cursor: pointer;
-  }
-  .dp-real-dl small { color: var(--ink3); }
-  .dp-real-dl:hover { border-style: solid; color: var(--ink); }
+  /* ---- 7 · Loomline: a software checkout --------------------------------- */
+  .s-continuity { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #0f172a; background: linear-gradient(180deg, #f0fdfa, #fff 40%); }
+  .lm-head { display: flex; align-items: center; gap: 24px; padding: 16px clamp(16px, 4cqi, 40px); }
+  .lm-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 19px; letter-spacing: -0.03em; }
+  .lm-logo i { width: 22px; height: 22px; border-radius: 6px; background: repeating-linear-gradient(90deg, #0f766e 0 3px, #5eead4 3px 6px), #0f766e; background-blend-mode: multiply; }
+  .lm-head nav { display: flex; gap: 20px; font-size: 14px; color: #475569; }
+  .lm-in { margin-left: auto; font-size: 14px; font-weight: 600; }
+  .lm-co { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(20px, 5cqi, 48px); max-width: 860px; margin: 0 auto; padding: clamp(20px, 5cqi, 44px) 20px 40px; }
+  .lm-pitch { display: grid; gap: 14px; align-content: start; }
+  .lm-kick { font-size: 13px; font-weight: 700; color: #0f766e; }
+  .lm-pitch h1 { font-size: clamp(26px, 4.6cqi, 36px); letter-spacing: -0.03em; line-height: 1.1; }
+  .lm-pitch ul { display: grid; gap: 8px; font-size: 15px; color: #334155; }
+  .lm-pitch li { display: flex; align-items: center; gap: 8px; } .lm-pitch li svg { color: #0f766e; }
+  .lm-due { display: flex; justify-content: space-between; padding: 14px 16px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; font-size: 15px; }
+  .lm-form { display: grid; gap: 12px; align-content: start; padding: 22px; border-radius: 14px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.18); }
+  .lm-ftitle { font-weight: 700; }
+  .lm-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: #334155; }
+  .lm-form input[readonly] { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #0f172a; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .lm-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .lm-form .lm-check { display: flex; align-items: center; gap: 8px; font-weight: 400; } .lm-check input { width: 16px; height: 16px; accent-color: #0f766e; }
+  .lm-go { height: 48px; border-radius: 10px; background: #0f766e; color: #fff; font-weight: 700; font-size: 15px; text-align: center; }
+  .lm-fine { font-size: 11px; line-height: 1.4; color: #94a3b8; text-align: center; }
+  @container site (max-width: 640px) { .lm-co { grid-template-columns: 1fr; } .lm-head nav { display: none; } }
 
-  /* Forced Continuity */
-  .dp-field input {
-    width: 100%; height: 48px; padding: 0 16px; border-radius: var(--r);
-    border: 1.5px solid var(--paper3); background: var(--card); font-size: 15px;
-  }
-  .dp-field input:focus { border-color: var(--ink); outline: none; }
-  .dp-fine { margin: -6px 0; }
+  /* ---- 8 · Account settings ------------------------------------------- */
+  .s-trick { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #111827; background: #f9fafb; min-height: 100%; }
+  .as-app { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 100%; }
+  .as-side { display: grid; align-content: start; gap: 2px; padding: 20px 12px; background: #fff; border-right: 1px solid #e5e7eb; font-size: 14px; color: #4b5563; }
+  .as-side span { padding: 8px 12px; border-radius: 6px; }
+  .as-side .is-on { background: #eef2ff; color: #1e3a8a; font-weight: 600; }
+  .as-brand { padding: 0 12px 14px; font-weight: 800; font-size: 16px; color: #111827; }
+  .as-main { display: grid; gap: 16px; align-content: start; padding: 28px clamp(16px, 4cqi, 40px) 40px; max-width: 680px; }
+  .as-main h1 { font-size: 24px; letter-spacing: -0.02em; }
+  .as-sub { color: #6b7280; font-size: 14px; margin-top: -10px; }
+  .as-card { display: grid; padding: 6px 18px; border-radius: 10px; background: #fff; border: 1px solid #e5e7eb; }
+  .as-card h2 { padding: 12px 0 6px; font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; }
+  .as-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid #f1f2f4; cursor: pointer; }
+  .as-row input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: #2563eb; }
+  .as-row span { display: grid; gap: 2px; } .as-row b { font-weight: 500; font-size: 15px; } .as-row small { font-size: 13px; color: #6b7280; }
+  .as-foot { display: flex; gap: 10px; }
+  .as-save { height: 40px; padding: 0 18px; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 600; font-size: 14px; }
+  .as-cancel { height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 14px; }
+  @container site (max-width: 560px) { .as-app { grid-template-columns: 1fr; } .as-side { display: none; } }
 
-  /* Privacy Zuckering */
-  .dp-trap.is-big { justify-self: stretch; min-height: 72px; font-size: 17px; }
+  /* ---- 9 · frennet: a social network's welcome ---------------------------- */
+  .s-zuckering { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1c1e21; background: #f0f2f5; min-height: 100%; }
+  .fn-head { display: flex; align-items: center; gap: 16px; padding: 10px clamp(14px, 3cqi, 24px); background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+  .fn-logo { font: 800 26px/1 system-ui, sans-serif; letter-spacing: -0.05em; color: #1d6ff2; }
+  .fn-search { flex: 1; max-width: 280px; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 19px; background: #f0f2f5; color: #65676b; font-size: 14px; }
+  .fn-av { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #a0b8de, #5f7fb0); }
+  .fn-feed { max-width: 520px; margin: 18px auto; padding: 0 14px; display: grid; gap: 14px; filter: blur(1.5px); }
+  .fn-post { display: grid; gap: 10px; padding: 14px; border-radius: 10px; background: #fff; }
+  .fn-who { display: flex; align-items: center; gap: 10px; } .fn-who i { width: 36px; height: 36px; border-radius: 50%; background: hsl(var(--h) 45% 62%); } .fn-who b { width: 120px; height: 10px; border-radius: 5px; background: #dfe2e6; }
+  .fn-txt { height: 9px; border-radius: 5px; background: #e4e6ea; } .fn-txt.is-short { width: 60%; }
+  .fn-pic { height: 160px; border-radius: 8px; background: linear-gradient(135deg, hsl(var(--h) 40% 72%), hsl(calc(var(--h) + 40) 45% 52%)); }
+  .fn-scrim { position: absolute; inset: 0; background: rgba(244, 245, 247, 0.72); }
+  .fn-card { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: min(420px, 92%); display: grid; gap: 12px; padding: 26px 24px 18px; border-radius: 14px; background: #fff; color: #1c1e21; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; text-align: center; }
+  .fn-step { font-size: 12px; font-weight: 600; color: #65676b; }
+  .fn-card h2 { font-size: 22px; letter-spacing: -0.02em; }
+  .fn-card > p:not(.fn-step) { font-size: 14px; color: #4b4f56; }
+  .fn-list { display: grid; gap: 6px; padding: 12px 14px; border-radius: 10px; background: #f0f2f5; font-size: 13px; text-align: left; }
+  .fn-list li::before { content: '✓  '; color: #1d6ff2; font-weight: 700; }
+  .fn-big { height: 52px; border-radius: 10px; background: #1d6ff2; color: #fff; font-weight: 700; font-size: 16px; text-align: center; }
+  .fn-link { justify-self: center; padding: 6px; font-size: 12px; color: #8a8d91; }
 
-  /* Fake Social Proof */
-  .dp-toasts { display: grid; gap: 8px; min-height: 96px; align-content: start; }
-  .dp-toast { padding: 10px 14px; border-radius: var(--r); border: 1.5px solid var(--ink); background: var(--card); font-size: 13px; font-weight: 500; box-shadow: var(--shadow-block); }
+  /* ---- 10 · NIMBUS: a fashion store's product page ------------------------ */
+  .s-social { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111; background: #fff; }
+  .nb-ann { padding: 8px; background: #f4f4f2; font-size: 11px; letter-spacing: 0.08em; text-align: center; text-transform: uppercase; }
+  .nb-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 16px clamp(16px, 4cqi, 40px); }
+  .nb-head nav { display: flex; gap: 20px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .nb-logo { font: 500 20px/1 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.42em; padding-left: 0.42em; }
+  .nb-tools { justify-content: flex-end; }
+  .nb-pdp { display: grid; grid-template-columns: 1.15fr 1fr; gap: clamp(18px, 4cqi, 44px); padding: 8px clamp(16px, 4cqi, 40px); }
+  .nb-gal { display: grid; gap: 8px; align-content: start; }
+  .nb-main { background: #f1f1ef; } .nb-main img { width: 100%; }
+  .nb-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .nb-thumbs img { aspect-ratio: 1; object-fit: cover; background: #f1f1ef; opacity: 0.7; }
+  .nb-thumbs img.is-on { opacity: 1; outline: 1px solid #111; outline-offset: -1px; }
+  .nb-thumbs .z1 { object-position: 85% 55%; transform: scale(1); } .nb-thumbs .z2 { object-position: 30% 40%; }
+  .nb-thumbs .z1, .nb-thumbs .z2 { object-fit: none; }
+  .nb-info { display: grid; gap: 12px; align-content: start; padding-top: 8px; }
+  .nb-crumb { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #777; }
+  .nb-info h1 { font: 400 clamp(24px, 4cqi, 32px)/1.1 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.01em; }
+  .nb-price { font-size: 18px; }
+  .nb-stars { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #555; } .nb-stars .sx-stars { color: #111; }
+  .nb-desc { font-size: 14px; line-height: 1.6; color: #444; }
+  .nb-opt { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #777; } .nb-opt b { color: #111; font-weight: 500; }
+  .nb-sw { display: flex; gap: 8px; } .nb-sw i { width: 26px; height: 26px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 2px #fff; border: 1px solid transparent; } .nb-sw i.is-on { border-color: #111; }
+  .nb-stock { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #b42318; } .nb-stock i { width: 7px; height: 7px; border-radius: 50%; background: #e11d48; box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.15); }
+  .nb-buy { height: 52px; background: #111; color: #fff; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
+  .nb-wish { height: 46px; border: 1px solid #111; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
+  .nb-fine { font-size: 12px; color: #777; }
+  @container site (max-width: 620px) { .nb-pdp { grid-template-columns: 1fr; } .nb-head nav:first-child { display: none; } .nb-head { grid-template-columns: auto 1fr; } .nb-thumbs { display: none; } }
+  .nb-toasts { position: absolute; left: 14px; bottom: 14px; width: min(320px, calc(100% - 28px)); pointer-events: none; }
+  .nb-toast { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; border-radius: 10px; background: #fff; color: #111; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05); font: 13px/1.35 'Helvetica Neue', Arial, sans-serif; }
+  .nb-toast img { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; background: #f1f1ef; }
+  .nb-toast b { font-weight: 600; } .nb-toast i { font-style: normal; text-decoration: underline; text-underline-offset: 2px; }
+  .nb-toast small { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 11px; color: #777; } .nb-toast small svg { color: #16a34a; }
+
+  /* ---- 11 · The Daily Briefing: a newspaper ----------------------------- */
+  .s-nagging { font-family: Georgia, 'Times New Roman', serif; color: #121212; background: #fff; }
+  .br-mast { display: grid; justify-items: center; gap: 10px; padding: 14px clamp(16px, 4cqi, 40px) 0; border-bottom: 1px solid #121212; }
+  .br-date { font: 12px/1 Arial, sans-serif; color: #555; }
+  .br-logo { font: 700 clamp(28px, 6cqi, 46px)/1 'Times New Roman', Georgia, serif; letter-spacing: -0.02em; }
+  .br-mast nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; width: 100%; padding: 10px 0; border-top: 1px solid #e2e2e2; font: 600 12px/1 Arial, sans-serif; }
+  .br-mast nav .is-on { text-decoration: underline; text-underline-offset: 6px; }
+  .br-art { max-width: 640px; margin: 0 auto; padding: 28px 20px 0; display: grid; gap: 14px; font-size: 18px; line-height: 1.65; }
+  .br-kick { font: 700 12px/1 Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #0b6b4f; }
+  .br-art h1 { font: 700 clamp(28px, 5cqi, 40px)/1.1 Georgia, serif; letter-spacing: -0.01em; }
+  .br-deck { font-size: 19px; color: #444; line-height: 1.45; }
+  .br-by { font: 12px/1 Arial, sans-serif; color: #555; }
+  .br-fig svg { display: block; width: 100%; height: auto; border-top: 1px solid #121212; padding-top: 10px; }
+  .br-fig figcaption { margin-top: 6px; font: 12px/1.4 Arial, sans-serif; color: #666; }
+  .br-ask { position: absolute; top: 10px; left: 50%; translate: -50% 0; width: min(420px, calc(100% - 24px)); display: flex; gap: 14px; padding: 16px 18px; border-radius: 12px; background: #fff; color: #121212; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06); font: 14px/1.45 Arial, Helvetica, sans-serif; }
+  .br-bell { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: #e8f3ef; color: #0b6b4f; }
+  .br-ask b { font-size: 15px; } .br-ask p { margin-top: 2px; color: #444; font-size: 13px; }
+  .br-acts { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+  .br-yes { height: 38px; padding: 0 18px; border-radius: 19px; background: #0b6b4f; color: #fff; font-weight: 700; }
+  .br-no { height: 38px; padding: 0 12px; font-size: 13px; color: #666; }
 
   /* ---- the notes ----------------------------------------------------- */
   .dp-notes { display: grid; gap: 16px; position: sticky; top: 16px; }
-  .dp-brief { display: grid; gap: 10px; }
-  /* On one column the errand has to be read before the site and the verdict
-     after it, so the notes dissolve into the grid and take their places. */
-  @media (max-width: 900px) {
+  .dp-brief { display: grid; gap: 10px; padding: 20px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-block); }
+  @media (max-width: 980px) {
     .dp-notes { display: contents; }
     .dp-brief { order: -1; }
   }
   .dp-errand-lbl { margin-top: 6px; }
   .dp-errand { font-family: var(--display); font-variation-settings: var(--display-axes); font-weight: 600; font-size: var(--fs-h3); line-height: 1.05; letter-spacing: -0.02em; }
   .dp-tally { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
-  .dp-tally li { position: relative; aspect-ratio: 1; max-width: 30px; border-radius: 8px; background: var(--paper2); display: grid; place-items: center; }
-  .dp-tally li::after { content: attr(data-sign); font: 800 13px/1 var(--sans); color: var(--ink); }
+  .dp-tally li { position: relative; aspect-ratio: 1; max-width: 26px; border-radius: 7px; background: var(--paper2); display: grid; place-items: center; }
+  .dp-tally li::after { content: attr(data-sign); font: 800 12px/1 var(--sans); color: var(--ink); }
   .dp-tally li.is-dodged { background: var(--sky); }
   .dp-tally li.is-fell { background: var(--red); }
   .dp-tally li.is-now { background: var(--card); box-shadow: inset 0 0 0 2px var(--ink); }
@@ -898,20 +1421,21 @@ const total = PATTERNS.length
   .dp-real a { color: var(--t-blue); font-weight: 600; }
 
   /* ---- motion: armed only under html.play ---------------------------- */
-  html.play .dp-trap { transition: transform var(--t-fast) var(--spring); animation: dp-breathe 2.6s var(--ease-io) infinite; }
-  html.play .dp-trap:hover { transform: translateY(-2px) scale(1.02); animation-play-state: paused; }
-  html.play .dp-trap:active { transform: scale(0.97); }
-  /* A real "act now" button is never quite still either. Subtle on purpose:
-     the joke is that this barely registers. */
-  @keyframes dp-breathe { 50% { transform: scale(1.03); } }
-
-  html.play .dp-load.is-loading { animation: dp-load 700ms var(--glide) both; }
-  @keyframes dp-load { 0% { opacity: 1; transform: scaleX(0); } 70% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
-  html.play .dp-site.is-loading { animation: dp-wipe 620ms var(--glide) both; }
-  @keyframes dp-wipe { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
-  html.play .dp-site.is-knock .dp-body > * { animation: dp-knock 380ms var(--spring) both; }
-  @keyframes dp-knock { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
-  html.play .dp-toast { animation: dp-knock 300ms var(--spring) both; }
+  html.play .bx-load.is-loading { animation: bx-load 800ms var(--glide) both; }
+  @keyframes bx-load { 0% { opacity: 1; transform: scaleX(0); } 70% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+  html.play #slot.is-loading { animation: bx-in 520ms var(--glide) both; }
+  @keyframes bx-in { from { opacity: 0; } }
+  html.play #slot.is-knock > *, html.play .bx-layer.is-knock > * { animation: bx-knock 360ms var(--glide) both; }
+  @keyframes bx-knock { from { opacity: 0; transform: translateY(8px); } }
+  html.play .fo-drawer { animation: fo-slide 420ms var(--glide) both; }
+  @keyframes fo-slide { from { transform: translateX(100%); } }
+  html.play .fo-scrim, html.play .db-scrim, html.play .fn-scrim { animation: bx-in 300ms ease both; }
+  html.play .db-modal, html.play .fn-card { animation: sx-pop 380ms var(--spring) both; }
+  @keyframes sx-pop { from { opacity: 0; scale: 0.94; } }
+  html.play .br-ask { animation: br-drop 420ms var(--spring) both; }
+  @keyframes br-drop { from { opacity: 0; translate: -50% -24px; } }
+  html.play .nb-toast { animation: nb-up 420ms var(--spring) both; }
+  @keyframes nb-up { from { opacity: 0; transform: translateY(16px); } }
   html.play .dp-verdict:not([hidden]) { animation: dp-settle 620ms var(--spring) both; }
   @keyframes dp-settle { from { transform: scale(0.94); border-radius: 48px; } }
 </style>
