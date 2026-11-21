@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="570" viewBox="0 0 1020 570">
+  <!-- The read card, 100 px to the centimetre: 10.2 x 5.7 cm, cream stock,
+       a ruled blue line near the top and the name typed under it. -->
+  <defs>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="5" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.4  0 0 0 0 0.35  0 0 0 0 0.25  0 0 0 0.12 0"/>
+    </filter>
+    <filter id="type" x="-2%" y="-10%" width="104%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" seed="9" result="t"/>
+      <feColorMatrix in="t" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.6 -0.35" result="m"/>
+      <feComposite in="SourceGraphic" in2="m" operator="in"/>
+    </filter>
+  </defs>
+  <rect width="1020" height="570" fill="#e4ddc6"/>
+  <rect width="1020" height="570" filter="url(#grain)"/>
+  <g stroke="#86a6c4" stroke-width="2.4" opacity="0.8">
+    <path d="M 0 130 H 1020 M 0 230 H 1020 M 0 330 H 1020 M 0 430 H 1020 M 0 530 H 1020"/>
+  </g>
+  <g filter="url(#type)" font-family="Courier New, Consolas, monospace" font-weight="bold" fill="#1d1a24">
+    <text x="60" y="122" font-size="68">SYMBOLICS, INC.</text>
+    <text x="60" y="222" font-size="68" fill="#17245e">symbolics.com</text>
+    <text x="60" y="322" font-size="68">registered</text>
+    <text x="60" y="422" font-size="68">March 15, 1985</text>
+  </g>
+</svg>

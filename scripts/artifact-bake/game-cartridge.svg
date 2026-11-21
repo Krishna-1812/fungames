@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="590" viewBox="0 0 1160 590">
+  <!-- The printed label, 100 px to the centimetre: 11.6 by 5.9 cm. A generic
+       design: a dark field, a blocky pixel craft and the famous sentence. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c1630"/><stop offset="0.6" stop-color="#1b2f66"/><stop offset="1" stop-color="#2a1f4f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1160" height="590" fill="#e9e5d6"/>
+  <rect x="14" y="14" width="1132" height="562" fill="url(#sky)"/>
+  <rect x="14" y="14" width="1132" height="562" fill="none" stroke="#f0b33a" stroke-width="8"/>
+  <!-- stars, in blocks -->
+  <g fill="#cfd8ff">
+    <rect x="80" y="70" width="8" height="8"/><rect x="190" y="150" width="6" height="6"/><rect x="320" y="60" width="8" height="8"/>
+    <rect x="470" y="130" width="6" height="6"/><rect x="620" y="58" width="8" height="8"/><rect x="760" y="140" width="6" height="6"/>
+    <rect x="900" y="66" width="8" height="8"/><rect x="1040" y="150" width="8" height="8"/><rect x="1090" y="80" width="6" height="6"/>
+    <rect x="140" y="250" width="6" height="6"/><rect x="1000" y="260" width="6" height="6"/>
+  </g>
+  <!-- a blocky craft, nose up, in 16 px squares -->
+  <g transform="translate(496,130)" shape-rendering="crispEdges">
+    <rect x="64" y="0" width="32" height="32" fill="#e8ecf4"/>
+    <rect x="48" y="32" width="64" height="32" fill="#e8ecf4"/>
+    <rect x="64" y="32" width="32" height="32" fill="#d6483a"/>
+    <rect x="32" y="64" width="96" height="48" fill="#b9c2d6"/>
+    <rect x="64" y="64" width="32" height="48" fill="#3a6fe0"/>
+    <rect x="0" y="96" width="32" height="48" fill="#b9c2d6"/><rect x="128" y="96" width="32" height="48" fill="#b9c2d6"/>
+    <rect x="16" y="128" width="32" height="16" fill="#d6483a"/><rect x="112" y="128" width="32" height="16" fill="#d6483a"/>
+    <rect x="64" y="112" width="32" height="32" fill="#f0b33a"/>
+  </g>
+  <g font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" text-anchor="middle">
+    <text x="580" y="392" font-size="92" fill="#000" opacity="0.5" letter-spacing="2" transform="translate(5,5)">ALL YOUR BASE</text>
+    <text x="580" y="392" font-size="92" fill="#f4efe0" letter-spacing="2">ALL YOUR BASE</text>
+    <text x="580" y="488" font-size="76" fill="#000" opacity="0.5" letter-spacing="2" transform="translate(5,5)">ARE BELONG TO US</text>
+    <text x="580" y="488" font-size="76" fill="#f0b33a" letter-spacing="2">ARE BELONG TO US</text>
+  </g>
+  <text x="580" y="548" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="24" fill="#cfd8ff" text-anchor="middle" letter-spacing="9">16-BIT CARTRIDGE</text>
+</svg>

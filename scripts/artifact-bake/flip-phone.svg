@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- An atlas. Left: the phone's small colour screen, 480 x 640 (3.4 x 4.5 cm),
+       showing a text message. Right: the keypad's legends, 490 x 740 at 100
+       px to the centimetre, white on black: the backlight shows through them. -->
+  <defs>
+    <linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9f1f6"/><stop offset="1" stop-color="#bdd0de"/></linearGradient>
+    <linearGradient id="hd" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1e5a96"/><stop offset="1" stop-color="#3b8bd0"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="#000"/>
+  <!-- screen -->
+  <g>
+    <rect x="0" y="0" width="480" height="640" fill="url(#sk)"/>
+    <rect x="0" y="0" width="480" height="40" fill="#10243a"/>
+    <g fill="#9fd4ff"><rect x="12" y="24" width="5" height="8"/><rect x="21" y="19" width="5" height="13"/><rect x="30" y="14" width="5" height="18"/><rect x="39" y="9" width="5" height="23"/></g>
+    <text x="240" y="29" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#fff" text-anchor="middle">12:50</text>
+    <rect x="420" y="11" width="42" height="20" rx="3" fill="none" stroke="#9fd4ff" stroke-width="3"/><rect x="424" y="15" width="30" height="12" fill="#7be07b"/>
+    <rect x="0" y="40" width="480" height="52" fill="url(#hd)"/>
+    <text x="20" y="77" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#fff">Message</text>
+    <text x="462" y="77" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#cfe6ff" text-anchor="end">1/1</text>
+    <text x="20" y="140" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#33506c">21 Mar 2006</text>
+    <line x1="20" y1="156" x2="460" y2="156" stroke="#8fa8bc" stroke-width="2"/>
+    <g font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="700" fill="#0b1a28">
+      <text x="24" y="250">just setting up</text>
+      <text x="24" y="312">my twttr</text>
+    </g>
+    <rect x="0" y="582" width="480" height="58" fill="#10243a"/>
+    <g font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="700" fill="#fff">
+      <text x="20" y="620">Options</text><text x="460" y="620" text-anchor="end">Back</text>
+    </g>
+  </g>
+  <!-- keypad legends: x = 520 + (X + 2.45) * 100, y = Z * 100 -->
+<g font-family="Arial, Helvetica, sans-serif" fill="#cfe8ff" text-anchor="middle">
+<text x="620" y="399" font-size="44" font-weight="700">1</text>
+<text x="765" y="399" font-size="44" font-weight="700">2</text>
+<text x="765" y="419" font-size="16" font-weight="700" fill="#8fc0f0">ABC</text>
+<text x="910" y="399" font-size="44" font-weight="700">3</text>
+<text x="910" y="419" font-size="16" font-weight="700" fill="#8fc0f0">DEF</text>
+<text x="620" y="494" font-size="44" font-weight="700">4</text>
+<text x="620" y="514" font-size="16" font-weight="700" fill="#8fc0f0">GHI</text>
+<text x="765" y="494" font-size="44" font-weight="700">5</text>
+<text x="765" y="514" font-size="16" font-weight="700" fill="#8fc0f0">JKL</text>
+<text x="910" y="494" font-size="44" font-weight="700">6</text>
+<text x="910" y="514" font-size="16" font-weight="700" fill="#8fc0f0">MNO</text>
+<text x="620" y="589" font-size="44" font-weight="700">7</text>
+<text x="620" y="609" font-size="16" font-weight="700" fill="#8fc0f0">PQRS</text>
+<text x="765" y="589" font-size="44" font-weight="700">8</text>
+<text x="765" y="609" font-size="16" font-weight="700" fill="#8fc0f0">TUV</text>
+<text x="910" y="589" font-size="44" font-weight="700">9</text>
+<text x="910" y="609" font-size="16" font-weight="700" fill="#8fc0f0">WXYZ</text>
+<text x="620" y="684" font-size="44" font-weight="700">*</text>
+<text x="765" y="684" font-size="44" font-weight="700">0</text>
+<text x="910" y="684" font-size="44" font-weight="700">#</text>
+<g fill="none" stroke="#cfe8ff" stroke-width="6" stroke-linecap="round"><line x1="590" y1="75" x2="640" y2="75"/><line x1="890" y1="75" x2="940" y2="75"/></g>
+<g fill="none" stroke="#7be07b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"><path d="M572 246 q8 -14 16 -2 l10 14 q-2 6 -8 8 q4 10 12 16 q8 -6 12 -2 l12 10 q-4 10 -12 12 q-36 -6 -42 -56z" transform="translate(-6 -10) scale(0.85)"/></g>
+<g stroke="#ff6a5a" stroke-width="9" stroke-linecap="round" fill="none"><path d="M918 262 q22 -14 44 0"/></g>
+<g fill="#cfe8ff"><path d="M755 150 l10 -12 l10 12z"/><path d="M755 270 l10 12 l10 -12z"/><path d="M703 205 l-12 10 l12 10z"/><path d="M827 205 l12 10 l-12 10z"/><circle cx="765" cy="210" r="6"/></g>
+</g>
+</svg>

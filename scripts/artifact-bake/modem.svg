@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="130" viewBox="0 0 1020 130">
+  <!-- The printed front plate of a 56K external modem: 20.4 x 3.2 cm, 50 px
+       to the centimetre. Cream-white on dark grey. The eight status
+       indicators sit above their labels; the LED windows are cut by the model. -->
+  <rect width="1020" height="130" fill="#202224"/>
+  <rect x="6" y="6" width="1008" height="118" rx="10" fill="none" stroke="#3a3d40" stroke-width="2"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#e9e7dc">
+    <text x="34" y="80" font-size="68" font-weight="700" font-style="italic" letter-spacing="2">56K</text>
+    <text x="38" y="112" font-size="19" letter-spacing="2.5" fill="#bdbbb0">DATA / FAX MODEM</text>
+  </g>
+  <g stroke="#6d7073" stroke-width="2.5" stroke-linecap="round">
+    <line x1="268" y1="20" x2="268" y2="110"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="28" fill="#e9e7dc" text-anchor="middle" letter-spacing="1">
+    <text x="325" y="108">HS</text>
+    <text x="412.5" y="108">AA</text>
+    <text x="500" y="108">CD</text>
+    <text x="587.5" y="108">OH</text>
+    <text x="675" y="108">RD</text>
+    <text x="762.5" y="108">SD</text>
+    <text x="850" y="108">TR</text>
+    <text x="937.5" y="108">MR</text>
+  </g>
+</svg>

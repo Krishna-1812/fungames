@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="620" viewBox="0 0 1024 620">
+  <!-- The paper label of a 3.5 inch disk: pale cream stock, a printed ruled
+       field and a coloured top band (generic, no maker), and the handwriting
+       of whoever kept it, in blue ballpoint. -->
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f1ede0"/>
+      <stop offset="1" stop-color="#e6e0cf"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="620" fill="url(#paper)"/>
+  <rect width="1024" height="86" fill="#c8cfd8"/>
+  <rect y="86" width="1024" height="5" fill="#8a95a6"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#5b6679">
+    <text x="42" y="58" font-size="36" letter-spacing="6">3.5" MICRODISK</text>
+    <text x="982" y="58" font-size="36" letter-spacing="3" text-anchor="end">2DD</text>
+  </g>
+  <g stroke="#8fb0cf" stroke-width="2.2" opacity="0.85">
+    <line x1="30" y1="205" x2="994" y2="205"/>
+    <line x1="30" y1="305" x2="994" y2="305"/>
+    <line x1="30" y1="405" x2="994" y2="405"/>
+    <line x1="30" y1="505" x2="994" y2="505"/>
+    <line x1="30" y1="590" x2="994" y2="590"/>
+  </g>
+  <line x1="92" y1="100" x2="92" y2="620" stroke="#d98a8a" stroke-width="2.4" opacity="0.8"/>
+  <g font-family="'Ink Free', 'Segoe Print', 'Bradley Hand ITC', cursive" fill="#1d2f7a" stroke="#1d2f7a" stroke-width="2.6" stroke-linejoin="round">
+    <text transform="translate(116 196) rotate(-2.2)" font-size="90" letter-spacing="0">INTERNET WORM —</text>
+    <text transform="translate(124 322) rotate(-1.6)" font-size="90" letter-spacing="0">NOV 1988</text>
+  </g>
+</svg>

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <!-- The inbox on the screen: a generic mid-nineties mail client, grey
+       bevelled chrome, a list of forwards. No real program's chrome. -->
+  <defs>
+    <linearGradient id="tb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1b2f7a"/><stop offset="1" stop-color="#5a8fd0"/></linearGradient>
+  </defs>
+  <rect width="1024" height="768" fill="#2a8a8a"/>
+  <rect x="46" y="40" width="936" height="690" fill="#c3c3c3"/>
+  <path d="M46 40H982M46 40V730" stroke="#fff" stroke-width="3" fill="none"/>
+  <path d="M982 40V730H46" stroke="#5a5a5a" stroke-width="3" fill="none"/>
+  <rect x="52" y="46" width="924" height="38" fill="url(#tb)"/>
+  <text x="66" y="74" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#fff">Inbox - Mail  (41 messages, 38 unread)</text>
+  <g fill="#c3c3c3" stroke="#fff"><rect x="890" y="52" width="26" height="26"/><rect x="920" y="52" width="26" height="26"/><rect x="946" y="52" width="26" height="26"/></g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#000">
+    <text x="66" y="120">File</text><text x="126" y="120">Edit</text><text x="190" y="120">View</text><text x="262" y="120">Message</text><text x="368" y="120">Help</text>
+  </g>
+  <g stroke="#fff" fill="#c3c3c3" stroke-width="2">
+    <rect x="60" y="138" width="110" height="46"/><rect x="176" y="138" width="110" height="46"/><rect x="292" y="138" width="110" height="46"/><rect x="408" y="138" width="110" height="46"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="21" fill="#000" text-anchor="middle">
+    <text x="115" y="168">Reply</text><text x="231" y="168">Forward</text><text x="347" y="168">Delete</text><text x="463" y="168">Send</text>
+  </g>
+  <rect x="60" y="198" width="906" height="520" fill="#fff"/>
+  <path d="M60 198H966M60 198V718" stroke="#5a5a5a" stroke-width="3"/>
+  <rect x="62" y="201" width="902" height="36" fill="#c3c3c3"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="23" fill="#000" font-weight="700">
+    <text x="74" y="228">From</text><text x="276" y="228">Subject</text><text x="870" y="228">Date</text>
+  </g>
+  <rect x="62" y="318" width="902" height="38" fill="#1b2f7a"/>
+  <g stroke="#d4d4d4" stroke-width="2"><path d="M62 280H964M62 394H964M62 432H964M62 470H964M62 508H964M62 546H964M62 584H964M62 622H964M62 660H964M62 698H964"/></g>
+  <g stroke="#9a9a9a" stroke-width="2"><path d="M262 201V718M856 201V718"/></g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#000">
+    <text x="74" y="272">Mom</text><text x="276" y="272">FW: FW: FW: baby.avi</text><text x="870" y="272">Mar 11</text>
+    <text x="74" y="310">Dave K</text><text x="276" y="310">FW: FW: FW: FW: baby.avi</text><text x="870" y="310">Mar 11</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#fff">
+    <text x="74" y="347">Kelly B</text><text x="276" y="347">RE: FW: FW: baby.avi !!!</text><text x="870" y="347">Mar 10</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#000">
+    <text x="74" y="386">Uncle Pete</text><text x="276" y="386">FW: FW: FW: baby.avi</text><text x="870" y="386">Mar 10</text>
+    <text x="74" y="424">Jen (work)</text><text x="276" y="424">FW: FW: FW: FW: FW: baby.avi</text><text x="870" y="424">Mar 10</text>
+    <text x="74" y="462">Dave K</text><text x="276" y="462">FW: baby.avi (you HAVE to see this)</text><text x="870" y="462">Mar 9</text>
+    <text x="74" y="500">Rob</text><text x="276" y="500">FW: FW: baby.avi</text><text x="870" y="500">Mar 9</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="25" fill="#000">
+    <text x="74" y="538">Admin</text><text x="276" y="538">Re: please stop sending 4MB attachments</text><text x="870" y="538">Mar 9</text>
+    <text x="74" y="576">Mom</text><text x="276" y="576">FW: FW: FW: baby.avi</text><text x="870" y="576">Mar 8</text>
+    <text x="74" y="614">Sam</text><text x="276" y="614">FW: FW: FW: FW: baby.avi</text><text x="870" y="614">Mar 8</text>
+    <text x="74" y="652">Kelly B</text><text x="276" y="652">FW: FW: baby.avi</text><text x="870" y="652">Mar 8</text>
+    <text x="74" y="690">Jen (work)</text><text x="276" y="690">FW: baby.avi</text><text x="870" y="690">Mar 7</text>
+  </g>
+</svg>

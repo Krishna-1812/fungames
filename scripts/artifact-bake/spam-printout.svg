@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2268" height="1674" viewBox="0 0 2268 1674">
+  <!-- The top sheet, 60 px to the centimetre: 14 7/8 by 11 inches. Green bars
+       are half an inch (76.2 px); the tractor strips run down both edges. -->
+  <defs>
+    <pattern id="bars" x="0" y="0" width="2268" height="152.4" patternUnits="userSpaceOnUse">
+      <rect width="2268" height="76.2" fill="#f3f2e8"/>
+      <rect y="76.2" width="2268" height="76.2" fill="#9ccb94"/>
+    </pattern>
+    <pattern id="dots" width="3" height="3" patternUnits="userSpaceOnUse">
+      <rect width="3" height="3" fill="#2a2c38" opacity="0.25"/><circle cx="1.5" cy="1.5" r="1.5" fill="#101118"/>
+    </pattern>
+    <mask id="glyph" maskUnits="userSpaceOnUse" x="0" y="0" width="2268" height="1674">
+      <rect width="2268" height="1674" fill="#000"/>
+      <g font-family="Courier New, Consolas, monospace" font-weight="bold" font-size="52" fill="#fff" letter-spacing="0">
+        <text x="170" y="236">MAIL-FROM: DEC-MARLBORO RCVD AT 3-MAY-78 0955-PDT</text>
+        <text x="170" y="287">DATE:  1 MAY 1978 1233-EDT</text>
+        <text x="170" y="338">FROM:  THUERK AT DEC-MARLBORO</text>
+        <text x="170" y="389">TO:    ADRIAN AT SRI-KL ET AL</text>
+        <text x="170" y="491">DIGITAL WILL BE GIVING A PRODUCT PRESENTATION OF THE NEWEST</text>
+        <text x="170" y="542">MEMBERS OF THE DECSYSTEM-20 FAMILY; THE DECSYSTEM-2020, 2020T,</text>
+        <text x="170" y="593">2060, AND 2060T. THE DECSYSTEM-20 FAMILY OF COMPUTERS HAS</text>
+        <text x="170" y="644">EVOLVED FROM THE TENEX OPERATING SYSTEM AND THE DECSYSTEM-10</text>
+        <text x="170" y="695">&lt;PDP-10&gt; COMPUTER ARCHITECTURE. BOTH THE DECSYSTEM-2060T AND</text>
+        <text x="170" y="746">2020T OFFER FULL ARPANET SUPPORT UNDER THE TOPS-20 OPERATING</text>
+        <text x="170" y="797">SYSTEM.</text>
+      </g>
+    </mask>
+    <filter id="fibre" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="11" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.35  0 0 0 0 0.3  0 0 0 0.12 0"/>
+    </filter>
+    <filter id="smear"><feGaussianBlur stdDeviation="0.5"/></filter>
+  </defs>
+  <rect width="2268" height="1674" fill="url(#bars)"/>
+  <rect width="2268" height="1674" filter="url(#fibre)"/>
+  <!-- the print-head's ribbon: ink laid down in dots, uneven line to line -->
+  <g mask="url(#glyph)" >
+    <rect width="2268" height="1674" fill="url(#dots)"/>
+    <rect y="220" width="2268" height="70" fill="#1d1f2b" opacity="0.1"/>
+    <rect y="520" width="2268" height="55" fill="#000" opacity="0.1"/>
+    <rect y="640" width="2268" height="60" fill="#fff" opacity="0.12"/>
+  </g>
+  <!-- tractor-strip tear lines -->
+  <g stroke="#77846f" stroke-width="2" stroke-dasharray="5 5" opacity="0.7">
+    <path d="M 76.2 0 V 1674 M 2191.8 0 V 1674"/>
+  </g>
+  <!-- the sheet's own perforation, top and bottom -->
+  <g stroke="#77846f" stroke-width="2" stroke-dasharray="5 5" opacity="0.6">
+    <path d="M 0 2 H 2268 M 0 1672 H 2268"/>
+  </g>
+  <!-- faint grey rule where each bar meets the next -->
+  <rect width="2268" height="1674" fill="url(#bars)" opacity="0"/>
+</svg>

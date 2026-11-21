@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2080" height="1300" viewBox="0 0 2080 1300">
+  <!-- The two leaves of the open log book, 50 px to the centimetre: left page
+       x 0..1040, right page 1040..2080; the gutter runs down x = 1040. -->
+  <defs>
+    <linearGradient id="gut" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#1f2d24" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="lp" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#c3cfc0"/><stop offset="1" stop-color="#d0dacb"/>
+    </linearGradient>
+    <linearGradient id="rp" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#d0dacb"/><stop offset="1" stop-color="#c6d1c2"/>
+    </linearGradient>
+    <filter id="hand" x="-5%" y="-30%" width="110%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.35  0 0 0 0 0.4  0 0 0 0 0.35  0 0 0 0.10 0"/>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="1040" height="1300" fill="url(#lp)"/>
+  <rect x="1040" y="0" width="1040" height="1300" fill="url(#rp)"/>
+  <rect width="2080" height="1300" filter="url(#grain)"/>
+
+  <!-- ruling: pale blue-green lines, a heavier head line, a red margin -->
+  <pattern id="rule" x="0" y="98" width="1040" height="52" patternUnits="userSpaceOnUse">
+    <path d="M 40 51 H 1010" stroke="#7fa196" stroke-width="2" opacity="0.85" fill="none"/>
+  </pattern>
+  <rect x="0" y="98" width="2080" height="1150" fill="url(#rule)"/>
+  <g stroke="#6f968c" stroke-width="2.6" opacity="0.9">
+    <path d="M 40 98 H 1010 M 1070 98 H 2040"/>
+  </g>
+  <g stroke="#c98686" stroke-width="2.2" opacity="0.8">
+    <path d="M 930 60 V 1240 M 1150 60 V 1240"/>
+  </g>
+  <!-- printed folios -->
+  <g font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#6e857c" opacity="0.85">
+    <text x="60" y="76">47</text>
+    <text x="2000" y="76" text-anchor="end">48</text>
+  </g>
+
+  <!-- the night's entries, in blue ballpoint, a little slanted and uneven -->
+  <g filter="url(#hand)" font-family="Ink Free, Segoe Print, cursive" fill="#1f3aa8">
+    <g transform="translate(1176 0) rotate(-0.8 0 0) skewX(-9)">
+      <text x="0" y="196" font-size="45" opacity="0.93">29 OCT 69</text>
+      <text x="262" y="198" font-size="45" opacity="0.97">2100 LOADED OP.</text>
+      <text x="0" y="249" font-size="45" opacity="0.9" stroke="#1f3aa8" stroke-width="0.6">PROGRAM FOR BEN BARKER BBN</text>
+    </g>
+    <g transform="translate(1180 0) rotate(-0.5 0 0) skewX(-9)">
+      <text x="0" y="352" font-size="45" opacity="0.97" stroke="#1f3aa8" stroke-width="0.9">22:30 TALKED TO SRI</text>
+      <text x="0" y="404" font-size="45" opacity="0.9">HOST TO HOST</text>
+    </g>
+    <g transform="translate(1760 0) rotate(-3 0 0) skewX(-12)">
+      <text x="0" y="458" font-size="50" opacity="0.96" stroke="#1f3aa8" stroke-width="1.1">CSK</text>
+    </g>
+  </g>
+
+  <!-- the fold in the paper -->
+  <rect x="940" y="0" width="200" height="1300" fill="url(#gut)"/>
+</svg>

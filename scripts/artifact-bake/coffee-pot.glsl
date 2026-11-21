@@ -14,7 +14,7 @@
 #define FILL 0.8
 #define GLASS 4.0
 #define GLASS_TINT vec3(0.95, 0.975, 0.965)
-#define COAT(id) (id == 2.0 ? 0.5 : id == 1.0 ? 1.0 : 0.0)
+#define COAT(id) (id == 2.0 ? 0.9 : id == 1.0 ? 1.0 : id == 3.0 ? 0.6 : 0.0)
 
 const float BASE = 0.07;     // the hot plate's top
 const float NECK = 1.30;     // where the glass meets the collar
@@ -76,7 +76,7 @@ Mat material(float id, vec3 p, vec3 n) {
   if (id == 1.0) {
     // Coffee left on the plate too long: near-black, red-brown where thin.
     float rim = smoothstep(0.04, 0.0, abs(p.y - LEVEL)) * 0.4;
-    vec3 c = mix(hex(0x120805), hex(0x3a1a0c), rim + 0.15 * fbm(p * 8.0));
+    vec3 c = mix(hex(0x080403), hex(0x2a1208), rim * 0.6 + 0.08 * fbm(p * 8.0));
     Mat m = mat(c, 0.06, 0.0);
     m.sss = 0.08;
     return m;
@@ -84,7 +84,7 @@ Mat material(float id, vec3 p, vec3 n) {
   if (id == 2.0) {
     // Black polypropylene, a little worn grey where hands go.
     float wear = smoothstep(0.62, 0.85, fbm(p * 9.0)) * 0.18;
-    Mat m = mat(mix(hex(0x0d0e10), hex(0x2a2c30), wear), 0.42 + 0.1 * noise(p * 60.0), 0.0);
+    Mat m = mat(mix(hex(0x101114), hex(0x2a2c30), wear), 0.3 + 0.08 * noise(p * 60.0), 0.0);
     return m;
   }
   if (id == 3.0) {

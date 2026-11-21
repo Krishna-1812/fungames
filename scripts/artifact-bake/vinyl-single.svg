@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The label of a 7 inch single, 9.2 cm across (the model's 4.6 cm radius
+       is 512 px). Plain and unbranded: a flat colour, a ring, three facts. -->
+  <defs>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="2" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.2  0 0 0 0 0.15  0 0 0 0.2 0"/>
+    </filter>
+  </defs>
+  <circle cx="512" cy="512" r="512" fill="#1f4f8a"/>
+  <circle cx="512" cy="512" r="512" filter="url(#grain)"/>
+  <circle cx="512" cy="512" r="478" fill="none" stroke="#f0e4c6" stroke-width="5" opacity="0.9"/>
+  <circle cx="512" cy="512" r="446" fill="none" stroke="#f0e4c6" stroke-width="2" opacity="0.7"/>
+  <circle cx="512" cy="512" r="236" fill="none" stroke="#f0e4c6" stroke-width="4" opacity="0.8"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#f3e8cb" text-anchor="middle">
+    <text x="512" y="178" font-size="70" letter-spacing="9">SIDE A</text>
+    <text x="512" y="250" font-size="44" letter-spacing="4">45 RPM · 1987</text>
+  </g>
+</svg>

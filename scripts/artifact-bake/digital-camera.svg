@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="950" height="600" viewBox="0 0 950 600">
+  <!-- The front plate's print, 100 px to the centimetre: x runs -4.75 .. 4.75,
+       y 0 .. 6 upwards. White is ink on the bare aluminium. -->
+  <rect width="950" height="600" fill="#000"/>
+  <g fill="#fff" font-family="Arial, Helvetica, sans-serif" font-weight="700">
+    <text x="710" y="470" font-size="30" letter-spacing="3" text-anchor="middle">5.0 MEGA PIXELS</text>
+    <text x="710" y="510" font-size="22" letter-spacing="3" text-anchor="middle" opacity="0.8">3x OPTICAL ZOOM</text>
+    <rect x="550" y="428" width="320" height="3"/>
+    <text x="710" y="396" font-size="20" letter-spacing="4" text-anchor="middle" opacity="0.75">DIGITAL CAMERA</text>
+    <!-- a ring of fine print round the lens collar is in the shader -->
+  </g>
+</svg>

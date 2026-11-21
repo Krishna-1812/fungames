@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Atlas. Top left: the printed label of the disc (a 512 px square, the
+       circle at its middle). Top right: the booklet's front page (a 512 px
+       square). Anything the print leaves bare is the lacquered aluminium. -->
+  <rect width="1024" height="1024" fill="#808080"/>
+  <!-- the label: a generic two-colour design -->
+  <rect width="512" height="512" fill="#e9e6dc"/>
+  <circle cx="256" cy="256" r="250" fill="#e6e3d8"/>
+  <path d="M256 256 L256 6 A250 250 0 0 1 506 256 Z" fill="#1d3f5e"/>
+  <path d="M256 256 L506 256 A250 250 0 0 1 256 506 Z" fill="#2f6f9f"/>
+  <circle cx="256" cy="256" r="196" fill="none" stroke="#e6e3d8" stroke-width="5"/>
+  <circle cx="256" cy="256" r="120" fill="#e6e3d8"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#1d3f5e" stroke-width="4"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#1d3f5e" text-anchor="middle">
+    <text x="256" y="238" font-size="30" letter-spacing="3">DIGITAL</text>
+    <text x="256" y="274" font-size="30" letter-spacing="3">AUDIO</text>
+  </g>
+  <text x="256" y="304" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#1d3f5e" text-anchor="middle" letter-spacing="3">74 MIN . STEREO</text>
+  <circle cx="256" cy="256" r="34" fill="#808080"/>
+  <!-- the booklet's front page -->
+  <g transform="translate(512,0)">
+    <rect width="512" height="512" fill="#14263a"/>
+    <circle cx="256" cy="330" r="190" fill="#2f6f9f"/>
+    <circle cx="256" cy="330" r="130" fill="#7fc4d8"/>
+    <circle cx="256" cy="330" r="70" fill="#14263a"/>
+    <rect y="396" width="512" height="116" fill="#e6e3d8"/>
+    <g font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#14263a" text-anchor="middle">
+      <text x="256" y="452" font-size="46" letter-spacing="6">DIGITAL AUDIO</text>
+    </g>
+    <text x="256" y="486" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#14263a" text-anchor="middle" letter-spacing="5">COMPACT DISC . 11 AUG 1994</text>
+    <text x="256" y="68" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#e6e3d8" text-anchor="middle" letter-spacing="9">SAMPLE ISSUE</text>
+  </g>
+</svg>

@@ -121,6 +121,11 @@ vec3 env(vec3 d) {
   vec3 r = normalize(RIM_C), rx = normalize(cross(vec3(0.0, 1.0, 0.0), r));
   float rb = smoothstep(0.075, 0.05, abs(dot(d, rx))) * smoothstep(0.5, 0.42, abs(d.y - r.y)) * step(0.0, dot(d, r));
   c += vec3(0.80, 0.88, 1.0) * 5.0 * rb;
+  // A tall strip in front on the right, seen only in reflections: the long
+  // highlight down a bottle or a carafe that a product photograph has.
+  vec3 s = normalize(vec3(0.74, 0.1, 0.66)), sx = normalize(cross(vec3(0.0, 1.0, 0.0), s));
+  float sb = smoothstep(0.13, 0.09, abs(dot(d, sx))) * smoothstep(0.55, 0.45, abs(d.y - s.y)) * step(0.0, dot(d, s));
+  c += vec3(0.92, 0.95, 1.0) * 3.2 * sb;
   vec3 f = normalize(FILL_C);
   c += vec3(0.85, 0.88, 0.92) * 0.9 * smoothstep(0.82, 0.95, dot(d, f));
   c += vec3(0.6, 0.64, 0.7) * 0.6 * smoothstep(0.86, 0.97, d.y);

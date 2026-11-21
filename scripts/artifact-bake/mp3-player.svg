@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="706" viewBox="0 0 1024 706">
+  <!-- The player's face, seen from above, 113.8 px to the centimetre: x runs
+       -4.5 .. 4.5 cm across, z -3.1 .. 3.1 cm down. Black is bare plastic;
+       the light marks are print. The grey-green rectangle is the LCD. -->
+  <rect width="1024" height="706" fill="#000"/>
+  <!-- LCD: x -3.8 .. 1.0, z -1.85 .. 0.85 -->
+  <rect x="80" y="142" width="546" height="308" fill="#a9b49c"/>
+  <g fill="#1d2a1e" font-family="'Courier New', monospace" font-weight="700">
+    <rect x="94" y="156" width="518" height="3" opacity="0.0"/>
+    <text x="104" y="196" font-size="30" letter-spacing="3">TRACK</text>
+    <text x="104" y="300" font-size="112" letter-spacing="2">05</text>
+    <text x="272" y="300" font-size="40">/12</text>
+    <text x="104" y="372" font-size="62" letter-spacing="3">01:42</text>
+    <text x="452" y="196" font-size="30" letter-spacing="2">MP3</text>
+    <text x="452" y="372" font-size="30" letter-spacing="2">128K</text>
+    <!-- play mark -->
+    <path d="M440 232 L440 276 L476 254 Z"/>
+    <!-- battery -->
+    <rect x="530" y="168" width="54" height="26" fill="none" stroke="#1d2a1e" stroke-width="4"/>
+    <rect x="584" y="175" width="6" height="12"/>
+    <rect x="536" y="174" width="10" height="14"/><rect x="550" y="174" width="10" height="14"/><rect x="564" y="174" width="10" height="14"/>
+    <!-- progress -->
+    <rect x="104" y="404" width="486" height="6" opacity="0.5"/>
+    <rect x="104" y="398" width="152" height="18"/>
+  </g>
+  <!-- LCD pixel columns are drawn in the shader; nothing more here. -->
+
+  <g fill="#cfd1d4" font-family="Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle">
+    <!-- the cross of buttons: play (2.65,-0.5), prev (1.55,-0.5), next (3.75,-0.5), stop (2.65,0.75) -->
+    <path d="M797 270 L797 322 L840 296 Z"/>
+    <rect x="818" y="270" width="0" height="0"/>
+    <path d="M708 296 L688 296 M708 282 L708 310" stroke="#cfd1d4" stroke-width="0"/>
+    <rect x="676" y="276" width="6" height="40"/><path d="M714 276 L714 316 L688 296 Z"/>
+    <rect x="953" y="276" width="6" height="40"/><path d="M925 276 L925 316 L951 296 Z"/>
+    <rect x="936" y="276" width="6" height="40" opacity="0"/>
+    <rect x="802" y="424" width="24" height="24" transform="translate(0,0)" fill="#cfd1d4"/>
+    <!-- labels under the small buttons, z = 2.15, buttons at x -3.0 -1.5 0.0 -->
+    <text x="171" y="664" font-size="25" letter-spacing="3">MENU</text>
+    <text x="341" y="664" font-size="25" letter-spacing="3">MODE</text>
+    <text x="512" y="664" font-size="25" letter-spacing="3">HOLD</text>
+    <text x="814" y="124" font-size="21" letter-spacing="4" fill="#9a9da1">DIGITAL AUDIO</text>
+    <text x="814" y="152" font-size="24" letter-spacing="5">MP-98</text>
+  </g>
+  <line x1="680" y1="470" x2="990" y2="470" stroke="#6c6f74" stroke-width="2" opacity="0"/>
+</svg>

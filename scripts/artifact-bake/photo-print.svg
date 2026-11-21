@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <!-- A snapshot from the floor of a small hall: four singers backlit on a
+       low stage, two follow-spots through the haze, the audience's heads in
+       the foreground, colour slide film pushed in the dark: grain, a soft
+       lens, a warm-magenta cast. Nobody's likeness; figures only. The white
+       border is the print's. -->
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.6"/></filter>
+    <filter id="softer" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="haze" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.22 0"/>
+    </filter>
+    <radialGradient id="spotL" cx="0.36" cy="0.0" r="0.9"><stop offset="0" stop-color="#fff4f0" stop-opacity="0.85"/><stop offset="0.5" stop-color="#d9a7c8" stop-opacity="0.25"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <radialGradient id="spotR" cx="0.66" cy="0.0" r="0.85"><stop offset="0" stop-color="#e8f2ff" stop-opacity="0.8"/><stop offset="0.5" stop-color="#8fb4e0" stop-opacity="0.22"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.45" r="0.75"><stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.75"/></radialGradient>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1024"/><stop offset="0.55" stop-color="#3a2340"/><stop offset="1" stop-color="#140c14"/></linearGradient>
+    <linearGradient id="stage" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a3a3c"/><stop offset="1" stop-color="#1c1214"/></linearGradient>
+    <clipPath id="pic"><rect x="44" y="44" width="1112" height="712"/></clipPath>
+  </defs>
+  <rect width="1200" height="800" fill="#f6f3ec"/>
+  <g clip-path="url(#pic)">
+    <rect x="44" y="44" width="1112" height="712" fill="url(#back)"/>
+    <!-- the painted backdrop, out of focus: hills and a pale sky band -->
+    <g filter="url(#softer)" opacity="0.7">
+      <path d="M40 420 C220 330 360 360 520 300 C700 240 860 330 1160 280 L1160 520 L40 520 Z" fill="#4b3a5e"/>
+      <path d="M40 470 C260 420 460 450 640 400 C840 350 980 420 1160 390 L1160 540 L40 540 Z" fill="#3d4a52"/>
+      <rect x="40" y="150" width="1120" height="120" fill="#6b5876" opacity="0.6"/>
+    </g>
+    <!-- curtains at the sides -->
+    <g filter="url(#soft)">
+      <path d="M40 40 L150 40 C140 250 170 480 130 600 L40 600 Z" fill="#3a0f22"/>
+      <path d="M1160 40 L1050 40 C1062 250 1030 480 1070 600 L1160 600 Z" fill="#3a0f22"/>
+    </g>
+    <!-- the stage -->
+    <path d="M40 560 L1160 560 L1160 760 L40 760 Z" fill="url(#stage)"/>
+    <rect x="40" y="556" width="1120" height="8" fill="#8a6a5a" opacity="0.6" filter="url(#soft)"/>
+    <!-- spots through the haze -->
+    <rect x="40" y="40" width="1120" height="720" fill="url(#spotL)" filter="url(#haze)" opacity="0.45"/>
+    <rect x="40" y="40" width="1120" height="720" fill="url(#spotR)" filter="url(#haze)" opacity="0.4"/>
+    <ellipse cx="420" cy="572" rx="250" ry="34" fill="#f3d6d0" opacity="0.35" filter="url(#softer)"/>
+    <ellipse cx="780" cy="572" rx="250" ry="34" fill="#cfe0f6" opacity="0.3" filter="url(#softer)"/>
+    <g filter="url(#softer)"><ellipse cx="420" cy="612" rx="70" ry="10" fill="#000" opacity="0.45"/><ellipse cx="560" cy="604" rx="70" ry="10" fill="#000" opacity="0.45"/><ellipse cx="700" cy="610" rx="70" ry="10" fill="#000" opacity="0.45"/><ellipse cx="840" cy="616" rx="70" ry="10" fill="#000" opacity="0.45"/></g>
+    <!-- four singers on a low stage, lit from the front-left -->
+    <g filter="url(#soft)">
+      <g transform="translate(390 290) rotate(-2)">
+        <path d="M-44 70 C-46 140 -58 190 -74 236 L74 236 C58 190 46 140 44 70 C30 58 -30 58 -44 70 Z" fill="#b0306a"/>
+        <path d="M-44 72 C-62 110 -66 160 -60 206" stroke="#c99883" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M44 72 C62 110 66 160 60 206" stroke="#c99883" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M-22 234 L-26 318 M22 234 L26 318" stroke="#c99883" stroke-width="17" stroke-linecap="round"/>
+        <path d="M-34 318 l18 0 M18 318 l18 0" stroke="#111" stroke-width="12" stroke-linecap="round"/>
+        <rect x="-10" y="36" width="20" height="30" fill="#c99883"/>
+        <ellipse cx="0" cy="12" rx="25" ry="31" fill="#c99883"/>
+        <path d="M-28 16 C-34 -30 34 -32 30 14 C26 -6 12 -16 0 -14 C-14 -14 -24 -6 -28 16 Z" fill="#2a1812"/>
+        <path d="M-25 6 C-22 -22 18 -26 26 -6" stroke="#fff6ee" stroke-width="4" fill="none" opacity="0.55"/>
+        <path d="M-44 72 C-30 60 30 60 44 72" stroke="#fff2ea" stroke-width="3" fill="none" opacity="0.5"/>
+      </g>
+      <g transform="translate(530 282) rotate(1)">
+        <path d="M-44 70 C-46 140 -58 190 -74 236 L74 236 C58 190 46 140 44 70 C30 58 -30 58 -44 70 Z" fill="#d8d2c8"/>
+        <path d="M-44 72 C-62 110 -66 160 -60 206" stroke="#d4a690" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M44 72 C62 110 66 160 60 206" stroke="#d4a690" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M-22 234 L-26 318 M22 234 L26 318" stroke="#d4a690" stroke-width="17" stroke-linecap="round"/>
+        <path d="M-34 318 l18 0 M18 318 l18 0" stroke="#111" stroke-width="12" stroke-linecap="round"/>
+        <rect x="-10" y="36" width="20" height="30" fill="#d4a690"/>
+        <ellipse cx="0" cy="12" rx="25" ry="31" fill="#d4a690"/>
+        <path d="M-28 16 C-34 -30 34 -32 30 14 C26 -6 12 -16 0 -14 C-14 -14 -24 -6 -28 16 Z" fill="#6a3b22"/>
+        <path d="M-25 6 C-22 -22 18 -26 26 -6" stroke="#fff6ee" stroke-width="4" fill="none" opacity="0.55"/>
+        <path d="M-44 72 C-30 60 30 60 44 72" stroke="#fff2ea" stroke-width="3" fill="none" opacity="0.5"/>
+      </g>
+      <g transform="translate(670 288) rotate(-1)">
+        <path d="M-44 70 C-46 140 -58 190 -74 236 L74 236 C58 190 46 140 44 70 C30 58 -30 58 -44 70 Z" fill="#257f86"/>
+        <path d="M-44 72 C-62 110 -66 160 -60 206" stroke="#cf9f88" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M44 72 C62 110 66 160 60 206" stroke="#cf9f88" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M-22 234 L-26 318 M22 234 L26 318" stroke="#cf9f88" stroke-width="17" stroke-linecap="round"/>
+        <path d="M-34 318 l18 0 M18 318 l18 0" stroke="#111" stroke-width="12" stroke-linecap="round"/>
+        <rect x="-10" y="36" width="20" height="30" fill="#cf9f88"/>
+        <ellipse cx="0" cy="12" rx="25" ry="31" fill="#cf9f88"/>
+        <path d="M-28 16 C-34 -30 34 -32 30 14 C26 -6 12 -16 0 -14 C-14 -14 -24 -6 -28 16 Z" fill="#c9a467"/>
+        <path d="M-25 6 C-22 -22 18 -26 26 -6" stroke="#fff6ee" stroke-width="4" fill="none" opacity="0.55"/>
+        <path d="M-44 72 C-30 60 30 60 44 72" stroke="#fff2ea" stroke-width="3" fill="none" opacity="0.5"/>
+      </g>
+      <g transform="translate(810 294) rotate(2)">
+        <path d="M-44 70 C-46 140 -58 190 -74 236 L74 236 C58 190 46 140 44 70 C30 58 -30 58 -44 70 Z" fill="#3a55a8"/>
+        <path d="M-44 72 C-62 110 -66 160 -60 206" stroke="#a87560" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M44 72 C62 110 66 160 60 206" stroke="#a87560" stroke-width="17" stroke-linecap="round" fill="none"/>
+        <path d="M-22 234 L-26 318 M22 234 L26 318" stroke="#a87560" stroke-width="17" stroke-linecap="round"/>
+        <path d="M-34 318 l18 0 M18 318 l18 0" stroke="#111" stroke-width="12" stroke-linecap="round"/>
+        <rect x="-10" y="36" width="20" height="30" fill="#a87560"/>
+        <ellipse cx="0" cy="12" rx="25" ry="31" fill="#a87560"/>
+        <path d="M-28 16 C-34 -30 34 -32 30 14 C26 -6 12 -16 0 -14 C-14 -14 -24 -6 -28 16 Z" fill="#1c120e"/>
+        <path d="M-25 6 C-22 -22 18 -26 26 -6" stroke="#fff6ee" stroke-width="4" fill="none" opacity="0.55"/>
+        <path d="M-44 72 C-30 60 30 60 44 72" stroke="#fff2ea" stroke-width="3" fill="none" opacity="0.5"/>
+      </g>
+    </g>
+    <!-- the audience, out of focus in front -->
+    <g filter="url(#softer)" fill="#07050a">
+      <ellipse cx="150" cy="770" rx="120" ry="110"/>
+      <ellipse cx="380" cy="800" rx="110" ry="96"/>
+      <ellipse cx="640" cy="790" rx="130" ry="100"/>
+      <ellipse cx="930" cy="780" rx="120" ry="104"/>
+      <ellipse cx="1120" cy="800" rx="110" ry="100"/>
+    </g>
+    <rect x="40" y="40" width="1120" height="720" fill="url(#vig)"/>
+    <rect x="40" y="40" width="1120" height="720" fill="#ff5fa0" opacity="0.05"/>
+    <rect x="40" y="40" width="1120" height="720" filter="url(#grain)"/>
+  </g>
+</svg>

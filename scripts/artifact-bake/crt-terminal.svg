@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <!-- What the green-phosphor screen shows: a university bulletin-board post
+       of 19 September 1982. A blurred copy under the sharp one is the bloom. -->
+  <defs>
+    <filter id="b1" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="b2" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="2.2"/></filter>
+    <radialGradient id="v" cx="50%" cy="50%" r="75%">
+      <stop offset="0" stop-color="#0a1f0e"/>
+      <stop offset="1" stop-color="#010402"/>
+    </radialGradient>
+    <g id="txt" font-family="Courier New, Courier, monospace" font-size="33" font-weight="700" xml:space="preserve">
+      <text x="46" y="80">BBOARD general                 19-Sep-82</text>
+      <text x="46" y="114">-------------------------------------------</text>
+      <text x="46" y="156">Msg 1471                              11:44</text>
+      <text x="46" y="192">From: Fahlman at Cmu-20c</text>
+      <text x="46" y="228">Subject: joke markers</text>
+      <text x="46" y="300">I propose that the following character</text>
+      <text x="46" y="336">sequence for joke markers:</text>
+      <text x="150" y="450" font-size="120" letter-spacing="0">:-)</text>
+      <text x="46" y="520">Read it sideways.</text>
+      <text x="46" y="590">[N]ext  [P]rev  [R]eply  [Q]uit</text>
+      <text x="46" y="650">READ&gt; <tspan>&#9608;</tspan></text>
+    </g>
+  </defs>
+  <rect width="1024" height="768" fill="url(#v)"/>
+  <g fill="#3dff6a" filter="url(#b1)" opacity="0.75"><use href="#txt"/></g>
+  <g fill="#6bff8d" filter="url(#b2)" opacity="0.6"><use href="#txt"/></g>
+  <g fill="#9dffb0"><use href="#txt"/></g>
+</svg>
