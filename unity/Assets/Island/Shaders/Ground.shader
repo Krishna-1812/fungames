@@ -144,12 +144,17 @@ Shader "Island/Ground"
                 float cliff = sa.a * (1 - b3.y);
 
                 float3 detail = 0; float3 bend = 0; float sum = 0;
+                float ripple = lerp(0.12, 1, smoothstep(0.84, 0.97, N.y));
                 [unroll] for (int k = 0; k < 9; k++)
                 {
                     if (w[k] > 0.003)
                     {
                         float3 d; float2 t;
                         Photo(k, p, mix, d, t);
+                        // Sand (dry 1, wet 2) holds its wind ripples only where it lies flat: down a bank into the sea
+                        // it slumps smooth. Laid on a slope turned from the sun, the ripples' small tilts swung the
+                        // light so far that they printed as dark teeth down every sand bank.
+                        if (k == 1 || k == 2) { d = lerp(1, d, ripple); t *= ripple; }
                         detail += w[k] * d; bend += w[k] * float3(t.x, 0, t.y); sum += w[k];
                     }
                 }
