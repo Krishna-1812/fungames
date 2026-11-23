@@ -69,6 +69,12 @@ export type DayModel = {
  *  2008 CHI paper "The Cost of Interrupted Work: More Speed and Stress"). */
 export const REFOCUS_MINUTES = 23.25
 
+/** Each part of the day's glass on the page, as the colour white light comes out of it. */
+export const GLASS_TINT: Record<string, string> = {
+  morning: '#a58cff', commute: '#8c9ab0', work: '#3f68ff', lunch: '#5fb8ff',
+  home: '#22c99c', dinner: '#ff3f62', sleep: '#2a3650',
+}
+
 export const SOURCES = {
   refocus:
     'Gloria Mark (UC Irvine) found information workers took an average of 23 minutes 15 seconds to fully return to a task after being interrupted from it — "The Cost of Interrupted Work: More Speed and Stress" (CHI 2008).',
