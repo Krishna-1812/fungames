@@ -268,6 +268,8 @@ export function createDayGlass(canvas: HTMLCanvasElement): DayGlass | null {
   } catch {
     return null
   }
+  // Windows' shader compiler warns about precision in three's own transmission code; the shaders are fine.
+  renderer.debug.checkShaderErrors = false
   renderer.toneMapping = ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.0
   renderer.outputColorSpace = SRGBColorSpace
