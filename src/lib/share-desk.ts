@@ -206,26 +206,50 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
   /* ---- the desk and the lamp ---- */
   const [wc, wx] = canvas(1024, 1024)
   {
-    // Grey-stained oak, the grain running left to right.
-    const r = rng(3)
-    wx.fillStyle = '#2b3038'
-    wx.fillRect(0, 0, 1024, 1024)
-    for (let i = 0; i < 520; i++) {
-      const y0 = r() * 1024, amp = 2 + r() * 10, f = 0.002 + r() * 0.006, ph = r() * 6
-      wx.strokeStyle = r() < 0.55 ? `rgba(14,16,20,${0.12 + r() * 0.25})` : `rgba(120,128,140,${0.04 + r() * 0.08})`
-      wx.lineWidth = 0.6 + r() * 2.4
-      wx.beginPath()
-      for (let x = 0; x <= 1024; x += 16) {
-        const y = y0 + Math.sin(x * f + ph) * amp + Math.sin(x * f * 3.1 + ph * 2) * amp * 0.3
-        x ? wx.lineTo(x, y) : wx.moveTo(x, y)
+    // Grey-stained oak, quarter-sawn, the grain running left to right:
+    // growth rings as bands bent by a slow warp, the late wood of each ring
+    // darker, and the open pores that make oak oak as fine dark flecks
+    // along it. Tiles seamlessly, so the noise wraps.
+    const N = 1024
+    const vn = (seed: number, period: number) => {
+      const r = rng(seed), g = new Float32Array(period * period).map(() => r())
+      return (x: number, y: number) => {
+        const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi
+        const at = (i: number, j: number) => g[(((j % period) + period) % period) * period + (((i % period) + period) % period)]
+        const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy)
+        const a = at(xi, yi) + (at(xi + 1, yi) - at(xi, yi)) * sx
+        const b = at(xi, yi + 1) + (at(xi + 1, yi + 1) - at(xi, yi + 1)) * sx
+        return a + (b - a) * sy
       }
-      wx.stroke()
     }
+    const warp = vn(11, 8), fine = vn(12, 64), fleck = vn(13, 256)
+    const img = wx.createImageData(N, N)
+    const dark = [33, 37, 44], light = [60, 66, 76]
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const u = x / N, v = y / N
+        const w = warp(u * 8, v * 8) * 2 + warp(u * 8 + 3.1, v * 8 + 1.7) * 0.6
+        const ring = (v * 64 + w * 3.2) % 1
+        // Early wood pale and wide, late wood a sharper dark line.
+        let t = 0.55 + 0.45 * Math.pow(Math.sin(ring * Math.PI), 0.6) - 0.34 * Math.pow(Math.max(0, ring - 0.82) / 0.18, 2)
+        t += (fine(u * 64, v * 64 * 0.25) - 0.5) * 0.22
+        const f = fleck(u * 256, v * 256 * 4)
+        if (f > 0.83) t -= (f - 0.83) * 2.4
+        t = Math.max(0, Math.min(1, t))
+        const i = (y * N + x) * 4
+        img.data[i] = dark[0] + (light[0] - dark[0]) * t
+        img.data[i + 1] = dark[1] + (light[1] - dark[1]) * t
+        img.data[i + 2] = dark[2] + (light[2] - dark[2]) * t
+        img.data[i + 3] = 255
+      }
+    }
+    wx.putImageData(img, 0, 0)
   }
   const wood = tex(wc)
   wood.wrapS = wood.wrapT = RepeatWrapping
-  wood.repeat.set(4, 4)
-  const deskMat = new MeshPhysicalMaterial({ color: '#c9ced8', map: wood, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.45, envMap: room, envMapIntensity: 0.35 })
+  // One tile of grain is 40 cm of desk: rings a few millimetres apart.
+  wood.repeat.set(10, 10)
+  const deskMat = new MeshPhysicalMaterial({ color: '#c3c8d1', map: wood, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.45, envMap: room, envMapIntensity: 0.35 })
   const desk = new Mesh(new PlaneGeometry(40, 40), deskMat)
   desk.rotation.x = -Math.PI / 2
   desk.receiveShadow = true
