@@ -11,20 +11,26 @@ import { METHODS } from '../lib/share-methods'
  * otherwise. Nothing here needs a backend: every "send" happens entirely in
  * this tab, against whatever you actually typed.
  *
- * Two materials, not one template with the colour swapped: real methods sit
- * on a bolted brushed-metal panel (rivets, a scanline, a lit LED rather than
- * a text pill), jokes are handwritten postcards — their own font, a stamp,
- * a few degrees of rotation seeded from the tile's own id so it is stable
- * rather than reshuffling on every reload. Four real tiles with the richest
- * payoff in their modal (Morse, Braille, Touch-Tone, Interstellar) get a
- * second column so the grid itself isn't perfectly uniform.
+ * Opening a way puts it on the sending desk (lib/share-desk.ts): a real
+ * thing under a lamp, made from the message — a brass telegraph key and
+ * its signal lamp keying the Morse, Braille embossed in heavy paper under a
+ * raking light, eight-track paper tape punched with the bytes, a telephone
+ * keypad and two octaves of piano pressed as their tones play, a steel pipe
+ * and a spoon for the tap code, a typed sheet for the ciphers, a fanfold
+ * printout of the interstellar bitmap, and for each joke a handwritten,
+ * stamped, postmarked postcard. The desk stays in view beside the tiles on
+ * a wide window and pinned above them on a narrow one; the exact encoding
+ * is under it as text, to copy. Without WebGL the text is all there is,
+ * which is everything that matters.
  *
- * In the shell the receiving room is a dark stage, its radar a sticky
- * backdrop inside the frame. Score is how many of the ways you have sent it,
- * Real how many of those were genuine encodings, Characters how long the
- * message is, and Best the most ways in one visit. Sending it every way there
- * is — jokes included — is the ending. The page's gold is mint and sky; the
- * postcards keep their own warm card.
+ * The tiles keep their two materials: real methods a bolted brushed-metal
+ * panel, jokes a handwritten postcard tilted by a few degrees seeded from
+ * the tile's own id, so it is stable rather than reshuffling on every load.
+ *
+ * In the shell the room is a dark stage. Score is how many of the ways you
+ * have sent it, Real how many of those were genuine encodings, Characters
+ * how long the message is, and Best the most ways in one visit. Sending it
+ * every way there is, jokes included, is the ending.
  */
 
 // Deterministic, so the same tile always tilts the same amount — a random()
@@ -39,27 +45,22 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   slug="share-this-page"
   labels={{ score: 'Sent', best: 'Most ways', level: 'Real', moves: 'Characters' }}
   initial={{ score: `0 / ${METHODS.length}`, level: `0 / ${METHODS.filter((m) => m.kind === 'real').length}`, moves: '20' }}
-  fonts={['Caveat:wght@600;700']}
+  fonts={['Caveat:wght@600;700', 'Courier Prime:wght@400;700']}
 >
   <div class="stp-body">
   <div class="stp-bg" aria-hidden="true">
     <div class="stp-grid-tex"></div>
     <div class="stp-radar"></div>
     <div class="stp-glow"></div>
-    <div class="stp-pings">
-      <i style="--x:12%; --y:22%; --d:0s"></i>
-      <i style="--x:82%; --y:16%; --d:1.6s"></i>
-      <i style="--x:68%; --y:70%; --d:3.1s"></i>
-      <i style="--x:24%; --y:64%; --d:4.4s"></i>
-    </div>
   </div>
 
   <header class="stp-head">
     <p class="stp-eyebrow"><i class="stp-live-dot" aria-hidden="true"></i>One message · thirty ways out</p>
     <p class="stp-sub">
-      Type anything below. Every tile sends it a different way — most of them
-      for real: the actual Morse timing, the actual Braille cell, the actual
-      dial tones. A handful are just jokes, and they admit it.
+      Type anything, then pick a way to send it. It goes out for real on the
+      desk: the actual Morse on a brass key, the actual Braille pressed into
+      paper, the actual dial tones on a keypad. A handful are just jokes, and
+      they admit it.
     </p>
     <div class="stp-composer">
       <label for="msg" class="stp-label">Your message</label>
@@ -70,52 +71,50 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     </div>
   </header>
 
-  <div class="stp-grid" id="grid">
-    {METHODS.map((m) => (
-      <button
-        type="button"
-        class:list={['stp-tile', `stp-mat-${m.kind}`, { 'stp-tile-big': BIG.has(m.id) }]}
-        data-id={m.id}
-        data-kind={m.kind}
-        style={`--accent:${m.accent}; --tilt:${tiltOf(m.id).toFixed(2)}deg`}
-      >
-        {m.kind === 'real' ? (
-          <>
-            <i class="stp-rivet stp-rivet-tl" aria-hidden="true"></i>
-            <i class="stp-rivet stp-rivet-br" aria-hidden="true"></i>
-            <span class="stp-led" aria-hidden="true"></span>
-          </>
-        ) : (
-          <i class="stp-stamp" aria-hidden="true"></i>
-        )}
-        <svg class="stp-tile-icon" viewBox="0 0 24 24" width={BIG.has(m.id) ? 34 : 26} height={BIG.has(m.id) ? 34 : 26} aria-hidden="true" set:html={m.icon} />
-        <span class="stp-tile-title">{m.title}</span>
-        {m.kind === 'real' && <span class="stp-real-badge">real</span>}
-      </button>
-    ))}
-  </div>
-
-  <div class="stp-modal" id="modal" hidden>
-    <div class="stp-modal-backdrop" id="backdrop"></div>
-    <div class="stp-modal-card" id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button type="button" class="stp-close" id="closeBtn" aria-label="Close">
-        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-      <div class="stp-modal-head">
-        <span class="stp-modal-icon" id="modalIconWrap"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" id="modalIcon"></svg></span>
-        <div>
-          <h2 id="modalTitle"></h2>
-          <p class="stp-modal-blurb" id="modalBlurb"></p>
+  <div class="stp-room">
+    <section class="stp-desk" id="desk" aria-labelledby="deskTitle">
+      <div class="stp-view">
+        <canvas class="stp-canvas" id="deskCanvas" aria-hidden="true"></canvas>
+        <div class="stp-view-head">
+          <span class="stp-kind" id="deskKind">Ready</span>
+          <h2 id="deskTitle">Pick a way to send it</h2>
+          <p class="stp-view-blurb" id="deskBlurb">Your message is typed and waiting. Every tile sends it differently.</p>
+        </div>
+        <div class="stp-view-acts">
+          <button type="button" class="stp-act" id="playBtn" hidden>
+            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>
+            <span id="playLabel">Play</span>
+          </button>
+          <button type="button" class="stp-act" id="copyBtn" hidden>Copy</button>
         </div>
       </div>
-      <div class="stp-output" id="modalOutput"></div>
-      <div class="stp-modal-actions" id="modalActions">
-        <button type="button" class="stp-act" id="playBtn" hidden>
-          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>
-          <span id="playLabel">Play</span>
+      <div class="stp-output" id="output" aria-live="polite"></div>
+    </section>
+
+    <div class="stp-grid" id="grid">
+      {METHODS.map((m) => (
+        <button
+          type="button"
+          class:list={['stp-tile', `stp-mat-${m.kind}`, { 'stp-tile-big': BIG.has(m.id) }]}
+          data-id={m.id}
+          data-kind={m.kind}
+          aria-controls="desk"
+          style={`--accent:${m.accent}; --tilt:${tiltOf(m.id).toFixed(2)}deg`}
+        >
+          {m.kind === 'real' ? (
+            <>
+              <i class="stp-rivet stp-rivet-tl" aria-hidden="true"></i>
+              <i class="stp-rivet stp-rivet-br" aria-hidden="true"></i>
+              <span class="stp-led" aria-hidden="true"></span>
+            </>
+          ) : (
+            <i class="stp-stamp" aria-hidden="true"></i>
+          )}
+          <svg class="stp-tile-icon" viewBox="0 0 24 24" width={BIG.has(m.id) ? 30 : 24} height={BIG.has(m.id) ? 30 : 24} aria-hidden="true" set:html={m.icon} />
+          <span class="stp-tile-title">{m.title}</span>
+          {m.kind === 'real' && <span class="stp-real-badge">real</span>}
         </button>
-        <button type="button" class="stp-act" id="copyBtn" hidden>Copy</button>
-      </div>
+      ))}
     </div>
   </div>
   </div>
@@ -123,21 +122,23 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   <Fragment slot="howto">
     <p>
       Type a message, then send it. Every tile is a different way out, and
-      opening one shows your message sent that way.
+      opening one sends your message that way on the desk.
     </p>
     <ul>
-      <li>The metal panels are real: the actual Morse timing, the actual Braille cell, the actual dial tones. Several can be played or copied.</li>
+      <li>The metal panels are real: the actual Morse timing, the actual Braille cell, the actual dial tones. The ones that make a sound play as they open, and again with Play; most can be copied.</li>
       <li>The handwritten postcards are jokes, and they say so.</li>
-      <li>Change the message whenever you like; every tile uses whatever is typed.</li>
+      <li>Change the message whenever you like; the desk sends whatever is typed.</li>
     </ul>
     <p>Send it every way there is to finish. The sounds need the Sound button on.</p>
   </Fragment>
 </GameShell>
 
 <script>
-  import { unlock, tone, hit, sfx } from '../lib/audio'
+  import { unlock, output as audioOut, sfx } from '../lib/audio'
   import { createShell } from '../lib/game-shell'
   import { recordPlay } from '../lib/stats'
+  import { PLAY } from '../lib/motion'
+  import type { Desk, DeskView } from '../lib/share-desk'
   import {
     METHODS, methodById,
     morseText, morseBeats, MORSE_UNIT,
@@ -154,19 +155,15 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
   const msgInput = $<HTMLInputElement>('msg')
   const grid = $('grid')
-  const modal = $('modal')
-  const backdrop = $('backdrop')
-  const closeBtn = $('closeBtn')
-  const modalTitle = $('modalTitle')
-  const modalBlurb = $('modalBlurb')
-  const modalOutput = $('modalOutput')
-  const modalIconWrap = $('modalIconWrap')
-  const modalIcon = $<SVGSVGElement & HTMLElement>('modalIcon')
+  const deskEl = $('desk')
+  const deskTitle = $('deskTitle')
+  const deskBlurb = $('deskBlurb')
+  const deskKind = $('deskKind')
+  const out = $('output')
   const playBtn = $<HTMLButtonElement>('playBtn')
   const playLabel = $('playLabel')
   const copyBtn = $<HTMLButtonElement>('copyBtn')
   const signal = $('signal')
-  const modalCard = $('modalCard')
 
   const message = () => msgInput.value.trim() || 'You should see this.'
 
@@ -187,6 +184,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     if (!m || sent.has(id)) return
     sent.add(id)
     if (m.kind === 'real') realSent++
+    grid.querySelector(`[data-id="${id}"]`)?.classList.add('is-sent')
     // Which ways, never the message: only whether one was written at all.
     if (sent.size === 1) { shell.pick('First way tried', m.title); shell.pick('Wrote own message', msgInput.value.trim() !== '') }
     shell.pick('Way shared', m.title)
@@ -197,7 +195,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     recordPlay('share-this-page', { ways: sent.size }, { ways: 'high' })
     shell.win({
       celebrate: false,
-      // The card waits under the tiles; the one just opened is still open.
+      // The card waits under the tiles; the desk keeps what was just sent.
       scroll: false,
       kicker: `All ${METHODS.length} ways`,
       title: 'Sent every way there is.',
@@ -213,89 +211,135 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   msgInput.addEventListener('input', paintLength)
   paintLength()
 
-  // A live "signal strength" readout under the input — not decoration, the
-  // bar heights are the real character codes of whatever is actually typed,
-  // so retyping the message visibly redraws it rather than replaying a loop.
+  // A live "signal strength" readout under the input — the bar heights are
+  // the real character codes of whatever is typed.
   function updateSignal() {
     const text = msgInput.value || ' '
     signal.innerHTML = ''
-    text
-      .split('')
-      .slice(0, 48)
-      .forEach((c) => {
-        const bar = document.createElement('i')
-        const h = 3 + (c.charCodeAt(0) % 17)
-        bar.style.height = `${h}px`
-        signal.append(bar)
-      })
+    text.split('').slice(0, 48).forEach((c) => {
+      const bar = document.createElement('i')
+      bar.style.height = `${3 + (c.charCodeAt(0) % 17)}px`
+      signal.append(bar)
+    })
   }
   msgInput.addEventListener('input', updateSignal)
   updateSignal()
 
-  let currentId = ''
-  let playing = false
+  /* ---- the desk ------------------------------------------------------------ */
+  let desk: Desk | null = null
+  const pending: DeskView[] = []
+  const show = (v: DeskView) => { if (desk) desk.show(v); else pending.splice(0, 1, v) }
 
-  function el(tag: string, cls?: string, text?: string): HTMLElement {
-    const e = document.createElement(tag)
-    if (cls) e.className = cls
-    if (text != null) e.textContent = text
-    return e
+  /* ---- sound: its own bus, so switching ways silences what was queued ---- */
+  let bus: GainNode | null = null
+  function freshBus() {
+    const o = audioOut()
+    if (bus) { try { bus.disconnect() } catch { /* already gone */ } }
+    bus = null
+    if (!o) return null
+    bus = o.ctx.createGain()
+    bus.connect(o.out)
+    return { ctx: o.ctx, bus }
+  }
+  type Bus = NonNullable<ReturnType<typeof freshBus>>
+  function beep(b: Bus | null, freq: number, at: number, dur: number, gain: number, type: OscillatorType = 'sine') {
+    if (!b) return
+    const t = b.ctx.currentTime + at
+    const g = b.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.008, dur * 0.2))
+    g.gain.setValueAtTime(gain, t + Math.max(0.01, dur - 0.012))
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    g.connect(b.bus)
+    const o = b.ctx.createOscillator()
+    o.type = type
+    o.frequency.value = freq
+    o.connect(g)
+    o.start(t)
+    o.stop(t + dur + 0.02)
+  }
+  /** A spoon on a steel pipe: two inharmonic partials, rung and gone. */
+  function ping(b: Bus | null, at: number) {
+    if (!b) return
+    for (const [f, gain, decay] of [[2380, 0.16, 0.35], [3910, 0.08, 0.18], [6020, 0.03, 0.08]] as const) {
+      const t = b.ctx.currentTime + at
+      const g = b.ctx.createGain()
+      g.gain.setValueAtTime(gain, t)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decay)
+      g.connect(b.bus)
+      const o = b.ctx.createOscillator()
+      o.frequency.value = f
+      o.connect(g)
+      o.start(t)
+      o.stop(t + decay + 0.02)
+    }
   }
 
-  function mono(text: string) {
-    const p = el('p', 'stp-mono')
-    p.textContent = text
-    return p
+  let timers: number[] = []
+  function stop() {
+    for (const t of timers) clearTimeout(t)
+    timers = []
+    freshBus()
+    desk?.release()
+    if ('speechSynthesis' in window) speechSynthesis.cancel()
+    out.querySelectorAll('.is-lit').forEach((e) => e.classList.remove('is-lit'))
   }
+  const later = (s: number, fn: () => void) => timers.push(window.setTimeout(fn, s * 1000))
 
-  // -------------------------------------------------------------- players --
-
+  /* ---- players: the sound and the desk on one schedule ---- */
   function playMorse() {
-    const beats = morseBeats(message())
-    let t = 0
-    const marks = Array.from(modalOutput.querySelectorAll<HTMLElement>('.stp-morse-mark'))
-    let mi = 0
-    beats.forEach((b) => {
-      if (b.on) {
-        tone({ freq: 660, dur: b.units * MORSE_UNIT * 0.92, type: 'sine', gain: 0.22, delay: t })
+    const b = freshBus()
+    const marks = Array.from(out.querySelectorAll<HTMLElement>('.stp-morse-mark'))
+    let t = 0.15, mi = 0
+    for (const beat of morseBeats(message())) {
+      const dur = beat.units * MORSE_UNIT
+      if (beat.on) {
+        beep(b, 660, t, dur * 0.96, 0.2)
+        desk?.press('key', t, dur * 0.96)
         const mark = marks[mi++]
-        if (mark) setTimeout(() => mark.classList.add('is-lit'), t * 1000)
+        if (mark) later(t, () => mark.classList.add('is-lit'))
       }
-      t += b.units * MORSE_UNIT
-    })
+      t += dur
+    }
     return t
   }
 
   function playTapCode() {
+    const b = freshBus()
     const taps = tapCode(message())
-    let t = 0
-    taps.forEach((tap) => {
-      for (let i = 0; i < tap.row; i++) { hit({ dur: 0.05, gain: 0.3, freq: 1800, q: 4, delay: t }); t += 0.14 }
-      t += 0.22
-      for (let i = 0; i < tap.col; i++) { hit({ dur: 0.05, gain: 0.3, freq: 1200, q: 4, delay: t }); t += 0.14 }
-      t += 0.4
+    desk?.ring(taps, 0)
+    let t = 0.2
+    taps.forEach((tap, i) => {
+      for (let k = 0; k < tap.row; k++) { ping(b, t); desk?.press('spoon', t - 0.05, 0.07); t += 0.16 }
+      t += 0.3
+      for (let k = 0; k < tap.col; k++) { ping(b, t); desk?.press('spoon', t - 0.05, 0.07); t += 0.16 }
+      later(t, () => desk?.ring(taps, i + 1))
+      t += 0.55
     })
     return t
   }
 
   function playDtmf() {
-    const tones = dtmfTones(message())
-    let t = 0
-    tones.forEach(({ freqs }) => {
-      tone({ freq: freqs[0], dur: 0.16, type: 'sine', gain: 0.16, delay: t })
-      tone({ freq: freqs[1], dur: 0.16, type: 'sine', gain: 0.16, delay: t })
-      t += 0.2
-    })
+    const b = freshBus()
+    let t = 0.15
+    for (const { digit, freqs } of dtmfTones(message())) {
+      beep(b, freqs[0], t, 0.16, 0.12)
+      beep(b, freqs[1], t, 0.16, 0.12)
+      desk?.press('pad:' + digit, t, 0.16)
+      t += 0.22
+    }
     return t
   }
 
   function playNotes() {
-    const notes = textNotes(message())
-    let t = 0
-    notes.forEach((n) => {
-      tone({ freq: n.freq, dur: 0.22, type: 'triangle', gain: 0.2, delay: t })
-      t += 0.15
-    })
+    const b = freshBus()
+    let t = 0.15
+    for (const n of textNotes(message())) {
+      beep(b, n.freq, t, 0.3, 0.16, 'triangle')
+      beep(b, n.freq * 2, t, 0.18, 0.03, 'sine')
+      desk?.press(`piano:${n.name}4`, t, 0.2)
+      t += 0.2
+    }
     return t
   }
 
@@ -307,235 +351,159 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     return 0
   }
 
-  // -------------------------------------------------------------- render --
+  const PLAYERS: Record<string, [string, () => number]> = {
+    morse: ['Key it again', playMorse],
+    'tap-code': ['Knock it again', playTapCode],
+    dtmf: ['Dial it again', playDtmf],
+    notes: ['Play it again', playNotes],
+    voice: ['Say it again', playVoice],
+  }
+  function play(id: string) {
+    const p = PLAYERS[id]
+    if (!p) return
+    stop()
+    unlock()
+    p[1]()
+  }
 
-  function renderReal(id: string) {
-    modalOutput.innerHTML = ''
-    playBtn.hidden = true
-    copyBtn.hidden = true
+  /* ---- the text under the desk ---- */
+  function el(tag: string, cls?: string, text?: string): HTMLElement {
+    const e = document.createElement(tag)
+    if (cls) e.className = cls
+    if (text != null) e.textContent = text
+    return e
+  }
+  const mono = (text: string) => el('p', 'stp-mono', text)
+  let copyText = ''
+
+  /** A way the message was typed out: the sheet, and the same words to copy. */
+  function typed(title: string, text: string, cls = 'stp-mono') {
+    out.append(el('p', cls, text))
+    copyText = text
+    return { kind: 'sheet', heading: title, text } as DeskView
+  }
+
+  function renderReal(id: string): DeskView {
     const msg = message()
-
+    const title = methodById(id)!.title
     switch (id) {
       case 'morse': {
         const text = morseText(msg)
-        modalOutput.append(mono(text))
+        out.append(mono(text))
         const row = el('div', 'stp-morse-row')
         text.replace(/\s+/g, ' ').split('').forEach((ch) => {
           if (ch === '.' || ch === '-') row.append(el('span', `stp-morse-mark stp-morse-${ch === '.' ? 'dot' : 'dash'}`))
         })
-        modalOutput.append(row)
-        playBtn.hidden = false
-        playLabel.textContent = 'Play the beeps'
-        copyBtn.hidden = false
-        playBtn.onclick = () => { unlock(); if (playing) return; playing = true; playMorse(); setTimeout(() => (playing = false), playMorse() * 1000) }
-        copyBtn.onclick = () => copy(text)
-        break
+        out.append(row)
+        copyText = text
+        return { kind: 'key' }
       }
       case 'braille': {
         const text = brailleText(msg)
-        const big = el('p', 'stp-braille-text', text)
-        modalOutput.append(big)
-        const cellsRow = el('div', 'stp-braille-cells')
-        brailleCells(msg).forEach((dots) => {
-          const cell = el('div', 'stp-braille-cell')
-          for (let d = 1; d <= 6; d++) cell.append(el('span', `stp-dot${dots.includes(d) ? ' is-on' : ''}`))
-          cellsRow.append(cell)
-        })
-        modalOutput.append(cellsRow)
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
+        out.append(el('p', 'stp-braille-text', text))
+        copyText = text
+        return { kind: 'braille', cells: brailleCells(msg) }
       }
       case 'tap-code': {
         const taps = tapCode(msg)
-        modalOutput.append(mono(taps.map((t) => `${t.row}-${t.col}`).join('  ')))
-        const gridWrap = el('div', 'stp-tapgrid')
-        for (let r = 1; r <= 5; r++) {
-          for (let c = 1; c <= 5; c++) gridWrap.append(el('div', 'stp-tapcell', ''))
-        }
-        modalOutput.append(gridWrap)
-        playBtn.hidden = false
-        playLabel.textContent = 'Play the knocks'
-        playBtn.onclick = async () => {
-          unlock()
-          if (playing) return
-          playing = true
-          const cells = Array.from(gridWrap.children) as HTMLElement[]
-          for (const tap of taps) {
-            const idx = (tap.row - 1) * 5 + (tap.col - 1)
-            cells[idx]?.classList.add('is-hit')
-            setTimeout(() => cells[idx]?.classList.remove('is-hit'), 500)
-            await new Promise((r) => setTimeout(r, 60))
-          }
-          playing = false
-          playTapCode()
-        }
-        break
+        out.append(mono(taps.map((t) => `${t.row}-${t.col}`).join('  ')))
+        copyText = ''
+        return { kind: 'pipe' }
       }
-      case 'nato': {
-        const words = natoWords(msg)
-        const list = el('div', 'stp-nato')
-        words.forEach((w) => list.append(el('span', 'stp-nato-word', w)))
-        modalOutput.append(list)
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(words.join(' '))
-        break
-      }
+      case 'nato': return typed(title, natoWords(msg).join(' '))
       case 'binary': {
         const text = binaryText(msg)
-        modalOutput.append(mono(text))
-        const bits = el('div', 'stp-bits')
-        text.replace(/ /g, '').split('').slice(0, 96).forEach((b) => bits.append(el('span', `stp-bit${b === '1' ? ' is-on' : ''}`)))
-        modalOutput.append(bits)
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
+        out.append(mono(text))
+        copyText = text
+        return { kind: 'tape', bytes: text.split(' ').map((b) => parseInt(b, 2) & 0xff) }
       }
-      case 'hex': {
-        const text = hexText(msg)
-        modalOutput.append(mono(text))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
-      }
-      case 'base64': {
-        const text = base64Text(msg)
-        modalOutput.append(mono(text))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
-      }
+      case 'hex': return typed(title, hexText(msg))
+      case 'base64': return typed(title, base64Text(msg))
       case 'rot13': {
-        const text = rot13(msg)
-        modalOutput.append(mono(text))
-        modalOutput.append(el('p', 'stp-note', 'Run it through ROT13 again and you get your message back.'))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
+        const v = typed(title, rot13(msg))
+        out.append(el('p', 'stp-note', 'Run it through ROT13 again and you get your message back.'))
+        return v
       }
-      case 'atbash': {
-        const text = atbash(msg)
-        modalOutput.append(mono(text))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
-      }
-      case 'leet': {
-        const text = leet(msg)
-        modalOutput.append(el('p', 'stp-leet', text))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
-      }
-      case 'pig-latin': {
-        const text = pigLatin(msg)
-        modalOutput.append(mono(text))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
-      }
-      case 'reverse': {
-        const text = reverseText(msg)
-        modalOutput.append(mono(text))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
-      }
-      case 'upside-down': {
-        const text = upsideDown(msg)
-        modalOutput.append(el('p', 'stp-flip', text))
-        copyBtn.hidden = false
-        copyBtn.onclick = () => copy(text)
-        break
-      }
+      case 'atbash': return typed(title, atbash(msg))
+      case 'leet': return typed(title, leet(msg), 'stp-leet')
+      case 'pig-latin': return typed(title, pigLatin(msg))
+      case 'reverse': return typed(title, reverseText(msg))
+      case 'upside-down': return typed(title, upsideDown(msg), 'stp-flip')
       case 'dtmf': {
-        const digits = keypadDigits(msg)
-        modalOutput.append(mono(digits))
-        const pad = el('div', 'stp-pad')
-        const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#']
-        keys.forEach((k) => pad.append(el('div', 'stp-key', k)))
-        modalOutput.append(pad)
-        playBtn.hidden = false
-        playLabel.textContent = 'Play the tones'
-        playBtn.onclick = async () => {
-          unlock()
-          if (playing) return
-          playing = true
-          const seq = digits.split('')
-          for (const d of seq) {
-            const keyEl = Array.from(pad.children).find((c) => c.textContent === d) as HTMLElement
-            keyEl?.classList.add('is-hit')
-            setTimeout(() => keyEl?.classList.remove('is-hit'), 180)
-            await new Promise((r) => setTimeout(r, 15))
-          }
-          playDtmf()
-          playing = false
-        }
-        break
+        out.append(mono(keypadDigits(msg)))
+        copyText = keypadDigits(msg)
+        return { kind: 'keypad' }
       }
       case 'notes': {
-        const notes = textNotes(msg)
         const row = el('div', 'stp-notes')
-        notes.forEach((n) => row.append(el('span', 'stp-note-chip', n.name)))
-        modalOutput.append(row)
-        playBtn.hidden = false
-        playLabel.textContent = 'Play the melody'
-        playBtn.onclick = () => { unlock(); if (playing) return; playing = true; const d = playNotes(); setTimeout(() => (playing = false), d * 1000) }
-        break
+        textNotes(msg).forEach((n) => row.append(el('span', 'stp-note-chip', n.name)))
+        out.append(row)
+        copyText = ''
+        return { kind: 'piano' }
       }
       case 'voice': {
         const supported = 'speechSynthesis' in window
-        modalOutput.append(el('p', 'stp-note', supported ? `“${msg}”` : 'Your browser does not support text-to-speech.'))
-        if (supported) {
-          playBtn.hidden = false
-          playLabel.textContent = 'Speak it'
-          playBtn.onclick = () => { unlock(); playVoice() }
-        }
-        break
+        out.append(el('p', 'stp-note', supported ? `“${msg}”` : 'Your browser does not support text-to-speech.'))
+        copyText = ''
+        return { kind: 'sheet', heading: 'Read aloud', text: msg }
       }
       case 'interstellar': {
         const g = interstellarGrid(msg)
-        modalOutput.append(el('p', 'stp-note', `${g.rows} × ${g.cols} bits, radioed outward at the speed of light.`))
-        const gridWrap = el('div', 'stp-stars')
-        gridWrap.style.setProperty('--cols', String(g.cols))
-        g.bits.forEach((b) => gridWrap.append(el('div', `stp-star${b ? ' is-on' : ''}`)))
-        modalOutput.append(gridWrap)
-        break
+        out.append(el('p', 'stp-note', `${g.rows} × ${g.cols} bits, radioed outward at the speed of light.`))
+        copyText = ''
+        return { kind: 'printout', rows: g.rows, cols: g.cols, bits: g.bits, caption: `${g.rows} x ${g.cols} bits, 7-bit ASCII, laid out the way Arecibo was in 1974` }
       }
     }
+    return { kind: 'sheet', heading: title, text: msg }
   }
 
-  function renderJoke() {
-    modalOutput.innerHTML = ''
-    playBtn.hidden = true
-    copyBtn.hidden = true
-    modalOutput.append(el('p', 'stp-joke-sent', `“${message()}” — sent.`))
+  /** Where each joke's postcard is addressed. */
+  const ADDRESS: Record<string, string[]> = {
+    god: ['Heaven', 'Up a bit, then left'],
+    satan: ['The Underworld', 'Lower ground floor'],
+    'the-dead': ['c/o The Other Side', 'Please forward'],
+    santa: ['North Pole', 'Canada  H0H 0H0'],
+    nsa: ['Fort Meade', 'Maryland, USA'],
+    telemarketers: ['All of them', 'At dinnertime'],
+    'a-billionaire': ['The penthouse', 'Wherever it is today'],
+    whales: ['The open ocean', 'About two hundred metres down'],
+    'the-future': ['Not to be opened', 'until later'],
+    'no-one': ['', ''],
   }
 
-  // -------------------------------------------------------------- modal --
-
-  function open(id: string) {
+  let currentId = ''
+  function open(id: string, fromTile = true) {
     const m = methodById(id)
     if (!m) return
+    stop()
     currentId = id
-    modalTitle.textContent = m.title
-    modalBlurb.textContent = m.blurb
-    modalIcon.innerHTML = m.icon
-    modalIconWrap.style.setProperty('--accent', m.accent)
-    modalCard.classList.toggle('stp-mat-joke', m.kind === 'joke')
-    modalCard.classList.toggle('stp-mat-real', m.kind === 'real')
-    if (m.kind === 'real') renderReal(id)
-    else renderJoke()
-    modal.hidden = false
-    document.body.style.overflow = 'hidden'
-    sfx.click()
-    noteSent(id)
-  }
-
-  function close() {
-    modal.hidden = true
-    document.body.style.overflow = ''
-    speechSynthesis?.cancel?.()
+    out.innerHTML = ''
+    copyText = ''
+    deskTitle.textContent = m.title
+    deskBlurb.textContent = m.blurb
+    deskKind.textContent = m.kind === 'real' ? 'Real' : 'Joke'
+    deskEl.dataset.kind = m.kind
+    let view: DeskView
+    if (m.kind === 'real') view = renderReal(id)
+    else {
+      out.append(el('p', 'stp-joke-sent', `“${message()}”, sent.`))
+      view = { kind: 'postcard', to: m.title, address: ADDRESS[id] ?? ['', ''], message: message(), seed: [...id].reduce((h, c) => h * 31 + c.charCodeAt(0), 7) >>> 0 }
+    }
+    show(view)
+    const player = PLAYERS[id]
+    playBtn.hidden = !player || (id === 'voice' && !('speechSynthesis' in window))
+    if (player) playLabel.textContent = player[0]
+    copyBtn.hidden = !copyText
+    grid.querySelectorAll('.stp-tile').forEach((t) => t.classList.toggle('is-open', (t as HTMLElement).dataset.id === id))
+    if (fromTile) {
+      sfx.click()
+      noteSent(id)
+      // Sending it is playing it: a way with a sound goes out as it opens.
+      if (player) play(id)
+      // On a narrow screen the desk is pinned above the tiles; on a wide one it is beside them.
+      const r = deskEl.getBoundingClientRect()
+      if (r.bottom < 80 || r.top > innerHeight - 120) deskEl.scrollIntoView({ block: 'start', behavior: PLAY ? 'smooth' : 'auto' })
+    }
   }
 
   async function copy(text: string) {
@@ -557,14 +525,32 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     const m = methodById(currentId)
     if (m && !ended && !done.has(what + currentId)) { done.add(what + currentId); shell.pick(what, m.title) }
   }
-  playBtn.addEventListener('click', () => once('Way played aloud'))
+  playBtn.addEventListener('click', () => { once('Way played aloud'); play(currentId) })
+  copyBtn.addEventListener('click', () => copy(copyText))
 
   grid.querySelectorAll<HTMLButtonElement>('.stp-tile').forEach((btn) => {
     btn.addEventListener('click', () => { unlock(); open(btn.dataset.id!) })
   })
-  closeBtn.addEventListener('click', close)
-  backdrop.addEventListener('click', close)
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) close() })
+
+  // A new message re-sends whatever is open, once the typing settles.
+  let retype = 0
+  msgInput.addEventListener('input', () => {
+    clearTimeout(retype)
+    retype = window.setTimeout(() => {
+      if (currentId) open(currentId, false)
+      else show({ kind: 'sheet', heading: 'Your message', text: message() })
+    }, 350)
+  })
+
+  show({ kind: 'sheet', heading: 'Your message', text: message() })
+  import('../lib/share-desk')
+    .then(({ createDesk }) => {
+      desk = createDesk($<HTMLCanvasElement>('deskCanvas'), { still: !PLAY })
+      if (!desk) { deskEl.classList.add('no-gl'); return }
+      const v = pending.pop()
+      if (v) desk.show(v)
+    })
+    .catch(() => deskEl.classList.add('no-gl'))
 </script>
 
 <style>
@@ -575,7 +561,7 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   .stp-body { position: relative; }
   /* Sticky, not fixed: pinned behind the tiles, but inside the frame. */
   .stp-bg { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; pointer-events: none; background: #131c30; }
-  .stp-head, .stp-grid { position: relative; z-index: 1; }
+  .stp-head { position: relative; z-index: 1; }
   .stp-grid-tex {
     position: absolute; inset: 0;
     background-image:
@@ -599,18 +585,6 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     transform: translateX(-50%);
     background: radial-gradient(ellipse at center, rgba(120, 160, 255, 0.16), transparent 70%);
   }
-  .stp-pings { position: absolute; inset: 0; }
-  .stp-pings i {
-    position: absolute; left: var(--x); top: var(--y); width: 6px; height: 6px; margin: -3px;
-    border-radius: 999px; border: 1px solid rgba(140, 190, 255, 0.55);
-    animation: stp-ping 5s ease-out infinite; animation-delay: var(--d);
-  }
-  @keyframes stp-ping {
-    0% { transform: scale(0.4); opacity: 0.9; }
-    70% { opacity: 0; }
-    100% { transform: scale(9); opacity: 0; }
-  }
-
   .stp-head { max-width: 720px; margin: 0 auto 8px; padding-top: 30px; padding: 0 20px; text-align: center; color: #eaf0ff; }
   .stp-eyebrow {
     display: inline-flex; align-items: center; gap: 7px;
@@ -643,14 +617,13 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   #msg:focus { outline: none; border-color: rgba(140, 170, 255, 0.6); background: rgba(255, 255, 255, 0.09); }
 
   .stp-grid {
-    max-width: 980px; margin: 34px auto 0; padding: 0 20px 48px;
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 13px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px;
     grid-auto-flow: dense;
   }
   .stp-tile {
     position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 8px;
-    padding: 18px 10px 14px;
+    padding: 16px 8px 12px;
     border-radius: 16px;
     color: #f2f5ff;
     cursor: pointer;
@@ -717,53 +690,68 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
     opacity: 0.7;
   }
 
-  .stp-modal { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; }
-  .stp-modal[hidden], .stp-act[hidden] { display: none; }
-  .stp-modal-backdrop { position: absolute; inset: 0; background: rgba(6, 9, 18, 0.72); backdrop-filter: blur(3px); }
-  .stp-modal-card {
+  /* ---- the room: the desk beside the tiles, or pinned above them ------- */
+  .stp-room {
     position: relative; z-index: 1;
-    width: min(100%, 460px); max-height: 84vh; overflow: auto;
-    background: #161f34; color: #eef1fb;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 26px 24px 22px;
-    box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.7);
-    animation: stp-pop 220ms var(--ease-bounce);
+    max-width: 1240px; margin: 30px auto 0; padding: 0 20px 48px;
+    display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(290px, 1fr); gap: 22px; align-items: start;
   }
-  /* A lit strip along the top identifies the device the modal is standing in
-     for — the same accent every tile already carries, just given somewhere
-     to live once you're inside it. */
-  .stp-modal-card::before {
-    content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; border-radius: 20px 20px 0 0;
-    background: linear-gradient(90deg, transparent, var(--accent, #8caaff), transparent);
-    opacity: 0.85;
+  .stp-desk { position: sticky; top: 12px; z-index: 2; }
+  .stp-view {
+    position: relative; overflow: hidden; border-radius: 18px;
+    height: min(64vh, 620px); min-height: 340px;
+    background: radial-gradient(120% 90% at 40% 30%, #1b2333, #0a0e16 70%);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 30px 60px -30px rgb(0 0 0 / 0.8);
   }
-  .stp-modal-card.stp-mat-joke {
-    background: #201a2c;
-    border-style: dashed;
-    border-color: rgba(255, 255, 255, 0.22);
+  .stp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .stp-desk.no-gl .stp-canvas { display: none; }
+  .stp-desk.no-gl .stp-view { height: auto; min-height: 0; padding-bottom: 64px; }
+  .stp-view-head {
+    position: relative; z-index: 1; padding: 18px 20px 40px; color: #eef2fb; max-width: 560px;
+    background: linear-gradient(180deg, rgb(8 11 18 / 0.78), rgb(8 11 18 / 0.4) 65%, transparent);
+    pointer-events: none;
   }
-  .stp-modal-card.stp-mat-joke::before { display: none; }
-  .stp-modal-card.stp-mat-joke #modalTitle { font-family: 'Caveat', var(--hand, cursive); font-size: 30px; font-weight: 700; }
-  @keyframes stp-pop { from { opacity: 0; transform: scale(0.92) translateY(10px); } to { opacity: 1; transform: none; } }
-  .stp-close {
-    position: absolute; top: 14px; right: 14px;
-    width: 30px; height: 30px; border-radius: 999px; border: 0;
-    background: rgba(255, 255, 255, 0.08); color: #cfd6ec; cursor: pointer;
-    display: grid; place-items: center;
+  .stp-kind {
+    display: inline-block; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; background: rgb(79 227 193 / 0.16); color: #8ff0d6; margin-bottom: 8px;
   }
-  .stp-close:hover { background: rgba(255, 255, 255, 0.16); }
-  .stp-modal-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; padding-right: 26px; }
-  .stp-modal-icon {
-    flex: none; width: 46px; height: 46px; border-radius: 12px;
-    display: grid; place-items: center;
-    background: color-mix(in srgb, var(--accent) 60%, #10182a);
-    color: #fff;
+  .stp-desk[data-kind='joke'] .stp-kind { background: rgb(255 255 255 / 0.1); color: #d9deea; }
+  .stp-view-head h2 { margin: 0 0 4px; font-size: clamp(20px, 2.2vw, 26px); line-height: 1.15; }
+  .stp-desk[data-kind='joke'] .stp-view-head h2 { font-family: 'Caveat', var(--hand, cursive); font-size: clamp(28px, 3vw, 34px); font-weight: 700; }
+  .stp-view-blurb { margin: 0; font-size: 14px; line-height: 1.5; color: rgb(238 242 251 / 0.8); text-shadow: 0 1px 8px rgb(0 0 0 / 0.6); }
+  .stp-view-acts { position: absolute; z-index: 1; left: 16px; bottom: 16px; display: flex; gap: 8px; }
+  .stp-act[hidden] { display: none; }
+  .stp-act {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 17px; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.16);
+    background: rgb(12 16 26 / 0.62); color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    transition: background 140ms var(--ease), transform 160ms var(--ease-bounce);
   }
-  .stp-modal-head h2 { margin: 2px 0 4px; font-size: 19px; }
-  .stp-modal-blurb { margin: 0; font-size: 13.5px; line-height: 1.5; opacity: 0.78; }
+  .stp-act:hover { background: rgb(40 48 66 / 0.8); transform: scale(1.04); }
+  .stp-act:active { transform: scale(0.96); }
+  .stp-act:focus-visible { outline: 2px solid #8ff0d6; outline-offset: 2px; }
 
-  .stp-output { margin-top: 16px; min-height: 20px; }
+  .stp-output { margin-top: 12px; max-height: 168px; overflow: auto; color: #e6ebf7; }
+  .stp-output:empty { display: none; }
+
+  .stp-tile.is-open { outline: 2px solid #8ff0d6; outline-offset: 2px; }
+  .stp-tile.is-sent .stp-tile-title::after { content: ' ✓'; color: #8ff0d6; font-family: var(--mono, ui-monospace, monospace); font-size: 0.8em; }
+
+  @media (max-width: 899px) {
+    .stp-room { grid-template-columns: minmax(0, 1fr); padding: 0 12px 40px; gap: 14px; margin-top: 22px; }
+    /* Pinned above the tiles, so a tap shows its way without leaving them. */
+    .stp-desk {
+      top: 0; margin: 0 -12px; padding: 0 12px 10px;
+      background: #0d1322; box-shadow: 0 16px 24px -18px rgb(0 0 0 / 0.9);
+    }
+    .stp-view { height: 44svh; min-height: 260px; border-radius: 0 0 16px 16px; margin: 0 -12px; }
+    .stp-view-head { padding: 12px 14px 30px; }
+    .stp-view-blurb { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .stp-view-acts { left: 12px; bottom: 12px; }
+    .stp-output { max-height: 76px; margin-top: 8px; }
+  }
+
   :global(.stp-mono) {
     font-family: var(--mono, ui-monospace, monospace); font-size: 14px; line-height: 1.6;
     word-break: break-all; background: rgba(0, 0, 0, 0.28); border-radius: 10px; padding: 12px 14px; margin: 0;
@@ -806,25 +794,13 @@ const BIG = new Set(['morse', 'braille', 'dtmf', 'interstellar'])
   :global(.stp-star) { width: 6px; height: 6px; border-radius: 1px; background: rgba(255, 255, 255, 0.08); }
   :global(.stp-star.is-on) { background: #cfe3ff; box-shadow: 0 0 4px rgba(207, 227, 255, 0.7); }
 
-  .stp-modal-actions { display: flex; gap: 8px; margin-top: 18px; }
-  .stp-act {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 9px 16px; border-radius: 999px; border: 0;
-    background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
-    transition: background 140ms var(--ease), transform 160ms var(--ease-bounce);
-  }
-  .stp-act:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.04); }
-  .stp-act:active { transform: scale(0.96); }
 
   /* The site's motion setting, not only the system one. */
   :global(html:not(.play)) .stp-tile,
-  :global(html:not(.play)) .stp-modal-card,
   :global(html:not(.play)) .stp-radar,
-  :global(html:not(.play)) .stp-pings i,
   :global(html:not(.play)) .stp-live-dot,
   :global(html:not(.play)) .stp-led {
     animation: none !important; transition: none !important;
   }
   :global(html:not(.play)) .stp-radar { opacity: 0.5; }
-  :global(html:not(.play)) .stp-pings i { display: none; }
 </style>
