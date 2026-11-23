@@ -36,6 +36,16 @@ export type DayInputs = {
 
 export type Segment = { key: string; label: string; hours: number }
 
+/**
+ * One piece of the day as it is lived, in order from waking: where it starts
+ * and ends (hours after waking), what it is, whether an interruption is what
+ * began it, and how much of its start is spent getting back to it. Only work
+ * counts its refocusing (`frost`): that is what `lostWorkMinutes` is the
+ * sum of, so a picture that frosts each piece's first `frost` hours shows
+ * exactly the work the numbers say was lost.
+ */
+export type Piece = { key: string; start: number; end: number; cut: boolean; frost: number }
+
 export type DayModel = {
   segments: Segment[]
   totalHours: number
@@ -45,6 +55,8 @@ export type DayModel = {
   totalInterruptions: number
   /** Fraction of the way across the non-sleep span (0..1), one per interruption. */
   cuts: number[]
+  /** The day in order from waking, cut where the interruptions land. */
+  pieces: Piece[]
   pieceCountBefore: number
   pieceCountAfter: number
   perceivedWorkHours: number
@@ -121,20 +133,61 @@ export function computeDay(input: DayInputs): DayModel {
     input.phoneIntervalMin > 0 ? Math.round((wakingHours * 60) / input.phoneIntervalMin) : 0
   const totalInterruptions = Math.max(0, phoneChecks + Math.round(clampMin0(input.extraDistractionsPerDay)))
 
-  // Spread evenly across the non-sleep span for the tick marks — sleep gets
-  // none, because nothing interrupts a day that is already over.
-  const cuts: number[] = nonSleepHours > 0
-    ? Array.from({ length: totalInterruptions }, (_, i) => (i + 0.5) / Math.max(1, totalInterruptions))
-    : []
+  // Where they land, as a fraction of the waking day (sleep gets none,
+  // because nothing interrupts a day that is already over). The phone is
+  // checked every so many minutes from waking; the others fall where they
+  // fall, at the same scattered moments every time (a golden-ratio walk), so
+  // one more of them only ever adds a cut and never moves the rest. That is
+  // what makes "more interruptions never leave more work" true of every
+  // input, not just of the ones checked.
+  const cuts: number[] = []
+  if (nonSleepHours > 0) {
+    for (let i = 0; i < phoneChecks; i++) cuts.push(Math.min(1, ((i + 0.5) * input.phoneIntervalMin) / (nonSleepHours * 60)))
+    const extra = totalInterruptions - phoneChecks
+    for (let k = 1; k <= extra; k++) cuts.push((k * 0.6180339887498949 + 0.31) % 1)
+    cuts.sort((a, b) => a - b)
+  }
+  // The day as it is lived, from waking: the morning, the trip in, work
+  // with lunch in the middle of it, the trip home, the evening with dinner
+  // in the middle of it, then sleep. Same hours as the segments, in order;
+  // a part with nothing in it is gone, and its neighbours join up.
+  const spans: { key: string; hours: number }[] = []
+  for (const [key, hours] of [
+    ['morning', morningH], ['commute', commuteH / 2], ['work', workLeft / 2], ['lunch', lunchH], ['work', workLeft / 2],
+    ['commute', commuteH / 2], ['home', homeLeft / 2], ['dinner', dinnerH], ['home', homeLeft / 2], ['sleep', sleepHours],
+  ] as [string, number][]) {
+    if (hours <= 1e-9) continue
+    const last = spans[spans.length - 1]
+    if (last && last.key === key) last.hours += hours
+    else spans.push({ key, hours })
+  }
 
-  const workShare = nonSleepHours > 0 ? workLeft / nonSleepHours : 0
-  const interruptionsDuringWork = Math.round(totalInterruptions * workShare)
-  const lostWorkMinutes = Math.min(workLeft * 60, interruptionsDuringWork * REFOCUS_MINUTES)
+  // Each interruption lands where it falls in the waking day, and the
+  // twenty-three minutes after it, up to the next one, go on getting back to
+  // the work it broke into. Interruptions that land outside work still cut
+  // the day; they just cost no work.
+  const at = cuts.map((f) => f * nonSleepHours)
+  const refocusH = REFOCUS_MINUTES / 60
+  const pieces: Piece[] = []
+  let t = 0
+  for (const s of spans) {
+    const a = t, b = t + s.hours
+    t = b
+    const inside = s.key === 'sleep' ? [] : at.filter((c) => c > a + 1e-9 && c < b - 1e-9)
+    const edges = [a, ...inside, b]
+    for (let i = 0; i < edges.length - 1; i++) {
+      const start = edges[i], end = edges[i + 1]
+      const cut = i > 0
+      const frost = cut && s.key === 'work' ? Math.min(end - start, refocusH) : 0
+      pieces.push({ key: s.key, start, end, cut, frost })
+    }
+  }
+
+  const lostWorkMinutes = Math.min(workLeft * 60, pieces.reduce((sum, p) => sum + p.frost, 0) * 60)
   const actualWorkHours = clampMin0(workLeft - lostWorkMinutes / 60)
 
-  const nonZeroSegments = segments.filter((s) => s.hours > 0).length
-  const pieceCountBefore = nonZeroSegments
-  const pieceCountAfter = nonZeroSegments + totalInterruptions
+  const pieceCountBefore = spans.length
+  const pieceCountAfter = pieces.length
 
   return {
     segments,
@@ -144,6 +197,7 @@ export function computeDay(input: DayInputs): DayModel {
     phoneChecks,
     totalInterruptions,
     cuts,
+    pieces,
     pieceCountBefore,
     pieceCountAfter,
     perceivedWorkHours: workLeft,

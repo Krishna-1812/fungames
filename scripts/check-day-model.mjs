@@ -121,7 +121,48 @@ console.log('\nedge cases stay finite and non-negative')
   check(bad === 0, `${cases.length} edge cases all stayed finite, non-negative, and internally consistent`)
 }
 
-/* ---- 4. the citation is the real one ------------------------------------ */
+/* ---- 4. the pieces are the day ------------------------------------------ */
+
+console.log('\nthe pieces are the day, in order, and the frost is the lost work')
+{
+  const rand = (lo, hi) => lo + Math.random() * (hi - lo)
+  let bad = 0
+  for (let i = 0; i < 500; i++) {
+    const input = {
+      workHours: rand(0, 16), homeHours: rand(0, 16), sleepHours: rand(0, 12),
+      morningMin: rand(0, 180), lunchMin: rand(0, 120), dinnerMin: rand(0, 120), commuteMin: rand(0, 150),
+      phoneIntervalMin: Math.random() < 0.2 ? 0 : rand(3, 60), extraDistractionsPerDay: Math.floor(rand(0, 30)),
+    }
+    const m = computeDay(input)
+    const why = []
+    let t = 0
+    for (const p of m.pieces) {
+      if (Math.abs(p.start - t) > 1e-9) why.push(`a gap or overlap at ${t.toFixed(3)}h`)
+      if (!(p.end > p.start)) why.push('an empty piece')
+      if (p.frost < 0 || p.frost > p.end - p.start + 1e-12) why.push('frost outside its piece')
+      if (p.frost > 0 && (p.key !== 'work' || !p.cut)) why.push(`frost on a ${p.cut ? '' : 'whole '}${p.key} piece`)
+      t = p.end
+    }
+    if (m.totalHours > 0 && Math.abs(t - m.totalHours) > 1e-6) why.push(`pieces end at ${t.toFixed(4)}, the day at ${m.totalHours.toFixed(4)}`)
+    if (m.pieces.length !== m.pieceCountAfter) why.push('pieceCountAfter is not the pieces')
+    const frost = m.pieces.reduce((s, p) => s + p.frost, 0) * 60
+    if (Math.abs(frost - m.lostWorkMinutes) > 1e-6) why.push(`frost ${frost.toFixed(2)}m, lost ${m.lostWorkMinutes.toFixed(2)}m`)
+    const work = m.pieces.filter((p) => p.key === 'work').reduce((s, p) => s + p.end - p.start, 0)
+    if (Math.abs(work - m.perceivedWorkHours) > 1e-6) why.push('the work pieces are not the work')
+    // One more interruption only adds a cut: it can never leave more work.
+    const more = computeDay({ ...input, extraDistractionsPerDay: input.extraDistractionsPerDay + 1 })
+    if (more.actualWorkHours > m.actualWorkHours + 1e-9) why.push('one more interruption left more work')
+    if (why.length) { bad++; if (bad < 4) fail(`${JSON.stringify(input)}: ${why.join('; ')}`) }
+  }
+  check(bad === 0, '500 random days: contiguous pieces from waking to the end of sleep, frost only after a cut into work, frost = lost work, and one more interruption never helps')
+
+  const m = computeDay(BASE)
+  check(m.pieceCountBefore === 10, `the default day is ten parts before anything cuts it (got ${m.pieceCountBefore})`)
+  check(m.pieces[m.pieces.length - 1].key === 'sleep' && m.pieces[0].key === 'morning', 'it starts with the morning and ends asleep')
+  console.log(`        defaults: ${m.pieceCountAfter} pieces, ${m.totalInterruptions} interruptions, ${m.actualWorkHours.toFixed(2)}h of ${m.perceivedWorkHours.toFixed(2)}h work kept`)
+}
+
+/* ---- 5. the citation is the real one ------------------------------------ */
 
 console.log('\nthe cited figure is real')
 {
