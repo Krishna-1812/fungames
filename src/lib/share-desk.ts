@@ -228,8 +228,8 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {
         const u = x / N, v = y / N
-        const w = warp(u * 8, v * 8) * 2 + warp(u * 8 + 3.1, v * 8 + 1.7) * 0.6
-        const ring = (v * 64 + w * 3.2) % 1
+        const w = warp(u * 8, v * 8) * 0.9 + warp(u * 8 + 3.1, v * 8 + 1.7) * 0.3
+        const ring = (v * 64 + w * 1.5) % 1
         // Early wood pale and wide, late wood a sharper dark line.
         let t = 0.55 + 0.45 * Math.pow(Math.sin(ring * Math.PI), 0.6) - 0.34 * Math.pow(Math.max(0, ring - 0.82) / 0.18, 2)
         t += (fine(u * 64, v * 64 * 0.25) - 0.5) * 0.22
@@ -271,7 +271,7 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
   scene.add(sky)
   // A low light from the left, only up for the Braille, which has nothing else to show it.
   const rake = new DirectionalLight('#f2f5ff', 0)
-  rake.position.set(-6, 0.9, -0.8)
+  rake.position.set(-6, 0.62, -0.8)
   rake.castShadow = true
   // Fine enough to throw a shadow from a dot half a millimetre high.
   rake.shadow.mapSize.set(4096, 4096)
@@ -289,7 +289,9 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
   const steel = env(new MeshPhysicalMaterial({ color: '#c3c9d2', metalness: 1, roughness: 0.32 }), 1)
   const blackGloss = env(new MeshPhysicalMaterial({ color: '#0d0f13', roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.12 }), 0.9)
   const ivory = env(new MeshPhysicalMaterial({ color: '#f4f5f6', roughness: 0.32, clearcoat: 0.8, clearcoatRoughness: 0.2 }), 0.8)
-  const walnut = env(new MeshPhysicalMaterial({ color: '#4a3a32', map: wood, roughness: 0.45, clearcoat: 0.7, clearcoatRoughness: 0.25 }), 0.6)
+  // Walnut: the desk's grain, lifted and warmed (a linear colour above 1 scales the grey map up).
+  const walnut = env(new MeshPhysicalMaterial({ map: wood, roughness: 0.5, clearcoat: 0.45, clearcoatRoughness: 0.3 }), 0.4)
+  walnut.color.setRGB(1.75, 1.0, 0.62)
   const plastic = env(new MeshPhysicalMaterial({ color: '#2a2f38', roughness: 0.55, clearcoat: 0.2 }), 0.5)
 
   /* ---- the things on the desk ---- */
@@ -385,6 +387,12 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
     inst.castShadow = inst.receiveShadow = true
     g.add(inst)
     g.rotation.y = 4 * DEG
+    // Where the writing is, for the camera: the middle of the dots, turned with the sheet.
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
+    for (const [px, pz] of pos) { x0 = Math.min(x0, px); x1 = Math.max(x1, px); z0 = Math.min(z0, pz); z1 = Math.max(z1, pz) }
+    if (!pos.length) { x0 = x1 = -W / 2 + margin; z0 = z1 = -D / 2 + margin }
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, a = g.rotation.y
+    return { x: mx * Math.cos(a) + mz * Math.sin(a), z: -mx * Math.sin(a) + mz * Math.cos(a), half: Math.max(x1 - x0, (z1 - z0) * 1.6) / 2 }
   }
 
   /** Eight-track paper tape, one row of holes a byte, laid across the desk in a slow S. */
@@ -417,15 +425,18 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
     look.wrapT = RepeatWrapping
     look.repeat.set(1, rowsN / 40)
     const mat = env(new MeshStandardMaterial({ map: look, alphaMap: alpha, alphaTest: 0.5, roughness: 0.62, side: DoubleSide }), 0.35)
-    // A strip along a gentle S, 1 inch wide, 0.1 inch a row.
+    // Unrolled off its roll across the desk, 1 inch wide, 0.1 inch a row:
+    // lying flat along one easy bend, the cut end curling up off the wood
+    // the way paper that has been wound does.
     const width = 0.254, pitch = 0.0254, len = rowsN * pitch
     const geo = new BufferGeometry()
-    const N = Math.max(8, rowsN * 2)
+    const N = Math.max(8, rowsN * 3)
     const vs: number[] = [], uvs: number[] = [], idx: number[] = []
     const path = (s: number) => {
       const f = s / len - 0.5
-      return new Vector2(f * len * 0.92, Math.sin(f * Math.PI * 1.6) * 0.17 + f * 0.12)
+      return new Vector2(f * len * 0.985, Math.sin((f + 0.5) * Math.PI) * 0.06 - f * 0.05)
     }
+    const curl = (s: number) => 0.055 * Math.pow(Math.max(0, 1 - s / 0.2), 2.6)
     let acc = 0, prev = path(0)
     const params: number[] = [0]
     for (let i = 1; i <= N; i++) { const p = path((i / N) * len); acc += p.distanceTo(prev); prev = p; params.push(acc) }
@@ -433,9 +444,10 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
       const s = (i / N) * len
       const p = path(s), q = path(Math.min(len, s + 0.01)), o = path(Math.max(0, s - 0.01))
       const t = q.clone().sub(o).normalize(), n = new Vector2(-t.y, t.x)
-      const lift = 0.004 + 0.02 * Math.pow(Math.max(0, Math.sin((i / N) * Math.PI * 3.1 + 0.4)), 6)
+      // Lies flat but not dead flat: a slow ripple, and the cut end lifted.
+      const lift = 0.003 + 0.0035 * Math.pow(Math.max(0, Math.sin(s * 9 + 0.7)), 4) + curl(s)
       for (const side of [-1, 1]) {
-        vs.push(p.x + (n.x * width * side) / 2, lift + 0.003 * side * Math.sin(i * 0.05), p.y + (n.y * width * side) / 2)
+        vs.push(p.x + (n.x * width * side) / 2, lift + 0.0015 * side * Math.sin(s * 5.3), p.y + (n.y * width * side) / 2)
         uvs.push(side < 0 ? 0 : 1, 1 - params[i] / acc)
       }
       if (i < N) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3) }
@@ -447,7 +459,38 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
     const strip = new Mesh(geo, mat)
     strip.castShadow = strip.receiveShadow = true
     g.add(strip)
-    return len
+
+    // The roll it came off, standing on the desk at the far end: the same
+    // paper wound a few hundred times round a card core, the turns showing
+    // on its face as fine rings.
+    const R = 0.13, core = 0.045
+    const [rc, rx] = canvas(512, 512)
+    rx.fillStyle = '#dfe5ec'
+    rx.fillRect(0, 0, 512, 512)
+    const rr = rng(rowsN + 5)
+    for (let r = core * (256 / R); r < 256; r += 1.6 + rr() * 1.4) {
+      rx.strokeStyle = `rgba(70,80,96,${0.1 + rr() * 0.16})`
+      rx.lineWidth = 0.6 + rr() * 0.6
+      rx.beginPath(); rx.arc(256, 256, r, 0, Math.PI * 2); rx.stroke()
+    }
+    // The card core and the hole through it.
+    rx.fillStyle = '#9aa3ae'
+    rx.beginPath(); rx.arc(256, 256, core * (256 / R), 0, Math.PI * 2); rx.fill()
+    rx.fillStyle = '#20252d'
+    rx.beginPath(); rx.arc(256, 256, core * (256 / R) - 9, 0, Math.PI * 2); rx.fill()
+    const face = env(new MeshStandardMaterial({ map: tex(rc), roughness: 0.8 }), 0.3)
+    const wound = env(new MeshStandardMaterial({ map: look.clone(), roughness: 0.7 }), 0.35)
+    const roll = new Mesh(new CylinderGeometry(R, R, width, 64, 1), [wound, face, face])
+    const end = path(len), before = path(len - 0.02)
+    const dir = end.clone().sub(before).normalize()
+    roll.rotation.order = 'YXZ'
+    roll.rotation.y = -Math.atan2(dir.y, dir.x)
+    roll.rotation.x = Math.PI / 2
+    // Tangent to the tape where it leaves the bottom of the roll.
+    roll.position.set(end.x + dir.x * 0.01, R + 0.002, end.y + dir.y * 0.01)
+    roll.castShadow = roll.receiveShadow = true
+    g.add(roll)
+    return len + R * 1.6
   }
 
   /** The interstellar bitmap, dot-matrix on tractor-feed paper. */
@@ -822,7 +865,7 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
     postcard: { r: 0.88, elev: 62, az: 4 },
     key: { r: 1.05, elev: 34, az: -18, target: [0, 0.12, -0.25] },
     keypad: { r: 0.82, elev: 52, az: 0, target: [0, 0.1, 0] },
-    piano: { r: 1.8, elev: 38, az: -6, target: [0, 0.1, 0] },
+    piano: { r: 1.95, elev: 38, az: -6, target: [0, 0.1, 0] },
     pipe: { r: 1.05, elev: 46, az: -10, target: [0, 0.08, 0.05] },
   }
 
@@ -892,12 +935,17 @@ export function createDesk(canvasEl: HTMLCanvasElement, opts: { still?: boolean 
   function show(v: DeskView) {
     const br = v.kind === 'braille'
     rake.visible = br
-    rake.intensity = br ? 4.6 : 0
-    lamp.intensity = br ? LAMP * 0.3 : LAMP
-    sky.intensity = br ? 0.12 : 0.32
+    rake.intensity = br ? 6.2 : 0
+    lamp.intensity = br ? LAMP * 0.13 : LAMP
+    sky.intensity = br ? 0.07 : 0.32
     switch (v.kind) {
       case 'sheet': buildSheet(v.heading, v.text); break
-      case 'braille': buildBraille(v.cells); break
+      case 'braille': {
+        const at = buildBraille(v.cells)
+        // Square on to the lines, low enough that the light across them shows every dot.
+        FRAMES.braille = { r: Math.min(0.75, Math.max(0.26, at.half * 0.92)), elev: 46, az: 4, target: [at.x, 0, at.z] }
+        break
+      }
       case 'tape': {
         const len = buildTape(v.bytes)
         FRAMES.tape = { r: Math.min(2.2, Math.max(0.9, len * 0.48)), elev: 58, az: 0 }
