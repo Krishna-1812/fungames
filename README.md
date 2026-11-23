@@ -896,6 +896,30 @@ every one of those captions rendered squeezed into a 30px circle regardless
 of which tile opened first. Neither is a fact a data checker can hold
 opinions about; both only exist once the thing actually renders.
 
+**Share This Page**, the desk — opening a way used to open a small dark
+pop-up with the encoding in it as text. It goes out on a desk now
+(`lib/share-desk.ts`, in three.js): grey-stained oak under a cool lamp in a
+dark room, beside the tiles on a wide window and pinned above them on a
+narrow one, with the encoding still under it as text to copy. Each way is a
+real thing made from what was typed. The Morse is keyed on a brass telegraph
+key whose lever goes down for every dot and dash, a signal lamp lighting the
+desk with it. The Braille is embossed in heavy paper at the real dimensions
+(1.44 mm dots, 2.34 mm apart, 6.2 mm cell to cell, 10 mm line to line) and
+seen under a low raking light, because Braille has no ink. Binary is
+punched into eight-track paper tape, one row a byte, the feed holes
+off-centre between tracks three and four as on real tape, the desk showing
+through the holes and the lamp through them in the tape's shadow. The dial
+tones press a telephone keypad's keys, the notes press two octaves of
+piano, the tap code is rung on a steel pipe with a spoon while each letter
+is ringed in pencil on the grid card, the ciphers are typed on a sheet with
+every strike a little different, the interstellar bitmap is dot-matrix on
+tractor-feed paper, and each joke is a handwritten postcard, stamped,
+postmarked and addressed (Santa's to North Pole, H0H 0H0, the postcode
+Canada Post really gives him). A way with a sound plays as it opens, the
+moving parts on the same schedule as the tones and on their own audio bus,
+so switching ways silences what was queued; the old Morse button had been
+playing every beep twice.
+
 **How Fast Are You Moving?**, the picture — each speed used to have a small
 cartoon in a card above it. There is one picture behind the whole page now
 (`lib/speed-scenes.ts`), and it pulls back a step for each speed, because

@@ -2695,6 +2695,12 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     measured from a mask render of the same scene, and the box placed in a
     real checkout page that dims only when the challenge opens. See the README.
 
+    **Share This Page** (later): a sending desk instead of a pop-up
+    (lib/share-desk.ts): every way a real thing made from the message, the
+    telegraph key, embossed Braille, punched tape, keypad, piano, pipe and
+    spoon, typed sheet, fanfold printout and postcards, the sounds and the
+    moving parts on one schedule. See the README.
+
     **Where Does The Day Go?** (later): the day as a ring of glass on a sheet
     of paper (lib/day-glass.ts), pinned while the sections scroll past it,
     each telling it one more thing; interruptions saw it into pieces that
