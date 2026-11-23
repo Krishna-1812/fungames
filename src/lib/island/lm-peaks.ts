@@ -28,15 +28,27 @@ export const peaks: Record<string, Landmark> = {
     for (const [x, y] of [[0.2, 0.2], [1.8, 0.2], [0.2, 1.8], [1.8, 1.8]] as const) p.line([x, y, 10], [1, 1, 120], { sw: 1.8 })
     // The cable itself goes on up out of the frame; only its foot counts towards the building's box.
     const [cx, cy] = P(1 + p.ox, 1 + p.oy, 46 + p.oz)
-    if (p.real) {
-      // A steel cable, lit on its right, as a rod in the sun is.
-      p.el('path', { d: `M${f(cx)} ${f(cy)}V${f(cy - 1500)}`, stroke: '#5d6478', 'stroke-width': 2.6, fill: 'none' })
-      p.el('path', { d: `M${f(cx + 0.5)} ${f(cy)}V${f(cy - 1500)}`, stroke: '#c9cfe0', 'stroke-width': 0.9, fill: 'none' })
-    } else {
-      p.el('path', { d: `M${f(cx)} ${f(cy)}V${f(cy - 1500)}`, stroke: INK, 'stroke-width': 4.5, fill: 'none' })
-      p.el('path', { d: `M${f(cx)} ${f(cy)}V${f(cy - 1500)}`, stroke: '#ffffff', 'stroke-width': 1.4, fill: 'none' })
+    // The cable climbs out of sight: thinning into the haze as it goes, in
+    // steps, so from far out it fades into the sky instead of stopping in
+    // mid-air like a stray line.
+    const RISE = 1500, STEPS = 12
+    const faded = (k: number) => Math.pow(1 - k / STEPS, 1.7)
+    for (let k = 0; k < STEPS; k++) {
+      const y0 = cy - (k * RISE) / STEPS, y1 = cy - ((k + 1) * RISE) / STEPS, op = faded(k)
+      // As thin filled strips, not stroked lines: a dead-vertical line has no width of its own, and
+      // resvg (the card pictures) panics making the layer an opacity needs for an empty box.
+      const strip = (dx: number, w: number, fill: string) =>
+        p.el('rect', { x: f(cx + dx - w / 2), y: f(y1), width: f(w), height: f(y0 - y1), fill, 'fill-opacity': op < 1 ? +op.toFixed(2) : undefined })
+      if (p.real) {
+        // A steel cable, lit on its right, as a rod in the sun is.
+        strip(0, 2.6, '#5d6478')
+        strip(0.5, 0.9, '#c9cfe0')
+      } else {
+        strip(0, 4.5, INK)
+        strip(0, 1.4, '#ffffff')
+      }
     }
-    for (let k = 1; k < 10; k++) p.el('circle', { cx, cy: cy - k * 150, r: 2.6, fill: C.rasp, class: 'blink', style: `animation-delay:${k * 0.2}s` })
+    for (let k = 1; k < 10; k++) p.el('circle', { cx, cy: cy - k * 150, r: 2.6, fill: C.rasp, class: 'blink', style: `animation-delay:${k * 0.2}s`, 'fill-opacity': +faded((k * 150 * STEPS) / RISE).toFixed(2) })
     p.grow(cx - 20, cy - 200, cx + 20, cy)
     const pod = p.group('se-pod')
     const climber = creatureUse('pod', C.lilac, 'stand', 'se', { transform: `translate(${f(cx)} ${f(cy - 122)})` })
