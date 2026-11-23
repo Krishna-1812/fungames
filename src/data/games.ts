@@ -157,7 +157,7 @@ export const GAMES: Game[] = [
     title: 'Where Does The Day Go?',
     blurb: 'Your day, cut into its real pieces',
     description:
-      'Slide in your work, home and sleep hours and watch a perfectly tidy 24-hour bar — then carve your actual morning routine, meals and commute out of it, and watch your own phone-check habit cut what is left into dozens of pieces. The 23-minute refocus cost after each one is Gloria Mark’s real, published figure, not a guess.',
+      'Your twenty-four hours as a ring of coloured glass on a sheet of paper, one block for each part of the day. Carve your real morning, meals and commute out of it, then watch your own phone-check habit saw it into dozens of pieces, the time it takes to get back to work after each cut turning the glass frosted. The 23-minute refocus cost after each one is Gloria Mark’s real, published figure, not a guess.',
     accent: '#301a10', accent2: '#7ec8ff',
     category: 'you',
     added: '2026-09-23',

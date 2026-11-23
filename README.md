@@ -929,27 +929,44 @@ equator, confirms every cited constant falls inside its real published range,
 and confirms both the Planck and SH0ES Hubble constants put the observable
 universe's edge several times past the speed of light.*
 
-**Where Does The Day Go?** — a live instrument, not a runner over stages: three
-sliders (work, home, sleep) draw a tidy day-bar, and every slider after that —
-morning routine, lunch, dinner, the commute — is carved out of "work" or
-"home" rather than added on top, so the bar never grows past the total you
-started with; it just gets honest about what was always inside it. The one
-number on the page that is not a slider is `REFOCUS_MINUTES`: Gloria Mark
-(UC Irvine) tracked real information workers through real interruptions and
-found an average of 23 minutes 15 seconds to fully return to a task
-afterwards — "The Cost of Interrupted Work: More Speed and Stress," CHI 2008.
-A phone-check-frequency slider applies that real cost to however many
-interruptions statistically land inside your work block, and "work you think
-you're doing" against "work you're actually doing" is the payoff. Each later
-section's slider activates to a sensible default the first time it scrolls
-into view — pacing, never a gate. *`scripts/check-day-model.mjs` proves the
-day-bar's arithmetic rather than trusting it: 500 random inputs confirm the
-segments always sum to exactly `workHours + homeHours + sleepHours`, however
-they get carved up, and a further sweep confirms more interruptions never
-*increase* actual work hours. It caught a real bug before shipping — the
-first version of `computeDay` let the day grow past 24 hours whenever a
-carved-out slice (say, an implausibly long morning routine) didn't fit inside
-the block it was supposed to come from, in 184 of 500 random trials.*
+**Where Does The Day Go?** — a live instrument, not a runner over stages.
+The day is a ring of glass lying on a sheet of paper (`lib/day-glass.ts`, in
+three.js): twenty-four hours clockwise from waking, each part its own block
+of coloured glass, smoked for sleep, cobalt for work, mint for home, swept
+along the ring with rounded edges and seen through, so the printed dial
+bends behind it. It stays on screen while the page scrolls past it (beside
+the words on a wide window, pinned across the top on a narrow one), and each
+section tells it one more thing the tidy estimate left out: the morning, the
+meals, the trip there and back, each carved out of work or home rather than
+added on top. Work and sleep are sliders and home is what they leave, so the
+ring is always one whole day. Then the interruptions: each is a saw cut
+where it lands, the pieces either side knocked apart and settling back on
+springs, never quite square, and the twenty-three minutes after a cut into
+work ground matt. The clear cobalt left is the work actually done. Shadows
+are painted rather than cast (a shadow map would make coloured glass throw a
+black one): each block's footprint in the colour it lets through, darker at
+the rim, with the bright line a rounded piece of clear glass gathers down the
+middle of its shadow, multiplied into the paper so it shows through the glass
+too. Scroll back up and the day is whole again. The one number on the page
+that is not a slider is `REFOCUS_MINUTES`: Gloria Mark (UC Irvine) tracked
+real information workers through real interruptions and found an average of
+23 minutes 15 seconds to fully return to a task afterwards — "The Cost of
+Interrupted Work: More Speed and Stress," CHI 2008. `computeDay` lays the
+day out in order from waking (the trip in, work with lunch in the middle of
+it, the trip home, the evening with dinner in the middle of it, sleep) and
+cuts it where each interruption lands, the phone every so many minutes and
+the rest at fixed scattered moments, so the frost the ring shows is exactly
+the work the numbers say was lost. *`scripts/check-day-model.mjs` proves the
+arithmetic rather than trusting it: 500 random inputs confirm the segments
+always sum to `workHours + homeHours + sleepHours`; 500 more that the pieces
+run without a gap from waking to the end of sleep, that only work cut by an
+interruption is frosted, that the frost is the lost work to the minute, and
+that one more interruption never leaves more work. The first version of
+`computeDay` let the day grow past 24 hours whenever a carved-out slice
+didn't fit inside the block it came from, in 184 of 500 random trials; the
+first version of the timeline spread the cuts evenly, so one more
+interruption moved all the others and could leave more work, which the
+second sweep caught.*
 
 **Printing Money**, the world — the hero was a red counter of what the US
 government has spent since you opened the page, and a bar creeping toward

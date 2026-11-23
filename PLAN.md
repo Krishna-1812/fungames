@@ -2695,6 +2695,13 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     measured from a mask render of the same scene, and the box placed in a
     real checkout page that dims only when the challenge opens. See the README.
 
+    **Where Does The Day Go?** (later): the day as a ring of glass on a sheet
+    of paper (lib/day-glass.ts), pinned while the sections scroll past it,
+    each telling it one more thing; interruptions saw it into pieces that
+    knock apart and settle back, and the refocusing after each cut into work
+    is ground matt. Home is what work and sleep leave, so the ring is always
+    one day. See the README.
+
     **Internet Artifacts** (later): an object for every moment, modelled and
     photographed cut out (scripts/bake-artifacts.mjs, a studio with no
     backdrop that sees through glass), standing in a faint pool of its era's
