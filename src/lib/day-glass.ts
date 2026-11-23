@@ -281,7 +281,7 @@ export function createDayGlass(canvas: HTMLCanvasElement): DayGlass | null {
   const camera = new PerspectiveCamera(26, 1, 0.05, 60)
 
   // A cool window light high to the back left, and the room.
-  const sunDir = new Vector3(-2.4, 4.2, -1.6).normalize()
+  const sunDir = new Vector3(-2.4, 3.0, -1.9).normalize()
   const sun = new DirectionalLight('#f3f6ff', 2.1)
   sun.position.copy(sunDir).multiplyScalar(6)
   scene.add(sun, new HemisphereLight('#e8eef8', '#9aa3b0', 0.85))
@@ -318,7 +318,8 @@ export function createDayGlass(canvas: HTMLCanvasElement): DayGlass | null {
         float inside = step(0.0, duv.x) * step(duv.x, 1.0) * step(0.0, duv.y) * step(duv.y, 1.0);
         vec4 ink = texture2D(dialMap, duv) * inside;
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.12, 0.14, 0.19), ink.a * 0.9);
-        diffuseColor.rgb *= mix(vec3(1.0), texture2D(shadeMap, duv).rgb, inside);
+        // Grey #808080 is no change: darker is shadow, lighter is light the glass gathered.
+        diffuseColor.rgb *= mix(vec3(1.0), texture2D(shadeMap, duv).rgb / 0.2158, inside);
         // The window's pool of light, falling away across the desk.
         diffuseColor.rgb *= mix(0.78, 1.05, smoothstep(5.0, 0.3, length(vDesk - vec2(-0.7, -1.0))));`,
       )
@@ -405,15 +406,15 @@ export function createDayGlass(canvas: HTMLCanvasElement): DayGlass | null {
     const s = sketchCtx
     s.setTransform(1, 0, 0, 1, 0, 0)
     s.globalCompositeOperation = 'source-over'
-    s.fillStyle = '#fff'
+    s.fillStyle = '#808080'
     s.fillRect(0, 0, SH, SH)
     s.setTransform(k, 0, 0, k, SH / 2, SH / 2)
     s.globalCompositeOperation = 'multiply'
     const off = (H * 0.9) / sunDir.y
     const ox = -sunDir.x * off, oz = -sunDir.z * off
     const v = new Vector3()
-    const outline = (l: Live, dx: number, dz: number, inset: number) => {
-      const [t0, t1] = l.built
+    const outline = (l: Live, dx: number, dz: number, inset: number, from?: number) => {
+      const t1 = l.built[1], t0 = from ?? l.built[0]
       const n = Math.max(2, Math.ceil((t1 - t0) / (2 * DEG)))
       s.beginPath()
       for (let j = 0; j <= n; j++) {
@@ -438,6 +439,20 @@ export function createDayGlass(canvas: HTMLCanvasElement): DayGlass | null {
       s.strokeStyle = l.key === 'sleep' ? '#8a8f9a' : '#b9bec8'
       s.stroke()
     }
+    // A rounded block of clear glass is a lens along its length: it gathers
+    // the light into a bright line down the middle of its shadow. Ground
+    // glass scatters it instead, so only the clear part does this.
+    s.globalCompositeOperation = 'screen'
+    for (const l of lives) {
+      const tf = l.built[2]
+      if (l.built[1] - tf < 0.2 * DEG) continue
+      const tint = new Color(GLASS_TINT[l.key] ?? '#8c9ab0')
+      const glow = mix(white, tint, l.key === 'sleep' ? 0.2 : 0.5).multiplyScalar(l.key === 'sleep' ? 0.16 : 0.34)
+      outline(l, ox * 1.25, oz * 1.25, (RO - RI) * 0.41, tf)
+      s.fillStyle = '#' + glow.getHexString()
+      s.fill()
+    }
+    s.globalCompositeOperation = 'multiply'
     for (const l of lives) {
       outline(l, 0, 0, -0.002)
       s.lineWidth = 0.006
