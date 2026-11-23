@@ -918,7 +918,13 @@ postmarked and addressed (Santa's to North Pole, H0H 0H0, the postcode
 Canada Post really gives him). A way with a sound plays as it opens, the
 moving parts on the same schedule as the tones and on their own audio bus,
 so switching ways silences what was queued; the old Morse button had been
-playing every beep twice.
+playing every beep twice. The tiles are two shelves of two materials: a real
+way is an engraved plate of dark brushed aluminium, screwed down, its symbol
+under a glass jewel, with an indicator lamp that lights once it has been
+sent (the light on the metal follows the pointer); a joke is a postcard on
+a slight tilt, its symbol on a perforated stamp, franked with a postmark
+once it has gone. The paper tape comes off its roll with the cut end curling
+up, and the Braille view finds the line of dots and looks square on to it.
 
 **How Fast Are You Moving?**, the picture — each speed used to have a small
 cartoon in a card above it. There is one picture behind the whole page now
