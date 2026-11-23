@@ -5,30 +5,31 @@ import { withBase } from '../lib/base'
 /**
  * Where Does The Day Go? — a live instrument, not a runner over stages.
  *
- * Every slider on this page feeds the same pure function,
- * `src/lib/day-model.ts`'s `computeDay`, which the day-bar redraws from on
- * every input event. The three headline sliders (work, home, sleep) always
- * summed to a tidy number; the point of the rest of the page is that
- * morning routine, meals and the commute were always happening *inside*
- * that tidy number, not on top of it — `computeDay` carves them out rather
- * than adding them on, so the bar never grows past where it started.
+ * The day is a ring of glass lying on a sheet of paper (lib/day-glass.ts):
+ * twenty-four hours clockwise from waking, one block of coloured glass for
+ * each part of it. The ring stays on screen while the page scrolls past it,
+ * and each section tells it one more thing the tidy estimate left out — the
+ * morning, the meals, the trip there and back, then the interruptions,
+ * which saw it into pieces and frost the twenty-three minutes after each cut
+ * into work. Scroll back up and it is whole again.
  *
- * Each later section's slider starts at 0 and animates in to a sensible
- * default the first time that section scrolls into view — a deliberate
- * pacing device (the day looks fine until you scroll to what it left out),
- * not a gate: nothing is locked, and moving a slider before its section
- * arrives works fine too.
+ * Every slider feeds the same pure function, `src/lib/day-model.ts`'s
+ * `computeDay`, which lays the day out in order and says where each cut
+ * lands; the glass only draws that. Work and sleep are sliders and home is
+ * what they leave of twenty-four hours, so the ring is always a whole day,
+ * and nothing carved out of it later ever makes it longer.
  *
- * The one number on this whole page that is not a slider is
- * `REFOCUS_MINUTES` — Gloria Mark's real, published 23-minutes-15-seconds
- * figure for how long it takes to fully refocus after an interruption.
- * `scripts/check-day-model.mjs` checks the arithmetic and the citation both.
+ * Each later section's sliders start at 0 and take a sensible default the
+ * first time that section scrolls into view — pacing, never a gate.
+ *
+ * The one number on the page that is not a slider is `REFOCUS_MINUTES`:
+ * Gloria Mark's published 23 minutes 15 seconds to get back to a task.
+ * `scripts/check-day-model.mjs` checks the arithmetic and the citation.
  *
  * In the shell it is a paper page. Score is the real work left in the day,
- * Pieces is how many pieces the day is in, Moves the interruptions, and Best
- * the most real work you have kept. Reaching the reckoning at the bottom is
- * the ending; the card under it is the summary, and a share. The day-bar's
- * colours are the design system's blocks rather than yellows and oranges.
+ * Pieces how many pieces the day is in, Moves the interruptions, and Best
+ * the most real work kept. Reaching the reckoning at the bottom is the
+ * ending; the card under it is the summary, and a share.
  */
 ---
 
@@ -38,204 +39,180 @@ import { withBase } from '../lib/base'
   initial={{ score: '8.0h', level: '3', moves: '0' }}
 >
   <div class="day-body">
-  <header class="dg-head">
-    <p class="label meta dg-eyebrow">A live instrument, not a quiz</p>
-    <p class="dg-lead">
-      Twenty-four hours felt like plenty this morning. Slide in what you
-      think your day looks like, then keep scrolling — we're going to find
-      everything that estimate left out, without ever making the day any
-      longer than it already is.
-    </p>
-  </header>
-
-  <div class="dg-body-content">
-    <section class="dg-sec" id="sec-basics">
-      <h2>First, your typical day</h2>
-      <p>Take your time. This is just a rough sense of things.</p>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Work / school</b><i id="v-work">8h</i></span>
-        <input type="range" id="workHours" min="0" max="16" step="0.5" value="8">
-      </label>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Home</b><i id="v-home">8h</i></span>
-        <input type="range" id="homeHours" min="0" max="16" step="0.5" value="8">
-      </label>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Sleep</b><i id="v-sleep">8h</i></span>
-        <input type="range" id="sleepHours" min="0" max="12" step="0.5" value="8">
-      </label>
-      <p class="dg-note">Take your time and slide those. Done? Here's what your day looks like:</p>
-
-      <div class="daybar" data-cp="basics">
-        <p class="daybar-title">Your day</p>
-        <div class="daybar-frame"><div class="daybar-col"></div></div>
-        <div class="legend"></div>
-        <p class="piececount"></p>
+    <div class="dg-bg" aria-hidden="true">
+      <canvas class="dg-canvas"></canvas>
+      <canvas class="dg-flat" hidden></canvas>
+      <div class="dg-hud">
+        <p class="dg-hud-title" id="hudTitle">Your day, as you would describe it</p>
+        <div class="dg-legend" id="legend"></div>
       </div>
-      <p class="dg-note">It's beautiful. Obviously it doesn't stay that way — keep scrolling.</p>
-    </section>
+    </div>
+
+    <header class="dg-head dg-sec" id="sec-basics">
+      <div class="dg-card">
+        <p class="label meta dg-eyebrow">A live instrument, not a quiz</p>
+        <h1 class="dg-title">Where does the day go?</h1>
+        <p class="dg-lead">
+          Here are your twenty-four hours as a ring of glass, one block for each
+          part of the day, clockwise from the moment you wake. Set it to what
+          you think a day looks like, then keep scrolling: we're going to find
+          everything that estimate left out, without ever making the day any
+          longer than it is.
+        </p>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>Work / school</b><i id="v-work">8h</i></span>
+          <input type="range" id="workHours" min="0" max="16" step="0.5" value="8">
+        </label>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>Sleep</b><i id="v-sleep">8h</i></span>
+          <input type="range" id="sleepHours" min="0" max="12" step="0.5" value="8">
+        </label>
+        <p class="dg-home">
+          <span><b>Home</b>, which is whatever is left</span><i id="v-home">8h</i>
+        </p>
+        <p class="dg-note">Three tidy pieces. It's beautiful. It doesn't stay that way, so keep scrolling.</p>
+      </div>
+    </header>
 
     <section class="dg-sec" id="sec-morning">
-      <h2>The part before work even starts</h2>
-      <p>
-        Getting up, showering, getting dressed — none of that was ever
-        "home" time in the sense you meant it. It's being carved out of
-        your home block now, not added on top.
-      </p>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Morning routine</b><i id="v-morning">0m</i></span>
-        <input type="range" id="morningMin" min="0" max="120" step="5" value="0">
-      </label>
-
-      <div class="daybar" data-cp="morning">
-        <p class="daybar-title">Your day, updated</p>
-        <div class="daybar-frame"><div class="daybar-col"></div></div>
-        <div class="legend"></div>
-        <p class="piececount"></p>
+      <div class="dg-card">
+        <h2>The part before work even starts</h2>
+        <p>
+          Getting up, showering, getting dressed: none of that was ever "home"
+          time in the sense you meant it. It's carved out of home now, not
+          added on top. Watch the mint glass give it up.
+        </p>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>Morning routine</b><i id="v-morning">0m</i></span>
+          <input type="range" id="morningMin" min="0" max="120" step="5" value="0">
+        </label>
       </div>
     </section>
 
     <section class="dg-sec" id="sec-meals">
-      <h2>And you have to eat. Twice.</h2>
-      <p>Lunch comes out of work. Dinner comes out of home.</p>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Lunch</b><i id="v-lunch">0m</i></span>
-        <input type="range" id="lunchMin" min="0" max="90" step="5" value="0">
-      </label>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Dinner</b><i id="v-dinner">0m</i></span>
-        <input type="range" id="dinnerMin" min="0" max="90" step="5" value="0">
-      </label>
-
-      <div class="daybar" data-cp="meals">
-        <p class="daybar-title">Your day, degrading nicely</p>
-        <div class="daybar-frame"><div class="daybar-col"></div></div>
-        <div class="legend"></div>
-        <p class="piececount"></p>
+      <div class="dg-card">
+        <h2>And you have to eat. Twice.</h2>
+        <p>Lunch comes out of the middle of work. Dinner comes out of the middle of home.</p>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>Lunch</b><i id="v-lunch">0m</i></span>
+          <input type="range" id="lunchMin" min="0" max="90" step="5" value="0">
+        </label>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>Dinner</b><i id="v-dinner">0m</i></span>
+          <input type="range" id="dinnerMin" min="0" max="90" step="5" value="0">
+        </label>
       </div>
     </section>
 
     <section class="dg-sec" id="sec-commute">
-      <h2>Unless you teleport to work</h2>
-      <p>Counted there and back — both trips happen, even if only one felt worth mentioning.</p>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Commute, one way</b><i id="v-commute">0m</i></span>
-        <input type="range" id="commuteMin" min="0" max="90" step="5" value="0">
-      </label>
-
-      <div class="daybar" data-cp="commute">
-        <p class="daybar-title">Your day, fully honest so far</p>
-        <div class="daybar-frame"><div class="daybar-col"></div></div>
-        <div class="legend"></div>
-        <p class="piececount"></p>
+      <div class="dg-card">
+        <h2>Unless you teleport to work</h2>
+        <p>Counted there and back: both trips happen, even if only one felt worth mentioning.</p>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>Commute, one way</b><i id="v-commute">0m</i></span>
+          <input type="range" id="commuteMin" min="0" max="90" step="5" value="0">
+        </label>
+        <p class="dg-note">The day is in ten pieces now, and not one of those sliders made it any longer. Now for the part that does the damage.</p>
       </div>
-      <p class="dg-note">Not one of those sliders made the day any longer. Now for the part that actually does.</p>
     </section>
 
     <section class="dg-sec" id="sec-phone">
-      <h2>Now the part that actually does the damage</h2>
-      <p>
-        None of the above cut your day into more pieces — it just relabelled
-        the same pieces honestly. This is the first thing that actually
-        multiplies them.
-      </p>
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>How often you check your phone</b><i id="v-phone">off</i></span>
-        <input type="range" id="phoneIntervalMin" min="0" max="60" step="1" value="0">
-      </label>
-      <p class="dg-source">{'Published estimates of daily phone checks vary widely by study — roughly 80 to 200+ times a day. This page uses whichever interval you pick rather than asserting one.'}</p>
-
-      <label class="dg-slider">
-        <span class="dg-slider-label"><b>Other interruptions, in a typical day</b><i id="v-extra">0</i></span>
-        <input type="range" id="extraDistractionsPerDay" min="0" max="20" step="1" value="0">
-      </label>
-      <ul class="dg-common" aria-label="Common examples">
-        <li>A co-worker with a quick question</li>
-        <li>An email that wasn't actually urgent</li>
-        <li>A notification you didn't need to open</li>
-        <li>Someone else in the house needing something</li>
-        <li>A pet deciding this was the moment</li>
-        <li>A thought about something completely unrelated</li>
-      </ul>
-
-      <div class="daybar daybar-big" data-cp="phone">
-        <p class="daybar-title">Your day, shattered</p>
-        <div class="daybar-frame"><div class="daybar-col"></div></div>
-        <div class="legend"></div>
-        <p class="piececount"></p>
+      <div class="dg-card">
+        <h2>Now the part that actually does the damage</h2>
+        <p>
+          Everything so far only relabelled the day honestly. This is the first
+          thing that cuts it. Each interruption is a saw cut where it lands, and
+          the twenty-three minutes after a cut into work are frosted: that is how
+          long it takes to get properly back to what you were doing.
+        </p>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>How often you check your phone</b><i id="v-phone">off</i></span>
+          <input type="range" id="phoneStep" min="0" max="13" step="1" value="0">
+        </label>
+        <p class="dg-source">Published estimates run from roughly 80 to over 200 checks a day: every five to twelve waking minutes. The page starts you at every half hour, gentler than any of them.</p>
+        <label class="dg-slider">
+          <span class="dg-slider-label"><b>Other interruptions, in a typical day</b><i id="v-extra">0</i></span>
+          <input type="range" id="extraDistractionsPerDay" min="0" max="20" step="1" value="0">
+        </label>
+        <ul class="dg-common" aria-label="Common examples">
+          <li>A co-worker with a quick question</li>
+          <li>An email that wasn't actually urgent</li>
+          <li>A notification you didn't need to open</li>
+          <li>Someone else in the house needing something</li>
+          <li>A pet deciding this was the moment</li>
+        </ul>
       </div>
     </section>
 
     <section class="dg-sec dg-results" id="sec-results">
-      <h2>So here's what's actually happening</h2>
-      <p class="dg-piece-line" id="pieceLine">Your day started as 7 pieces. Right now it's 7.</p>
+      <div class="dg-card">
+        <h2>So here's what's actually happening</h2>
+        <p class="dg-piece-line" id="pieceLine">Your day started as 3 pieces. Right now it's 3.</p>
+        <div class="dg-worklines">
+          <div class="dg-workline">
+            <span>Work you think you're doing</span>
+            <b id="perceivedWork">8.0h</b>
+          </div>
+          <div class="dg-workline dg-actual">
+            <span>Work you're actually doing <small>(the clear cobalt glass)</small></span>
+            <b id="actualWork">8.0h</b>
+          </div>
+        </div>
+        <p class="dg-lost" id="lostLine"></p>
+        <p class="dg-source" id="refocusSource"></p>
+        <p class="dg-clock" id="clockLine"></p>
 
-      <div class="dg-worklines">
-        <div class="dg-workline">
-          <span>Work you think you're doing</span>
-          <b id="perceivedWork">8.0h</b>
-        </div>
-        <div class="dg-workline dg-actual">
-          <span>Work you're actually doing</span>
-          <b id="actualWork">8.0h</b>
-        </div>
+        <details class="how">
+          <summary>How this actually works</summary>
+          <p>
+            Work and sleep are sliders, and home is what they leave of
+            twenty-four hours, so the ring is always one whole day. Every slider
+            after that (the morning, lunch, dinner, the commute) is carved out of
+            work or home rather than added on top: the day never grows, it just
+            gets more honest about what was always inside it.
+          </p>
+          <p>
+            The day is laid out in order from waking: the morning, the trip in,
+            work with lunch in the middle of it, the trip home, the evening with
+            dinner in the middle of it, then sleep. The phone is checked every so
+            many minutes from the moment you wake; the other interruptions land at
+            scattered moments of the waking day. Each one cuts the glass where it
+            lands.
+          </p>
+          <p>
+            The cost of an interruption is a published figure rather than a guess:
+            Gloria Mark, at UC Irvine, tracked information workers through real
+            interruptions and found an average of 23 minutes 15 seconds to fully
+            return to a task afterwards ("The Cost of Interrupted Work: More Speed
+            and Stress," CHI 2008). Here, the first 23 minutes 15 seconds after
+            each cut into work, or as much of it as there is before the next cut,
+            is frosted, and "work you're actually doing" is the clear glass left.
+            It is a model, not a measurement of your day: the figure is real, and
+            the way the page applies it is the page's own.
+          </p>
+          <p>Related: <a href={withBase('/progress/')}>Progress</a> is the other page here about how much of something is already gone, computed live rather than looked up.</p>
+        </details>
       </div>
-      <p class="dg-lost" id="lostLine"></p>
-      <p class="dg-source" id="refocusSource"></p>
-
-      <p class="dg-clock" id="clockLine"></p>
     </section>
-
-    <footer class="dg-outro">
-
-      <details class="how">
-        <summary>How this actually works</summary>
-        <p>
-          The three headline sliders — work, home, sleep — set a total.
-          Every slider after that (morning routine, lunch, dinner, commute)
-          is carved out of "work" or "home" rather than added on top, so the
-          bar never grows past the total you started with; it just gets
-          more honest about what was always inside it.
-        </p>
-        <p>
-          The interruption cost is a real, published figure rather than a
-          guess: Gloria Mark, at UC Irvine, tracked information workers
-          through real interruptions and found an average of 23 minutes 15
-          seconds to fully return to a task afterwards — "The Cost of
-          Interrupted Work: More Speed and Stress," CHI 2008. That number is
-          fixed on this page on purpose; the only thing you control is how
-          often the interruptions happen.
-        </p>
-        <p>
-          "Work you're actually doing" applies that cost to however many of
-          your interruptions statistically land inside your work block
-          (proportional to how much of your waking day work takes up), then
-          subtracts the total, floored at zero. It is a model, not a
-          measurement of your specific day — the citation above is real; the
-          way this page applies it to your sliders is this page's own.
-        </p>
-        <p>Related: <a href={withBase('/progress/')}>Progress</a> is the other page here about how much of something is already gone, computed live rather than looked up.</p>
-      </details>
-    </footer>
-  </div>
   </div>
 
   <Fragment slot="howto">
     <p>
-      Slide in what you think a typical day looks like — work, home, sleep — then
-      keep scrolling. Each section finds something that estimate left out.
+      Set work and sleep to what a typical day looks like; home is whatever they
+      leave. Then keep scrolling: each section finds something that estimate left out.
     </p>
     <ul>
-      <li>Morning routine, meals and the commute are carved out of the day you already have; none of them makes it longer.</li>
-      <li>Then the interruptions: each one costs the real, published time it takes to get back to what you were doing.</li>
-      <li>Every slider can be moved at any time, and every bar redraws from all of them.</li>
+      <li>The morning, meals and the commute are carved out of the day you already have; none of them makes it longer.</li>
+      <li>Then the interruptions saw the ring into pieces, and the time it takes to get back to work after each one turns the glass frosted.</li>
+      <li>Every slider can be moved at any time. Scroll back up and the day is whole again.</li>
     </ul>
     <p>The reckoning at the bottom is the end. Your best is the most real work you have kept in a day.</p>
   </Fragment>
 </GameShell>
 
 <script>
-  import { computeDay, hoursLeftToday, SOURCES, type DayInputs } from '../lib/day-model'
+  import { computeDay, hoursLeftToday, SOURCES, GLASS_TINT, type DayInputs, type DayModel, type Piece as DayPiece } from '../lib/day-model'
+  import type { DayGlass } from '../lib/day-glass'
   import { recordPlay } from '../lib/stats'
   import { shareResult, outcomeLabel } from '../lib/share-card'
   import { SITE } from '../site.config'
@@ -253,161 +230,177 @@ import { withBase } from '../lib/base'
     lunch: 'Lunch', home: 'Home', dinner: 'Dinner', sleep: 'Sleep',
   }
 
+  /** The phone slider's stops, in minutes between checks (0 is never). */
+  const PHONE = [0, 60, 45, 40, 30, 25, 20, 15, 12, 10, 8, 7, 6, 5]
+  const phoneStepOf = (min: number) => Math.max(0, PHONE.indexOf(min))
+
   const state: DayInputs = {
     workHours: 8, homeHours: 8, sleepHours: 8,
     morningMin: 0, lunchMin: 0, dinnerMin: 0, commuteMin: 0,
     phoneIntervalMin: 0, extraDistractionsPerDay: 0,
   }
 
-  const PICK_ROW: Record<keyof DayInputs, string> = {
-    workHours: 'Work / school, hours', homeHours: 'Home, hours', sleepHours: 'Sleep, hours',
+  const PICK_ROW: Record<string, string> = {
+    workHours: 'Work / school, hours', sleepHours: 'Sleep, hours',
     morningMin: 'Morning routine, minutes', lunchMin: 'Lunch, minutes', dinnerMin: 'Dinner, minutes',
-    commuteMin: 'Commute one way, minutes', phoneIntervalMin: 'Phone checked every, minutes',
+    commuteMin: 'Commute one way, minutes', phoneStep: 'Phone checked every, minutes',
     extraDistractionsPerDay: 'Other interruptions a day',
   }
 
   const fmtH = (h: number) => `${h.toFixed(1)}h`
+  const fmtHM = (h: number) => (Math.abs(h - Math.round(h)) < 0.01 ? `${Math.round(h)}h` : `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`)
   const fmtMin = (m: number) => (m >= 60 ? `${(m / 60).toFixed(m % 60 ? 1 : 0)}h` : `${Math.round(m)}m`)
 
   /* ------------------------------------------------------------------ */
-  /* Multiple day-bars, not one dock — each section gets its own fresh,   */
-  /* large reveal of the day as it stands once that section's sliders are */
-  /* folded in, echoing the way the real thing does this rather than      */
-  /* shrinking the one visual that matters into a corner widget.          */
+  /* The stage: one ring of glass, told one more thing per section.       */
   /* ------------------------------------------------------------------ */
 
-  type Bar = { col: HTMLElement; legend: HTMLElement; piece: HTMLElement; segEls: Map<string, HTMLElement> }
-
-  const SEG_ORDER = ['morning', 'commute', 'work', 'lunch', 'home', 'dinner', 'sleep'] as const
-
-  function buildBar(root: HTMLElement): Bar {
-    const col = root.querySelector<HTMLElement>('.daybar-col')!
-    const segEls = new Map<string, HTMLElement>()
-    for (const key of SEG_ORDER) {
-      const seg = document.createElement('div')
-      seg.className = 'seg'
-      seg.dataset.key = key
-      const shine = document.createElement('i')
-      seg.appendChild(shine)
-      col.appendChild(seg)
-      segEls.set(key, seg)
-    }
-    const cuts = document.createElement('div')
-    cuts.className = 'cuts'
-    cuts.setAttribute('aria-hidden', 'true')
-    col.appendChild(cuts)
-    return { col, legend: root.querySelector('.legend')!, piece: root.querySelector('.piececount')!, segEls }
-  }
-
-  const BARS = new Map<string, Bar>()
-  document.querySelectorAll<HTMLElement>('.daybar').forEach((root) => {
-    BARS.set(root.dataset.cp!, buildBar(root))
-  })
-
-  function paintBar(bar: Bar, m: ReturnType<typeof computeDay>) {
-    for (const seg of m.segments) {
-      const el = bar.segEls.get(seg.key)!
-      const pct = m.totalHours > 0 ? (seg.hours / m.totalHours) * 100 : 0
-      el.style.height = `${pct}%`
-      el.classList.toggle('is-empty', pct < 0.3)
-    }
-    const nonSleepPct = m.totalHours > 0 ? (m.nonSleepHours / m.totalHours) * 100 : 0
-    const cutsHost = bar.col.querySelector('.cuts')!
-    cutsHost.innerHTML = m.cuts
-      .map((f, i) => `<i style="top:${(f * nonSleepPct).toFixed(2)}%; animation-delay:${Math.min(i * 14, 900)}ms"></i>`)
-      .join('')
-    bar.legend.innerHTML = m.segments
-      .filter((s) => s.hours > 0.05)
-      .map((s) => `<span class="dg-chip" data-key="${s.key}"><i></i>${SEG_LABEL[s.key]} · ${fmtH(s.hours)}</span>`)
-      .join('')
-    bar.piece.textContent = `${m.pieceCountAfter} piece${m.pieceCountAfter === 1 ? '' : 's'}.`
-  }
-
-  /** What each checkpoint has "found out about" so far — everything else is
-   *  forced to 0, so an early bar doesn't quietly know about a slider its
-   *  own section hasn't introduced yet, even if that slider already has a
-   *  value because a later section activated first. */
-  const CHECKPOINTS: { id: string; keys: (keyof DayInputs)[] }[] = [
-    { id: 'basics', keys: [] },
-    { id: 'morning', keys: ['morningMin'] },
-    { id: 'meals', keys: ['morningMin', 'lunchMin', 'dinnerMin'] },
-    { id: 'commute', keys: ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin'] },
-    { id: 'phone', keys: ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin', 'phoneIntervalMin', 'extraDistractionsPerDay'] },
+  const CHECKPOINTS: { id: string; title: string; keys: (keyof DayInputs)[] }[] = [
+    { id: 'sec-basics', title: 'Your day, as you would describe it', keys: [] },
+    { id: 'sec-morning', title: 'Your day, with the morning in it', keys: ['morningMin'] },
+    { id: 'sec-meals', title: 'Your day, with meals in it', keys: ['morningMin', 'lunchMin', 'dinnerMin'] },
+    { id: 'sec-commute', title: 'Your day, there and back', keys: ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin'] },
+    { id: 'sec-phone', title: 'Your day, cut where the interruptions land', keys: ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin', 'phoneIntervalMin', 'extraDistractionsPerDay'] },
+    { id: 'sec-results', title: 'Your day, as it is lived', keys: ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin', 'phoneIntervalMin', 'extraDistractionsPerDay'] },
   ]
+  let active = 0
 
+  /** Only what the section in view has found out about so far: an early
+   *  section's ring doesn't know about a slider it hasn't introduced yet. */
   function partialState(keys: (keyof DayInputs)[]): DayInputs {
     const only = new Set(keys)
-    return {
-      workHours: state.workHours, homeHours: state.homeHours, sleepHours: state.sleepHours,
-      morningMin: only.has('morningMin') ? state.morningMin : 0,
-      lunchMin: only.has('lunchMin') ? state.lunchMin : 0,
-      dinnerMin: only.has('dinnerMin') ? state.dinnerMin : 0,
-      commuteMin: only.has('commuteMin') ? state.commuteMin : 0,
-      phoneIntervalMin: only.has('phoneIntervalMin') ? state.phoneIntervalMin : 0,
-      extraDistractionsPerDay: only.has('extraDistractionsPerDay') ? state.extraDistractionsPerDay : 0,
+    const out = { ...state }
+    for (const k of ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin', 'phoneIntervalMin', 'extraDistractionsPerDay'] as const) {
+      if (!only.has(k)) out[k] = 0
     }
+    return out
+  }
+
+  const canvas = document.querySelector<HTMLCanvasElement>('.dg-canvas')!
+  let glass: DayGlass | null = null
+  let flatPieces: { pieces: DayPiece[]; total: number } | null = null
+
+  // The ring sits to the right of the words on a wide window and above them on a narrow one.
+  const wide = matchMedia('(min-width: 900px)')
+  const framing = () => (wide.matches ? { x: 0.7, y: 0.5, size: 0.84 } : { x: 0.5, y: 0.41, size: 1.0 })
+
+  /** Without WebGL: the same ring, flat, in the same colours. */
+  function drawFlat() {
+    const c = document.querySelector<HTMLCanvasElement>('.dg-flat')!
+    if (!flatPieces) return
+    const w = c.clientWidth, h = c.clientHeight, dpr = Math.min(2, devicePixelRatio || 1)
+    c.width = w * dpr; c.height = h * dpr
+    const x = c.getContext('2d')!
+    x.scale(dpr, dpr)
+    const f = framing(), R = (f.size * Math.min(w, h)) / 2 / 1.36, cx = f.x * w, cy = f.y * h
+    const { pieces, total } = flatPieces
+    for (const p of pieces) {
+      const a0 = (p.start / total) * Math.PI * 2 - Math.PI / 2, a1 = (p.end / total) * Math.PI * 2 - Math.PI / 2
+      const g = p.cut ? 0.012 : 0.002
+      x.beginPath(); x.arc(cx, cy, R, a0 + g, a1 - g); x.arc(cx, cy, R * 0.73, a1 - g, a0 + g, true); x.closePath()
+      x.fillStyle = GLASS_TINT[p.key]; x.fill()
+      if (p.frost > 0) {
+        const af = a0 + (p.frost / total) * Math.PI * 2
+        x.beginPath(); x.arc(cx, cy, R, a0 + g, af); x.arc(cx, cy, R * 0.73, af, a0 + g, true); x.closePath()
+        x.fillStyle = 'rgba(240,244,250,0.72)'; x.fill()
+      }
+    }
+  }
+
+  function paintStage(instant = false) {
+    const cp = CHECKPOINTS[active]
+    const m = computeDay(partialState(cp.keys))
+    $('hudTitle').textContent = cp.title
+    const frost = m.pieces.reduce((s, p) => s + p.frost, 0)
+    $('legend').innerHTML =
+      m.segments
+        .filter((s) => s.hours > 0.05)
+        .map((s) => `<span class="dg-chip"><i style="--c:${GLASS_TINT[s.key]}"></i>${SEG_LABEL[s.key]} <b>${fmtHM(s.hours)}</b></span>`)
+        .join('') +
+      (frost > 0.01 ? `<span class="dg-chip dg-chip--frost"><i></i>Getting back to work <b>${fmtHM(frost)}</b></span>` : '') +
+      `<span class="dg-chip dg-chip--count">${m.pieceCountAfter} piece${m.pieceCountAfter === 1 ? '' : 's'}</span>`
+    if (glass) glass.set(m.pieces, m.totalHours, { instant: instant || prefersReducedMotion })
+    else { flatPieces = { pieces: m.pieces, total: m.totalHours }; drawFlat() }
   }
 
   function render() {
-    for (const cp of CHECKPOINTS) {
-      const bar = BARS.get(cp.id)
-      if (bar) paintBar(bar, computeDay(partialState(cp.keys)))
-    }
-
+    paintStage()
     const m = computeDay(state)
     $('pieceLine').textContent =
       `Your day started as ${m.pieceCountBefore} piece${m.pieceCountBefore === 1 ? '' : 's'}. ` +
       `Right now it's ${m.pieceCountAfter}${m.totalInterruptions ? `, cut apart by ${m.totalInterruptions} interruption${m.totalInterruptions === 1 ? '' : 's'} a day` : ''}.`
-
     $('perceivedWork').textContent = fmtH(m.perceivedWorkHours)
     $('actualWork').textContent = fmtH(m.actualWorkHours)
     $('lostLine').textContent =
       m.lostWorkMinutes > 0.5
-        ? `That's ${Math.round(m.lostWorkMinutes)} minutes a day spent refocusing rather than working — about ${(m.lostWorkMinutes / 60).toFixed(1)} hours, or roughly ${Math.max(1, Math.round(m.lostWorkMinutes / 110))} average feature-length films, every single day.`
-        : 'At this rate, almost none of it is lost to refocusing. Try raising how often you check your phone.'
+        ? `That's ${Math.round(m.lostWorkMinutes)} minutes a day spent getting back to work rather than doing it: ${(m.lostWorkMinutes / 60).toFixed(1)} hours, or roughly ${Math.max(1, Math.round(m.lostWorkMinutes / 110))} feature-length film${Math.round(m.lostWorkMinutes / 110) > 1 ? 's' : ''}, every single day.`
+        : 'At this rate, almost none of it is lost to refocusing. Try checking your phone more often.'
     $('refocusSource').textContent = SOURCES.refocus
-
     shell.setScore(fmtH(m.actualWorkHours))
     shell.setLevel(String(m.pieceCountAfter))
     shell.setMoves(String(m.totalInterruptions))
   }
 
-  // How far along each slider is, for its track's filled part.
+  /* ------------------------------------------------------------------ */
+  /* Sliders                                                             */
+  /* ------------------------------------------------------------------ */
+
   const fill = (i: HTMLInputElement) => i.style.setProperty('--p', `${((Number(i.value) - Number(i.min)) / (Number(i.max) - Number(i.min))) * 100}%`)
-  document.querySelectorAll<HTMLInputElement>('.dg-sec input[type="range"]').forEach((input) => {
-    fill(input)
-    input.addEventListener('input', () => fill(input))
-    input.addEventListener('input', () => {
-      const key = input.id as keyof DayInputs
-      state[key] = Number(input.value)
-      if (key === 'workHours') $('v-work').textContent = fmtH(state.workHours)
-      if (key === 'homeHours') $('v-home').textContent = fmtH(state.homeHours)
-      if (key === 'sleepHours') $('v-sleep').textContent = fmtH(state.sleepHours)
-      if (key === 'morningMin') $('v-morning').textContent = fmtMin(state.morningMin)
-      if (key === 'lunchMin') $('v-lunch').textContent = fmtMin(state.lunchMin)
-      if (key === 'dinnerMin') $('v-dinner').textContent = fmtMin(state.dinnerMin)
-      if (key === 'commuteMin') $('v-commute').textContent = fmtMin(state.commuteMin)
-      if (key === 'phoneIntervalMin') $('v-phone').textContent = state.phoneIntervalMin > 0 ? `every ${Math.round(state.phoneIntervalMin)}m` : 'off'
-      if (key === 'extraDistractionsPerDay') $('v-extra').textContent = String(Math.round(state.extraDistractionsPerDay))
+  const input = (id: string) => $<HTMLInputElement>(id)
+
+  function readouts() {
+    $('v-work').textContent = fmtHM(state.workHours)
+    $('v-sleep').textContent = fmtHM(state.sleepHours)
+    $('v-home').textContent = fmtHM(state.homeHours)
+    $('v-morning').textContent = fmtMin(state.morningMin)
+    $('v-lunch').textContent = fmtMin(state.lunchMin)
+    $('v-dinner').textContent = fmtMin(state.dinnerMin)
+    $('v-commute').textContent = fmtMin(state.commuteMin)
+    const waking = 24 - state.sleepHours
+    $('v-phone').textContent = state.phoneIntervalMin > 0
+      ? `every ${state.phoneIntervalMin} min · ${Math.round((waking * 60) / state.phoneIntervalMin)} a day`
+      : 'never'
+    $('v-extra').textContent = String(Math.round(state.extraDistractionsPerDay))
+  }
+
+  /** Reads every slider into the state. Home is what work and sleep leave of a day. */
+  function syncStateFromDOM(changed?: string) {
+    let work = Number(input('workHours').value), sleep = Number(input('sleepHours').value)
+    if (work + sleep > 24) {
+      if (changed === 'sleepHours') work = 24 - sleep
+      else sleep = 24 - work
+      input('workHours').value = String(work); input('sleepHours').value = String(sleep)
+      fill(input('workHours')); fill(input('sleepHours'))
+    }
+    state.workHours = work
+    state.sleepHours = sleep
+    state.homeHours = Math.max(0, 24 - work - sleep)
+    for (const k of ['morningMin', 'lunchMin', 'dinnerMin', 'commuteMin', 'extraDistractionsPerDay'] as const) state[k] = Number(input(k).value)
+    state.phoneIntervalMin = PHONE[Number(input('phoneStep').value)] ?? 0
+    readouts()
+  }
+
+  document.querySelectorAll<HTMLInputElement>('.dg-sec input[type="range"]').forEach((el) => {
+    fill(el)
+    el.addEventListener('input', () => {
+      fill(el)
+      syncStateFromDOM(el.id)
       render()
     })
     // The value let go of, once the slider has settled.
     let settle = 0
-    input.addEventListener('change', () => {
+    el.addEventListener('change', () => {
       clearTimeout(settle)
-      settle = window.setTimeout(() => shell.pick('Typical day, as set', Number(input.value), PICK_ROW[input.id as keyof DayInputs]), 1500)
+      const v = el.id === 'phoneStep' ? PHONE[Number(el.value)] : Number(el.value)
+      settle = window.setTimeout(() => shell.pick('Typical day, as set', v, PICK_ROW[el.id]), 1500)
     })
   })
 
   /* ------------------------------------------------------------------ */
-  /* Share + record                                                      */
-  /*                                                                      */
-  /* Declared before the pacing block below on purpose: `checkSections`   */
-  /* can call `updateShareCard` synchronously the moment it first runs    */
-  /* (a page that loads already scrolled down — a browser restoring       */
-  /* scroll position on reload or back/forward is a real, common way      */
-  /* that happens), and a `let` referenced before its own declaration      */
-  /* line executes throws, even from inside an already-hoisted function.  */
+  /* Share + record. Declared before the pacing below on purpose: the     */
+  /* first check can reach the reckoning at once on a page that loads     */
+  /* already scrolled down, and a `let` read before its declaration runs  */
+  /* throws.                                                              */
   /* ------------------------------------------------------------------ */
 
   let shareCard: import('../lib/result-card').ResultCard | null = null
@@ -431,7 +424,7 @@ import { withBase } from '../lib/base'
 
   /** The reckoning, as the shell's result card. It waits under the section
       rather than pulling the page past it. */
-  function finish(m: ReturnType<typeof computeDay>) {
+  function finish(m: DayModel) {
     if (m.actualWorkHours > 0) shell.considerBest(Math.round(m.actualWorkHours * 10), fmtH(m.actualWorkHours))
     shell.win({
       celebrate: false,
@@ -457,118 +450,108 @@ import { withBase } from '../lib/base'
   }
 
   /* ------------------------------------------------------------------ */
-  /* Each later section activates its slider to a real default the first */
-  /* time it scrolls into view — a pacing device, never a gate.          */
+  /* Pacing: each later section takes a real default the first time it   */
+  /* scrolls into view, and the ring shows what the section in view knows. */
+  /* One synchronous check on scroll, not IntersectionObserver: its        */
+  /* callbacks are queued, and a jump straight to the reckoning could show */
+  /* numbers from before the sections above it had taken their defaults.  */
   /* ------------------------------------------------------------------ */
 
-  const DEFAULTS: Partial<Record<keyof DayInputs, number>> = {
-    morningMin: 30, lunchMin: 30, dinnerMin: 30, commuteMin: 20,
-    phoneIntervalMin: 15, extraDistractionsPerDay: 4,
-  }
-  const SECTION_KEYS: Record<string, (keyof DayInputs)[]> = {
-    'sec-morning': ['morningMin'],
-    'sec-meals': ['lunchMin', 'dinnerMin'],
-    'sec-commute': ['commuteMin'],
-    'sec-phone': ['phoneIntervalMin', 'extraDistractionsPerDay'],
+  const DEFAULTS: Record<string, [string, number][]> = {
+    'sec-morning': [['morningMin', 30]],
+    'sec-meals': [['lunchMin', 30], ['dinnerMin', 30]],
+    'sec-commute': [['commuteMin', 20]],
+    'sec-phone': [['phoneStep', phoneStepOf(30)], ['extraDistractionsPerDay', 4]],
   }
 
   function activate(sectionId: string) {
-    for (const key of SECTION_KEYS[sectionId] ?? []) {
-      const el = document.getElementById(key) as HTMLInputElement | null
+    let any = false
+    for (const [id, target] of DEFAULTS[sectionId] ?? []) {
+      const el = input(id)
       if (!el || Number(el.value) !== 0) continue
-      const target = DEFAULTS[key]!
       el.value = String(target)
-      el.dispatchEvent(new Event('input', { bubbles: true }))
+      fill(el)
+      any = true
     }
+    return any
   }
 
-  /* ------------------------------------------------------------------ */
-  /* One synchronous, scroll-driven check — not IntersectionObserver.     */
-  /*                                                                      */
-  /* An earlier version used IntersectionObserver for this (one instance  */
-  /* per pacing section, plus a second instance watching the results      */
-  /* section as a "did anything get skipped" safety net). Both instances  */
-  /* worked, but IntersectionObserver callbacks are asynchronous by spec — */
-  /* queued after layout rather than run inline — and jumping straight to */
-  /* the results section (a real path: a11y "skip to results" navigation, */
-  /* a fast trackpad flick, or simply this page's own `sec-results`       */
-  /* scrollIntoView safety net firing before the *other* four observers'  */
-  /* callbacks had been dispatched) could show the results section with   */
-  /* stale, half-activated numbers for one to a few hundred milliseconds  */
-  /* before the second observer's callback finally ran and corrected it.  */
-  /* A `getBoundingClientRect` check driven by `scroll` + `requestAnimationFrame`  */
-  /* is synchronous with the frame it runs in — there is no callback queue */
-  /* to be behind — so the results section can never render a number      */
-  /* before every earlier section has already been activated.             */
-  /* ------------------------------------------------------------------ */
-
-  const PACING_SECTIONS = Object.keys(SECTION_KEYS)
   let recorded = false
-
-  /** Reads every slider's live DOM value straight into `state`, bypassing
-   *  the input-event round trip entirely. `activate()` sets `.value` and
-   *  dispatches a synthetic `input` event for the normal case (so typing in
-   *  a slider and a section merely scrolling into view go through the same
-   *  one code path) — but a *smooth* scroll (this site sets
-   *  `scroll-behavior: smooth` globally) fires a real `scroll` event on
-   *  nearly every animation frame of the scroll, and `checkSections` below
-   *  runs on each one. Several `activate()` calls landing across
-   *  consecutive frames, each synchronously dispatching and handling its
-   *  own `input` event, is exactly the kind of interleaving that is easy to
-   *  reason about wrong; reading the DOM directly has no such ordering to
-   *  get wrong. This is what the results section actually relies on. */
-  function syncStateFromDOM() {
-    for (const key of Object.keys(state) as (keyof DayInputs)[]) {
-      const el = document.getElementById(key) as HTMLInputElement | null
-      if (el) state[key] = Number(el.value)
-    }
-  }
-
   let reached = 1
   function checkSections() {
-    PACING_SECTIONS.forEach((id, i) => {
-      const el = document.getElementById(id)
-      if (el && el.getBoundingClientRect().top < innerHeight * 0.9) {
-        activate(id)
-        // Sections down the page: 1 is the basics, 5 the interruptions.
-        if (i + 2 > reached) shell.progress(reached = i + 2)
+    let changed = false
+    let now = 0
+    CHECKPOINTS.forEach((cp, i) => {
+      const el = $(cp.id)
+      const top = el.getBoundingClientRect().top
+      if (i > 0 && top < innerHeight * 0.9) {
+        if (activate(cp.id)) changed = true
+        if (i < 5 && i + 1 > reached) shell.progress(reached = i + 1)
       }
+      // The section in view is the last one whose top has passed the middle of
+      // the screen (or of the part of it under the ring, on a narrow one).
+      if (i === 0 || top < innerHeight * (wide.matches ? 0.55 : 0.78)) now = i
     })
-    const results = document.getElementById('sec-results')
-    if (!recorded && results && results.getBoundingClientRect().top < innerHeight) {
-      // Belt and suspenders: whatever might have kept an earlier section
-      // from activating on its own (this loop runs first every time, so in
-      // the ordinary case there is nothing left to do here) is caught here
-      // too, before the results section is allowed to compute anything.
-      for (const id of PACING_SECTIONS) activate(id)
+    const results = $('sec-results')
+    if (!recorded && results.getBoundingClientRect().top < innerHeight) {
+      for (const id of Object.keys(DEFAULTS)) if (activate(id)) changed = true
       recorded = true
       syncStateFromDOM()
       render()
       updateShareCard()
     }
+    if (changed) syncStateFromDOM()
+    if (changed || now !== active) { active = now; render() }
   }
 
+  /* ------------------------------------------------------------------ */
+  /* The glass, loaded after first paint; the page works without it.      */
+  /* ------------------------------------------------------------------ */
+
+  async function mountGlass() {
+    try {
+      const { createDayGlass } = await import('../lib/day-glass')
+      glass = createDayGlass(canvas)
+    } catch {
+      glass = null
+    }
+    if (glass) {
+      glass.frame(framing())
+      wide.addEventListener('change', () => glass?.frame(framing()))
+      paintStage(true)
+    } else {
+      canvas.hidden = true
+      const flat = document.querySelector<HTMLCanvasElement>('.dg-flat')!
+      flat.hidden = false
+      new ResizeObserver(drawFlat).observe(flat)
+      paintStage(true)
+    }
+  }
+
+  syncStateFromDOM()
+  render()
+  mountGlass()
+
   if (prefersReducedMotion) {
-    for (const id of PACING_SECTIONS) activate(id)
+    for (const id of Object.keys(DEFAULTS)) activate(id)
+    syncStateFromDOM()
     recorded = true
-    // Still an ending, once the reckoning is actually reached.
     const io = new IntersectionObserver((rows) => {
       if (rows.some((r) => r.isIntersecting)) { io.disconnect(); syncStateFromDOM(); render(); updateShareCard() }
     })
-    io.observe(document.getElementById('sec-results')!)
-  } else {
-    let ticking = false
-    addEventListener(
-      'scroll',
-      () => {
-        if (ticking) return
-        ticking = true
-        requestAnimationFrame(() => { ticking = false; checkSections() })
-      },
-      { passive: true },
-    )
-    checkSections() // in case the page loads already scrolled (a reload, a deep link)
+    io.observe($('sec-results'))
   }
+  let ticking = false
+  addEventListener(
+    'scroll',
+    () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => { ticking = false; checkSections() })
+    },
+    { passive: true },
+  )
+  checkSections() // in case the page loads already scrolled (a reload, a deep link)
 
   /* ------------------------------------------------------------------ */
   /* The real clock                                                      */
@@ -582,95 +565,78 @@ import { withBase } from '../lib/base'
   }
   paintClock()
   setInterval(paintClock, 30_000)
-
-  render()
 </script>
 
 <style is:global>
-  /* A paper page. The day-bar's colours are the design system's own blocks,
-     one per part of the day, with sleep as ink. */
-  .day-body {
-    --dg-morning: var(--lilac); --dg-commute: #aab4c4; --dg-work: var(--cobalt);
-    --dg-lunch: var(--sky); --dg-home: var(--mint); --dg-dinner: var(--red); --dg-sleep: #1a2233;
+  /* The stage is the desk: a sheet of paper under a window, edge to edge. */
+  .stage:has(> .day-body) { padding: 0; overflow: clip; background: #e9ecf0; }
+  .day-body { position: relative; }
+
+  /* Sticky, not fixed: pinned while the page scrolls over it, but inside the frame. */
+  .dg-bg {
+    position: sticky; top: 0; height: 100vh; height: 100svh; margin-bottom: -100vh; margin-bottom: -100svh;
+    z-index: 0; pointer-events: none; overflow: hidden; border-radius: inherit;
   }
-  .dg-head { max-width: 640px; margin: 2vh auto 0; text-align: center; }
-  .dg-eyebrow { display: block; margin: 0 0 12px; color: var(--ink2); }
-  .dg-lead { font-size: var(--fs-lead); line-height: 1.6; color: var(--ink2); max-width: 54ch; margin: 0 auto; }
+  .dg-canvas, .dg-flat { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .dg-flat[hidden], .dg-canvas[hidden] { display: none; }
+  .day-body > :not(.dg-bg) { position: relative; z-index: 1; }
+
+  /* What the ring is showing, and what each colour of glass is. */
+  .dg-hud {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 0 clamp(16px, 4vw, 48px) clamp(14px, 3vh, 30px);
+    display: grid; justify-items: center; gap: 8px; text-align: center;
+  }
+  .dg-hud-title {
+    margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink2);
+  }
+  .dg-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; max-width: 640px; }
+  .dg-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); white-space: nowrap; }
+  .dg-chip b { color: var(--ink); font-weight: 700; }
+  .dg-chip i {
+    width: 11px; height: 11px; border-radius: 3px; flex: none; background: var(--c);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45), inset 0 -1px 2px rgb(0 0 0 / 0.25);
+  }
+  .dg-chip--frost i { background: linear-gradient(135deg, #e9eef8, #b8c3d8); }
+  .dg-chip--count { font-weight: 700; color: var(--ink); }
+  @media (min-width: 900px) {
+    .dg-hud { left: 46%; right: 0; }
+  }
+
+  /* ---- the words, scrolling past the ring ---------------------------- */
+  .dg-sec { min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: 10vh clamp(16px, 4vw, 56px); }
+  .dg-card { width: 100%; max-width: 440px; }
+  .dg-results { min-height: 0; padding-bottom: 14vh; }
+  @media (max-width: 899px) {
+    /* On a narrow screen the ring and its legend are a band pinned across the
+       top, and the words scroll up under it, so the ring is always in sight
+       while its sliders are being moved. */
+    .dg-bg {
+      height: 54svh; margin-bottom: 0; z-index: 3; background: #eceff3;
+      box-shadow: 0 1px 0 rgb(17 19 24 / 0.08), 0 14px 22px -20px rgb(17 19 24 / 0.5);
+    }
+    .dg-sec { min-height: 62svh; justify-content: flex-start; padding: 30px 16px 36px; }
+    .dg-sec { scroll-margin-top: 54svh; }
+    .dg-results { min-height: 0; padding-bottom: 12vh; }
+    .dg-card { max-width: 560px; margin: 0 auto; }
+    .dg-hud { gap: 5px; padding-bottom: 10px; }
+    .dg-hud-title { font-size: 11px; }
+    .dg-legend { gap: 3px 10px; }
+    .dg-chip { font-size: 12px; gap: 5px; }
+    .dg-chip i { width: 9px; height: 9px; }
+  }
+
+  .dg-eyebrow { display: block; margin: 0 0 10px; color: var(--ink2); }
+  .dg-title { font-size: clamp(34px, 4.6vw, 56px); line-height: 1.02; margin: 0 0 14px; }
+  .dg-lead { font-size: var(--fs-lead); line-height: 1.55; color: var(--ink2); margin: 0 0 24px; }
+  .dg-sec h2 { font-size: clamp(26px, 3.4vw, 40px); line-height: 1.08; margin: 0 0 12px; }
+  .dg-sec p { font-size: 16px; line-height: 1.6; color: var(--ink2); margin: 0 0 20px; }
+  .dg-note { font-style: italic; color: var(--ink3) !important; }
   .dg-report-acts { display: flex; flex-wrap: wrap; gap: 10px; }
 
-  /* ---- the day-bar itself: big, vertical, and the actual point ---------
-     A thin horizontal pill read as a footnote. A day is better read the way
-     it is lived — top to bottom, morning to sleep — and big enough that the
-     cuts later on genuinely register rather than needing a caption to
-     explain them. Each section gets its own fresh one instead of a single
-     shrunk dashboard that stays pinned the whole way down. */
-  .daybar { margin: 34px auto 0; max-width: 340px; text-align: center; }
-  .daybar-title {
-    font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--ink2); margin: 0 0 14px;
-  }
-  .daybar-frame {
-    padding: 14px; border-radius: var(--r-lg);
-    background: var(--card);
-    border: 2px solid var(--ink);
-    box-shadow: var(--shadow-block);
-  }
-  .daybar-col {
-    position: relative; display: flex; flex-direction: column;
-    height: clamp(260px, 40vh, 420px); border-radius: 13px; overflow: hidden;
-    background: var(--paper2);
-  }
-  .daybar-big .daybar-col { height: clamp(300px, 52vh, 520px); }
-  .seg { position: relative; width: 100%; height: 0; }
-  html.play .seg { transition: height 620ms cubic-bezier(0.22, 0.61, 0.36, 1); }
-  .seg.is-empty { height: 0 !important; }
-  /* A soft top-edge highlight on every segment — the difference between a
-     flat swatch and something that reads as a material with real light on
-     it, without ever touching a real gradient fill (still flat colour). */
-  .seg > i { position: absolute; inset: 0 0 auto 0; height: 40%; background: rgba(255, 255, 255, 0.16); }
-  .seg[data-key='morning'] { background: var(--dg-morning); }
-  .seg[data-key='commute'] { background: var(--dg-commute); }
-  .seg[data-key='work'] { background: var(--dg-work); }
-  .seg[data-key='lunch'] { background: var(--dg-lunch); }
-  .seg[data-key='home'] { background: var(--dg-home); }
-  .seg[data-key='dinner'] { background: var(--dg-dinner); }
-  .seg[data-key='sleep'] { background: var(--dg-sleep); }
-  .seg[data-key='sleep'] > i { background: rgba(255, 255, 255, 0.05); }
-
-  .cuts { position: absolute; inset: 0; pointer-events: none; }
-  .cuts i {
-    position: absolute; left: 0; right: 0; height: 2px;
-    background: rgba(17, 19, 24, 0.7);
-    box-shadow: 0 0 3px rgba(255, 255, 255, 0.35);
-    transform: translateY(-50%);
-  }
-  html.play .cuts i { opacity: 0; animation: dg-cut-in 260ms ease forwards; }
-  @keyframes dg-cut-in { to { opacity: 1; } }
-
-  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 14px; margin: 16px 0 0; }
-  .legend .dg-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); }
-  .legend .dg-chip i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
-  .legend .dg-chip[data-key='morning'] i { background: var(--dg-morning); }
-  .legend .dg-chip[data-key='commute'] i { background: var(--dg-commute); }
-  .legend .dg-chip[data-key='work'] i { background: var(--dg-work); }
-  .legend .dg-chip[data-key='lunch'] i { background: var(--dg-lunch); }
-  .legend .dg-chip[data-key='home'] i { background: var(--dg-home); }
-  .legend .dg-chip[data-key='dinner'] i { background: var(--dg-dinner); }
-  .legend .dg-chip[data-key='sleep'] i { background: var(--dg-sleep); }
-  .piececount { margin: 10px 0 0; font-size: 14px; color: var(--ink2); }
-
-  /* ---- sections -------------------------------------------------------- */
-  .dg-body-content { max-width: 640px; margin: 0 auto; }
-  .dg-sec { padding: 8vh 0; border-top: 1.5px solid var(--paper3); }
-  .dg-sec:first-of-type { border-top: 0; }
-  .dg-sec h2 { font-size: clamp(26px, 4vw, 38px); line-height: 1.1; margin: 0 0 10px; }
-  .dg-sec > p { font-size: 16px; line-height: 1.6; color: var(--ink2); margin: 0 0 22px; max-width: 56ch; }
-  .dg-note { font-style: italic; color: var(--ink3) !important; }
-
-  .dg-slider { display: block; margin: 0 0 22px; }
-  .dg-slider-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 14.5px; margin-bottom: 8px; }
+  .dg-slider { display: block; margin: 0 0 18px; }
+  .dg-slider-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14.5px; margin-bottom: 6px; }
   .dg-slider-label b { font-weight: 600; }
-  .dg-slider-label i { font-style: normal; font-weight: 700; color: var(--ink2); }
+  .dg-slider-label i { font-style: normal; font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* A thumb a finger can find: 26px on a 36px-tall track, drawn here rather than left at the browser's own. */
   .dg-slider input[type='range'] { width: 100%; height: 36px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
   .dg-slider input[type='range']::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--ink) var(--p, 0%), var(--paper3) var(--p, 0%)); }
@@ -680,36 +646,32 @@ import { withBase } from '../lib/base'
   .dg-slider input[type='range']::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--card); border: 3px solid var(--ink); }
   .dg-slider input[type='range']:focus-visible { outline: 3px solid var(--t-cobalt); outline-offset: 4px; border-radius: 6px; }
 
-  .dg-source { font-size: 13px; color: var(--ink3); line-height: 1.5; margin: -8px 0 20px; max-width: 56ch; }
+  .dg-home { display: flex; justify-content: space-between; align-items: baseline; font-size: 14.5px !important; color: var(--ink2); padding: 10px 0 0; border-top: 1.5px dashed var(--paper3); }
+  .dg-home b { font-weight: 600; color: var(--ink); }
+  .dg-home i { font-style: normal; font-weight: 700; color: var(--ink); }
 
-  .dg-common { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
-  .dg-common li {
-    font-size: 14px; color: var(--ink2); padding-left: 16px; position: relative;
-  }
-  .dg-common li::before {
-    content: ''; position: absolute; left: 0; top: 0.55em; width: 6px; height: 6px;
-    border-radius: 50%; background: var(--cobalt);
-  }
+  .dg-source { font-size: 13px !important; color: var(--ink3) !important; line-height: 1.5 !important; margin: -6px 0 18px !important; }
 
-  /* ---- results ----------------------------------------------------------- */
-  .dg-results { text-align: left; }
-  .dg-piece-line { font-size: var(--fs-lead); margin-bottom: 26px; }
-  .dg-worklines { display: grid; gap: 12px; margin-bottom: 14px; }
+  .dg-common { list-style: none; margin: 4px 0 16px; padding: 0; display: grid; gap: 6px; }
+  .dg-common li { font-size: 14px; color: var(--ink2); padding-left: 16px; position: relative; }
+  .dg-common li::before { content: ''; position: absolute; left: 0; top: 0.55em; width: 6px; height: 6px; border-radius: 50%; background: var(--cobalt); }
+
+  /* ---- the reckoning ------------------------------------------------- */
+  .dg-piece-line { font-size: var(--fs-lead) !important; color: var(--ink) !important; }
+  .dg-worklines { display: grid; gap: 10px; margin-bottom: 14px; }
   .dg-workline {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 18px; border-radius: var(--r); background: var(--paper2);
-    font-size: 15px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 13px 16px; border-radius: var(--r); background: rgb(255 255 255 / 0.7); font-size: 15px;
+    box-shadow: inset 0 0 0 1.5px var(--paper3);
   }
-  .dg-workline b { font-size: 24px; }
-  .dg-workline.dg-actual { background: var(--mint); }
-  .dg-lost { font-size: 16px; line-height: 1.6; margin: 4px 0 6px; }
-  .dg-clock { font-size: 15px; color: var(--ink2); margin-top: 20px; }
+  .dg-workline small { display: block; font-size: 12px; color: var(--ink3); }
+  .dg-workline b { font-size: 24px; font-variant-numeric: tabular-nums; }
+  .dg-workline.dg-actual { background: rgb(63 104 255 / 0.12); box-shadow: inset 0 0 0 1.5px rgb(63 104 255 / 0.45); }
+  .dg-lost { color: var(--ink) !important; }
+  .dg-clock { font-size: 15px !important; }
 
-  /* ---- outro --------------------------------------------------------- */
-  .dg-outro { padding: 4vh 0 2vh; }
-
-  .how { text-align: left; font-size: 15px; color: var(--ink2); }
-  .how summary { cursor: pointer; font-weight: 700; color: var(--ink); margin-bottom: 8px; text-align: center; }
-  .how p { line-height: 1.6; margin: 10px 0; }
+  .how { text-align: left; font-size: 15px; color: var(--ink2); margin-top: 8px; }
+  .how summary { cursor: pointer; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+  .how p { font-size: 15px !important; line-height: 1.6; margin: 10px 0 !important; }
   .how a { color: var(--t-cobalt); }
 </style>
