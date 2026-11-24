@@ -2703,7 +2703,14 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     cove; the harbour wraps a basin, the lighthouse on the breakwater at
     its mouth and the ferry berthing inside. Each district is laid along
     streets of its own, and their frontage fills with terraced townhouses,
-    shops under striped awnings and fishermen's cottages. See the README.
+    shops under striped awnings and fishermen's cottages. Then a cable car from
+    the lake up to the summit, hot springs steaming in the Badlands, trees
+    along every street, swans and rowing boats on the lake. Then, after
+    looking at what makes GTA VI's streets read as real (bounce light, and
+    every block full of lived-in clutter and wear): power lines on wooden
+    poles, parked cars, bins, air conditioners and drainpipes, shop boards;
+    and in Unity, walls streaked by rain and damp at their foot, oil stains
+    and cracks in the roads, a wrack line on the beaches. See the README.
 
     **Share This Page** (later): a sending desk instead of a pop-up
     (lib/share-desk.ts): every way a real thing made from the message, the
