@@ -70,6 +70,23 @@ Shader "Island/Building"
 
             float fbm(float2 p) { return vnoise(p) * 0.5 + vnoise(p * 2.07 + 3.1) * 0.3 + vnoise(p * 4.3 + 7.7) * 0.2; }
 
+            // A wall's years: rain has run down it from every sill and the eaves in long, broken streaks, and the damp
+            // has risen into its foot, a little greener; each building aged its own amount (its seed), so no two
+            // neighbours wear alike. In stone greys and moss, never a warm stain.
+            float3 Weathered(float3 alb, float2 uv, float seed)
+            {
+                float age = 0.35 + 0.65 * hash21(float2(seed * 17.3, 4.1));
+                float sx = uv.x * 26 + (vnoise(float2(uv.y * 1.3, seed * 3.1)) - 0.5) * 1.4;
+                float streak = smoothstep(0.6, 0.95, vnoise(float2(sx, uv.y * 0.3 + seed * 9.7)))
+                             * smoothstep(0.3, 0.75, vnoise(float2(uv.x * 3.7 + seed * 5.3, uv.y * 0.7)));
+                alb *= 1 - 0.17 * age * streak;
+                float foot = 1 - saturate(uv.y * 5.0 + (vnoise(uv * float2(5.5, 2.2) + seed * 7.1) - 0.5) * 0.7);
+                alb = lerp(alb, alb * float3(0.82, 0.88, 0.84), foot * foot * 0.5 * age);
+                // Soot and grime in patches, broad and soft.
+                alb *= 1 - 0.07 * age * smoothstep(0.55, 0.85, fbm(uv * 2.3 + seed * 11.0));
+                return alb;
+            }
+
             half4 frag(V i, bool front : SV_IsFrontFace) : SV_Target
             {
                 int m = (int)round(i.mat.x);
@@ -96,6 +113,7 @@ Shader "Island/Building"
                     bump = lerp(b0, b1, pale) * 0.3;
                     alb *= d * (0.97 + 0.05 * (fbm(uv * 9) - 0.5));
                     alb *= lerp(0.9, 1, saturate(uv.y * 8));
+                    if (abs(N.y) < 0.4) alb = Weathered(alb, uv, seed);
                 }
                 else if (m == 1)
                 {
@@ -105,6 +123,7 @@ Shader "Island/Building"
                     float3 d = lerp(Photo(3, uv, seed, 1.0, 0.35, b0), Photo(2, uv, seed, 0.9, 0.2, b1), pale);
                     bump = lerp(b0, b1, pale) * 0.8;
                     alb *= d;
+                    if (abs(N.y) < 0.4) alb = Weathered(alb, uv, seed);
                 }
                 else if (m == 2 || m == 3)
                 {

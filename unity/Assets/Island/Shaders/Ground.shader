@@ -173,6 +173,13 @@ Shader "Island/Ground"
                 detail += saturate(1 - sum);
 
                 alb *= detail;
+                // The road's years: oil dropped where cars stand, and fine cracks wandering across it, in patches.
+                if (sb.r > 0.05)
+                {
+                    float stain = smoothstep(0.7, 0.9, vnoise(p * 2.3 + 17.1)) * smoothstep(0.35, 0.7, vnoise(p * 0.7 + 3.3));
+                    float crack = (1 - smoothstep(0.0, 0.03, abs(vnoise(p * 9.0 + 5.5) - 0.5))) * smoothstep(0.55, 0.78, vnoise(p * 1.3 + 9.0));
+                    alb *= 1 - sb.r * (0.2 * stain + 0.22 * crack);
+                }
                 // Under the sea: wet and darker at once, and the water taking the red out of it first, then the
                 // green, the deeper it lies; faint caustics in the shallows, gone by the shelf's edge.
                 float under = _IslandSea - i.ws.y;
@@ -182,8 +189,15 @@ Shader "Island/Ground"
                     float fade = smoothstep(0.0, 0.05, under) * (1 - smoothstep(0.1, 0.65, under));
                     alb *= 1 + Caustics(p * 0.6) * 0.25 * fade;
                 }
-                // Just above the water: a band of wet sand, darker, drying as it rises.
-                else alb *= lerp(0.76, 1, smoothstep(0, 0.03, -under));
+                // Just above the water: a band of wet sand, darker, drying as it rises; a little higher, the broken
+                // line of weed and wrack the last tide left.
+                else
+                {
+                    alb *= lerp(0.76, 1, smoothstep(0, 0.03, -under));
+                    float tide = -under - 0.034 - (vnoise(p * 1.7) - 0.5) * 0.018;
+                    float wrack = (1 - smoothstep(0.0, 0.006, abs(tide))) * smoothstep(0.35, 0.62, vnoise(p * 6.3 + 2.2)) * saturate(sa.g + sa.b);
+                    alb = lerp(alb, alb * float3(0.6, 0.66, 0.6), wrack * 0.75);
+                }
                 // Fine bumps where there is no photo, so the flat still catches the light unevenly.
                 float2 q = p * 120;
                 float bx = vnoise(q + float2(0.5, 0)) - vnoise(q - float2(0.5, 0));
