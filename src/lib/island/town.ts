@@ -71,6 +71,97 @@ export function cottage(p: Pen, x: number, y: number, o: { wall?: string; roof?:
   }
 }
 
+/**
+ * A townhouse: two or three storeys on a narrow plot, a window to every
+ * storey on both faces we see, its door to the road, a steep roof with its
+ * gable to the street. Side by side along a road they make a terrace.
+ */
+export function townhouse(p: Pen, x: number, y: number, o: { wall?: string; roof?: string; door: 'x' | 'y'; storeys?: number; w?: number; d?: number; smoke?: boolean }) {
+  const st = o.storeys ?? 2, w = o.w ?? 0.62, d = o.d ?? 0.58, h = 6 + st * 11
+  const wall = o.wall ?? '#ffffff', roof = o.roof ?? C.cobalt
+  const x0 = x - w / 2, y0 = y - d / 2
+  const [sx, sy] = p.at(x, y)
+  p.el('ellipse', { cx: sx, cy: sy + 5, rx: 28, ry: 10, fill: INK, opacity: p.real ? 0 : 0.1 })
+  const b = p.box(x0, y0, w, d, h, { fill: wall })
+  p.band(b, 0, 3, shade(wall, 0.78))
+  // A cornice under the roof, so the storeys read as a building, not a box.
+  p.band(b, h - 2.5, h, shade(wall, 0.86))
+  const other = o.door === 'x' ? 'y' : 'x'
+  p.door(b, o.door, 0.5, { w: 0.14, h: 10, fill: o.door === 'x' ? C.cobalt : '#5b6fd6' })
+  p.windows(b, o.door, { rows: st - 1, cols: 2, z0: 15, h: 5.5, gap: 5.5, wide: 0.3 })
+  p.windows(b, other, { rows: st, cols: 2, z0: 4, h: 5.5, gap: 5.5, wide: 0.34 })
+  p.gable(x0, y0, w, d, h, 13, roof, o.door === 'x' ? 'y' : 'x', { lines: 3, over: 0.05 })
+  const cx = x0 + w * 0.25, cy = y0 + d * 0.7
+  p.box(cx - 0.05, cy - 0.05, 0.1, 0.1, 10, { z0: h + 5, fill: '#d5d9ea', trim: shade('#d5d9ea', 0.8) })
+  if (o.smoke) {
+    const [mx, my] = p.at(cx, cy, h + 16)
+    const g = p.el('g', { class: 'amb', 'data-b': box(mx - 14, my - 50, mx + 20, my) })
+    const soft = p.real ? puffShade(g, `smoke${f(mx)}_${f(my)}`, '#eef0f4', 0.75) : null
+    for (const dl of [0, 1, 2]) g.add(new N('circle', { cx: f(mx), cy: f(my - 2), r: soft ? 5.2 : 3.4, fill: soft ?? '#ffffff', stroke: soft ? undefined : INK, 'stroke-width': soft ? undefined : 0.8, class: 'puff', style: `animation-delay:${dl}s` }))
+  }
+}
+
+/**
+ * A shop: a wide window and a striped awning on the street, a storey of
+ * rooms above it, its roof with the gable to the side.
+ */
+export function shopfront(p: Pen, x: number, y: number, o: { wall?: string; roof?: string; door: 'x' | 'y'; stripes: string[]; storeys?: number; w?: number; d?: number }) {
+  const st = o.storeys ?? 2, w = o.w ?? 0.7, d = o.d ?? 0.62, h = 8 + (st - 1) * 11
+  const wall = o.wall ?? '#ffffff', roof = o.roof ?? C.lilac
+  const x0 = x - w / 2, y0 = y - d / 2
+  const [sx, sy] = p.at(x, y)
+  p.el('ellipse', { cx: sx, cy: sy + 5, rx: 30, ry: 10, fill: INK, opacity: p.real ? 0 : 0.1 })
+  const b = p.box(x0, y0, w, d, h, { fill: wall })
+  p.band(b, 0, 2.5, shade(wall, 0.75))
+  const other = o.door === 'x' ? 'y' : 'x'
+  // The shop window, the door beside it, and the awning over both.
+  p.windows(b, o.door, { rows: 1, cols: 1, z0: 2.5, h: 6.5, wide: 0.55, lit: true })
+  p.door(b, o.door, 0.86, { w: 0.11, h: 8, fill: C.mint })
+  p.awning(b, o.door, 0.06, 0.94, 10.5, 0.16, o.stripes)
+  if (st > 1) {
+    p.windows(b, o.door, { rows: st - 1, cols: 2, z0: 14, h: 5, gap: 6, wide: 0.3 })
+    p.windows(b, other, { rows: st - 1, cols: 2, z0: 14, h: 5, gap: 6, wide: 0.34 })
+  }
+  p.windows(b, other, { rows: 1, cols: 1, z0: 3, h: 5, wide: 0.3, lit: false })
+  p.gable(x0, y0, w, d, h, 10, roof, o.door, { lines: 2, over: 0.05 })
+}
+
+/**
+ * A suspension bridge along i, from tile point a to b at j, its deck z up:
+ * two towers standing in the water, the main cables hung between their tops
+ * and down to the deck at either end, hangers from cable to deck, railings.
+ * Drawn a stretch at a time (u0 to u1, fractions of its length), so each
+ * stretch takes its place among the things round it, back to front.
+ */
+export function bridge(p: Pen, a: number, b: number, j: number, z: number, u0: number, u1: number) {
+  const len = b - a, half = 0.34, top = z + 50, sag = z + 9
+  const steel = '#7d92d4', deck = '#d3dae8', rail = '#eef2fb'
+  const at = (u: number) => a + len * u
+  const t1 = 0.27, t2 = 0.73
+  // The cable's height at u: from the deck at each end up to a tower, and sagging between the towers.
+  const cable = (u: number) => u < t1 ? z + 4 + (top - z - 4) * (u / t1) ** 1.6 : u > t2 ? z + 4 + (top - z - 4) * ((1 - u) / (1 - t2)) ** 1.6 : sag + (top - sag) * ((2 * (u - t1)) / (t2 - t1) - 1) ** 2
+  // The deck, with its road on top.
+  p.box(at(u0), j - half, len * (u1 - u0), half * 2, 3, { z0: z - 3, fill: deck, top: '#9aa6bf', sw: 1.1 })
+  // Towers, where this stretch has one: two legs from the water to above the cables, braced across.
+  for (const t of [t1, t2]) {
+    if (t < u0 || t >= u1) continue
+    for (const s of [-1, 1]) p.box(at(t) - 0.07, j + s * half - 0.07, 0.14, 0.14, top + 6 - -12, { z0: -12, fill: steel, sw: 1.2 })
+    p.box(at(t) - 0.06, j - half, 0.12, half * 2, 4, { z0: top - 6, fill: steel, sw: 1 })
+    p.box(at(t) - 0.06, j - half, 0.12, half * 2, 3, { z0: z + 18, fill: steel, sw: 1 })
+  }
+  // Cables and hangers, each side.
+  const steps = Math.max(2, Math.round((u1 - u0) * 16))
+  for (const s of [-1, 1]) {
+    const y = j + s * half
+    for (let k = 0; k < steps; k++) {
+      const ua = u0 + ((u1 - u0) * k) / steps, ub = u0 + ((u1 - u0) * (k + 1)) / steps
+      p.line([at(ua), y, cable(ua)], [at(ub), y, cable(ub)], { sw: 1.6, stroke: steel })
+      if (k % 2 === 0 && cable(ua) > z + 7) p.line([at(ua), y, z], [at(ua), y, cable(ua)], { sw: 0.7, stroke: rail })
+    }
+    p.line([at(u0), y, z + 5], [at(u1), y, z + 5], { sw: 1, stroke: rail })
+  }
+}
+
 /** A post box. */
 export function postbox(p: Pen, x: number, y: number) {
   p.cyl(x, y, 0.045, 0, 11, C.rasp, { sw: 1.1, top: shade(C.rasp, 1.1) })
