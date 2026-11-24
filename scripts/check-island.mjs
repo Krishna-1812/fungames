@@ -23,7 +23,7 @@ import { register } from 'node:module'
 register('./resolve-ts.mjs', import.meta.url)
 
 const { listedGames } = await import('../src/data/games.ts')
-const { LANDMARKS, PLACES, DISTRICTS } = await import('../src/lib/island/landmarks.ts')
+const { LANDMARKS, PLACES, DISTRICTS, ground } = await import('../src/lib/island/landmarks.ts')
 const { buildIsland, GRID } = await import('../src/lib/island/world.ts')
 const { Resvg } = await import('@resvg/resvg-js')
 const { resvgRaster } = await import('../src/lib/island/raster.ts')
@@ -55,10 +55,7 @@ for (const [slug, , i, j] of PLACES) {
 }
 ok(`${PLACES.length} footprints checked for overlap`)
 // The districts' own land, before any building forces its cells to be land.
-const baseLand = (i, j) => DISTRICTS.some((d) => {
-  const wob = 0.55 * Math.sin(i * 1.27 + j * 0.71) + 0.4 * Math.cos(j * 1.93 - i * 0.43)
-  return Math.hypot(i + 0.5 - d.at[0], j + 0.5 - d.at[1]) < d.r + wob
-})
+const baseLand = (i, j) => ground(i, j).land
 for (const [slug, , i, j] of PLACES) {
   const lm = LANDMARKS[slug]; if (!lm) continue
   const [w, d] = lm.size, own = []
@@ -99,8 +96,9 @@ check(island.hiddenLights > 0 && island.hiddenLights < island.lights.length * 0.
 }
 // The page no longer ships this markup (the canvas draws the bake of it), so
 // this is not a download limit: it is what the bake has to read and paint, and
-// how long a build takes when the island changes.
-check(island.svg.length < 1600 * 1024, 'the island is under 1600 KB of markup')
+// how long a build takes when the island changes. (Raised from 1600 KB in
+// November 2026, when the towns filled their streets with houses.)
+check(island.svg.length < 2000 * 1024, 'the island is under 2000 KB of markup')
 
 console.log('bottles and signposts')
 {

@@ -17,10 +17,10 @@ import { folkPic } from './folk'
 import { figFeet, tree, person, lamp, bench, flowers, walkerFigure, sailboat, birds, cloudShape, cloudModel, type TreeKind, setFigures, figureDefs, planted, type Planted } from './props'
 import type { FigureSet, BuildingSet } from './figures'
 import type { SkyArt } from './plate'
-import { LANDMARKS, DISTRICTS, PLACES, type DistrictKey, type District } from './landmarks'
+import { LANDMARKS, DISTRICTS, PLACES, RIVER, POND, HUB, STREETS, ground as shapeAt, type DistrictKey, type District } from './landmarks'
 import { beacon, harbourArt } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
-import { cottage, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
+import { cottage, townhouse, shopfront, bridge, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
 import { paintGround, LAND, wander } from './terrain'
 import { STAMP } from '../passport-art'
 import { glassOf, BOTTLE_COUNT } from '../bottles'
@@ -33,12 +33,12 @@ const BEACH = -6
 /** The hot-air balloons: where each loops round (a tile and a height), its two colours, and its start in the loop (s). */
 const BALLOONS: [number, number, number, string, string, number][] = [[9, 26, 230, C.rasp, '#ffffff', 0], [26, 10, 260, C.cobalt, C.mint, 40]]
 /** The two fishing boats moored off the coast: a tile, the hull's colour, and when each starts to bob. */
-const FISHING: [number, number, string, number][] = [[31.6, 11.4, C.mint, 0], [-2.6, 9.2, C.rasp, 2.2]]
+const FISHING: [number, number, string, number][] = [[31.6, 11.4, C.mint, 0], [-2.6, 9.2, C.rasp, 2.2], [23.5, 21.7, C.cobalt, 1.1], [24.7, 24.5, '#ffffff', 3.3]]
 /** Piers: a run of ground points from a beach out over the water. */
-const PIERS: [number, number][][] = [[[5.5, 17.2], [5.5, 14.3]], [[14.5, 29.4], [14.5, 31.7]], [[21.5, 27.3], [21.5, 30.1]]]
+const PIERS: [number, number][][] = [[[6.5, 25.8], [6.5, 28.4]], [[13.5, 27.8], [13.5, 30.4]], [[25.5, 19.6], [25.5, 22.6]]]
 /** The ferry ties up at the end of the last pier, on its far side; a crossing takes this long. */
 const FERRY_DUR = 48
-const FERRY = { dock: [21.02, 29.75] as [number, number], from: [21.02, 47] as [number, number] }
+const FERRY = { dock: [26.05, 22.95] as [number, number], from: [47, 22.95] as [number, number] }
 const f = (v: number) => Math.round(v * 10) / 10
 const f2 = (v: number) => Math.round(v * 100) / 100
 /** Sand: two tones for the tops, the wet edge, and the two faces of a step. */
@@ -205,17 +205,8 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   /* ---- land, height, district ------------------------------------------ */
   const land: boolean[][] = [], height: number[][] = [], dist: District[][] = []
   for (let i = 0; i < GRID; i++) { land[i] = []; height[i] = []; dist[i] = []; for (let j = 0; j < GRID; j++) {
-    const c = [i + 0.5, j + 0.5]
-    let best = DISTRICTS[0], bd = Infinity, inside = false
-    for (const d of DISTRICTS) {
-      const r = Math.hypot(c[0] - d.at[0], c[1] - d.at[1])
-      const wob = 0.55 * Math.sin(i * 1.27 + j * 0.71) + 0.4 * Math.cos(j * 1.93 - i * 0.43)
-      if (r < d.r + wob) inside = true
-      if (r / d.r < bd) { bd = r / d.r; best = d }
-    }
-    land[i][j] = inside; dist[i][j] = best
-    const sd = Math.hypot(c[0] - 5.2, c[1] - 5.2)
-    height[i][j] = inside && best.key === 'peaks' ? Math.max(0, Math.round(5.2 - sd * 0.62)) * 12 : 0
+    const g = shapeAt(i, j)
+    land[i][j] = g.land; dist[i][j] = g.district; height[i][j] = g.level * 12
   } }
   const inGrid = (i: number, j: number) => i >= 0 && j >= 0 && i < GRID && j < GRID
   const isLand = (i: number, j: number) => inGrid(i, j) && land[i][j]
@@ -250,18 +241,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (isLand(i, j) && height[i][j] === 0 && !taken.has(key(i, j)) && coast(i, j)) beach.add(key(i, j))
   for (const k of beach) { const [i, j] = k.split(',').map(Number); height[i][j] = BEACH }
 
-  // A river: a spring high on Sky Peaks, falling down the terraces to the sea.
-  const river: [number, number][] = []
-  for (let j = 4; j < GRID && isLand(7, j); j++) river.push([7, j])
+  // A river: a spring high on Sky Peaks, falling down the terraces into the lake, and out of it into the fjord.
+  const river: [number, number][] = RIVER.filter(([i, j]) => isLand(i, j) && !taken.has(key(i, j)))
   const wet = new Set(river.map((c) => key(...c)))
   // A pond in the park in Old Town.
   const pond = new Set<string>()
-  for (const [i, j] of [[14, 9], [14, 10], [14, 11], [15, 9], [15, 10], [15, 11]]) if (isLand(i, j) && !taken.has(key(i, j))) pond.add(key(i, j))
+  for (const [i, j] of POND) if (isLand(i, j) && !taken.has(key(i, j))) pond.add(key(i, j))
   // Ground kept for fields, the windmill and the rock formations, so no tree
   // or tuft lands on them. Each is only used if its ground really is free.
   const reserved = new Set<string>()
-  const FIELDS: [number, number, number, number, 'lavender' | 'wheat' | 'greens'][] = [[9, 13, 1, 3, 'lavender'], [19, 15, 2, 3, 'wheat'], [22, 19, 2, 3, 'greens']]
-  const SPOTS: { mill: [number, number]; bale: [number, number][]; arch: [number, number]; buttes: [number, number, number][]; hoodoos: [number, number][]; boulders: [number, number][] } = { mill: [8, 15], bale: [[8, 16], [9, 12], [21, 15], [21, 16]], arch: [20, 7], buttes: [[22, 3, 34], [25, 6, 26], [18, 5, 20]], hoodoos: [[18, 4], [20, 9], [24, 3]], boulders: [[19, 6], [26, 6], [23, 4], [20, 10]] }
+  const FIELDS: [number, number, number, number, 'lavender' | 'wheat' | 'greens'][] = [[12, 5, 1, 3, 'lavender'], [20, 14, 2, 3, 'wheat'], [14, 14, 2, 2, 'greens']]
+  const SPOTS: { mill: [number, number]; bale: [number, number][]; arch: [number, number]; buttes: [number, number, number][]; hoodoos: [number, number][]; boulders: [number, number][] } = { mill: [23, 15], bale: [[23, 16], [23, 17], [25, 14], [26, 15]], arch: [21, 8], buttes: [[20, 3, 32], [23, 4, 24], [18, 6, 22], [25, 8, 28]], hoodoos: [[17, 5], [20, 4], [23, 3], [24, 7]], boulders: [[18, 5], [24, 6], [24, 9], [19, 6], [22, 4]] }
 
   /* ---- roads: found by searching round the buildings -------------------- */
   const road = new Set<string>()
@@ -296,11 +286,25 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     while (k) { const n = done.get(k)!; out.unshift(n.c); k = n.prev }
     return out
   }
-  const hub = nearestFree(14.8, 12.9)
-  const gates = Object.fromEntries(DISTRICTS.map((d) => [d.key, nearestFree(d.at[0] + (d.key === 'peaks' ? 3.6 : 0), d.at[1] + (d.key === 'peaks' ? 3.6 : 0))])) as Record<DistrictKey, [number, number]>
+  const hub = nearestFree(HUB[0] + 0.5, HUB[1] + 0.5)
   const routes: [number, number][][] = []
-  for (const d of DISTRICTS) if (d.key !== 'oldtown') { const r = search(gates[d.key], hub); if (r.length > 1) { routes.push(r); r.forEach((c) => road.add(key(...c))) } }
-  for (const [a, b] of [['market', 'funfair'], ['funfair', 'harbour'], ['harbour', 'proving'], ['proving', 'badlands']] as [DistrictKey, DistrictKey][]) { const r = search(gates[a], gates[b]); if (r.length > 1) { routes.push(r); r.forEach((c) => road.add(key(...c))) } }
+  // The streets first: each district's own, laid where the town is.
+  for (const [a, b] of STREETS) { const r = search(nearestFree(a[0] + 0.5, a[1] + 0.5), nearestFree(b[0] + 0.5, b[1] + 0.5)); if (r.length > 1) { routes.push(r); r.forEach((c) => road.add(key(...c))) } }
+  // A district's gate is its own street nearest its middle (Sky Peaks', at the foot of the mountain, the nearest street to it).
+  const nearestRoad = (x: number, y: number): [number, number] | null => {
+    let best: [number, number] | null = null, bd = Infinity
+    for (const k of road) { const [i, j] = k.split(',').map(Number); const d = Math.hypot(i + 0.5 - x, j + 0.5 - y) + (dist[i][j].key === dist[Math.min(GRID - 1, Math.max(0, Math.floor(x)))][Math.min(GRID - 1, Math.max(0, Math.floor(y)))].key ? 0 : 3); if (d < bd) { bd = d; best = [i, j] } }
+    return best
+  }
+  const gates = Object.fromEntries(DISTRICTS.map((d) => [d.key, nearestRoad(d.at[0] + (d.key === 'peaks' ? 3.6 : 0), d.at[1] + (d.key === 'peaks' ? 3.6 : 0)) ?? nearestFree(d.at[0], d.at[1])])) as Record<DistrictKey, [number, number]>
+  // Then whatever is not yet joined to the town square is joined to it, along the streets where they go.
+  const joined = () => { const seen = new Set([key(...hub)]), q = [hub]; while (q.length) { const [i, j] = q.shift()!; for (const [u, v] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = key(i + u, j + v); if (!seen.has(k) && road.has(k)) { seen.add(k); q.push([i + u, j + v]) } } } return seen }
+  for (const d of DISTRICTS) {
+    if (joined().has(key(...gates[d.key]))) continue
+    const r = search(gates[d.key], hub)
+    if (r.length > 1) { routes.push(r); r.forEach((c) => road.add(key(...c))) }
+  }
+  for (const r of routes) { if (joined().has(key(...r[0]))) continue; const back = search(r[0], hub); if (back.length > 1) { routes.push(back); back.forEach((c) => road.add(key(...c))) } }
 
   const free = (i: number, j: number) => { const k = key(i, j); return isLand(i, j) && !taken.has(k) && !road.has(k) && !wet.has(k) && !pond.has(k) && !beach.has(k) && !reserved.has(k) }
   const claim = (cells: [number, number][]) => { if (!cells.every(([i, j]) => free(i, j))) return false; cells.forEach(([i, j]) => reserved.add(key(i, j))); return true }
@@ -313,7 +317,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const boulderAt = SPOTS.boulders.filter((c) => claim([c]))
   // A dry wash across the Badlands: a riverbed that only runs once a year,
   // winding down to the western beach. Its cells are kept clear.
-  const WASH: [number, number][] = [[25.5, 8.7], [24.7, 7.6], [23.6, 7.4], [22.7, 6.4], [22.4, 5.0], [22.0, 4.1], [21.4, 3.3], [21.0, 2.4], [20.5, 2.05]]
+  const WASH: [number, number][] = [[23.4, 9.6], [23.8, 8.7], [24.6, 8.3], [25.3, 7.6], [25.8, 6.8]]
   const washCells = [...new Set(WASH.map(([u, v]) => key(Math.floor(u), Math.floor(v))))].map((k) => k.split(',').map(Number) as [number, number])
   const wash = claim(washCells) ? WASH : null
 
@@ -1337,19 +1341,19 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   for (const [n, [i, j]] of hoodoos.entries()) for (const [u, v, h, k] of [[0.38, 0.4, 44 - n * 6, 1], [0.66, 0.56, 30, 0.8], [0.4, 0.74, 22, 0.7]] as [number, number, number, number][]) at(i + u, j + v, i + j + u + v, (p) => hoodoo(p, i + u, j + v, h, k))
   for (const [n, [i, j]] of boulderAt.entries()) at(i + 0.5, j + 0.5, i + j + 1, (p) => boulders(p, i + 0.5, j + 0.5, 0.85 + (n % 2) * 0.25))
   // Sheep graze the low slopes of Sky Peaks; deer stand at the forest edge.
-  ;[[10.5, 3.4, false], [10.35, 5.3, true], [11.45, 6.6, false], [9.55, 9.55, true], [10.6, 7.7, false]].forEach(([i, j, flip], n) => {
+  ;[[10.5, 5.5, false], [11.4, 4.5, true], [10.5, 7.5, false], [11.5, 3.5, true]].forEach(([i, j, flip], n) => {
     if (!free(Math.floor(i as number), Math.floor(j as number))) return
     at(i as number, j as number, (i as number) + (j as number), (p) => sheep(poke(p, 'sheep', i as number, j as number, 'baa!', 16), i as number, j as number, flip as boolean, n * 1.7))
   })
-  ;[[8.5, 9.45, false], [6.45, 1.5, true]].forEach(([i, j, flip], n) => {
+  ;[[2.5, 5.5, false], [7.5, 3.5, true]].forEach(([i, j, flip], n) => {
     if (!free(Math.floor(i as number), Math.floor(j as number))) return
     at(i as number, j as number, (i as number) + (j as number), (p) => deer(poke(p, 'deer', i as number, j as number), i as number, j as number, flip as boolean, n * 3))
   })
-  for (const [i, j] of [[10.5, 2.5], [12.5, 7.5], [4.6, 1.5]]) if (free(Math.floor(i), Math.floor(j))) at(i, j, i + j, (p) => toadstools(p, i, j))
+  for (const [i, j] of [[6.5, 5.5], [3.5, 1.5], [9.5, 4.5]]) if (free(Math.floor(i), Math.floor(j))) at(i, j, i + j, (p) => toadstools(p, i, j))
   // Reeds round the pond and along the river's banks.
-  for (const [i, j] of [[14.22, 9.25], [15.8, 11.72], [14.2, 11.75], [15.82, 9.3], [7.12, 6.5], [7.86, 9.4], [7.85, 5.3], [7.14, 10.6]]) at(i, j, i + j, (p) => reeds(p, i, j, 0.85))
+  for (const [i, j] of [[16.15, 13.9], [17.6, 16.1], [18.05, 14.6], [15.95, 15.4], [3.4, 8.9], [5.6, 10.05], [7.2, 8.92], [12.1, 11.2], [9.3, 10.1]]) at(i, j, i + j, (p) => reeds(p, i, j, 0.85))
   // Crabs on the beaches, a tumbleweed in the Badlands.
-  ;[[8.5, 13.5], [24.5, 24.6], [13.5, 27.5], [3.5, 17.4]].forEach(([i, j], n) => { if (beach.has(key(Math.floor(i), Math.floor(j)))) at(i, j, i + j, (p) => crab(poke(p, 'crab', i, j, 'snip!', 12), i, j, n * 2.3)) })
+  ;[[3.5, 14.5], [26.5, 24.5], [13.5, 27.5], [21.5, 1.5]].forEach(([i, j], n) => { if (beach.has(key(Math.floor(i), Math.floor(j)))) at(i, j, i + j, (p) => crab(poke(p, 'crab', i, j, 'snip!', 12), i, j, n * 2.3)) })
   if (free(23, 7) || isLand(23, 7)) at(23.5, 6.5, 30, (p) => tumbleweed(p, 23.5, 6.5, 2))
   // Butterflies over the brightest meadows.
   {
@@ -1378,34 +1382,13 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       reserved.add(key(ni, nj))
     }
   }
-  for (const [i, j] of [[12.3, 12.4], [12.7, 12.6], [17.3, 13.3], [10.4, 13.6]]) if (free(Math.floor(i), Math.floor(j)) && height[Math.floor(i)][Math.floor(j)] === 0) at(i, j, i + j, (p) => topiary(p, i, j, 0.9))
+  for (const [i, j] of [[13.3, 15.4], [16.3, 12.4], [18.4, 12.4], [11.4, 13.6]]) if (free(Math.floor(i), Math.floor(j)) && height[Math.floor(i)][Math.floor(j)] === 0) at(i, j, i + j, (p) => topiary(p, i, j, 0.9))
 
   /* ---- town life ------------------------------------------------------------ */
   // Filler is quieter than the games: paler roofs, no raspberry, so the
   // buildings you can play stand out from the houses between them.
   const ROOFS = ['#9fb5f2', '#c3b3f3', '#8fd9c4', '#a9cdf5', '#d6b9e6', '#b3c4e8']
   const WALLS = ['#ffffff', '#f6f8fd', '#f2f6fd', '#f6f3fd']
-  // Little houses between the big ones, each with its door to a road we can
-  // see (the +x or +y side), kept a tile clear of every building.
-  {
-    let made = 0
-    const nearLm = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => taken.has(key(i + a, j + b)))
-    const homes = new Set<string>()
-    const nearHome = (i: number, j: number) => { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (homes.has(key(i + a, j + b))) return true; return false }
-    for (let s = 0; s < GRID * 2 && made < 16; s++) for (let i = 0; i < GRID && made < 16; i++) {
-      const j = s - i
-      if (j < 0 || j >= GRID || !free(i, j) || height[i][j] !== 0 || coast(i, j) || nearLm(i, j) || nearHome(i, j)) continue
-      if (!['oldtown', 'market', 'harbour', 'funfair', 'proving'].includes(dist[i][j].key)) continue
-      const door: 'x' | 'y' | null = road.has(key(i + 1, j)) ? 'x' : road.has(key(i, j + 1)) ? 'y' : null
-      if (!door) continue
-      reserved.add(key(i, j)); homes.add(key(i, j))
-      const n = made++
-      const roof = ROOFS[n % ROOFS.length], wall = WALLS[n % WALLS.length]
-      at(i + 0.5, j + 0.5, i + j + 1, (p) => cottage(p, i + 0.45, j + 0.45, { wall, roof, door, smoke: n % 3 === 0 }))
-      if (n % 2 === 0) at(i + 0.9, j + 0.88, i + j + 1.8, (p) => (door === 'x' ? postbox(p, i + 0.9, j + 0.85) : postbox(p, i + 0.85, j + 0.9)))
-      else at(i + 0.82, j + 0.14, i + j + 0.96, (p) => flowers(p, i + 0.82, j + 0.16))
-    }
-  }
   // Signposts at the crossroads, and where a road crosses from one district
   // into the next: a board for each road out, saying which district it leads to: the district whose own end of the roads (its gate,
   // or the hub for Old Town) is fewest steps away that way, and nearer that
@@ -1472,26 +1455,36 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     for (const [i, j] of cands) if (free(i, j) && ok(i, j)) { reserved.add(key(i, j)); fn(i, j); return true }
     return false
   }
-  spot([[13, 16], [16, 13], [12, 13], [11, 17], [13, 11]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => fountain(poke(p, 'fountain', i + 0.5, j + 0.5, 'splash!', 34), i + 0.5, j + 0.5)))
-  spot([[16, 16], [16, 15], [16, 17], [12, 14], [9, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => busStop(p, i + 0.5, j + 0.45)), (i, j) => height[i][j] === 0 && [[1, 0], [0, 1], [-1, 0], [0, -1]].some(([a, b]) => road.has(key(i + a, j + b))))
+  spot([[13, 15], [11, 14], [13, 14], [11, 17]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => fountain(poke(p, 'fountain', i + 0.5, j + 0.5, 'splash!', 34), i + 0.5, j + 0.5)))
+  spot([[13, 17], [11, 15], [18, 16], [16, 17]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => busStop(p, i + 0.5, j + 0.45)), (i, j) => height[i][j] === 0 && [[1, 0], [0, 1], [-1, 0], [0, -1]].some(([a, b]) => road.has(key(i + a, j + b))))
   // The park: a picnic, someone flying a kite, a playground.
-  spot([[16, 18], [16, 14], [12, 15], [11, 13]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => picnic(p, i + 0.5, j + 0.5, [C.cobalt, C.rasp])))
-  spot([[16, 17], [17, 17], [13, 19], [12, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(poke(p, 'kite', i + 0.5, j + 0.5, 'wheee!', 30), i + 0.5, j + 0.5, C.lilac, C.rasp, 1)))
-  spot([[11, 18], [12, 19], [13, 15], [17, 16]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => playground(p, i + 0.5, j + 0.5)))
-  spot([[13, 22], [12, 21], [10, 23], [16, 23]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(poke(p, 'kite', i + 0.5, j + 0.5, 'wheee!', 30), i + 0.5, j + 0.5, C.mint, C.cobalt, 4)))
+  spot([[15, 13], [18, 13], [18, 14]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => picnic(p, i + 0.5, j + 0.5, [C.cobalt, C.rasp])))
+  spot([[16, 13], [15, 12], [16, 12]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(poke(p, 'kite', i + 0.5, j + 0.5, 'wheee!', 30), i + 0.5, j + 0.5, C.lilac, C.rasp, 1)))
+  spot([[16, 10], [15, 11], [13, 18]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => playground(p, i + 0.5, j + 0.5)))
+  spot([[11, 25], [13, 26], [15, 26], [11, 24]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => kiteFlyer(poke(p, 'kite', i + 0.5, j + 0.5, 'wheee!', 30), i + 0.5, j + 0.5, C.mint, C.cobalt, 4)))
   // The 32nd building: tucked away at the very back of Sky Peaks, among
   // the pines, where hardly anyone looks.
-  spot([[1, 7], [2, 7], [2, 6], [1, 8], [3, 3]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => house32(poke(p, 'house32', i + 0.5, j + 0.5, 'shh!', 34), i + 0.5, j + 0.5)), (i, j) => height[i][j] >= 12)
+  spot([[1, 3], [2, 2], [1, 4], [2, 1]], (i, j) => at(i + 0.5, j + 0.5, i + j + 1, (p) => house32(poke(p, 'house32', i + 0.5, j + 0.5, 'shh!', 34), i + 0.5, j + 0.5)), (i, j) => height[i][j] >= 12)
   // A campsite high on the peaks: two tents round a fire.
   {
-    const cells: [number, number][] = [[3, 4], [3, 5], [2, 5]]
+    const cells: [number, number][] = [[6, 4], [6, 5], [5, 5]]
     const ok = cells.filter(([i, j]) => free(i, j))
     if (ok.length === cells.length) {
       ok.forEach(([i, j]) => reserved.add(key(i, j)))
-      at(3.35, 4.4, 7.75, (p) => tent(p, 3.35, 4.4, C.rasp))
-      at(2.6, 5.5, 8.1, (p) => tent(p, 2.6, 5.5, C.leafB))
-      at(3.5, 5.5, 9.0, (p) => campfire(p, 3.5, 5.45))
-      at(3.75, 5.85, 9.6, (p) => sitter(p, 3.75, 5.85, C.cobalt, '#e0b899'))
+      at(6.35, 4.4, 10.75, (p) => tent(p, 6.35, 4.4, C.rasp))
+      at(5.6, 5.5, 11.1, (p) => tent(p, 5.6, 5.5, C.leafB))
+      at(6.5, 5.5, 12.0, (p) => campfire(p, 6.5, 5.45))
+      at(6.75, 5.85, 12.6, (p) => sitter(p, 6.75, 5.85, C.cobalt, '#e0b899'))
+    }
+  }
+  // The bridge over the fjord, from the foot of Sky Peaks across to the Badlands: the one way
+  // over the water, hung from two towers standing in it.
+  {
+    const A = 12.2, B = 16.8, J = 5.5, Z = 8, N = 5
+    for (const c of [[12, 5], [16, 5]] as [number, number][]) reserved.add(key(...c))
+    for (let k = 0; k < N; k++) {
+      const u0 = k / N, u1 = (k + 1) / N, mid = A + ((B - A) * (u0 + u1)) / 2
+      things.push({ depth: mid + J + 0.6, draw: (layer) => bridge(new Pen(layer, 0, 0, 0, new Bounds(), lights, sinkFor(`bridge-${k}`).sink), A, B, J, Z, u0, u1) })
     }
   }
   // The promenade: a row of market stalls along Market Street's beach, lit
@@ -1622,6 +1615,53 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     }
   }
 
+  const heroPlots = placed.filter((pl) => heroK(pl.slug) !== 1 && !pl.lm.water).map(drawnPlot)
+  const under = (x: number, y: number) => heroPlots.some((h) => x > h.i - 0.12 && x < h.i + h.w + 0.12 && y > h.j - 0.12 && y < h.j + h.d + 0.12)
+  // The towns: houses along the roads, their doors to the street. Old Town
+  // is terraces of tall townhouses; Market Street, shops under striped
+  // awnings; the Harbour, fishermen's cottages; the Funfair, kiosks and
+  // cottages; out on the Proving Grounds a cottage here and there. Side by
+  // side where the road runs on, a tile clear of every game's building so
+  // each stands in its own space.
+  {
+    const WEIGHT: Partial<Record<DistrictKey, number>> = { oldtown: 0.95, market: 0.92, harbour: 0.85, funfair: 0.72, proving: 0.62 }
+    const PASTEL = ['#ffffff', '#f3f7ff', '#eef8f4', '#f5f1fd', '#eef4fb', '#f9f6fb']
+    const HARBOUR_WALLS = ['#ffffff', '#f2f8ff', '#eef6fb']
+    const nearLm = (i: number, j: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => taken.has(key(i + a, j + b)))
+    const roadSide = (i: number, j: number) => ([[1, 0, 'x'], [0, 1, 'y'], [-1, 0, 'x'], [0, -1, 'y']] as [number, number, 'x' | 'y'][]).find(([a, b]) => road.has(key(i + a, j + b)))
+    const cells: [number, number][] = []
+    for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
+      const w = WEIGHT[dist[i][j].key] ?? 0
+      if (!w || !free(i, j) || height[i][j] !== 0 || coast(i, j) || nearLm(i, j) || !roadSide(i, j) || under(i + 0.5, j + 0.5)) continue
+      if (hz(i, j, 91) > w) continue
+      cells.push([i, j])
+    }
+    let made = 0
+    for (const [i, j] of cells) {
+      if (made >= 64) break
+      const [, , door] = roadSide(i, j)!
+      reserved.add(key(i, j))
+      const n = made++, dk = dist[i][j].key, roof = ROOFS[(n * 5 + i) % ROOFS.length]
+      const x = i + 0.5, y = j + 0.5
+      if (dk === 'oldtown') {
+        const tall = hz(i, j, 92) < 0.45
+        at(x, y, i + j + 1, (p) => townhouse(p, x, y, { wall: PASTEL[(i * 3 + j) % PASTEL.length], roof, door, storeys: tall ? 3 : 2, smoke: n % 4 === 0 }))
+      } else if (dk === 'market' && hz(i, j, 93) < 0.75) {
+        const stripes = [[C.mint, '#ffffff'], [C.cobalt, '#ffffff'], [C.lilac, '#ffffff'], ['#ff9fb2', '#ffffff'], [C.sky, '#ffffff']][n % 5]
+        at(x, y, i + j + 1, (p) => shopfront(p, x, y, { wall: PASTEL[(i + j * 2) % PASTEL.length], roof, door, stripes, storeys: hz(i, j, 94) < 0.5 ? 2 : 1 }))
+      } else if (dk === 'harbour') {
+        at(x, y, i + j + 1, (p) => cottage(p, x, y, { wall: HARBOUR_WALLS[n % HARBOUR_WALLS.length], roof: n % 2 ? '#7f9ee8' : '#8fd9c4', door, smoke: n % 3 === 0, w: 0.62, d: 0.56, h: 16 }))
+      } else if (dk === 'funfair' && hz(i, j, 95) < 0.5) {
+        const stripes = [['#ff9fb2', '#ffffff'], [C.mint, '#ffffff'], [C.sky, '#ffffff']][n % 3]
+        at(x, y, i + j + 1, (p) => shopfront(p, x, y, { wall: '#ffffff', roof, door, stripes, storeys: 1, w: 0.56, d: 0.5 }))
+      } else {
+        at(x, y, i + j + 1, (p) => cottage(p, x, y, { wall: PASTEL[n % PASTEL.length], roof, door, smoke: n % 3 === 0, w: 0.58, d: 0.52, h: 16 }))
+      }
+      // A front garden's flowers, or a post box at the kerb, on some.
+      if (n % 3 === 0) at(i + 0.86, j + 0.14, i + j + 1.0, (p) => flowers(p, i + 0.86, j + 0.16))
+      else if (n % 5 === 1) at(i + 0.88, j + 0.86, i + j + 1.74, (p) => postbox(p, i + 0.88, j + 0.86))
+    }
+  }
   // Trees, rocks and the odd lamp or bench, on the land left over.
   const treeKind = (d: District, coastal: boolean): TreeKind => {
     if (coastal && d.key === 'peaks') return R() < 0.7 ? 'pine' : 'rock'
@@ -1633,8 +1673,6 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     if (d.key === 'market') return r < 0.5 ? 'cypress' : 'round'
     return r < 0.55 ? 'round' : r < 0.8 ? 'bush' : 'blossom'
   }
-  const heroPlots = placed.filter((pl) => heroK(pl.slug) !== 1 && !pl.lm.water).map(drawnPlot)
-  const under = (x: number, y: number) => heroPlots.some((h) => x > h.i - 0.12 && x < h.i + h.w + 0.12 && y > h.j - 0.12 && y < h.j + h.d + 0.12)
   const grow = (x: number, y: number, t: Thing) => { if (!under(x, y)) things.push(t) }
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
     if (!isLand(i, j) || taken.has(key(i, j)) || pond.has(key(i, j)) || reserved.has(key(i, j))) continue
@@ -1645,7 +1683,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if ((i * 7 + j * 3) % 5 === 0) things.push({ depth: i + j + 0.9, draw: (layer) => lamp(new Pen(layer, 0, 0, z, new Bounds(), lights, sinkFor(`lamp-${i}-${j}`).sink), i + 0.12, j + 0.12, 24) })
       continue
     }
-    const density = { peaks: 0.55, badlands: 0.3, proving: 0.28, harbour: 0.16, funfair: 0.24, market: 0.2, oldtown: 0.22 }[d.key]
+    const density = { peaks: 0.62, badlands: 0.34, proving: 0.4, harbour: 0.3, funfair: 0.36, market: 0.32, oldtown: 0.34 }[d.key]
     const cluster = 0.5 + 0.5 * Math.sin(i * 0.9 + 1.3) * Math.cos(j * 0.8 - 0.4)
     if (R() > density * (0.5 + cluster)) {
       if (R() < 0.04 && !coastal && z === 0) grow(i + 0.5, j + 0.5, { depth: i + j + 1, draw: (layer) => flowers(new Pen(layer, 0, 0, 0, new Bounds(), [], sinkFor(`flowers-${i}-${j}`).sink), i + 0.5, j + 0.5) })
@@ -1672,12 +1710,14 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // it ties up and walks the jetty ashore; another hurries out to catch it.
   {
     const z = BEACH + 3
-    const end = P(21.5, 29.85, z), land = P(21.5, 27.4, z), shore = P(20.7, 26.5, BEACH)
+    // Along the harbour pier: its end, its foot, and the quay behind it.
+    const [ps, pe] = [PIERS[2][0], PIERS[2][PIERS[2].length - 1]], len = Math.hypot(pe[0] - ps[0], pe[1] - ps[1]), du = (pe[0] - ps[0]) / len, dv = (pe[1] - ps[1]) / len
+    const end = P(pe[0] - du * 0.25, pe[1] - dv * 0.25, z), land = P(ps[0] + du * 0.1, ps[1] + dv * 0.1, z), shore = P(ps[0] - du * 0.9 - 0.4, ps[1] - dv * 0.9 - 0.4, BEACH)
     const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
     motionCss.push(`@keyframes isl-off{0%,33%{${tr(end)};opacity:0}34%{opacity:1}52%{${tr(land)}}58%{${tr(shore)};opacity:1}60%,100%{${tr(shore)};opacity:0}}`)
     motionCss.push(`@keyframes isl-on{0%,40%{${tr(shore)};opacity:0}41%{opacity:1}46%{${tr(land)}}59%{${tr(end)};opacity:1}61%,100%{${tr(end)};opacity:0}}`)
     const ways: Record<string, MotionFrame[]> = { 'isl-off': stopsOf([[0, end], [34, end], [52, land], [58, shore], [100, shore]]), 'isl-on': stopsOf([[0, shore], [41, shore], [46, land], [59, end], [100, end]]) }
-    for (const [name, shirt] of [['isl-off', C.rasp], ['isl-on', C.mint]] as const) things.push({ depth: 21.5 + 30.5, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(shore[0] - 30)} ${f(land[1] - 30)} ${f(end[0] + 12)} ${f(end[1] + 8)}`, style: `animation:${name} ${FERRY_DUR}s linear infinite` })); g.add(walker(who(shirt, name === 'isl-on' ? 31 : 47), name, ways[name], `${FERRY_DUR}s`, '0s') ?? walkerFigure(shirt, 1, shirt === C.rasp ? 201 : 202)) } })
+    for (const [name, shirt] of [['isl-off', C.rasp], ['isl-on', C.mint]] as const) things.push({ depth: pe[0] + pe[1] + 0.4, draw: (layer) => { const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(shore[0] - 30)} ${f(land[1] - 30)} ${f(end[0] + 12)} ${f(end[1] + 8)}`, style: `animation:${name} ${FERRY_DUR}s linear infinite` })); g.add(walker(who(shirt, name === 'isl-on' ? 31 : 47), name, ways[name], `${FERRY_DUR}s`, '0s') ?? walkerFigure(shirt, 1, shirt === C.rasp ? 201 : 202)) } })
   }
   // Cause and effect, part two: people walking up to a building's door and
   // going in, and a while later coming out again and walking off.
