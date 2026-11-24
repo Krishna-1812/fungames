@@ -20,7 +20,7 @@ import type { SkyArt } from './plate'
 import { LANDMARKS, DISTRICTS, PLACES, RIVER, POND, HUB, STREETS, ground as shapeAt, type DistrictKey, type District } from './landmarks'
 import { beacon, harbourArt } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
-import { cottage, townhouse, shopfront, bridge, cableStation, gondola, hotSpring, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
+import { cottage, townhouse, shopfront, bridge, cableStation, gondola, hotSpring, bins, condenser, pole, wires, parkedCar, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
 import { paintGround, LAND, wander } from './terrain'
 import { STAMP } from '../passport-art'
 import { glassOf, BOTTLE_COUNT } from '../bottles'
@@ -1666,6 +1666,9 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       // A front garden's flowers, or a post box at the kerb, on some.
       if (n % 3 === 0) at(i + 0.86, j + 0.14, i + j + 1.0, (p) => flowers(p, i + 0.86, j + 0.16))
       else if (n % 5 === 1) at(i + 0.88, j + 0.86, i + j + 1.74, (p) => postbox(p, i + 0.88, j + 0.86))
+      // Round the back: the bins out, an air conditioner's unit humming against the wall.
+      if (n % 4 === 1) at(i + 0.14, j + 0.8, i + j + 0.95, (p) => bins(p, i + 0.12, j + 0.82, [n % 8 === 1 ? '#5f9f7f' : '#55617a', '#7c8bab']))
+      else if (n % 4 === 3) at(i + 0.82, j + 0.14, i + j + 0.97, (p) => condenser(p, i + 0.84, j + 0.13))
     }
   }
   // The cable car: from Old Town by the lake up to Sky Peaks' summit, its two cabins passing half way.
@@ -1693,6 +1696,49 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   // Hot springs in the Badlands, each with a geyser that steams and now and then goes up.
   spot([[20, 5], [17, 6], [23, 6]], (i, j) => at(i + 0.5, j + 0.5, i + j + 0.6, (p) => hotSpring(p, i + 0.5, j + 0.5, 1, 0)))
   spot([[25, 7], [24, 8], [21, 9], [19, 2]], (i, j) => at(i + 0.5, j + 0.5, i + j + 0.6, (p) => hotSpring(p, i + 0.5, j + 0.5, 0.8, 5.5)))
+  // Power lines: wooden poles along the town's streets, every third tile on one side of a straight run,
+  // the wires sagging from each to the next. (The most lived-in thing there is: nobody builds them for looks.)
+  {
+    const TOWN = new Set<DistrictKey>(['oldtown', 'market', 'harbour', 'funfair', 'proving'])
+    const placedPoles = new Set<string>()
+    for (const r of routes) {
+      let prev: { x: number; y: number; along: 'x' | 'y'; k: number } | null = null
+      r.forEach(([i, j], k) => {
+        if (k % 3 || !TOWN.has(dist[i][j].key)) { if (k % 3 === 0) prev = null; return }
+        const a = r[k - 1] ?? r[k + 1], b = r[k + 1] ?? r[k - 1]
+        if (!a || !b || (a[0] !== b[0] && a[1] !== b[1])) { prev = null; return }
+        const along: 'x' | 'y' = a[0] !== i || b[0] !== i ? 'x' : 'y'
+        // On the far side of the road from us (its -x or -y edge), so it never stands in front of what is behind it.
+        const x = along === 'x' ? i + 0.5 : i + 0.1, y = along === 'x' ? j + 0.1 : j + 0.5
+        const id = key(i, j)
+        if (placedPoles.has(id) || taken.has(along === 'x' ? key(i, j - 1) : key(i - 1, j))) { prev = null; return }
+        placedPoles.add(id)
+        at(x, y, x + y, (p) => pole(p, x, y, along, 44))
+        if (prev && prev.along === along && k - prev.k === 3 && (along === 'x' ? prev.y === y : prev.x === x)) {
+          const q = prev
+          at(Math.max(q.x, x), Math.max(q.y, y), Math.max(q.x + q.y, x + y) + 0.01, (p) => wires(p, [q.x, q.y], [x, y], along, 44, 6))
+        }
+        prev = { x, y, along, k }
+      })
+    }
+  }
+  // Cars parked at the kerb along the straight streets, in the colours and facings Unity has pictured.
+  {
+    let parked = 0
+    for (let i = 0; i < GRID && parked < 16; i++) for (let j = 0; j < GRID && parked < 16; j++) {
+      if (!road.has(key(i, j)) || !['oldtown', 'market', 'harbour', 'funfair'].includes(dist[i][j].key) || hz(i, j, 101) > 0.2) continue
+      const alongX = road.has(key(i - 1, j)) && road.has(key(i + 1, j)) && !road.has(key(i, j - 1)) && !road.has(key(i, j + 1))
+      const alongY = road.has(key(i, j - 1)) && road.has(key(i, j + 1)) && !road.has(key(i - 1, j)) && !road.has(key(i + 1, j))
+      if (!alongX && !alongY) continue
+      const along: 'x' | 'y' = alongX ? 'x' : 'y'
+      // At the near kerb, out of the traffic's way.
+      const x = along === 'x' ? i + 0.5 : i + 0.8, y = along === 'x' ? j + 0.8 : j + 0.5
+      const body = along === 'x' ? '#ffffff' : parked % 2 ? C.mint : C.rasp, back = hz(i, j, 102) < 0.5
+      const [sx, sy] = P(x, y)
+      parked++
+      things.push({ depth: x + y + 0.05, draw: (layer) => layer.add(parkedCar(sx, sy, along, body, along === 'y' ? back : back)) })
+    }
+  }
   // Trees along the streets: in the towns, a tree on a free plot beside a road, near the kerb, so the streets are avenues.
   for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
     const dk = dist[i][j].key

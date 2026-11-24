@@ -43,6 +43,8 @@ export function cottage(p: Pen, x: number, y: number, o: { wall?: string; roof?:
   const b = p.box(x0, y0, w, d, h, { fill: wall })
   p.band(b, 0, 2.5, shade(wall, 0.8))
   p.door(b, o.door, 0.5, { w: 0.13, h: 9, fill: o.door === 'x' ? C.cobalt : C.mint })
+  p.line([x0 + w + 0.012, y0 + d + 0.012, 0], [x0 + w + 0.012, y0 + d + 0.012, h], { sw: 1.3, stroke: '#7c8597' })
+
   const other = o.door === 'x' ? 'y' : 'x'
   p.windows(b, other, { rows: 1, cols: 2, z0: 7, h: 5, wide: 0.42 })
   p.windows(b, o.door, { rows: 1, cols: 2, z0: 6, h: 4.5, wide: 0.22, lit: true })
@@ -86,6 +88,8 @@ export function townhouse(p: Pen, x: number, y: number, o: { wall?: string; roof
   p.band(b, 0, 3, shade(wall, 0.78))
   // A cornice under the roof, so the storeys read as a building, not a box.
   p.band(b, h - 2.5, h, shade(wall, 0.86))
+  p.line([x0 + w + 0.012, y0 + d + 0.012, 0], [x0 + w + 0.012, y0 + d + 0.012, h - 1], { sw: 1.3, stroke: '#7c8597' })
+
   const other = o.door === 'x' ? 'y' : 'x'
   p.door(b, o.door, 0.5, { w: 0.14, h: 10, fill: o.door === 'x' ? C.cobalt : '#5b6fd6' })
   p.windows(b, o.door, { rows: st - 1, cols: 2, z0: 15, h: 5.5, gap: 5.5, wide: 0.3 })
@@ -118,6 +122,11 @@ export function shopfront(p: Pen, x: number, y: number, o: { wall?: string; roof
   p.windows(b, o.door, { rows: 1, cols: 1, z0: 2.5, h: 6.5, wide: 0.55, lit: true })
   p.door(b, o.door, 0.86, { w: 0.11, h: 8, fill: C.mint })
   p.awning(b, o.door, 0.06, 0.94, 10.5, 0.16, o.stripes)
+  // The shop's name board over the awning, in its own colour.
+  if (o.door === 'y') p.box(x0 + 0.1, y0 + d, w - 0.2, 0.03, 3.5, { z0: 11.5, fill: shade(o.stripes[0], 0.85), sw: 0.9 })
+  else p.box(x0 + w, y0 + 0.1, 0.03, d - 0.2, 3.5, { z0: 11.5, fill: shade(o.stripes[0], 0.85), sw: 0.9 })
+  p.line([x0 + w + 0.012, y0 + d + 0.012, 0], [x0 + w + 0.012, y0 + d + 0.012, h], { sw: 1.3, stroke: '#7c8597' })
+
   if (st > 1) {
     p.windows(b, o.door, { rows: st - 1, cols: 2, z0: 14, h: 5, gap: 6, wide: 0.3 })
     p.windows(b, other, { rows: st - 1, cols: 2, z0: 14, h: 5, gap: 6, wide: 0.34 })
@@ -215,6 +224,64 @@ export function hotSpring(p: Pen, x: number, y: number, k = 1, delay = 0) {
   for (const dl of [0, 0.7, 1.4, 2.1]) g.add(new N('circle', { cx: f(cx + (dl - 1) * 4), cy: f(cy - 4), r: f(6 * k), fill: soft, class: 'puff', style: `animation-delay:${f(dl + delay)}s` }))
   const plume = g.add(new N('g', { class: 'geyser', style: `animation-delay:${f(delay)}s` }))
   for (const [dy, r] of [[-14, 5], [-30, 7], [-48, 9], [-66, 10], [-82, 9]]) plume.add(new N('circle', { cx: f(cx), cy: f(cy + dy * k), r: f(r * k), fill: soft }))
+}
+
+/* ---- the street's own clutter ---------------------------------------------- */
+
+/** Two wheelie bins against a wall, each a body and a lid a shade darker. */
+export function bins(p: Pen, x: number, y: number, cols: string[]) {
+  cols.forEach((c, k) => {
+    const bx = x + k * 0.14
+    p.box(bx - 0.055, y - 0.055, 0.11, 0.11, 7, { fill: c, sw: 0.9 })
+    p.box(bx - 0.065, y - 0.065, 0.13, 0.13, 1.3, { z0: 7, fill: shade(c, 0.8), sw: 0.8 })
+  })
+}
+
+/** An air conditioner's outdoor unit on the ground against a wall: a grey box with its fan grille on top. */
+export function condenser(p: Pen, x: number, y: number) {
+  p.box(x - 0.08, y - 0.08, 0.16, 0.16, 6, { fill: '#c9ced8', top: '#aeb5c2', sw: 0.9 })
+  p.disc(x, y, 0.055, 6.05, '#6d7686', { sw: 0.6 })
+}
+
+/** A wooden utility pole: the post, a crossarm across the line its wires run along, and two insulators. */
+export function pole(p: Pen, x: number, y: number, along: 'x' | 'y', h = 44) {
+  p.box(x - 0.035, y - 0.035, 0.07, 0.07, h, { fill: '#8f8274', sw: 1 })
+  if (along === 'x') p.box(x - 0.025, y - 0.2, 0.05, 0.4, 2, { z0: h - 6, fill: '#7d7164', sw: 0.9 })
+  else p.box(x - 0.2, y - 0.025, 0.4, 0.05, 2, { z0: h - 6, fill: '#7d7164', sw: 0.9 })
+  for (const u of [-0.16, 0.16]) {
+    const [ix, iy] = along === 'x' ? [x, y + u] : [x + u, y]
+    p.box(ix - 0.015, iy - 0.015, 0.03, 0.03, 2.5, { z0: h - 4, fill: '#e6ecf6', sw: 0.6 })
+  }
+}
+
+/** The two wires from one pole's insulators to the next's, sagging between them. */
+export function wires(p: Pen, a: [number, number], b: [number, number], along: 'x' | 'y', h = 44, sag = 6) {
+  const n = 6, top = h - 1.5
+  for (const u of [-0.16, 0.16]) {
+    const off = along === 'x' ? [0, u] : [u, 0]
+    for (let k = 0; k < n; k++) {
+      const t0 = k / n, t1 = (k + 1) / n, z = (t: number) => top - sag * 4 * t * (1 - t)
+      p.line([a[0] + off[0] + (b[0] - a[0]) * t0, a[1] + off[1] + (b[1] - a[1]) * t0, z(t0)], [a[0] + off[0] + (b[0] - a[0]) * t1, a[1] + off[1] + (b[1] - a[1]) * t1, z(t1)], { sw: 0.9, stroke: '#2a3142' })
+    }
+  }
+}
+
+/**
+ * A car parked at the kerb, along the road: Unity's picture of it where it
+ * has one in that colour and facing, else the drawn one.
+ */
+export function parkedCar(x: number, y: number, along: 'x' | 'y', body: string, back = false): N {
+  const facing: Facing = along === 'x' ? (back ? 'nw' : 'se') : back ? 'sw' : 'ne'
+  const g = new N('g', { transform: `translate(${f(x)} ${f(y)})` })
+  const real = vehicleUse('car', body, facing)
+  if (real) { g.add(real); return g }
+  const skew = along === 'x' ? 26.57 : -26.57, dir = back ? -1 : 1
+  const c = g.add(new N('g', { transform: `skewY(${skew}) scale(${dir} 1)` }))
+  c.add(new N('ellipse', { cx: 0, cy: 1, rx: 13, ry: 3.5, fill: INK, opacity: 0.15 }))
+  c.add(new N('path', { d: 'M-12 -2L-9 -8Q-7 -10 -4 -10H5Q8 -10 9 -8L12 -2V2H-12Z', fill: body, stroke: INK, 'stroke-width': OUT, 'stroke-linejoin': 'round' }))
+  c.add(new N('path', { d: 'M-6 -8.5L-4.5 -12.5H4L6 -8.5Z', fill: C.glassHi, stroke: INK, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }))
+  for (const wx of [-7, 7]) c.add(new N('circle', { cx: wx, cy: 2, r: 2.8, fill: INK }))
+  return g
 }
 
 /** A post box. */
