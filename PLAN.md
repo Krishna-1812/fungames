@@ -2695,6 +2695,16 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     measured from a mask render of the same scene, and the box placed in a
     real checkout page that dims only when the challenge opens. See the README.
 
+    **The island** (later, November 2026): a new map, drawn a letter a tile
+    in landmarks.ts instead of seven overlapping discs. Sky Peaks rises to
+    two summits and falls in cliffs into a fjord that cuts off the
+    Badlands, crossed by a suspension bridge; a river steps down its
+    terraces into a lake with an islet; Market Street has a headland and a
+    cove; the harbour wraps a basin, the lighthouse on the breakwater at
+    its mouth and the ferry berthing inside. Each district is laid along
+    streets of its own, and their frontage fills with terraced townhouses,
+    shops under striped awnings and fishermen's cottages. See the README.
+
     **Share This Page** (later): a sending desk instead of a pop-up
     (lib/share-desk.ts): every way a real thing made from the message, the
     telegraph key, embossed Braille, punched tape, keypad, piano, pipe and
