@@ -20,7 +20,7 @@ import type { SkyArt } from './plate'
 import { LANDMARKS, DISTRICTS, PLACES, RIVER, POND, HUB, STREETS, ground as shapeAt, type DistrictKey, type District } from './landmarks'
 import { beacon, harbourArt } from './lm-harbour'
 import { hotAirBalloon, plane as skyPlane, ufo } from './sky'
-import { cottage, townhouse, shopfront, bridge, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
+import { cottage, townhouse, shopfront, bridge, cableStation, gondola, hotSpring, postbox, signpost, crossing, busStop, fountain, sitter, picnic, kiteFlyer, playground, umbrella, towel, sandcastle, lifeguard, surfboard, pier, rowboat, buoy, tent, campfire, shuttle, stall, stringLights, ferry, fishingBoat, speedboat, secretIslet, house32, sayBubble, beachBottle, noticeboard, pigeonSquare, type Emblem } from './town'
 import { paintGround, LAND, wander } from './terrain'
 import { STAMP } from '../passport-art'
 import { glassOf, BOTTLE_COUNT } from '../bottles'
@@ -1192,11 +1192,17 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     })
   }
 
-  // Two ducks going round the pond.
+  // Two ducks going round the pond; two swans round the islet in the lake, and rowing boats out on it.
+  const round = (ci: number, cj: number, ri: number, rj: number, z = 0): [number, number][] => Array.from({ length: 20 }, (_, k) => { const a = (k / 20) * Math.PI * 2; return P(ci + Math.cos(a) * ri, cj + Math.sin(a) * rj, z) })
   if (pond.size) {
-    const loop = (ri: number, rj: number): [number, number][] => Array.from({ length: 20 }, (_, k) => { const a = (k / 20) * Math.PI * 2; return P(15 + Math.cos(a) * ri, 10.5 + Math.sin(a) * rj) })
-    walkers.add(pokeN('duck')).add(duck(loop(0.42, 0.85), 'duck0', 26, 0))
-    walkers.add(pokeN('duck')).add(duck(loop(0.3, 0.6).reverse(), 'duck1', 19, 7, '#b9a6ff'))
+    const pc = [...pond].map((k) => k.split(',').map(Number)), ci = pc.reduce((t, [i]) => t + i, 0) / pc.length + 0.5, cj = pc.reduce((t, [, j]) => t + j, 0) / pc.length + 0.5
+    walkers.add(pokeN('duck')).add(duck(round(ci, cj, 0.62, 0.62), 'duck0', 26, 0))
+    walkers.add(pokeN('duck')).add(duck(round(ci, cj, 0.4, 0.4).reverse(), 'duck1', 19, 7, '#b9a6ff'))
+  }
+  if (!isLand(9, 10) && !isLand(11, 10)) {
+    walkers.add(pokeN('duck')).add(duck(round(10.5, 10.5, 0.98, 0.98), 'swan0', 38, 0))
+    walkers.add(pokeN('duck')).add(duck(round(10.5, 10.5, 1.12, 1.12).reverse(), 'swan1', 44, 15))
+    for (const [i, j, c] of [[11.75, 9.55, C.cobalt], [9.45, 11.3, C.mint]] as [number, number, string][]) { const [x, y] = P(i, j, SEA); walkers.add(ripple(x, y + 4, 20, 6, i * 0.7)); walkers.add(rowboat(x, y, c)) }
   }
 
   /* ---- everything standing up, back to front ---------------------------- */
@@ -1661,6 +1667,42 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
       if (n % 3 === 0) at(i + 0.86, j + 0.14, i + j + 1.0, (p) => flowers(p, i + 0.86, j + 0.16))
       else if (n % 5 === 1) at(i + 0.88, j + 0.86, i + j + 1.74, (p) => postbox(p, i + 0.88, j + 0.86))
     }
+  }
+  // The cable car: from Old Town by the lake up to Sky Peaks' summit, its two cabins passing half way.
+  {
+    const foot: [number, number] = [11.5, 13.5], top: [number, number] = [4.5, 5.5]
+    const zt = height[Math.floor(top[0])][Math.floor(top[1])], up = 24
+    if (free(11, 13) || reserved.has(key(11, 13))) {
+      for (const c of [[11, 13], [4, 5]] as [number, number][]) reserved.add(key(...c))
+      at(foot[0], foot[1], foot[0] + foot[1] + 0.5, (p) => { p.sink = sinkFor('cable-foot').sink; cableStation(p, foot[0], foot[1], 0) }, 0)
+      at(top[0], top[1], top[0] + top[1] + 0.5, (p) => { p.sink = sinkFor('cable-top').sink; cableStation(p, top[0], top[1], 0) }, zt)
+      const ends = (s: number) => [[foot[0], foot[1] + s, up], [top[0], top[1] + s, zt + up]] as [number, number, number][]
+      things.push({ depth: foot[0] + foot[1] + 0.45, draw: (layer) => { const p = new Pen(layer, 0, 0, 0, new Bounds(), lights, sinkFor('cable').sink); for (const s of [-0.1, 0.1]) { const [a, b] = ends(s); p.line(a, b, { sw: 2, stroke: '#27324a' }) } } })
+      const DUR = 44
+      things.push({ depth: foot[0] + foot[1] + 0.46, draw: (layer) => {
+        ;[[0.1, '#ff6b8a', 0], [-0.1, '#4f86ff', DUR / 2]].forEach(([s, body, delay], n) => {
+          const [a, b] = ends(s as number), A = P(...a), B = P(...b)
+          const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1] + 21)}px)`
+          motionCss.push(`@keyframes isl-gondola${n}{0%,5%{${tr(A)}}45%,55%{${tr(B)}}95%,100%{${tr(A)}}}`)
+          const g = layer.add(new N('g', { class: 'mover amb', 'data-b': `${f(Math.min(A[0], B[0]) - 20)} ${f(Math.min(A[1], B[1]) - 10)} ${f(Math.max(A[0], B[0]) + 20)} ${f(Math.max(A[1], B[1]) + 40)}`, style: `animation:isl-gondola${n} ${DUR}s ease-in-out infinite ${f(-(delay as number))}s` }))
+          g.add(gondola(body as string))
+        })
+      } })
+    }
+  }
+  // Hot springs in the Badlands, each with a geyser that steams and now and then goes up.
+  spot([[20, 5], [17, 6], [23, 6]], (i, j) => at(i + 0.5, j + 0.5, i + j + 0.6, (p) => hotSpring(p, i + 0.5, j + 0.5, 1, 0)))
+  spot([[25, 7], [24, 8], [21, 9], [19, 2]], (i, j) => at(i + 0.5, j + 0.5, i + j + 0.6, (p) => hotSpring(p, i + 0.5, j + 0.5, 0.8, 5.5)))
+  // Trees along the streets: in the towns, a tree on a free plot beside a road, near the kerb, so the streets are avenues.
+  for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) {
+    const dk = dist[i][j].key
+    if (!['oldtown', 'market', 'harbour', 'funfair', 'proving'].includes(dk) || !free(i, j) || height[i][j] !== 0 || coast(i, j) || under(i + 0.5, j + 0.5)) continue
+    const side = ([[1, 0], [0, 1], [-1, 0], [0, -1]] as [number, number][]).find(([a, b]) => road.has(key(i + a, j + b)))
+    if (!side || hz(i, j, 97) > 0.72) continue
+    reserved.add(key(i, j))
+    const x = i + 0.5 + side[0] * 0.27, y = j + 0.5 + side[1] * 0.27
+    const kind: TreeKind = dk === 'market' ? 'cypress' : hz(i, j, 98) < 0.35 ? 'blossom' : 'round'
+    at(x, y, x + y, (p) => tree(p, x, y, kind, kind === 'blossom' ? C.leaf : hz(i, j, 99) < 0.3 ? C.leafB : C.leaf, 0.95))
   }
   // Trees, rocks and the odd lamp or bench, on the land left over.
   const treeKind = (d: District, coastal: boolean): TreeKind => {

@@ -60,6 +60,7 @@ export const KEYFRAMES = `
 @keyframes isl-drift { 50% { transform: translateX(10px); } }
 @keyframes isl-puff { 0% { transform: translate(0, 0) scale(0.4); opacity: 0.95; } 100% { transform: translate(8px, -44px) scale(1.8); opacity: 0; } }
 @keyframes isl-blink { 50% { opacity: 0.2; } }
+@keyframes isl-geyser { 0%, 70% { transform: scale(0.3, 0.1); opacity: 0; } 76% { transform: scale(0.9, 1.05); opacity: 0.95; } 86% { transform: scale(1.1, 1); opacity: 0.7; } 100% { transform: scale(1.4, 1.1); opacity: 0; } }
 @keyframes isl-chase { 50% { fill: #ff4f6e; } }
 @keyframes isl-rain { from { transform: translateY(-6px); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(20px); opacity: 0; } }
 @keyframes isl-bubble { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-46px); opacity: 0; } }
@@ -162,6 +163,7 @@ export const RULES: Rule[] = [
   { on: ['drift'], loop: L('isl-drift', 7, 'ease-in-out') },
   { on: ['puff'], loop: L('isl-puff', 3, 'ease-out'), base: { opacity: 0 }, fillBox: true, origin: 'center' },
   { on: ['blink'], loop: L('isl-blink', 1, 'steps(2, jump-none)') },
+  { on: ['geyser'], loop: L('isl-geyser', 11, 'ease-out'), base: { opacity: 0 }, fillBox: true, origin: '50% 100%' },
   { on: ['blink-slow'], loop: L('isl-blink', 2.2, 'steps(2, jump-none)') },
   { on: ['chase'], loop: L('isl-chase', 1, 'steps(2, jump-none)') },
   { on: ['rain'], loop: L('isl-rain', 0.8, 'linear') },

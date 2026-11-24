@@ -162,6 +162,61 @@ export function bridge(p: Pen, a: number, b: number, j: number, z: number, u0: n
   }
 }
 
+/**
+ * A cable car's station: a glass-fronted hall on a stone base, the big
+ * bullwheel the cable turns round under a roof that overhangs it, the cable
+ * leaving through its open end towards `to` (a tile point).
+ */
+export function cableStation(p: Pen, x: number, y: number, z: number) {
+  const w = 0.7, d = 0.7, x0 = x - w / 2, y0 = y - d / 2
+  const [sx, sy] = p.at(x, y, z)
+  p.el('ellipse', { cx: sx, cy: sy + 5, rx: 30, ry: 11, fill: INK, opacity: p.real ? 0 : 0.1 })
+  const base = p.box(x0, y0, w, d, 6, { z0: z, fill: '#c9ccd6' })
+  p.band(base, 0, 2, shade('#c9ccd6', 0.8))
+  const hall = p.box(x0 + 0.05, y0 + 0.05, w - 0.1, d - 0.1, 14, { z0: z + 6, fill: '#eef2fb', trim: '#7d92d4' })
+  p.windows(hall, 'x', { rows: 1, cols: 3, z0: 3, h: 8, wide: 0.7, gap: 4 })
+  p.windows(hall, 'y', { rows: 1, cols: 3, z0: 3, h: 8, wide: 0.7, gap: 4 })
+  p.door(hall, 'y', 0.5, { w: 0.16, h: 9, fill: '#5b6fd6' })
+  // The roof, flat and deep, over the bullwheel.
+  p.box(x0 - 0.06, y0 - 0.06, w + 0.12, d + 0.12, 3, { z0: z + 20, fill: '#7d92d4', top: '#93a6e0' })
+  p.cyl(x, y, 0.22, z + 23, 2.5, '#5d6478', { top: '#8a93a8' })
+  p.box(x - 0.04, y - 0.04, 0.08, 0.08, 4, { z0: z + 25.5, fill: '#5d6478' })
+}
+
+/** A cable car's cabin, hanging from its grip: drawn at the origin, for the page to move along the cable. */
+export function gondola(body: string): N {
+  const g = new N('g')
+  g.add(new N('path', { d: 'M0 -20V-9', stroke: '#3b4a6b', 'stroke-width': 1.6, 'stroke-linecap': 'round' }))
+  g.add(new N('circle', { cx: 0, cy: -21, r: 2.2, fill: '#5d6478', stroke: INK, 'stroke-width': 0.9 }))
+  g.add(new N('path', { d: 'M-8 -9h16l1 12q0 3 -3 3h-12q-3 0 -3 -3z', fill: body, stroke: INK, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }))
+  g.add(new N('path', { d: 'M-6 -6h12v6h-12z', fill: C.glass, stroke: INK, 'stroke-width': 0.8 }))
+  g.add(new N('path', { d: 'M-5 -5h4v4h-4z', fill: C.glassHi, opacity: 0.8 }))
+  g.add(new N('path', { d: 'M-8.6 2.5h17.2', stroke: '#ffffff', 'stroke-width': 1.2, opacity: 0.8 }))
+  return g
+}
+
+/**
+ * A hot spring in the Badlands: a pool of milky turquoise water in a crust of
+ * pale minerals, terraced at its rim, and a geyser in it that steams all day
+ * and now and then throws its plume up high.
+ */
+export function hotSpring(p: Pen, x: number, y: number, k = 1, delay = 0) {
+  const [cx, cy] = p.at(x, y)
+  const rx = 26 * k, ry = 13 * k
+  // The crust, in two steps, and the water in it.
+  p.el('ellipse', { cx: cx, cy: cy + 2, rx: rx + 7, ry: ry + 4, fill: '#e9e4d8', stroke: INK, 'stroke-width': p.real ? 0 : 1.1 })
+  p.el('ellipse', { cx: cx, cy: cy + 4, rx: rx + 7, ry: ry + 4, fill: 'none', stroke: '#cfc6b2', 'stroke-width': 2, opacity: 0.7 })
+  p.el('ellipse', { cx: cx, cy: cy, rx, ry, fill: '#6fd6d0', stroke: p.real ? 'none' : INK, 'stroke-width': 1 })
+  p.el('ellipse', { cx: cx - rx * 0.25, cy: cy - ry * 0.2, rx: rx * 0.55, ry: ry * 0.45, fill: '#b9f1ea', opacity: 0.8 })
+  p.el('ellipse', { cx: cx, cy: cy, rx: rx * 0.25, ry: ry * 0.25, fill: '#2a9fae', opacity: 0.6 })
+  // Steam, always; and the plume, now and then.
+  const g = p.el('g', { class: 'amb', 'data-b': box(cx - 30, cy - 120 * k, cx + 30, cy) })
+  const soft = puffShade(g, `spring${f(cx)}_${f(cy)}`, '#f4f7fb', p.real ? 0.75 : 0.9)
+  for (const dl of [0, 0.7, 1.4, 2.1]) g.add(new N('circle', { cx: f(cx + (dl - 1) * 4), cy: f(cy - 4), r: f(6 * k), fill: soft, class: 'puff', style: `animation-delay:${f(dl + delay)}s` }))
+  const plume = g.add(new N('g', { class: 'geyser', style: `animation-delay:${f(delay)}s` }))
+  for (const [dy, r] of [[-14, 5], [-30, 7], [-48, 9], [-66, 10], [-82, 9]]) plume.add(new N('circle', { cx: f(cx), cy: f(cy + dy * k), r: f(r * k), fill: soft }))
+}
+
 /** A post box. */
 export function postbox(p: Pen, x: number, y: number) {
   p.cyl(x, y, 0.045, 0, 11, C.rasp, { sw: 1.1, top: shade(C.rasp, 1.1) })
