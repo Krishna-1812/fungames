@@ -26,7 +26,7 @@ export const DISTRICTS: District[] = [
   { key: 'peaks', name: 'Sky Peaks', at: [6.6, 6.6], r: 6.2, ground: ['#62a95b', '#6cb162'], tint: '#c9f7ea', label: [10.6, 6.2, 24] },
   { key: 'badlands', name: 'The Badlands', at: [23.6, 5.4], r: 5.0, ground: ['#d1c7b4', '#c8bda8'], tint: '#e6e1f7' },
   { key: 'proving', name: 'Proving Grounds', at: [24, 14.6], r: 4.6, ground: ['#6aaf5a', '#74b763'], tint: '#cff6ea' },
-  { key: 'harbour', name: 'The Harbour', at: [22.4, 22.6], r: 4.4, ground: ['#6cb65c', '#78bd66'], tint: '#d6ecff', label: [20.6, 19.6, 0] },
+  { key: 'harbour', name: 'The Harbour', at: [22.4, 22.6], r: 4.4, ground: ['#6cb65c', '#78bd66'], tint: '#d6ecff', label: [24.6, 19.2, 0] },
   { key: 'funfair', name: 'The Funfair', at: [13.8, 24.6], r: 4.8, ground: ['#6cb65c', '#78bd66'], tint: '#ffe1e8', label: [16.4, 23.2, 0] },
   { key: 'market', name: 'Market Street', at: [5.6, 21.6], r: 5.0, ground: ['#6cb65c', '#78bd66'], tint: '#d9f3f0' },
   { key: 'oldtown', name: 'Old Town', at: [14.6, 14.6], r: 6.3, ground: ['#6cb65c', '#78bd66'], tint: '#e3e9ff' },

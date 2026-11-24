@@ -49,9 +49,12 @@ const PHONE_WARN = 40
  * October 2026; after the art pass added rings on the water and people
  * walking in front of buildings, 1480, 1368, 707, 183 and 1603), so ordinary
  * new art fits and a slip (a thousand shapes left as outlines, every tree a
- * sprite of its own) does not.
+ * sprite of its own) does not. In November 2026 the new map filled its
+ * streets with houses: the whole island hardly moved (1466), but the busiest
+ * corner the close views find is now the thick of the town (861 and 353),
+ * so those two have room for it again.
  */
-const BUDGET = { whole: 1750, opening: 1750, closer: 850, closest: 320, night: 1900 }
+const BUDGET = { whole: 1750, opening: 1750, closer: 1000, closest: 420, night: 1900 }
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
