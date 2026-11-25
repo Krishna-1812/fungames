@@ -9,7 +9,9 @@
  * cannot walk up you may climb if it is no higher than your chest; buildings stop you at their walls (their
  * solids, as boxes), and you can stand on what is low enough to step onto (a
  * plinth, a pier); in water too deep to stand in you swim, slowly, your head
- * above it. The island's traffic (traffic.ts, the same that drives the map)
+ * above it, rising and falling with the swell; water slows you as you wade,
+ * a stream's current carries you along, and the water answers you: rings
+ * spread from you and spray flies when you jump in. The island's traffic (traffic.ts, the same that drives the map)
  * drives its roads round you and pushes you aside if you stand in its way.
  * Walk up to a game's building and it offers to take you in.
  *
@@ -24,10 +26,11 @@ import {
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { buildWorld, Y, type WorldData } from './build3d'
 import { createTraffic } from '../island/traffic'
+import { splashes } from './splash'
 
 export type Walk = { dispose(): void; setNight(on: boolean): void; setAerial(on: boolean): void; near(): { slug: string; title: string; href: string } | null
   /** Where you are and how (for the checks). */
-  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; cars: number[][] }
+  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; cars: number[][] }
   /** Set you down somewhere, looking a given way (for the checks, and for pictures). */
   goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void }
 
@@ -49,6 +52,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const scene = new Scene()
   const world = buildWorld(data)
   scene.add(world.root)
+  // Asked for less motion: the sea lies flat (no swell rocking you, or the camera, as you swim).
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) world.swell.value = 0
 
   /* ---- the sky, the sun, the air ---- */
   const sky = new Sky()
@@ -96,6 +101,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     scene.background = night ? new Color('#0b1430') : null
     moon.position.copy(sunDir).multiplyScalar(800)
     world.bulbs.emissiveIntensity = night ? 2.2 : 0
+    // The moon's light under the water is a faint net; the sun's, a bright one.
+    world.caustics.value = night ? 0.12 : 1
     sun.color.set(night ? '#9fb4ff' : '#fff1dc')
     hemi.intensity = night ? 0.12 : 0.6
     hemi.color.set(night ? '#4a5a88' : '#bcd4f0')
@@ -149,13 +156,17 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     return top > pos.y ? top : true
   }
   let climbTo: number | null = null
+  /** The water's surface where you are (the sea with its swell, or the stream or the pond), if there is water there. */
+  const waterAt = (x: number, z: number, ground: number) => world.poolAt(x, z) ?? (ground < seaY + 0.06 ? world.seaAt(x, z) : null)
+  let inWater = false, waterDepth = 0, rippleTick = 0
+  const water = splashes(scene)
 
   // Set down in the town square, facing into it.
   const start = data.road[Math.floor(data.road.length / 2)] ?? [15, 15]
   const pos = new Vector3(start[1] + 0.5, 0, start[0] + 0.5)
   pos.y = groundAt(pos.x, pos.z, 99)
   const vel = new Vector3()
-  let yaw = Math.PI * 0.75, pitch = 0.32, dist = innerHeight > innerWidth ? 1.9 : 1.35, onGround = true, swimming = false, stride = 0
+  let yaw = Math.PI * 0.75, pitch = 0.32, dist = innerHeight > innerWidth ? 1.9 : 1.35, onGround = true, swimming = false, stride = 0, stroke = 0
 
   /* ---- the traffic ---- */
   const traffic = createTraffic({ roads: data.road, play: true, dark: () => (night ? 1 : 0) })
@@ -213,7 +224,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     const hx = -fz * sx + fx * cz, hz = -fz * cz - fx * sx, hl = Math.hypot(hx, hz) || 1
     const rise = onGround && !swimming ? (world.heightAt(pos.x + (hx / hl) * 0.08, pos.z + (hz / hl) * 0.08) - world.heightAt(pos.x, pos.z)) / 0.08 : 0
     // Wading, the water holds you back: the deeper, the harder (up to your chest, about half your pace).
-    const wade = !swimming && pos.y < seaY ? 1 - 0.5 * Math.min(1, (seaY - pos.y) / 0.32) : 1
+    const wade = !swimming && inWater ? 1 - 0.5 * Math.min(1, waterDepth / 0.32) : 1
     const speed = speed0 * Math.max(0.55, Math.min(1.12, 1 - rise * 0.9)) * wade
     const wantX = (-fz * sx + fx * cz) * speed * mag / (mag || 1), wantZ = (-fz * cz - fx * sx) * speed * mag / (mag || 1)
     // Your feet take a moment to get going and to stop (more on the ground than in the air or the water).
@@ -240,9 +251,33 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       const wasOn = onGround && !swimming
       swimming = g < seaY - 0.32
       pos.y += vel.y * dt
-      const floor = swimming ? seaY - 0.36 : g
+      // Swimming, you float with your head out, riding the swell.
+      const floor = swimming ? world.seaAt(pos.x, pos.z) - 0.36 : g
+      const falling = vel.y
       // Walking down a slope (or off a kerb) your feet keep to the ground; off anything higher than a step you fall.
-      if (pos.y <= floor || (wasOn && vel.y <= 0 && pos.y - floor < STEP * 0.6)) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
+      if (pos.y <= floor || (wasOn && vel.y <= 0 && pos.y - floor < STEP * 0.6) || (swimming && vel.y <= 0 && pos.y - floor < 0.12)) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
+      // In the water, and how deep; jumping or stepping in throws up spray.
+      const surface = waterAt(pos.x, pos.z, g)
+      const wet = surface !== null && pos.y < surface - 0.004
+      if (wet && !inWater) {
+        const hard = Math.min(1, Math.max(0, -falling) / 1.4)
+        water.burst(pos.x, surface, pos.z, Math.round(6 + 60 * hard), 0.45 + hard * 0.9, [vel.x, vel.z])
+        water.ring(pos.x, surface, pos.z, 1 + hard * 1.5, 1.6)
+      }
+      inWater = wet; waterDepth = wet ? surface - pos.y : 0
+      // A stream carries you with it.
+      const run = wet ? world.flowAt(pos.x, pos.z) : null
+      if (run) {
+        const cx = pos.x + run[0] * 0.14 * dt, cz = pos.z + run[1] * 0.14 * dt
+        if (!blockedAt(cx, cz, pos.y)) { pos.x = cx; pos.z = cz }
+      }
+      // Moving through it, rings spread behind you and a little spray is kicked up; still, it only laps round you.
+      if (wet && (rippleTick -= dt) <= 0) {
+        const moving = Math.hypot(vel.x, vel.z) > 0.08
+        rippleTick = moving ? (swimming ? 0.3 : 0.38) : 1.5
+        water.ring(pos.x, surface, pos.z, moving ? 0.7 : 0.45, moving ? 1.3 : 2)
+        if (moving) water.burst(pos.x + vel.x * 0.12, surface, pos.z + vel.z * 0.12, swimming ? 5 : 3, 0.32, [vel.x, vel.z])
+      }
     }
     // The traffic: driven, and in your way only for as long as it takes to push you aside.
     traffic.step(dt)
@@ -259,6 +294,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     stride += sp * dt * 22
     const swing = Math.sin(stride) * Math.min(1, sp * 2) * (swimming ? 0.3 : 0.7)
     legL.rotation.x = swing; legR.rotation.x = -swing; armL.rotation.x = -swing * 0.8; armR.rotation.x = swing * 0.8
+    // Swimming: a crawl, arm over arm, the legs kicking.
+    if (swimming) { stroke += dt * (2.5 + sp * 9); armL.rotation.x = -stroke; armR.rotation.x = -stroke - Math.PI; legL.rotation.x = Math.sin(stroke * 3) * 0.25; legR.rotation.x = -legL.rotation.x }
+    water.update(dt)
     me.position.copy(pos)
     // The camera, behind and above, easing after you; never inside a wall of the ground.
     look.set(pos.x, pos.y + TALL * 0.8, pos.z)
@@ -302,7 +340,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       if (view?.dist !== undefined) dist = view.dist
       camera.position.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.8 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
     },
-    state: () => ({ x: pos.x, y: pos.y, z: pos.z, onGround, swimming, cars: carMeshes.map((g) => [g.position.x, g.position.z]) }),
+    state: () => ({ x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), cars: carMeshes.map((g) => [g.position.x, g.position.z]) }),
     dispose() {
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
