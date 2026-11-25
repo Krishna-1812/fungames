@@ -3117,7 +3117,15 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        building or the hill), shadows soft-edged, twice as sharp, half as
        far again and held to the shadow map's texels so they never crawl;
        multisampled edges.
-    4. *A day that passes* — dawn, noon, golden hour, dusk, night.
+    4. ~~*A day that passes*~~ **done** — an hour a minute, from the sun's
+       real path at 24°N: its light warmer and weaker low down, the sky
+       reddening at sunset, then a blue hour with the afterglow, stars that
+       wheel and a moon that casts the night's shadows; lamps on at dusk,
+       windows lighting one by one and most going out after midnight; a
+       clock to pause or go to any hour. Also: the lens now smooths edges
+       with SMAA and works its occlusion at half size, and steps itself
+       down on a machine that cannot keep up (this laptop on battery holds
+       about 40 fps after the step-down).
     5. *Buildings up close* — recessed windows, rooftop clutter, game
        signs, ledges and trims.
     6. *What grows* — real palms and trees, grass and flowers, wind.
