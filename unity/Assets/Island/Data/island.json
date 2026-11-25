@@ -13460,50 +13460,6 @@
    "frame": 0
   },
   {
-   "name": "v-bike-5b82ff-ne",
-   "kind": "bike",
-   "shirt": "5b82ff",
-   "skin": "0",
-   "hat": "0",
-   "v": 7,
-   "pose": "drive",
-   "facing": "ne",
-   "frame": 0
-  },
-  {
-   "name": "v-bike-5b82ff-sw",
-   "kind": "bike",
-   "shirt": "5b82ff",
-   "skin": "0",
-   "hat": "0",
-   "v": 7,
-   "pose": "drive",
-   "facing": "sw",
-   "frame": 0
-  },
-  {
-   "name": "v-bike-ff4f6e-ne",
-   "kind": "bike",
-   "shirt": "ff4f6e",
-   "skin": "0",
-   "hat": "0",
-   "v": 7,
-   "pose": "drive",
-   "facing": "ne",
-   "frame": 0
-  },
-  {
-   "name": "v-bike-ff4f6e-sw",
-   "kind": "bike",
-   "shirt": "ff4f6e",
-   "skin": "0",
-   "hat": "0",
-   "v": 7,
-   "pose": "drive",
-   "facing": "sw",
-   "frame": 0
-  },
-  {
    "name": "v-bus-5b82ff-ne",
    "kind": "bus",
    "shirt": "5b82ff",
@@ -13512,6 +13468,28 @@
    "v": 7,
    "pose": "drive",
    "facing": "ne",
+   "frame": 0
+  },
+  {
+   "name": "v-bus-5b82ff-nw",
+   "kind": "bus",
+   "shirt": "5b82ff",
+   "skin": "0",
+   "hat": "0",
+   "v": 7,
+   "pose": "drive",
+   "facing": "nw",
+   "frame": 0
+  },
+  {
+   "name": "v-bus-5b82ff-se",
+   "kind": "bus",
+   "shirt": "5b82ff",
+   "skin": "0",
+   "hat": "0",
+   "v": 7,
+   "pose": "drive",
+   "facing": "se",
    "frame": 0
   },
   {
@@ -13581,6 +13559,28 @@
    "frame": 0
   },
   {
+   "name": "v-car-ff4f6e-nw",
+   "kind": "car",
+   "shirt": "ff4f6e",
+   "skin": "0",
+   "hat": "0",
+   "v": 7,
+   "pose": "drive",
+   "facing": "nw",
+   "frame": 0
+  },
+  {
+   "name": "v-car-ff4f6e-se",
+   "kind": "car",
+   "shirt": "ff4f6e",
+   "skin": "0",
+   "hat": "0",
+   "v": 7,
+   "pose": "drive",
+   "facing": "se",
+   "frame": 0
+  },
+  {
    "name": "v-car-ff4f6e-sw",
    "kind": "car",
    "shirt": "ff4f6e",
@@ -13589,6 +13589,17 @@
    "v": 7,
    "pose": "drive",
    "facing": "sw",
+   "frame": 0
+  },
+  {
+   "name": "v-car-ffffff-ne",
+   "kind": "car",
+   "shirt": "ffffff",
+   "skin": "0",
+   "hat": "0",
+   "v": 7,
+   "pose": "drive",
+   "facing": "ne",
    "frame": 0
   },
   {
@@ -13611,6 +13622,17 @@
    "v": 7,
    "pose": "drive",
    "facing": "se",
+   "frame": 0
+  },
+  {
+   "name": "v-car-ffffff-sw",
+   "kind": "car",
+   "shirt": "ffffff",
+   "skin": "0",
+   "hat": "0",
+   "v": 7,
+   "pose": "drive",
+   "facing": "sw",
    "frame": 0
   },
   {
