@@ -3126,8 +3126,16 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        with SMAA and works its occlusion at half size, and steps itself
        down on a machine that cannot keep up (this laptop on battery holds
        about 40 fps after the step-down).
-    5. *Buildings up close* — recessed windows, rooftop clutter, game
-       signs, ledges and trims.
+    5. ~~*Buildings up close*~~ **done** — walls of render streaked by rain
+       and damp at the foot, tiled roofs in courses, gravel on flat roofs;
+       window frames standing proud, glazing bars and stone sills, and a
+       room behind every one of the 240 windows (walls, floor, ceiling,
+       furniture, curtains or blinds) lit at night if someone is home; door
+       frames, panels, handles and steps; cornices and plinths; parapets,
+       air conditioning, vents and water tanks on the 14 flat roofs; the
+       lighthouse, the boards and posters with the map's own pictures,
+       window boxes and dishes; every game on land has its name over its
+       door or on a sign at the front of its plot.
     6. *What grows* — real palms and trees, grass and flowers, wind.
     7. *You* — a proper figure, and the way it walks, runs, swims, climbs.
     8. *Cars* — real shapes and lights, and getting in and driving one.
