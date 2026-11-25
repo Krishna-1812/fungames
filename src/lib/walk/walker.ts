@@ -4,8 +4,9 @@
  * Moving is physical: you walk at a walk and run at a run (a tile is about
  * three and a half metres, so you are half a tile tall), gravity pulls you
  * down and a jump takes you a hand's height off the ground; the ground under
- * you is the island's own, terrace by terrace, so a step up you can climb and
- * a terrace's wall you cannot; buildings stop you at their walls (their
+ * you is the island's own (terrain.ts), so you walk up a slope, a little
+ * slower the steeper it is, and down it without leaving it, and a wall you
+ * cannot walk up you may climb if it is no higher than your chest; buildings stop you at their walls (their
  * solids, as boxes), and you can stand on what is low enough to step onto (a
  * plinth, a pier); in water too deep to stand in you swim, slowly, your head
  * above it. The island's traffic (traffic.ts, the same that drives the map)
@@ -26,7 +27,9 @@ import { createTraffic } from '../island/traffic'
 
 export type Walk = { dispose(): void; setNight(on: boolean): void; setAerial(on: boolean): void; near(): { slug: string; title: string; href: string } | null
   /** Where you are and how (for the checks). */
-  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; cars: number[][] } }
+  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; cars: number[][] }
+  /** Set you down somewhere, looking a given way (for the checks, and for pictures). */
+  goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void }
 
 const TALL = 0.5, RADIUS = 0.11, STEP = 0.14
 /** The highest ledge you can pull yourself up onto (about 1.25 m), and out of the water onto a quay or a beach. */
@@ -124,14 +127,14 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const seaY = Y(data.sea)
   /** The ground's height at a world point: the tile's top, or the top of something built low enough to stand on. */
   const groundAt = (x: number, z: number, from: number, reach = STEP) => {
-    let g = Y(world.top(Math.floor(z), Math.floor(x)))
+    let g = world.heightAt(x, z)
     for (const b of world.boxes) if (x > b.j0 && x < b.j1 && z > b.i0 && z < b.i1 && b.z1 <= from + reach && b.z1 > g) g = b.z1
     return g
   }
   /** Whether a wall stands at a point: ground or something built, higher than you can get up (by a step, or a climb). */
   const blockedAt = (x: number, z: number, y: number, reach = STEP) => {
     // A terrace wall or a cliff too tall.
-    for (const [dx, dz] of [[RADIUS, 0], [-RADIUS, 0], [0, RADIUS], [0, -RADIUS]]) if (Y(world.top(Math.floor(z + dz), Math.floor(x + dx))) > y + reach) return true
+    for (const [dx, dz] of [[RADIUS, 0], [-RADIUS, 0], [0, RADIUS], [0, -RADIUS]]) if (world.heightAt(x + dx, z + dz) > y + reach) return true
     // A wall: any box you would be inside that rises above what you can get up.
     for (const b of world.boxes) if (b.z1 > y + reach && b.z0 < y + TALL && x > b.j0 - RADIUS && x < b.j1 + RADIUS && z > b.i0 - RADIUS && z < b.i1 + RADIUS) return true
     return false
@@ -204,8 +207,14 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     const stick = ui.move?.() ?? [0, 0]
     if (stick[0] || stick[1]) { fx = stick[0]; fz = -stick[1] }
     const mag = Math.min(1, Math.hypot(fx, fz))
-    const speed = swimming ? SWIM : keys.has('ShiftLeft') || keys.has('ShiftRight') || mag > 0.95 && stick[0] + stick[1] !== 0 ? RUN : WALK
+    const speed0 = swimming ? SWIM : keys.has('ShiftLeft') || keys.has('ShiftRight') || mag > 0.95 && stick[0] + stick[1] !== 0 ? RUN : WALK
     const sx = Math.sin(yaw), cz = Math.cos(yaw)
+    // Uphill is harder going: slower the steeper it is the way you are heading (and a touch quicker down).
+    const hx = -fz * sx + fx * cz, hz = -fz * cz - fx * sx, hl = Math.hypot(hx, hz) || 1
+    const rise = onGround && !swimming ? (world.heightAt(pos.x + (hx / hl) * 0.08, pos.z + (hz / hl) * 0.08) - world.heightAt(pos.x, pos.z)) / 0.08 : 0
+    // Wading, the water holds you back: the deeper, the harder (up to your chest, about half your pace).
+    const wade = !swimming && pos.y < seaY ? 1 - 0.5 * Math.min(1, (seaY - pos.y) / 0.32) : 1
+    const speed = speed0 * Math.max(0.55, Math.min(1.12, 1 - rise * 0.9)) * wade
     const wantX = (-fz * sx + fx * cz) * speed * mag / (mag || 1), wantZ = (-fz * cz - fx * sx) * speed * mag / (mag || 1)
     // Your feet take a moment to get going and to stop (more on the ground than in the air or the water).
     const grip = onGround ? 10 : swimming ? 3 : 1.5
@@ -228,20 +237,21 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       pos.x = Math.max(-OUT, Math.min(data.grid + OUT, pos.x)); pos.z = Math.max(-OUT, Math.min(data.grid + OUT, pos.z))
       // Down: onto the ground, or into the water.
       const g = groundAt(pos.x, pos.z, pos.y)
+      const wasOn = onGround && !swimming
       swimming = g < seaY - 0.32
       pos.y += vel.y * dt
       const floor = swimming ? seaY - 0.36 : g
-      if (pos.y <= floor) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
+      // Walking down a slope (or off a kerb) your feet keep to the ground; off anything higher than a step you fall.
+      if (pos.y <= floor || (wasOn && vel.y <= 0 && pos.y - floor < STEP * 0.6)) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
     }
     // The traffic: driven, and in your way only for as long as it takes to push you aside.
     traffic.step(dt)
     traffic.state().forEach((c, k) => {
       const m = carMeshes[k]; if (!m) return
-      m.position.set(c.j, Y(0), c.i)
-      m.rotation.y = Math.atan2(c.hi, c.hj) * -1 + Math.PI / 2 - Math.PI / 2
+      m.position.set(c.j, world.heightAt(c.j, c.i), c.i)
       m.rotation.y = Math.atan2(-c.hi, c.hj)
       const dx = pos.x - c.j, dz = pos.z - c.i, d = Math.hypot(dx, dz)
-      if (d < 0.26 && pos.y < Y(0) + 0.25) { pos.x += (dx / (d || 1)) * (0.26 - d); pos.z += (dz / (d || 1)) * (0.26 - d) }
+      if (d < 0.26 && pos.y < m.position.y + 0.25) { pos.x += (dx / (d || 1)) * (0.26 - d); pos.z += (dz / (d || 1)) * (0.26 - d) }
     })
     // You, walking: legs and arms swinging with your speed, turned the way you go.
     const sp = Math.hypot(vel.x, vel.z)
@@ -255,7 +265,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     camPos.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.8 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
     // From the air: high over the island's middle, looking down at it the way the map does.
     if (aerial) { const c = data.grid / 2; look.set(c, 0, c); camPos.set(c + Math.sin(yaw) * 24, 26, c + Math.cos(yaw) * 24) }
-    const under = Y(world.top(Math.floor(camPos.z), Math.floor(camPos.x))) + 0.08
+    const under = world.heightAt(camPos.x, camPos.z) + 0.08
     if (camPos.y < under) camPos.y = under
     camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : 8)))
     camera.lookAt(look)
@@ -285,6 +295,13 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     setNight(on) { night = on; setSky() },
     setAerial(on) { aerial = on; (scene.fog as Fog).far = on ? 160 : 70 },
     near: () => near,
+    goTo(x, z, view) {
+      pos.set(x, world.heightAt(x, z), z); vel.set(0, 0, 0); climbTo = null
+      if (view?.yaw !== undefined) yaw = view.yaw
+      if (view?.pitch !== undefined) pitch = view.pitch
+      if (view?.dist !== undefined) dist = view.dist
+      camera.position.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.8 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
+    },
     state: () => ({ x: pos.x, y: pos.y, z: pos.z, onGround, swimming, cars: carMeshes.map((g) => [g.position.x, g.position.z]) }),
     dispose() {
       cancelAnimationFrame(raf)
