@@ -13,11 +13,14 @@
  *     never bands (still, for anyone who asked for reduced motion);
  *   - the sun, looked towards: its glare, and the faint ghosts a lens throws
  *     across the picture from it (none when something stands in front of it);
- *   - and the edges smoothed (multisampling), everything rendered in floating
- *     point until the very end.
+ *   - and the edges smoothed (SMAA, on the finished picture: a fraction of what
+ *     multisampling costs), everything rendered in floating point until the
+ *     tone mapping.
  *
- * A phone gets the same picture without the occlusion pass (its cost is a
- * second drawing of the scene) and at a lower bloom resolution.
+ * The occlusion is worked out at half the picture's size (it is soft; nobody
+ * can tell), and a phone does without it (its cost is a second drawing of
+ * the scene), with bloom at a third of the size. If a machine still cannot
+ * keep up, walker.ts steps the quality down (drop()).
  */
 import { HalfFloatType, type PerspectiveCamera, type Scene, Vector2, type WebGLRenderer, WebGLRenderTarget } from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -26,6 +29,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js'
 
 const Grade = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uGrain: { value: 0.018 }, uRes: { value: new Vector2(1, 1) }, uVignette: { value: 0.26 }, uCool: { value: 1 }, uSun: { value: new Vector2(0.5, 0.5) }, uSunVis: { value: 0 } },
@@ -70,22 +74,27 @@ const Grade = {
     }`,
 }
 
-export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, opts: { phone: boolean; still: boolean; ao?: boolean }) {
-  const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: opts.phone ? 0 : 4 })
+export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, opts: { phone: boolean; still: boolean; ao?: boolean; samples?: number; bloom?: boolean }) {
+  const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: opts.samples ?? 0 })
   const composer = new EffectComposer(renderer, target)
   composer.addPass(new RenderPass(scene, camera))
   let ao: GTAOPass | null = null
   if (!opts.phone && opts.ao !== false) {
     ao = new GTAOPass(scene, camera, 1, 1)
     // A tile is three and a half metres: reach about a metre, fade with distance.
-    ao.updateGtaoMaterial({ radius: 0.4, distanceExponent: 1.5, thickness: 0.6, scale: 1.25, samples: 12, distanceFallOff: 1 })
-    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 })
+    ao.updateGtaoMaterial({ radius: 0.4, distanceExponent: 1.5, thickness: 0.6, scale: 1.25, samples: 8, distanceFallOff: 1 })
+    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 8 })
+    // (At half size.)
+    const full = ao.setSize.bind(ao)
+    ao.setSize = (w: number, h: number) => full(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)))
     ao.blendIntensity = 1
     composer.addPass(ao)
   }
   const bloom = new UnrealBloomPass(new Vector2(256, 256), 0.16, 0.2, 7)
-  composer.addPass(bloom)
+  if (opts.bloom !== false) composer.addPass(bloom)
   composer.addPass(new OutputPass())
+  const smaa = opts.samples ? null : new SMAAPass()
+  if (smaa) composer.addPass(smaa)
   const grade = new ShaderPass(Grade)
   composer.addPass(grade)
   let t = 0
@@ -96,11 +105,12 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
       bloom.resolution.set((w * pr) / (opts.phone ? 3 : 2), (h * pr) / (opts.phone ? 3 : 2))
       grade.uniforms.uRes.value.set(w * pr, h * pr)
     },
-    setNight(on: boolean) {
-      // At night the lamps and the lit windows glow, and the shadows need no cooling.
-      bloom.strength = on ? 0.42 : 0.16; bloom.threshold = on ? 1.1 : 7; bloom.radius = on ? 0.45 : 0.2
-      grade.uniforms.uCool.value = on ? 0 : 1
-      if (ao) ao.blendIntensity = on ? 0.6 : 1
+    /** How light it is (0 night, 1 day): at night the lamps and the lit windows glow, and the shadows need no cooling. */
+    setDaylight(d: number) {
+      const L = (a: number, b: number) => a + (b - a) * d
+      bloom.strength = L(0.3, 0.12); bloom.threshold = L(1.4, 9); bloom.radius = L(0.35, 0.2)
+      grade.uniforms.uCool.value = d
+      if (ao) ao.blendIntensity = L(0.6, 1)
     },
     /** Where the sun is in the picture (0–1 across and up) and how much of it can be seen. */
     sun(u: number, v: number, vis: number) { grade.uniforms.uSun.value.set(u, v); grade.uniforms.uSunVis.value = vis },
@@ -108,6 +118,11 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
       if (!opts.still) t += dt
       grade.uniforms.uTime.value = t
       composer.render(dt)
+    },
+    /** Gives up the most costly thing left (the occlusion; then, for walker.ts, sharper shadows and pixels). Whether there was any to give. */
+    drop() {
+      if (ao && ao.enabled) { ao.enabled = false; return true }
+      return false
     },
     dispose() { composer.dispose(); target.dispose(); ao?.dispose() },
   }
