@@ -3110,8 +3110,13 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        the cliff into the sea, its current carrying you; rings and spray
        where you wade, swim or jump in. check-walk proves the stream runs
        downhill into the sea and the swell is still at the shore.
-    3. *Light and lens* — ambient occlusion, bloom, colour grading, softer
-       wider shadows.
+    3. ~~*Light and lens*~~ **done** — ambient occlusion where things meet
+       (off on phones), bloom on the sun's glitter, the lamps and lit
+       windows, a filmic grade with cool shadows and a vignette, the sun's
+       glare and lens ghosts when you look towards it (hidden behind a
+       building or the hill), shadows soft-edged, twice as sharp, half as
+       far again and held to the shadow map's texels so they never crawl;
+       multisampled edges.
     4. *A day that passes* — dawn, noon, golden hour, dusk, night.
     5. *Buildings up close* — recessed windows, rooftop clutter, game
        signs, ledges and trims.
