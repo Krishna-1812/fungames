@@ -136,12 +136,12 @@ check(start && world.kind(start[0], start[1]) === '1', `you start on land, on a 
 
 // Walked, climbed and swum out from the start, as walker.ts lets you (its
 // numbers): a flood over the island a fifth of a tile at a time.
-const STEP = 0.14, CLIMB = 0.36, CLIMB_WET = 0.62, TALL = 0.5, RADIUS = 0.11, REACH = 0.45, seaY = Y(data.sea)
+const METRE = 0.11, STEP = 0.35 * METRE, CLIMB = 3 * METRE, CLIMB_WET = 3.6 * METRE, TALL = 1.75 * METRE, RADIUS = 0.25 * METRE, CHEST = 1.3 * METRE, AFLOAT = 1.05 * METRE, REACH = 0.45, seaY = Y(data.sea)
 const H = 0.2, M = 4, N = Math.round((data.grid + 2 * M) / H)
 const level = new Float32Array(N * N).fill(NaN)
 const at = (x, z) => {
   const g = world.heightAt(x, z)
-  return g < seaY - 0.32 ? { y: seaY - 0.36, wet: true } : { y: g, wet: false }
+  return g < seaY - CHEST ? { y: seaY - AFLOAT, wet: true } : { y: g, wet: false }
 }
 const reachable = (x, z, from, wet) => {
   const here = at(x, z), reach = wet ? CLIMB_WET : CLIMB
