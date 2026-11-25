@@ -1,8 +1,8 @@
 /**
  * The walk — you, on foot, on the island (build3d.ts), in third person.
  *
- * Moving is physical: you walk at a walk and run at a run (a tile is about
- * three and a half metres, so you are half a tile tall), gravity pulls you
+ * Moving is physical, at the island's own scale (body.ts: a metre is 0.11 of
+ * a world unit, a tile about nine metres): you walk at 1.5 m/s and run at 5.5, gravity pulls you
  * down and a jump takes you a hand's height off the ground; the ground under
  * you is the island's own (terrain.ts), so you walk up a slope, a little
  * slower the steeper it is, and down it without leaving it, and a wall you
@@ -27,6 +27,7 @@ import { createTraffic } from '../island/traffic'
 import { splashes } from './splash'
 import { lens } from './lens'
 import { daylight } from './daylight'
+import { figure, METRE } from './body'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -39,11 +40,19 @@ export type Walk = { dispose(): void
   /** Set you down somewhere, looking a given way (for the checks, and for pictures). */
   goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void }
 
-const TALL = 0.5, RADIUS = 0.11, STEP = 0.14
-/** The highest ledge you can pull yourself up onto (about 1.25 m), and out of the water onto a quay or a beach. */
-const CLIMB = 0.36, CLIMB_WET = 0.62, CLIMB_SPEED = 1.5
-const WALK = 0.5, RUN = 1.45, SWIM = 0.32
-const GRAVITY = 2.8, JUMP = 1.15
+/*
+ * Everything at the island's own scale (body.ts): a metre is 0.11 of a world unit. You are 1.75 m tall and
+ * 25 cm round; a step up of 35 cm you just take; a wall up to 3 m you climb, as anyone fit can with a run at
+ * it; out of the water you can haul yourself onto a quay 3.6 m above your feet.
+ */
+const TALL = 1.75 * METRE, RADIUS = 0.25 * METRE, STEP = 0.35 * METRE
+const CLIMB = 3 * METRE, CLIMB_WET = 3.6 * METRE, CLIMB_SPEED = 2.6 * METRE
+/** A walk is 1.5 m a second, a run 5.5, swimming 1.1. */
+const WALK = 1.5 * METRE, RUN = 5.5 * METRE, SWIM = 1.1 * METRE
+/** Gravity is the Earth's; a jump leaves the ground at 3 m a second (a 46 cm hop). */
+const GRAVITY = 9.8 * METRE, JUMP = 3 * METRE
+/** Water deeper than your chest you swim in, your hips just under the surface. */
+const CHEST = 1.3 * METRE, AFLOAT = 1.05 * METRE
 
 export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNear(g: { title: string } | null): void; move?: () => [number, number] }): Walk {
   const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
@@ -92,19 +101,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   }
   applyTime()
 
-  /* ---- you ---- */
-  const me = new Group()
-  const skin = new MeshStandardMaterial({ color: '#e0b38f', roughness: 0.7 }), shirt = new MeshStandardMaterial({ color: '#4fe3c1', roughness: 0.8 }), trousers = new MeshStandardMaterial({ color: '#3b4a6b', roughness: 0.85 })
-  const body = new Mesh(new CylinderGeometry(0.075, 0.085, 0.2, 10), shirt); body.position.y = 0.3
-  const head = new Mesh(new SphereGeometry(0.065, 14, 10), skin); head.position.y = 0.45
-  const legGeo = new BoxGeometry(0.05, 0.2, 0.06)
-  const legL = new Mesh(legGeo, trousers), legR = new Mesh(legGeo, trousers)
-  legL.geometry.translate(0, -0.1, 0)
-  legL.position.set(-0.035, 0.2, 0); legR.position.set(0.035, 0.2, 0)
-  const armGeo = new BoxGeometry(0.035, 0.17, 0.04); armGeo.translate(0, -0.085, 0)
-  const armL = new Mesh(armGeo, shirt), armR = new Mesh(armGeo, shirt)
-  armL.position.set(-0.1, 0.39, 0); armR.position.set(0.1, 0.39, 0)
-  for (const m of [body, head, legL, legR, armL, armR]) { m.castShadow = true; me.add(m) }
+  /* ---- you (body.ts) ---- */
+  const you = figure(), me = you.root
   scene.add(me)
 
   /* ---- where you can stand ---- */
@@ -132,7 +130,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     const top = Math.max(groundAt(x, z, pos.y, reach), ...[[RADIUS, 0], [-RADIUS, 0], [0, RADIUS], [0, -RADIUS]].map(([dx, dz]) => groundAt(x + dx, z + dz, pos.y, reach)))
     return top > pos.y ? top : true
   }
-  let climbTo: number | null = null
+  let climbTo: number | null = null, climbFrom = 0, climbed: number | null = null
   /** The water's surface where you are (the sea with its swell, or the stream or the pond), if there is water there. */
   const waterAt = (x: number, z: number, ground: number) => world.poolAt(x, z) ?? (ground < seaY + 0.06 ? world.seaAt(x, z) : null)
   let inWater = false, waterDepth = 0, rippleTick = 0
@@ -143,7 +141,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const pos = new Vector3(start[1] + 0.5, 0, start[0] + 0.5)
   pos.y = groundAt(pos.x, pos.z, 99)
   const vel = new Vector3()
-  let yaw = Math.PI * 0.75, pitch = 0.32, dist = innerHeight > innerWidth ? 1.9 : 1.35, onGround = true, swimming = false, stride = 0, stroke = 0
+  let yaw = Math.PI * 0.75, pitch = 0.32, dist = innerHeight > innerWidth ? 1.05 : 0.8, onGround = true, swimming = false
 
   /* ---- the traffic ---- */
   const traffic = createTraffic({ roads: data.road, play: true, dark: () => (dark() ? 1 : 0) })
@@ -160,7 +158,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   }
 
   /* ---- the camera ---- */
-  const camera = new PerspectiveCamera(55, 1, 0.03, 500)
+  const camera = new PerspectiveCamera(55, 1, 0.012, 500)
   /** The picture's sharpness: the screen's own pixels (up to two to a point), less if the machine needs it. */
   let sharp = 1
   const fit = () => {
@@ -184,7 +182,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const pd = (e: PointerEvent) => { if ((e.target as HTMLElement) !== canvas) return; dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId) }
   const pm = (e: PointerEvent) => { if (!dragging) return; yaw -= (e.clientX - lx) * 0.006; pitch = MathUtils.clamp(pitch + (e.clientY - ly) * 0.004, 0.05, 1.2); lx = e.clientX; ly = e.clientY }
   const pu = () => { dragging = false }
-  const wh = (e: WheelEvent) => { dist = MathUtils.clamp(dist * (1 + e.deltaY * 0.001), 0.6, 4); e.preventDefault() }
+  const wh = (e: WheelEvent) => { dist = MathUtils.clamp(dist * (1 + e.deltaY * 0.001), 0.3, 3); e.preventDefault() }
   canvas.addEventListener('pointerdown', pd); addEventListener('pointermove', pm); addEventListener('pointerup', pu); canvas.addEventListener('wheel', wh, { passive: false })
 
   /* ---- each frame ---- */
@@ -222,7 +220,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     const hx = -fz * sx + fx * cz, hz = -fz * cz - fx * sx, hl = Math.hypot(hx, hz) || 1
     const rise = onGround && !swimming ? (world.heightAt(pos.x + (hx / hl) * 0.08, pos.z + (hz / hl) * 0.08) - world.heightAt(pos.x, pos.z)) / 0.08 : 0
     // Wading, the water holds you back: the deeper, the harder (up to your chest, about half your pace).
-    const wade = !swimming && inWater ? 1 - 0.5 * Math.min(1, waterDepth / 0.32) : 1
+    const wade = !swimming && inWater ? 1 - 0.5 * Math.min(1, waterDepth / CHEST) : 1
     const speed = speed0 * Math.max(0.55, Math.min(1.12, 1 - rise * 0.9)) * wade
     const wantX = (-fz * sx + fx * cz) * speed * mag / (mag || 1), wantZ = (-fz * cz - fx * sx) * speed * mag / (mag || 1)
     // Your feet take a moment to get going and to stop (more on the ground than in the air or the water).
@@ -232,28 +230,29 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       // Pulling yourself up a ledge: up first, then on over it.
       pos.y = Math.min(climbTo + 0.002, pos.y + CLIMB_SPEED * dt); vel.y = 0
       if (pos.y >= climbTo) { climbTo = null; onGround = true; swimming = false }
+      climbed = climbTo === null ? null : Math.min(1, (pos.y - climbFrom) / Math.max(1e-4, climbTo - climbFrom))
     } else {
       if (onGround && !swimming && keys.has('Space')) { vel.y = JUMP; onGround = false }
       vel.y -= GRAVITY * dt
       // Across, then along: each blocked on its own, so you slide along a wall; a
       // ledge no higher than your chest (from the water, a quay or a beach) you climb.
       const nx = pos.x + vel.x * dt, mx = moveTo(nx, pos.z)
-      if (mx === true) pos.x = nx; else if (typeof mx === 'number' && (onGround || swimming)) climbTo = mx; else vel.x = 0
+      if (mx === true) pos.x = nx; else if (typeof mx === 'number' && (onGround || swimming)) { climbTo = mx; climbFrom = pos.y } else vel.x = 0
       const nz = pos.z + vel.z * dt, mz = climbTo !== null ? false : moveTo(pos.x, nz)
-      if (mz === true) pos.z = nz; else if (typeof mz === 'number' && (onGround || swimming)) climbTo = mz; else if (climbTo === null) vel.z = 0
+      if (mz === true) pos.z = nz; else if (typeof mz === 'number' && (onGround || swimming)) { climbTo = mz; climbFrom = pos.y } else if (climbTo === null) vel.z = 0
       // Out at sea, a current turns you back towards the island.
       const OUT = 6
       pos.x = Math.max(-OUT, Math.min(data.grid + OUT, pos.x)); pos.z = Math.max(-OUT, Math.min(data.grid + OUT, pos.z))
       // Down: onto the ground, or into the water.
       const g = groundAt(pos.x, pos.z, pos.y)
       const wasOn = onGround && !swimming
-      swimming = g < seaY - 0.32
+      swimming = g < seaY - CHEST
       pos.y += vel.y * dt
       // Swimming, you float with your head out, riding the swell.
-      const floor = swimming ? world.seaAt(pos.x, pos.z) - 0.36 : g
+      const floor = swimming ? world.seaAt(pos.x, pos.z) - AFLOAT : g
       const falling = vel.y
       // Walking down a slope (or off a kerb) your feet keep to the ground; off anything higher than a step you fall.
-      if (pos.y <= floor || (wasOn && vel.y <= 0 && pos.y - floor < STEP * 0.6) || (swimming && vel.y <= 0 && pos.y - floor < 0.12)) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
+      if (pos.y <= floor || (wasOn && vel.y <= 0 && pos.y - floor < STEP * 0.6) || (swimming && vel.y <= 0 && pos.y - floor < 0.05)) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
       // In the water, and how deep; jumping or stepping in throws up spray.
       const surface = waterAt(pos.x, pos.z, g)
       const wet = surface !== null && pos.y < surface - 0.004
@@ -284,24 +283,32 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       m.position.set(c.j, world.heightAt(c.j, c.i), c.i)
       m.rotation.y = Math.atan2(-c.hi, c.hj)
       const dx = pos.x - c.j, dz = pos.z - c.i, d = Math.hypot(dx, dz)
-      if (d < 0.26 && pos.y < m.position.y + 0.25) { pos.x += (dx / (d || 1)) * (0.26 - d); pos.z += (dz / (d || 1)) * (0.26 - d) }
+      if (d < 0.22 && pos.y < m.position.y + 0.15) { pos.x += (dx / (d || 1)) * (0.22 - d); pos.z += (dz / (d || 1)) * (0.22 - d) }
     })
     // You, walking: legs and arms swinging with your speed, turned the way you go.
     const sp = Math.hypot(vel.x, vel.z)
     if (sp > 0.05) me.rotation.y = MathUtils.lerp(me.rotation.y, Math.atan2(vel.x, vel.z) + (Math.abs(Math.atan2(vel.x, vel.z) - me.rotation.y) > Math.PI ? Math.sign(me.rotation.y) * Math.PI * 2 : 0), Math.min(1, dt * 10))
-    stride += sp * dt * 22
-    const swing = Math.sin(stride) * Math.min(1, sp * 2) * (swimming ? 0.3 : 0.7)
-    legL.rotation.x = swing; legR.rotation.x = -swing; armL.rotation.x = -swing * 0.8; armR.rotation.x = swing * 0.8
-    // Swimming: a crawl, arm over arm, the legs kicking.
-    if (swimming) { stroke += dt * (2.5 + sp * 9); armL.rotation.x = -stroke; armR.rotation.x = -stroke - Math.PI; legL.rotation.x = Math.sin(stroke * 3) * 0.25; legR.rotation.x = -legL.rotation.x }
+    you.update(dt, { speed: sp, running: sp > WALK * 1.4, ground: onGround && !swimming && climbTo === null, swimming, wade: inWater && !swimming ? Math.min(1, waterDepth / CHEST) : 0, climb: climbed, vy: vel.y })
     water.update(dt)
     me.position.copy(pos)
     // The camera, behind and above, easing after you; never inside a wall of the ground.
-    look.set(pos.x, pos.y + TALL * 0.8, pos.z)
-    camPos.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.8 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
+    look.set(pos.x, pos.y + TALL * 0.85, pos.z)
+    camPos.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.85 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
+    // ...and never behind a wall: drawn in to just short of whatever stands between it and you.
+    if (!aerial) {
+      const dir = camPos.clone().sub(look), len = dir.length(); dir.divideScalar(len)
+      let t = len
+      for (const b of world.boxes) {
+        if (b.z1 - b.z0 < 0.04 || b.j1 - b.j0 < 0.03 || b.i1 - b.i0 < 0.03) continue
+        const tx0 = (b.j0 - look.x) / dir.x, tx1 = (b.j1 - look.x) / dir.x, ty0 = (b.z0 - look.y) / dir.y, ty1 = (b.z1 - look.y) / dir.y, tz0 = (b.i0 - look.z) / dir.z, tz1 = (b.i1 - look.z) / dir.z
+        const tin = Math.max(Math.min(tx0, tx1), Math.min(ty0, ty1), Math.min(tz0, tz1)), tout = Math.min(Math.max(tx0, tx1), Math.max(ty0, ty1), Math.max(tz0, tz1))
+        if (tin < tout && tout > 0 && tin > 0.02 && tin < t) t = tin
+      }
+      if (t < len) camPos.copy(look).addScaledVector(dir, Math.max(0.06, t - 0.03))
+    }
     // From the air: high over the island's middle, looking down at it the way the map does.
     if (aerial) { const c = data.grid / 2; look.set(c, 0, c); camPos.set(c + Math.sin(yaw) * 24, 26, c + Math.cos(yaw) * 24) }
-    const under = world.heightAt(camPos.x, camPos.z) + 0.08
+    const under = world.heightAt(camPos.x, camPos.z) + 0.03
     if (camPos.y < under) camPos.y = under
     camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : 8)))
     camera.lookAt(look)
