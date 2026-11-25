@@ -1,8 +1,8 @@
 /**
  * The walk — the island built in three.js, from the same facts Unity builds
  * the realistic island from (world.ts, IslandModel; pages/walk/world.json):
- * the ground tile by tile, with its terraces and cliffs, beaches, roads, the
- * river and the pond; the sea over its floor; every building out of its
+ * the ground (terrain.ts: slopes, cliffs, beaches, streets, the stream and
+ * the pond, painted with what each is made of); the sea over its floor; every building out of its
  * solids, as unity/Assets/Island/Editor/Buildings.cs builds them (boxes,
  * bands, windows with their frames and sills, doors, awnings, pitched and
  * pyramid roofs, drums, cones, domes, balls, discs, panels and rods); and the
@@ -14,8 +14,9 @@
  * ground, one for what is built, one for the lit windows (they glow at
  * night), one for what grows.
  */
+import { terrain } from './terrain'
 import {
-  BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3, Group, MeshPhysicalMaterial,
+  BufferGeometry, Color, DoubleSide, FrontSide, type Side, Float32BufferAttribute, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3, Group, MeshPhysicalMaterial,
 } from 'three'
 
 export const PX_H = 39.19
@@ -55,62 +56,8 @@ class Bag {
   }
 }
 
-const GREEN: Record<string, string> = { peaks: '#5f9e57', badlands: '#cfc4ae', proving: '#67a957', harbour: '#69ad5b', funfair: '#69ad5b', market: '#69ad5b', oldtown: '#69ad5b' }
-
 /** The open ocean's colour, beyond the floor the island stands on. */
 const DEEP_SEA = '#0c3a55'
-
-/* ---- the ground ------------------------------------------------------------ */
-function ground(d: WorldData) {
-  const g = new Bag()
-  const N = d.grid
-  const road = new Set(d.road.map(([i, j]) => `${i},${j}`)), wet = new Set([...d.river, ...d.pond].map(([i, j]) => `${i},${j}`))
-  const kind = (i: number, j: number) => (i < 0 || j < 0 || i >= N || j >= N ? '0' : d.ground[i * N + j])
-  /** The top of a tile: land at its height, a beach half-way down to the sea, the sea's floor deeper the further out. */
-  const top = (i: number, j: number) => {
-    const k = kind(i, j)
-    if (k === '1') return d.height[i][j]
-    if (k === 'b') return d.beachZ
-    return d.sea - 3 - Math.min(26, offshore(i, j) * 6)
-  }
-  /** How far a sea tile is from the nearest land, in tiles (9 for anywhere further than three). */
-  const offshore = (i: number, j: number) => {
-    let near = 9
-    for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) if (kind(i + a, j + b) !== '0') near = Math.min(near, Math.hypot(a, b))
-    return near
-  }
-  // The sea floor: pale sand in the shallows, going to the open ocean's own deep blue, so its edge never shows.
-  const SAND = new Color('#d9cfb2'), DEEP = new Color(DEEP_SEA)
-  const floor = (i: number, j: number) => '#' + SAND.clone().lerp(DEEP, Math.min(1, Math.max(0, (offshore(i, j) - 1) / 2.6)) ** 0.8).getHexString()
-  const colour = (i: number, j: number) => {
-    const k = kind(i, j), key = `${i},${j}`
-    if (k === '0') return floor(i, j)
-    if (k === 'b') return '#eadfc4'
-    if (wet.has(key)) return '#3f93b8'
-    if (road.has(key)) return '#8a8f99'
-    const h = d.height[i][j], dk = d.district[i][j]
-    if (dk === 'peaks' && h >= 48) return '#eef2f6'
-    return GREEN[dk] ?? '#69ad5b'
-  }
-  const M = 8
-  for (let i = -M; i < N + M; i++) for (let j = -M; j < N + M; j++) {
-    const z = top(i, j), c = colour(i, j)
-    // A little unevenness in the grass, so a lawn is never one flat colour.
-    const shade = 0.94 + 0.08 * Math.sin(i * 1.7 + j * 0.9) * Math.cos(j * 1.3 - i * 0.4)
-    g.quad(W(i, j, z), W(i, j + 1, z), W(i + 1, j + 1, z), W(i + 1, j, z), c, kind(i, j) === '1' && !road.has(`${i},${j}`) ? shade : 1)
-    // Walls down to each lower neighbour: rock for a terrace or a cliff, sand down a beach.
-    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const z2 = top(i + a, j + b)
-      if (z2 >= z) continue
-      const wall = kind(i, j) === '1' && z - z2 > 8 ? (d.district[Math.max(0, Math.min(N - 1, i))]?.[Math.max(0, Math.min(N - 1, j))] === 'badlands' ? '#b9a88f' : '#8d8780') : '#d8cba9'
-      const [p, q] = a === 1 ? [[i + 1, j + 1], [i + 1, j]] : a === -1 ? [[i, j], [i, j + 1]] : b === 1 ? [[i + 1, j + 1], [i, j + 1]] : [[i, j], [i + 1, j]]
-      g.quad(W(p[0], p[1], z), W(q[0], q[1], z), W(q[0], q[1], z2), W(p[0], p[1], z2), wall, a + b > 0 ? 0.86 : 1)
-    }
-  }
-  const mesh = new Mesh(g.geometry(), new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true, side: DoubleSide }))
-  mesh.receiveShadow = true
-  return { mesh, top, kind }
-}
 
 /* ---- what is built ------------------------------------------------------- */
 type Num = number
@@ -274,7 +221,7 @@ function solids(d: WorldData) {
 }
 
 /* ---- what grows ---------------------------------------------------------- */
-function plants(d: WorldData) {
+function plants(d: WorldData, siteAt: (x: number, z: number) => number) {
   const g = new Bag()
   const cone = (x: number, y: number, z: number, r: number, h: number, col: string, sides = 8) => {
     for (let t = 0; t < sides; t++) { const a0 = (t / sides) * Math.PI * 2, a1 = ((t + 1) / sides) * Math.PI * 2; g.tri(W(x + Math.sin(a0) * r, y + Math.cos(a0) * r, z), W(x + Math.sin(a1) * r, y + Math.cos(a1) * r, z), W(x, y, z + h), col, t % 2 ? 0.88 : 1) }
@@ -290,7 +237,9 @@ function plants(d: WorldData) {
       g.quad(P(t0, p0), P(t0, p1), P(t1, p1), P(t1, p0), col, a < 2 ? 0.85 : 1)
     }
   }
-  for (const [name, x, y, z, k] of d.plants) {
+  for (const [name, x, y, z0, k] of d.plants) {
+    // On the ground where it now is (a slope may have eased it up or down a little), a touch into it.
+    const gz = siteAt(y, x), z = Math.abs(z0 - gz) < 14 ? gz - 0.6 : z0
     const kind = name.replace(/[0-9]+$/, '').split('-')[0]
     if (kind === 'pine' || kind === 'snowpine') { trunk(x, y, z, 0.025 * k, 6 * k); cone(x, y, z + 5 * k, 0.17 * k, 22 * k, kind === 'snowpine' ? '#dfe8ee' : '#2f6b43'); cone(x, y, z + 14 * k, 0.12 * k, 18 * k, kind === 'snowpine' ? '#eef3f7' : '#3a7d4f') }
     else if (kind === 'palm') { trunk(x, y, z, 0.022 * k, 22 * k, '#9a8466'); for (let t = 0; t < 6; t++) { const a = (t / 6) * Math.PI * 2; g.tri(W(x, y, z + 22 * k), W(x + Math.sin(a) * 0.26 * k, y + Math.cos(a) * 0.26 * k, z + 15 * k), W(x + Math.sin(a + 0.4) * 0.22 * k, y + Math.cos(a + 0.4) * 0.22 * k, z + 18 * k), '#3f8f4c') } }
@@ -331,11 +280,11 @@ const WAVES = /* glsl */ `#include <normal_fragment_maps>
 /** The whole island: its meshes, the sea, and what the walker needs to know of it (heights, walls, the games). */
 export function buildWorld(d: WorldData) {
   const root = new Group()
-  const gr = ground(d)
-  root.add(gr.mesh)
   const sol = solids(d)
+  const gr = terrain(d, sol.boxes)
+  root.add(gr.mesh)
   root.add(sol.builtMesh, sol.glassMesh, sol.bulbMesh)
-  root.add(plants(d))
+  root.add(plants(d, gr.siteAt))
   // The sea: clear water over its sandy floor, deepening off the coast, and
   // beyond the floor the open ocean, dark and deep, out to the horizon.
   const deep = new Mesh(new PlaneGeometry(6000, 6000, 1, 1), new MeshStandardMaterial({ color: DEEP_SEA, roughness: 1 }))
@@ -343,19 +292,26 @@ export function buildWorld(d: WorldData) {
   deep.position.set(d.grid / 2, Y(d.sea) - 1.6, d.grid / 2)
   root.add(deep)
   const time = { value: 0 }
-  const water = new MeshPhysicalMaterial({ color: '#14688f', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.84 })
   // Its surface moves: a few long swells and many short ripples, summed as a
   // slope the light then sees (the sun's glitter, the sky's reflection) — the
   // sheet itself stays flat, so the coast never shifts under you.
-  water.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = time
-    sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
-    sh.fragmentShader = 'uniform float uTime;\nvarying vec3 vWPos;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', WAVES)
+  const waterOf = (opacity: number, side: Side) => {
+    const m = new MeshPhysicalMaterial({ color: '#14688f', roughness: 0.05, metalness: 0, transparent: true, opacity, side })
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = time
+      sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
+      sh.fragmentShader = 'uniform float uTime;\nvarying vec3 vWPos;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', WAVES)
+    }
+    return m
   }
+  const water = waterOf(0.84, FrontSide)
+  // The stream and the pond: clearer, shallower water over their pebbles, and its little falls.
+  const pools = new Mesh(gr.poolGeo, waterOf(0.66, DoubleSide))
+  root.add(pools)
   const sea = new Mesh(new PlaneGeometry(6000, 6000, 1, 1), water)
   sea.rotation.x = -Math.PI / 2
   sea.position.set(d.grid / 2, Y(d.sea), d.grid / 2)
   sea.receiveShadow = true
   root.add(sea)
-  return { root, top: gr.top, kind: gr.kind, boxes: sol.boxes, glass: sol.glassMat, bulbs: sol.bulbMat, lamps: sol.lamps, sea, time }
+  return { root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes], glass: sol.glassMat, bulbs: sol.bulbMat, lamps: sol.lamps, sea, time }
 }
