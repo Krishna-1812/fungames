@@ -15,8 +15,9 @@
  * night), one for what grows.
  */
 import { terrain } from './terrain'
+import { buildSea, poolMaterial } from './water'
 import {
-  BufferGeometry, Color, DoubleSide, FrontSide, type Side, Float32BufferAttribute, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3, Group, MeshPhysicalMaterial,
+  BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3, Group,
 } from 'three'
 
 export const PX_H = 39.19
@@ -256,62 +257,30 @@ function plants(d: WorldData, siteAt: (x: number, z: number) => number) {
   return mesh
 }
 
-/** The sea's slope at a point: seven waves, long swells to short ripples, each running at deep water's speed for its length. */
-const WAVES = /* glsl */ `#include <normal_fragment_maps>
-  {
-    vec2 p = vWPos.xz, g = vec2(0.0);
-    vec4 W[7];
-    W[0] = vec4(normalize(vec2(1.0, 0.35)), 1.9, 0.11);
-    W[1] = vec4(normalize(vec2(0.6, 1.0)), 2.7, 0.08);
-    W[2] = vec4(normalize(vec2(-0.8, 0.5)), 4.3, 0.06);
-    W[3] = vec4(normalize(vec2(0.2, -1.0)), 7.9, 0.05);
-    W[4] = vec4(normalize(vec2(1.0, -0.6)), 13.0, 0.04);
-    W[5] = vec4(normalize(vec2(-0.3, -1.0)), 21.0, 0.03);
-    W[6] = vec4(normalize(vec2(0.9, 0.9)), 33.0, 0.025);
-    for (int k = 0; k < 7; k++) {
-      float kn = W[k].z, ph = dot(W[k].xy, p) * kn - uTime * sqrt(9.8 * kn * 0.29);
-      g += W[k].xy * W[k].w * cos(ph);
-    }
-    // Calmer far off, so the horizon reads as a line, not noise.
-    g *= 1.0 - 0.75 * clamp(length(vWPos - cameraPosition) / 60.0, 0.0, 1.0);
-    normal = normalize((viewMatrix * vec4(normalize(vec3(-g.x, 1.0, -g.y)), 0.0)).xyz);
-  }`
-
-/** The whole island: its meshes, the sea, and what the walker needs to know of it (heights, walls, the games). */
+/** The whole island: its meshes, the sea, and what the walker needs to know of it (heights, walls, water, the games). */
 export function buildWorld(d: WorldData) {
   const root = new Group()
+  const time = { value: 0 }
   const sol = solids(d)
-  const gr = terrain(d, sol.boxes)
+  const gr = terrain(d, sol.boxes, time)
   root.add(gr.mesh)
   root.add(sol.builtMesh, sol.glassMesh, sol.bulbMesh)
   root.add(plants(d, gr.siteAt))
-  // The sea: clear water over its sandy floor, deepening off the coast, and
-  // beyond the floor the open ocean, dark and deep, out to the horizon.
+  // The sea (water.ts): it knows its depth everywhere, so it is clear in the shallows and deep blue
+  // beyond, breaks in foam on every shore, and lifts in a long swell that calms to nothing at the edge.
+  // Under it, far out past the floor the island stands on, the open ocean's dark.
   const deep = new Mesh(new PlaneGeometry(6000, 6000, 1, 1), new MeshStandardMaterial({ color: DEEP_SEA, roughness: 1 }))
   deep.rotation.x = -Math.PI / 2
   deep.position.set(d.grid / 2, Y(d.sea) - 1.6, d.grid / 2)
   root.add(deep)
-  const time = { value: 0 }
-  // Its surface moves: a few long swells and many short ripples, summed as a
-  // slope the light then sees (the sun's glitter, the sky's reflection) — the
-  // sheet itself stays flat, so the coast never shifts under you.
-  const waterOf = (opacity: number, side: Side) => {
-    const m = new MeshPhysicalMaterial({ color: '#14688f', roughness: 0.05, metalness: 0, transparent: true, opacity, side })
-    m.onBeforeCompile = (sh) => {
-      sh.uniforms.uTime = time
-      sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
-      sh.fragmentShader = 'uniform float uTime;\nvarying vec3 vWPos;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', WAVES)
-    }
-    return m
+  const sea = buildSea({ grid: d.grid, margin: 8, seaY: Y(d.sea), heightAt: gr.heightAt, rocks: gr.rocks, falls: gr.falls, time })
+  root.add(...sea.meshes)
+  // The stream and the pond: running water, its falls, and the still pond.
+  root.add(new Mesh(gr.poolGeo, poolMaterial(time)))
+  return {
+    root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes],
+    glass: sol.glassMat, bulbs: sol.bulbMat, lamps: sol.lamps, time,
+    /** Water: the sea's surface (swell and all) and depth, the stream's surface and which way it runs, and how bright the light under it is. */
+    seaAt: sea.surfaceAt, depthAt: sea.depthAt, poolAt: gr.poolAt, flowAt: gr.flowAt, caustics: gr.caustics, falls: gr.falls, swell: sea.uniforms.uLift,
   }
-  const water = waterOf(0.84, FrontSide)
-  // The stream and the pond: clearer, shallower water over their pebbles, and its little falls.
-  const pools = new Mesh(gr.poolGeo, waterOf(0.66, DoubleSide))
-  root.add(pools)
-  const sea = new Mesh(new PlaneGeometry(6000, 6000, 1, 1), water)
-  sea.rotation.x = -Math.PI / 2
-  sea.position.set(d.grid / 2, Y(d.sea), d.grid / 2)
-  sea.receiveShadow = true
-  root.add(sea)
-  return { root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes], glass: sol.glassMat, bulbs: sol.bulbMat, lamps: sol.lamps, sea, time }
 }
