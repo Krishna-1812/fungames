@@ -109,7 +109,7 @@ class Geo {
   }
 }
 
-export function terrain(d: WorldData, boxes: Box[]) {
+export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
   const N = d.grid, seaY = Y(d.sea)
   const key = (i: number, j: number) => `${i},${j}`
   const roads = new Set(d.road.map(([i, j]) => key(i, j)))
@@ -190,7 +190,8 @@ export function terrain(d: WorldData, boxes: Box[]) {
   }
   const edgeMid = (i: number, j: number, i2: number, j2: number) => {
     if (joined(i, j, i2, j2)) return isWet(i, j) && isWet(i2, j2) ? (carved(i, j) + carved(i2, j2)) / 2 : (top(i, j) + top(i2, j2)) / 2
-    return isWet(i, j) && isWet(i2, j2) ? carved(i, j) : top(i, j)
+    // A stream's bank holds it, except where it runs on down the stream or off the land into the sea.
+    return isWet(i, j) && (isWet(i2, j2) || kind(i2, j2) === '0') ? carved(i, j) : top(i, j)
   }
 
   // The sea floor's own shapes: banks of sand rising out of it, and the trench.
@@ -411,26 +412,61 @@ export function terrain(d: WorldData, boxes: Box[]) {
   })
 
   /* ---- water in the stream and the pond ---- */
-  const pools: number[] = []
-  const quad = (a: Vector3, b: Vector3, c: Vector3, e: Vector3) => pools.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, e.x, e.y, e.z)
-  for (const [i, j] of [...d.river, ...d.pond]) {
-    if (!isWet(i, j)) continue
-    const y = Y(top(i, j) - 1)
-    quad(new Vector3(j - 0.01, y, i - 0.01), new Vector3(j + 1.01, y, i - 0.01), new Vector3(j + 1.01, y, i + 1.01), new Vector3(j - 0.01, y, i + 1.01))
-    // Down to the next stretch of the stream, where it is lower: a little fall.
+  // Each stretch of the stream runs on to the next (the river is listed downstream); where it reaches the
+  // sea's edge it pours over the cliff. Each piece of water says which way it runs: [x, z, what it is]
+  // (0 still, 1 running, 2 falling).
+  const pools: number[] = [], flow: number[] = []
+  const quad = (a: Vector3, b: Vector3, c: Vector3, e: Vector3, fl: [number, number, number]) => {
+    for (const p of [a, c, b, a, e, c]) { pools.push(p.x, p.y, p.z); flow.push(...fl) }
+  }
+  const flows = new Map<string, [number, number]>(), levels = new Map<string, number>()
+  const falls: { x: number; z: number }[] = []
+  const river = d.river.filter(([i, j]) => isWet(i, j))
+  river.forEach(([i, j], n) => {
+    const next = river[n + 1], prev = river[n - 1]
+    const sea = SIDES.find((S) => kind(i + S.di, j + S.dj) === '0')
+    let dir: [number, number] = [0, 1]
+    if (next && Math.abs(next[0] - i) + Math.abs(next[1] - j) === 1) dir = [next[1] - j, next[0] - i]
+    else if (sea) dir = [sea.dj, sea.di]
+    else if (prev) dir = [j - prev[1], i - prev[0]]
+    flows.set(key(i, j), dir)
+  })
+  for (const [i, j] of [...river, ...d.pond.filter(([i, j]) => isWet(i, j))]) {
+    const y = Y(top(i, j) - 1), dir = flows.get(key(i, j))
+    levels.set(key(i, j), y)
+    quad(new Vector3(j - 0.01, y, i - 0.01), new Vector3(j + 1.01, y, i - 0.01), new Vector3(j + 1.01, y, i + 1.01), new Vector3(j - 0.01, y, i + 1.01), dir ? [dir[0], dir[1], 1] : [0, 0, 0])
     for (const S of SIDES) {
       const i2 = i + S.di, j2 = j + S.dj
-      if (!isWet(i2, j2) || top(i2, j2) >= top(i, j)) continue
-      const y2 = Y(top(i2, j2) - 1), [u0, v0] = S.at(0.12), [u1, v1] = S.at(0.88)
-      quad(new Vector3(j + u0, y, i + v0), new Vector3(j + u1, y, i + v1), new Vector3(j + u1, y2, i + v1), new Vector3(j + u0, y2, i + v0))
+      // Down to the next stretch of the stream, where it is lower: a little fall.
+      if (isWet(i2, j2) && top(i2, j2) < top(i, j)) {
+        const y2 = Y(top(i2, j2) - 1), [u0, v0] = S.at(0.12), [u1, v1] = S.at(0.88)
+        quad(new Vector3(j + u0, y, i + v0), new Vector3(j + u1, y, i + v1), new Vector3(j + u1, y2, i + v1), new Vector3(j + u0, y2, i + v0), [S.dj, S.di, 2])
+      }
+      // Off the land, over the cliff and into the sea.
+      if (kind(i2, j2) === '0' && dir && dir[0] === S.dj && dir[1] === S.di) {
+        const [u0, v0] = S.at(0.22), [u1, v1] = S.at(0.78), o = 0.016, [ox, oz] = S.out
+        const bottom = seaY - 0.02
+        quad(new Vector3(j + u0 + ox * o, y, i + v0 + oz * o), new Vector3(j + u1 + ox * o, y, i + v1 + oz * o), new Vector3(j + u1 + ox * o * 3, bottom, i + v1 + oz * o * 3), new Vector3(j + u0 + ox * o * 3, bottom, i + v0 + oz * o * 3), [S.dj, S.di, 2])
+        falls.push({ x: j + (u0 + u1) / 2 + ox * 0.05, z: i + (v0 + v1) / 2 + oz * 0.05 })
+      }
     }
   }
-  const poolGeo = new BufferGeometry(); poolGeo.setAttribute('position', new Float32BufferAttribute(pools, 3)); poolGeo.computeVertexNormals()
+  const poolGeo = new BufferGeometry()
+  poolGeo.setAttribute('position', new Float32BufferAttribute(pools, 3))
+  poolGeo.setAttribute('aFlow', new Float32BufferAttribute(flow, 3))
+  poolGeo.computeVertexNormals()
+  const tileKey = (x: number, z: number) => key(Math.floor(z), Math.floor(x))
+  /** Which way a stream carries you at a point (world x, z per second's push), if it runs there. */
+  const flowAt = (x: number, z: number) => flows.get(tileKey(x, z)) ?? null
+  /** The stream's or the pond's surface at a point, if there is one. */
+  const poolAt = (x: number, z: number) => levels.get(tileKey(x, z)) ?? null
+  const rocks = d.seaRocks.map(([i, j, k]) => ({ x: j + 0.5, z: i + 0.5, r: 0.34 * k }))
 
-  const mesh = new Mesh(geo.geometry(), groundMaterial(seaY))
+  const causticK = { value: 1 }
+  const mesh = new Mesh(geo.geometry(), groundMaterial(seaY, time, causticK))
   // It takes the shadows of all that stands on it (its own would only speckle it: the shading at the foot of each wall is its own).
   mesh.receiveShadow = true
-  return { mesh, poolGeo, rockBoxes, heightAt, siteAt, top, kind, joined, pinned }
+  return { mesh, poolGeo, rockBoxes, rocks, falls, flowAt, poolAt, caustics: causticK, heightAt, siteAt, top, kind, joined, pinned }
 }
 
 function smoothstep(a: number, b: number, x: number) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t) }
@@ -438,6 +474,8 @@ function smoothstep(a: number, b: number, x: number) { const t = Math.max(0, Mat
 /* ---- what the ground is made of: painted where it is ---------------------- */
 const GROUND_HEAD = /* glsl */ `
 uniform float uSeaY;
+uniform float uTime;
+uniform float uCaustic;
 varying vec3 vTW;
 varying vec3 vTN;
 varying vec3 vTSurf;
@@ -607,6 +645,16 @@ const GROUND_BODY = /* glsl */ `
     float cov = kind > 0.5 && kind < 1.5 ? smoothstep(-0.98, -0.75, row) : smoothstep(-0.5, 0.1, row);
     col = mix(soil, crop, cov); bh = row * 0.9 + n3 * 0.5;
   }
+  // Under the water, the sun's light comes through its ripples in a moving net of bright lines.
+  if (wetY < 0.0 && uCaustic > 0.0) {
+    // (Two nets drifting different ways, each bent by the swell, so no line stays straight.)
+    vec2 cp = p * 4.2 + vec2(tNoise(p * 1.6 + uTime * 0.21), tNoise(p * 1.6 - uTime * 0.17 + 5.0)) * 1.1;
+    float c1 = tCells(cp + vec2(uTime * 0.12, uTime * 0.08));
+    float c2 = tCells(cp * 1.63 + vec2(-uTime * 0.1, uTime * 0.14) + 7.3);
+    float caus = pow(1.0 - smoothstep(0.0, 0.075, c1), 2.0) * 0.55 + pow(1.0 - smoothstep(0.0, 0.055, c2), 2.0) * 0.4;
+    caus *= smoothstep(0.0, 0.04, -wetY) * (1.0 - smoothstep(0.12, 0.7, -wetY)) * uCaustic * wn.y * (1.0 - 0.6 * smoothstep(5.0, 18.0, dist));
+    col += col * caus * 0.85;
+  }
   // Wet where the sea reaches: darker, and shining.
   float wet = (1.0 - smoothstep(0.0, 0.05 + 0.03 * n2, wetY)) * step(id, 4.5 + step(8.5, id) * 9.0);
   col = mix(col, col * vec3(0.5, 0.52, 0.56), wet); rough = mix(rough, 0.25, wet);
@@ -617,10 +665,12 @@ const GROUND_BODY = /* glsl */ `
 }
 `
 
-function groundMaterial(seaY: number) {
+function groundMaterial(seaY: number, time: { value: number }, caustics: { value: number }) {
   const m = new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uSeaY = { value: seaY }
+    sh.uniforms.uTime = time
+    sh.uniforms.uCaustic = caustics
     sh.vertexShader = 'attribute vec3 aSurf;\nattribute vec4 aBlend;\nvarying vec3 vTW;\nvarying vec3 vTN;\nvarying vec3 vTSurf;\nvarying vec4 vTBlend;\n' + sh.vertexShader.replace(
       '#include <begin_vertex>',
       '#include <begin_vertex>\n  vTW = (modelMatrix * vec4(transformed, 1.0)).xyz;\n  vTN = normalize(mat3(modelMatrix) * objectNormal);\n  vTSurf = aSurf;\n  vTBlend = aBlend;',
