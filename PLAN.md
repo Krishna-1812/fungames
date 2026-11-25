@@ -3091,10 +3091,15 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     the walker's own rules — every game's building has to be reachable.
 70. **The walk, toward real** — fifteen phases, one at a time, each pushed
     and shown before the next starts:
-    1. *The ground* — smooth slopes instead of steps, beaches running down
-       into the sea, rock faces on cliffs, and real surfaces: grass, sand
-       (wet at the waterline), asphalt with kerbs and lane lines, crop
-       fields, snow; the sea rocks and sandbanks.
+    1. ~~*The ground*~~ **done** — terraces eased into slopes where the
+       step is small, walls of rock (or cut stone, under a road or a plot)
+       where it is not; beaches shelving under the sea, the stream in a
+       channel with little falls, the pond a bowl, sea rocks and sandbanks;
+       grass, earth with mud cracks, sand, snow, rock, asphalt with kerbs,
+       pavements, lines and crossings, crop rows, the sea floor fading to
+       the deep, all painted per pixel. You walk slower uphill and wading.
+       check-walk proves no cracks, walls where tiles part, every beach
+       running under the sea and every street level.
     2. *The water* — shore foam, shallow-to-deep colour, caustics, a river
        that flows, splashes and ripples where you swim.
     3. *Light and lens* — ambient occlusion, bloom, colour grading, softer
