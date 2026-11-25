@@ -3100,8 +3100,16 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        the deep, all painted per pixel. You walk slower uphill and wading.
        check-walk proves no cracks, walls where tiles part, every beach
        running under the sea and every street level.
-    2. *The water* — shore foam, shallow-to-deep colour, caustics, a river
-       that flows, splashes and ripples where you swim.
+    2. ~~*The water*~~ **done** — the sea knows its depth (a baked map of
+       depth and distance to shore): clear over the sand in the shallows,
+       turquoise, then deep blue; surf lapping every beach and rock, lines
+       of it running in; a swell that lifts the open sea and calms to
+       nothing at the edge, which you bob on swimming (flat for reduced
+       motion); the sun's light netted on the floor under it; the stream
+       running downhill with foam streaks, white down its falls and over
+       the cliff into the sea, its current carrying you; rings and spray
+       where you wade, swim or jump in. check-walk proves the stream runs
+       downhill into the sea and the swell is still at the shore.
     3. *Light and lens* — ambient occlusion, bloom, colour grading, softer
        wider shadows.
     4. *A day that passes* — dawn, noon, golden hour, dusk, night.
