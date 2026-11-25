@@ -10,6 +10,10 @@
  *     a slope, both come to the same height all along the edge between them,
  *     and wherever they do not, a wall stands; the beaches run down under the
  *     sea, and the surface you walk on is the one drawn (terrain.ts);
+ *   - the water: the stream runs downhill all the way and pours off the land
+ *     into the sea; the sea's swell (the one you bob on) dies away to
+ *     nothing at the water's edge, so the coast never moves, yet out in
+ *     open water it truly lifts;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -22,6 +26,7 @@ register('./resolve-ts.mjs', import.meta.url)
 const { listedGames } = await import('../src/data/games.ts')
 const { buildIsland } = await import('../src/lib/island/world.ts')
 const { buildWorld, Y } = await import('../src/lib/walk/build3d.ts')
+const { waveAt } = await import('../src/lib/walk/water.ts')
 
 let failures = 0
 const ok = (m) => console.log(`  ok    ${m}`)
@@ -80,6 +85,30 @@ check(start && world.kind(start[0], start[1]) === '1', `you start on land, on a 
   let flat = 0, total = 0
   for (const [i, j] of data.road) { total++; const h = [0.2, 0.5, 0.8].flatMap((a) => [0.2, 0.5, 0.8].map((b) => world.heightAt(j + b, i + a))); if (Math.max(...h) - Math.min(...h) < 0.002) flat++ }
   check(flat === total, `the streets are level, as the traffic drives them (${flat} of ${total})`)
+}
+
+// The water.
+{
+  const seaY = Y(data.sea), N = data.grid
+  let runs = 0, downhill = 0, intoSea = 0
+  for (const [i, j] of data.river) {
+    const dir = world.flowAt(j + 0.5, i + 0.5)
+    if (!dir) continue
+    runs++
+    const i2 = i + dir[1], j2 = j + dir[0], here = world.poolAt(j + 0.5, i + 0.5), there = world.poolAt(j2 + 0.5, i2 + 0.5)
+    if (there !== null ? there <= here + 1e-6 : world.kind(i2, j2) === '0') downhill++
+    if (world.kind(i2, j2) === '0') intoSea++
+  }
+  check(runs >= 6 && downhill === runs, `the stream runs downhill all the way (${downhill} of ${runs} stretches)`)
+  check(intoSea >= 1 && world.falls.length >= 1, `and pours off the land into the sea (${world.falls.length} fall)`)
+  let edge = 0, still = 0, lift = 0
+  for (let x = -6; x < N + 6; x += 0.13) for (let z = -6; z < N + 6; z += 0.17) {
+    const dp = world.depthAt(x, z)
+    if (dp > 0 && dp < 0.04) { edge++; let w = 0; for (let t = 0; t < 12; t += 0.7) w = Math.max(w, Math.abs(waveAt(x, z, t, dp))); if (w < 0.001) still++ }
+    if (dp > 0.8) for (let t = 0; t < 12; t += 1.3) lift = Math.max(lift, waveAt(x, z, t, dp))
+  }
+  check(edge > 500 && still === edge, `the swell dies away at the water's edge (${still} of ${edge} points there stay still)`)
+  check(lift > 0.05, `and lifts the open sea (${(lift * 3.5).toFixed(2)} m at most)`)
 }
 
 // Walked, climbed and swum out from the start, as walker.ts lets you (its
