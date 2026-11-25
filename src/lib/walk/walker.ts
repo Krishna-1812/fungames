@@ -27,6 +27,7 @@ import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { buildWorld, Y, type WorldData } from './build3d'
 import { createTraffic } from '../island/traffic'
 import { splashes } from './splash'
+import { lens } from './lens'
 
 export type Walk = { dispose(): void; setNight(on: boolean): void; setAerial(on: boolean): void; near(): { slug: string; title: string; href: string } | null
   /** Where you are and how (for the checks). */
@@ -46,7 +47,11 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   renderer.toneMapping = ACESFilmicToneMapping
   renderer.toneMappingExposure = 0.55
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = PCFShadowMap
+  renderer.shadowMap.type = PCFShadowMap // (soft-edged by the light's shadow.radius)
+  // A phone (or a small screen) draws a lighter picture: no occlusion pass, a smaller shadow map.
+  const phone = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  let post: ReturnType<typeof lens> | null = null
   renderer.debug.checkShaderErrors = false
 
   const scene = new Scene()
@@ -82,8 +87,11 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const lampLights = Array.from({ length: 6 }, () => { const l = new PointLight('#dfe8ff', 0, 2.2, 1.6); scene.add(l); return l })
   const sun = new DirectionalLight('#fff3e2', 2.6)
   sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
-  const sc = sun.shadow.camera; sc.left = -9; sc.right = 9; sc.top = 9; sc.bottom = -9; sc.near = 0.5; sc.far = 60
+  // Shadows soft-edged, cast across the thirteen tiles round you (more than you can make out the shadows past).
+  const SHADOW = phone ? 2048 : 4096, REACH = 13
+  sun.shadow.mapSize.set(SHADOW, SHADOW)
+  const sc = sun.shadow.camera; sc.left = -REACH; sc.right = REACH; sc.top = REACH; sc.bottom = -REACH; sc.near = 0.5; sc.far = 70
+  sun.shadow.radius = 3
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02
   scene.add(sun, sun.target)
   const hemi = new HemisphereLight('#bcd4f0', '#7d8a6a', 0.9)
@@ -109,6 +117,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     ;(scene.fog as Fog).color.set(night ? '#0d1424' : '#c9dbe8')
     world.glass.emissiveIntensity = night ? 1.4 : 0
     renderer.toneMappingExposure = night ? 0.9 : 0.55
+    post?.setNight(night)
     envRT?.dispose(); envRT = pmrem.fromScene(night ? nightEnv : envScene)
     scene.environment = envRT.texture
     scene.environmentIntensity = night ? 0.35 : 0.3
@@ -186,9 +195,13 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const camera = new PerspectiveCamera(55, 1, 0.03, 500)
   const fit = () => {
     const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(w, h, false)
+    const pr = Math.min(devicePixelRatio, 2)
+    renderer.setPixelRatio(pr); renderer.setSize(w, h, false)
+    post?.setSize(w, h, pr)
     camera.aspect = w / h; camera.updateProjectionMatrix()
   }
+  post = lens(renderer, scene, camera, { phone, still, ao: !new URLSearchParams(location.search).has('noao') })
+  post.setNight(night)
   fit()
   addEventListener('resize', fit)
 
@@ -207,6 +220,19 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   /* ---- each frame ---- */
   let raf = 0, last = performance.now(), near: { slug: string; title: string; href: string } | null = null
   const camPos = new Vector3(), look = new Vector3()
+  let sunTick = 0, sunSeen = 0, sunVis = 0
+  const sunAt = new Vector3(), sunLook = new Vector3(), ray = new Vector3()
+  /** Whether a line from the camera towards the sun gets clear of the ground and everything built. */
+  const sunClear = () => {
+    for (let t = 0.15; t < 18; t += 0.3) {
+      ray.copy(camera.position).addScaledVector(sunDir, t)
+      if (ray.y < world.heightAt(ray.x, ray.z)) return false
+      for (const b of world.boxes) if (ray.y < b.z1 && ray.y > b.z0 && ray.x > b.j0 && ray.x < b.j1 && ray.z > b.i0 && ray.z < b.i1) return false
+      if (ray.y > 3) return true
+    }
+    return true
+  }
+  const UP = new Vector3(0, 1, 0), lightRight = new Vector3(), lightUp = new Vector3(), snapped = new Vector3()
   let lampTick = 0
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop)
@@ -315,7 +341,12 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     }
     if (!night && lampLights[0].intensity) for (const L of lampLights) L.intensity = 0
     // The sun's shadows follow you.
-    sun.position.copy(pos).addScaledVector(sunDir, 30); sun.target.position.copy(pos)
+    // (Held to whole texels of the shadow map, so the edges of shadows do not crawl as you walk.)
+    const texel = (2 * REACH) / SHADOW
+    lightRight.crossVectors(UP, sunDir).normalize(); lightUp.crossVectors(sunDir, lightRight)
+    const pr = Math.round(pos.dot(lightRight) / texel) * texel, pu = Math.round(pos.dot(lightUp) / texel) * texel, pa = pos.dot(sunDir)
+    snapped.copy(lightRight).multiplyScalar(pr).addScaledVector(lightUp, pu).addScaledVector(sunDir, pa)
+    sun.position.copy(snapped).addScaledVector(sunDir, 35); sun.target.position.copy(snapped)
     // A game's building near: it offers to take you in.
     let best: typeof near = null, bd = 0.45
     for (const b of data.buildings) {
@@ -325,7 +356,16 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       if (d < bd) { bd = d; best = { slug: b.slug, title: gm.title, href: gm.href } }
     }
     if (best?.slug !== near?.slug) { near = best; ui.onNear(best) }
-    renderer.render(scene, camera)
+    // The sun in the picture: where, and whether anything (the hill, a building) stands in front of it.
+    if (!night && !aerial) {
+      if ((sunTick -= dt) <= 0) { sunTick = 0.1; sunSeen = sunClear() ? 1 : 0 }
+      sunAt.copy(camera.position).addScaledVector(sunDir, 100).project(camera)
+      camera.getWorldDirection(sunLook)
+      const facing = MathUtils.smoothstep(sunLook.dot(sunDir), 0.55, 0.9)
+      sunVis += ((sunAt.z < 1 ? sunSeen * facing : 0) - sunVis) * Math.min(1, dt * 6)
+    } else sunVis = 0
+    post!.sun(sunAt.x * 0.5 + 0.5, sunAt.y * 0.5 + 0.5, sunVis)
+    post!.render(dt)
   }
   raf = requestAnimationFrame(loop)
 
@@ -345,7 +385,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
       removeEventListener('pointermove', pm); removeEventListener('pointerup', pu)
-      envRT?.dispose(); pmrem.dispose(); renderer.dispose()
+      envRT?.dispose(); pmrem.dispose(); post?.dispose(); renderer.dispose()
     },
   }
 }
