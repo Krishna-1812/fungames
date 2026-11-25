@@ -3089,6 +3089,29 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     phone, and a Walk button beside Cartoon and Realistic on the map.
     `check-walk` builds it headlessly and floods out from the start by
     the walker's own rules — every game's building has to be reachable.
+70. **The walk, toward real** — fifteen phases, one at a time, each pushed
+    and shown before the next starts:
+    1. *The ground* — smooth slopes instead of steps, beaches running down
+       into the sea, rock faces on cliffs, and real surfaces: grass, sand
+       (wet at the waterline), asphalt with kerbs and lane lines, crop
+       fields, snow; the sea rocks and sandbanks.
+    2. *The water* — shore foam, shallow-to-deep colour, caustics, a river
+       that flows, splashes and ripples where you swim.
+    3. *Light and lens* — ambient occlusion, bloom, colour grading, softer
+       wider shadows.
+    4. *A day that passes* — dawn, noon, golden hour, dusk, night.
+    5. *Buildings up close* — recessed windows, rooftop clutter, game
+       signs, ledges and trims.
+    6. *What grows* — real palms and trees, grass and flowers, wind.
+    7. *You* — a proper figure, and the way it walks, runs, swims, climbs.
+    8. *Cars* — real shapes and lights, and getting in and driving one.
+    9. *Life* — people on the pavements, gulls, fish, boats.
+    10. *Weather* — clouds, rain, wet streets, wind.
+    11. *Sound* — waves, wind, footsteps, traffic, birds, night.
+    12. *Things that move* — balls, crates and cones to push and kick.
+    13. *The street* — benches, bins, signs, traffic lights, parked cars.
+    14. *Finding your way* — minimap, district names, compass, photo mode.
+    15. *Every device* — quality tiers, phone speed, reduced motion.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
