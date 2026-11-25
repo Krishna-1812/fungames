@@ -371,7 +371,7 @@ export function flora(d: WorldData, opts: { siteAt: (x: number, z: number) => nu
 
   const group = new Group()
   group.add(woodMesh, leafMesh)
-  const lawn = grass(opts, w, opts.phone ? 40 : 80)
+  const lawn = grass(opts, w, opts.phone ? 70 : 140)
   group.add(lawn.group)
   return { group, solids, wind, lawn, grown: { wood: wood.pos.length / 9, leaves: leaves.pos.length / 18 } }
 }
@@ -385,8 +385,9 @@ function grass(opts: { heightAt: (x: number, z: number) => number; meadow: (x: n
     const base = new Color('#ffffff').multiplyScalar(0.5), mid = new Color('#ffffff').multiplyScalar(0.85), tip = new Color('#ffffff').multiplyScalar(1.15)
     for (let b = 0; b < blades; b++) {
       const a = (b / blades) * Math.PI * 2 + r(), out = new Vector3(Math.sin(a), 0, Math.cos(a)), side = new Vector3(Math.cos(a), 0, -Math.sin(a))
-      const h = 0.05 + 0.04 * r(), wd = 0.0055
-      const sp = 0.004 + 0.022 * r(), p0 = out.clone().multiplyScalar(sp), p1 = out.clone().multiplyScalar(sp + h * 0.18).add(new Vector3(0, h * 0.55, 0)), p2 = out.clone().multiplyScalar(sp + h * 0.5).add(new Vector3(0, h, 0))
+      // (About 20 to 40 cm: a metre is 0.11.)
+      const h = 0.022 + 0.022 * r(), wd = 0.0032
+      const sp = 0.002 + 0.012 * r(), p0 = out.clone().multiplyScalar(sp), p1 = out.clone().multiplyScalar(sp + h * 0.18).add(new Vector3(0, h * 0.55, 0)), p2 = out.clone().multiplyScalar(sp + h * 0.5).add(new Vector3(0, h, 0))
       const L0 = p0.clone().addScaledVector(side, -wd), R0 = p0.clone().addScaledVector(side, wd), L1 = p1.clone().addScaledVector(side, -wd * 0.6), R1 = p1.clone().addScaledVector(side, wd * 0.6)
       g.v(L0, UP, base, 0); g.v(R0, UP, base, 0); g.v(R1, UP, mid, 0.55)
       g.v(L0, UP, base, 0); g.v(R1, UP, mid, 0.55); g.v(L1, UP, mid, 0.55)
@@ -394,10 +395,10 @@ function grass(opts: { heightAt: (x: number, z: number) => number; meadow: (x: n
     }
     if (flower) {
       // A flower head on its stalk: a little star of petals.
-      const top = new Vector3(0, 0.1, 0), white = new Color('#ffffff').multiplyScalar(1.6)
+      const top = new Vector3(0, 0.045, 0), white = new Color('#ffffff').multiplyScalar(1.6)
       for (let p = 0; p < 5; p++) {
         const a0 = (p / 5) * Math.PI * 2, a1 = a0 + 0.9
-        g.v(top, UP, white, 1); g.v(top.clone().add(new Vector3(Math.sin(a0) * 0.013, 0.002, Math.cos(a0) * 0.013)), UP, white, 1); g.v(top.clone().add(new Vector3(Math.sin(a1) * 0.013, 0.002, Math.cos(a1) * 0.013)), UP, white, 1)
+        g.v(top, UP, white, 1); g.v(top.clone().add(new Vector3(Math.sin(a0) * 0.007, 0.001, Math.cos(a0) * 0.007)), UP, white, 1); g.v(top.clone().add(new Vector3(Math.sin(a1) * 0.007, 0.001, Math.cos(a1) * 0.007)), UP, white, 1)
       }
       const s = new Vector3(0.0025, 0, 0)
       g.v(s.clone().negate(), UP, base, 0); g.v(s, UP, base, 0); g.v(top, UP, mid, 1)

@@ -8,7 +8,7 @@
  */
 import { BufferAttribute, BufferGeometry, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, Points, PointsMaterial, RingGeometry, type Scene } from 'three'
 
-const RINGS = 16, DROPS = 220, G = 2.8
+const RINGS = 16, DROPS = 220, G = 9.8 * 0.11
 
 export function splashes(scene: Scene) {
   const ringGeo = new RingGeometry(0.93, 1, 56).rotateX(-Math.PI / 2)
@@ -27,7 +27,7 @@ export function splashes(scene: Scene) {
     px[i] = px[i + 1] = px[i + 2] = 255; px[i + 3] = Math.round(255 * Math.max(0, Math.min(1, (1 - r) * 2.2)) ** 1.5)
   }
   const dot = new DataTexture(px, D, D); dot.magFilter = dot.minFilter = LinearFilter; dot.needsUpdate = true
-  const spray = new Points(geo, new PointsMaterial({ color: '#f4f9ff', map: dot, size: 0.032, transparent: true, opacity: 0.9, depthWrite: false }))
+  const spray = new Points(geo, new PointsMaterial({ color: '#f4f9ff', map: dot, size: 0.012, transparent: true, opacity: 0.9, depthWrite: false }))
   spray.frustumCulled = false; scene.add(spray)
   let nextDrop = 0
 
@@ -35,15 +35,16 @@ export function splashes(scene: Scene) {
     /** A ring on the water at a point, widening from a start radius. */
     ring(x: number, y: number, z: number, size = 1, life = 1.4) {
       const r = rings[nextRing++ % RINGS]
-      r.m.position.set(x, y + 0.004, z); r.age = 0; r.life = life; r.grow = 0.32 * size; r.start = 0.04 * size; r.peak = Math.min(0.55, 0.25 + size * 0.2)
+      r.m.position.set(x, y + 0.004, z); r.age = 0; r.life = life; r.grow = 0.13 * size; r.start = 0.015 * size; r.peak = Math.min(0.55, 0.25 + size * 0.2)
       r.m.visible = true
     },
     /** A burst of spray from a point on the water: n drops, thrown up as hard as power. */
     burst(x: number, y: number, z: number, n: number, power: number, push: [number, number] = [0, 0]) {
       for (let k = 0; k < n; k++) {
-        const i = nextDrop++ % DROPS, a = Math.random() * Math.PI * 2, out = (0.15 + Math.random() * 0.45) * power
-        pos[i * 3] = x + Math.cos(a) * 0.04; pos[i * 3 + 1] = y + 0.01; pos[i * 3 + 2] = z + Math.sin(a) * 0.04
-        vel[i * 3] = Math.cos(a) * out + push[0] * 0.4; vel[i * 3 + 1] = (0.5 + Math.random() * 0.9) * power; vel[i * 3 + 2] = Math.sin(a) * out + push[1] * 0.4
+        // (At a person's size: a metre is 0.11 of a world unit, so a hard splash flies a metre or so.)
+        const i = nextDrop++ % DROPS, a = Math.random() * Math.PI * 2, out = (0.06 + Math.random() * 0.18) * power
+        pos[i * 3] = x + Math.cos(a) * 0.015; pos[i * 3 + 1] = y + 0.004; pos[i * 3 + 2] = z + Math.sin(a) * 0.015
+        vel[i * 3] = Math.cos(a) * out + push[0] * 0.4; vel[i * 3 + 1] = (0.2 + Math.random() * 0.36) * power; vel[i * 3 + 2] = Math.sin(a) * out + push[1] * 0.4
         floor[i] = y
       }
     },
