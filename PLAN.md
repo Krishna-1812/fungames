@@ -3136,7 +3136,14 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        lighthouse, the boards and posters with the map's own pictures,
        window boxes and dishes; every game on land has its name over its
        door or on a sign at the front of its plot.
-    6. *What grows* — real palms and trees, grass and flowers, wind.
+    6. ~~*What grows*~~ **done** — every tree the map plants grown for real:
+       bark trunks and branches, crowns of leaf sprays painted from a drawn
+       atlas (21,000 of them), pines in thirteen whorls of boughs, ringed
+       curving palms with drooping fronds and coconuts, ribbed cacti,
+       faceted rocks, banded hoodoos and buttes, reeds; 12,600 tufts of
+       grass and wildflowers on the lawns, drawn near you and growing up at
+       the edge of sight; all of it in a gusting wind; trunks and rocks are
+       solid now.
     7. *You* — a proper figure, and the way it walks, runs, swims, climbs.
     8. *Cars* — real shapes and lights, and getting in and driving one.
     9. *Life* — people on the pavements, gulls, fish, boats.
