@@ -3,7 +3,8 @@
  * /walk/ — the island on foot, in 3D (lib/walk): built in the browser from
  * the same facts Unity builds the realistic island from, and walked in third
  * person, with the island's own traffic on its roads. Walk up to any game's
- * building and it offers to take you in.
+ * building and it offers to take you in. The day passes, an hour a minute;
+ * the clock lets you pause it or go to any hour.
  */
 import Base from '../layouts/Base.astro'
 import { withBase } from '../lib/base'
@@ -14,7 +15,18 @@ import { withBase } from '../lib/base'
     <canvas class="wk-canvas" id="wk" aria-label="The island in 3D"></canvas>
     <div class="wk-top">
       <a class="wk-btn" href={withBase('/')}>← The map</a>
-      <span class="wk-right"><button class="wk-btn" id="wkAir" type="button" aria-pressed="false">Aerial</button> <button class="wk-btn" id="wkNight" type="button" aria-pressed="false">Night</button></span>
+      <span class="wk-right"><button class="wk-btn" id="wkAir" type="button" aria-pressed="false">Aerial</button> <button class="wk-btn wk-clock" id="wkClock" type="button" aria-expanded="false" aria-controls="wkTime" aria-label="Time of day"><svg class="wk-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4"/></svg><svg class="wk-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.8A6.5 6.5 0 0 1 7.2 4.5a6.5 6.5 0 1 0 8.3 8.3z"/></svg><span id="wkClockText">16:30</span></button></span>
+    </div>
+    <div class="wk-time" id="wkTime" hidden>
+      <label class="wk-time-label" for="wkHour">Time of day <output id="wkHourOut">16:30</output></label>
+      <input id="wkHour" type="range" min="0" max="24" step="0.05" value="16.5" />
+      <div class="wk-time-row">
+        <button class="wk-chip" id="wkPause" type="button" aria-pressed="false">Pause</button>
+        <button class="wk-chip" type="button" data-hour="5.8">Dawn</button>
+        <button class="wk-chip" type="button" data-hour="12">Noon</button>
+        <button class="wk-chip" type="button" data-hour="18.2">Sunset</button>
+        <button class="wk-chip" type="button" data-hour="22">Night</button>
+      </div>
     </div>
     <p class="wk-help" id="wkHelp">W A S D or the arrow keys to walk · Shift to run · Space to jump · drag to look round · scroll to step back</p>
     <a class="wk-near" id="wkNear" hidden href="/"><span>Play</span> <b id="wkNearTitle"></b> <kbd>E</kbd></a>
@@ -29,7 +41,10 @@ import { withBase } from '../lib/base'
   const near = document.getElementById('wkNear') as HTMLAnchorElement
   const nearTitle = document.getElementById('wkNearTitle')!
   const load = document.getElementById('wkLoad')!
-  const nightBtn = document.getElementById('wkNight') as HTMLButtonElement
+  const clockBtn = document.getElementById('wkClock') as HTMLButtonElement, clockText = document.getElementById('wkClockText')!
+  const timePanel = document.getElementById('wkTime')!, hourIn = document.getElementById('wkHour') as HTMLInputElement, hourOut = document.getElementById('wkHourOut')!
+  const pauseBtn = document.getElementById('wkPause') as HTMLButtonElement
+  const hhmm = (h: number) => { const m = Math.floor((((h % 24) + 24) % 24) * 60); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` }
   const stickEl = document.getElementById('wkStick')!, knob = document.getElementById('wkKnob')!
 
   // A thumb-stick for a phone: where the thumb is from the stick's middle, as a direction and how far.
@@ -59,11 +74,25 @@ import { withBase } from '../lib/base'
     })
     load.remove()
     ;(window as unknown as { __walk: typeof walk }).__walk = walk
-    addEventListener('keydown', (e) => { if (e.code === 'KeyE') { const g = walk.near(); if (g) location.href = g.href } if (e.code === 'KeyN') nightBtn.click() })
+    addEventListener('keydown', (e) => { if (e.code === 'KeyE') { const g = walk.near(); if (g) location.href = g.href } if (e.code === 'KeyN') { const h = walk.time(); walk.setNight(h > 6 && h < 19.5) } })
     const air = document.getElementById('wkAir') as HTMLButtonElement
     air.addEventListener('click', () => { const on = air.getAttribute('aria-pressed') !== 'true'; air.setAttribute('aria-pressed', String(on)); air.textContent = on ? 'On foot' : 'Aerial'; walk.setAerial(on) })
     if (new URLSearchParams(location.search).has('aerial')) air.click()
-    nightBtn.addEventListener('click', () => { const on = nightBtn.getAttribute('aria-pressed') !== 'true'; nightBtn.setAttribute('aria-pressed', String(on)); nightBtn.textContent = on ? 'Day' : 'Night'; walk.setNight(on) })
+    // The clock: the hour, a sun or a moon; open, a slider for any hour, a pause, and the day's moments.
+    let dragging = false
+    const show = () => {
+      const h = walk.time()
+      clockText.textContent = hhmm(h); hourOut.textContent = hhmm(h)
+      clockBtn.dataset.night = String(h < 5.6 || h > 18.6)
+      if (!dragging) hourIn.value = String(h)
+      hourIn.style.setProperty('--at', `${(+hourIn.value / 24) * 100}%`)
+    }
+    show(); setInterval(show, 250)
+    clockBtn.addEventListener('click', () => { const open = timePanel.hidden; timePanel.hidden = !open; clockBtn.setAttribute('aria-expanded', String(open)) })
+    hourIn.addEventListener('input', () => { dragging = true; walk.setTime(+hourIn.value); show() })
+    hourIn.addEventListener('change', () => { dragging = false })
+    pauseBtn.addEventListener('click', () => { const on = walk.clock(); walk.setClock(!on); pauseBtn.setAttribute('aria-pressed', String(on)); pauseBtn.textContent = on ? 'Play' : 'Pause' })
+    for (const b of timePanel.querySelectorAll<HTMLButtonElement>('[data-hour]')) b.addEventListener('click', () => { walk.setTime(+b.dataset.hour!); show() })
   }).catch(() => { load.textContent = 'The island could not be built here (this browser needs WebGL).' })
 </script>
 
@@ -92,6 +121,34 @@ import { withBase } from '../lib/base'
   .wk-stick { display: none; position: absolute; left: 22px; bottom: 70px; width: 120px; height: 120px; border-radius: 50%; background: rgb(255 255 255 / 0.16); border: 2px solid rgb(255 255 255 / 0.35); touch-action: none; }
   .wk-stick.on { display: block; }
   .wk-stick i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: rgb(255 255 255 / 0.85); }
+  .wk-clock { display: inline-flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
+  .wk-clock svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+  .wk-clock .wk-sun circle { fill: currentColor; }
+  .wk-clock .wk-moon { display: none; fill: currentColor; stroke: none; }
+  .wk-clock[data-night='true'] .wk-moon { display: block; }
+  .wk-clock[data-night='true'] .wk-sun { display: none; }
+  .wk-time {
+    position: absolute; top: 62px; right: 14px; width: min(318px, calc(100% - 28px)); padding: 14px 16px 12px; border-radius: 18px;
+    background: rgb(255 255 255 / 0.94); color: #0f1730; box-shadow: 0 12px 32px rgb(0 0 0 / 0.28); font: 500 13px/1.3 var(--font-ui, system-ui, sans-serif);
+  }
+  .wk-time[hidden] { display: none; }
+  .wk-time-label { display: flex; justify-content: space-between; font-weight: 600; }
+  .wk-time-label output { font-variant-numeric: tabular-nums; }
+  /* The slider drawn by hand (left to the browser it takes the system's accent colour). */
+  .wk-time input {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 6px 0 8px; background: transparent; cursor: pointer;
+    --at: 50%;
+  }
+  .wk-time input::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, #2f6df6 var(--at), #d6def0 var(--at)); }
+  .wk-time input::-moz-range-track { height: 6px; border-radius: 999px; background: #d6def0; }
+  .wk-time input::-moz-range-progress { height: 6px; border-radius: 999px; background: #2f6df6; }
+  .wk-time input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: #fff; border: 3px solid #2f6df6; box-shadow: 0 2px 6px rgb(15 23 48 / 0.3); }
+  .wk-time input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid #2f6df6; }
+  .wk-time input:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; border-radius: 8px; }
+  .wk-time-row { display: flex; flex-wrap: wrap; gap: 5px; }
+  .wk-chip { border: 0; border-radius: 999px; padding: 7px 10px; background: #e8eefb; color: #0f1730; font: 600 12px/1 var(--font-ui, system-ui, sans-serif); cursor: pointer; }
+  .wk-chip:hover { background: #d8e3fa; }
+  .wk-chip:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
   .wk-load { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: #eef3ff; font: 600 16px/1.4 var(--font-ui, system-ui, sans-serif); }
   @media (pointer: coarse) { .wk-help { display: none; } .wk-near { bottom: 210px; } }
 </style>
