@@ -15,23 +15,27 @@
  * drives its roads round you and pushes you aside if you stand in its way.
  * Walk up to a game's building and it offers to take you in.
  *
- * The sky is a physical one (three's Sky: Rayleigh and Mie scattering) with
- * the sun in it, the distance hazed the way air hazes it; after dark the
- * windows light. Keyboard and mouse, or a thumb on a phone.
+ * The day passes (daylight.ts): the sun goes over, it gets dark, the lamps
+ * come on and the windows light, the moon and the stars come out. Keyboard and mouse, or a thumb on a phone.
  */
 import {
-  ACESFilmicToneMapping, AmbientLight, BoxGeometry, Color, DirectionalLight, Fog, Group, HemisphereLight, Mesh, MeshStandardMaterial,
-  PCFShadowMap, PerspectiveCamera, PointLight, Points, PointsMaterial, BufferGeometry, Float32BufferAttribute, PMREMGenerator, type WebGLRenderTarget, Scene, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, CylinderGeometry, MathUtils,
+  ACESFilmicToneMapping, BoxGeometry, Fog, Group, Mesh, MeshStandardMaterial, PCFShadowMap, PerspectiveCamera, PointLight, Float32BufferAttribute,
+  Scene, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, CylinderGeometry, MathUtils,
 } from 'three'
-import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { buildWorld, Y, type WorldData } from './build3d'
 import { createTraffic } from '../island/traffic'
 import { splashes } from './splash'
 import { lens } from './lens'
+import { daylight } from './daylight'
 
-export type Walk = { dispose(): void; setNight(on: boolean): void; setAerial(on: boolean): void; near(): { slug: string; title: string; href: string } | null
+export type Walk = { dispose(): void
+  /** Jump to the night (half past nine) or to the morning (ten). */
+  setNight(on: boolean): void
+  /** The time of day, in hours (0–24), and whether it is passing. */
+  setTime(hour: number): void; time(): number; setClock(on: boolean): void; clock(): boolean
+  setAerial(on: boolean): void; near(): { slug: string; title: string; href: string } | null
   /** Where you are and how (for the checks). */
-  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; cars: number[][] }
+  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; quality: string; cars: number[][] }
   /** Set you down somewhere, looking a given way (for the checks, and for pictures). */
   goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void }
 
@@ -60,69 +64,42 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   // Asked for less motion: the sea lies flat (no swell rocking you, or the camera, as you swim).
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) world.swell.value = 0
 
-  /* ---- the sky, the sun, the air ---- */
-  const sky = new Sky()
-  sky.scale.setScalar(4000)
-  const su = sky.material.uniforms
-  su.turbidity.value = 4; su.rayleigh.value = 1.6; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.86
-  scene.add(sky)
-  // The sky also lights the world: blurred into an environment map, it is what
-  // the sea and the glass reflect and the soft light that fills every shadow.
-  const pmrem = new PMREMGenerator(renderer)
-  const envScene = new Scene(), envSky = new Sky()
-  envSky.material = sky.material; envSky.scale.setScalar(1000); envScene.add(envSky)
-  let envRT: WebGLRenderTarget | null = null
-  // The night: a deep blue dark, a few thousand stars and the moon, which casts the shadows.
-  const nightEnv = new Scene(); nightEnv.background = new Color('#1b2a52')
-  const starPos: number[] = []
-  for (let k = 0; k < 2600; k++) {
-    const u = Math.random(), a = Math.random() * Math.PI * 2, el = Math.asin(0.04 + 0.96 * u)
-    starPos.push(Math.cos(el) * Math.sin(a) * 900, Math.sin(el) * 900, Math.cos(el) * Math.cos(a) * 900)
-  }
-  const starGeo = new BufferGeometry(); starGeo.setAttribute('position', new Float32BufferAttribute(starPos, 3))
-  const stars = new Points(starGeo, new PointsMaterial({ color: '#dfe8ff', size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85 }))
-  const moon = new Mesh(new SphereGeometry(18, 24, 16), new MeshStandardMaterial({ color: '#000000', emissive: new Color('#eef2ff'), emissiveIntensity: 1.1, fog: false }))
-  scene.add(stars, moon)
+  /* ---- the day: sun, moon, stars, sky and air (daylight.ts) ---- */
+  // Shadows soft-edged, cast across the thirteen tiles round you (more than you can make out the shadows past).
+  const Q = new URLSearchParams(location.search)
+  const SHADOW = Number(Q.get('shadow')) || (phone ? 2048 : 4096), REACH = 13
+  const dl = daylight(scene, renderer, { shadowSize: SHADOW, reach: REACH, soft: Q.has('soft') ? Number(Q.get('soft')) : undefined })
+  const sun = dl.light, sunDir = dl.state.lightDir
   // Light from the lamps nearest you (a handful of real lights, moved to whichever lamps are close).
   const lampLights = Array.from({ length: 6 }, () => { const l = new PointLight('#dfe8ff', 0, 2.2, 1.6); scene.add(l); return l })
-  const sun = new DirectionalLight('#fff3e2', 2.6)
-  sun.castShadow = true
-  // Shadows soft-edged, cast across the thirteen tiles round you (more than you can make out the shadows past).
-  const SHADOW = phone ? 2048 : 4096, REACH = 13
-  sun.shadow.mapSize.set(SHADOW, SHADOW)
-  const sc = sun.shadow.camera; sc.left = -REACH; sc.right = REACH; sc.top = REACH; sc.bottom = -REACH; sc.near = 0.5; sc.far = 70
-  sun.shadow.radius = 3
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02
-  scene.add(sun, sun.target)
-  const hemi = new HemisphereLight('#bcd4f0', '#7d8a6a', 0.9)
-  const amb = new AmbientLight('#ffffff', 0.12)
-  scene.add(hemi, amb)
-  scene.fog = new Fog('#c9dbe8', 14, 70)
-  let night = false, aerial = false
-  const sunDir = new Vector3()
-  const setSky = () => {
-    const elev = night ? 38 : 34, az = night ? 140 : 215
-    sunDir.setFromSphericalCoords(1, MathUtils.degToRad(90 - elev), MathUtils.degToRad(az))
-    su.sunPosition.value.copy(sunDir)
-    sun.intensity = night ? 0.32 : 2.6
-    sky.visible = !night; stars.visible = moon.visible = night
-    scene.background = night ? new Color('#0b1430') : null
-    moon.position.copy(sunDir).multiplyScalar(800)
-    world.bulbs.emissiveIntensity = night ? 2.2 : 0
-    // The moon's light under the water is a faint net; the sun's, a bright one.
-    world.caustics.value = night ? 0.12 : 1
-    sun.color.set(night ? '#9fb4ff' : '#fff1dc')
-    hemi.intensity = night ? 0.12 : 0.6
-    hemi.color.set(night ? '#4a5a88' : '#bcd4f0')
-    ;(scene.fog as Fog).color.set(night ? '#0d1424' : '#c9dbe8')
-    world.glass.emissiveIntensity = night ? 1.4 : 0
-    renderer.toneMappingExposure = night ? 0.9 : 0.55
-    post?.setNight(night)
-    envRT?.dispose(); envRT = pmrem.fromScene(night ? nightEnv : envScene)
-    scene.environment = envRT.texture
-    scene.environmentIntensity = night ? 0.35 : 0.3
+  // The windows with someone home light one by one as it gets dark, and go out one by one late at night:
+  // each window (two triangles) gets its own moment.
+  const homes = { value: 0 }
+  world.root.traverse((o) => {
+    const m = o as Mesh
+    if (!m.isMesh || m.material !== world.glass) return
+    const n = m.geometry.getAttribute('position').count, at = new Float32Array(n)
+    for (let q = 0; q < n; q += 6) { const r = Math.abs(Math.sin(q * 12.9898 + 4.1) * 43758.5453) % 1; for (let k = 0; k < 6 && q + k < n; k++) at[q + k] = r }
+    m.geometry.setAttribute('aHome', new Float32BufferAttribute(at, 1))
+  })
+  world.glass.emissiveIntensity = 1.4
+  world.glass.onBeforeCompile = (sh) => {
+    sh.uniforms.uHomes = homes
+    sh.vertexShader = 'attribute float aHome;\nvarying float vHome;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vHome = aHome;')
+    sh.fragmentShader = 'uniform float uHomes;\nvarying float vHome;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= smoothstep(vHome, vHome + 0.02, uHomes);')
   }
-  setSky()
+  let hour = Number(new URLSearchParams(location.search).get('t') ?? '16.5'), clockOn = true, aerial = false
+  if (!Number.isFinite(hour)) hour = 16.5
+  /** It is dark enough to count as night (for the traffic's lights). */
+  const dark = () => dl.state.day < 0.5
+  const applyTime = () => {
+    dl.set(hour)
+    homes.value = dl.state.homes
+    // The sun's light under the water is a bright net; the moon's, a faint one.
+    world.caustics.value = Math.max(0.12, dl.state.day)
+    post?.setDaylight(dl.state.day)
+  }
+  applyTime()
 
   /* ---- you ---- */
   const me = new Group()
@@ -178,7 +155,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   let yaw = Math.PI * 0.75, pitch = 0.32, dist = innerHeight > innerWidth ? 1.9 : 1.35, onGround = true, swimming = false, stride = 0, stroke = 0
 
   /* ---- the traffic ---- */
-  const traffic = createTraffic({ roads: data.road, play: true, dark: () => (night ? 1 : 0) })
+  const traffic = createTraffic({ roads: data.road, play: true, dark: () => (dark() ? 1 : 0) })
   const carMeshes: Group[] = []
   const carGeo = new BoxGeometry(0.42, 0.09, 0.2), cabGeo = new BoxGeometry(0.22, 0.07, 0.18), busGeo = new BoxGeometry(0.76, 0.2, 0.24), wheelGeo = new CylinderGeometry(0.035, 0.035, 0.21, 10)
   const glassMat = new MeshStandardMaterial({ color: '#203048', roughness: 0.2, metalness: 0.4 }), tyre = new MeshStandardMaterial({ color: '#1b1f27', roughness: 0.9 })
@@ -193,15 +170,17 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
 
   /* ---- the camera ---- */
   const camera = new PerspectiveCamera(55, 1, 0.03, 500)
+  /** The picture's sharpness: the screen's own pixels (up to two to a point), less if the machine needs it. */
+  let sharp = 1
   const fit = () => {
     const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight
-    const pr = Math.min(devicePixelRatio, 2)
+    const pr = Math.max(0.75, Math.min(devicePixelRatio, 2) * sharp)
     renderer.setPixelRatio(pr); renderer.setSize(w, h, false)
     post?.setSize(w, h, pr)
     camera.aspect = w / h; camera.updateProjectionMatrix()
   }
-  post = lens(renderer, scene, camera, { phone, still, ao: !new URLSearchParams(location.search).has('noao') })
-  post.setNight(night)
+  post = lens(renderer, scene, camera, { phone, still, ao: !Q.has('noao'), samples: Q.has('msaa') ? Number(Q.get('msaa')) : undefined, bloom: !Q.has('nobloom') })
+  post.setDaylight(dl.state.day)
   fit()
   addEventListener('resize', fit)
 
@@ -218,6 +197,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   canvas.addEventListener('pointerdown', pd); addEventListener('pointermove', pm); addEventListener('pointerup', pu); canvas.addEventListener('wheel', wh, { passive: false })
 
   /* ---- each frame ---- */
+  const born = performance.now()
+  let frames = 0, spent = 0, lastFrame = born, quality = 'full'
   let raf = 0, last = performance.now(), near: { slug: string; title: string; href: string } | null = null
   const camPos = new Vector3(), look = new Vector3()
   let sunTick = 0, sunSeen = 0, sunVis = 0
@@ -225,7 +206,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   /** Whether a line from the camera towards the sun gets clear of the ground and everything built. */
   const sunClear = () => {
     for (let t = 0.15; t < 18; t += 0.3) {
-      ray.copy(camera.position).addScaledVector(sunDir, t)
+      ray.copy(camera.position).addScaledVector(dl.state.sunDir, t)
       if (ray.y < world.heightAt(ray.x, ray.z)) return false
       for (const b of world.boxes) if (ray.y < b.z1 && ray.y > b.z0 && ray.x > b.j0 && ray.x < b.j1 && ray.z > b.i0 && ray.z < b.i1) return false
       if (ray.y > 3) return true
@@ -333,13 +314,17 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (camPos.y < under) camPos.y = under
     camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : 8)))
     camera.lookAt(look)
-    // At night the lamps near you light the street.
-    if (night && (lampTick -= dt) <= 0) {
+    // The day goes on: an hour of it a minute.
+    if (clockOn) { hour = (hour + dt / 60) % 24; applyTime() }
+    dl.follow(camera.position, dt)
+    world.bulbs.emissiveIntensity = 2.2 * dl.state.lampGlow
+    // After dark the lamps near you light the street.
+    if (dl.state.lampGlow > 0.02 && (lampTick -= dt) <= 0) {
       lampTick = 0.4
       const near6 = world.lamps.map((l) => [l.distanceToSquared(pos), l] as const).sort((a, b) => a[0] - b[0]).slice(0, lampLights.length)
-      lampLights.forEach((L, k) => { const p = near6[k]; if (p) { L.position.copy(p[1]).y -= 0.03; L.intensity = 1.3 } else L.intensity = 0 })
+      lampLights.forEach((L, k) => { const p = near6[k]; if (p) { L.position.copy(p[1]).y -= 0.03; L.intensity = 1.3 * dl.state.lampGlow } else L.intensity = 0 })
     }
-    if (!night && lampLights[0].intensity) for (const L of lampLights) L.intensity = 0
+    if (dl.state.lampGlow <= 0.02 && lampLights[0].intensity) for (const L of lampLights) L.intensity = 0
     // The sun's shadows follow you.
     // (Held to whole texels of the shadow map, so the edges of shadows do not crawl as you walk.)
     const texel = (2 * REACH) / SHADOW
@@ -357,20 +342,42 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     }
     if (best?.slug !== near?.slug) { near = best; ui.onNear(best) }
     // The sun in the picture: where, and whether anything (the hill, a building) stands in front of it.
-    if (!night && !aerial) {
+    if (dl.state.sunEl > -1 && !aerial) {
       if ((sunTick -= dt) <= 0) { sunTick = 0.1; sunSeen = sunClear() ? 1 : 0 }
-      sunAt.copy(camera.position).addScaledVector(sunDir, 100).project(camera)
+      sunAt.copy(camera.position).addScaledVector(dl.state.sunDir, 100).project(camera)
       camera.getWorldDirection(sunLook)
-      const facing = MathUtils.smoothstep(sunLook.dot(sunDir), 0.55, 0.9)
+      // (A low sun, through more air, glares less.)
+      const facing = MathUtils.smoothstep(sunLook.dot(dl.state.sunDir), 0.55, 0.9) * MathUtils.smoothstep(dl.state.sunEl, -1, 3) * (0.4 + 0.6 * MathUtils.smoothstep(dl.state.sunEl, 3, 25))
       sunVis += ((sunAt.z < 1 ? sunSeen * facing : 0) - sunVis) * Math.min(1, dt * 6)
     } else sunVis = 0
     post!.sun(sunAt.x * 0.5 + 0.5, sunAt.y * 0.5 + 0.5, sunVis)
     post!.render(dt)
+    // Keeping up: once it has settled, if three seconds go by at under 45 frames a second, give up the costliest
+    // thing left — the occlusion, then the finer shadows, then a little sharpness (never more than a quarter).
+    if (!Q.has('fixed')) {
+      // (A pause — another tab, a dragged window — is not a slow frame.)
+      const gap = now - lastFrame
+      if (gap < 250) { frames++; spent += gap }
+      if (now - born > 5000 && spent > 3000) {
+        const fps = (frames * 1000) / spent
+        if (fps < 45) {
+          if (post!.drop()) quality = 'no occlusion'
+          else if (sun.shadow.mapSize.x > 2048) { sun.shadow.mapSize.setScalar(sun.shadow.mapSize.x / 2); sun.shadow.map?.dispose(); sun.shadow.map = null; quality = `shadows ${sun.shadow.mapSize.x}` }
+          else if (sharp > 0.75) { sharp = Math.max(0.75, sharp - 0.125); fit(); quality = `sharpness ${sharp.toFixed(2)}` }
+        }
+        frames = 0; spent = 0
+      }
+    }
+    lastFrame = now
   }
   raf = requestAnimationFrame(loop)
 
   return {
-    setNight(on) { night = on; setSky() },
+    setNight(on) { hour = on ? 21.5 : 10; applyTime() },
+    setTime(h) { hour = ((h % 24) + 24) % 24; applyTime() },
+    time: () => hour,
+    setClock(on) { clockOn = on },
+    clock: () => clockOn,
     setAerial(on) { aerial = on; (scene.fog as Fog).far = on ? 160 : 70 },
     near: () => near,
     goTo(x, z, view) {
@@ -380,12 +387,12 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       if (view?.dist !== undefined) dist = view.dist
       camera.position.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.8 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
     },
-    state: () => ({ x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), cars: carMeshes.map((g) => [g.position.x, g.position.z]) }),
+    state: () => ({ x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), quality, cars: carMeshes.map((g) => [g.position.x, g.position.z]) }),
     dispose() {
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
       removeEventListener('pointermove', pm); removeEventListener('pointerup', pu)
-      envRT?.dispose(); pmrem.dispose(); post?.dispose(); renderer.dispose()
+      dl.dispose(); post?.dispose(); renderer.dispose()
     },
   }
 }
