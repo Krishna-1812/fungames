@@ -14,6 +14,9 @@
  *     into the sea; the sea's swell (the one you bob on) dies away to
  *     nothing at the water's edge, so the coast never moves, yet out in
  *     open water it truly lifts;
+ *   - the day: the sun comes up in the east before six, crosses the south
+ *     high at noon and goes down in the west after six; the windows go out
+ *     after midnight;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -27,6 +30,7 @@ const { listedGames } = await import('../src/data/games.ts')
 const { buildIsland } = await import('../src/lib/island/world.ts')
 const { buildWorld, Y } = await import('../src/lib/walk/build3d.ts')
 const { waveAt } = await import('../src/lib/walk/water.ts')
+const { sunPlace, homesLit } = await import('../src/lib/walk/daylight.ts')
 
 let failures = 0
 const ok = (m) => console.log(`  ok    ${m}`)
@@ -109,6 +113,18 @@ check(start && world.kind(start[0], start[1]) === '1', `you start on land, on a 
   }
   check(edge > 500 && still === edge, `the swell dies away at the water's edge (${still} of ${edge} points there stay still)`)
   check(lift > 0.05, `and lifts the open sea (${(lift * 3.5).toFixed(2)} m at most)`)
+}
+
+// The day.
+{
+  let rise = null, set = null
+  for (let h = 0; h < 24; h += 0.01) { const a = sunPlace(h).el, b = sunPlace(h + 0.01).el; if (a < 0 && b >= 0) rise = h; if (a >= 0 && b < 0) set = h }
+  const hm = (h) => `${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`
+  const noon = sunPlace(12), up = sunPlace(rise + 0.02), down = sunPlace(set)
+  check(rise > 5 && rise < 6 && up.az > 60 && up.az < 120, `the sun comes up in the east at ${hm(rise)} (bearing ${up.az.toFixed(0)}°)`)
+  check(noon.el > 60 && Math.abs(noon.az - 180) < 1, `stands ${noon.el.toFixed(0)}° up in the south at noon`)
+  check(set > 18 && set < 19 && down.az > 240 && down.az < 300, `and goes down in the west at ${hm(set)} (bearing ${down.az.toFixed(0)}°)`)
+  check(homesLit(20) === 1 && homesLit(3) < 0.4 && homesLit(5.5) > homesLit(3), `every home's window lit at eight, ${Math.round(homesLit(3) * 100)}% at three in the morning, more by half past five`)
 }
 
 // Walked, climbed and swum out from the start, as walker.ts lets you (its
