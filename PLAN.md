@@ -3074,6 +3074,22 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
 68. Still waiting on a decision: the site's name, its contact email and
     its domain (`site.config.ts`; everything reads from there).
 
+69. ~~**The island on foot.**~~ **done.** `/walk/` builds the island in
+    three.js in the browser from the same model Unity renders the
+    realistic island from (every building out of its own solids, so the
+    two always match), and you walk it in third person: real gravity and
+    a jump, sliding along walls, climbing a ledge up to chest height (out
+    of the sea, onto a beach or a quay), wading and swimming, the island's
+    own traffic on its roads pushing past you, and every game's building
+    offering to take you in when you walk up to it. The sky is physical
+    and also lights the world; the sea moves (seven waves, swell to
+    ripple) and reflects it, deepening to open ocean with no edge; at
+    night the moon casts the shadows, two windows in three are lit and the
+    lamps nearest you light the street. An aerial view, a thumb-stick on a
+    phone, and a Walk button beside Cartoon and Realistic on the map.
+    `check-walk` builds it headlessly and floods out from the start by
+    the walker's own rules — every game's building has to be reachable.
+
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
 time: build the model as pure functions over plain data, run it headlessly

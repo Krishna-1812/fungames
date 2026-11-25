@@ -238,6 +238,7 @@ const book = BOOK.map((key) => {
         <div class="isl-world isl-world--map" role="group" aria-label="How the island looks">
           <a class="isl-world-opt" href={worldHref.cartoon} data-world="cartoon" aria-label="Cartoon island" aria-current={world === 'cartoon' ? 'page' : undefined} title="The island, drawn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-8.2 8.2c-.9.9-2.2 1.3-3.4 1.1l-3.4-.6.6-3.4c.2-1.2.6-2.5 1.5-3.4z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12.5 6.5l5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Cartoon</span></a>
           <a class="isl-world-opt" href={worldHref.real} data-world="real" aria-label="Realistic island" aria-current={world === 'real' ? 'page' : undefined} title="The island, rendered in 3D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 19.5l6-9 4 5.5 2.6-3.5 6.4 7z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="17" cy="6.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2" /></svg><span>Realistic</span></a>
+          <a class="isl-world-opt isl-world-walk" href={withBase('/walk/')} aria-label="Walk the island in 3D" title="Walk round the island in 3D"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4.5" r="2.2" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2" /><path d="M9.5 21l2.5-6 3 3v3M12 15l1-5.5-3.5 2.5-1.5 3M13 9.5l2.5 3 3 .5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg><span>Walk</span></a>
         </div>
       )}
         <button type="button" class="isl-mapbtn" id="islMapBtn" aria-expanded="false" aria-label="Show the map" title="Map"><svg class="ic-map" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5 9 4.5l6 2 5.5-2v13l-5.5 2-6-2-5.5 2z" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M9 4.5v13M15 6.5v13" fill="none" stroke="currentColor" stroke-width="2" /></svg><svg class="ic-fold" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg></button>
@@ -629,7 +630,7 @@ const book = BOOK.map((key) => {
   }
   const box = document.getElementById('islBox')!
   /* ---- the cartoon island or the realistic one: the other page, remembered for next time ---- */
-  for (const a of document.querySelectorAll<HTMLAnchorElement>('a.isl-world-opt')) {
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('a.isl-world-opt[data-world]')) {
     a.addEventListener('click', (ev) => {
       if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return
       ev.preventDefault()
