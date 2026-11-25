@@ -21,6 +21,9 @@
  *     have a parapet and what stands on roofs, the lighthouse stands, the
  *     boards and posters carry their pictures, and every game on land has
  *     its name over its door or at the front of its plot;
+ *   - what grows: every tree the map plants is grown, with leaves, and its
+ *     trunk is solid; grass grows on the lawns — thousands of tufts — and
+ *     never on a street or inside anything built;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -192,6 +195,16 @@ check(unreachable.length === 0, `every game's building can be walked (or climbed
   const onLand = data.buildings.filter((b) => data.games[b.slug] && !b.water).map((b) => b.slug)
   const missing = onLand.filter((sl) => !mk.signed.includes(sl))
   check(missing.length === 0, `every game on land has its name up (${onLand.length - missing.length} of ${onLand.length})${missing.length ? ' — not: ' + missing.join(', ') : ''}`)
+}
+
+{
+  const fl = world.flora, trees = data.plants.filter(([n]) => /^(round|blossom|pine|snowpine|palm|cypress)/.test(n)).length
+  check(fl.grown.leaves > trees * 30 && fl.solids.length >= trees, `${trees} trees grown, ${fl.grown.leaves.toLocaleString()} leaf sprays among them, ${fl.solids.length} trunks and rocks solid`)
+  const feet = fl.lawn.feet(), road = new Set(data.road.map(([i, j]) => i + ',' + j))
+  const onRoad = feet.filter(([x, z]) => road.has(Math.floor(z) + ',' + Math.floor(x))).length
+  const growing = new Set(fl.solids)
+  const inside = feet.filter(([x, z]) => world.boxes.some((b) => !growing.has(b) && b.z1 - b.z0 > 0.15 && x > b.j0 + 0.01 && x < b.j1 - 0.01 && z > b.i0 + 0.01 && z < b.i1 - 0.01 && Math.abs(b.z0 - world.heightAt(x, z)) < 0.1 && b.z0 > -0.5 && b.j1 - b.j0 > 0.1)).length
+  check(feet.length > 10000 && onRoad === 0 && inside === 0, `${feet.length.toLocaleString()} tufts of grass, none on a street (${onRoad}) or inside a building (${inside})`)
 }
 
 const badBox = world.boxes.filter((b) => !(b.i1 > b.i0 && b.j1 > b.j0 && b.z1 > b.z0) || ![b.i0, b.i1, b.j0, b.j1, b.z0, b.z1].every(Number.isFinite))
