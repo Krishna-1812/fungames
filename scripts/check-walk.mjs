@@ -6,6 +6,10 @@
  *
  *   - it builds, and no vertex anywhere is NaN (a NaN hides a whole mesh);
  *   - you start on land, on a road;
+ *   - the ground has no cracks: wherever two tiles run into one another as
+ *     a slope, both come to the same height all along the edge between them,
+ *     and wherever they do not, a wall stands; the beaches run down under the
+ *     sea, and the surface you walk on is the one drawn (terrain.ts);
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -48,14 +52,43 @@ check(verts > 50_000 && nan === 0, `it builds: ${verts.toLocaleString()} vertice
 const start = data.road[Math.floor(data.road.length / 2)]
 check(start && world.kind(start[0], start[1]) === '1', `you start on land, on a road (${start})`)
 
+// The ground: joined edges meet exactly; the walls are where they are not.
+{
+  let seams = 0, worst = 0, walls = 0
+  const N = data.grid, e = 1e-5
+  for (let i = -6; i < N + 6; i++) for (let j = -6; j < N + 6; j++) for (const [di, dj] of [[1, 0], [0, 1]]) {
+    const i2 = i + di, j2 = j + dj
+    for (let s = 0.02; s < 1; s += 0.08) {
+      // A point on the edge, from either side.
+      const [x, z] = di ? [j + s, i2] : [j2, i + s]
+      const a = di ? world.heightAt(x, z - e) : world.heightAt(x - e, z), b = di ? world.heightAt(x, z + e) : world.heightAt(x + e, z)
+      if (world.joined(i, j, i2, j2)) { seams++; worst = Math.max(worst, Math.abs(a - b)) } else if (Math.abs(a - b) > 0.01) walls++
+    }
+  }
+  check(worst < 0.002, `the ground has no cracks: ${seams.toLocaleString()} points on joined edges, the worst ${worst.toFixed(5)} apart`)
+  check(walls > 400, `and walls where tiles do not join (${walls.toLocaleString()} points on them)`)
+  const seaY = Y(data.sea)
+  let shelving = 0, beaches = 0
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    if (world.kind(i, j) !== 'b' || ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => world.kind(i + a, j + b) === '0')) continue
+    beaches++
+    let lo = Infinity, hi = -Infinity
+    for (let a = 0; a <= 10; a++) for (let b = 0; b <= 10; b++) { const h = world.heightAt(j + b / 10, i + a / 10); lo = Math.min(lo, h); hi = Math.max(hi, h) }
+    if (lo < seaY && hi > seaY) shelving++
+  }
+  check(beaches > 10 && shelving === beaches, `every beach on the sea runs down under it (${shelving} of ${beaches})`)
+  let flat = 0, total = 0
+  for (const [i, j] of data.road) { total++; const h = [0.2, 0.5, 0.8].flatMap((a) => [0.2, 0.5, 0.8].map((b) => world.heightAt(j + b, i + a))); if (Math.max(...h) - Math.min(...h) < 0.002) flat++ }
+  check(flat === total, `the streets are level, as the traffic drives them (${flat} of ${total})`)
+}
+
 // Walked, climbed and swum out from the start, as walker.ts lets you (its
 // numbers): a flood over the island a fifth of a tile at a time.
 const STEP = 0.14, CLIMB = 0.36, CLIMB_WET = 0.62, TALL = 0.5, RADIUS = 0.11, REACH = 0.45, seaY = Y(data.sea)
 const H = 0.2, M = 4, N = Math.round((data.grid + 2 * M) / H)
 const level = new Float32Array(N * N).fill(NaN)
 const at = (x, z) => {
-  const i = Math.floor(z), j = Math.floor(x)
-  const g = Y(world.top(i, j))
+  const g = world.heightAt(x, z)
   return g < seaY - 0.32 ? { y: seaY - 0.36, wet: true } : { y: g, wet: false }
 }
 const reachable = (x, z, from, wet) => {
