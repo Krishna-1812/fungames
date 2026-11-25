@@ -3144,7 +3144,16 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        grass and wildflowers on the lawns, drawn near you and growing up at
        the edge of sight; all of it in a gusting wind; trunks and rocks are
        solid now.
-    7. *You* — a proper figure, and the way it walks, runs, swims, climbs.
+    7. ~~*You*~~ **done** — the figure was 4.5 m tall against the island's
+       own doors, storeys and cars (which agree on 0.11 world units to the
+       metre); you are now 1.75 m, jointed (hips, knees, ankles, shoulders,
+       elbows, neck), with hair, face, T-shirt, jeans and trainers, posed
+       every frame: breathing, walk and run cycles, tucked jumps and a
+       landing squat, wading, a front crawl, hauling up over a ledge. Real
+       units: 1.5 m/s walk, 5.5 m/s run, 9.8 m/s² gravity, a 46 cm jump, a
+       3 m climb (3.6 m out of the water), swimming past chest depth. The
+       camera sits closer and is drawn in rather than go behind a wall.
+       Grass and splashes rescaled to match.
     8. *Cars* — real shapes and lights, and getting in and driving one.
     9. *Life* — people on the pavements, gulls, fish, boats.
     10. *Weather* — clouds, rain, wet streets, wind.
