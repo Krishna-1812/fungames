@@ -72,22 +72,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const sun = dl.light, sunDir = dl.state.lightDir
   // Light from the lamps nearest you (a handful of real lights, moved to whichever lamps are close).
   const lampLights = Array.from({ length: 6 }, () => { const l = new PointLight('#dfe8ff', 0, 2.2, 1.6); scene.add(l); return l })
-  // The windows with someone home light one by one as it gets dark, and go out one by one late at night:
-  // each window (two triangles) gets its own moment.
-  const homes = { value: 0 }
-  world.root.traverse((o) => {
-    const m = o as Mesh
-    if (!m.isMesh || m.material !== world.glass) return
-    const n = m.geometry.getAttribute('position').count, at = new Float32Array(n)
-    for (let q = 0; q < n; q += 6) { const r = Math.abs(Math.sin(q * 12.9898 + 4.1) * 43758.5453) % 1; for (let k = 0; k < 6 && q + k < n; k++) at[q + k] = r }
-    m.geometry.setAttribute('aHome', new Float32BufferAttribute(at, 1))
-  })
-  world.glass.emissiveIntensity = 1.4
-  world.glass.onBeforeCompile = (sh) => {
-    sh.uniforms.uHomes = homes
-    sh.vertexShader = 'attribute float aHome;\nvarying float vHome;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vHome = aHome;')
-    sh.fragmentShader = 'uniform float uHomes;\nvarying float vHome;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= smoothstep(vHome, vHome + 0.02, uHomes);')
-  }
+  // The windows (facade.ts): a room behind each; those with someone home light one by one as it gets dark,
+  // and go out one by one late at night.
+  const homes = world.windows.homes
   let hour = Number(new URLSearchParams(location.search).get('t') ?? '16.5'), clockOn = true, aerial = false
   if (!Number.isFinite(hour)) hour = 16.5
   /** It is dark enough to count as night (for the traffic's lights). */
@@ -95,6 +82,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const applyTime = () => {
     dl.set(hour)
     homes.value = dl.state.homes
+    world.windows.day.value = dl.state.day
+    // The name boards are lit from behind after dark.
+    world.boards.emissiveIntensity = 0.85 * (1 - dl.state.day)
     // The sun's light under the water is a bright net; the moon's, a faint one.
     world.caustics.value = Math.max(0.12, dl.state.day)
     post?.setDaylight(dl.state.day)
@@ -198,7 +188,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
 
   /* ---- each frame ---- */
   const born = performance.now()
-  let frames = 0, spent = 0, lastFrame = born, quality = 'full'
+  let frames = 0, spent = 0, lastFrame = born, quality = 'full', slow = 0
   let raf = 0, last = performance.now(), near: { slug: string; title: string; href: string } | null = null
   const camPos = new Vector3(), look = new Vector3()
   let sunTick = 0, sunSeen = 0, sunVis = 0
@@ -352,15 +342,18 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     } else sunVis = 0
     post!.sun(sunAt.x * 0.5 + 0.5, sunAt.y * 0.5 + 0.5, sunVis)
     post!.render(dt)
-    // Keeping up: once it has settled, if three seconds go by at under 45 frames a second, give up the costliest
+    // Keeping up: once it has settled, if six seconds go by at under 45 frames a second, give up the costliest
     // thing left — the occlusion, then the finer shadows, then a little sharpness (never more than a quarter).
     if (!Q.has('fixed')) {
       // (A pause — another tab, a dragged window — is not a slow frame.)
       const gap = now - lastFrame
       if (gap < 250) { frames++; spent += gap }
-      if (now - born > 5000 && spent > 3000) {
+      if (now - born > 9000 && spent > 3000) {
         const fps = (frames * 1000) / spent
-        if (fps < 45) {
+        // (Two slow stretches running, not a hitch while something new is first drawn.)
+        slow = fps < 45 ? slow + 1 : 0
+        if (slow >= 2) {
+          slow = 0
           if (post!.drop()) quality = 'no occlusion'
           else if (sun.shadow.mapSize.x > 2048) { sun.shadow.mapSize.setScalar(sun.shadow.mapSize.x / 2); sun.shadow.map?.dispose(); sun.shadow.map = null; quality = `shadows ${sun.shadow.mapSize.x}` }
           else if (sharp > 0.75) { sharp = Math.max(0.75, sharp - 0.125); fit(); quality = `sharpness ${sharp.toFixed(2)}` }

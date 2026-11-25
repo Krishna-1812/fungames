@@ -179,7 +179,7 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
     hemi.intensity = 0.2 + 0.4 * day; hemi.color.copy(HEMI_NIGHT).lerp(HEMI_DAY, day); hemi.groundColor.copy(GROUND_NIGHT).lerp(GROUND_DAY, day)
     fog.color.copy(FOG_NIGHT).lerp(FOG_DUSK, smooth(-10, -3, e)).lerp(FOG_DAY, day).lerp(FOG_GOLD, gold * 0.6)
     // The eye opens to the dark, and a little to the low light of the golden hour.
-    state.exposure = 0.95 - 0.4 * day + 0.05 * gold
+    state.exposure = 0.95 - 0.46 * day + 0.06 * gold
     // Street lamps: on as the sun goes down, off once it is up (a little apart, as their switches are).
     if (e < 1.5) state.lamps = true
     else if (e > 4) state.lamps = false

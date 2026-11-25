@@ -93,7 +93,7 @@ import { withBase } from '../lib/base'
     hourIn.addEventListener('change', () => { dragging = false })
     pauseBtn.addEventListener('click', () => { const on = walk.clock(); walk.setClock(!on); pauseBtn.setAttribute('aria-pressed', String(on)); pauseBtn.textContent = on ? 'Play' : 'Pause' })
     for (const b of timePanel.querySelectorAll<HTMLButtonElement>('[data-hour]')) b.addEventListener('click', () => { walk.setTime(+b.dataset.hour!); show() })
-  }).catch(() => { load.textContent = 'The island could not be built here (this browser needs WebGL).' })
+  }).catch((e) => { console.error(e); load.textContent = 'The island could not be built here (this browser needs WebGL).' })
 </script>
 
 <style>
