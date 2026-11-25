@@ -88,6 +88,16 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
     const full = ao.setSize.bind(ao)
     ao.setSize = (w: number, h: number) => full(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)))
     ao.blendIntensity = 1
+    // Leaf sprays are cards cut out by their picture: the occlusion pass would see them as solid squares, so they are
+    // left out of what it looks at (userData.noAO).
+    let skip: { visible: boolean }[] | null = null
+    const drawAO = ao.render.bind(ao)
+    ao.render = (...args: Parameters<typeof drawAO>) => {
+      if (!skip) { skip = []; scene.traverse((o) => { if (o.userData.noAO) skip!.push(o) }) }
+      const was = skip.map((o) => o.visible); for (const o of skip) o.visible = false
+      drawAO(...args)
+      skip.forEach((o, i) => { o.visible = was[i] })
+    }
     composer.addPass(ao)
   }
   const bloom = new UnrealBloomPass(new Vector2(256, 256), 0.16, 0.2, 7)

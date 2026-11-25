@@ -59,10 +59,11 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   renderer.debug.checkShaderErrors = false
 
   const scene = new Scene()
-  const world = buildWorld(data)
+  const world = buildWorld(data, { phone: matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600 })
   scene.add(world.root)
   // Asked for less motion: the sea lies flat (no swell rocking you, or the camera, as you swim).
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) world.swell.value = 0
+  // (And the wind barely stirs the trees and the grass.)
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { world.swell.value = 0; world.flora.wind.value = 0.25 }
 
   /* ---- the day: sun, moon, stars, sky and air (daylight.ts) ---- */
   // Shadows soft-edged, cast across the thirteen tiles round you (more than you can make out the shadows past).
@@ -204,7 +205,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     return true
   }
   const UP = new Vector3(0, 1, 0), lightRight = new Vector3(), lightUp = new Vector3(), snapped = new Vector3()
-  let lampTick = 0
+  let lampTick = 0, grassTick = 0
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop)
     const dt = Math.min(0.05, (now - last) / 1000); last = now
@@ -307,6 +308,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // The day goes on: an hour of it a minute.
     if (clockOn) { hour = (hour + dt / 60) % 24; applyTime() }
     dl.follow(camera.position, dt)
+    // The grass near you is drawn; further off, the ground's own green does.
+    if ((grassTick -= dt) <= 0) { grassTick = 0.25; world.flora.lawn.near(camera.position.x, camera.position.z) }
     world.bulbs.emissiveIntensity = 2.2 * dl.state.lampGlow
     // After dark the lamps near you light the street.
     if (dl.state.lampGlow > 0.02 && (lampTick -= dt) <= 0) {
@@ -356,6 +359,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
           slow = 0
           if (post!.drop()) quality = 'no occlusion'
           else if (sun.shadow.mapSize.x > 2048) { sun.shadow.mapSize.setScalar(sun.shadow.mapSize.x / 2); sun.shadow.map?.dispose(); sun.shadow.map = null; quality = `shadows ${sun.shadow.mapSize.x}` }
+          else if (world.flora.lawn.reach.value > 6) { world.flora.lawn.reach.value = 6; quality = 'less grass' }
           else if (sharp > 0.75) { sharp = Math.max(0.75, sharp - 0.125); fit(); quality = `sharpness ${sharp.toFixed(2)}` }
         }
         frames = 0; spent = 0
