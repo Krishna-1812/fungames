@@ -17,6 +17,10 @@
  *   - the day: the sun comes up in the east before six, crosses the south
  *     high at noon and goes down in the west after six; the windows go out
  *     after midnight;
+ *   - the buildings up close: every window has a room behind it, flat roofs
+ *     have a parapet and what stands on roofs, the lighthouse stands, the
+ *     boards and posters carry their pictures, and every game on land has
+ *     its name over its door or at the front of its plot;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -44,7 +48,7 @@ const data = {
   grid: m.grid, sea: m.sea, beachZ: m.beachZ, ground: m.ground, height: m.height, district: m.district,
   river: m.river, pond: m.pond, road: m.road, piers: m.piers, fields: m.fields,
   buildings: m.buildings, solids: m.solids, plants: m.plants.map((p) => [p.name, +p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(1), +p.k.toFixed(2)]),
-  seaRocks: m.seaRocks, isles: m.isles, games: Object.fromEntries(games.map((g) => [g.slug, { title: g.title, href: `/${g.slug}/` }])),
+  seaRocks: m.seaRocks, isles: m.isles, games: Object.fromEntries(games.map((g) => [g.slug, { title: g.title, href: `/${g.slug}/` }])), prints: m.prints,
 }
 const json = JSON.stringify(data)
 check(json.length < 3_000_000, `the world the page fetches is ${(json.length / 1024).toFixed(0)} KB (under 3 MB)`)
@@ -177,6 +181,18 @@ for (const slug of Object.keys(data.games)) {
 }
 check(placed >= Object.keys(data.games).length - 2, `the games have their buildings (${placed} of ${Object.keys(data.games).length})`)
 check(unreachable.length === 0, `every game's building can be walked (or climbed, or swum) up to from the start${unreachable.length ? ` — not: ${unreachable.join(', ')}` : ''}`)
+
+{
+  const mk = world.made, wins = data.solids.flatMap((r) => r.runs.flat()).filter((q) => q.k === 'win').reduce((t, q) => t + (q.rows ?? 1) * (q.cols ?? 2), 0)
+  check(mk.rooms === wins && wins > 100, `every window has a room behind it (${mk.rooms} of ${wins})`)
+  check(mk.roofs.length >= 8 && mk.onRoofs >= mk.roofs.length, `${mk.roofs.length} flat roofs with parapets, ${mk.onRoofs} things standing on them`)
+  check(mk.lighthouse, 'the lighthouse stands')
+  const want = data.solids.flatMap((r) => r.runs.flat()).filter((q) => q.k === 'model' && (q.name === 'plaque' || q.name === 'decal') && (q.prints ?? []).length).length
+  check(mk.pictures === want && want > 10, `the boards and posters carry their pictures (${mk.pictures} of ${want})`)
+  const onLand = data.buildings.filter((b) => data.games[b.slug] && !b.water).map((b) => b.slug)
+  const missing = onLand.filter((sl) => !mk.signed.includes(sl))
+  check(missing.length === 0, `every game on land has its name up (${onLand.length - missing.length} of ${onLand.length})${missing.length ? ' — not: ' + missing.join(', ') : ''}`)
+}
 
 const badBox = world.boxes.filter((b) => !(b.i1 > b.i0 && b.j1 > b.j0 && b.z1 > b.z0) || ![b.i0, b.i1, b.j0, b.j1, b.z0, b.z1].every(Number.isFinite))
 check(world.boxes.length > 100 && badBox.length === 0, `${world.boxes.length} walls to collide with, all real boxes`)
