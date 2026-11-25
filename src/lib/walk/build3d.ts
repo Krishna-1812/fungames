@@ -8,8 +8,9 @@
  * pyramid roofs, drums, cones, domes, balls, discs, panels and rods), with
  * what makes them real up close (facade.ts: render, tiles and gravel, rooms
  * behind the glass, cornices, parapets and what stands on flat roofs, the
- * lighthouse, boards and posters, a name over each game's door); and the
- * trees and rocks, low-poly, where the island planted them.
+ * lighthouse, boards and posters, a name over each game's door); and what
+ * grows where the island planted it (flora.ts: trees, palms, cacti, rocks,
+ * grass and wildflowers, all in the wind).
  *
  * Tile i runs along world z, tile j along world x, and the island's heights
  * (P()'s z, in the site's units) go up y at 39.19 to a tile, as in Unity.
@@ -19,6 +20,7 @@
  */
 import { terrain } from './terrain'
 import { buildSea, poolMaterial } from './water'
+import { flora } from './flora'
 import { ACROSS, FACING, GlassBag, Hy, MAT, PrintBag, Px, atlas, facadeMaterial, glassMaterial, type Print } from './facade'
 import {
   BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3, Group,
@@ -551,44 +553,8 @@ function solids(d: WorldData, pics: ReturnType<typeof atlas>) {
   return { builtMesh, glassMesh, windows: win, bulbMesh, bulbMat, printMesh, lamps, boxes, made: { ...made, signed: [...signed] } }
 }
 
-/* ---- what grows ---------------------------------------------------------- */
-function plants(d: WorldData, siteAt: (x: number, z: number) => number) {
-  const g = new Bag()
-  const cone = (x: number, y: number, z: number, r: number, h: number, col: string, sides = 8) => {
-    for (let t = 0; t < sides; t++) { const a0 = (t / sides) * Math.PI * 2, a1 = ((t + 1) / sides) * Math.PI * 2; g.tri(W(x + Math.sin(a0) * r, y + Math.cos(a0) * r, z), W(x + Math.sin(a1) * r, y + Math.cos(a1) * r, z), W(x, y, z + h), col, t % 2 ? 0.88 : 1) }
-  }
-  const trunk = (x: number, y: number, z: number, r: number, h: number, col = '#7a5f4a') => {
-    for (let t = 0; t < 6; t++) { const a0 = (t / 6) * Math.PI * 2, a1 = ((t + 1) / 6) * Math.PI * 2; g.quad(W(x + Math.sin(a0) * r, y + Math.cos(a0) * r, z), W(x + Math.sin(a1) * r, y + Math.cos(a1) * r, z), W(x + Math.sin(a1) * r, y + Math.cos(a1) * r, z + h), W(x + Math.sin(a0) * r, y + Math.cos(a0) * r, z + h), col) }
-  }
-  const blob = (x: number, y: number, z: number, r: number, col: string) => {
-    const lon = 8, lat = 5
-    for (let a = 0; a < lat; a++) for (let b = 0; b < lon; b++) {
-      const t0 = -Math.PI / 2 + (a / lat) * Math.PI, t1 = -Math.PI / 2 + ((a + 1) / lat) * Math.PI, p0 = (b / lon) * Math.PI * 2, p1 = ((b + 1) / lon) * Math.PI * 2
-      const P = (t: number, p: number) => W(x + Math.cos(t) * Math.sin(p) * r, y + Math.cos(t) * Math.cos(p) * r, z + (Math.sin(t) + 1) * r * PX_H * 0.85)
-      g.quad(P(t0, p0), P(t0, p1), P(t1, p1), P(t1, p0), col, a < 2 ? 0.85 : 1)
-    }
-  }
-  for (const [name, x, y, z0, k] of d.plants) {
-    // On the ground where it now is (a slope may have eased it up or down a little), a touch into it.
-    const gz = siteAt(y, x), z = Math.abs(z0 - gz) < 14 ? gz - 0.6 : z0
-    const kind = name.replace(/[0-9]+$/, '').split('-')[0]
-    if (kind === 'pine' || kind === 'snowpine') { trunk(x, y, z, 0.025 * k, 6 * k); cone(x, y, z + 5 * k, 0.17 * k, 22 * k, kind === 'snowpine' ? '#dfe8ee' : '#2f6b43'); cone(x, y, z + 14 * k, 0.12 * k, 18 * k, kind === 'snowpine' ? '#eef3f7' : '#3a7d4f') }
-    else if (kind === 'palm') { trunk(x, y, z, 0.022 * k, 22 * k, '#9a8466'); for (let t = 0; t < 6; t++) { const a = (t / 6) * Math.PI * 2; g.tri(W(x, y, z + 22 * k), W(x + Math.sin(a) * 0.26 * k, y + Math.cos(a) * 0.26 * k, z + 15 * k), W(x + Math.sin(a + 0.4) * 0.22 * k, y + Math.cos(a + 0.4) * 0.22 * k, z + 18 * k), '#3f8f4c') } }
-    else if (kind === 'cypress') { trunk(x, y, z, 0.02 * k, 4 * k); cone(x, y, z + 3 * k, 0.09 * k, 30 * k, '#2c6845') }
-    else if (kind === 'round' || kind === 'blossom' || kind === 'bush') { const r = (kind === 'bush' ? 0.13 : 0.18) * k; if (kind !== 'bush') trunk(x, y, z, 0.025 * k, 8 * k); blob(x, y, z + (kind === 'bush' ? 0 : 7 * k), r, kind === 'blossom' ? '#f3b6c9' : kind === 'bush' ? '#4f9550' : '#4e9a4d') }
-    else if (kind === 'rock' || kind === 'boulders') blob(x, y, z - 1, 0.12 * k, '#8d8a85')
-    else if (kind === 'cactus' || kind === 'barrel') { trunk(x, y, z, 0.035 * k, (kind === 'barrel' ? 6 : 18) * k, '#4f9a5e') }
-    else if (kind === 'hoodoo' || kind === 'butte') trunk(x, y, z, (kind === 'butte' ? 0.32 : 0.09) * k, (kind === 'butte' ? 30 : 34) * k, '#c4a98c')
-    else if (kind === 'reeds') cone(x, y, z, 0.05 * k, 10 * k, '#6f9a4e', 5)
-    else if (kind === 'snag') trunk(x, y, z, 0.02 * k, 14 * k, '#8d7a66')
-  }
-  const mesh = new Mesh(g.geometry(), new MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true, side: DoubleSide }))
-  mesh.castShadow = true; mesh.receiveShadow = true
-  return mesh
-}
-
 /** The whole island: its meshes, the sea, and what the walker needs to know of it (heights, walls, water, the games). */
-export function buildWorld(d: WorldData) {
+export function buildWorld(d: WorldData, opts: { phone?: boolean } = {}) {
   const root = new Group()
   const time = { value: 0 }
   // The pictures boards and posters carry, and the games' names for their boards.
@@ -597,7 +563,9 @@ export function buildWorld(d: WorldData) {
   const gr = terrain(d, sol.boxes, time)
   root.add(gr.mesh)
   root.add(sol.builtMesh, sol.glassMesh, sol.bulbMesh, sol.printMesh)
-  root.add(plants(d, gr.siteAt))
+  // What grows (flora.ts): trees, palms, cacti, rocks, the grass and its flowers, in the wind.
+  const fl = flora(d, { siteAt: gr.siteAt, heightAt: gr.heightAt, meadow: gr.meadow, boxes: sol.boxes, time, phone: !!opts.phone })
+  root.add(fl.group)
   // The sea (water.ts): it knows its depth everywhere, so it is clear in the shallows and deep blue
   // beyond, breaks in foam on every shore, and lifts in a long swell that calms to nothing at the edge.
   // Under it, far out past the floor the island stands on, the open ocean's dark.
@@ -610,7 +578,7 @@ export function buildWorld(d: WorldData) {
   // The stream and the pond: running water, its falls, and the still pond.
   root.add(new Mesh(gr.poolGeo, poolMaterial(time)))
   return {
-    root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes],
+    root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes, ...fl.solids], flora: fl,
     windows: sol.windows, bulbs: sol.bulbMat, boards: pics.material, made: sol.made, lamps: sol.lamps, time,
     /** Water: the sea's surface (swell and all) and depth, the stream's surface and which way it runs, and how bright the light under it is. */
     seaAt: sea.surfaceAt, depthAt: sea.depthAt, poolAt: gr.poolAt, flowAt: gr.flowAt, caustics: gr.caustics, falls: gr.falls, swell: sea.uniforms.uLift,

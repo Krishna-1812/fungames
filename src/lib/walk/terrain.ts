@@ -462,11 +462,25 @@ export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
   const poolAt = (x: number, z: number) => levels.get(tileKey(x, z)) ?? null
   const rocks = d.seaRocks.map(([i, j, k]) => ({ x: j + 0.5, z: i + 0.5, r: 0.34 * k }))
 
+  /**
+   * Whether grass grows at a point, and its green (flora.ts plants tufts by it): on land, not a street, a field,
+   * the stream or the pond; not on sand, the badlands' earth, the peaks' snow, or a slope too steep to hold it.
+   */
+  const meadow = (x: number, z: number): Color | null => {
+    const i = Math.floor(z), j = Math.floor(x)
+    if (kind(i, j) !== '1' || roads.has(key(i, j)) || fieldAt.has(key(i, j)) || isWet(i, j)) return null
+    if (bilerp(x, z, beachy) > 0.36 || bilerp(x, z, badland) > 0.3) return null
+    const h = siteAt(x, z)
+    if (district(i, j) === 'peaks' && h > 41) return null
+    const e = 0.05, dx = heightAt(x + e, z) - heightAt(x - e, z), dz = heightAt(x, z + e) - heightAt(x, z - e)
+    if (Math.hypot(dx, dz) / (2 * e) > 0.75) return null
+    return grassAt(x, z, [i, j])
+  }
   const causticK = { value: 1 }
   const mesh = new Mesh(geo.geometry(), groundMaterial(seaY, time, causticK))
   // It takes the shadows of all that stands on it (its own would only speckle it: the shading at the foot of each wall is its own).
   mesh.receiveShadow = true
-  return { mesh, poolGeo, rockBoxes, rocks, falls, flowAt, poolAt, caustics: causticK, heightAt, siteAt, top, kind, joined, pinned }
+  return { mesh, poolGeo, rockBoxes, rocks, falls, flowAt, poolAt, caustics: causticK, meadow, heightAt, siteAt, top, kind, joined, pinned }
 }
 
 function smoothstep(a: number, b: number, x: number) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t) }
