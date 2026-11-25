@@ -30,9 +30,13 @@ const SEA = -12, BEACH = -6, GRID = 30
 
 /** A marcher of the parade as a picture (folk.ts): their body without legs, for the canvas to march; the colour of their legs, and how big they are. */
 export type FolkPic = { svg: string; legs: string; k: number }
-export type PlayData = { square: [number, number]; board: [number, number]; /** The open sea (where the sun sparkles on it), in tiles, filled even-odd. */ openSea?: string; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: FolkPic[] }
+export type PlayData = { square: [number, number]; board: [number, number]; /** The open sea (where the sun sparkles on it), in tiles, filled even-odd. */ openSea?: string; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: FolkPic[]
+  /** The roads, a cell at a time, for the traffic to drive (traffic.ts); the towns' open ground, where leaves come off the trees; where the gulls wheel (flock.ts). */
+  roads?: [number, number][]; towns?: [number, number][]; gulls?: [number, number] }
 import type { Sprites } from './actors'
 import { sunOnWater } from './water'
+import { createTraffic } from './traffic'
+import { createFlock } from './flock'
 export type Sounds = { thump?: (k: number) => void; splash?: () => void; flutter?: () => void }
 
 /** The parade's timetable: once every this many seconds, by the clock. */
@@ -91,6 +95,9 @@ export function createPlay(o: {
   const sparkle = o.data.openSea && typeof document !== 'undefined' ? sunOnWater(o.data.openSea, o.play) : null
   /** Device pixels to a map unit, as the last frame drew. */
   let scale = 1
+  /* ---- the traffic, and the wind with what it carries (traffic.ts, flock.ts) ---- */
+  const traffic = o.data.roads?.length ? createTraffic({ roads: o.data.roads, play: o.play, dark: () => o.dark?.() ?? 0, pic: (c, name, x, y) => drawPic(c, name, x, y), names: sp?.cars ? { cars: sp.cars, bus: sp.bus ?? [] } : null }) : null
+  const flock = createFlock({ grid: o.grid, gridSize: GRID, home: o.data.gulls ?? [26, 21], play: o.play, towns: o.data.towns ?? [] })
 
   /* ---- rings on the water ---------------------------------------------------- */
   type Ring = { x: number; y: number; at: number; size: number; life: number }
@@ -616,8 +623,10 @@ export function createPlay(o: {
         const now = performance.now()
         const dt = last ? Math.min(0.05, Math.max(0, (now - last) / 1000)) : 0
         last = now
-        if (o.play && dt > 0) { stepBall(dt); stepBirds(dt, now) }
+        if (o.play && dt > 0) { stepBall(dt); stepBirds(dt, now); traffic?.step(dt); flock.step(dt) }
         let n = 0
+        if (traffic) n += traffic.draw(c, m, (b) => visible(m, b))
+        n += flock.drawGround(c, m)
         if (!ball.wet) n += drawBall(c, m)
         n += drawBirdsOnGround(c, m, now)
         frameMarchers = marchers(now)
@@ -628,9 +637,9 @@ export function createPlay(o: {
         return n
       },
       // Today's balloon and the birds in flight: in the air, so graded with the sky after dark (engine.ts gradeSky).
-      sky: (c, m) => drawToday(c, m, performance.now()) + drawBirdsFlying(c, m, performance.now()),
+      sky: (c, m) => drawToday(c, m, performance.now()) + drawBirdsFlying(c, m, performance.now()) + flock.drawSky(c, m),
     },
-    front: (c, m, _t, inWin) => drawParade(c, m, performance.now(), frameMarchers, inWin),
+    front: (c, m, _t, inWin) => drawParade(c, m, performance.now(), frameMarchers, inWin) + (traffic ? traffic.draw(c, m, (b) => visible(m, b), inWin) : 0),
   }
 
   return {
@@ -681,6 +690,7 @@ export function createPlay(o: {
     /** The pointer is over the map at (x, y) (hovering, or pressing): pigeons near it go up; water touched ripples. */
     pointer(x: number, y: number, z: number, kind: 'hover' | 'down' | 'tap') {
       scareNear(x, y, kind === 'hover' ? 26 + 8 / z : 34 + 14 / z)
+      flock.pointer(x, y)
       const [i, j] = tile(x, y, SEA)
       if (!o.play || !inSea(i, j)) return
       if (kind === 'tap') splash(x, y, 0.9)

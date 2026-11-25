@@ -125,7 +125,7 @@ export type Signpost = { i: number; j: number; at: [number, number]; boards: { d
  * the ball can roll on, and for every building the roads from the town square
  * to its door, for the day's parade. All in tiles.
  */
-export type PlayData = { square: [number, number]; board: [number, number]; /** The open sea (where the sun sparkles on it), in tiles, filled even-odd. */ openSea?: string; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: import('./play').FolkPic[] }
+export type PlayData = { square: [number, number]; board: [number, number]; /** The open sea (where the sun sparkles on it), in tiles, filled even-odd. */ openSea?: string; ball: { at: [number, number]; cells: [number, number][] }; routes: Record<string, [number, number][]>; sprites?: (Sprites & { id: string }) | null; folk?: import('./play').FolkPic[]; roads?: [number, number][]; towns?: [number, number][]; gulls?: [number, number] }
 /**
  * The island as facts rather than a picture, for anything that draws it
  * another way (the Unity scene in unity/, which renders it in 3D): every
@@ -1162,33 +1162,12 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
     }
     const seen = new Set<string>()
     const long = runs.filter((r) => r.length >= 5).sort((a, b) => b.length - a.length).filter((r) => { const k = r.map((c) => key(...c)); if (k.some((x) => seen.has(x))) return false; k.forEach((x) => seen.add(x)); return true }).slice(0, 6)
-    const kinds: ['car' | 'bus' | 'bike', string][] = [['car', C.rasp], ['bus', C.cobalt], ['car', C.mint], ['bike', C.rasp], ['car', '#ffffff'], ['bike', C.cobalt]]
+    // (The traffic is driven live by the page now, round every road: traffic.ts. Zebra crossings stay half-way along the longest runs.)
     long.forEach((r, n) => {
-      const [kind, body] = kinds[n % kinds.length]
-      const a0 = r[0], b0 = r[r.length - 1]
-      const axis: 'x' | 'y' = a0[0] !== b0[0] ? 'x' : 'y'
-      const dur = r.length * (kind === 'bike' ? 3.2 : 2) + 4, delay = n * 3.3
-      const A = P(a0[0] + 0.5, a0[1] + 0.5), B = P(b0[0] + 0.5, b0[1] + 0.5)
-      // Cause and effect, part three: the first few stop at a zebra crossing
-      // half-way along, while someone waiting on the kerb walks over.
-      if (n < 4 && kind !== 'bike' && r.length >= 6) {
-        const mid = r[Math.floor(r.length / 2)], di = Math.sign(b0[0] - a0[0]), dj = Math.sign(b0[1] - a0[1])
-        const cx = mid[0] + 0.5, cy = mid[1] + 0.5
-        crossing(new Pen(walkers), cx, cy, axis === 'x' ? 'y' : 'x')
-        const back = kind === 'bus' ? 0.75 : 0.58
-        const sh = shuttle(kind, body, A, B, axis, `drive${n}`, dur, delay, [P(cx - di * back, cy - dj * back), P(cx + di * back, cy + dj * back)])
-        const [h1, h2] = sh.holds!
-        const kA = P(cx + dj * 0.4, cy + di * 0.4), kB = P(cx - dj * 0.4, cy - di * 0.4)
-        const tr = (q: [number, number]) => `transform:translate(${r1(q[0])}px,${r1(q[1])}px)`
-        motionCss.push(`@keyframes cross${n}{0%,${f(h1[0] + 1)}%{${tr(kA)}}${f(h1[1] - 1)}%,${f(h2[0] + 1)}%{${tr(kB)}}${f(h2[1] - 1)}%,100%{${tr(kA)}}}`)
-        const pg = walkers.add(new N('g', { class: 'walker mover', 'data-b': `${f(Math.min(kA[0], kB[0]) - 8)} ${f(Math.min(kA[1], kB[1]) - 24)} ${f(Math.max(kA[0], kB[0]) + 8)} ${f(Math.max(kA[1], kB[1]) + 3)}`, style: `animation:cross${n} ${dur}s linear infinite ${f(-delay)}s` }))
-        pg.add(walker(crowd[(n + 5) % crowd.length], `cross${n}`, stopsOf([[0, kA], [h1[0] + 1, kA], [h1[1] - 1, kB], [h2[0] + 1, kB], [h2[1] - 1, kA], [100, kA]]), `${dur}s`, `${f(-delay)}s`) ?? walkerFigure(shirts[(n + 2) % shirts.length], 1, 100 + n))
-        walkers.add(sh)
-        goers.push({ cells: cellsOf([mid]), node: pg }, { cells: cellsOf(r), node: sh })
-        return
-      }
-      const sh = walkers.add(shuttle(kind, body, A, B, axis, `drive${n}`, dur, delay))
-      goers.push({ cells: cellsOf(r), node: sh })
+      if (n >= 4 || r.length < 6) return
+      const a0 = r[0], b0 = r[r.length - 1], axis: 'x' | 'y' = a0[0] !== b0[0] ? 'x' : 'y'
+      const mid = r[Math.floor(r.length / 2)]
+      crossing(new Pen(walkers), mid[0] + 0.5, mid[1] + 0.5, axis === 'x' ? 'y' : 'x')
     })
   }
 
@@ -2459,7 +2438,7 @@ export function buildIsland(games: GameLink[], opts: { raster?: Raster; plate?: 
   const css = motionCss.join('')
   // The island's own extent, without the sea round it: the camera keeps this in view.
   const landBox: [number, number, number, number] = [f(P(0, GRID)[0]), f(P(0, 0, 60)[1]), f(P(GRID, 0)[0]), f(P(GRID, GRID)[1])]
-  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, moon: moonAt, anchors, lights, banners, labels, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, openSea, folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
+  return { land: landBox, hiddenLights, svg: `<style>${css}</style>` + layers.map((l) => l.body).join(''), layers, css, viewBox, moon: moonAt, anchors, lights, banners, labels, mini, bottles, signposts, play: { square, board, ball, routes: parades, sprites, openSea, roads: [...road].map((k) => k.split(',').map(Number) as [number, number]), towns: (() => { const out: [number, number][] = []; for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) if (isLand(i, j) && height[i][j] === 0 && !taken.has(key(i, j)) && !road.has(key(i, j)) && !beach.has(key(i, j)) && ['oldtown', 'market', 'funfair', 'harbour'].includes(dist[i][j].key)) out.push([i, j]); return out })(), gulls: [24.5, 23.5], folk: plate ? undefined : PARADE.map(([seed, shirt, k]) => folkPic(seed, shirt, k)) }, grid: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''), model: {
     grid: GRID, tile: S, sea: SEA, beachZ: BEACH,
     ground: Array.from({ length: GRID }, (_, i) => Array.from({ length: GRID }, (_, j) => (isLand(i, j) ? (beach.has(key(i, j)) ? 'b' : '1') : '0')).join('')).join(''),
     height: height.map((r) => [...r]), district: dist.map((r) => r.map((d) => d.key)),
