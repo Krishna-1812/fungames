@@ -27,7 +27,14 @@
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
- *     light the streets at night.
+ *     light the streets at night;
+ *   - the cars (cars.ts, drive.ts): each model built to its real size;
+ *     driven on the flat, a car pulls away, tops out, stops, turns and hits a
+ *     wall as a real one does (0–50 km/h, its top speed, the distance it
+ *     stops in from 50, its turning circle; it never goes into the wall);
+ *     deep water floods its engine; cars of your own are parked level and
+ *     clear beside a road, facing the way its traffic goes; and the traffic
+ *     stops short of whatever stands in its lane.
  *
  *   node scripts/check-walk.mjs
  */
@@ -38,6 +45,9 @@ const { buildIsland } = await import('../src/lib/island/world.ts')
 const { buildWorld, Y } = await import('../src/lib/walk/build3d.ts')
 const { waveAt } = await import('../src/lib/walk/water.ts')
 const { sunPlace, homesLit } = await import('../src/lib/walk/daylight.ts')
+const { carShapes, MODELS, parkingSpots } = await import('../src/lib/walk/cars.ts')
+const { vehicle } = await import('../src/lib/walk/drive.ts')
+const { createTraffic } = await import('../src/lib/island/traffic.ts')
 
 let failures = 0
 const ok = (m) => console.log(`  ok    ${m}`)
@@ -210,6 +220,75 @@ check(unreachable.length === 0, `every game's building can be walked (or climbed
 const badBox = world.boxes.filter((b) => !(b.i1 > b.i0 && b.j1 > b.j0 && b.z1 > b.z0) || ![b.i0, b.i1, b.j0, b.j1, b.z0, b.z1].every(Number.isFinite))
 check(world.boxes.length > 100 && badBox.length === 0, `${world.boxes.length} walls to collide with, all real boxes`)
 check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the night`)
+
+// The cars.
+{
+  const wrong = []
+  for (const name of Object.keys(MODELS)) {
+    const S = MODELS[name], sh = carShapes(name)
+    let nan = 0
+    const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9]
+    for (const g of Object.values(sh)) { const a = g.getAttribute('position').array; for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) nan++ }
+    const a = sh.paint.getAttribute('position').array
+    for (let i = 0; i < a.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], a[i + k] / METRE); hi[k] = Math.max(hi[k], a[i + k] / METRE) }
+    const len = hi[0] - lo[0], tall = hi[1], wid = 2 * Math.max(...(() => { const w = []; for (let i = 0; i < a.length; i += 3) if (Math.abs(a[i] / METRE) < S.len * 0.3 && a[i + 1] / METRE < S.tall * 0.6) w.push(Math.abs(a[i + 2] / METRE)); return w })())
+    if (nan || Math.abs(len - S.len) > 0.03 * S.len || Math.abs(tall - S.tall) > 0.04 * S.tall || Math.abs(wid - S.wid) > 0.03 * S.wid) wrong.push(`${name} ${len.toFixed(2)}×${wid.toFixed(2)}×${tall.toFixed(2)} m${nan ? ' NaN' : ''}`)
+  }
+  check(!wrong.length, `the hatchback, saloon, SUV and bus are built to their real size (${Object.values(MODELS).map((S) => S.len + ' m').join(', ')} long)${wrong.length ? ' — not: ' + wrong.join('; ') : ''}`)
+
+  const spec = MODELS.hatch.spec, flat = { heightAt: () => 0, boxes: [], waterAt: () => null, others: () => [], grid: 1e4 }
+  const dt = 1 / 60
+  let v = vehicle(spec, 500, 500, 0); v.place(500, 500, 0, flat)
+  let t = 0, t50 = null
+  while (t < 40) { v.step(dt, { throttle: 1, steer: 0, handbrake: false }, flat); t += dt; if (t50 === null && v.s.u >= 50 / 3.6) t50 = t }
+  const top = v.s.u * 3.6
+  v = vehicle(spec, 500, 500, 0); v.place(500, 500, 0, flat); v.s.u = 50 / 3.6
+  let x0 = v.s.x
+  for (let k = 0; k < 600 && v.s.u > 0.01; k++) v.step(dt, { throttle: -1, steer: 0, handbrake: false }, flat)
+  const stop = (v.s.x - x0) / METRE
+  v = vehicle(spec, 500, 500, 0); v.place(500, 500, 0, flat)
+  const box = [1e9, -1e9]
+  for (let k = 0; k < 60 * 30; k++) { v.step(dt, { throttle: v.s.u < 3 ? 0.35 : 0, steer: -1, handbrake: false }, flat); if (k > 300) { box[0] = Math.min(box[0], v.s.x); box[1] = Math.max(box[1], v.s.x) } }
+  const circle = (box[1] - box[0]) / METRE + spec.wid
+  check(t50 > 3 && t50 < 6.5 && top > spec.top * 3.6 - 3 && top < spec.top * 3.6 + 1 && stop > 10 && stop < 16 && circle > 9 && circle < 12.5,
+    `driven on the flat, a hatchback does 0–50 km/h in ${t50?.toFixed(1)} s, tops out at ${top.toFixed(0)} km/h, stops from 50 in ${stop.toFixed(1)} m and turns in a ${circle.toFixed(1)} m circle`)
+
+  const wallAt = 500 + 20 * METRE, wall = { ...flat, boxes: [{ j0: wallAt, j1: wallAt + 5 * METRE, i0: 490, i1: 510, z0: 0, z1: 1 }] }
+  v = vehicle(spec, 500, 500, 0); v.place(500, 500, 0, wall); v.s.u = 15
+  let into = 0
+  for (let k = 0; k < 180; k++) { v.step(dt, { throttle: 1, steer: 0, handbrake: false }, wall); into = Math.max(into, v.s.x + (spec.len / 2) * METRE - wallAt) }
+  check(into / METRE < 0.01 && v.s.u < 1.5, `driven into a wall at 54 km/h it stops there (${Math.max(0, into / METRE * 100).toFixed(1)} cm into it at most)`)
+
+  const sea = { ...flat, heightAt: (x) => -Math.max(0, (x - 500) * 0.08), waterAt: (x, z, g) => (g < 0 ? 0 : null) }
+  v = vehicle(spec, 500, 500, 0); v.place(500, 500, 0, sea)
+  let drowned = null
+  for (let k = 0; k < 60 * 20; k++) { v.step(dt, { throttle: 1, steer: 0, handbrake: false }, sea); if (drowned === null && v.s.flooded) drowned = v.s.depth }
+  check(drowned !== null && drowned < 0.8 && Math.abs(v.s.u) < 0.3, `driven down a slipway into the sea, the engine floods ${drowned?.toFixed(2)} m deep and the car comes to a stop`)
+
+  const start = data.road[Math.floor(data.road.length / 2)]
+  const spots = parkingSpots(world, data.road, { x: start[1] + 0.5, z: start[0] + 0.5 }, 3)
+  const bad = spots.filter((sp) => {
+    const [ri, rj] = sp.road, rx = rj + 0.5, rz = ri + 0.5
+    // The road is on its left: facing the way that side's traffic goes.
+    const rightX = Math.sin(sp.yaw), rightZ = Math.cos(sp.yaw)
+    if ((sp.x - rx) * rightX + (sp.z - rz) * rightZ < 0.1) return true
+    const c = Math.cos(sp.yaw), n = Math.sin(sp.yaw), L = 2.4 * METRE, W = 1.0 * METRE
+    for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1], [0, 0]]) {
+      const px = sp.x + a * L * c + b * W * n, pz = sp.z - a * L * n + b * W * c
+      if (Math.abs(world.heightAt(px, pz) - world.heightAt(rx, rz)) > 0.01) return true
+      if (world.boxes.some((B) => B.z1 > world.heightAt(px, pz) + 0.01 && px > B.j0 && px < B.j1 && pz > B.i0 && pz < B.i1)) return true
+    }
+    return false
+  })
+  check(spots.length === 3 && !bad.length, `${spots.length} cars of your own parked level and clear beside a road, facing its traffic${bad.length ? ' — not ' + bad.length : ''}`)
+
+  // Something standing in a lane: the car coming up to it stops short.
+  const tr = createTraffic({ roads: data.road, play: true, dark: () => 0, others: () => obs })
+  const c0 = tr.state()[0], obs = [{ i: c0.i + c0.hi * 0.7, j: c0.j + c0.hj * 0.7, r: 0.03, w: 0.03 }]
+  let closest = 9
+  for (let k = 0; k < 30 * 12; k++) { tr.step(1 / 30); const c = tr.state()[0]; closest = Math.min(closest, Math.hypot(c.i - obs[0].i, c.j - obs[0].j)) }
+  check(closest > 0.22, `the traffic stops short of someone standing in its lane (${(closest / METRE).toFixed(1)} m away at the closest)`)
+}
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
 process.exit(failures ? 1 : 0)
