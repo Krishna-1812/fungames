@@ -12,15 +12,20 @@
  * above it, rising and falling with the swell; water slows you as you wade,
  * a stream's current carries you along, and the water answers you: rings
  * spread from you and spray flies when you jump in. The island's traffic (traffic.ts, the same that drives the map)
- * drives its roads round you and pushes you aside if you stand in its way.
+ * drives its roads round you in real cars (cars.ts), and stops for you if you stand in its way.
  * Walk up to a game's building and it offers to take you in.
+ *
+ * Cars of your own stand parked by the road: get in (F) and drive one
+ * (drive.ts) — throttle, brake and reverse, steering, the handbrake — with a
+ * camera that follows behind; its headlights light the road after dark; get
+ * out wherever you like and it stays where you left it.
  *
  * The day passes (daylight.ts): the sun goes over, it gets dark, the lamps
  * come on and the windows light, the moon and the stars come out. Keyboard and mouse, or a thumb on a phone.
  */
 import {
-  ACESFilmicToneMapping, BoxGeometry, Fog, Group, Mesh, MeshStandardMaterial, PCFShadowMap, PerspectiveCamera, PointLight, Float32BufferAttribute,
-  Scene, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, CylinderGeometry, MathUtils,
+  ACESFilmicToneMapping, Fog, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
+  Scene, SRGBColorSpace, Vector3, WebGLRenderer, MathUtils,
 } from 'three'
 import { buildWorld, Y, type WorldData } from './build3d'
 import { createTraffic } from '../island/traffic'
@@ -28,6 +33,8 @@ import { splashes } from './splash'
 import { lens } from './lens'
 import { daylight } from './daylight'
 import { figure, METRE } from './body'
+import { fleet, MODELS, parkingSpots, type ModelName, type Pose } from './cars'
+import { vehicle, type Ground, type Vehicle } from './drive'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -35,10 +42,16 @@ export type Walk = { dispose(): void
   /** The time of day, in hours (0–24), and whether it is passing. */
   setTime(hour: number): void; time(): number; setClock(on: boolean): void; clock(): boolean
   setAerial(on: boolean): void; near(): { slug: string; title: string; href: string } | null
+  /** Get into the car you are next to, or out of the one you are driving; false if there is neither (or no room to get out). */
+  toggleCar(): boolean
   /** Where you are and how (for the checks). */
-  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; quality: string; cars: number[][] }
+  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; quality: string; cars: number[][]; driving: boolean; speed: number; parked: number[][] }
   /** Set you down somewhere, looking a given way (for the checks, and for pictures). */
-  goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void }
+  goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void
+  scene: Scene }
+
+/** What the page shows about cars: one to get into near you, the one you drive (its speed in km/h, and its gear). */
+export type CarInfo = { near: boolean; driving: boolean; kmh: number; gear: 'D' | 'R' | 'N'; flooded: boolean }
 
 /*
  * Everything at the island's own scale (body.ts): a metre is 0.11 of a world unit. You are 1.75 m tall and
@@ -53,8 +66,12 @@ const WALK = 1.5 * METRE, RUN = 5.5 * METRE, SWIM = 1.1 * METRE
 const GRAVITY = 9.8 * METRE, JUMP = 3 * METRE
 /** Water deeper than your chest you swim in, your hips just under the surface. */
 const CHEST = 1.3 * METRE, AFLOAT = 1.05 * METRE
+/** The traffic's own cars, and the paints they come in (and yours: a blue saloon, a red hatchback, a white SUV). */
+const TRAFFIC: ModelName[] = ['hatch', 'saloon', 'suv']
+const PAINTS = ['#8e1622', '#e8ebee', '#1c5c66', '#9ea6b0', '#1b2b4c', '#26292e', '#c9cdd3', '#36624c', '#5d6f86']
+const YOURS: { model: ModelName; paint: string }[] = [{ model: 'saloon', paint: '#1f3f94' }, { model: 'hatch', paint: '#a3121f' }, { model: 'suv', paint: '#eef0f2' }]
 
-export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNear(g: { title: string } | null): void; move?: () => [number, number] }): Walk {
+export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNear(g: { title: string } | null): void; move?: () => [number, number]; onCar?(c: CarInfo): void }): Walk {
   const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
   renderer.outputColorSpace = SRGBColorSpace
   renderer.toneMapping = ACESFilmicToneMapping
@@ -82,6 +99,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const sun = dl.light, sunDir = dl.state.lightDir
   // Light from the lamps nearest you (a handful of real lights, moved to whichever lamps are close).
   const lampLights = Array.from({ length: 6 }, () => { const l = new PointLight('#dfe8ff', 0, 2.2, 1.6); scene.add(l); return l })
+  // Your car's headlights: a real light, thrown ahead down the road (always there, dark by day, so nothing has to be redrawn when it comes on).
+  const beam = new SpotLight('#eef3ff', 0, 7, 0.52, 0.55, 1.3)
+  scene.add(beam, beam.target)
   // The windows (facade.ts): a room behind each; those with someone home light one by one as it gets dark,
   // and go out one by one late at night.
   const homes = world.windows.homes
@@ -107,10 +127,23 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
 
   /* ---- where you can stand ---- */
   const seaY = Y(data.sea)
-  /** The ground's height at a world point: the tile's top, or the top of something built low enough to stand on. */
+  /** A parked car at a point (or within pad of it): its footprint and the height of its roof. */
+  let own: Vehicle[] = []
+  let driving: number | null = null
+  const carAt = (x: number, z: number, pad: number) => {
+    for (let k = 0; k < own.length; k++) {
+      if (k === driving) continue
+      const b = own[k].box(), c = Math.cos(b.yaw), n = Math.sin(b.yaw), dx = x - b.x, dz = z - b.z
+      if (Math.abs(dx * c - dz * n) < b.hl + pad && Math.abs(dx * n + dz * c) < b.hw + pad) return b
+    }
+    return null
+  }
+  /** The ground's height at a world point: the tile's top, or the top of something built low enough to stand on (a car's roof, too). */
   const groundAt = (x: number, z: number, from: number, reach = STEP) => {
     let g = world.heightAt(x, z)
     for (const b of world.boxes) if (x > b.j0 && x < b.j1 && z > b.i0 && z < b.i1 && b.z1 <= from + reach && b.z1 > g) g = b.z1
+    const car = carAt(x, z, 0)
+    if (car && car.top <= from + reach && car.top > g) g = car.top
     return g
   }
   /** Whether a wall stands at a point: ground or something built, higher than you can get up (by a step, or a climb). */
@@ -119,6 +152,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     for (const [dx, dz] of [[RADIUS, 0], [-RADIUS, 0], [0, RADIUS], [0, -RADIUS]]) if (world.heightAt(x + dx, z + dz) > y + reach) return true
     // A wall: any box you would be inside that rises above what you can get up.
     for (const b of world.boxes) if (b.z1 > y + reach && b.z0 < y + TALL && x > b.j0 - RADIUS && x < b.j1 + RADIUS && z > b.i0 - RADIUS && z < b.i1 + RADIUS) return true
+    // A parked car.
+    const car = carAt(x, z, RADIUS)
+    if (car && car.top > y + reach) return true
     return false
   }
   /** Moving to a point: free, a ledge to pull yourself up onto first (its top), or a wall (false). */
@@ -143,18 +179,69 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const vel = new Vector3()
   let yaw = Math.PI * 0.75, pitch = 0.32, dist = innerHeight > innerWidth ? 1.05 : 0.8, onGround = true, swimming = false
 
-  /* ---- the traffic ---- */
-  const traffic = createTraffic({ roads: data.road, play: true, dark: () => (dark() ? 1 : 0) })
-  const carMeshes: Group[] = []
-  const carGeo = new BoxGeometry(0.42, 0.09, 0.2), cabGeo = new BoxGeometry(0.22, 0.07, 0.18), busGeo = new BoxGeometry(0.76, 0.2, 0.24), wheelGeo = new CylinderGeometry(0.035, 0.035, 0.21, 10)
-  const glassMat = new MeshStandardMaterial({ color: '#203048', roughness: 0.2, metalness: 0.4 }), tyre = new MeshStandardMaterial({ color: '#1b1f27', roughness: 0.9 })
-  for (const c of traffic.state()) {
-    const g = new Group(), paint = new MeshStandardMaterial({ color: c.kind === 'bus' ? '#5b82ff' : ['#ff4f6e', '#4fe3c1', '#ffffff'][carMeshes.length % 3], roughness: 0.35, metalness: 0.3 })
-    if (c.kind === 'bus') { const b = new Mesh(busGeo, paint); b.position.y = 0.14; g.add(b) }
-    else { const b = new Mesh(carGeo, paint); b.position.y = 0.075; const cab = new Mesh(cabGeo, glassMat); cab.position.set(-0.02, 0.15, 0); g.add(b, cab) }
-    for (const [x] of [[-0.13], [0.13]]) { const w = new Mesh(wheelGeo, tyre); w.rotation.x = Math.PI / 2; w.position.set(x * (c.kind === 'bus' ? 2 : 1), 0.035, 0); g.add(w) }
-    g.traverse((m) => { if ((m as Mesh).isMesh) m.castShadow = true })
-    scene.add(g); carMeshes.push(g)
+  /* ---- the traffic, and cars of your own ---- */
+  /** Where the traffic must stop: the car you drive, and you if you are on foot in the road. */
+  const obstacles: { i: number; j: number; r: number; w: number }[] = []
+  const traffic = createTraffic({ roads: data.road, play: true, dark: () => (dark() ? 1 : 0), others: () => obstacles })
+  const tStart = traffic.state()
+  const kinds = tStart.map((c, k) => ({ model: (c.kind === 'bus' ? 'bus' : TRAFFIC[k % TRAFFIC.length]) as ModelName, paint: PAINTS[k % PAINTS.length] }))
+  // Cars of your own, parked by the road (cars.ts): the first near the square, the others about the island.
+  const spots = parkingSpots(world, data.road, pos, YOURS.length)
+  const mine = spots.map((_, k) => YOURS[k])
+  const cars = fleet(scene, [...kinds, ...mine])
+  const NT = kinds.length
+  const ground: Ground = {
+    heightAt: world.heightAt, boxes: world.boxes, grid: data.grid,
+    waterAt: (x, z, g) => waterAt(x, z, g),
+    others: () => {
+      const o = traffic.state().map((c, k) => { const S = MODELS[kinds[k].model]; return { x: c.j, z: c.i, yaw: Math.atan2(-c.hi, c.hj), hl: (S.len / 2) * METRE, hw: (S.wid / 2) * METRE } })
+      own.forEach((v, k) => { if (k !== driving) { const b = v.box(); o.push({ x: b.x, z: b.z, yaw: b.yaw, hl: b.hl, hw: b.hw }) } })
+      return o
+    },
+  }
+  own = spots.map((s, k) => { const v = vehicle(MODELS[mine[k].model].spec, s.x, s.z, s.yaw); v.place(s.x, s.z, s.yaw, ground); return v })
+  // (No grass growing up through a parked car.)
+  world.flora.lawn.clear((x, z) => spots.some((s) => Math.abs(x - s.x) < (s.yaw ? 1.2 : 2.6) * METRE && Math.abs(z - s.z) < (s.yaw ? 2.6 : 1.2) * METRE))
+  // Riding in a car: you sit at its wheel (on its left: the island drives on the right).
+  const rig = new Group(); rig.matrixAutoUpdate = false; scene.add(rig)
+  const tPrev: number[] = [], tSpin: number[] = [], tSteer: number[] = []
+  let carDist = 1.25, lastDrag = -1e9, carTick = 0, splashTick = 0, wasDeep = false
+  const pose: Pose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, dive: 0, lean: 0, bob: 0, spin: 0, steer: 0, on: 1, head: 0, tail: 0, brake: 0, reverse: 0 }
+  /** The seat (metres from the car's middle): the driver's hips. */
+  const seatOf = (k: number) => { const S = MODELS[mine[k].model]; return { x: (S.screen[1] - 0.5) * S.len - 1.2, y: S.seat, z: -0.37 } }
+  /** The car you could get into: near its driver's door, and not one you are driving. */
+  const nearCar = () => {
+    if (driving !== null || swimming || climbTo !== null) return null
+    let best: number | null = null, bd = 0.36
+    own.forEach((v, k) => { const d = Math.hypot(v.s.x - pos.x, v.s.z - pos.z); if (d < bd && Math.abs(pos.y - v.s.y) < 0.15) { bd = d; best = k } })
+    return best
+  }
+  const getIn = (k: number) => {
+    driving = k; vel.set(0, 0, 0); climbTo = null
+    const st = seatOf(k)
+    rig.add(me); me.position.set(st.x * METRE, (st.y - 0.93) * METRE, st.z * METRE); me.rotation.set(0, Math.PI / 2, 0)
+    // The camera swings round behind the car.
+    const v = own[k]; yaw = Math.atan2(-Math.cos(v.s.yaw), Math.sin(v.s.yaw)); pitch = 0.2; lastDrag = -1e9
+  }
+  const getOut = () => {
+    if (driving === null) return false
+    const v = own[driving], S = MODELS[mine[driving].model], st = seatOf(driving)
+    if (v.speed() > 2.5) return false
+    // Out of the driver's door if there is room; if not, across and out of the other one.
+    for (const sd of [-1, 1]) {
+      const [x, z] = v.toWorld(st.x, sd * (S.wid / 2 + 0.45))
+      const k: number = driving
+      driving = null // (so the car itself counts as in the way)
+      const g = groundAt(x, z, v.s.y + 0.4 * METRE)
+      if (!blockedAt(x, z, g) && Math.abs(g - v.s.y) < 0.6 * METRE) {
+        scene.add(me); me.position.set(x, g, z); me.rotation.set(0, v.s.yaw + (sd < 0 ? Math.PI : 0), 0)
+        pos.set(x, g, z); vel.set(0, 0, 0); onGround = true; swimming = false
+        v.s.u = v.s.vl = v.s.r = 0
+        return true
+      }
+      driving = k
+    }
+    return false
   }
 
   /* ---- the camera ---- */
@@ -175,20 +262,21 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
 
   /* ---- input ---- */
   const keys = new Set<string>()
-  const kd = (e: KeyboardEvent) => { keys.add(e.code); if (e.code === 'Space') e.preventDefault() }
+  const kd = (e: KeyboardEvent) => { keys.add(e.code); if (e.code === 'Space' || (driving !== null && e.code.startsWith('Arrow'))) e.preventDefault() }
   const ku = (e: KeyboardEvent) => keys.delete(e.code)
   addEventListener('keydown', kd); addEventListener('keyup', ku)
   let dragging = false, lx = 0, ly = 0
   const pd = (e: PointerEvent) => { if ((e.target as HTMLElement) !== canvas) return; dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId) }
-  const pm = (e: PointerEvent) => { if (!dragging) return; yaw -= (e.clientX - lx) * 0.006; pitch = MathUtils.clamp(pitch + (e.clientY - ly) * 0.004, 0.05, 1.2); lx = e.clientX; ly = e.clientY }
+  const pm = (e: PointerEvent) => { if (!dragging) return; yaw -= (e.clientX - lx) * 0.006; pitch = MathUtils.clamp(pitch + (e.clientY - ly) * 0.004, 0.05, 1.2); lx = e.clientX; ly = e.clientY; lastDrag = performance.now() }
   const pu = () => { dragging = false }
-  const wh = (e: WheelEvent) => { dist = MathUtils.clamp(dist * (1 + e.deltaY * 0.001), 0.3, 3); e.preventDefault() }
+  const wh = (e: WheelEvent) => { if (driving !== null) carDist = MathUtils.clamp(carDist * (1 + e.deltaY * 0.001), 0.5, 3); else dist = MathUtils.clamp(dist * (1 + e.deltaY * 0.001), 0.3, 3); e.preventDefault() }
   canvas.addEventListener('pointerdown', pd); addEventListener('pointermove', pm); addEventListener('pointerup', pu); canvas.addEventListener('wheel', wh, { passive: false })
 
   /* ---- each frame ---- */
   const born = performance.now()
   let frames = 0, spent = 0, lastFrame = born, quality = 'full', slow = 0
   let raf = 0, last = performance.now(), near: { slug: string; title: string; href: string } | null = null
+  let shownCar: string | null = null
   const camPos = new Vector3(), look = new Vector3()
   let sunTick = 0, sunSeen = 0, sunVis = 0
   const sunAt = new Vector3(), sunLook = new Vector3(), ray = new Vector3()
@@ -213,87 +301,161 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     let fz = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0)
     const stick = ui.move?.() ?? [0, 0]
     if (stick[0] || stick[1]) { fx = stick[0]; fz = -stick[1] }
-    const mag = Math.min(1, Math.hypot(fx, fz))
-    const speed0 = swimming ? SWIM : keys.has('ShiftLeft') || keys.has('ShiftRight') || mag > 0.95 && stick[0] + stick[1] !== 0 ? RUN : WALK
-    const sx = Math.sin(yaw), cz = Math.cos(yaw)
-    // Uphill is harder going: slower the steeper it is the way you are heading (and a touch quicker down).
-    const hx = -fz * sx + fx * cz, hz = -fz * cz - fx * sx, hl = Math.hypot(hx, hz) || 1
-    const rise = onGround && !swimming ? (world.heightAt(pos.x + (hx / hl) * 0.08, pos.z + (hz / hl) * 0.08) - world.heightAt(pos.x, pos.z)) / 0.08 : 0
-    // Wading, the water holds you back: the deeper, the harder (up to your chest, about half your pace).
-    const wade = !swimming && inWater ? 1 - 0.5 * Math.min(1, waterDepth / CHEST) : 1
-    const speed = speed0 * Math.max(0.55, Math.min(1.12, 1 - rise * 0.9)) * wade
-    const wantX = (-fz * sx + fx * cz) * speed * mag / (mag || 1), wantZ = (-fz * cz - fx * sx) * speed * mag / (mag || 1)
-    // Your feet take a moment to get going and to stop (more on the ground than in the air or the water).
-    const grip = onGround ? 10 : swimming ? 3 : 1.5
-    vel.x += (wantX - vel.x) * Math.min(1, grip * dt); vel.z += (wantZ - vel.z) * Math.min(1, grip * dt)
-    if (climbTo !== null) {
-      // Pulling yourself up a ledge: up first, then on over it.
-      pos.y = Math.min(climbTo + 0.002, pos.y + CLIMB_SPEED * dt); vel.y = 0
-      if (pos.y >= climbTo) { climbTo = null; onGround = true; swimming = false }
-      climbed = climbTo === null ? null : Math.min(1, (pos.y - climbFrom) / Math.max(1e-4, climbTo - climbFrom))
+    const glow = dl.state.lampGlow
+    if (driving !== null) {
+      // Driving: the keys are the pedals and the wheel.
+      const v = own[driving]
+      v.step(dt, { throttle: fz, steer: fx, handbrake: keys.has('Space') }, ground)
+      pos.set(v.s.x, v.s.y, v.s.z); vel.set(0, 0, 0); onGround = true; swimming = false; inWater = false
+      // Into the water: a wave thrown up as it goes in, spray off the wheels as it ploughs on.
+      const deep = v.s.depth > 0.15, surf = waterAt(v.s.x, v.s.z, v.s.y)
+      if (deep && surf !== null) {
+        const sp = v.speed()
+        if (!wasDeep) { water.burst(v.s.x, surf, v.s.z, Math.round(20 + 50 * Math.min(1, sp / 8)), 0.7 + Math.min(1, sp / 8), [0, 0]); water.ring(v.s.x, surf, v.s.z, 2.5, 1.8) }
+        if ((splashTick -= dt) <= 0 && sp > 0.8) {
+          splashTick = 0.12
+          for (const sd of [-1, 1]) { const [x, z] = v.toWorld(v.spec.front, sd * v.spec.wid * 0.55); water.burst(x, surf, z, 3 + Math.round(sp), 0.3 + sp * 0.06, [0, 0]) }
+          water.ring(v.s.x, surf, v.s.z, 1.4, 1.4)
+        }
+      }
+      wasDeep = deep
     } else {
-      if (onGround && !swimming && keys.has('Space')) { vel.y = JUMP; onGround = false }
-      vel.y -= GRAVITY * dt
-      // Across, then along: each blocked on its own, so you slide along a wall; a
-      // ledge no higher than your chest (from the water, a quay or a beach) you climb.
-      const nx = pos.x + vel.x * dt, mx = moveTo(nx, pos.z)
-      if (mx === true) pos.x = nx; else if (typeof mx === 'number' && (onGround || swimming)) { climbTo = mx; climbFrom = pos.y } else vel.x = 0
-      const nz = pos.z + vel.z * dt, mz = climbTo !== null ? false : moveTo(pos.x, nz)
-      if (mz === true) pos.z = nz; else if (typeof mz === 'number' && (onGround || swimming)) { climbTo = mz; climbFrom = pos.y } else if (climbTo === null) vel.z = 0
-      // Out at sea, a current turns you back towards the island.
-      const OUT = 6
-      pos.x = Math.max(-OUT, Math.min(data.grid + OUT, pos.x)); pos.z = Math.max(-OUT, Math.min(data.grid + OUT, pos.z))
-      // Down: onto the ground, or into the water.
-      const g = groundAt(pos.x, pos.z, pos.y)
-      const wasOn = onGround && !swimming
-      swimming = g < seaY - CHEST
-      pos.y += vel.y * dt
-      // Swimming, you float with your head out, riding the swell.
-      const floor = swimming ? world.seaAt(pos.x, pos.z) - AFLOAT : g
-      const falling = vel.y
-      // Walking down a slope (or off a kerb) your feet keep to the ground; off anything higher than a step you fall.
-      if (pos.y <= floor || (wasOn && vel.y <= 0 && pos.y - floor < STEP * 0.6) || (swimming && vel.y <= 0 && pos.y - floor < 0.05)) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
-      // In the water, and how deep; jumping or stepping in throws up spray.
-      const surface = waterAt(pos.x, pos.z, g)
-      const wet = surface !== null && pos.y < surface - 0.004
-      if (wet && !inWater) {
-        const hard = Math.min(1, Math.max(0, -falling) / 1.4)
-        water.burst(pos.x, surface, pos.z, Math.round(6 + 60 * hard), 0.45 + hard * 0.9, [vel.x, vel.z])
-        water.ring(pos.x, surface, pos.z, 1 + hard * 1.5, 1.6)
-      }
-      inWater = wet; waterDepth = wet ? surface - pos.y : 0
-      // A stream carries you with it.
-      const run = wet ? world.flowAt(pos.x, pos.z) : null
-      if (run) {
-        const cx = pos.x + run[0] * 0.14 * dt, cz = pos.z + run[1] * 0.14 * dt
-        if (!blockedAt(cx, cz, pos.y)) { pos.x = cx; pos.z = cz }
-      }
-      // Moving through it, rings spread behind you and a little spray is kicked up; still, it only laps round you.
-      if (wet && (rippleTick -= dt) <= 0) {
-        const moving = Math.hypot(vel.x, vel.z) > 0.08
-        rippleTick = moving ? (swimming ? 0.3 : 0.38) : 1.5
-        water.ring(pos.x, surface, pos.z, moving ? 0.7 : 0.45, moving ? 1.3 : 2)
-        if (moving) water.burst(pos.x + vel.x * 0.12, surface, pos.z + vel.z * 0.12, swimming ? 5 : 3, 0.32, [vel.x, vel.z])
+      const mag = Math.min(1, Math.hypot(fx, fz))
+      const speed0 = swimming ? SWIM : keys.has('ShiftLeft') || keys.has('ShiftRight') || mag > 0.95 && stick[0] + stick[1] !== 0 ? RUN : WALK
+      const sx = Math.sin(yaw), cz = Math.cos(yaw)
+      // Uphill is harder going: slower the steeper it is the way you are heading (and a touch quicker down).
+      const hx = -fz * sx + fx * cz, hz = -fz * cz - fx * sx, hl = Math.hypot(hx, hz) || 1
+      const rise = onGround && !swimming ? (world.heightAt(pos.x + (hx / hl) * 0.08, pos.z + (hz / hl) * 0.08) - world.heightAt(pos.x, pos.z)) / 0.08 : 0
+      // Wading, the water holds you back: the deeper, the harder (up to your chest, about half your pace).
+      const wade = !swimming && inWater ? 1 - 0.5 * Math.min(1, waterDepth / CHEST) : 1
+      const speed = speed0 * Math.max(0.55, Math.min(1.12, 1 - rise * 0.9)) * wade
+      const wantX = (-fz * sx + fx * cz) * speed * mag / (mag || 1), wantZ = (-fz * cz - fx * sx) * speed * mag / (mag || 1)
+      // Your feet take a moment to get going and to stop (more on the ground than in the air or the water).
+      const grip = onGround ? 10 : swimming ? 3 : 1.5
+      vel.x += (wantX - vel.x) * Math.min(1, grip * dt); vel.z += (wantZ - vel.z) * Math.min(1, grip * dt)
+      if (climbTo !== null) {
+        // Pulling yourself up a ledge: up first, then on over it.
+        pos.y = Math.min(climbTo + 0.002, pos.y + CLIMB_SPEED * dt); vel.y = 0
+        if (pos.y >= climbTo) { climbTo = null; onGround = true; swimming = false }
+        climbed = climbTo === null ? null : Math.min(1, (pos.y - climbFrom) / Math.max(1e-4, climbTo - climbFrom))
+      } else {
+        if (onGround && !swimming && keys.has('Space')) { vel.y = JUMP; onGround = false }
+        vel.y -= GRAVITY * dt
+        // Across, then along: each blocked on its own, so you slide along a wall; a
+        // ledge no higher than your chest (from the water, a quay or a beach) you climb.
+        const nx = pos.x + vel.x * dt, mx = moveTo(nx, pos.z)
+        if (mx === true) pos.x = nx; else if (typeof mx === 'number' && (onGround || swimming)) { climbTo = mx; climbFrom = pos.y } else vel.x = 0
+        const nz = pos.z + vel.z * dt, mz = climbTo !== null ? false : moveTo(pos.x, nz)
+        if (mz === true) pos.z = nz; else if (typeof mz === 'number' && (onGround || swimming)) { climbTo = mz; climbFrom = pos.y } else if (climbTo === null) vel.z = 0
+        // Out at sea, a current turns you back towards the island.
+        const OUT = 6
+        pos.x = Math.max(-OUT, Math.min(data.grid + OUT, pos.x)); pos.z = Math.max(-OUT, Math.min(data.grid + OUT, pos.z))
+        // Down: onto the ground, or into the water.
+        const g = groundAt(pos.x, pos.z, pos.y)
+        const wasOn = onGround && !swimming
+        swimming = g < seaY - CHEST
+        pos.y += vel.y * dt
+        // Swimming, you float with your head out, riding the swell.
+        const floor = swimming ? world.seaAt(pos.x, pos.z) - AFLOAT : g
+        const falling = vel.y
+        // Walking down a slope (or off a kerb) your feet keep to the ground; off anything higher than a step you fall.
+        if (pos.y <= floor || (wasOn && vel.y <= 0 && pos.y - floor < STEP * 0.6) || (swimming && vel.y <= 0 && pos.y - floor < 0.05)) { pos.y = floor; vel.y = 0; onGround = true } else onGround = swimming
+        // In the water, and how deep; jumping or stepping in throws up spray.
+        const surface = waterAt(pos.x, pos.z, g)
+        const wet = surface !== null && pos.y < surface - 0.004
+        if (wet && !inWater) {
+          const hard = Math.min(1, Math.max(0, -falling) / 1.4)
+          water.burst(pos.x, surface, pos.z, Math.round(6 + 60 * hard), 0.45 + hard * 0.9, [vel.x, vel.z])
+          water.ring(pos.x, surface, pos.z, 1 + hard * 1.5, 1.6)
+        }
+        inWater = wet; waterDepth = wet ? surface - pos.y : 0
+        // A stream carries you with it.
+        const run = wet ? world.flowAt(pos.x, pos.z) : null
+        if (run) {
+          const cx = pos.x + run[0] * 0.14 * dt, cz = pos.z + run[1] * 0.14 * dt
+          if (!blockedAt(cx, cz, pos.y)) { pos.x = cx; pos.z = cz }
+        }
+        // Moving through it, rings spread behind you and a little spray is kicked up; still, it only laps round you.
+        if (wet && (rippleTick -= dt) <= 0) {
+          const moving = Math.hypot(vel.x, vel.z) > 0.08
+          rippleTick = moving ? (swimming ? 0.3 : 0.38) : 1.5
+          water.ring(pos.x, surface, pos.z, moving ? 0.7 : 0.45, moving ? 1.3 : 2)
+          if (moving) water.burst(pos.x + vel.x * 0.12, surface, pos.z + vel.z * 0.12, swimming ? 5 : 3, 0.32, [vel.x, vel.z])
+        }
       }
     }
-    // The traffic: driven, and in your way only for as long as it takes to push you aside.
+    // The traffic stops for the car you drive, and for you in the road.
+    obstacles.length = 0
+    if (driving !== null) { const b = own[driving].box(); obstacles.push({ i: b.z, j: b.x, r: b.hl, w: b.hw }) } else obstacles.push({ i: pos.z, j: pos.x, r: 0.03, w: 0.03 })
     traffic.step(dt)
-    traffic.state().forEach((c, k) => {
-      const m = carMeshes[k]; if (!m) return
-      m.position.set(c.j, world.heightAt(c.j, c.i), c.i)
-      m.rotation.y = Math.atan2(-c.hi, c.hj)
-      const dx = pos.x - c.j, dz = pos.z - c.i, d = Math.hypot(dx, dz)
-      if (d < 0.22 && pos.y < m.position.y + 0.15) { pos.x += (dx / (d || 1)) * (0.22 - d); pos.z += (dz / (d || 1)) * (0.22 - d) }
+    const ts = traffic.state()
+    ts.forEach((c, k) => {
+      const S = MODELS[kinds[k].model], heading = Math.atan2(-c.hi, c.hj)
+      let turn = heading - (tPrev[k] ?? heading); turn = Math.atan2(Math.sin(turn), Math.cos(turn)); tPrev[k] = heading
+      const ms = c.v / METRE, rate = dt > 0 ? turn / dt : 0
+      tSpin[k] = (tSpin[k] ?? 0) + (ms * dt) / S.wheel
+      // The front wheels turned as much as the curve it is on needs.
+      tSteer[k] = MathUtils.lerp(tSteer[k] ?? 0, ms > 0.4 ? Math.atan((rate * (S.front - S.rear)) / ms) : tSteer[k] ?? 0, Math.min(1, dt * 6))
+      const cs = Math.cos(heading), sn = Math.sin(heading)
+      const hf = world.heightAt(c.j + cs * S.front * METRE, c.i - sn * S.front * METRE), hr = world.heightAt(c.j + cs * S.rear * METRE, c.i - sn * S.rear * METRE)
+      const braking = (c.acc ?? 0) < -0.35 || c.v < 0.04
+      Object.assign(pose, {
+        x: c.j, y: (hf + hr) / 2, z: c.i, yaw: heading, pitch: Math.atan2(hf - hr, (S.front - S.rear) * METRE), roll: 0,
+        dive: MathUtils.clamp(((c.acc ?? 0) / METRE) * 0.0075, -0.05, 0.04), lean: MathUtils.clamp(ms * rate * 0.0085, -0.06, 0.06), bob: 0,
+        spin: tSpin[k], steer: tSteer[k], on: 1, head: glow, tail: glow, brake: braking ? 1 : 0, reverse: 0,
+      })
+      cars.set(k, pose, Math.hypot(c.j - camera.position.x, c.i - camera.position.z) < 2.8)
+      // In your way only for as long as it takes to push you aside (it stops for you; this is if you step out in front).
+      if (driving === null) {
+        const dx = pos.x - c.j, dz = pos.z - c.i, d = Math.hypot(dx, dz)
+        if (d < 0.22 && pos.y < pose.y + 0.15) { pos.x += (dx / (d || 1)) * (0.22 - d); pos.z += (dz / (d || 1)) * (0.22 - d) }
+      }
     })
-    // You, walking: legs and arms swinging with your speed, turned the way you go.
-    const sp = Math.hypot(vel.x, vel.z)
-    if (sp > 0.05) me.rotation.y = MathUtils.lerp(me.rotation.y, Math.atan2(vel.x, vel.z) + (Math.abs(Math.atan2(vel.x, vel.z) - me.rotation.y) > Math.PI ? Math.sign(me.rotation.y) * Math.PI * 2 : 0), Math.min(1, dt * 10))
-    you.update(dt, { speed: sp, running: sp > WALK * 1.4, ground: onGround && !swimming && climbTo === null, swimming, wade: inWater && !swimming ? Math.min(1, waterDepth / CHEST) : 0, climb: climbed, vy: vel.y })
+    // Your cars: the one you drive, and those standing where they were left.
+    own.forEach((v, k) => {
+      const s = v.s, on = k === driving
+      Object.assign(pose, {
+        x: s.x, y: s.y, z: s.z, yaw: s.yaw, pitch: s.pitch, roll: s.roll, dive: s.dive, lean: s.lean, bob: 0, spin: s.spin, steer: s.steer,
+        on: on ? 1 : 0, head: on ? glow : 0, tail: on ? glow : 0, brake: on && s.braking ? 1 : 0, reverse: on && s.reversing ? 1 : 0,
+      })
+      cars.set(NT + k, pose, Math.hypot(s.x - camera.position.x, s.z - camera.position.z) < 2.8)
+    })
+    cars.done()
+    // You, at the wheel or on foot.
+    if (driving !== null) {
+      rig.matrix.copy(cars.body(NT + driving)); rig.matrixWorldNeedsUpdate = true
+      you.update(dt, { speed: 0, running: false, ground: false, swimming: false, wade: 0, climb: null, vy: 0, seated: -own[driving].s.steer / own[driving].spec.lock })
+    } else {
+      // You, walking: legs and arms swinging with your speed, turned the way you go.
+      const sp = Math.hypot(vel.x, vel.z)
+      if (sp > 0.05) me.rotation.y = MathUtils.lerp(me.rotation.y, Math.atan2(vel.x, vel.z) + (Math.abs(Math.atan2(vel.x, vel.z) - me.rotation.y) > Math.PI ? Math.sign(me.rotation.y) * Math.PI * 2 : 0), Math.min(1, dt * 10))
+      you.update(dt, { speed: sp, running: sp > WALK * 1.4, ground: onGround && !swimming && climbTo === null, swimming, wade: inWater && !swimming ? Math.min(1, waterDepth / CHEST) : 0, climb: climbed, vy: vel.y })
+      me.position.copy(pos)
+    }
     water.update(dt)
-    me.position.copy(pos)
+    // Your headlights: on after dark while you drive, thrown down the road ahead.
+    if (driving !== null && glow > 0.02) {
+      const v = own[driving], S = MODELS[mine[driving].model]
+      const [bx, bz] = v.toWorld(S.len / 2 - 0.2, 0), [tx, tz] = v.toWorld(S.len / 2 + 14, 0)
+      beam.position.set(bx, v.s.y + 0.75 * METRE, bz); beam.target.position.set(tx, v.s.y - 1.2 * METRE, tz); beam.target.updateMatrixWorld()
+      beam.intensity = 5.5 * glow
+    } else beam.intensity = 0
     // The camera, behind and above, easing after you; never inside a wall of the ground.
-    look.set(pos.x, pos.y + TALL * 0.85, pos.z)
-    camPos.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.85 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
+    if (driving !== null) {
+      const v = own[driving]
+      look.set(pos.x, pos.y + 1.25 * METRE, pos.z)
+      // Behind the car, unless you have just looked round: it swings back once you let go.
+      if (!dragging && now - lastDrag > 1400 && v.speed() > 0.8) {
+        const behind = Math.atan2(-Math.cos(v.s.yaw), Math.sin(v.s.yaw))
+        let dy = behind - yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy))
+        yaw += dy * Math.min(1, dt * 2.6)
+        pitch += (0.2 - pitch) * Math.min(1, dt * 1.5)
+      }
+      camPos.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * carDist, look.y + Math.sin(pitch) * carDist, pos.z + Math.cos(yaw) * Math.cos(pitch) * carDist)
+    } else {
+      look.set(pos.x, pos.y + TALL * 0.85, pos.z)
+      camPos.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.85 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
+    }
     // ...and never behind a wall: drawn in to just short of whatever stands between it and you.
     if (!aerial) {
       const dir = camPos.clone().sub(look), len = dir.length(); dir.divideScalar(len)
@@ -310,7 +472,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (aerial) { const c = data.grid / 2; look.set(c, 0, c); camPos.set(c + Math.sin(yaw) * 24, 26, c + Math.cos(yaw) * 24) }
     const under = world.heightAt(camPos.x, camPos.z) + 0.03
     if (camPos.y < under) camPos.y = under
-    camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : 8)))
+    camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : driving !== null ? 10 : 8)))
     camera.lookAt(look)
     // The day goes on: an hour of it a minute.
     if (clockOn) { hour = (hour + dt / 60) % 24; applyTime() }
@@ -332,15 +494,23 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     const pr = Math.round(pos.dot(lightRight) / texel) * texel, pu = Math.round(pos.dot(lightUp) / texel) * texel, pa = pos.dot(sunDir)
     snapped.copy(lightRight).multiplyScalar(pr).addScaledVector(lightUp, pu).addScaledVector(sunDir, pa)
     sun.position.copy(snapped).addScaledVector(sunDir, 35); sun.target.position.copy(snapped)
-    // A game's building near: it offers to take you in.
+    // A game's building near: it offers to take you in (not while you drive).
     let best: typeof near = null, bd = 0.45
-    for (const b of data.buildings) {
+    if (driving === null) for (const b of data.buildings) {
       const gm = data.games[b.slug]; if (!gm) continue
       const cx = Math.max(b.j, Math.min(b.j + b.d, pos.x)), cz = Math.max(b.i, Math.min(b.i + b.w, pos.z))
       const d = Math.hypot(pos.x - cx, pos.z - cz)
       if (d < bd) { bd = d; best = { slug: b.slug, title: gm.title, href: gm.href } }
     }
     if (best?.slug !== near?.slug) { near = best; ui.onNear(best) }
+    // A car to get into, or the one you drive: what the page shows of it.
+    if ((carTick -= dt) <= 0) {
+      carTick = 0.1
+      const v = driving !== null ? own[driving] : null
+      const info: CarInfo = { near: nearCar() !== null, driving: !!v, kmh: v ? Math.round(Math.abs(v.s.u) * 3.6) : 0, gear: v ? (v.s.u < -0.2 ? 'R' : Math.abs(v.s.u) < 0.2 ? 'N' : 'D') : 'N', flooded: !!v?.s.flooded }
+      const key = JSON.stringify(info)
+      if (key !== shownCar) { shownCar = key; ui.onCar?.(info) }
+    }
     // The sun in the picture: where, and whether anything (the hill, a building) stands in front of it.
     if (dl.state.sunEl > -1 && !aerial) {
       if ((sunTick -= dt) <= 0) { sunTick = 0.1; sunSeen = sunClear() ? 1 : 0 }
@@ -384,14 +554,28 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     clock: () => clockOn,
     setAerial(on) { aerial = on; (scene.fog as Fog).far = on ? 160 : 70 },
     near: () => near,
+    toggleCar() {
+      if (driving !== null) return getOut()
+      const k = nearCar()
+      if (k === null) return false
+      getIn(k); return true
+    },
     goTo(x, z, view) {
+      // (Out of any car first, wherever it is.)
+      if (driving !== null) { const v = own[driving]; v.s.u = v.s.vl = v.s.r = 0; driving = null; scene.add(me); me.rotation.set(0, 0, 0) }
       pos.set(x, world.heightAt(x, z), z); vel.set(0, 0, 0); climbTo = null
       if (view?.yaw !== undefined) yaw = view.yaw
       if (view?.pitch !== undefined) pitch = view.pitch
       if (view?.dist !== undefined) dist = view.dist
       camera.position.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.8 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
     },
-    state: () => ({ x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), quality, cars: carMeshes.map((g) => [g.position.x, g.position.z]) }),
+    state: () => ({
+      x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), quality,
+      cars: traffic.state().map((c) => [c.j, c.i]), driving: driving !== null, speed: driving !== null ? own[driving].speed() : 0,
+      parked: own.map((v) => [v.s.x, v.s.z, v.s.yaw]),
+    }),
+    /** (For the checks: the scene itself.) */
+    scene,
     dispose() {
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)

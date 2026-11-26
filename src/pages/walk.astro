@@ -3,14 +3,15 @@
  * /walk/ — the island on foot, in 3D (lib/walk): built in the browser from
  * the same facts Unity builds the realistic island from, and walked in third
  * person, with the island's own traffic on its roads. Walk up to any game's
- * building and it offers to take you in. The day passes, an hour a minute;
- * the clock lets you pause it or go to any hour.
+ * building and it offers to take you in. Cars of your own stand parked by
+ * the road: get in and drive one. The day passes, an hour a minute; the
+ * clock lets you pause it or go to any hour.
  */
 import Base from '../layouts/Base.astro'
 import { withBase } from '../lib/base'
 ---
 
-<Base title="Walk the island" description="Walk round Tiny Island in 3D: its streets, its traffic, its harbour and its mountain, and every game's building to walk into.">
+<Base title="Walk the island" description="Walk round Tiny Island in 3D, or drive it: its streets, its traffic, its harbour and its mountain, and every game's building to walk into.">
   <main class="wk" id="main">
     <canvas class="wk-canvas" id="wk" aria-label="The island in 3D"></canvas>
     <div class="wk-top">
@@ -30,6 +31,13 @@ import { withBase } from '../lib/base'
     </div>
     <p class="wk-help" id="wkHelp">W A S D or the arrow keys to walk · Shift to run · Space to jump · drag to look round · scroll to step back</p>
     <a class="wk-near" id="wkNear" hidden href="/"><span>Play</span> <b id="wkNearTitle"></b> <kbd>E</kbd></a>
+    <button class="wk-near wk-drive" id="wkDrive" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5M5 12h14M5 16.5h14M7.5 19v-2.5M16.5 19v-2.5"/><circle cx="8" cy="14.2" r="0.9"/><circle cx="16" cy="14.2" r="0.9"/></svg><span>Drive</span> <kbd>F</kbd></button>
+    <div class="wk-dash" id="wkDash" hidden aria-live="off">
+      <span class="wk-speed"><b id="wkKmh">0</b><small>km/h</small></span>
+      <span class="wk-gear" id="wkGear">N</span>
+      <span class="wk-flood" id="wkFlood" hidden>Engine flooded</span>
+      <button class="wk-chip wk-out" id="wkOut" type="button">Get out <kbd>F</kbd></button>
+    </div>
     <div class="wk-stick" id="wkStick" aria-hidden="true"><i id="wkKnob"></i></div>
     <p class="wk-load" id="wkLoad">Building the island…</p>
   </main>
@@ -46,6 +54,10 @@ import { withBase } from '../lib/base'
   const pauseBtn = document.getElementById('wkPause') as HTMLButtonElement
   const hhmm = (h: number) => { const m = Math.floor((((h % 24) + 24) % 24) * 60); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` }
   const stickEl = document.getElementById('wkStick')!, knob = document.getElementById('wkKnob')!
+  const help = document.getElementById('wkHelp')!, driveBtn = document.getElementById('wkDrive') as HTMLButtonElement
+  const dash = document.getElementById('wkDash')!, kmh = document.getElementById('wkKmh')!, gear = document.getElementById('wkGear')!, flood = document.getElementById('wkFlood')!, outBtn = document.getElementById('wkOut') as HTMLButtonElement
+  const WALK_HELP = help.textContent!, DRIVE_HELP = 'W or ↑ to drive · S or ↓ to brake and reverse · A D or ← → to steer · Space for the handbrake · F to get out'
+  let nearGame = false
 
   // A thumb-stick for a phone: where the thumb is from the stick's middle, as a direction and how far.
   let stick: [number, number] = [0, 0]
@@ -67,14 +79,31 @@ import { withBase } from '../lib/base'
   Promise.all([fetch('world.json').then((r) => r.json() as Promise<WorldData>), import('../lib/walk/walker')]).then(([data, { startWalk }]) => {
     const walk = startWalk(canvas, data, {
       onNear(g) {
+        nearGame = !!g
         near.hidden = !g
         if (g) { nearTitle.textContent = g.title; near.href = (g as { href?: string }).href ?? '/' }
       },
       move: () => stick,
+      onCar(c) {
+        driveBtn.hidden = !c.near || c.driving
+        // (A game's door and a car both near: the car's button sits above the game's.)
+        driveBtn.classList.toggle('wk-up', nearGame)
+        dash.hidden = !c.driving
+        help.textContent = c.driving ? DRIVE_HELP : WALK_HELP
+        kmh.textContent = String(c.kmh); gear.textContent = c.gear; flood.hidden = !c.flooded
+      },
     })
+    driveBtn.addEventListener('click', () => walk.toggleCar())
+    outBtn.addEventListener('click', () => walk.toggleCar())
     load.remove()
     ;(window as unknown as { __walk: typeof walk }).__walk = walk
-    addEventListener('keydown', (e) => { if (e.code === 'KeyE') { const g = walk.near(); if (g) location.href = g.href } if (e.code === 'KeyN') { const h = walk.time(); walk.setNight(h > 6 && h < 19.5) } })
+    addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement)?.closest?.('input, textarea')) return
+      // F gets you in and out of a car; E takes you into a game (or, with none near, into the car).
+      if (e.code === 'KeyF') walk.toggleCar()
+      if (e.code === 'KeyE') { const g = walk.near(); if (g) location.href = g.href; else walk.toggleCar() }
+      if (e.code === 'KeyN') { const h = walk.time(); walk.setNight(h > 6 && h < 19.5) }
+    })
     const air = document.getElementById('wkAir') as HTMLButtonElement
     air.addEventListener('click', () => { const on = air.getAttribute('aria-pressed') !== 'true'; air.setAttribute('aria-pressed', String(on)); air.textContent = on ? 'On foot' : 'Aerial'; walk.setAerial(on) })
     if (new URLSearchParams(location.search).has('aerial')) air.click()
@@ -150,5 +179,24 @@ import { withBase } from '../lib/base'
   .wk-chip:hover { background: #d8e3fa; }
   .wk-chip:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
   .wk-load { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: #eef3ff; font: 600 16px/1.4 var(--font-ui, system-ui, sans-serif); }
-  @media (pointer: coarse) { .wk-help { display: none; } .wk-near { bottom: 210px; } }
+  .wk-drive { border: 0; cursor: pointer; background: #eaf1ff; }
+  .wk-drive.wk-up { bottom: 124px; }
+  .wk-drive svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .wk-drive svg circle { fill: currentColor; stroke: none; }
+  .wk-drive:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
+  /* The dashboard while you drive: the speed, the gear, a button to get out. */
+  .wk-dash {
+    position: absolute; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 18px; border-radius: 18px;
+    background: rgb(10 16 30 / 0.72); color: #eef3ff; backdrop-filter: blur(8px); box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+    font: 500 13px/1 var(--font-ui, system-ui, sans-serif);
+  }
+  .wk-dash[hidden] { display: none; }
+  .wk-speed { display: inline-flex; align-items: baseline; gap: 5px; }
+  .wk-speed b { font: 700 30px/1 var(--font-ui, system-ui, sans-serif); font-variant-numeric: tabular-nums; min-width: 2.2ch; text-align: right; }
+  .wk-speed small { opacity: 0.7; }
+  .wk-gear { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgb(255 255 255 / 0.12); font-weight: 700; }
+  .wk-flood { color: #9fc4ff; font-weight: 600; }
+  .wk-out { display: inline-flex; align-items: center; gap: 6px; }
+  .wk-out kbd { font: 700 11px/1 ui-monospace, monospace; padding: 3px 5px; border-radius: 5px; background: rgb(15 23 48 / 0.12); }
+  @media (pointer: coarse) { .wk-help { display: none; } .wk-near { bottom: 210px; } .wk-drive.wk-up { bottom: 270px; } .wk-out kbd, .wk-drive kbd { display: none; } .wk-dash { bottom: 210px; } }
 </style>
