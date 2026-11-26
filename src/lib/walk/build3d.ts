@@ -376,6 +376,8 @@ function solids(d: WorldData, pics: ReturnType<typeof atlas>) {
           built.m = MAT.paint; built.b = -99
           for (const band of (q.bands as [number, number, string][] | undefined) ?? []) ring(cx, cy, r + 0.004, z0 + band[0], z0 + band[1], band[2])
           lid(cx, cy, r, z0 + h, s(q.top ?? q.fill))
+          // Solid, as a square round it (a fountain's basin, a pillar, a tank).
+          { const a = w(cx - r, cy - r, z0), b = w(cx + r, cy + r, z0 + h); boxes.push({ i0: Math.min(a.z, b.z), i1: Math.max(a.z, b.z), j0: Math.min(a.x, b.x), j1: Math.max(a.x, b.x), z0: Math.min(a.y, b.y), z1: Math.max(a.y, b.y) }) }
           break
         }
         case 'cone': {
@@ -406,6 +408,9 @@ function solids(d: WorldData, pics: ReturnType<typeof atlas>) {
             built.quad(A.clone().add(o0), A.clone().add(o1), B.clone().add(o1), B.clone().add(o0), col)
           }
           built.m = MAT.paint
+          // Solid if it is a post standing up or a rail near the ground (a fence); not a cable slung overhead.
+          const upright = Math.abs(A.x - B.x) + Math.abs(A.z - B.z) < 0.01, low = Math.max(A.y, B.y) - Math.min(A.y, B.y) < 0.02 && Math.max(a[2], b[2]) - Math.min(a[2], b[2]) < 1 && Math.max(A.y, B.y) - Math.min(w(a[0], a[1], 0).y, w(b[0], b[1], 0).y) < 0.25
+          if (upright || low) boxes.push({ i0: Math.min(A.z, B.z) - r, i1: Math.max(A.z, B.z) + r, j0: Math.min(A.x, B.x) - r, j1: Math.max(A.x, B.x) + r, z0: Math.min(A.y, B.y) - r, z1: Math.max(A.y, B.y) + r })
           break
         }
         case 'model': {
