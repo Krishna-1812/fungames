@@ -59,6 +59,8 @@ export function createTraffic(o: {
   /** Unity's pictures: for each body colour, its name facing se, sw, nw and ne; and the bus's. */
   names?: { cars: Record<string, string[]>; bus: string[] } | null
   count?: number
+  /** Anything else on the road that the traffic must stop for (the walk's own car, someone on foot): where (tiles), how far it reaches along the road and across it (tiles). */
+  others?: () => { i: number; j: number; r: number; w: number }[]
 }) {
   const road = new Set(o.roads.map(([i, j]) => key(i, j)))
   const isRoad = (i: number, j: number) => road.has(key(i, j))
@@ -170,6 +172,14 @@ export function createTraffic(o: {
         const g = fwd - (p.len + IDM[other.kind].len) / 2
         if (g < gap) { gap = g; lead = other.v }
       }
+      // Something else in its lane ahead (a car somebody is driving, a person in the road): it stops short of it.
+      for (const ob of o.others?.() ?? []) {
+        const di = ob.i - car.i, dj = ob.j - car.j
+        const fwd = di * car.hi + dj * car.hj, lat = Math.abs(di * car.hj - dj * car.hi)
+        if (fwd <= 0 || fwd > 3 || lat > 0.12 + ob.w) continue
+        const g = fwd - p.len / 2 - ob.r
+        if (g < gap) { gap = Math.max(0.001, g); lead = 0 }
+      }
       // A box it is about to drive into: only if nobody else holds it, and there is room to get out the
       // far side (blocking the box is how a grid of streets locks solid). Then it is this car's.
       const zone = boxOfCell(car.path[2])
@@ -273,6 +283,6 @@ export function createTraffic(o: {
   return {
     step, draw, cars: () => cars.length,
     /** Where every vehicle is, which way it heads and how fast (for check-traffic). */
-    state: () => cars.map((c) => ({ i: c.i, j: c.j, hi: c.hi, hj: c.hj, v: c.v, kind: c.kind, path: c.path.slice(0, 4).map((q) => q.join(",")).join(" "), u: c.u, waited: c.waited })),
+    state: () => cars.map((c) => ({ i: c.i, j: c.j, hi: c.hi, hj: c.hj, v: c.v, kind: c.kind, acc: c.acc, path: c.path.slice(0, 4).map((q) => q.join(",")).join(" "), u: c.u, waited: c.waited })),
   }
 }
