@@ -21,7 +21,9 @@
  *   - wading: arms lifted clear of the water, a shorter step;
  *   - swimming: lying along the surface in a front crawl, arm over arm, the
  *     legs fluttering, turning the head to breathe every other stroke;
- *   - climbing: reaching up, hauling yourself over, a knee up onto the edge.
+ *   - climbing: reaching up, hauling yourself over, a knee up onto the edge;
+ *   - driving: sat back in the seat, hands on the wheel, turning it as you
+ *     steer, your head turned a little into the bend.
  */
 import { CapsuleGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, type Material } from 'three'
 
@@ -39,6 +41,8 @@ export type Doing = {
   climb: number | null
   /** Your speed up or down (world units a second). */
   vy: number
+  /** Sat at the wheel of a car: how far it is turned (−1 left to 1 right); null on foot. */
+  seated?: number | null
 }
 
 export function figure() {
@@ -108,7 +112,15 @@ export function figure() {
       // Limb angles to blend towards (x: forward and back; z: out to the side).
       const tgt = { lt: 0, lk: 0, la: 0, rt: 0, rk: 0, ra: 0, ls: 0, le: 0, lz: 0.06, rs: 0, re: 0, rz: -0.06, headY: 0, headX: 0, twist: 0 }
 
-      if (d.swimming) {
+      if (d.seated != null) {
+        // At the wheel: thighs along the seat, shins down to the pedals, leaning back; hands at ten to two, turning with it.
+        const st = d.seated
+        tgt.lt = tgt.rt = -1.42; tgt.lk = tgt.rk = 1.3; tgt.la = tgt.ra = 0.2
+        tgt.ls = -1.05 - 0.28 * st; tgt.rs = -1.05 + 0.28 * st; tgt.le = tgt.re = -0.62
+        tgt.lz = 0.18 - 0.1 * st; tgt.rz = -0.18 - 0.1 * st
+        tgt.headY = -0.22 * st; tgt.headX = 0.12
+        lean = -0.24
+      } else if (d.swimming) {
         // The crawl: lying along the water, arm over arm, legs fluttering, breathing to one side every other stroke.
         stroke += dt * (2.2 + d.speed * 18)
         pitch = 1.38; hipY = M(0.93)

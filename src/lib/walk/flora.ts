@@ -450,6 +450,16 @@ function grass(opts: { heightAt: (x: number, z: number) => number; meadow: (x: n
     /** Draw the chunks within reach of a point (the camera). */
     near(x: number, z: number) { for (const c of chunks) c.mesh.visible = Math.hypot(c.x - x, c.z - z) < reach.value + CH * 0.75 },
     count: () => chunks.reduce((t, c) => t + c.mesh.children.reduce((u, m) => u + (m as InstancedMesh).count, 0), 0),
+    /** Clear the tufts from a patch (where a car stands parked). */
+    clear(inside: (x: number, z: number) => boolean) {
+      const e = new Matrix4(), none = new Matrix4().makeScale(0, 0, 0)
+      for (const c of chunks) for (const m of c.mesh.children) {
+        const im = m as InstancedMesh
+        let hit = false
+        for (let i = 0; i < im.count; i++) { im.getMatrixAt(i, e); if (e.elements[0] !== 0 && inside(e.elements[12], e.elements[14])) { im.setMatrixAt(i, none); hit = true } }
+        if (hit) im.instanceMatrix.needsUpdate = true
+      }
+    },
     /** Every tuft's foot (for the checks). */
     feet: () => chunks.flatMap((c) => c.mesh.children.flatMap((m) => { const im = m as InstancedMesh, out: [number, number][] = [], e = new Matrix4(); for (let i = 0; i < im.count; i++) { im.getMatrixAt(i, e); out.push([e.elements[12], e.elements[14]]) } return out })),
   }
