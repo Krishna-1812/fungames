@@ -3154,7 +3154,22 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        3 m climb (3.6 m out of the water), swimming past chest depth. The
        camera sits closer and is drawn in rather than go behind a wall.
        Grass and splashes rescaled to match.
-    8. *Cars* — real shapes and lights, and getting in and driving one.
+    8. ~~*Cars*~~ **done** — the traffic's boxes are real cars now: a
+       hatchback, a saloon, an SUV and a bus at their real sizes (4.05,
+       4.68, 4.45 and 7.1 m), lofted from sill, beltline and roofline curves,
+       arches cut round the tyres; windscreens and side windows between
+       gloss-black pillars, glass that reflects the sky and shows the cabin
+       (seats, dashboard, wheel); clear-coated paint with panel gaps, handles
+       and a fuel flap; grille, intakes, mirrors, wipers, plates; alloys on
+       tyres with discs and callipers; headlights, tail, brake and reversing
+       lamps lit per car, headlight pools on the road after dark. The wheels
+       roll and the front ones steer; bodies dive, squat and lean. Traffic
+       stops for you and for the car you drive. Three cars of your own are
+       parked by the road: F (or a tap) to get in, drive with real physics
+       (power, brakes, drag, tyre grip and slides, collisions, a flooded
+       engine in deep water), a chase camera, a real headlight beam at
+       night, a dashboard; get out anywhere. Round things and fences are
+       solid now (the camera no longer slips behind pillars).
     9. *Life* — people on the pavements, gulls, fish, boats.
     10. *Weather* — clouds, rain, wet streets, wind.
     11. *Sound* — waves, wind, footsteps, traffic, birds, night.
