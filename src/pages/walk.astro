@@ -8,6 +8,9 @@
  * clock lets you pause it or go to any hour, and choose the weather (or let
  * it change by itself). It all sounds as it should (the sea, the wind and
  * the rain, your steps, the traffic, the birds); the speaker turns it off.
+ * To find your way: a map in the corner (M for the whole island, and a
+ * waypoint to any game), a compass, the district's name as you come into it;
+ * and a photo mode (P) to hold everything still and take a picture.
  */
 import Base from '../layouts/Base.astro'
 import { withBase } from '../lib/base'
@@ -18,7 +21,7 @@ import { withBase } from '../lib/base'
     <canvas class="wk-canvas" id="wk" aria-label="The island in 3D"></canvas>
     <div class="wk-top">
       <a class="wk-btn" href={withBase('/')}>← The map</a>
-      <span class="wk-right"><button class="wk-btn wk-icon" id="wkSound" type="button" aria-pressed="true" aria-label="Sound"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="wk-spk" d="M3 7.5h3l4-3.5v12l-4-3.5H3z"/><path class="wk-waves" d="M13 7a4 4 0 0 1 0 6M15.3 4.8a7 7 0 0 1 0 10.4"/><path class="wk-mute" d="M13 7.5l5 5M18 7.5l-5 5"/></svg></button> <button class="wk-btn" id="wkAir" type="button" aria-pressed="false">Aerial</button> <button class="wk-btn wk-clock" id="wkClock" type="button" aria-expanded="false" aria-controls="wkTime" aria-label="Time of day"><svg class="wk-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4"/></svg><svg class="wk-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.8A6.5 6.5 0 0 1 7.2 4.5a6.5 6.5 0 1 0 8.3 8.3z"/></svg><span id="wkClockText">16:30</span></button></span>
+      <span class="wk-right"><button class="wk-btn wk-icon" id="wkPhoto" type="button" aria-pressed="false" aria-label="Photo mode (P)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z"/><circle cx="10" cy="11" r="3.2"/></svg></button> <button class="wk-btn wk-icon" id="wkSound" type="button" aria-pressed="true" aria-label="Sound"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="wk-spk" d="M3 7.5h3l4-3.5v12l-4-3.5H3z"/><path class="wk-waves" d="M13 7a4 4 0 0 1 0 6M15.3 4.8a7 7 0 0 1 0 10.4"/><path class="wk-mute" d="M13 7.5l5 5M18 7.5l-5 5"/></svg></button> <button class="wk-btn" id="wkAir" type="button" aria-pressed="false">Aerial</button> <button class="wk-btn wk-clock" id="wkClock" type="button" aria-expanded="false" aria-controls="wkTime" aria-label="Time of day"><svg class="wk-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4"/></svg><svg class="wk-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.8A6.5 6.5 0 0 1 7.2 4.5a6.5 6.5 0 1 0 8.3 8.3z"/></svg><span id="wkClockText">16:30</span></button></span>
     </div>
     <div class="wk-time" id="wkTime" hidden>
       <label class="wk-time-label" for="wkHour">Time of day <output id="wkHourOut">16:30</output></label>
@@ -49,6 +52,25 @@ import { withBase } from '../lib/base'
       <button class="wk-chip wk-out" id="wkOut" type="button">Get out <kbd>F</kbd></button>
     </div>
     <div class="wk-stick" id="wkStick" aria-hidden="true"><i id="wkKnob"></i></div>
+    <div class="wk-photo" id="wkPhotoPanel" hidden>
+      <div class="wk-photo-row">
+        <label class="wk-time-label" for="wkExpo">Exposure <output id="wkExpoOut">0</output></label>
+        <input id="wkExpo" type="range" min="-1.5" max="1.5" step="0.1" value="0" />
+      </div>
+      <div class="wk-time-row" role="group" aria-label="Look">
+        <button class="wk-chip" type="button" data-look="natural" aria-pressed="true">Natural</button>
+        <button class="wk-chip" type="button" data-look="vivid" aria-pressed="false">Vivid</button>
+        <button class="wk-chip" type="button" data-look="golden" aria-pressed="false">Golden</button>
+        <button class="wk-chip" type="button" data-look="film" aria-pressed="false">Film</button>
+        <button class="wk-chip" type="button" data-look="mono" aria-pressed="false">Mono</button>
+        <button class="wk-chip" type="button" id="wkMe" aria-pressed="true">Me in it</button>
+      </div>
+      <p class="wk-photo-help">Drag to turn · scroll to go nearer · W A S D to move · R F up and down</p>
+      <div class="wk-time-row">
+        <button class="wk-chip wk-shoot" type="button" id="wkShoot">Take picture</button>
+        <button class="wk-chip" type="button" id="wkPhotoOut">Done <kbd>P</kbd></button>
+      </div>
+    </div>
     <p class="wk-load" id="wkLoad">Building the island…</p>
   </main>
 </Base>
@@ -86,7 +108,7 @@ import { withBase } from '../lib/base'
     stickEl.addEventListener('pointermove', move); stickEl.addEventListener('pointerup', up)
   })
 
-  Promise.all([fetch('world.json').then((r) => r.json() as Promise<WorldData>), import('../lib/walk/walker')]).then(([data, { startWalk }]) => {
+  Promise.all([fetch('world.json').then((r) => r.json() as Promise<WorldData>), import('../lib/walk/walker'), import('../lib/walk/map')]).then(([data, { startWalk }, { wayfinding }]) => {
     const walk = startWalk(canvas, data, {
       onNear(g) {
         nearGame = !!g
@@ -121,6 +143,37 @@ import { withBase } from '../lib/base'
     const showSound = () => { soundBtn.setAttribute('aria-pressed', String(soundOn)); soundBtn.setAttribute('aria-label', soundOn ? 'Sound on' : 'Sound off'); walk.setSound(soundOn) }
     showSound()
     soundBtn.addEventListener('click', () => { soundOn = !soundOn; try { localStorage.setItem('walk-sound', soundOn ? 'on' : 'off') } catch {} showSound() })
+    // Finding your way: the map in the corner (and the whole island), the compass, the district's name.
+    const main = document.getElementById('main')!
+    const ways = wayfinding(main, data, walk, { phone: matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600 })
+    // Photo mode: everything held still, the camera free; a look, the exposure, you in the picture or not; a picture to keep.
+    const photoBtn = document.getElementById('wkPhoto') as HTMLButtonElement, photoPanel = document.getElementById('wkPhotoPanel')!
+    const expo = document.getElementById('wkExpo') as HTMLInputElement, expoOut = document.getElementById('wkExpoOut')!, meBtn = document.getElementById('wkMe') as HTMLButtonElement
+    const LOOKS: Record<string, { sat?: number; warm?: number; film?: number; vignette?: number; grain?: number }> = {
+      natural: {}, vivid: { sat: 1.3, vignette: 0.2 }, golden: { warm: 1, sat: 1.08, vignette: 0.3 }, film: { film: 0.8, sat: 0.86, grain: 0.05, vignette: 0.42 }, mono: { sat: 0, film: 0.35, grain: 0.045, vignette: 0.38 },
+    }
+    let look = 'natural', photoOn = false
+    const lookBtns = [...photoPanel.querySelectorAll<HTMLButtonElement>('[data-look]')]
+    const applyLook = () => { walk.photoLook({ ...LOOKS[look], expo: Math.pow(2, +expo.value) }); expo.style.setProperty('--at', ((+expo.value + 1.5) / 3) * 100 + '%'); expoOut.textContent = (+expo.value > 0 ? '+' : '') + (+expo.value).toFixed(1) }
+    const setPhoto = (on: boolean) => {
+      photoOn = on; walk.setPhoto(on); main.classList.toggle('wk-photo-on', on); photoPanel.hidden = !on; ways.show(!on)
+      photoBtn.setAttribute('aria-pressed', String(on))
+      if (on) applyLook()
+      else { look = 'natural'; expo.value = '0'; for (const b of lookBtns) b.setAttribute('aria-pressed', String(b.dataset.look === 'natural')); meBtn.setAttribute('aria-pressed', 'true') }
+    }
+    photoBtn.addEventListener('click', () => setPhoto(!photoOn))
+    document.getElementById('wkPhotoOut')!.addEventListener('click', () => setPhoto(false))
+    expo.addEventListener('input', applyLook)
+    for (const b of lookBtns) b.addEventListener('click', () => { look = b.dataset.look!; for (const x of lookBtns) x.setAttribute('aria-pressed', String(x === b)); applyLook() })
+    meBtn.addEventListener('click', () => { const on = meBtn.getAttribute('aria-pressed') !== 'true'; meBtn.setAttribute('aria-pressed', String(on)); walk.showMe(on) })
+    document.getElementById('wkShoot')!.addEventListener('click', async () => {
+      main.classList.add('wk-flash'); setTimeout(() => main.classList.remove('wk-flash'), 220)
+      const blob = await walk.snap()
+      if (!blob) return
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tiny-island-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png'
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+    })
+    addEventListener('keydown', (e) => { if (!(e.target as HTMLElement)?.closest?.('input, textarea') && e.code === 'KeyP') setPhoto(!photoOn) })
     const air = document.getElementById('wkAir') as HTMLButtonElement
     air.addEventListener('click', () => { const on = air.getAttribute('aria-pressed') !== 'true'; air.setAttribute('aria-pressed', String(on)); air.textContent = on ? 'On foot' : 'Aerial'; walk.setAerial(on) })
     if (new URLSearchParams(location.search).has('aerial')) air.click()
@@ -191,20 +244,29 @@ import { withBase } from '../lib/base'
   .wk-time-label { display: flex; justify-content: space-between; font-weight: 600; }
   .wk-time-label output { font-variant-numeric: tabular-nums; }
   /* The slider drawn by hand (left to the browser it takes the system's accent colour). */
-  .wk-time input {
+  .wk-time input, .wk-photo input {
     -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 6px 0 8px; background: transparent; cursor: pointer;
     --at: 50%;
   }
-  .wk-time input::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, #2f6df6 var(--at), #d6def0 var(--at)); }
-  .wk-time input::-moz-range-track { height: 6px; border-radius: 999px; background: #d6def0; }
-  .wk-time input::-moz-range-progress { height: 6px; border-radius: 999px; background: #2f6df6; }
-  .wk-time input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: #fff; border: 3px solid #2f6df6; box-shadow: 0 2px 6px rgb(15 23 48 / 0.3); }
-  .wk-time input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid #2f6df6; }
-  .wk-time input:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; border-radius: 8px; }
+  .wk-time input::-webkit-slider-runnable-track, .wk-photo input::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, #2f6df6 var(--at), #d6def0 var(--at)); }
+  .wk-time input::-moz-range-track, .wk-photo input::-moz-range-track { height: 6px; border-radius: 999px; background: #d6def0; }
+  .wk-time input::-moz-range-progress, .wk-photo input::-moz-range-progress { height: 6px; border-radius: 999px; background: #2f6df6; }
+  .wk-time input::-webkit-slider-thumb, .wk-photo input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: #fff; border: 3px solid #2f6df6; box-shadow: 0 2px 6px rgb(15 23 48 / 0.3); }
+  .wk-time input::-moz-range-thumb, .wk-photo input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid #2f6df6; }
+  .wk-time input:focus-visible, .wk-photo input:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; border-radius: 8px; }
   .wk-time-row { display: flex; flex-wrap: wrap; gap: 5px; }
   .wk-chip { border: 0; border-radius: 999px; padding: 7px 10px; background: #e8eefb; color: #0f1730; font: 600 12px/1 var(--font-ui, system-ui, sans-serif); cursor: pointer; }
   .wk-chip:hover { background: #d8e3fa; }
   .wk-chip[aria-pressed='true'] { background: #2f6df6; color: #fff; }
+  .wk-photo { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); background: rgb(255 255 255 / 0.94); border-radius: 18px; padding: 12px 14px; display: grid; gap: 8px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.3); color: #0f1730; font: 500 13px/1.3 var(--font-ui, system-ui, sans-serif); z-index: 4; }
+  .wk-photo[hidden] { display: none; }
+  .wk-photo-row { display: grid; gap: 4px; }
+  .wk-photo-help { margin: 0; color: #4a5672; font-size: 12px; }
+  .wk-shoot { background: #2f6df6; color: #fff; }
+  .wk-shoot:hover { background: #2559d1; }
+  .wk-photo-on .wk-top a, .wk-photo-on #wkAir, .wk-photo-on #wkClock, .wk-photo-on #wkSound, .wk-photo-on .wk-help, .wk-photo-on .wk-near, .wk-photo-on .wk-dash, .wk-photo-on .wk-stick, .wk-photo-on .wk-time { visibility: hidden; }
+  .wk-flash::after { content: ''; position: absolute; inset: 0; background: #fff; opacity: 0.6; pointer-events: none; animation: wk-flash 0.22s ease-out forwards; }
+  @keyframes wk-flash { to { opacity: 0; } }
   .wk-icon { padding: 8px 11px; display: inline-flex; align-items: center; vertical-align: top; }
   .wk-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .wk-icon .wk-spk { fill: currentColor; }

@@ -42,7 +42,7 @@ export function lightAt(t: number, offset: number, axis: 'ns' | 'ew'): Light {
 /** What a district's streets are called, by the way they run. */
 const NAMES: Record<string, [string, string]> = {
   oldtown: ['Castle Street', 'Chapel Lane'], market: ['Market Street', 'Corn Row'], harbour: ['Quay Road', 'Anchor Lane'], funfair: ['Pier Parade', 'Carousel Walk'],
-  beach: ['Shore Road', 'Dune Lane'], hills: ['Hill Road', 'Ridge Way'], farm: ['Mill Lane', 'Barn Road'], forest: ['Pine Walk', 'Fern Lane'], peaks: ['Summit Road', 'Scree Lane'],
+  peaks: ['Summit Road', 'Scree Lane'], badlands: ['Mesa Road', 'Canyon Lane'], proving: ['Gauge Road', 'Test Track Lane'],
 }
 const nameFor = (district: string, ew: boolean) => {
   const n = NAMES[district] ?? [district.replace(/(^|-)(\w)/g, (_, a, b) => (a ? ' ' : '') + b.toUpperCase()) + ' Street', district.replace(/(^|-)(\w)/g, (_, a, b) => (a ? ' ' : '') + b.toUpperCase()) + ' Lane']
