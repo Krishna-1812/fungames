@@ -16,13 +16,14 @@
  * tone, hair (short, long, none; dark, fair, grey), a T-shirt or a long-
  * sleeved top or a dress, jeans or trousers or shorts or a skirt, trainers
  * or shoes, some with a bag over the shoulder or a backpack; walking at their
- * own pace (a few jog). They are jointed as you are (body.ts) and walk as you
+ * own pace (a few jog); when it rains, fewer are out, and most of those who
+ * are put up an umbrella, held over their heads. They are jointed as you are (body.ts) and walk as you
  * do — a stride from their speed, arms against legs, hips rising and falling
  * — and drawn together: one draw for each part of a body (the heads, the
  * torsos, the shins) for everyone on the island.
  */
 import {
-  CapsuleGeometry, Color, CylinderGeometry, Euler, Group, InstancedMesh, LatheGeometry, Matrix4, MeshStandardMaterial, Quaternion, SphereGeometry,
+  CapsuleGeometry, Color, CylinderGeometry, DoubleSide, Euler, Group, InstancedMesh, LatheGeometry, Matrix4, MeshStandardMaterial, Quaternion, SphereGeometry,
   Vector2, Vector3, type BufferGeometry, type Scene,
 } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
@@ -47,11 +48,12 @@ const HAIR = ['#17120f', '#2a1d16', '#3b2a20', '#56392a', '#7b5b3e', '#b89466', 
 const TOPS = ['#f2f4f7', '#1f2a44', '#3a6ea5', '#4f8f8a', '#8fb3cf', '#2d2f33', '#7a7f87', '#6c4f7c', '#8e2a38', '#3f6b4f', '#c7cdd6', '#5f86b6', '#dfe7ee', '#24464f', '#a7b9c9', '#e9e4dc']
 const LEGS = ['#2f3d5c', '#3a4a6a', '#1d1f24', '#55595f', '#a99c80', '#232c42', '#6e7b8a', '#46505e', '#d9d6cf']
 const FEET = ['#f2f4f8', '#1c1d20', '#4a3426', '#7d8590', '#e4e6ea', '#2a3346']
+const BROLLIES = ['#1d1f24', '#25324f', '#3a6ea5', '#7a7f87', '#8e2a38', '#2f5f55', '#e9e4dc', '#4f8f8a']
 const BAGS = ['#3a2a20', '#1d1f24', '#2b3a55', '#6b4a33', '#5a6470', '#26464f']
 
 type Look = {
   tall: number; broad: number; hips: number
-  skin: Color; hair: Color; top: Color; legs: Color; feet: Color; bag: Color
+  skin: Color; hair: Color; top: Color; legs: Color; feet: Color; bag: Color; brolly: Color | null
   /** Hair: 0 none, 1 short, 2 long. Top: 0 T-shirt, 1 long sleeves, 2 dress. Legs: 0 long, 1 shorts, 2 skirt. Carrying: 0 nothing, 1 a bag, 2 a backpack. */
   hairStyle: number; topStyle: number; legStyle: number; carry: number
   pace: number; jog: boolean
@@ -69,7 +71,7 @@ function someone(rnd: () => number, n: number): Look {
     tall: (slight ? 1.6 + rnd() * 0.17 : 1.7 + rnd() * 0.2) / 1.75 * (n % 17 === 3 ? 0.84 : 1),
     broad: (slight ? 0.88 : 1) * (0.92 + rnd() * 0.2), hips: slight ? 1.08 : 0.96,
     skin: c(pick(SKIN)), hair: c(grey ? pick(HAIR.slice(7)) : pick(HAIR.slice(0, 7))), top: c(pick(TOPS)), legs: c(legStyle === 1 && rnd() < 0.5 ? pick(['#a99c80', '#3a4a6a', '#5a6470', '#d9d6cf']) : pick(LEGS)),
-    feet: c(pick(FEET)), bag: c(pick(BAGS)),
+    feet: c(pick(FEET)), bag: c(pick(BAGS)), brolly: !jog && rnd() < 0.7 ? c(pick(BROLLIES)) : null,
     hairStyle: !slight && rnd() < 0.12 ? 0 : slight && rnd() < 0.7 ? 2 : 1,
     topStyle, legStyle, carry: jog ? 0 : rnd() < 0.22 ? 1 : rnd() < 0.18 ? 2 : 0,
     pace: jog ? 2.9 : (1.05 + rnd() * 0.5) * (grey ? 0.82 : 1), jog,
@@ -113,7 +115,20 @@ function bodyParts() {
     .add(new RoundedBoxGeometry(0.29, 0.38, 0.15, 1, 0.05), place(0, 0.26, -0.17))
     .add(new RoundedBoxGeometry(0.2, 0.12, 0.05, 1, 0.02), place(0, 0.16, -0.25), new Color(0.82, 0.82, 0.82))
     .geometry(1)
-  // The materials: 0 skin, 1 cloth, 2 hair, 3 shoes, 4 bags.
+  // An umbrella, held up in the right hand: the shaft from the hand, the canopy of eight gores on its ribs, the tip.
+  // (Built along +y from the hand, then turned to stand upright for the arm's pose when holding it: fore-arm raised 1.9 radians.)
+  const brolly = (() => {
+    // (Leaning in, so the canopy is over the head, not the hand.)
+    const b = new Bag(), up = place(0, -0.26, 0.01, 1.9, 0, -0.34)
+    const dark = new Color(0.12, 0.12, 0.13)
+    const part = (g: BufferGeometry, m: Matrix4, c?: Color) => b.add(g, up.clone().multiply(m), c)
+    part(new CylinderGeometry(0.007, 0.007, 0.84, 5), place(0, 0.32, 0), dark)
+    part(new CylinderGeometry(0.016, 0.014, 0.1, 6), place(0, -0.06, 0), dark)
+    part(new LatheGeometry([[0.0, 0.17], [0.16, 0.15], [0.32, 0.1], [0.46, 0.02], [0.5, -0.02]].map(([r, y]) => new Vector2(r, y)), 8), place(0, 0.62, 0))
+    part(new CylinderGeometry(0.004, 0.006, 0.07, 4), place(0, 0.82, 0), dark)
+    return b.geometry(1)
+  })()
+  // The materials: 0 skin, 1 cloth, 2 hair, 3 shoes, 4 bags, 5 an umbrella's canopy (seen from under it too).
   const parts: Record<string, Part> = {
     pelvis: { geo: cap(0.15, 0.08, 0.03, 1.1, 0.78), joint: J.hips, mat: 1, shadow: true },
     torso: { geo: torso, joint: J.torso, mat: 1, shadow: true },
@@ -132,6 +147,7 @@ function bodyParts() {
     skirt: { geo: skirt, joint: J.hips, mat: 1, shadow: true },
     bag: { geo: bag, joint: J.torso, mat: 4, shadow: false },
     pack: { geo: pack, joint: J.torso, mat: 4, shadow: false },
+    brolly: { geo: brolly, joint: J.el + 1, mat: 5, shadow: true },
   }
   return parts
 }
@@ -149,6 +165,8 @@ type Person = {
   v: number; phase: number; breathe: number; stuck: number
   /** What they are doing: walking, standing a while (looking at a phone, or not), waiting to cross, talking. */
   mode: 'walk' | 'pause' | 'wait' | 'talk'; timer: number; phone: boolean; gesture: number
+  /** Holding an umbrella up (it is raining, and they have one). */
+  brolly: boolean
   shown: boolean; out: boolean
   /** Their joints' angles now (eased towards what they are doing). */
   a: Float32Array
@@ -228,8 +246,16 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
     const cx = p.tj + 0.5, cz = p.ti + 0.5, s = p.side, a = p.din, b = p.dout
     const la = lineAt(p.ti, p.tj, sideOf(s, a)) ?? 0.3, lb = lineAt(p.ti, p.tj, sideOf(s, b)) ?? 0.3
     if (a === b) return [cx + s * la * rx(a), cz + s * la * rz(a)]
-    if (b === BACK[a]) return [cx + s * la * rx(a) + DX[a] * 0.28, cz + s * la * rz(a) + DZ[a] * 0.28]
-    return [cx + s * (la * rx(a) + lb * rx(b)), cz + s * (la * rz(a) + lb * rz(b))]
+    if (b === BACK[a]) {
+      // (Round the end of a dead end: as far along as is clear of anything built there.)
+      let reach = 0.28
+      while (reach > 0.02 && blocked(cx + s * la * rx(a) + DX[a] * reach, cz + s * la * rz(a) + DZ[a] * reach, o.heightAt(cx, cz))) reach -= 0.04
+      return [cx + s * la * rx(a) + DX[a] * reach, cz + s * la * rz(a) + DZ[a] * reach]
+    }
+    // (A corner with something built into it: taken a little nearer the kerb.)
+    let x = cx + s * (la * rx(a) + lb * rx(b)), z = cz + s * (la * rz(a) + lb * rz(b))
+    for (let k = 0; k < 6 && blocked(x, z, o.heightAt(cx, cz)); k++) { x += (cx - x) * 0.12; z += (cz - z) * 0.12 }
+    return [x, z]
   }
   /** On to the next tile: its turning point becomes the one walked to. */
   const advance = (p: Person) => {
@@ -245,13 +271,14 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
   const tiles = o.roads.filter(([i, j]) => links(i, j).length > 0)
   for (let n = 0, tries = 0; n < N && tiles.length && tries < 2000; tries++) {
     const [i, j] = tiles[Math.floor(rnd() * tiles.length)]
-    const ways = links(i, j), din = ways[Math.floor(rnd() * ways.length)], side = rnd() < 0.5 ? 1 : -1
+    // (Come from a street: the tile behind them is road too.)
+    const ways = links(i, j).map((d) => BACK[d]), din = ways[Math.floor(rnd() * ways.length)], side = rnd() < 0.5 ? 1 : -1
     // (Somewhere there is room to walk.)
     if (lineAt(i, j, sideOf(side, din)) === null || lineAt(i - DZ[din], j - DX[din], sideOf(side, din)) === null) continue
     const p: Person = {
       look: someone(rnd, n++), ti: i, tj: j, din, dout: din, side,
       ax: 0, az: 0, bx: 0, bz: 0, x: 0, z: 0, lat: 0, latT: (rnd() - 0.5) * 0.03, px: 0, pz: 0, py: 0, yaw: 0,
-      v: 0, phase: rnd() * 6.28, breathe: rnd() * 10, stuck: 0, mode: 'walk', timer: 0, phone: false, gesture: rnd() * 6, shown: true, out: true, a: new Float32Array(20),
+      v: 0, phase: rnd() * 6.28, breathe: rnd() * 10, stuck: 0, mode: 'walk', timer: 0, phone: false, gesture: rnd() * 6, shown: true, out: true, brolly: false, a: new Float32Array(20),
     }
     p.dout = onward(i, j, din, side)
     ;[p.ax, p.az] = corner(p)
@@ -259,6 +286,7 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
     p.bx = p.ax - DX[din] * 0.7; p.bz = p.az - DZ[din] * 0.7
     const f = rnd(); p.x = p.bx + (p.ax - p.bx) * f; p.z = p.bz + (p.az - p.bz) * f
     p.px = p.x; p.pz = p.z; p.py = o.heightAt(p.x, p.z)
+    if (blocked(p.x, p.z, p.py)) { n--; continue }
     p.yaw = Math.atan2(DX[din], DZ[din])
     people.push(p)
   }
@@ -281,7 +309,7 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
       people.push({
         look, ti: Math.floor(z), tj: Math.floor(x), din: 0, dout: 0, side: 1, ax: px, az: pz, bx: px, bz: pz, x: px, z: pz, lat: 0, latT: 0,
         px, pz, py: o.heightAt(px, pz), yaw: turn + (s > 0 ? Math.PI : 0), v: 0, phase: 0, breathe: rnd() * 10, stuck: 0, mode: 'talk', timer: 0, phone: false, gesture: rnd() * 6,
-        shown: true, out: true, a: new Float32Array(20),
+        shown: true, out: true, brolly: false, a: new Float32Array(20),
       })
     }
   }
@@ -294,6 +322,7 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
     new MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }),
     new MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }),
     new MeshStandardMaterial({ vertexColors: true, roughness: 0.62 }),
+    new MeshStandardMaterial({ vertexColors: true, roughness: 0.45, side: DoubleSide }),
   ]
   const group = new Group(); group.name = 'folk'
   const meshes: Record<string, InstancedMesh> = {}
@@ -353,6 +382,8 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
         tgt[4] = 0.05 * Math.sin(p.breathe * 2.3); tgt[3] = 0.2 * Math.sin(p.breathe * 0.31 + p.gesture)
       } else if (p.mode === 'wait') { tgt[3] = 0.7 * Math.sin(p.breathe * 1.1) }
     }
+    // An umbrella up: the right arm raised and still, holding it over the head.
+    if (p.brolly) { tgt[14] = -0.55; tgt[15] = -1.35; tgt[16] = -0.12; tgt[2] *= 0.4 }
     const k = Math.min(1, dt * 10)
     for (let n = 0; n < 17; n++) a[n] += (tgt[n] - a[n]) * (n === 3 ? Math.min(1, dt * 3) : k)
   }
@@ -383,6 +414,8 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
     }
     if (Lk.legStyle === 2) put('skirt', J.hips, Lk.topStyle === 2 ? top : legs)
     if (Lk.carry === 1) put('bag', J.torso, Lk.bag); else if (Lk.carry === 2) put('pack', J.torso, Lk.bag)
+    // (Only once the arm is up.)
+    if (p.brolly && Lk.brolly && a[15] < -1.2) put('brolly', J.el + 1, Lk.brolly)
   }
 
   /** People out in the road (crossing it), for the traffic to wait for. */
@@ -394,11 +427,13 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
     /** How many are about. */
     get count() { return people.filter((p) => p.out).length },
     /** Each frame: everyone walks on, and is drawn if near enough to see. */
-    update(dt: number, c: { cam: Vector3; you: { x: number; z: number; y: number } | null; cars: CarNear[]; day: number }) {
+    update(dt: number, c: { cam: Vector3; you: { x: number; z: number; y: number } | null; cars: CarNear[]; day: number; rain?: number }) {
       if (dt <= 0) return
       crossing.length = 0
       // Fewer out at night: those past the count go home (out of sight), and come back out in the morning.
-      const wanted = Math.round(people.length * (0.3 + 0.7 * Math.min(1, c.day * 1.4)))
+      // (And fewer in the rain.)
+      const rain = c.rain ?? 0
+      const wanted = Math.round(people.length * (0.3 + 0.7 * Math.min(1, c.day * 1.4)) * (1 - 0.45 * rain))
       for (const k in counts) counts[k] = 0
       thin = (thin + 1) % 8
       people.forEach((p, n) => {
@@ -406,6 +441,7 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
         if (n % 8 === thin && camD > 5) p.out = p.mode === 'talk' ? c.day > 0.25 : n < wanted
         if (!p.out) return
         const Lk = p.look
+        p.brolly = !!Lk.brolly && rain > 0.15
         if (p.mode !== 'talk') {
           // Along the path: towards the turning point, then on round it.
           let dx = p.ax - p.bx, dz = p.az - p.bz
@@ -453,7 +489,7 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
           if (p.mode === 'wait') { want = 0; if ((p.timer -= dt) <= 0) p.mode = 'walk' }
           if (!onFoot(p.px, p.pz)) crossing.push({ i: p.pz, j: p.px, r: 0.04, w: 0.04 })
           // Now and then, a stop: a look at the phone, or just a moment.
-          if (p.mode === 'walk' && !Lk.jog && !road && rnd() < dt * 0.012) { p.mode = 'pause'; p.timer = 3 + rnd() * 7; p.phone = rnd() < 0.65 }
+          if (p.mode === 'walk' && !Lk.jog && !road && rnd() < dt * 0.012) { p.mode = 'pause'; p.timer = 3 + rnd() * 7; p.phone = !p.brolly && rnd() < 0.65 }
           if (p.mode === 'pause') { want = 0; if ((p.timer -= dt) <= 0) { p.mode = 'walk'; p.phone = false } }
           // The pace: picking up and slowing as people do.
           p.v += Math.max(-0.5 * METRE * dt * 4, Math.min(0.9 * METRE * dt * 2, want - p.v))
@@ -477,6 +513,8 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
             p.yaw += dy * Math.min(1, dt * 6)
           }
           p.py = o.heightAt(p.px, p.pz)
+          // (Somehow inside something after all — eased round a corner into it: straight back onto the path.)
+          if (blocked(p.px, p.pz, p.py) && !blocked(p.x, p.z, p.py)) { p.px = p.x; p.pz = p.z; p.lat = p.latT = 0 }
         }
         // Out of the way of a car that comes at them (yours, on the pavement).
         for (const k2 of c.cars) {
