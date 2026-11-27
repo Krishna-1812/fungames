@@ -33,7 +33,13 @@
  *
  * And to find your way (the page draws the map, the compass, the district you
  * are in): a waypoint, marked in the world by a column of light; and a photo
- * mode, everything held still while the camera goes where you like. Keyboard and mouse, or a thumb on a phone.
+ * mode, everything held still while the camera goes where you like. Keyboard and mouse, or a thumb on a phone
+ * (two fingers to go nearer or further).
+ *
+ * On every device (tiers.ts): a quality level (Low, Medium, High, Ultra), or Auto, which picks one for the device and
+ * steps down if the frames come too slowly; and less motion, asked for by the device or chosen (the sea flat, the trees
+ * barely stirring, no lightning, the waypoint's light steady). Everything near you is looked up by the tile it stands on
+ * (grid.ts), not looked for through all of it, which is most of what a phone's processor had to do.
  */
 import {
   AdditiveBlending, CylinderGeometry, DoubleSide, Mesh, MeshBasicMaterial, RingGeometry, ShaderMaterial,
@@ -58,6 +64,8 @@ import { wetness } from './wet'
 import { soundscape, type Surface } from './sound'
 import { toys } from './props'
 import { street } from './street'
+import { autoStep, guessTier, pixelsFor, TIER_ORDER, TIERS, type Tier } from './tiers'
+import { boxGrid } from './grid'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -84,6 +92,10 @@ export type Walk = { dispose(): void
   /** Photo mode: everything held still, the camera free (drag to turn, scroll to go nearer, W A S D and R F to move it); its look; you in the picture or not; the picture. */
   setPhoto(on: boolean): void; photoLook(o: { expo?: number; sat?: number; warm?: number; film?: number; vignette?: number; grain?: number }): void; showMe(on: boolean): void
   snap(): Promise<Blob | null>
+  /** The quality: a level, or 'auto'; and less motion (or not). */
+  setQuality(q: 'auto' | Tier): void; setMotion(still: boolean): void
+  /** How it is running: frames a second, the processor's milliseconds a frame, the level (and what was chosen), the pixels to a point, draw calls. */
+  perf(): { fps: number; cpu: number; tier: Tier; choice: 'auto' | Tier; sharp: number; pixels: number; calls: number; triangles: number; still: boolean; shadow: number; ao: string; bloom: boolean; grass: number }
   scene: Scene }
 
 /** What the page shows about cars: one to get into near you, the one you drive (its speed in km/h, and its gear). */
@@ -107,30 +119,40 @@ const TRAFFIC: ModelName[] = ['hatch', 'saloon', 'suv']
 const PAINTS = ['#8e1622', '#e8ebee', '#1c5c66', '#9ea6b0', '#1b2b4c', '#26292e', '#c9cdd3', '#36624c', '#5d6f86']
 const YOURS: { model: ModelName; paint: string }[] = [{ model: 'saloon', paint: '#1f3f94' }, { model: 'hatch', paint: '#a3121f' }, { model: 'suv', paint: '#eef0f2' }]
 
-export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNear(g: { title: string } | null): void; move?: () => [number, number]; onCar?(c: CarInfo): void }): Walk {
+export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNear(g: { title: string } | null): void; move?: () => [number, number]; onCar?(c: CarInfo): void; quality?: 'auto' | Tier; still?: boolean }): Walk {
   const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
   renderer.outputColorSpace = SRGBColorSpace
   renderer.toneMapping = ACESFilmicToneMapping
   renderer.toneMappingExposure = 0.55
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = PCFShadowMap // (soft-edged by the light's shadow.radius)
-  // A phone (or a small screen) draws a lighter picture: no occlusion pass, a smaller shadow map.
+  // (Draw calls and triangles counted over the whole frame, every pass, not just the last.)
+  renderer.info.autoReset = false
+  const Q = new URLSearchParams(location.search)
   const phone = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  // Less motion: as the device asks, unless chosen on the page.
+  let still = ui.still ?? matchMedia('(prefers-reduced-motion: reduce)').matches
+  // The quality level (tiers.ts): chosen, or Auto — its guess for this device, or lower if it came down to that last time.
+  const guess = guessTier({ phone, cores: navigator.hardwareConcurrency || 4, memory: (navigator as { deviceMemory?: number }).deviceMemory ?? null, pixels: devicePixelRatio, width: innerWidth, height: innerHeight })
+  const asked = Q.get('q')
+  let choice: 'auto' | Tier = asked && asked in TIERS ? (asked as Tier) : (ui.quality ?? 'auto')
+  const remembered = (): Tier | null => { try { const r = localStorage.getItem('walk-auto-tier'); return r && r in TIERS ? (r as Tier) : null } catch { return null } }
+  const autoStart = () => { const r = remembered(); return r && TIER_ORDER.indexOf(r) < TIER_ORDER.indexOf(guess) ? r : guess }
+  let tier: Tier = choice === 'auto' ? autoStart() : choice
+  let auto = { slow: 0, easy: 0, triedUp: false }
   let post: ReturnType<typeof lens> | null = null
   renderer.debug.checkShaderErrors = false
 
   const scene = new Scene()
-  const world = buildWorld(data, { phone: matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600 })
+  const world = buildWorld(data, { phone })
   scene.add(world.root)
   // Asked for less motion: the sea lies flat (no swell rocking you, or the camera, as you swim).
   // (And the wind barely stirs the trees and the grass.)
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { world.swell.value = 0; world.flora.wind.value = 0.25 }
+  if (still) { world.swell.value = 0; world.flora.wind.value = 0.25 }
 
   /* ---- the day: sun, moon, stars, sky and air (daylight.ts) ---- */
   // Shadows soft-edged, cast across the thirteen tiles round you (more than you can make out the shadows past).
-  const Q = new URLSearchParams(location.search)
-  const SHADOW = Number(Q.get('shadow')) || (phone ? 2048 : 4096), REACH = 13
+  const SHADOW = Number(Q.get('shadow')) || TIERS[tier].shadow, REACH = 13
   const dl = daylight(scene, renderer, { shadowSize: SHADOW, reach: REACH, soft: Q.has('soft') ? Number(Q.get('soft')) : undefined })
   const sun = dl.light, sunDir = dl.state.lightDir
   // The weather (weather.ts): clouds and their shadows, rain, wet, wind; ?w=rain to start in it.
@@ -167,6 +189,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
 
   /* ---- where you can stand ---- */
   const seaY = Y(data.sea)
+  /** The boxes by the tile they stand on (grid.ts; made once the street's furniture is in). */
+  let solid: ReturnType<typeof boxGrid> | null = null
+  const boxesAt = (x: number, z: number) => solid ? solid.at(x, z) : world.boxes
   /** A parked car at a point (or within pad of it): its footprint and the height of its roof. */
   let own: Vehicle[] = []
   let driving: number | null = null
@@ -181,7 +206,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   /** The ground's height at a world point: the tile's top, or the top of something built low enough to stand on (a car's roof, too). */
   const groundAt = (x: number, z: number, from: number, reach = STEP) => {
     let g = world.heightAt(x, z)
-    for (const b of world.boxes) if (x > b.j0 && x < b.j1 && z > b.i0 && z < b.i1 && b.z1 <= from + reach && b.z1 > g) g = b.z1
+    for (const b of boxesAt(x, z)) if (x > b.j0 && x < b.j1 && z > b.i0 && z < b.i1 && b.z1 <= from + reach && b.z1 > g) g = b.z1
     const car = carAt(x, z, 0)
     if (car && car.top <= from + reach && car.top > g) g = car.top
     return g
@@ -191,7 +216,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // A terrace wall or a cliff too tall.
     for (const [dx, dz] of [[RADIUS, 0], [-RADIUS, 0], [0, RADIUS], [0, -RADIUS]]) if (world.heightAt(x + dx, z + dz) > y + reach) return true
     // A wall: any box you would be inside that rises above what you can get up.
-    for (const b of world.boxes) if (b.z1 > y + reach && b.z0 < y + TALL && x > b.j0 - RADIUS && x < b.j1 + RADIUS && z > b.i0 - RADIUS && z < b.i1 + RADIUS) return true
+    for (const b of boxesAt(x, z)) if (b.z1 > y + reach && b.z0 < y + TALL && x > b.j0 - RADIUS && x < b.j1 + RADIUS && z > b.i0 - RADIUS && z < b.i1 + RADIUS) return true
     // A parked car.
     const car = carAt(x, z, RADIUS)
     if (car && car.top > y + reach) return true
@@ -234,6 +259,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
 
   /* ---- the street's furniture (street.ts): before anything that has to go round it ---- */
   const furniture = street(scene, { roads: data.road, kind: world.kind, heightAt: world.heightAt, boxes: world.boxes, district: data.district })
+  solid = boxGrid(world.boxes)
 
   /* ---- the traffic, and cars of your own ---- */
   /** Where the traffic must stop: the car you drive, and you if you are on foot in the road. */
@@ -304,7 +330,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   /* ---- the island's people, on its pavements (folk.ts) ---- */
   // (?nolife: none of them; ?off=people,boats,fish,gulls: some — to measure what each costs.)
   const off = new Set(Q.has('nolife') ? ['people', 'boats', 'fish', 'gulls'] : (Q.get('off') ?? '').split(','))
-  const people = folk(scene, { roads: data.road, heightAt: world.heightAt, boxes: world.boxes, count: phone ? 26 : 40, seats: furniture.benches, mayCross: furniture.mayCross })
+  const people = folk(scene, { roads: data.road, heightAt: world.heightAt, boxes: world.boxes, count: 40, seats: furniture.benches, mayCross: furniture.mayCross })
   const nearCars: CarNear[] = []
   let lifeMs = 0
   // The gulls: circling over the harbour, the west bay and off the north shore, and standing about by the sea (birds.ts).
@@ -343,7 +369,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // (Up on something built: a pier's planks over the water or the sand, stone or a step anywhere else.)
     if (y > world.heightAt(x, z) + 0.01) return k === '0' || k === 'b' ? 'wood' : 'hard'
     if (k === 'b') return 'sand'
-    const hard = roadSet.has(i * 1000 + j) || world.boxes.some((b) => x > b.j0 - 0.3 && x < b.j1 + 0.3 && z > b.i0 - 0.3 && z < b.i1 + 0.3 && b.z1 - b.z0 > 0.2 && b.j1 - b.j0 > 0.3)
+    const hard = roadSet.has(i * 1000 + j) || boxesAt(x, z).some((b) => x > b.j0 - 0.3 && x < b.j1 + 0.3 && z > b.i0 - 0.3 && z < b.i1 + 0.3 && b.z1 - b.z0 > 0.2 && b.j1 - b.j0 > 0.3)
     return hard ? (wetness.wet.value > 0.45 && Math.random() < 0.35 ? 'puddle' : 'hard') : 'grass'
   }
   const startSound = () => ears.start()
@@ -351,18 +377,33 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
 
   /* ---- the camera ---- */
   const camera = new PerspectiveCamera(55, 1, 0.012, 500)
-  /** The picture's sharpness: the screen's own pixels (up to two to a point), less if the machine needs it. */
+  /** The picture's sharpness: the level's pixels to a point (tiers.ts), less if Auto at Low still needs it. */
   let sharp = 1
   const fit = () => {
     const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight
-    const pr = Math.max(0.75, Math.min(devicePixelRatio, 2) * sharp)
+    const pr = Number(Q.get('pr')) || pixelsFor(tier, devicePixelRatio, sharp)
     renderer.setPixelRatio(pr); renderer.setSize(w, h, false)
     post?.setSize(w, h, pr)
     camera.aspect = w / h; camera.updateProjectionMatrix()
   }
-  post = lens(renderer, scene, camera, { phone, still, ao: !Q.has('noao'), samples: Q.has('msaa') ? Number(Q.get('msaa')) : undefined, bloom: !Q.has('nobloom') })
+  post = lens(renderer, scene, camera, { phone, still, ao: Q.has('noao') ? 'off' : TIERS[tier].ao, samples: Q.has('msaa') ? Number(Q.get('msaa')) : undefined, bloom: !Q.has('nobloom') && TIERS[tier].bloom })
   post.setDaylight(dl.state.day)
-  fit()
+  /** Everything the level sets: shadows, occlusion, glow, grass, people, rain, and the pixels. */
+  const applyTier = () => {
+    const t = TIERS[tier]
+    if (!Q.has('shadow') && sun.shadow.mapSize.x !== t.shadow) { sun.shadow.mapSize.setScalar(t.shadow); sun.shadow.map?.dispose(); sun.shadow.map = null }
+    post!.setAO(Q.has('noao') ? 'off' : t.ao); post!.setBloom(!Q.has('nobloom') && t.bloom)
+    world.flora.lawn.reach.value = t.grass; grassTick = 0
+    people.setDensity(t.people); sky.setDensity(t.rain * (still ? 0.6 : 1))
+    fit()
+  }
+  /** Less motion, or not: the sea, the wind in the trees, the lightning, the film's grain. */
+  const applyMotion = () => {
+    if (still) { world.swell.value = 0; world.flora.wind.value = 0.25 }
+    sky.setStill(still); post!.setStill(still); sky.setDensity(TIERS[tier].rain * (still ? 0.6 : 1))
+  }
+  let grassTick = 0
+  applyTier(); applyMotion()
   addEventListener('resize', fit)
 
   /* ---- input ---- */
@@ -371,21 +412,41 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const ku = (e: KeyboardEvent) => keys.delete(e.code)
   addEventListener('keydown', kd); addEventListener('keyup', ku)
   let dragging = false, lx = 0, ly = 0
-  const pd = (e: PointerEvent) => { if ((e.target as HTMLElement) !== canvas) return; dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId) }
-  const pm = (e: PointerEvent) => { if (!dragging) return; yaw -= (e.clientX - lx) * 0.006; pitch = MathUtils.clamp(pitch + (e.clientY - ly) * 0.004, 0.05, 1.2); lx = e.clientX; ly = e.clientY; lastDrag = performance.now() }
-  const pu = () => { dragging = false }
-  const wh = (e: WheelEvent) => { if (photo) dist = MathUtils.clamp(dist * (1 + e.deltaY * 0.001), 0.06, 6); else if (driving !== null) carDist = MathUtils.clamp(carDist * (1 + e.deltaY * 0.001), 0.5, 3); else dist = MathUtils.clamp(dist * (1 + e.deltaY * 0.001), 0.3, 3); e.preventDefault() }
-  canvas.addEventListener('pointerdown', pd); addEventListener('pointermove', pm); addEventListener('pointerup', pu); canvas.addEventListener('wheel', wh, { passive: false })
+  /** Nearer or further: the scroll wheel, or two fingers pinched or spread (a factor: under 1 nearer). */
+  const zoom = (k: number) => { if (photo) dist = MathUtils.clamp(dist * k, 0.06, 6); else if (driving !== null) carDist = MathUtils.clamp(carDist * k, 0.5, 3); else dist = MathUtils.clamp(dist * k, 0.3, 3) }
+  const fingers = new Map<number, { x: number; y: number }>()
+  let pinch = 0
+  const spread = () => { const [a, b] = [...fingers.values()]; return Math.hypot(a.x - b.x, a.y - b.y) }
+  const pd = (e: PointerEvent) => {
+    if ((e.target as HTMLElement) !== canvas) return
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId)
+    if (fingers.size === 2) { dragging = false; pinch = spread() } else if (fingers.size === 1) { dragging = true; lx = e.clientX; ly = e.clientY }
+  }
+  const pm = (e: PointerEvent) => {
+    const fp = fingers.get(e.pointerId)
+    if (fp) { fp.x = e.clientX; fp.y = e.clientY }
+    if (fingers.size === 2 && fp) { const d = spread(); if (pinch > 0 && d > 0) zoom(pinch / d); pinch = d; return }
+    if (!dragging) return
+    yaw -= (e.clientX - lx) * 0.006; pitch = MathUtils.clamp(pitch + (e.clientY - ly) * 0.004, 0.05, 1.2); lx = e.clientX; ly = e.clientY; lastDrag = performance.now()
+  }
+  const pu = (e: PointerEvent) => {
+    fingers.delete(e.pointerId)
+    // (One finger left after a pinch: it turns the view again from where it is.)
+    if (fingers.size === 1) { const [p] = [...fingers.values()]; dragging = true; lx = p.x; ly = p.y } else dragging = false
+    pinch = 0
+  }
+  const wh = (e: WheelEvent) => { zoom(1 + e.deltaY * 0.001); e.preventDefault() }
+  canvas.addEventListener('pointerdown', pd); addEventListener('pointermove', pm); addEventListener('pointerup', pu); addEventListener('pointercancel', pu); canvas.addEventListener('wheel', wh, { passive: false })
 
   /* ---- each frame ---- */
   const born = performance.now()
-  let frames = 0, spent = 0, lastFrame = born, quality = 'full', slow = 0
+  let frames = 0, spent = 0, lastFrame = born, fpsNow = 0, cpuNow = 0
   let raf = 0, last = performance.now(), near: { slug: string; title: string; href: string } | null = null
   let shownCar: string | null = null
   const camPos = new Vector3(), look = new Vector3()
   let held: [Vector3, Vector3] | null = null
   let photo = false, simT = performance.now() / 1000, snapWant: ((b: Blob | null) => void) | null = null
-  const photoFocus = new Vector3()
+  const photoFocus = new Vector3(), photoMove = [0, 0]
   // The waypoint's column of light, and a ring on the ground at its foot.
   const beacon = new Group(); beacon.visible = false
   {
@@ -406,15 +467,17 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     for (let t = 0.15; t < 18; t += 0.3) {
       ray.copy(camera.position).addScaledVector(dl.state.sunDir, t)
       if (ray.y < world.heightAt(ray.x, ray.z)) return false
-      for (const b of world.boxes) if (ray.y < b.z1 && ray.y > b.z0 && ray.x > b.j0 && ray.x < b.j1 && ray.z > b.i0 && ray.z < b.i1) return false
+      for (const b of boxesAt(ray.x, ray.z)) if (ray.y < b.z1 && ray.y > b.z0 && ray.x > b.j0 && ray.x < b.j1 && ray.z > b.i0 && ray.z < b.i1) return false
       if (ray.y > 3) return true
     }
     return true
   }
   const UP = new Vector3(0, 1, 0), lightRight = new Vector3(), lightUp = new Vector3(), snapped = new Vector3()
-  let lampTick = 0, grassTick = 0
+  let lampTick = 0
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop)
+    const t0 = performance.now()
+    renderer.info.reset()
     // (In photo mode, the world holds still: nothing moves on but the camera.)
     const realDt = Math.min(0.05, (now - last) / 1000); last = now
     const dt = photo ? 0 : realDt
@@ -425,6 +488,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     let fz = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0)
     const stick = ui.move?.() ?? [0, 0]
     if (stick[0] || stick[1]) { fx = stick[0]; fz = -stick[1] }
+    // (In photo mode, the keys and the stick move the camera instead of you.)
+    if (photo) { photoMove[0] = fx; photoMove[1] = fz; fx = fz = 0 }
     const glow = dl.state.lampGlow
     if (driving !== null) {
       // Driving: the keys are the pedals and the wheel.
@@ -620,7 +685,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (!aerial) {
       const dir = camPos.clone().sub(look), len = dir.length(); dir.divideScalar(len)
       let t = len
-      for (const b of world.boxes) {
+      for (const b of solid!.within(look.x, look.z, camPos.x, camPos.z)) {
         if (b.z1 - b.z0 < 0.04 || b.j1 - b.j0 < 0.03 || b.i1 - b.i0 < 0.03) continue
         const tx0 = (b.j0 - look.x) / dir.x, tx1 = (b.j1 - look.x) / dir.x, ty0 = (b.z0 - look.y) / dir.y, ty1 = (b.z1 - look.y) / dir.y, tz0 = (b.i0 - look.z) / dir.z, tz1 = (b.i1 - look.z) / dir.z
         const tin = Math.max(Math.min(tx0, tx1), Math.min(ty0, ty1), Math.min(tz0, tz1)), tout = Math.min(Math.max(tx0, tx1), Math.max(ty0, ty1), Math.max(tz0, tz1))
@@ -634,7 +699,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (camPos.y < under) camPos.y = under
     if (photo) {
       // The camera free: W A S D move the point it turns about, R and F raise and lower it.
-      const mx = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), mz = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0), my = (keys.has('KeyR') ? 1 : 0) - (keys.has('KeyF') ? 1 : 0)
+      const mx = photoMove[0], mz = photoMove[1], my = (keys.has('KeyR') ? 1 : 0) - (keys.has('KeyF') ? 1 : 0)
       const sp = 0.6 * realDt * Math.max(0.4, dist)
       photoFocus.x += (-mz * Math.sin(yaw) + mx * Math.cos(yaw)) * sp; photoFocus.z += (-mz * Math.cos(yaw) - mx * Math.sin(yaw)) * sp; photoFocus.y += my * sp
       photoFocus.y = Math.max(photoFocus.y, world.heightAt(photoFocus.x, photoFocus.z) + 0.01)
@@ -644,7 +709,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       camera.position.copy(camPos)
     } else camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : driving !== null ? 10 : 8)))
     camera.lookAt(look)
-    ;(beacon.children[0] as Mesh<CylinderGeometry, ShaderMaterial>).material.uniforms.uTime.value = simT
+    // (Its light runs up the column; held steady for less motion.)
+    ;(beacon.children[0] as Mesh<CylinderGeometry, ShaderMaterial>).material.uniforms.uTime.value = still ? 0.5 : simT
     if (held) { camera.position.copy(held[0]); camera.lookAt(held[1]) }
     // What you hear: the sea's edge, the town, the green round you (looked for now and then); the cars, your engine, the gulls.
     if ((earTick -= dt) <= 0) {
@@ -683,6 +749,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     fog.near = 14 * (1 - 0.6 * sky.state.rain); fog.far = (aerial ? 160 : 70) * (1 - 0.5 * sky.state.rain)
     // The wind in the trees and the grass, and in the sea's swell.
     if (!still) { world.flora.wind.value = 0.45 + 1.6 * sky.state.wind * (0.7 + 0.3 * sky.state.gust); world.swell.value = 0.75 + 0.6 * sky.state.wind }
+    else { world.flora.wind.value = 0.25; world.swell.value = 0 }
     windNow[0] = sky.state.dir.x; windNow[1] = sky.state.dir.z
     dl.follow(camera.position, dt)
     // The grass near you is drawn; further off, the ground's own green does.
@@ -698,7 +765,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (dl.state.lampGlow <= 0.02 && lampLights[0].intensity) for (const L of lampLights) L.intensity = 0
     // The sun's shadows follow you.
     // (Held to whole texels of the shadow map, so the edges of shadows do not crawl as you walk.)
-    const texel = (2 * REACH) / SHADOW
+    const texel = (2 * REACH) / sun.shadow.mapSize.x
     lightRight.crossVectors(UP, sunDir).normalize(); lightUp.crossVectors(sunDir, lightRight)
     const pr = Math.round(pos.dot(lightRight) / texel) * texel, pu = Math.round(pos.dot(lightUp) / texel) * texel, pa = pos.dot(sunDir)
     snapped.copy(lightRight).multiplyScalar(pr).addScaledVector(lightUp, pu).addScaledVector(sunDir, pa)
@@ -736,25 +803,26 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     post!.render(realDt)
     // A picture asked for: taken from what was just drawn, before the browser clears it.
     if (snapWant) { const done = snapWant; snapWant = null; canvas.toBlob((b) => done(b), 'image/png') }
-    // Keeping up: once it has settled, if six seconds go by at under 45 frames a second, give up the costliest
-    // thing left — the occlusion, then the finer shadows, then a little sharpness (never more than a quarter).
-    if (!Q.has('fixed')) {
-      // (A pause — another tab, a dragged window — is not a slow frame.)
-      const gap = now - lastFrame
-      if (gap < 250) { frames++; spent += gap }
-      if (now - born > 9000 && spent > 3000) {
-        const fps = (frames * 1000) / spent
-        // (Two slow stretches running, not a hitch while something new is first drawn.)
-        slow = fps < 45 ? slow + 1 : 0
-        if (slow >= 2) {
-          slow = 0
-          if (post!.drop()) quality = 'no occlusion'
-          else if (sun.shadow.mapSize.x > 2048) { sun.shadow.mapSize.setScalar(sun.shadow.mapSize.x / 2); sun.shadow.map?.dispose(); sun.shadow.map = null; quality = `shadows ${sun.shadow.mapSize.x}` }
-          else if (world.flora.lawn.reach.value > 6) { world.flora.lawn.reach.value = 6; quality = 'less grass' }
-          else if (sharp > 0.75) { sharp = Math.max(0.75, sharp - 0.125); fit(); quality = `sharpness ${sharp.toFixed(2)}` }
+    // How it is running: the frames a second (over three seconds or so) and the processor's share of a frame.
+    // (A pause — another tab, a dragged window — is not a slow frame; a quarter of a second, or a half, is.)
+    const gap = now - lastFrame
+    if (gap < 1000) { frames++; spent += gap }
+    cpuNow += (performance.now() - t0 - cpuNow) * 0.05
+    if (spent > 3000) {
+      fpsNow = (frames * 1000) / spent
+      // Keeping up, on Auto: once it has settled, two slow stretches running (not a hitch while something new is first
+      // drawn) and it steps down a level; running easily, at a level it came down to, it tries the one above once (tiers.ts).
+      if (choice === 'auto' && !Q.has('fixed') && now - born > 9000 && !document.hidden) {
+        const n = autoStep({ tier, sharp, ...auto, ceiling: guess }, fpsNow, spent / 1000, cpuNow)
+        auto = { slow: n.slow, easy: n.easy, triedUp: n.triedUp }
+        if (n.changed) {
+          const down = TIER_ORDER.indexOf(n.tier) < TIER_ORDER.indexOf(tier)
+          tier = n.tier; sharp = n.sharp; applyTier()
+          // (Remembered, so the next visit starts where this one settled.)
+          try { if (down || tier === guess) localStorage.setItem('walk-auto-tier', tier) } catch {}
         }
-        frames = 0; spent = 0
       }
+      frames = 0; spent = 0
     }
     lastFrame = now
   }
@@ -779,6 +847,19 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     showMe(on) { me.visible = on },
     snap: () => new Promise((res) => { snapWant = res }),
     setSound(on) { ears.setOn(on) },
+    setQuality(q) {
+      choice = q; auto = { slow: 0, easy: 0, triedUp: false }; sharp = 1
+      tier = q === 'auto' ? autoStart() : q
+      applyTier()
+    },
+    setMotion(on) { still = on; applyMotion() },
+    perf: () => {
+      const lp = post!.state()
+      return {
+        fps: Math.round(fpsNow * 10) / 10, cpu: Math.round(cpuNow * 100) / 100, tier, choice, sharp, pixels: renderer.getPixelRatio(),
+        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, still, shadow: sun.shadow.mapSize.x, ao: lp.ao, bloom: lp.bloom, grass: world.flora.lawn.reach.value,
+      }
+    },
     sound: () => ({ on: ears.on, running: ears.running, levels: ears.levels() }),
     weather: () => ({ kind: sky.state.kind, auto: sky.state.auto, cover: sky.state.cover, rain: sky.state.rain, wind: sky.state.wind, wet: wetness.wet.value }),
     near: () => near,
@@ -799,7 +880,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       camera.position.set(pos.x + Math.sin(yaw) * Math.cos(pitch) * dist, pos.y + TALL * 0.8 + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * Math.cos(pitch) * dist)
     },
     state: () => ({
-      x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), quality,
+      x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), quality: tier + (sharp < 1 ? ` ${sharp}` : ''),
       cars: traffic.state().map((c) => [c.j, c.i]), driving: driving !== null, speed: driving !== null ? own[driving].speed() : 0,
       parked: own.map((v) => [v.s.x, v.s.z, v.s.yaw]), people: people.state(), gulls: birds.state(), props: things.state(), fish: shoals.state(), boats: harbour.state(), lifeMs,
     }),
@@ -808,7 +889,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     dispose() {
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
-      removeEventListener('pointermove', pm); removeEventListener('pointerup', pu)
+      removeEventListener('pointermove', pm); removeEventListener('pointerup', pu); removeEventListener('pointercancel', pu)
       dl.dispose(); sky.dispose(); ears.dispose(); things.dispose(); removeEventListener('keydown', startSound); removeEventListener('pointerdown', startSound); post?.dispose(); renderer.dispose()
     },
   }

@@ -17,10 +17,10 @@
  *     multisampling costs), everything rendered in floating point until the
  *     tone mapping.
  *
- * The occlusion is worked out at half the picture's size (it is soft; nobody
- * can tell), and a phone does without it (its cost is a second drawing of
- * the scene), with bloom at a third of the size. If a machine still cannot
- * keep up, walker.ts steps the quality down (drop()).
+ * How much of this is done is the quality level's (tiers.ts, applied by
+ * walker.ts as it goes): the occlusion at half the picture's size (it is soft;
+ * nobody can tell), at its full size, or not at all (its cost is a second
+ * drawing of the scene); the glow or none (at a third of the size on a phone).
  */
 import { HalfFloatType, type PerspectiveCamera, type Scene, Vector2, type WebGLRenderer, WebGLRenderTarget } from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -80,19 +80,21 @@ const Grade = {
     }`,
 }
 
-export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, opts: { phone: boolean; still: boolean; ao?: boolean; samples?: number; bloom?: boolean }) {
+export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, opts: { phone: boolean; still: boolean; ao?: 'off' | 'half' | 'full'; samples?: number; bloom?: boolean }) {
   const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: opts.samples ?? 0 })
   const composer = new EffectComposer(renderer, target)
   composer.addPass(new RenderPass(scene, camera))
-  let ao: GTAOPass | null = null
-  if (!opts.phone && opts.ao !== false) {
-    ao = new GTAOPass(scene, camera, 1, 1)
+  let ao: GTAOPass | null = null, aoHalf = true, still = opts.still
+  const size = { w: 1, h: 1, pr: 1 }
+  /** The occlusion pass, made the first time it is wanted. */
+  const makeAO = () => {
+    const ao = new GTAOPass(scene, camera, 1, 1)
     // A tile is three and a half metres: reach about a metre, fade with distance.
     ao.updateGtaoMaterial({ radius: 0.4, distanceExponent: 1.5, thickness: 0.6, scale: 1.25, samples: 8, distanceFallOff: 1 })
     ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 8 })
-    // (At half size.)
+    // (At half size, unless at full.)
     const full = ao.setSize.bind(ao)
-    ao.setSize = (w: number, h: number) => full(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)))
+    ao.setSize = (w: number, h: number) => (aoHalf ? full(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2))) : full(w, h))
     ao.blendIntensity = 1
     // Leaf sprays are cards cut out by their picture: the occlusion pass would see them as solid squares, so they are
     // left out of what it looks at (userData.noAO).
@@ -104,18 +106,28 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
       drawAO(...args)
       skip.forEach((o, i) => { o.visible = was[i] })
     }
-    composer.addPass(ao)
+    composer.insertPass(ao, 1)
+    return ao
+  }
+  const setAO = (mode: 'off' | 'half' | 'full') => {
+    if (mode === 'off') { if (ao) ao.enabled = false; return }
+    if (!ao) ao = makeAO()
+    aoHalf = mode === 'half'; ao.enabled = true
+    ao.setSize(Math.round(size.w * size.pr), Math.round(size.h * size.pr))
   }
   const bloom = new UnrealBloomPass(new Vector2(256, 256), 0.16, 0.2, 7)
-  if (opts.bloom !== false) composer.addPass(bloom)
+  bloom.enabled = opts.bloom !== false
+  composer.addPass(bloom)
   composer.addPass(new OutputPass())
   const smaa = opts.samples ? null : new SMAAPass()
   if (smaa) composer.addPass(smaa)
   const grade = new ShaderPass(Grade)
   composer.addPass(grade)
+  setAO(opts.ao ?? 'half')
   let t = 0
   return {
     setSize(w: number, h: number, pr: number) {
+      size.w = w; size.h = h; size.pr = pr
       composer.setPixelRatio(pr); composer.setSize(w, h)
       // (Bloom need not be sharp: half the size, a third on a phone.)
       bloom.resolution.set((w * pr) / (opts.phone ? 3 : 2), (h * pr) / (opts.phone ? 3 : 2))
@@ -138,15 +150,18 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
     /** Where the sun is in the picture (0–1 across and up) and how much of it can be seen. */
     sun(u: number, v: number, vis: number) { grade.uniforms.uSun.value.set(u, v); grade.uniforms.uSunVis.value = vis },
     render(dt: number) {
-      if (!opts.still) t += dt
+      if (!still) t += dt
       grade.uniforms.uTime.value = t
       composer.render(dt)
     },
-    /** Gives up the most costly thing left (the occlusion; then, for walker.ts, sharper shadows and pixels). Whether there was any to give. */
-    drop() {
-      if (ao && ao.enabled) { ao.enabled = false; return true }
-      return false
-    },
+    /** The occlusion: none, at half size, at full size. */
+    setAO,
+    /** The glow round bright lights, or none. */
+    setBloom(on: boolean) { bloom.enabled = on },
+    /** For less motion: the film grain holds still. */
+    setStill(on: boolean) { still = on },
+    /** What it is doing (for the checks and the settings). */
+    state: () => ({ ao: ao?.enabled ? (aoHalf ? 'half' : 'full') : 'off', bloom: bloom.enabled }),
     dispose() { composer.dispose(); target.dispose(); ao?.dispose() },
   }
 }

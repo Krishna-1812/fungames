@@ -94,7 +94,9 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
   }
   const start = o.start && (o.start in LOOKS) ? (o.start as WeatherKind) : null
   if (start) { state.kind = start; state.auto = false; Object.assign(state, { ...LOOKS[start] }); wetness.wet.value = LOOKS[start].rain > 0 ? 0.85 : 0 }
-  let spell = 150 + Math.random() * 120, nextFlash = 6, t = 0
+  let spell = 150 + Math.random() * 120, nextFlash = 6, second = -1, t = 0
+  // Less motion asked for (no lightning); how much of the rain is drawn (the quality level's).
+  let still = o.still, density = 1
   const cover = { value: state.cover }
   const driftUv = { value: new Vector3(Math.random() * 50, Math.random() * 50, 0) }
 
@@ -284,12 +286,15 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
       U.uLit.value.copy(c.litColor); U.uShade.value.copy(c.shadeColor); U.uHaze.value.copy(c.haze)
       dome.position.copy(c.cam)
       // Lightning, in a storm.
-      if (state.kind === 'storm' && state.rain > 0.6 && !o.still) {
-        if ((nextFlash -= dt) <= 0) { state.flash = 1; nextFlash = 7 + Math.random() * 18 }
+      if (state.kind === 'storm' && state.rain > 0.6 && !still) {
+        if ((nextFlash -= dt) <= 0) { state.flash = 1; second = 0.34; nextFlash = 7 + Math.random() * 18 }
       }
       state.flash = Math.max(0, state.flash - dt * (state.flash > 0.5 ? 2.5 : 1.2))
-      // (A flicker: two pulses.)
-      U.uFlash.value = state.flash * (0.6 + 0.4 * Math.sin(t * 60))
+      // (Two pulses a third of a second apart, then nothing for seconds: never more than two flashes in a second, well
+      // short of the three that can bring on a seizure.)
+      if (second > 0 && (second -= dt) <= 0) { second = -1; if (!still) state.flash = Math.max(state.flash, 0.65) }
+      if (still) state.flash = 0
+      U.uFlash.value = state.flash
       // The shadow sheet: under the sun's shadow camera, carrying the pattern of the clouds overhead where its shadow falls.
       const sy = Math.max(0.05, c.lightDir.y), y0 = c.lightTarget.y + Math.min(6, Math.max(1.2, c.lightDir.y * 35 * 0.6))
       sheet.position.set(c.lightTarget.x, y0, c.lightTarget.z)
@@ -302,12 +307,13 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
       R.uColor.value.setRGB(0.75, 0.8, 0.86).multiplyScalar(0.35 + 0.65 * c.day + 0.6 * c.lampGlow * (1 - c.day) + state.flash)
       R.uAlpha.value = Math.min(1, state.rain * 1.6) * 0.6
       rainMesh.visible = state.rain > 0.01
-      rainGeo.setDrawRange(0, Math.ceil(DROPS * Math.min(1, state.rain * 1.3)) * 6)
+      rainGeo.setDrawRange(0, Math.ceil(DROPS * density * Math.min(1, state.rain * 1.3)) * 6)
       // Splashes on whatever is under you, round about.
       splashes.visible = state.rain > 0.05
       if (splashes.visible) {
         const P = splGeo.getAttribute('position') as Float32BufferAttribute
         for (let k = 0; k < SPL; k++) {
+          if (k >= SPL * density) { P.setXYZ(k, 0, -999, 0); continue }
           splAge[k] += dt
           if (splAge[k] > 0.22) {
             if (Math.random() > state.rain) { P.setXYZ(k, 0, -999, 0); splAge[k] = Math.random() * 0.2; continue }
@@ -319,6 +325,10 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
         splMat.opacity = 0.45 * state.rain * (0.15 + 0.85 * c.day)
       }
     },
+    /** Less motion: no lightning. */
+    setStill(on: boolean) { still = on },
+    /** How much of the rain (streaks and splashes) is drawn, 0 to 1. */
+    setDensity(f: number) { density = Math.max(0.1, Math.min(1, f)) },
     dispose() {
       for (const m of [dome, envDome, sheet, rainMesh]) { scene.remove(m); m.geometry.dispose() }
       scene.remove(splashes); splGeo.dispose(); splMat.dispose(); dot?.dispose(); cloudMat.dispose(); rainMat.dispose(); shadeMat.dispose()

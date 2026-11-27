@@ -453,8 +453,12 @@ export function folk(scene: Scene, o: {
   const crossing: { i: number; j: number; r: number; w: number }[] = []
   let thin = 0
 
+  // (A lighter quality level has fewer of them out: tiers.ts.)
+  let density = 1
   return {
     group, onFoot,
+    /** What share of them may be out at once (the quality level's), 0 to 1. */
+    setDensity(f: number) { density = Math.max(0, Math.min(1, f)) },
     /** How many are about. */
     get count() { return people.filter((p) => p.out).length },
     /** Each frame: everyone walks on, and is drawn if near enough to see. */
@@ -464,7 +468,7 @@ export function folk(scene: Scene, o: {
       // Fewer out at night: those past the count go home (out of sight), and come back out in the morning.
       // (And fewer in the rain.)
       const rain = c.rain ?? 0
-      const wanted = Math.round(people.length * (0.3 + 0.7 * Math.min(1, c.day * 1.4)) * (1 - 0.45 * rain))
+      const wanted = Math.round(people.length * density * (0.3 + 0.7 * Math.min(1, c.day * 1.4)) * (1 - 0.45 * rain))
       for (const k in counts) counts[k] = 0
       thin = (thin + 1) % 8
       people.forEach((p, n) => {
