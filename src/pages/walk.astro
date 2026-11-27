@@ -20,8 +20,8 @@ import { withBase } from '../lib/base'
   <main class="wk" id="main">
     <canvas class="wk-canvas" id="wk" aria-label="The island in 3D"></canvas>
     <div class="wk-top">
-      <a class="wk-btn" href={withBase('/')}>← The map</a>
-      <span class="wk-right"><button class="wk-btn wk-icon" id="wkPhoto" type="button" aria-pressed="false" aria-label="Photo mode (P)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z"/><circle cx="10" cy="11" r="3.2"/></svg></button> <button class="wk-btn wk-icon" id="wkSound" type="button" aria-pressed="true" aria-label="Sound"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="wk-spk" d="M3 7.5h3l4-3.5v12l-4-3.5H3z"/><path class="wk-waves" d="M13 7a4 4 0 0 1 0 6M15.3 4.8a7 7 0 0 1 0 10.4"/><path class="wk-mute" d="M13 7.5l5 5M18 7.5l-5 5"/></svg></button> <button class="wk-btn" id="wkAir" type="button" aria-pressed="false">Aerial</button> <button class="wk-btn wk-clock" id="wkClock" type="button" aria-expanded="false" aria-controls="wkTime" aria-label="Time of day"><svg class="wk-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4"/></svg><svg class="wk-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.8A6.5 6.5 0 0 1 7.2 4.5a6.5 6.5 0 1 0 8.3 8.3z"/></svg><span id="wkClockText">16:30</span></button></span>
+      <a class="wk-btn wk-back" href={withBase('/')} aria-label="Back to the map"><span aria-hidden="true">←</span><span class="wk-long">The map</span></a>
+      <span class="wk-right"><button class="wk-btn wk-icon" id="wkPhoto" type="button" aria-pressed="false" aria-label="Photo mode (P)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z"/><circle cx="10" cy="11" r="3.2"/></svg></button> <button class="wk-btn wk-icon" id="wkSound" type="button" aria-pressed="true" aria-label="Sound"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="wk-spk" d="M3 7.5h3l4-3.5v12l-4-3.5H3z"/><path class="wk-waves" d="M13 7a4 4 0 0 1 0 6M15.3 4.8a7 7 0 0 1 0 10.4"/><path class="wk-mute" d="M13 7.5l5 5M18 7.5l-5 5"/></svg></button> <button class="wk-btn wk-icon" id="wkSettings" type="button" aria-expanded="false" aria-controls="wkSet" aria-label="Settings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h7.5M15.5 6H17M3 14h1.5M9.5 14H17"/><circle cx="13" cy="6" r="2.3"/><circle cx="7" cy="14" r="2.3"/></svg></button> <button class="wk-btn wk-air" id="wkAir" type="button" aria-pressed="false" aria-label="Aerial view"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 13.5 10 6l7.5 7.5M5.5 16.5 10 12l4.5 4.5"/></svg><span class="wk-long">Aerial</span></button> <button class="wk-btn wk-clock" id="wkClock" type="button" aria-expanded="false" aria-controls="wkTime" aria-label="Time of day"><svg class="wk-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4"/></svg><svg class="wk-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.8A6.5 6.5 0 0 1 7.2 4.5a6.5 6.5 0 1 0 8.3 8.3z"/></svg><span id="wkClockText">16:30</span></button></span>
     </div>
     <div class="wk-time" id="wkTime" hidden>
       <label class="wk-time-label" for="wkHour">Time of day <output id="wkHourOut">16:30</output></label>
@@ -42,6 +42,26 @@ import { withBase } from '../lib/base'
         <button class="wk-chip" type="button" data-sky="storm" aria-pressed="false">Storm</button>
       </div>
     </div>
+    <div class="wk-time wk-set" id="wkSet" hidden>
+      <p class="wk-time-label" id="wkQLabel">Picture <output id="wkQOut">Auto</output></p>
+      <div class="wk-time-row" role="group" aria-labelledby="wkQLabel">
+        <button class="wk-chip" type="button" data-q="auto" aria-pressed="true">Auto</button>
+        <button class="wk-chip" type="button" data-q="low" aria-pressed="false">Low</button>
+        <button class="wk-chip" type="button" data-q="medium" aria-pressed="false">Medium</button>
+        <button class="wk-chip" type="button" data-q="high" aria-pressed="false">High</button>
+        <button class="wk-chip" type="button" data-q="ultra" aria-pressed="false">Ultra</button>
+      </div>
+      <p class="wk-set-note" id="wkQNote">Auto picks a level for this device, and steps down if it struggles.</p>
+      <p class="wk-time-label" id="wkMLabel">Motion <output id="wkMOut">Full</output></p>
+      <div class="wk-time-row" role="group" aria-labelledby="wkMLabel">
+        <button class="wk-chip" type="button" data-motion="system" aria-pressed="true">As the device</button>
+        <button class="wk-chip" type="button" data-motion="full" aria-pressed="false">Full</button>
+        <button class="wk-chip" type="button" data-motion="calm" aria-pressed="false">Calm</button>
+      </div>
+      <p class="wk-set-note">Calm: the sea lies flat, the trees barely stir, lighter rain, no lightning or flashes.</p>
+      <div class="wk-time-row"><button class="wk-chip" type="button" id="wkFps" aria-pressed="false">Show frame rate</button></div>
+    </div>
+    <p class="wk-fps" id="wkFpsOut" hidden aria-hidden="true"></p>
     <p class="wk-help" id="wkHelp">W A S D or the arrow keys to walk · Shift to run · Space to jump · drag to look round · scroll to step back</p>
     <a class="wk-near" id="wkNear" hidden href="/"><span>Play</span> <b id="wkNearTitle"></b> <kbd>E</kbd></a>
     <button class="wk-near wk-drive" id="wkDrive" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5M5 12h14M5 16.5h14M7.5 19v-2.5M16.5 19v-2.5"/><circle cx="8" cy="14.2" r="0.9"/><circle cx="16" cy="14.2" r="0.9"/></svg><span>Drive</span> <kbd>F</kbd></button>
@@ -65,7 +85,7 @@ import { withBase } from '../lib/base'
         <button class="wk-chip" type="button" data-look="mono" aria-pressed="false">Mono</button>
         <button class="wk-chip" type="button" id="wkMe" aria-pressed="true">Me in it</button>
       </div>
-      <p class="wk-photo-help">Drag to turn · scroll to go nearer · W A S D to move · R F up and down</p>
+      <p class="wk-photo-help" id="wkPhotoHelp">Drag to turn · scroll to go nearer · W A S D to move · R F up and down</p>
       <div class="wk-time-row">
         <button class="wk-chip wk-shoot" type="button" id="wkShoot">Take picture</button>
         <button class="wk-chip" type="button" id="wkPhotoOut">Done <kbd>P</kbd></button>
@@ -108,6 +128,17 @@ import { withBase } from '../lib/base'
     stickEl.addEventListener('pointermove', move); stickEl.addEventListener('pointerup', up)
   })
 
+  // The settings, kept on this device: the picture's level (or Auto), motion (as the device asks, full, calm), the frame rate shown.
+  const kept = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d } catch { return d } }
+  const keep = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch {} }
+  const LEVELS = ['auto', 'low', 'medium', 'high', 'ultra'] as const
+  type Level = (typeof LEVELS)[number]
+  let level = kept('walk-quality', 'auto') as Level
+  if (!LEVELS.includes(level)) level = 'auto'
+  let motion = kept('walk-motion', 'system')
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)')
+  const calm = () => motion === 'calm' || (motion === 'system' && reduce.matches)
+
   Promise.all([fetch('world.json').then((r) => r.json() as Promise<WorldData>), import('../lib/walk/walker'), import('../lib/walk/map')]).then(([data, { startWalk }, { wayfinding }]) => {
     const walk = startWalk(canvas, data, {
       onNear(g) {
@@ -116,6 +147,8 @@ import { withBase } from '../lib/base'
         if (g) { nearTitle.textContent = g.title; near.href = (g as { href?: string }).href ?? '/' }
       },
       move: () => stick,
+      quality: level === 'auto' ? undefined : level,
+      still: calm(),
       onCar(c) {
         driveBtn.hidden = !c.near || c.driving
         // (A game's door and a car both near: the car's button sits above the game's.)
@@ -175,8 +208,51 @@ import { withBase } from '../lib/base'
     })
     addEventListener('keydown', (e) => { if (!(e.target as HTMLElement)?.closest?.('input, textarea') && e.code === 'KeyP') setPhoto(!photoOn) })
     const air = document.getElementById('wkAir') as HTMLButtonElement
-    air.addEventListener('click', () => { const on = air.getAttribute('aria-pressed') !== 'true'; air.setAttribute('aria-pressed', String(on)); air.textContent = on ? 'On foot' : 'Aerial'; walk.setAerial(on) })
+    const airText = air.querySelector('.wk-long')!
+    air.addEventListener('click', () => { const on = air.getAttribute('aria-pressed') !== 'true'; air.setAttribute('aria-pressed', String(on)); airText.textContent = on ? 'On foot' : 'Aerial'; air.setAttribute('aria-label', on ? 'Back on foot' : 'Aerial view'); walk.setAerial(on) })
     if (new URLSearchParams(location.search).has('aerial')) air.click()
+    // Settings: the picture's level, motion, the frame rate.
+    const setBtn = document.getElementById('wkSettings') as HTMLButtonElement, setPanel = document.getElementById('wkSet')!
+    const qOut = document.getElementById('wkQOut')!, mOut = document.getElementById('wkMOut')!, qNote = document.getElementById('wkQNote')!
+    const qBtns = [...setPanel.querySelectorAll<HTMLButtonElement>('[data-q]')], mBtns = [...setPanel.querySelectorAll<HTMLButtonElement>('[data-motion]')]
+    const fpsBtn = document.getElementById('wkFps') as HTMLButtonElement, fpsOut = document.getElementById('wkFpsOut')!
+    const TIER: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' }
+    const NOTES: Record<string, string> = {
+      auto: 'Auto picks a level for this device, and steps down if it struggles.',
+      low: 'For a phone or an older laptop: softer shadows, less grass, fewer people out.',
+      medium: 'For most phones and small laptops.',
+      high: 'For a desktop or a good laptop: the full picture.',
+      ultra: 'For a strong graphics card: every edge drawn finer, grass to the horizon.',
+    }
+    const showSettings = () => {
+      const p = walk.perf()
+      qOut.textContent = level === 'auto' ? `Auto · ${TIER[p.tier]}` : TIER[level]
+      for (const b of qBtns) b.setAttribute('aria-pressed', String(b.dataset.q === level))
+      qNote.textContent = NOTES[level]
+      mOut.textContent = (motion === 'system' ? 'As the device · ' : '') + (calm() ? 'Calm' : 'Full')
+      for (const b of mBtns) b.setAttribute('aria-pressed', String(b.dataset.motion === motion))
+      main.classList.toggle('wk-still', calm())
+    }
+    const applyMotion = () => { walk.setMotion(calm()); showSettings() }
+    setBtn.addEventListener('click', () => {
+      const open = setPanel.hidden; setPanel.hidden = !open; setBtn.setAttribute('aria-expanded', String(open))
+      // (One panel at a time up there: the clock's closes.)
+      if (open && !timePanel.hidden) { timePanel.hidden = true; clockBtn.setAttribute('aria-expanded', 'false') }
+      showSettings()
+    })
+    for (const b of qBtns) b.addEventListener('click', () => { level = b.dataset.q as Level; keep('walk-quality', level); walk.setQuality(level); showSettings() })
+    for (const b of mBtns) b.addEventListener('click', () => { motion = b.dataset.motion!; keep('walk-motion', motion); applyMotion() })
+    reduce.addEventListener('change', applyMotion)
+    let fpsOn = kept('walk-fps', 'off') === 'on'
+    const showFps = () => {
+      fpsBtn.setAttribute('aria-pressed', String(fpsOn)); fpsOut.hidden = !fpsOn
+      if (fpsOn) { const p = walk.perf(); fpsOut.textContent = `${p.fps ? Math.round(p.fps) : "–"} fps · ${p.cpu.toFixed(1)} ms · ${TIER[p.tier]}${p.sharp < 1 ? ' ' + Math.round(p.sharp * 100) + '%' : ''}` }
+    }
+    fpsBtn.addEventListener('click', () => { fpsOn = !fpsOn; keep('walk-fps', fpsOn ? 'on' : 'off'); showFps() })
+    setInterval(() => { showFps(); if (!setPanel.hidden) showSettings() }, 1000)
+    showSettings(); showFps()
+    // On a phone, photo mode is moved with the stick and two fingers.
+    if (touch) document.getElementById('wkPhotoHelp')!.textContent = 'Drag to turn · pinch to go nearer · the stick to move'
     // The clock: the hour, a sun or a moon; open, a slider for any hour, a pause, and the day's moments.
     let dragging = false
     const show = () => {
@@ -187,7 +263,10 @@ import { withBase } from '../lib/base'
       hourIn.style.setProperty('--at', `${(+hourIn.value / 24) * 100}%`)
     }
     show(); setInterval(show, 250)
-    clockBtn.addEventListener('click', () => { const open = timePanel.hidden; timePanel.hidden = !open; clockBtn.setAttribute('aria-expanded', String(open)) })
+    clockBtn.addEventListener('click', () => {
+      const open = timePanel.hidden; timePanel.hidden = !open; clockBtn.setAttribute('aria-expanded', String(open))
+      if (open && !setPanel.hidden) { setPanel.hidden = true; setBtn.setAttribute('aria-expanded', 'false') }
+    })
     hourIn.addEventListener('input', () => { dragging = true; walk.setTime(+hourIn.value); show() })
     hourIn.addEventListener('change', () => { dragging = false })
     pauseBtn.addEventListener('click', () => { const on = walk.clock(); walk.setClock(!on); pauseBtn.setAttribute('aria-pressed', String(on)); pauseBtn.textContent = on ? 'Play' : 'Pause' })
@@ -264,9 +343,35 @@ import { withBase } from '../lib/base'
   .wk-photo-help { margin: 0; color: #4a5672; font-size: 12px; }
   .wk-shoot { background: #2f6df6; color: #fff; }
   .wk-shoot:hover { background: #2559d1; }
-  .wk-photo-on .wk-top a, .wk-photo-on #wkAir, .wk-photo-on #wkClock, .wk-photo-on #wkSound, .wk-photo-on .wk-help, .wk-photo-on .wk-near, .wk-photo-on .wk-dash, .wk-photo-on .wk-stick, .wk-photo-on .wk-time { visibility: hidden; }
+  .wk-photo-on .wk-top a, .wk-photo-on #wkAir, .wk-photo-on #wkClock, .wk-photo-on #wkSound, .wk-photo-on .wk-help, .wk-photo-on .wk-near, .wk-photo-on .wk-dash, .wk-photo-on .wk-time, .wk-photo-on .wk-set, .wk-photo-on #wkSettings, .wk-photo-on .wk-fps { visibility: hidden; }
+  /* (On a phone, the stick moves the camera in photo mode: above the panel.) */
+  .wk-photo-on .wk-stick { bottom: 236px; }
+  .wk-photo-on .wk-stick:not(.on) { visibility: hidden; }
   .wk-flash::after { content: ''; position: absolute; inset: 0; background: #fff; opacity: 0.6; pointer-events: none; animation: wk-flash 0.22s ease-out forwards; }
   @keyframes wk-flash { to { opacity: 0; } }
+  .wk-set-note { margin: 2px 0 8px; color: #4a5672; font-size: 12px; }
+  .wk-set .wk-time-row + .wk-time-label { margin-top: 6px; }
+  .wk-fps { position: absolute; left: 14px; top: 62px; margin: 0; padding: 6px 10px; border-radius: 999px; background: rgb(10 16 30 / 0.66); color: #eef3ff; font: 600 12px/1 ui-monospace, monospace; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .wk-fps[hidden] { display: none; }
+  .wk-air { display: inline-flex; align-items: center; gap: 6px; }
+  .wk-air svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .wk-back { display: inline-flex; align-items: center; gap: 6px; }
+  /* (The panels up top sit over the compass and the district's name.) */
+  .wk-time { z-index: 3; }
+  /* A phone: the top bar's words go, its buttons stay. */
+  @media (max-width: 560px) {
+    .wk-long { display: none; }
+    .wk-top { left: 10px; right: 10px; }
+    .wk-right { gap: 6px; }
+    .wk-btn { padding: 9px 12px; }
+    .wk-icon, .wk-air { padding: 8px 10px; }
+    .wk-clock { padding: 9px 11px; }
+  }
+  /* (On a phone the frame rate sits above the stick, clear of the compass.) */
+  @media (pointer: coarse), (max-width: 640px) { .wk-fps { top: auto; left: 22px; bottom: 202px; } }
+  /* Calm motion: no flash for a picture, nothing fading or sliding about. */
+  .wk-still.wk-flash::after { animation: none; opacity: 0; }
+  @media (prefers-reduced-motion: reduce) { .wk-flash::after { animation: none; opacity: 0; } }
   .wk-icon { padding: 8px 11px; display: inline-flex; align-items: center; vertical-align: top; }
   .wk-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .wk-icon .wk-spk { fill: currentColor; }
