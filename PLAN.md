@@ -3189,9 +3189,45 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        (saloon lit after dark), a speedboat with its wake, two yachts
        sailing with their sails set to the wind, buoys; all floating on the
        swell, with their lights after dark. About 7–9% of the frame rate.
-    10. *Weather* — clouds, rain, wet streets, wind.
-    11. *Sound* — waves, wind, footsteps, traffic, birds, night.
-    12. *Things that move* — balls, crates and cones to push and kick.
+    10. ~~*Weather*~~ **done** — the weather changes by itself, a spell
+       every few minutes (clear, fair-weather cloud, overcast, rain, storm),
+       or you choose it from the clock's panel. A cloud layer 500 m up drifts
+       with the wind, lit on the sun's side and grey beneath, silver where
+       the sun is behind one, closing to a grey ceiling; its shadows sweep
+       across the streets (a hidden sheet in the sun's shadow carrying the
+       clouds' own pattern); an overcast sky takes the sun out of the light
+       and greys the haze, and the sky that lights the world carries the
+       clouds. Rain falls at 9 m/s, slanting with the wind, splashing where
+       it lands; the streets, paving and walls darken and shine as it soaks
+       in, puddles gather with rings in them, rain rings on the sea, and it
+       dries slowly afterwards. The wind gusts and veers: the trees bend
+       harder, the sea gets choppier and its swell higher. Lightning in a
+       storm. People put up umbrellas (and fewer go out); gulls settle.
+       Also fixed: the night glare — the cars' headlight pools ended in a
+       hard white square and the lamps lit the street white; now soft
+       pools, lamps that light without flaring.
+    11. ~~*Sound*~~ **done** — everything synthesised as it plays (no
+       recordings) and placed in the world round your ears: surf growing
+       towards the shore and each wave swelling and breaking on the side the
+       sea is, lapping as you wade or swim; the wind moaning with its gusts,
+       whistling in a gale, the leaves; rain's hiss and patter, thunder a
+       few seconds after the lightning; footsteps by what is underfoot
+       (street, grass, sand, a pier's planks, puddles, the shallows), a thud
+       landing, a splash, swimming strokes; the cars near you going by, your
+       own engine climbing through five gears, tyres squealing in a slide;
+       gulls calling from where they fly or stand, birdsong by day,
+       crickets at night, the ferry's horn as it pulls away. It starts at
+       the first key or touch; a speaker button turns it off.
+    12. ~~*Things that move*~~ **done** — footballs on the grass, beach balls
+       on the sand, crates and fish boxes stacked by the harbour, a row of
+       red-and-white cones along a kerb: rigid bodies (cannon-es, in metres,
+       at their real masses — a football 430 g, a crate 9 kg, a cone 2 kg
+       weighted at its base) on the island's own ground and against
+       everything built. Run into a ball and it is kicked on (some 35 m at a
+       sprint); walk into a crate and it slides, holding you back; drive
+       into the cones and they fly and fall over; stacks stand until
+       knocked; they float as they weigh; every knock sounds (a ball's
+       thump, a crate's wooden knock, a cone's clack).
     13. *The street* — benches, bins, signs, traffic lights, parked cars.
     14. *Finding your way* — minimap, district names, compass, photo mode.
     15. *Every device* — quality tiers, phone speed, reduced motion.
