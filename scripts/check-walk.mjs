@@ -407,7 +407,9 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   const sky = () => { let n = 0, c = 0; for (let a = 0; a < 20; a++) for (let b = 0; b < 15; b++) { const el = 0.35 + (b / 15) * 1.1, az = (a / 20) * Math.PI * 2; up.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); c += wx.cloudToward(cam, up); n++ } return c / n }
   const settle = (kind, s) => { wx.set(kind); for (let k = 0; k < 30 * s; k++) wx.update(1 / 30, ctx) }
   settle('clear', 60); const clear = sky()
-  settle('cloudy', 60); const cloudy = sky()
+  // (Cloudy is broken cloud drifting over: looked at six times, five seconds apart, not once, which can catch a gap.)
+  settle('cloudy', 60); let cloudy = 0
+  for (let n = 0; n < 6; n++) { for (let k = 0; k < 150; k++) wx.update(1 / 30, ctx); cloudy += sky() / 6 }
   settle('rain', 60); const rainy = sky(), raining = wx.state.rain, soaked = wetness.wet.value
   check(clear < 0.2 && cloudy > 0.2 && cloudy < 0.75 && rainy > 0.9, `the sky is as cloudy as the weather says: clear ${(clear * 100).toFixed(0)}%, cloudy ${(cloudy * 100).toFixed(0)}%, rain ${(rainy * 100).toFixed(0)}% cloud`)
   check(raining > 0.5 && soaked > 0.6, `choose rain and it rains within a minute (${raining.toFixed(2)}), and the streets are soaked (${soaked.toFixed(2)})`)
