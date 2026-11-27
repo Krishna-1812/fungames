@@ -401,7 +401,7 @@ export function wheelShapes() {
  * road; side-on to the kerb and facing the way the traffic on that side goes (the island drives on the right). The
  * first is the one nearest a point (where you start), the others at least seven tiles from it and each other.
  */
-export function parkingSpots(world: { kind(i: number, j: number): string; heightAt(x: number, z: number): number; poolAt(x: number, z: number): number | null; boxes: { i0: number; i1: number; j0: number; j1: number; z1: number }[] }, roads: [number, number][], from: { x: number; z: number }, n: number) {
+export function parkingSpots(world: { kind(i: number, j: number): string; heightAt(x: number, z: number): number; poolAt(x: number, z: number): number | null; boxes: { i0: number; i1: number; j0: number; j1: number; z1: number }[] }, roads: [number, number][], from: { x: number; z: number }, n: number, gap = 7) {
   const road = new Set(roads.map(([i, j]) => `${i},${j}`))
   const out: { x: number; z: number; yaw: number; d: number; road: [number, number] }[] = []
   for (const [i, j] of roads) for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -424,7 +424,7 @@ export function parkingSpots(world: { kind(i: number, j: number): string; height
   }
   out.sort((a, b) => a.d - b.d)
   const chosen: typeof out = []
-  for (const s of out) if (chosen.length < n && chosen.every((c) => Math.hypot(c.x - s.x, c.z - s.z) > 7)) chosen.push(s)
+  for (const s of out) if (chosen.length < n && chosen.every((c) => Math.hypot(c.x - s.x, c.z - s.z) > gap)) chosen.push(s)
   return chosen
 }
 

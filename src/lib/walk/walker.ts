@@ -26,7 +26,10 @@
  * streets, it rains and the streets shine, the wind gets up. And it all
  * sounds (sound.ts): the sea, the wind and the rain, your steps, the traffic,
  * the gulls, birdsong by day and crickets at night. Balls, crates and cones
- * lie about (props.ts) to kick, push, knock over and drive into. Keyboard and mouse, or a thumb on a phone.
+ * lie about (props.ts) to kick, push, knock over and drive into. The streets
+ * have their furniture (street.ts): traffic lights the traffic and the people
+ * obey, benches people sit on, bins, name plates, road signs; and cars parked
+ * about the island, any of them yours to drive. Keyboard and mouse, or a thumb on a phone.
  */
 import {
   ACESFilmicToneMapping, Fog, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
@@ -49,6 +52,7 @@ import { weather, type WeatherKind } from './weather'
 import { wetness } from './wet'
 import { soundscape, type Surface } from './sound'
 import { toys } from './props'
+import { street } from './street'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -203,15 +207,19 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const vel = new Vector3()
   let yaw = Math.PI * 0.75, pitch = 0.32, dist = innerHeight > innerWidth ? 1.05 : 0.8, onGround = true, swimming = false
 
+  /* ---- the street's furniture (street.ts): before anything that has to go round it ---- */
+  const furniture = street(scene, { roads: data.road, kind: world.kind, heightAt: world.heightAt, boxes: world.boxes, district: data.district })
+
   /* ---- the traffic, and cars of your own ---- */
   /** Where the traffic must stop: the car you drive, and you if you are on foot in the road. */
   const obstacles: { i: number; j: number; r: number; w: number }[] = []
-  const traffic = createTraffic({ roads: data.road, play: true, dark: () => (dark() ? 1 : 0), others: () => obstacles })
+  const traffic = createTraffic({ roads: data.road, play: true, dark: () => (dark() ? 1 : 0), others: () => obstacles, signal: furniture.signal })
   const tStart = traffic.state()
   const kinds = tStart.map((c, k) => ({ model: (c.kind === 'bus' ? 'bus' : TRAFFIC[k % TRAFFIC.length]) as ModelName, paint: PAINTS[k % PAINTS.length] }))
   // Cars of your own, parked by the road (cars.ts): the first near the square, the others about the island.
-  const spots = parkingSpots(world, data.road, pos, YOURS.length)
-  const mine = spots.map((_, k) => YOURS[k])
+  // (Yours first, near the square; more parked about the island, any of them yours to drive.)
+  const spots = parkingSpots(world, data.road, pos, phone ? 8 : 12, 2.4)
+  const mine = spots.map((_, k) => YOURS[k] ?? { model: TRAFFIC[(k * 7) % TRAFFIC.length], paint: PAINTS[(k * 5 + 2) % PAINTS.length] })
   const cars = fleet(scene, [...kinds, ...mine])
   const NT = kinds.length
   const ground: Ground = {
@@ -271,7 +279,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   /* ---- the island's people, on its pavements (folk.ts) ---- */
   // (?nolife: none of them; ?off=people,boats,fish,gulls: some — to measure what each costs.)
   const off = new Set(Q.has('nolife') ? ['people', 'boats', 'fish', 'gulls'] : (Q.get('off') ?? '').split(','))
-  const people = folk(scene, { roads: data.road, heightAt: world.heightAt, boxes: world.boxes, count: phone ? 26 : 40 })
+  const people = folk(scene, { roads: data.road, heightAt: world.heightAt, boxes: world.boxes, count: phone ? 26 : 40, seats: furniture.benches, mayCross: furniture.mayCross })
   const nearCars: CarNear[] = []
   let lifeMs = 0
   // The gulls: circling over the harbour, the west bay and off the north shore, and standing about by the sea (birds.ts).
@@ -468,6 +476,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
         }
       }
     }
+    // The traffic lights change.
+    furniture.update(dt, glow)
     // The traffic stops for the car you drive, and for you in the road.
     obstacles.length = 0
     if (driving !== null) { const b = own[driving].box(); obstacles.push({ i: b.z, j: b.x, r: b.hl, w: b.hw }) } else obstacles.push({ i: pos.z, j: pos.x, r: 0.03, w: 0.03 })
