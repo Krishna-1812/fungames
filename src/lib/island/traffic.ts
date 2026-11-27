@@ -61,6 +61,8 @@ export function createTraffic(o: {
   count?: number
   /** Anything else on the road that the traffic must stop for (the walk's own car, someone on foot): where (tiles), how far it reaches along the road and across it (tiles). */
   others?: () => { i: number; j: number; r: number; w: number }[]
+  /** Traffic lights (the walk's): the light facing a car driving from one cell into a junction's cell. */
+  signal?: (cell: [number, number], from: [number, number]) => 'green' | 'amber' | 'red'
 }) {
   const road = new Set(o.roads.map(([i, j]) => key(i, j)))
   const isRoad = (i: number, j: number) => road.has(key(i, j))
@@ -180,10 +182,18 @@ export function createTraffic(o: {
         const g = fwd - p.len / 2 - ob.r
         if (g < gap) { gap = Math.max(0.001, g); lead = 0 }
       }
+      // A light at red ahead (or amber, with room to stop): it stops at the line, and waits as long as it takes.
+      let atLight = false
+      // (Once inside the junction it goes on out; until then, the light has the say, whoever holds the box.)
+      const ahead = boxOfCell(car.path[2])
+      if (o.signal && ahead !== undefined && boxOfCell(car.path[1]) !== ahead) {
+        const lt = o.signal(car.path[2], car.path[1]), g = (1 - car.u) * len - 0.06
+        if (lt === 'red' || (lt === 'amber' && g > 0.3)) { atLight = true; if (holder.get(ahead) === car) holder.delete(ahead); if (g < gap) { gap = Math.max(0.001, g); lead = 0 } }
+      }
       // A box it is about to drive into: only if nobody else holds it, and there is room to get out the
       // far side (blocking the box is how a grid of streets locks solid). Then it is this car's.
       const zone = boxOfCell(car.path[2])
-      if (zone !== undefined && holder.get(zone) !== car && car.squeeze <= 0) {
+      if (zone !== undefined && holder.get(zone) !== car && car.squeeze <= 0 && !atLight) {
         const out = car.path.slice(3).find((c) => boxOfCell(c) !== zone) ?? car.path[car.path.length - 1]
         const held = holder.get(zone)
         const blocked = (held && held !== car) || cars.some((other) => other !== car && other.v < 0.3 && Math.hypot(other.i - (out[0] + 0.5), other.j - (out[1] + 0.5)) < 0.55)
@@ -198,7 +208,8 @@ export function createTraffic(o: {
       a = Math.max(-p.b * 3, Math.min(p.a, a))
       car.acc = a
       car.v = Math.max(0, Math.min(p.v0 * 1.05, car.v + a * dt))
-      car.waited = car.v < 0.05 ? car.waited + dt : 0
+      // (Waiting at a red light is not being stuck.)
+      car.waited = car.v < 0.05 && !atLight ? car.waited + dt : 0
       car.u += (car.v * dt) / len
       while (car.u >= 1) {
         car.u -= 1
