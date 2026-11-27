@@ -43,11 +43,15 @@ register('./resolve-ts.mjs', import.meta.url)
 const { listedGames } = await import('../src/data/games.ts')
 const { buildIsland } = await import('../src/lib/island/world.ts')
 const { buildWorld, Y } = await import('../src/lib/walk/build3d.ts')
-const { waveAt } = await import('../src/lib/walk/water.ts')
+const { waveAt, WAVES } = await import('../src/lib/walk/water.ts')
 const { sunPlace, homesLit } = await import('../src/lib/walk/daylight.ts')
 const { carShapes, MODELS, parkingSpots } = await import('../src/lib/walk/cars.ts')
 const { vehicle } = await import('../src/lib/walk/drive.ts')
 const { createTraffic } = await import('../src/lib/island/traffic.ts')
+const { folk } = await import('../src/lib/walk/folk.ts')
+const { gulls } = await import('../src/lib/walk/birds.ts')
+const { fishes } = await import('../src/lib/walk/fish.ts')
+const { boats } = await import('../src/lib/walk/boats.ts')
 
 let failures = 0
 const ok = (m) => console.log(`  ok    ${m}`)
@@ -288,6 +292,104 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   let closest = 9
   for (let k = 0; k < 30 * 12; k++) { tr.step(1 / 30); const c = tr.state()[0]; closest = Math.min(closest, Math.hypot(c.i - obs[0].i, c.j - obs[0].j)) }
   check(closest > 0.22, `the traffic stops short of someone standing in its lane (${(closest / METRE).toFixed(1)} m away at the closest)`)
+}
+
+// Life: people on the pavements, gulls, fish, boats.
+{
+  const { Scene, Vector3 } = await import('three')
+  const scene = new Scene()
+  const key = (i, j) => i * 1000 + j
+  const roads = new Set(data.road.map(([i, j]) => key(i, j)))
+  const linkN = (i, j) => [[-1, 0], [1, 0], [0, -1], [0, 1]].filter(([a, b]) => roads.has(key(i + a, j + b))).length
+  // People: a minute and a half of them walking about the island, the traffic driving round them.
+  const people = folk(scene, { roads: data.road, heightAt: world.heightAt, boxes: world.boxes, count: 40 })
+  const tr = createTraffic({ roads: data.road, play: true, dark: () => 0, others: () => people.crossing() })
+  const cam = new Vector3(15, 1, 15)
+  let inLane = 0, inside = 0, hit = 0, samples = 0, moved = 0, crossings = 0
+  const before = people.state().map((p) => [p.x, p.z])
+  for (let k = 0; k < 30 * 90; k++) {
+    tr.step(1 / 30)
+    const cars = tr.state().map((c) => ({ x: c.j, z: c.i, hx: c.hj, hz: c.hi, v: c.v, hl: 0.25, hw: 0.1, yaw: Math.atan2(-c.hi, c.hj) }))
+    // (Drawn from wherever they are: the camera goes with the first of them.)
+    const p0 = people.state()[0]; cam.set(p0.x, 1, p0.z)
+    people.update(1 / 30, { cam, you: null, cars, day: 1 })
+    if (k % 15) continue
+    for (const p of people.state()) {
+      if (p.mode === 'talk') continue
+      samples++
+      const i = Math.floor(p.z), j = Math.floor(p.x), fx = p.x - j - 0.5, fz = p.z - i - 0.5
+      // Off the pavement, and in a lane (not on a junction's crossing, nor along the gutter past something built over the pavement).
+      if (!p.onFoot && linkN(i, j) < 3 && Math.max(Math.abs(fx), Math.abs(fz)) < 0.27) inLane++
+      if (!p.onFoot) crossings++
+      if (world.boxes.some((b) => b.z1 > p.y + 0.05 && b.z0 < p.y + 0.15 && p.x > b.j0 + 0.005 && p.x < b.j1 - 0.005 && p.z > b.i0 + 0.005 && p.z < b.i1 - 0.005)) inside++
+      for (const c of cars) { const dx = p.x - c.x, dz = p.z - c.z, cs = Math.cos(c.yaw), sn = Math.sin(c.yaw); if (Math.abs(dx * cs - dz * sn) < 0.22 && Math.abs(dx * sn + dz * cs) < 0.09) hit++ }
+    }
+  }
+  people.state().forEach((p, n) => { if (before[n] && Math.hypot(p.x - before[n][0], p.z - before[n][1]) > 1) moved++ })
+  const walkers = people.state().filter((p) => p.mode !== 'talk').length
+  check(walkers >= 36 && moved > walkers * 0.7, `${walkers} people walk the pavements (${moved} of them got more than a tile in 90 s), and a few more stand talking`)
+  check(inLane === 0 && crossings > 0, `they keep to the pavements, crossing at the junctions (${crossings} of ${samples} looks were mid-crossing, ${inLane} in a lane)`)
+  check(inside <= samples * 0.002, `they step round lamp posts and bins (inside something ${inside} of ${samples} times)`)
+  check(hit === 0, `the traffic never runs into anyone (${hit} times)`)
+  people.dispose()
+
+  // Gulls: those standing, on something; those flying, clear of everything; one standing takes off when you walk up.
+  const flock = gulls(scene, { seaY, grid: data.grid, heightAt: world.heightAt, seaAt: world.seaAt, depthAt: world.depthAt, kind: world.kind, boxes: world.boxes, lamps: world.lamps, piers: data.piers, rocks: data.seaRocks, rings: [[24, 23], [13, 4], [3, 23]], count: 18 })
+  const you = { x: -99, y: 0, z: -99 }
+  let low = 0, flown = 0
+  for (let k = 0; k < 30 * 120; k++) {
+    flock.update(1 / 30, { cam, you, driving: false, day: 1, time: k / 30, still: false })
+    if (k % 30 === 0) for (const g of flock.state()) if (g.mode === 'soar') { flown++; if (g.y < world.heightAt(g.x, g.z) + 0.6) low++ }
+  }
+  const st = flock.state(), standing = st.filter((g) => g.mode === 'stand')
+  check(flock.perches() >= 18 && standing.length > 0 && st.some((g) => g.mode === 'soar'), `the gulls: ${flock.perches()} places to stand (rocks, piers, lamps, sand, water), ${standing.length} standing, ${st.length - standing.length} in the air`)
+  check(low === 0, `those circling stay well up (${low} of ${flown} looks under 5 m over the ground)`)
+  const g0 = standing.find((g) => !g.water)
+  if (g0) {
+    you.x = g0.x + 0.2; you.y = g0.y; you.z = g0.z
+    for (let k = 0; k < 15; k++) flock.update(1 / 30, { cam, you, driving: false, day: 1, time: 200 + k / 30, still: false })
+    const after = flock.state().find((g) => Math.abs(g.x - g0.x) < 0.3 && Math.abs(g.z - g0.z) < 0.3)
+    check(after && after.mode !== 'stand', `walk up to a gull and it takes off (${after?.mode})`)
+  }
+  flock.dispose()
+
+  // Fish: schools where the water is clear and shallow enough to see them; they scatter from a swimmer.
+  const fsh = fishes(scene, { seaY, grid: data.grid, depthAt: world.depthAt, seaAt: world.seaAt, splash: () => {}, ring: () => {}, schools: 8 })
+  for (let k = 0; k < 30 * 60; k++) fsh.update(1 / 30, { cam, you: { x: -99, y: 0, z: -99 }, inWater: false, time: k / 30 })
+  const sc = fsh.state().schools
+  check(sc.length >= 6 && sc.every((s) => s.depth > 0.04 && s.depth < 0.4), `${sc.length} schools (${fsh.state().fish} fish) keep to clear water 0.4–3.6 m deep after a minute (${sc.map((s) => (s.depth / METRE).toFixed(1)).join(', ')} m)`)
+  const s0 = sc[0], swimmer = { x: s0.x + 0.1, y: seaY, z: s0.z }
+  for (let k = 0; k < 45; k++) fsh.update(1 / 30, { cam, you: swimmer, inWater: true, time: 100 + k / 30 })
+  const s1 = fsh.state().schools[0]
+  check(Math.hypot(s1.x - swimmer.x, s1.z - swimmer.z) > 0.2 && s1.scared, `swim up to a school and it darts away (${(Math.hypot(s1.x - swimmer.x, s1.z - swimmer.z) / METRE).toFixed(1)} m off after 1.5 s)`)
+  fsh.dispose()
+
+  // Boats: afloat, in the sea (never over land), the ferry alongside the harbour pier on its timetable.
+  const port = boats(scene, { seaAt: world.seaAt, piers: data.piers, wind: [WAVES[0].x, WAVES[0].z], splash: () => {} })
+  let aground = [], afloat = 0, looks = 0, nanB = 0
+  scene.traverse((o) => { const p = o.geometry?.getAttribute?.('position'); if (p) for (const v of p.array) if (!Number.isFinite(v)) { nanB++; break } })
+  for (let k = 0; k <= 30 * 130; k++) {
+    port.update(1 / 30, { time: k / 30, glow: 0, cam })
+    if (k % 90) continue
+    for (const b of port.state()) {
+      if (!b.visible) continue
+      looks++
+      // (Riding the swell: at the sea's surface where it is, give or take half a metre as a big hull lags it.)
+      if (Math.abs(b.y - world.seaAt(b.x, b.z)) < 0.06) afloat++
+      const L = { rowboat: 1.8, fishing: 5.5, ferry: 12, speed: 3.2, yacht: 4.8 }[b.kind] * METRE, Wd = { rowboat: 0.7, fishing: 1.9, ferry: 3.5, speed: 1.2, yacht: 1.5 }[b.kind] * METRE
+      const s = Math.sin(b.yaw), c = Math.cos(b.yaw)
+      for (const [a, w] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7], [0, 0]]) {
+        const x = b.x + s * a * L + c * w * Wd, z = b.z + c * a * L - s * w * Wd
+        if (world.heightAt(x, z) > seaY - 0.02) { aground.push(`${b.kind} at ${x.toFixed(1)},${z.toFixed(1)}`); break }
+      }
+    }
+  }
+  const fer = port.state().find((b) => b.kind === 'ferry')
+  aground = [...new Set(aground)]
+  check(nanB === 0 && port.state().length >= 10 && afloat === looks, `${port.state().length} boats afloat (${afloat} of ${looks} looks at the sea's surface): rowing boats at the piers, fishing boats at anchor, the ferry, a speedboat, two yachts`)
+  check(aground.length === 0, `every hull stays in the water, never over the sand${aground.length ? ' — not: ' + aground.slice(0, 4).join('; ') : ''}`)
+  check(fer.visible && Math.abs(fer.z - (26.05 + 12 * METRE + 0.06)) < 0.02 && fer.v < 0.01, `the ferry comes in and lies alongside the harbour pier (at ${fer.z.toFixed(2)}, still)`)
+  port.dispose()
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
