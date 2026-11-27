@@ -508,9 +508,11 @@ function beamMap() {
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128
   const c = cv.getContext('2d')!
   // (Forward is along the picture's width: the lamps side by side down its height.)
-  for (const y of [46, 82]) {
-    const g = c.createRadialGradient(6, y, 2, 52, y, 70)
-    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)')
+  // (Each falls to nothing well inside the square, so the pool has no edge.)
+  c.globalCompositeOperation = 'lighter'
+  for (const y of [48, 80]) {
+    const g = c.createRadialGradient(14, y, 1, 44, y, 42)
+    g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(0.45, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)')
     c.fillStyle = g; c.fillRect(0, 0, 128, 128)
   }
   return new CanvasTexture(cv)
@@ -650,7 +652,7 @@ export function fleet(scene: Scene, list: { model: ModelName; paint: string }[])
       }
       // The pool of light ahead, and the shadow under it.
       tmp.compose(v.set((S.len / 2 + 5) * METRE, 0.04 * METRE, 0), q.identity(), v.clone().set(10 * METRE, 1, 7 * METRE)).premultiply(base)
-      pools.setMatrixAt(k, p.head > 0.01 ? tmp : none); pools.setColorAt(k, col.setRGB(0.9, 0.93, 1).multiplyScalar(0.5 * p.head))
+      pools.setMatrixAt(k, p.head > 0.01 ? tmp : none); pools.setColorAt(k, col.setRGB(0.9, 0.93, 1).multiplyScalar(0.3 * p.head))
       if (p.head > 0.01) lit = true
       tmp.compose(v.set(0, 0.03 * METRE, 0), q.identity(), v.clone().set((S.len + 0.7) * METRE, 1, (S.wid + 0.6) * METRE)).premultiply(base)
       blobs.setMatrixAt(k, tmp)
