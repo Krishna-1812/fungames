@@ -489,5 +489,82 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   check(entries > 40 && runs <= entries * 0.02, `in three minutes the traffic goes into the junctions ${entries} times, ${runs} of them on red (a car already at the line as it changes)`)
 }
 
+// Every device (tiers.ts, grid.ts): the quality levels, Auto's steps, the boxes found by the tile, fewer people at a
+// lower level, the physics sitting out when nothing can move, and the lightning never more than two flashes a second.
+{
+  const { TIERS, TIER_ORDER, pixelsFor, guessTier, autoStep } = await import('../src/lib/walk/tiers.ts')
+  const { boxGrid } = await import('../src/lib/walk/grid.ts')
+  const { Scene, Vector3, DirectionalLight, Color } = await import('three')
+  const L = TIER_ORDER.map((t) => TIERS[t]), rising = (f) => L.every((s, k) => k === 0 || f(s) >= f(L[k - 1]))
+  check(rising((s) => s.shadow) && rising((s) => s.grass) && rising((s) => s.people) && rising((s) => s.rain) && rising((s) => s.maxPixels) && rising((s) => s.minPixels)
+    && !TIERS.low.bloom && TIERS.low.ao === 'off' && TIERS.ultra.ao === 'full' && TIERS.high.ao === 'half',
+  `four levels, each asking more than the one below: shadows ${L.map((s) => s.shadow).join('/')}, grass to ${L.map((s) => s.grass).join('/')} tiles, people ${L.map((s) => s.people).join('/')}`)
+  check(pixelsFor('low', 3) === 1 && pixelsFor('medium', 3) === 1.5 && pixelsFor('high', 3) === 2 && pixelsFor('ultra', 1) === 1.5 && pixelsFor('high', 1) === 1 && pixelsFor('low', 1, 0.5) === 0.75,
+    `pixels to a point: a 3× phone draws 1, 1.5 or 2 of them by level; Ultra draws 1.5 on a plain screen; never under 0.75`)
+  const D = { pixels: 2, width: 400, height: 800, memory: null }
+  check(guessTier({ ...D, phone: true, cores: 4 }) === 'low' && guessTier({ ...D, phone: true, cores: 8, memory: 8 }) === 'medium' && guessTier({ ...D, phone: false, cores: 8 }) === 'high' && guessTier({ ...D, phone: false, cores: 4 }) === 'medium',
+    `Auto's first guess: a small phone Low, a phone Medium, a small laptop Medium, a computer High (never Ultra)`)
+  let s = { tier: 'high', sharp: 1, slow: 0, easy: 0, triedUp: false, ceiling: 'high' }
+  s = autoStep(s, 30, 3); const once = s.tier; s = autoStep(s, 30, 3)
+  let low = { tier: 'low', sharp: 1, slow: 1, easy: 0, triedUp: false, ceiling: 'high' }
+  const gpu = autoStep(low, 30, 3, 8), cpu = autoStep(low, 30, 3, 30)
+  let up = { tier: 'medium', sharp: 1, slow: 0, easy: 0, triedUp: false, ceiling: 'high' }
+  for (let k = 0; k < 20; k++) up = autoStep(up, 60, 3)
+  let top = { tier: 'high', sharp: 1, slow: 0, easy: 0, triedUp: false, ceiling: 'high' }
+  for (let k = 0; k < 40; k++) top = autoStep(top, 60, 3)
+  check(once === 'high' && s.tier === 'medium' && gpu.sharp === 0.875 && cpu.sharp === 1 && up.tier === 'high' && up.triedUp && top.tier === 'high',
+    `Auto: one slow stretch is a hitch, two step it down (High → ${s.tier}); at Low it gives up sharpness only when the graphics are what is slow; running easily it climbs back once, never past its start`)
+  // The boxes by the tile: the same answers as looking through all of them.
+  const w3 = buildWorld(JSON.parse(json))
+  street(new Scene(), { roads: data.road, kind: w3.kind, heightAt: w3.heightAt, boxes: w3.boxes, district: data.district })
+  const G = boxGrid(w3.boxes)
+  let r = 9, miss = 0, tried = 0, seg = 0
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  for (let k = 0; k < 20000; k++) {
+    const x = rnd() * data.grid, z = rnd() * data.grid, pad = 0.3 * rnd()
+    const want = w3.boxes.filter((b) => x > b.j0 - pad && x < b.j1 + pad && z > b.i0 - pad && z < b.i1 + pad), got = G.at(x, z)
+    tried++; if (want.some((b) => !got.includes(b))) miss++
+  }
+  for (let k = 0; k < 3000; k++) {
+    const x0 = rnd() * data.grid, z0 = rnd() * data.grid, x1 = x0 + (rnd() - 0.5) * 6, z1 = z0 + (rnd() - 0.5) * 6
+    const want = w3.boxes.filter((b) => b.j1 > Math.min(x0, x1) && b.j0 < Math.max(x0, x1) && b.i1 > Math.min(z0, z1) && b.i0 < Math.max(z0, z1)), got = new Set(G.within(x0, z0, x1, z1))
+    if (want.some((b) => !got.has(b))) seg++
+  }
+  check(miss === 0 && seg === 0, `the ${w3.boxes.length.toLocaleString()} boxes found by the tile they stand on: ${tried.toLocaleString()} points and 3,000 camera lines, nothing missed (${miss}, ${seg})`)
+  // Fewer people out at a lower level.
+  const out = (density) => {
+    const p = folk(new Scene(), { roads: data.road, heightAt: world.heightAt, boxes: world.boxes, count: 40 }); p.setDensity(density)
+    const cam = new Vector3(-50, 1, -50)
+    for (let k = 0; k < 30 * 10; k++) p.update(1 / 30, { cam, you: null, cars: [], day: 1 })
+    return p.count
+  }
+  const full = out(1), lowN = out(TIERS.low.people)
+  check(lowN < full * 0.7 && lowN >= 8, `at Low fewer people are out (${lowN} of the ${full} at High)`)
+  // The physics: nothing awake and nobody near, it sits out; walk up to a ball and it runs again.
+  {
+    const start = data.road[Math.floor(data.road.length / 2)]
+    const waterAt = (x, z) => world.poolAt(x, z) ?? (world.heightAt(x, z) < Y(data.sea) + 0.06 ? world.seaAt(x, z) : null)
+    const T = toys(new Scene(), { heightAt: world.heightAt, boxes: world.boxes, seaY: Y(data.sea), waterAt, kind: world.kind, roads: data.road, start: { x: start[1] + 0.5, z: start[0] + 0.5 }, piers: data.piers })
+    const far = { x: -20, y: 0, z: -20, vx: 0, vz: 0, running: false }
+    T.step(1 / 60, { you: far, cars: [] }); const idleFar = T.idle().idle
+    const ball = T.bodies.find((b) => b.kind === 'football')
+    T.step(1 / 60, { you: { x: ball.p.x - 0.2, y: ball.p.y, z: ball.p.z, vx: 0, vz: 0, running: false }, cars: [] }); const idleNear = T.idle().idle
+    check(idleFar && !idleNear, `the physics sits out while everything is asleep and nothing is near (${idleFar}), and runs as you come up to a ball (${!idleNear})`)
+    T.dispose()
+  }
+  // The lightning: a storm for five minutes; never more than two flashes in any second, and none at all asked for less motion.
+  const strikes = (still) => {
+    const wx = weather(new Scene(), { light: new DirectionalLight(), phone: false, still, start: 'storm' }), col = new Color()
+    const ctx = { cam: new Vector3(15, 0.5, 15), groundAt: (x, z) => world.heightAt(x, z), sunDir: new Vector3(0, 1, 0), lightDir: new Vector3(0, 1, 0), lightTarget: new Vector3(15, 0, 15), litColor: col, shadeColor: col, haze: col, day: 0.3, lampGlow: 0 }
+    const at = []; let was = 0
+    for (let k = 0; k < 60 * 300; k++) { wx.update(1 / 60, ctx); const f = wx.state.flash; if (f > 0.5 && was <= 0.5) at.push(k / 60); was = f }
+    wx.dispose()
+    let most = 0; for (const t of at) most = Math.max(most, at.filter((u) => u >= t && u < t + 1).length)
+    return { n: at.length, most }
+  }
+  const storm = strikes(false), calm = strikes(true)
+  check(storm.n >= 10 && storm.most <= 2 && calm.n === 0, `a storm's lightning: ${storm.n} flashes in five minutes, at most ${storm.most} in any second (three can bring on a seizure); none with less motion`)
+}
+
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
 process.exit(failures ? 1 : 0)
