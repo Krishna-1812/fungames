@@ -445,6 +445,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   let shownCar: string | null = null
   const camPos = new Vector3(), look = new Vector3()
   let held: [Vector3, Vector3] | null = null
+  let firstView = true
   let photo = false, simT = performance.now() / 1000, snapWant: ((b: Blob | null) => void) | null = null
   const photoFocus = new Vector3(), photoMove = [0, 0]
   // The waypoint's column of light, and a ring on the ground at its foot.
@@ -707,7 +708,11 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       camPos.set(look.x + Math.sin(yaw) * Math.cos(pitch) * dist, look.y + Math.sin(pitch) * dist, look.z + Math.cos(yaw) * Math.cos(pitch) * dist)
       camPos.y = Math.max(camPos.y, world.heightAt(camPos.x, camPos.z) + 0.01)
       camera.position.copy(camPos)
-    } else camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : driving !== null ? 10 : 8)))
+    } else if (firstView) camera.position.copy(camPos)
+    else camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : driving !== null ? 10 : 8)))
+    // (The first frame puts the camera where it belongs, not easing in from the world's middle: a slow first frame
+    // on a phone could catch it under the ground, looking up at you.)
+    firstView = false
     camera.lookAt(look)
     // (Its light runs up the column; held steady for less motion.)
     ;(beacon.children[0] as Mesh<CylinderGeometry, ShaderMaterial>).material.uniforms.uTime.value = still ? 0.5 : simT
