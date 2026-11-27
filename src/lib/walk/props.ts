@@ -252,6 +252,7 @@ export function toys(scene: Scene, o: {
     }
   }
   const knocks: { kind: PropKind; at: Vector3; hard: number }[] = []
+  let idle = false, skipped = 0
   // The things themselves.
   for (const b of bodies) {
     const c = new CBody({ mass: b.mass, collisionFilterGroup: PROP, collisionFilterMask: WORLD | PROP | YOU | CAR, allowSleep: true, sleepSpeedLimit: 0.08, sleepTimeLimit: 0.6 })
@@ -302,6 +303,11 @@ export function toys(scene: Scene, o: {
     step(dt: number, c: { you: { x: number; y: number; z: number; vx: number; vz: number; running: boolean } | null; cars: { x: number; y: number; z: number; yaw: number; hl: number; hw: number; tall: number; vx: number; vz: number }[] }) {
       knocks.length = 0
       if (dt <= 0) return null
+      // Nothing moving, and nothing near enough to move anything (you, a car): the physics need not run at all.
+      // (Most of the time: it is what a phone's processor spent most of each frame on.)
+      const reach = (x: number, z: number, r: number) => bodies.some((b) => Math.abs(b.p.x - x) < r && Math.abs(b.p.z - z) < r)
+      idle = bodies.every((b) => b.c!.sleepState === CBody.SLEEPING) && !(c.you && reach(c.you.x, c.you.z, 0.6)) && !c.cars.some((car) => reach(car.x, car.z, car.hl + 0.6))
+      if (idle) { skipped++; return c.you ? { vx: c.you.vx, vz: c.you.vz } : null }
       const h = Math.min(dt, 1 / 20)
       kicked -= h
       for (const b of bodies) b.knockT -= h
@@ -369,6 +375,8 @@ export function toys(scene: Scene, o: {
     },
     /** What was hit this frame, and how hard (m/s), for the sound. */
     knocks: () => knocks,
+    /** Whether the physics sat out the last frame (all asleep, nothing near), and how many frames it has sat out. */
+    idle: () => ({ idle, skipped }),
     state: () => bodies.map((b) => ({ kind: b.kind, x: b.p.x, y: b.p.y, z: b.p.z, asleep: b.c!.sleepState === CBody.SLEEPING, up: new Vector3(0, 1, 0).applyQuaternion(b.q).y, v: b.c!.velocity.length() })),
     dispose() { for (const m of Object.values(meshes)) { scene.remove(m); m.geometry.dispose(); (m.material as MeshStandardMaterial).dispose() } },
   }
