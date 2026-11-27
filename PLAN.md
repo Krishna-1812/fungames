@@ -3239,7 +3239,17 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        (named by district and the way the road runs); 30 and
        crossing-ahead signs. Twelve cars parked about the island, any of
        them yours to drive. All of it solid.
-    14. *Finding your way* — minimap, district names, compass, photo mode.
+    14. ~~*Finding your way*~~ **done** — a round map in the corner that
+       turns as you do (streets, buildings, the games in blue, your cars); a
+       compass across the top; the district's name as you come into it (Old
+       Town, The Harbour, Sky Peaks…); M or a tap for the whole island with
+       its districts and every game as a pin — choose one and it is your
+       waypoint: a column of light in the world, the way there along the
+       streets on both maps, its bearing on the compass, how far, and
+       "You have arrived". Photo mode (P): everything held still, the camera
+       free (drag, scroll, W A S D, R F), exposure, a look (natural, vivid,
+       golden, film, mono), you in the picture or not, a PNG to keep. And
+       the first view no longer starts inside a tree.
     15. *Every device* — quality tiers, phone speed, reduced motion.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
