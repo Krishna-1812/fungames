@@ -3228,7 +3228,17 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        into the cones and they fly and fall over; stacks stand until
        knocked; they float as they weigh; every knock sounds (a ball's
        thump, a crate's wooden knock, a cone's clack).
-    13. *The street* — benches, bins, signs, traffic lights, parked cars.
+    13. ~~*The street*~~ **done** — traffic lights at every junction that
+       work: each way takes its turn (14 s green, 3 amber, 2 all-red), the
+       traffic stops at red (and at amber with room to), people cross only
+       while the traffic they cross has red; a signal head for each
+       approach on the near right corner, lit red, amber or green, glowing
+       at night. Benches by the pavements and along the sand, slatted wood
+       on cast-iron ends, some with people sitting on them (a phone, a look
+       about); dark-green bins; navy street-name plates on the corners
+       (named by district and the way the road runs); 30 and
+       crossing-ahead signs. Twelve cars parked about the island, any of
+       them yours to drive. All of it solid.
     14. *Finding your way* — minimap, district names, compass, photo mode.
     15. *Every device* — quality tiers, phone speed, reduced motion.
 
