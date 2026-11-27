@@ -52,6 +52,9 @@ const { folk } = await import('../src/lib/walk/folk.ts')
 const { gulls } = await import('../src/lib/walk/birds.ts')
 const { fishes } = await import('../src/lib/walk/fish.ts')
 const { boats } = await import('../src/lib/walk/boats.ts')
+const { weather } = await import('../src/lib/walk/weather.ts')
+const { wetness } = await import('../src/lib/walk/wet.ts')
+const { toys } = await import('../src/lib/walk/props.ts')
 
 let failures = 0
 const ok = (m) => console.log(`  ok    ${m}`)
@@ -390,6 +393,68 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   check(aground.length === 0, `every hull stays in the water, never over the sand${aground.length ? ' — not: ' + aground.slice(0, 4).join('; ') : ''}`)
   check(fer.visible && Math.abs(fer.z - (26.05 + 12 * METRE + 0.06)) < 0.02 && fer.v < 0.01, `the ferry comes in and lies alongside the harbour pier (at ${fer.z.toFixed(2)}, still)`)
   port.dispose()
+}
+
+// The weather: spells that follow one another, clouds as much of the sky as each says, rain only from a heavy sky, wet that soaks in and dries.
+{
+  const { Scene, Vector3, DirectionalLight, Color } = await import('three')
+  const scene = new Scene(), light = new DirectionalLight()
+  const wx = weather(scene, { light, phone: false, still: false, start: 'clear' })
+  const cam = new Vector3(15, 0.5, 15), up = new Vector3(), col = new Color()
+  const ctx = { cam, groundAt: (x, z) => world.heightAt(x, z), sunDir: new Vector3(0.3, 0.8, 0.2).normalize(), lightDir: new Vector3(0.3, 0.8, 0.2).normalize(), lightTarget: new Vector3(15, 0, 15), litColor: col, shadeColor: col, haze: col, day: 1, lampGlow: 0 }
+  // How much of the sky overhead is cloud, for a spell (looking up at 300 points of the sky).
+  const sky = () => { let n = 0, c = 0; for (let a = 0; a < 20; a++) for (let b = 0; b < 15; b++) { const el = 0.35 + (b / 15) * 1.1, az = (a / 20) * Math.PI * 2; up.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); c += wx.cloudToward(cam, up); n++ } return c / n }
+  const settle = (kind, s) => { wx.set(kind); for (let k = 0; k < 30 * s; k++) wx.update(1 / 30, ctx) }
+  settle('clear', 60); const clear = sky()
+  settle('cloudy', 60); const cloudy = sky()
+  settle('rain', 60); const rainy = sky(), raining = wx.state.rain, soaked = wetness.wet.value
+  check(clear < 0.2 && cloudy > 0.2 && cloudy < 0.75 && rainy > 0.9, `the sky is as cloudy as the weather says: clear ${(clear * 100).toFixed(0)}%, cloudy ${(cloudy * 100).toFixed(0)}%, rain ${(rainy * 100).toFixed(0)}% cloud`)
+  check(raining > 0.5 && soaked > 0.6, `choose rain and it rains within a minute (${raining.toFixed(2)}), and the streets are soaked (${soaked.toFixed(2)})`)
+  settle('clear', 60); const after1 = wetness.wet.value
+  settle('clear', 300); const after6 = wetness.wet.value
+  check(wx.state.rain < 0.02 && after1 > 0.3 && after6 < after1 - 0.3, `once it stops, the wet dries slowly (${after1.toFixed(2)} a minute on, ${after6.toFixed(2)} after six)`)
+  // Left to itself, an hour of it: the spells change, and it only rains from a heavy sky.
+  wx.set('auto'); const seen = new Set(); let badRain = 0
+  for (let k = 0; k < 2 * 3600; k++) { wx.update(0.5, ctx); if (k % 20 === 0) { seen.add(wx.state.kind); if (wx.state.rain > 0.05 && wx.state.cover < 0.8) badRain++ } }
+  check(seen.size >= 3 && badRain === 0, `left to itself for an hour the weather goes through ${seen.size} spells (${[...seen].join(', ')}), raining only from a heavy sky`)
+  wx.dispose()
+}
+
+// Things to kick and push: they stand where they are put, a ball goes when kicked, a crate pushes along, a car knocks a cone flying, a ball floats.
+{
+  const { Scene } = await import('three')
+  const start = data.road[Math.floor(data.road.length / 2)]
+  const waterAt = (x, z) => world.poolAt(x, z) ?? (world.heightAt(x, z) < Y(data.sea) + 0.06 ? world.seaAt(x, z) : null)
+  const T = toys(new Scene(), { heightAt: world.heightAt, boxes: world.boxes, seaY: Y(data.sea), waterAt, kind: world.kind, roads: data.road, start: { x: start[1] + 0.5, z: start[0] + 0.5 }, piers: data.piers })
+  const kinds = T.state().map((b) => b.kind), count = (k) => kinds.filter((x) => x === k).length
+  const s0 = T.state()
+  for (const b of T.bodies) b.c.wakeUp()
+  for (let k = 0; k < 300; k++) T.step(1 / 60, { you: null, cars: [] })
+  const s1 = T.state(), drift = Math.max(...s1.map((b, i) => Math.hypot(b.x - s0[i].x, b.y - s0[i].y, b.z - s0[i].z) / METRE))
+  check(count('football') >= 2 && count('beachball') >= 2 && count('crate') >= 3 && count('fishbox') >= 3 && count('cone') >= 3, `things lie about: ${count('football')} footballs, ${count('beachball')} beach balls, ${count('crate')} crates, ${count('fishbox')} fish boxes, ${count('cone')} cones`)
+  check(drift < 0.03 && s1.every((b) => b.up > 0.99), `left alone, every stack stands (the most anything settled: ${(drift * 100).toFixed(1)} cm)`)
+  // A football, run at (5.5 m/s): it goes on twenty or thirty metres, rolling.
+  const ball = T.bodies.find((b) => b.kind === 'football'), b0 = ball.p.clone()
+  let you = { x: ball.p.x - 0.1, y: world.heightAt(ball.p.x, ball.p.z), z: ball.p.z, vx: 5.5 * METRE, vz: 0, running: true }
+  for (let k = 0; k < 60; k++) { you.x += you.vx / 60; T.step(1 / 60, { you, cars: [] }) }
+  for (let k = 0; k < 600; k++) T.step(1 / 60, { you: null, cars: [] })
+  const kick = Math.hypot(ball.p.x - b0.x, ball.p.z - b0.z) / METRE
+  check(kick > 12 && kick < 60, `run into a football and it is kicked on ${kick.toFixed(0)} m`)
+  // A crate, walked into at 1.5 m/s for three seconds: it slides along, and holds you back.
+  const cr = T.bodies.filter((b) => b.kind === 'crate').at(-1), c0 = cr.p.clone()
+  you = { x: cr.p.x - 0.07, y: world.heightAt(cr.p.x, cr.p.z), z: cr.p.z, vx: 1.5 * METRE, vz: 0, running: false }
+  let went = 0
+  for (let k = 0; k < 180; k++) { const r = T.step(1 / 60, { you, cars: [] }); const vx = r ? r.vx : you.vx; you.x += vx / 60; went += vx / 60 }
+  const pushed = Math.hypot(cr.p.x - c0.x, cr.p.z - c0.z) / METRE
+  check(pushed > 0.8 && went / METRE < 4.4, `walk into a crate and it slides along (${pushed.toFixed(1)} m) while you go slower than a walk (${(went / METRE).toFixed(1)} m in 3 s)`)
+  // A car at 30 km/h into a cone: it flies and falls over.
+  const cn = T.bodies.find((b) => b.kind === 'cone'), k0 = cn.p.clone()
+  const car = { x: cn.p.x - 0.4, y: world.heightAt(cn.p.x, cn.p.z), z: cn.p.z, yaw: 0, hl: 0.22, hw: 0.1, tall: 0.16, vx: 8.3 * METRE, vz: 0 }
+  for (let k = 0; k < 90; k++) { car.x += car.vx / 60; T.step(1 / 60, { you: null, cars: [car] }) }
+  for (let k = 0; k < 300; k++) T.step(1 / 60, { you: null, cars: [] })
+  const flew = Math.hypot(cn.p.x - k0.x, cn.p.z - k0.z) / METRE, cs = T.state()[T.bodies.indexOf(cn)]
+  check(flew > 3 && cs.up < 0.9, `drive into a cone at 30 km/h and it is knocked ${flew.toFixed(0)} m, and over`)
+  T.dispose()
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
