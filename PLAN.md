@@ -3170,7 +3170,25 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        engine in deep water), a chase camera, a real headlight beam at
        night, a dashboard; get out anywhere. Round things and fences are
        solid now (the camera no longer slips behind pillars).
-    9. *Life* — people on the pavements, gulls, fish, boats.
+    9. ~~*Life*~~ **done** — forty people on the pavements, each somebody
+       (1.55–1.92 m, build, skin, hair, a T-shirt or long sleeves or a
+       dress, jeans, shorts or a skirt, trainers or shoes, a bag or a
+       backpack), jointed and walking as you do: keeping to one side of the
+       street, crossing at the junctions on the zebras once the road is
+       clear (the traffic waits for anyone on a crossing), stepping round
+       lamp posts, bins, each other and you, stopping to look at a phone; a
+       few talking on corners; fewer out at night. Herring gulls at their
+       real size, circling high over the harbour and the bays, banking, a
+       wingbeat bending at the wrist; standing on the rocks, the piers, the
+       lamps by the sea and the sand, or sitting on the swell; they take off
+       as you walk up, and glide in to land, wings raised to brake. Schools
+       of fish in the clear shallows (their shadows on the sand), scattering
+       from a swimmer; now and then one leaps. Boats where the map has them:
+       rowing boats tied up at the piers, fishing boats at anchor head to
+       wind, the double-ended ferry in to the harbour pier on its timetable
+       (saloon lit after dark), a speedboat with its wake, two yachts
+       sailing with their sails set to the wind, buoys; all floating on the
+       swell, with their lights after dark. About 7–9% of the frame rate.
     10. *Weather* — clouds, rain, wet streets, wind.
     11. *Sound* — waves, wind, footsteps, traffic, birds, night.
     12. *Things that move* — balls, crates and cones to push and kick.
