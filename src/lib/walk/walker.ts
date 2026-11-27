@@ -23,7 +23,10 @@
  * The day passes (daylight.ts): the sun goes over, it gets dark, the lamps
  * come on and the windows light, the moon and the stars come out. The
  * weather changes (weather.ts): clouds come over and their shadows cross the
- * streets, it rains and the streets shine, the wind gets up. Keyboard and mouse, or a thumb on a phone.
+ * streets, it rains and the streets shine, the wind gets up. And it all
+ * sounds (sound.ts): the sea, the wind and the rain, your steps, the traffic,
+ * the gulls, birdsong by day and crickets at night. Balls, crates and cones
+ * lie about (props.ts) to kick, push, knock over and drive into. Keyboard and mouse, or a thumb on a phone.
  */
 import {
   ACESFilmicToneMapping, Fog, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
@@ -44,6 +47,8 @@ import { boats } from './boats'
 import { WAVES } from './water'
 import { weather, type WeatherKind } from './weather'
 import { wetness } from './wet'
+import { soundscape, type Surface } from './sound'
+import { toys } from './props'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -54,12 +59,14 @@ export type Walk = { dispose(): void
   /** Get into the car you are next to, or out of the one you are driving; false if there is neither (or no room to get out). */
   toggleCar(): boolean
   /** Where you are and how (for the checks). */
-  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; quality: string; cars: number[][]; driving: boolean; speed: number; parked: number[][]; people: ReturnType<Folk['state']>; gulls: { x: number; y: number; z: number; mode: string; water: boolean }[]; fish: ReturnType<ReturnType<typeof fishes>['state']>; boats: ReturnType<ReturnType<typeof boats>['state']>; lifeMs: number }
+  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; quality: string; cars: number[][]; driving: boolean; speed: number; parked: number[][]; people: ReturnType<Folk['state']>; gulls: { x: number; y: number; z: number; mode: string; water: boolean }[]; fish: ReturnType<ReturnType<typeof fishes>['state']>; boats: ReturnType<ReturnType<typeof boats>['state']>; lifeMs: number; props: ReturnType<ReturnType<typeof toys>['state']> }
   /** Set you down somewhere, looking a given way (for the checks, and for pictures). */
   goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void
   /** Hold the camera at a point, looking at another (for the checks, and for pictures); null to let it follow you again. */
   look(eye: [number, number, number] | null, at?: [number, number, number]): void
   /** The weather: choose one, or 'auto' to let it change by itself; and what it is now. */
+  /** Sound on or off; whether it is playing (browsers start it at the first key or touch); how loud each part is (for the checks). */
+  setSound(on: boolean): void; sound(): { on: boolean; running: boolean; levels: Record<string, number> }
   setWeather(kind: WeatherKind | 'auto'): void; weather(): { kind: WeatherKind; auto: boolean; cover: number; rain: number; wind: number; wet: number }
   scene: Scene }
 
@@ -278,6 +285,37 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   if (off.has('fish')) shoals.mesh.visible = false
   if (off.has('boats')) harbour.show(false)
 
+  /* ---- things to kick and push (props.ts) ---- */
+  const things = toys(scene, { heightAt: world.heightAt, boxes: world.boxes, seaY, waterAt: (x, z) => waterAt(x, z, world.heightAt(x, z)), kind: world.kind, roads: data.road, start: { x: pos.x, z: pos.z }, piers: data.piers })
+  /** The cars near enough to matter to them (your own too, while you drive it). */
+  const thingCars = () => nearCars.map((c) => ({ x: c.x, y: world.heightAt(c.x, c.z), z: c.z, yaw: c.yaw, hl: c.hl, hw: c.hw, tall: 1.45 * METRE, vx: c.hx * c.v, vz: c.hz * c.v }))
+    .filter((c) => Math.hypot(c.x - pos.x, c.z - pos.z) < 6).slice(0, 6)
+
+  /* ---- the sound (sound.ts) ---- */
+  const ears = soundscape()
+  // The sea's edge: the middle of each side of land that faces the sea.
+  const shoreline: [number, number][] = []
+  for (let i = -1; i <= data.grid; i++) for (let j = -1; j <= data.grid; j++) {
+    if (world.kind(i, j) === '0') continue
+    for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (world.kind(i + a, j + b) === '0') shoreline.push([j + 0.5 + b * 0.5, i + 0.5 + a * 0.5])
+  }
+  const roadSet = new Set(data.road.map(([i, j]) => i * 1000 + j))
+  let shore: { d: number; x: number; z: number } | null = null, earTick = 0, town = 0, green = 0
+  let stepGone = 0, strokeT = 0, wasAir = false, airVy = 0, knockT = 0, ferryWas = 0
+  const fwd = new Vector3()
+  /** What you are walking on. */
+  const surfaceAt = (x: number, z: number, y: number): Surface => {
+    if (inWater) return 'water'
+    const i = Math.floor(z), j = Math.floor(x), k = world.kind(i, j)
+    // (Up on something built: a pier's planks over the water or the sand, stone or a step anywhere else.)
+    if (y > world.heightAt(x, z) + 0.01) return k === '0' || k === 'b' ? 'wood' : 'hard'
+    if (k === 'b') return 'sand'
+    const hard = roadSet.has(i * 1000 + j) || world.boxes.some((b) => x > b.j0 - 0.3 && x < b.j1 + 0.3 && z > b.i0 - 0.3 && z < b.i1 + 0.3 && b.z1 - b.z0 > 0.2 && b.j1 - b.j0 > 0.3)
+    return hard ? (wetness.wet.value > 0.45 && Math.random() < 0.35 ? 'puddle' : 'hard') : 'grass'
+  }
+  const startSound = () => ears.start()
+  addEventListener('keydown', startSound); addEventListener('pointerdown', startSound)
+
   /* ---- the camera ---- */
   const camera = new PerspectiveCamera(55, 1, 0.012, 500)
   /** The picture's sharpness: the screen's own pixels (up to two to a point), less if the machine needs it. */
@@ -341,6 +379,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       // Driving: the keys are the pedals and the wheel.
       const v = own[driving]
       v.step(dt, { throttle: fz, steer: fx, handbrake: keys.has('Space') }, ground)
+      things.step(dt, { you: null, cars: thingCars() })
       pos.set(v.s.x, v.s.y, v.s.z); vel.set(0, 0, 0); onGround = true; swimming = false; inWater = false
       // Into the water: a wave thrown up as it goes in, spray off the wheels as it ploughs on.
       const deep = v.s.depth > 0.15, surf = waterAt(v.s.x, v.s.z, v.s.y)
@@ -368,6 +407,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       // Your feet take a moment to get going and to stop (more on the ground than in the air or the water).
       const grip = onGround ? 10 : swimming ? 3 : 1.5
       vel.x += (wantX - vel.x) * Math.min(1, grip * dt); vel.z += (wantZ - vel.z) * Math.min(1, grip * dt)
+      // Things in your way: pushed along (and holding you back), a ball kicked on.
+      const shoved = things.step(dt, { you: { x: pos.x, y: pos.y, z: pos.z, vx: vel.x, vz: vel.z, running: Math.hypot(vel.x, vel.z) > WALK * 1.4 }, cars: thingCars() })
+      if (shoved && onGround && !swimming) { vel.x = shoved.vx; vel.z = shoved.vz }
       if (climbTo !== null) {
         // Pulling yourself up a ledge: up first, then on over it.
         pos.y = Math.min(climbTo + 0.002, pos.y + CLIMB_SPEED * dt); vel.y = 0
@@ -402,6 +444,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
           const hard = Math.min(1, Math.max(0, -falling) / 1.4)
           water.burst(pos.x, surface, pos.z, Math.round(6 + 60 * hard), 0.45 + hard * 0.9, [vel.x, vel.z])
           water.ring(pos.x, surface, pos.z, 1 + hard * 1.5, 1.6)
+          ears.splash(hard)
         }
         inWater = wet; waterDepth = wet ? surface - pos.y : 0
         // Someone in the way: you are held back out of them.
@@ -485,6 +528,16 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       if (sp > 0.05) me.rotation.y = MathUtils.lerp(me.rotation.y, Math.atan2(vel.x, vel.z) + (Math.abs(Math.atan2(vel.x, vel.z) - me.rotation.y) > Math.PI ? Math.sign(me.rotation.y) * Math.PI * 2 : 0), Math.min(1, dt * 10))
       you.update(dt, { speed: sp, running: sp > WALK * 1.4, ground: onGround && !swimming && climbTo === null, swimming, wade: inWater && !swimming ? Math.min(1, waterDepth / CHEST) : 0, climb: climbed, vy: vel.y })
       me.position.copy(pos)
+      // Your steps: one each half-stride (about 75 cm walking, 1.25 m running), on whatever is underfoot; a thud landing.
+      const onFoot = onGround && !swimming && climbTo === null
+      if (onFoot && sp > 0.02) {
+        stepGone += sp * dt
+        const half = (sp > WALK * 1.4 ? 1.25 : 0.75) * METRE
+        if (stepGone > half) { stepGone -= half; ears.step(surfaceAt(pos.x, pos.z, pos.y), sp > WALK * 1.4) }
+      }
+      if (onFoot && wasAir && airVy < -0.25) ears.land(-airVy / 1.2)
+      wasAir = !onGround && !swimming; if (wasAir) airVy = vel.y
+      if (swimming && sp > 0.03 && (strokeT -= dt) <= 0) { strokeT = 0.75; ears.stroke() }
     }
     water.update(dt)
     // Your headlights: on after dark while you drive, thrown down the road ahead.
@@ -529,6 +582,34 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : driving !== null ? 10 : 8)))
     camera.lookAt(look)
     if (held) { camera.position.copy(held[0]); camera.lookAt(held[1]) }
+    // What you hear: the sea's edge, the town, the green round you (looked for now and then); the cars, your engine, the gulls.
+    if ((earTick -= dt) <= 0) {
+      earTick = 0.4
+      let bd = 9, bx = 0, bz = 0
+      for (const [x, z] of shoreline) { const d = Math.hypot(x - camera.position.x, z - camera.position.z); if (d < bd) { bd = d; bx = x - camera.position.x; bz = z - camera.position.z } }
+      shore = bd < 9 ? { d: bd, x: bx, z: bz } : null
+      let roads = 0, land = 0
+      for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) { const i = Math.floor(pos.z) + a, j = Math.floor(pos.x) + b; if (roadSet.has(i * 1000 + j)) roads++; else if (world.kind(i, j) === '1') land++ }
+      town = Math.min(1, roads / 8); green = Math.min(1, land / 14)
+    }
+    camera.getWorldDirection(fwd)
+    {
+      const fer = harbour.state().find((b) => b.kind === 'ferry')
+      // The ferry sounds its horn as it pulls away from the pier.
+      if (fer && fer.v > 0.003 && ferryWas <= 0.003 && fer.z < 29) ears.horn({ x: fer.x, y: seaY + 0.6, z: fer.z })
+      ferryWas = fer?.v ?? 0
+      const mv = driving !== null ? own[driving] : null
+      knockT -= dt
+      const knock = mv && mv.s.hit > 1.5 && knockT <= 0 ? (knockT = 0.4, mv.s.hit) : 0
+      ears.update(dt, {
+        cam: camera.position, forward: fwd, up: UP, shore, inWater: inWater && driving === null, swimming,
+        wind: sky.state.wind, gust: sky.state.gust, rain: sky.state.rain, flash: sky.state.flash, day: dl.state.day, wet: wetness.wet.value, town, green,
+        cars: ts.map((c, k) => ({ x: c.j, y: world.heightAt(c.j, c.i), z: c.i, v: c.v / METRE, bus: kinds[k].model === 'bus' })),
+        mine: mv ? { x: mv.s.x, y: mv.s.y, z: mv.s.z, v: mv.s.u, throttle: Math.abs(fz), slide: Math.abs(mv.s.vl), hit: knock, flooded: mv.s.flooded } : null,
+        gulls: birds.state(),
+      })
+    }
+    for (const k of things.knocks()) ears.knock(k.kind, k.hard, k.at)
     // The day goes on: an hour of it a minute.
     if (clockOn) hour = (hour + dt / 60) % 24
     // The weather has its say in the light, then the light in the weather.
@@ -621,6 +702,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     clock: () => clockOn,
     setAerial(on) { aerial = on },
     setWeather(kind) { sky.set(kind) },
+    setSound(on) { ears.setOn(on) },
+    sound: () => ({ on: ears.on, running: ears.running, levels: ears.levels() }),
     weather: () => ({ kind: sky.state.kind, auto: sky.state.auto, cover: sky.state.cover, rain: sky.state.rain, wind: sky.state.wind, wet: wetness.wet.value }),
     near: () => near,
     toggleCar() {
@@ -642,7 +725,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     state: () => ({
       x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), quality,
       cars: traffic.state().map((c) => [c.j, c.i]), driving: driving !== null, speed: driving !== null ? own[driving].speed() : 0,
-      parked: own.map((v) => [v.s.x, v.s.z, v.s.yaw]), people: people.state(), gulls: birds.state(), fish: shoals.state(), boats: harbour.state(), lifeMs,
+      parked: own.map((v) => [v.s.x, v.s.z, v.s.yaw]), people: people.state(), gulls: birds.state(), props: things.state(), fish: shoals.state(), boats: harbour.state(), lifeMs,
     }),
     /** (For the checks: the scene itself.) */
     scene,
@@ -650,7 +733,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
       removeEventListener('pointermove', pm); removeEventListener('pointerup', pu)
-      dl.dispose(); sky.dispose(); post?.dispose(); renderer.dispose()
+      dl.dispose(); sky.dispose(); ears.dispose(); things.dispose(); removeEventListener('keydown', startSound); removeEventListener('pointerdown', startSound); post?.dispose(); renderer.dispose()
     },
   }
 }

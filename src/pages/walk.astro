@@ -6,7 +6,8 @@
  * building and it offers to take you in. Cars of your own stand parked by
  * the road: get in and drive one. The day passes, an hour a minute; the
  * clock lets you pause it or go to any hour, and choose the weather (or let
- * it change by itself).
+ * it change by itself). It all sounds as it should (the sea, the wind and
+ * the rain, your steps, the traffic, the birds); the speaker turns it off.
  */
 import Base from '../layouts/Base.astro'
 import { withBase } from '../lib/base'
@@ -17,7 +18,7 @@ import { withBase } from '../lib/base'
     <canvas class="wk-canvas" id="wk" aria-label="The island in 3D"></canvas>
     <div class="wk-top">
       <a class="wk-btn" href={withBase('/')}>← The map</a>
-      <span class="wk-right"><button class="wk-btn" id="wkAir" type="button" aria-pressed="false">Aerial</button> <button class="wk-btn wk-clock" id="wkClock" type="button" aria-expanded="false" aria-controls="wkTime" aria-label="Time of day"><svg class="wk-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4"/></svg><svg class="wk-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.8A6.5 6.5 0 0 1 7.2 4.5a6.5 6.5 0 1 0 8.3 8.3z"/></svg><span id="wkClockText">16:30</span></button></span>
+      <span class="wk-right"><button class="wk-btn wk-icon" id="wkSound" type="button" aria-pressed="true" aria-label="Sound"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="wk-spk" d="M3 7.5h3l4-3.5v12l-4-3.5H3z"/><path class="wk-waves" d="M13 7a4 4 0 0 1 0 6M15.3 4.8a7 7 0 0 1 0 10.4"/><path class="wk-mute" d="M13 7.5l5 5M18 7.5l-5 5"/></svg></button> <button class="wk-btn" id="wkAir" type="button" aria-pressed="false">Aerial</button> <button class="wk-btn wk-clock" id="wkClock" type="button" aria-expanded="false" aria-controls="wkTime" aria-label="Time of day"><svg class="wk-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4"/></svg><svg class="wk-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.8A6.5 6.5 0 0 1 7.2 4.5a6.5 6.5 0 1 0 8.3 8.3z"/></svg><span id="wkClockText">16:30</span></button></span>
     </div>
     <div class="wk-time" id="wkTime" hidden>
       <label class="wk-time-label" for="wkHour">Time of day <output id="wkHourOut">16:30</output></label>
@@ -113,6 +114,13 @@ import { withBase } from '../lib/base'
       if (e.code === 'KeyE') { const g = walk.near(); if (g) location.href = g.href; else walk.toggleCar() }
       if (e.code === 'KeyN') { const h = walk.time(); walk.setNight(h > 6 && h < 19.5) }
     })
+    // Sound: on unless turned off before (it starts at the first key or touch).
+    const soundBtn = document.getElementById('wkSound') as HTMLButtonElement
+    let soundOn = true
+    try { soundOn = localStorage.getItem('walk-sound') !== 'off' } catch {}
+    const showSound = () => { soundBtn.setAttribute('aria-pressed', String(soundOn)); soundBtn.setAttribute('aria-label', soundOn ? 'Sound on' : 'Sound off'); walk.setSound(soundOn) }
+    showSound()
+    soundBtn.addEventListener('click', () => { soundOn = !soundOn; try { localStorage.setItem('walk-sound', soundOn ? 'on' : 'off') } catch {} showSound() })
     const air = document.getElementById('wkAir') as HTMLButtonElement
     air.addEventListener('click', () => { const on = air.getAttribute('aria-pressed') !== 'true'; air.setAttribute('aria-pressed', String(on)); air.textContent = on ? 'On foot' : 'Aerial'; walk.setAerial(on) })
     if (new URLSearchParams(location.search).has('aerial')) air.click()
@@ -197,6 +205,10 @@ import { withBase } from '../lib/base'
   .wk-chip { border: 0; border-radius: 999px; padding: 7px 10px; background: #e8eefb; color: #0f1730; font: 600 12px/1 var(--font-ui, system-ui, sans-serif); cursor: pointer; }
   .wk-chip:hover { background: #d8e3fa; }
   .wk-chip[aria-pressed='true'] { background: #2f6df6; color: #fff; }
+  .wk-icon { padding: 8px 11px; display: inline-flex; align-items: center; vertical-align: top; }
+  .wk-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .wk-icon .wk-spk { fill: currentColor; }
+  .wk-icon[aria-pressed='true'] .wk-mute, .wk-icon[aria-pressed='false'] .wk-waves { display: none; }
   #wkSkyLabel { margin: 4px 0 0; }
   .wk-chip:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
   .wk-load { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: #eef3ff; font: 600 16px/1.4 var(--font-ui, system-ui, sans-serif); }
