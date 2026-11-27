@@ -3089,7 +3089,7 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     phone, and a Walk button beside Cartoon and Realistic on the map.
     `check-walk` builds it headlessly and floods out from the start by
     the walker's own rules — every game's building has to be reachable.
-70. **The walk, toward real** — fifteen phases, one at a time, each pushed
+70. ~~**The walk, toward real**~~ **done.** Fifteen phases, one at a time, each pushed
     and shown before the next starts:
     1. ~~*The ground*~~ **done** — terraces eased into slopes where the
        step is small, walls of rock (or cut stone, under a road or a plot)
@@ -3250,7 +3250,28 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        free (drag, scroll, W A S D, R F), exposure, a look (natural, vivid,
        golden, film, mono), you in the picture or not, a PNG to keep. And
        the first view no longer starts inside a tree.
-    15. *Every device* — quality tiers, phone speed, reduced motion.
+    15. ~~*Every device*~~ **done** — four quality levels (Low, Medium,
+       High, Ultra) and Auto, which guesses one for the device (a phone
+       Medium, a computer High, a level lower on few cores or little
+       memory), steps down if it cannot keep 45 fps, remembers where it
+       settled, and once a visit tries the level above again; it gives up
+       sharpness only when the graphics are what is slow. Each level sets the
+       pixels to a point, the shadows, the occlusion (none, half, full), the
+       glow, the grass's reach, how many people are out and how heavy the rain
+       is drawn — changed as it runs, from a settings panel (with a frame-rate
+       readout). The phone's speed: the physics sits out while every ball,
+       crate and cone is asleep and nothing is near (it had been most of a
+       phone's processor time), and the island's 1,163 walls are found by the
+       tile they stand on, not looked through each time — the processor's
+       share of a frame went from 67 ms to under 40 on a phone emulated at a
+       quarter speed (17 to 8 on a desktop). Less motion, asked for by the
+       device or chosen (Calm): the sea flat, the trees barely stirring, the
+       rain lighter, no lightning, the film's grain and the waypoint's light
+       still, no flash for a picture; and for everyone, lightning is two
+       pulses then nothing for seconds, never more than two flashes in a
+       second. On a phone: the top bar's words go (its buttons stay), two
+       fingers pinch to go nearer or further, and in photo mode the stick
+       moves the camera.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
