@@ -24,6 +24,7 @@
 import {
   BufferGeometry, CanvasTexture, Color, DoubleSide, Float32BufferAttribute, LinearMipmapLinearFilter, Mesh, MeshStandardMaterial, SRGBColorSpace, Vector3,
 } from 'three'
+import { wetness } from './wet'
 
 export const PX = 45.254834, PH = PX * 0.8660254
 /** Screen pixels, and the site's height pixels, as world units. */
@@ -184,11 +185,18 @@ const FACADE = /* glsl */ `
   } else {
     c *= 0.95 + 0.05 * fNoise(face * 40.0);
   }
+  // Wet with rain: render and stone darken, roofs and paint shine.
+  if (uWet > 0.001) {
+    float up = smoothstep(0.3, 0.9, n.y);
+    c *= 1.0 - uWet * (kind > 0.5 && kind < 1.5 ? 0.28 : 0.2) * (0.6 + 0.4 * up);
+    rough = mix(rough, rough * (up > 0.5 ? 0.3 : 0.6), uWet);
+  }
   diffuseColor.rgb = c;
   fRough = rough; fBump = bh * fade * 0.05;
 }
 `
 const FACADE_HEAD = /* glsl */ `
+uniform float uWet;
 varying float vFMat;
 varying float vFBase;
 varying vec3 vFW;
@@ -213,6 +221,7 @@ vec3 fPerturb(vec3 surfPos, vec3 surfNorm, vec2 dHdxy, float faceDir) {
 export function facadeMaterial() {
   const m = new MeshStandardMaterial({ vertexColors: true, roughness: 0.78, side: DoubleSide })
   m.onBeforeCompile = (sh) => {
+    sh.uniforms.uWet = wetness.wet
     sh.vertexShader = 'attribute float aMat;\nattribute float aBase;\nvarying float vFMat;\nvarying float vFBase;\nvarying vec3 vFW;\nvarying vec3 vFN;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFMat = aMat; vFBase = aBase;\n  vFW = (modelMatrix * vec4(transformed, 1.0)).xyz; vFN = normalize(mat3(modelMatrix) * objectNormal);')
     sh.fragmentShader = FACADE_HEAD + sh.fragmentShader

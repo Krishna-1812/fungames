@@ -23,6 +23,7 @@
 import {
   BufferGeometry, ClampToEdgeWrapping, Color, DataTexture, DoubleSide, Float32BufferAttribute, FrontSide, LinearFilter, Mesh, MeshPhysicalMaterial, RGBAFormat, UnsignedByteType,
 } from 'three'
+import { wetness, RIPPLES_GLSL } from './wet'
 
 /**
  * The waves: direction, wavenumber (radians a tile), and steepness (how far each tilts the surface). Each runs
@@ -109,6 +110,7 @@ export function buildSea(opts: { grid: number; margin: number; seaY: number; hei
     uFoam: { value: 1 },
     /** How much the swell lifts the sea (0 for someone who asked for less motion: the sea lies flat, still glittering). */
     uLift: { value: 1 },
+    uRain: wetness.rain, uChop: wetness.chop,
   }
   const mat = new MeshPhysicalMaterial({ color: '#14688f', roughness: 0.04, metalness: 0, transparent: true, side: FrontSide, clearcoat: 0 })
   mat.onBeforeCompile = (sh) => {
@@ -140,11 +142,14 @@ uniform vec3 uShallow;
 uniform vec3 uMid;
 uniform vec3 uDeep;
 uniform float uFoam;
+uniform float uRain;
+uniform float uChop;
 varying vec3 vWPos;
 float wDepth;
 float wFoam;
 float wCalm;
 ${NOISE}
+${RIPPLES_GLSL}
 ` + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
   {
@@ -177,7 +182,9 @@ ${NOISE}
     vec2 p = vWPos.xz, g = vec2(0.0);
     ${TILT_GLSL}
     // Calmer far off (the horizon is a line, not noise) and in the shallows.
-    g *= (1.0 - 0.75 * clamp(length(vWPos - cameraPosition) / 60.0, 0.0, 1.0)) * mix(0.35, 1.0, wCalm) * (1.0 - wFoam * 0.7);
+    g *= (1.0 - 0.75 * clamp(length(vWPos - cameraPosition) / 60.0, 0.0, 1.0)) * mix(0.35, 1.0, wCalm) * (1.0 - wFoam * 0.7) * uChop;
+    // Rain: rings everywhere it lands (near you; further off they are too small to see).
+    if (uRain > 0.01) g += rRipples(p * 0.6, uTime, uRain).xy * 0.16 * (1.0 - smoothstep(2.0, 8.0, length(vWPos - cameraPosition)));
     normal = normalize((viewMatrix * vec4(normalize(vec3(-g.x, 1.0, -g.y)), 0.0)).xyz);
   }`)
   }

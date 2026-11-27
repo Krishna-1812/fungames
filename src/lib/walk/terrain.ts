@@ -25,6 +25,7 @@
  * screen is, and never tiles.
  */
 import { BufferGeometry, Color, Float32BufferAttribute, Mesh, MeshStandardMaterial, Uint32BufferAttribute, Vector3 } from 'three'
+import { wetness, RIPPLES_GLSL } from './wet'
 import { PX_H, Y, type WorldData } from './build3d'
 
 export type Box = { i0: number; j0: number; i1: number; j1: number; z0: number; z1: number }
@@ -488,6 +489,8 @@ function smoothstep(a: number, b: number, x: number) { const t = Math.max(0, Mat
 /* ---- what the ground is made of: painted where it is ---------------------- */
 const GROUND_HEAD = /* glsl */ `
 uniform float uSeaY;
+uniform float uWet;
+uniform float uRain;
 uniform float uTime;
 uniform float uCaustic;
 varying vec3 vTW;
@@ -669,6 +672,20 @@ const GROUND_BODY = /* glsl */ `
     caus *= smoothstep(0.0, 0.04, -wetY) * (1.0 - smoothstep(0.12, 0.7, -wetY)) * uCaustic * wn.y * (1.0 - 0.6 * smoothstep(5.0, 18.0, dist));
     col += col * caus * 0.85;
   }
+  // Rain: everything darkens and shines as it soaks in — the streets, the paving and the rock most, grass and earth less;
+  // puddles gather on the level street and paving, mirrors with rings in them while it rains.
+  if (uWet > 0.001 && wetY > 0.0) {
+    float hard = (id > 1.5 && id < 3.5) || id > 8.5 ? 1.0 : 0.4;
+    float soak = uWet * hard;
+    col *= 1.0 - 0.38 * soak; rough = mix(rough, rough * 0.32, soak);
+    if (hard > 0.5 && wn.y > 0.97) {
+      float pud = smoothstep(0.66 - 0.2 * uWet, 0.7 - 0.2 * uWet, tFbm(p * 1.6 + 3.3) * 0.7 + tNoise(p * 6.0) * 0.3) * smoothstep(0.3, 0.8, uWet);
+      col = mix(col, col * 0.5, pud); rough = mix(rough, 0.025, pud);
+      bh *= 1.0 - pud;
+      // (The rings: a bump of their own, flattened away from the puddles.)
+      bh += rRipples(p * 0.6, uTime, uRain * 0.9).z * 0.18 * pud * fade / max(bumpK, 0.1);
+    }
+  }
   // Wet where the sea reaches: darker, and shining.
   float wet = (1.0 - smoothstep(0.0, 0.05 + 0.03 * n2, wetY)) * step(id, 4.5 + step(8.5, id) * 9.0);
   col = mix(col, col * vec3(0.5, 0.52, 0.56), wet); rough = mix(rough, 0.25, wet);
@@ -685,11 +702,12 @@ function groundMaterial(seaY: number, time: { value: number }, caustics: { value
     sh.uniforms.uSeaY = { value: seaY }
     sh.uniforms.uTime = time
     sh.uniforms.uCaustic = caustics
+    sh.uniforms.uWet = wetness.wet; sh.uniforms.uRain = wetness.rain
     sh.vertexShader = 'attribute vec3 aSurf;\nattribute vec4 aBlend;\nvarying vec3 vTW;\nvarying vec3 vTN;\nvarying vec3 vTSurf;\nvarying vec4 vTBlend;\n' + sh.vertexShader.replace(
       '#include <begin_vertex>',
       '#include <begin_vertex>\n  vTW = (modelMatrix * vec4(transformed, 1.0)).xyz;\n  vTN = normalize(mat3(modelMatrix) * objectNormal);\n  vTSurf = aSurf;\n  vTBlend = aBlend;',
     )
-    sh.fragmentShader = GROUND_HEAD + sh.fragmentShader
+    sh.fragmentShader = GROUND_HEAD + RIPPLES_GLSL + sh.fragmentShader
       .replace('#include <color_fragment>', () => '#include <color_fragment>\n' + GROUND_BODY)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = tPerturb(-vViewPosition, normal, vec2(dFdx(tBump), dFdy(tBump)), faceDirection);')
