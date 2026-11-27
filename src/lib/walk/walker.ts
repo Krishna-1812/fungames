@@ -35,6 +35,11 @@ import { daylight } from './daylight'
 import { figure, METRE } from './body'
 import { fleet, MODELS, parkingSpots, type ModelName, type Pose } from './cars'
 import { vehicle, type Ground, type Vehicle } from './drive'
+import { folk, type CarNear, type Folk } from './folk'
+import { gulls } from './birds'
+import { fishes } from './fish'
+import { boats } from './boats'
+import { WAVES } from './water'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -45,9 +50,11 @@ export type Walk = { dispose(): void
   /** Get into the car you are next to, or out of the one you are driving; false if there is neither (or no room to get out). */
   toggleCar(): boolean
   /** Where you are and how (for the checks). */
-  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; quality: string; cars: number[][]; driving: boolean; speed: number; parked: number[][] }
+  state(): { x: number; y: number; z: number; onGround: boolean; swimming: boolean; inWater: boolean; spray: number; quality: string; cars: number[][]; driving: boolean; speed: number; parked: number[][]; people: ReturnType<Folk['state']>; gulls: { x: number; y: number; z: number; mode: string; water: boolean }[]; fish: ReturnType<ReturnType<typeof fishes>['state']>; boats: ReturnType<ReturnType<typeof boats>['state']>; lifeMs: number }
   /** Set you down somewhere, looking a given way (for the checks, and for pictures). */
   goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void
+  /** Hold the camera at a point, looking at another (for the checks, and for pictures); null to let it follow you again. */
+  look(eye: [number, number, number] | null, at?: [number, number, number]): void
   scene: Scene }
 
 /** What the page shows about cars: one to get into near you, the one you drive (its speed in km/h, and its gear). */
@@ -244,6 +251,23 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     return false
   }
 
+  /* ---- the island's people, on its pavements (folk.ts) ---- */
+  // (?nolife: none of them; ?off=people,boats,fish,gulls: some — to measure what each costs.)
+  const off = new Set(Q.has('nolife') ? ['people', 'boats', 'fish', 'gulls'] : (Q.get('off') ?? '').split(','))
+  const people = folk(scene, { roads: data.road, heightAt: world.heightAt, boxes: world.boxes, count: phone ? 26 : 40 })
+  const nearCars: CarNear[] = []
+  let lifeMs = 0
+  // The gulls: circling over the harbour, the west bay and off the north shore, and standing about by the sea (birds.ts).
+  const birds = gulls(scene, { seaY, grid: data.grid, heightAt: world.heightAt, seaAt: world.seaAt, depthAt: world.depthAt, kind: world.kind, boxes: world.boxes, lamps: world.lamps, piers: data.piers, rocks: data.seaRocks, rings: [[24, 23], [13, 4], [3, 23]], count: phone ? 12 : 18 })
+
+  // Fish in the shallows, and now and then one leaping (fish.ts).
+  const shoals = fishes(scene, { seaY, grid: data.grid, depthAt: world.depthAt, seaAt: world.seaAt, splash: (x, y, z, n, p) => water.burst(x, y, z, n, p, [0, 0]), ring: (x, y, z, r) => water.ring(x, y, z, r, 1.4), schools: phone ? 5 : 8 })
+  // Boats: tied up at the piers, at anchor, the ferry on its timetable, a speedboat, two yachts (boats.ts).
+  const harbour = boats(scene, { seaAt: world.seaAt, piers: data.piers, wind: [WAVES[0].x, WAVES[0].z], splash: (x, y, z, n, p) => water.burst(x, y, z, n, p, [0, 0]) })
+
+  if (off.has('fish')) shoals.mesh.visible = false
+  if (off.has('boats')) harbour.show(false)
+
   /* ---- the camera ---- */
   const camera = new PerspectiveCamera(55, 1, 0.012, 500)
   /** The picture's sharpness: the screen's own pixels (up to two to a point), less if the machine needs it. */
@@ -278,6 +302,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   let raf = 0, last = performance.now(), near: { slug: string; title: string; href: string } | null = null
   let shownCar: string | null = null
   const camPos = new Vector3(), look = new Vector3()
+  let held: [Vector3, Vector3] | null = null
   let sunTick = 0, sunSeen = 0, sunVis = 0
   const sunAt = new Vector3(), sunLook = new Vector3(), ray = new Vector3()
   /** Whether a line from the camera towards the sun gets clear of the ground and everything built. */
@@ -369,6 +394,12 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
           water.ring(pos.x, surface, pos.z, 1 + hard * 1.5, 1.6)
         }
         inWater = wet; waterDepth = wet ? surface - pos.y : 0
+        // Someone in the way: you are held back out of them.
+        const bump = people.push(pos.x, pos.z, pos.y, RADIUS)
+        if (bump && !blockedAt(pos.x + bump[0], pos.z + bump[1], pos.y)) { pos.x += bump[0]; pos.z += bump[1] }
+        // A boat's hull, swimming into it.
+        const hulled = inWater || swimming ? harbour.push(pos.x, pos.z, pos.y, RADIUS) : null
+        if (hulled) { pos.x += hulled[0]; pos.z += hulled[1] }
         // A stream carries you with it.
         const run = wet ? world.flowAt(pos.x, pos.z) : null
         if (run) {
@@ -387,6 +418,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // The traffic stops for the car you drive, and for you in the road.
     obstacles.length = 0
     if (driving !== null) { const b = own[driving].box(); obstacles.push({ i: b.z, j: b.x, r: b.hl, w: b.hw }) } else obstacles.push({ i: pos.z, j: pos.x, r: 0.03, w: 0.03 })
+    obstacles.push(...people.crossing())
     traffic.step(dt)
     const ts = traffic.state()
     ts.forEach((c, k) => {
@@ -421,6 +453,18 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       cars.set(NT + k, pose, Math.hypot(s.x - camera.position.x, s.z - camera.position.z) < 2.8)
     })
     cars.done()
+    // The people on the pavements: they look out for the traffic (and your car), and step round you.
+    nearCars.length = 0
+    ts.forEach((c, k) => { const S = MODELS[kinds[k].model]; nearCars.push({ x: c.j, z: c.i, hx: c.hj, hz: c.hi, v: c.v, hl: (S.len / 2) * METRE, hw: (S.wid / 2) * METRE, yaw: Math.atan2(-c.hi, c.hj) }) })
+    if (driving !== null) { const v = own[driving], b = v.box(); nearCars.push({ x: b.x, z: b.z, hx: Math.cos(b.yaw) * Math.sign(v.s.u || 1), hz: -Math.sin(b.yaw) * Math.sign(v.s.u || 1), v: Math.abs(v.s.u) * METRE, hl: b.hl, hw: b.hw, yaw: b.yaw }) }
+    {
+      const t0 = performance.now()
+      if (!off.has('people')) people.update(dt, { cam: camera.position, you: driving === null ? pos : null, cars: nearCars, day: dl.state.day })
+      if (!off.has('boats')) harbour.update(dt, { time: now / 1000, glow, cam: camera.position })
+      if (!off.has('fish')) shoals.update(dt, { cam: camera.position, you: pos, inWater: inWater || swimming, time: now / 1000 })
+      if (!off.has('gulls')) birds.update(dt, { cam: camera.position, you: pos, driving: driving !== null, day: dl.state.day, time: now / 1000, still })
+      lifeMs += (performance.now() - t0 - lifeMs) * 0.05
+    }
     // You, at the wheel or on foot.
     if (driving !== null) {
       rig.matrix.copy(cars.body(NT + driving)); rig.matrixWorldNeedsUpdate = true
@@ -474,6 +518,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (camPos.y < under) camPos.y = under
     camera.position.lerp(camPos, Math.min(1, dt * (aerial ? 3 : driving !== null ? 10 : 8)))
     camera.lookAt(look)
+    if (held) { camera.position.copy(held[0]); camera.lookAt(held[1]) }
     // The day goes on: an hour of it a minute.
     if (clockOn) { hour = (hour + dt / 60) % 24; applyTime() }
     dl.follow(camera.position, dt)
@@ -560,6 +605,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       if (k === null) return false
       getIn(k); return true
     },
+    look(eye, at) { held = eye && at ? [new Vector3(...eye), new Vector3(...at)] : null },
     goTo(x, z, view) {
       // (Out of any car first, wherever it is.)
       if (driving !== null) { const v = own[driving]; v.s.u = v.s.vl = v.s.r = 0; driving = null; scene.add(me); me.rotation.set(0, 0, 0) }
@@ -572,7 +618,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     state: () => ({
       x: pos.x, y: pos.y, z: pos.z, onGround, swimming, inWater, spray: water.drops(), quality,
       cars: traffic.state().map((c) => [c.j, c.i]), driving: driving !== null, speed: driving !== null ? own[driving].speed() : 0,
-      parked: own.map((v) => [v.s.x, v.s.z, v.s.yaw]),
+      parked: own.map((v) => [v.s.x, v.s.z, v.s.yaw]), people: people.state(), gulls: birds.state(), fish: shoals.state(), boats: harbour.state(), lifeMs,
     }),
     /** (For the checks: the scene itself.) */
     scene,
