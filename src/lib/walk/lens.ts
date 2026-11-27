@@ -32,10 +32,10 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js'
 
 const Grade = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uGrain: { value: 0.018 }, uRes: { value: new Vector2(1, 1) }, uVignette: { value: 0.26 }, uCool: { value: 1 }, uSun: { value: new Vector2(0.5, 0.5) }, uSunVis: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uGrain: { value: 0.018 }, uRes: { value: new Vector2(1, 1) }, uVignette: { value: 0.26 }, uCool: { value: 1 }, uSun: { value: new Vector2(0.5, 0.5) }, uSunVis: { value: 0 }, uExpo: { value: 1 }, uSat: { value: 1 }, uWarm: { value: 0 }, uFilm: { value: 0 } },
   vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse; uniform float uTime, uGrain, uVignette, uCool, uSunVis; uniform vec2 uRes, uSun;
+    uniform sampler2D tDiffuse; uniform float uTime, uGrain, uVignette, uCool, uSunVis, uExpo, uSat, uWarm, uFilm; uniform vec2 uRes, uSun;
     varying vec2 vUv;
     float hash(vec2 p) { p = fract(p * vec2(443.897, 441.423)); p += dot(p, p.yx + 19.19); return fract((p.x + p.y) * p.x); }
     void main() {
@@ -65,6 +65,12 @@ const Grade = {
         }
         c += glare * uSunVis;
       }
+      // A photograph's own look (photo mode): exposure, colour, warmth, a film's lifted blacks and soft highlights.
+      c *= uExpo;
+      float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = max(mix(vec3(lum), c, uSat), 0.0);
+      c += vec3(0.035, 0.008, -0.03) * uWarm;
+      c = mix(c, 0.045 + 0.9 * c * c * (3.0 - 2.0 * c), uFilm);
       // The lens: its corners fall off a little.
       vec2 q = vUv - 0.5; q.x *= uRes.x / uRes.y;
       c *= 1.0 - uVignette * smoothstep(0.3, 0.95, length(q));
@@ -122,6 +128,12 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
       bloom.strength = L(0.15, 0.12) + 0.06 * mist; bloom.threshold = L(1.8, 9); bloom.radius = L(0.22, 0.2) + 0.1 * mist
       grade.uniforms.uCool.value = d
       if (ao) ao.blendIntensity = L(0.6, 1)
+    },
+    /** A photograph's look: exposure (×), saturation (0 grey, 1 as is), warmth, film; a vignette and grain (defaults when unset). */
+    look(o: { expo?: number; sat?: number; warm?: number; film?: number; vignette?: number; grain?: number }) {
+      const u = grade.uniforms
+      u.uExpo.value = o.expo ?? 1; u.uSat.value = o.sat ?? 1; u.uWarm.value = o.warm ?? 0; u.uFilm.value = o.film ?? 0
+      u.uVignette.value = o.vignette ?? 0.26; u.uGrain.value = o.grain ?? 0.018
     },
     /** Where the sun is in the picture (0–1 across and up) and how much of it can be seen. */
     sun(u: number, v: number, vis: number) { grade.uniforms.uSun.value.set(u, v); grade.uniforms.uSunVis.value = vis },
