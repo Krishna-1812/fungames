@@ -55,6 +55,7 @@ const { boats } = await import('../src/lib/walk/boats.ts')
 const { weather } = await import('../src/lib/walk/weather.ts')
 const { wetness } = await import('../src/lib/walk/wet.ts')
 const { toys } = await import('../src/lib/walk/props.ts')
+const { street, lightAt } = await import('../src/lib/walk/street.ts')
 
 let failures = 0
 const ok = (m) => console.log(`  ok    ${m}`)
@@ -455,6 +456,37 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   const flew = Math.hypot(cn.p.x - k0.x, cn.p.z - k0.z) / METRE, cs = T.state()[T.bodies.indexOf(cn)]
   check(flew > 3 && cs.up < 0.9, `drive into a cone at 30 km/h and it is knocked ${flew.toFixed(0)} m, and over`)
   T.dispose()
+}
+
+// The street: traffic lights at the junctions, which the traffic obeys; benches, bins, signs; all of it solid.
+{
+  const { Scene } = await import('three')
+  const w2 = buildWorld(JSON.parse(json))
+  const st = street(new Scene(), { roads: data.road, kind: w2.kind, heightAt: w2.heightAt, boxes: w2.boxes, district: data.district })
+  const n = st.counts()
+  check(n.junctions >= 8 && n.heads >= n.junctions * 3 && n.benches >= 12 && n.bins >= 8 && n.signs >= 4 && n.solids >= n.benches + n.bins + n.poles, `the street: ${n.junctions} junctions with ${n.heads} signal heads on ${n.poles} poles, ${n.benches} benches, ${n.bins} bins, ${n.signs} road signs, all solid`)
+  // The cycle: never green both ways at once, every way green a while each minute.
+  let both = 0, greens = { ns: 0, ew: 0 }
+  for (let t = 0; t < 76; t += 0.25) { const a = lightAt(t, 3, 'ns'), b = lightAt(t, 3, 'ew'); if (a !== 'red' && b !== 'red') both++; if (a === 'green') greens.ns += 0.25; if (b === 'green') greens.ew += 0.25 }
+  check(both === 0 && greens.ns >= 25 && greens.ew >= 25, `the lights never let both ways go at once (${both} moments), each way green ${greens.ns} s and ${greens.ew} s in 76`)
+  // Three minutes of traffic: nobody drives into a junction on red, and the traffic still flows.
+  const tr = createTraffic({ roads: data.road, play: true, dark: () => 0, signal: st.signal })
+  const cell = (c) => [Math.floor(c.i), Math.floor(c.j)]
+  let prev = tr.state().map(cell), runs = 0, entries = 0, moved = 0
+  const jset = new Set(st.junctions.map(([i, j]) => `${i},${j}`))
+  for (let k = 0; k < 30 * 180; k++) {
+    tr.step(1 / 30); st.update(1 / 30, 0)
+    const now = tr.state()
+    now.forEach((c, m) => {
+      const a = prev[m], b = cell(c)
+      // (Not a U-turn at a dead end beside a junction, whose curve cuts its corner at the line.)
+      const uturn = c.path.split(' ')[0] === c.path.split(' ')[2]
+      if ((a[0] !== b[0] || a[1] !== b[1]) && jset.has(`${b[0]},${b[1]}`) && !jset.has(`${a[0]},${a[1]}`) && !uturn) { entries++; if (st.signal(b, a) === 'red') runs++ }
+      prev[m] = b
+      moved += c.v / 30
+    })
+  }
+  check(entries > 40 && runs <= entries * 0.02, `in three minutes the traffic goes into the junctions ${entries} times, ${runs} of them on red (a car already at the line as it changes)`)
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
