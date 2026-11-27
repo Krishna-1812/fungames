@@ -21,7 +21,9 @@
  * out wherever you like and it stays where you left it.
  *
  * The day passes (daylight.ts): the sun goes over, it gets dark, the lamps
- * come on and the windows light, the moon and the stars come out. Keyboard and mouse, or a thumb on a phone.
+ * come on and the windows light, the moon and the stars come out. The
+ * weather changes (weather.ts): clouds come over and their shadows cross the
+ * streets, it rains and the streets shine, the wind gets up. Keyboard and mouse, or a thumb on a phone.
  */
 import {
   ACESFilmicToneMapping, Fog, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
@@ -40,6 +42,8 @@ import { gulls } from './birds'
 import { fishes } from './fish'
 import { boats } from './boats'
 import { WAVES } from './water'
+import { weather, type WeatherKind } from './weather'
+import { wetness } from './wet'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -55,6 +59,8 @@ export type Walk = { dispose(): void
   goTo(x: number, z: number, view?: { yaw?: number; pitch?: number; dist?: number }): void
   /** Hold the camera at a point, looking at another (for the checks, and for pictures); null to let it follow you again. */
   look(eye: [number, number, number] | null, at?: [number, number, number]): void
+  /** The weather: choose one, or 'auto' to let it change by itself; and what it is now. */
+  setWeather(kind: WeatherKind | 'auto'): void; weather(): { kind: WeatherKind; auto: boolean; cover: number; rain: number; wind: number; wet: number }
   scene: Scene }
 
 /** What the page shows about cars: one to get into near you, the one you drive (its speed in km/h, and its gear). */
@@ -104,8 +110,12 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const SHADOW = Number(Q.get('shadow')) || (phone ? 2048 : 4096), REACH = 13
   const dl = daylight(scene, renderer, { shadowSize: SHADOW, reach: REACH, soft: Q.has('soft') ? Number(Q.get('soft')) : undefined })
   const sun = dl.light, sunDir = dl.state.lightDir
+  // The weather (weather.ts): clouds and their shadows, rain, wet, wind; ?w=rain to start in it.
+  const sky = weather(scene, { light: sun, phone, still, start: Q.get('w') })
+  dl.addToSky(sky.dome)
+  const windNow: [number, number] = [WAVES[0].x, WAVES[0].z]
   // Light from the lamps nearest you (a handful of real lights, moved to whichever lamps are close).
-  const lampLights = Array.from({ length: 6 }, () => { const l = new PointLight('#dfe8ff', 0, 2.2, 1.6); scene.add(l); return l })
+  const lampLights = Array.from({ length: 6 }, () => { const l = new PointLight('#dfe8ff', 0, 2.4, 2); scene.add(l); return l })
   // Your car's headlights: a real light, thrown ahead down the road (always there, dark by day, so nothing has to be redrawn when it comes on).
   const beam = new SpotLight('#eef3ff', 0, 7, 0.52, 0.55, 1.3)
   scene.add(beam, beam.target)
@@ -123,8 +133,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // The name boards are lit from behind after dark.
     world.boards.emissiveIntensity = 0.85 * (1 - dl.state.day)
     // The sun's light under the water is a bright net; the moon's, a faint one.
-    world.caustics.value = Math.max(0.12, dl.state.day)
-    post?.setDaylight(dl.state.day)
+    world.caustics.value = Math.max(0.12, dl.state.day) * (1 - 0.8 * dl.state.cover)
+    post?.setDaylight(dl.state.day, dl.state.rain)
   }
   applyTime()
 
@@ -263,7 +273,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   // Fish in the shallows, and now and then one leaping (fish.ts).
   const shoals = fishes(scene, { seaY, grid: data.grid, depthAt: world.depthAt, seaAt: world.seaAt, splash: (x, y, z, n, p) => water.burst(x, y, z, n, p, [0, 0]), ring: (x, y, z, r) => water.ring(x, y, z, r, 1.4), schools: phone ? 5 : 8 })
   // Boats: tied up at the piers, at anchor, the ferry on its timetable, a speedboat, two yachts (boats.ts).
-  const harbour = boats(scene, { seaAt: world.seaAt, piers: data.piers, wind: [WAVES[0].x, WAVES[0].z], splash: (x, y, z, n, p) => water.burst(x, y, z, n, p, [0, 0]) })
+  const harbour = boats(scene, { seaAt: world.seaAt, piers: data.piers, wind: windNow, splash: (x, y, z, n, p) => water.burst(x, y, z, n, p, [0, 0]) })
 
   if (off.has('fish')) shoals.mesh.visible = false
   if (off.has('boats')) harbour.show(false)
@@ -459,10 +469,10 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (driving !== null) { const v = own[driving], b = v.box(); nearCars.push({ x: b.x, z: b.z, hx: Math.cos(b.yaw) * Math.sign(v.s.u || 1), hz: -Math.sin(b.yaw) * Math.sign(v.s.u || 1), v: Math.abs(v.s.u) * METRE, hl: b.hl, hw: b.hw, yaw: b.yaw }) }
     {
       const t0 = performance.now()
-      if (!off.has('people')) people.update(dt, { cam: camera.position, you: driving === null ? pos : null, cars: nearCars, day: dl.state.day })
+      if (!off.has('people')) people.update(dt, { cam: camera.position, you: driving === null ? pos : null, cars: nearCars, day: dl.state.day, rain: sky.state.rain })
       if (!off.has('boats')) harbour.update(dt, { time: now / 1000, glow, cam: camera.position })
       if (!off.has('fish')) shoals.update(dt, { cam: camera.position, you: pos, inWater: inWater || swimming, time: now / 1000 })
-      if (!off.has('gulls')) birds.update(dt, { cam: camera.position, you: pos, driving: driving !== null, day: dl.state.day, time: now / 1000, still })
+      if (!off.has('gulls')) birds.update(dt, { cam: camera.position, you: pos, driving: driving !== null, day: dl.state.day * (1 - 0.85 * sky.state.rain), time: now / 1000, still })
       lifeMs += (performance.now() - t0 - lifeMs) * 0.05
     }
     // You, at the wheel or on foot.
@@ -520,16 +530,25 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     camera.lookAt(look)
     if (held) { camera.position.copy(held[0]); camera.lookAt(held[1]) }
     // The day goes on: an hour of it a minute.
-    if (clockOn) { hour = (hour + dt / 60) % 24; applyTime() }
+    if (clockOn) hour = (hour + dt / 60) % 24
+    // The weather has its say in the light, then the light in the weather.
+    dl.state.cover = sky.state.cover; dl.state.rain = sky.state.rain; dl.state.flash = sky.state.flash
+    applyTime()
+    const fog = scene.fog as Fog
+    fog.near = 14 * (1 - 0.6 * sky.state.rain); fog.far = (aerial ? 160 : 70) * (1 - 0.5 * sky.state.rain)
+    // The wind in the trees and the grass, and in the sea's swell.
+    if (!still) { world.flora.wind.value = 0.45 + 1.6 * sky.state.wind * (0.7 + 0.3 * sky.state.gust); world.swell.value = 0.75 + 0.6 * sky.state.wind }
+    windNow[0] = sky.state.dir.x; windNow[1] = sky.state.dir.z
     dl.follow(camera.position, dt)
     // The grass near you is drawn; further off, the ground's own green does.
     if ((grassTick -= dt) <= 0) { grassTick = 0.25; world.flora.lawn.near(camera.position.x, camera.position.z) }
-    world.bulbs.emissiveIntensity = 2.2 * dl.state.lampGlow
+    // (Bright enough to read as a lamp, not so bright it flares round itself.)
+    world.bulbs.emissiveIntensity = 1.0 * dl.state.lampGlow
     // After dark the lamps near you light the street.
     if (dl.state.lampGlow > 0.02 && (lampTick -= dt) <= 0) {
       lampTick = 0.4
       const near6 = world.lamps.map((l) => [l.distanceToSquared(pos), l] as const).sort((a, b) => a[0] - b[0]).slice(0, lampLights.length)
-      lampLights.forEach((L, k) => { const p = near6[k]; if (p) { L.position.copy(p[1]).y -= 0.03; L.intensity = 1.3 * dl.state.lampGlow } else L.intensity = 0 })
+      lampLights.forEach((L, k) => { const p = near6[k]; if (p) { L.position.copy(p[1]).y -= 0.03; L.intensity = 0.2 * dl.state.lampGlow } else L.intensity = 0 })
     }
     if (dl.state.lampGlow <= 0.02 && lampLights[0].intensity) for (const L of lampLights) L.intensity = 0
     // The sun's shadows follow you.
@@ -539,6 +558,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     const pr = Math.round(pos.dot(lightRight) / texel) * texel, pu = Math.round(pos.dot(lightUp) / texel) * texel, pa = pos.dot(sunDir)
     snapped.copy(lightRight).multiplyScalar(pr).addScaledVector(lightUp, pu).addScaledVector(sunDir, pa)
     sun.position.copy(snapped).addScaledVector(sunDir, 35); sun.target.position.copy(snapped)
+    sky.update(dt, { cam: camera.position, groundAt: (x, z) => groundAt(x, z, 99), sunDir: dl.state.sunDir, lightDir: sunDir, lightTarget: snapped, litColor: dl.state.cloudLit, shadeColor: dl.state.cloudShade, haze: (scene.fog as Fog).color, day: dl.state.day, lampGlow: dl.state.lampGlow })
     // A game's building near: it offers to take you in (not while you drive).
     let best: typeof near = null, bd = 0.45
     if (driving === null) for (const b of data.buildings) {
@@ -563,7 +583,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       camera.getWorldDirection(sunLook)
       // (A low sun, through more air, glares less.)
       const facing = MathUtils.smoothstep(sunLook.dot(dl.state.sunDir), 0.55, 0.9) * MathUtils.smoothstep(dl.state.sunEl, -1, 3) * (0.4 + 0.6 * MathUtils.smoothstep(dl.state.sunEl, 3, 25))
-      sunVis += ((sunAt.z < 1 ? sunSeen * facing : 0) - sunVis) * Math.min(1, dt * 6)
+      // (Nor through cloud.)
+      const veiled = 1 - sky.cloudToward(camera.position, dl.state.sunDir)
+      sunVis += ((sunAt.z < 1 ? sunSeen * facing * veiled : 0) - sunVis) * Math.min(1, dt * 6)
     } else sunVis = 0
     post!.sun(sunAt.x * 0.5 + 0.5, sunAt.y * 0.5 + 0.5, sunVis)
     post!.render(dt)
@@ -597,7 +619,9 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     time: () => hour,
     setClock(on) { clockOn = on },
     clock: () => clockOn,
-    setAerial(on) { aerial = on; (scene.fog as Fog).far = on ? 160 : 70 },
+    setAerial(on) { aerial = on },
+    setWeather(kind) { sky.set(kind) },
+    weather: () => ({ kind: sky.state.kind, auto: sky.state.auto, cover: sky.state.cover, rain: sky.state.rain, wind: sky.state.wind, wet: wetness.wet.value }),
     near: () => near,
     toggleCar() {
       if (driving !== null) return getOut()
@@ -626,7 +650,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
       removeEventListener('pointermove', pm); removeEventListener('pointerup', pu)
-      dl.dispose(); post?.dispose(); renderer.dispose()
+      dl.dispose(); sky.dispose(); post?.dispose(); renderer.dispose()
     },
   }
 }

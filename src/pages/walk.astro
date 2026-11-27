@@ -5,7 +5,8 @@
  * person, with the island's own traffic on its roads. Walk up to any game's
  * building and it offers to take you in. Cars of your own stand parked by
  * the road: get in and drive one. The day passes, an hour a minute; the
- * clock lets you pause it or go to any hour.
+ * clock lets you pause it or go to any hour, and choose the weather (or let
+ * it change by itself).
  */
 import Base from '../layouts/Base.astro'
 import { withBase } from '../lib/base'
@@ -27,6 +28,14 @@ import { withBase } from '../lib/base'
         <button class="wk-chip" type="button" data-hour="12">Noon</button>
         <button class="wk-chip" type="button" data-hour="18.2">Sunset</button>
         <button class="wk-chip" type="button" data-hour="22">Night</button>
+      </div>
+      <p class="wk-time-label" id="wkSkyLabel">Weather <output id="wkSkyOut">Changing</output></p>
+      <div class="wk-time-row" role="group" aria-labelledby="wkSkyLabel">
+        <button class="wk-chip" type="button" data-sky="auto" aria-pressed="true">Changing</button>
+        <button class="wk-chip" type="button" data-sky="clear" aria-pressed="false">Clear</button>
+        <button class="wk-chip" type="button" data-sky="cloudy" aria-pressed="false">Cloudy</button>
+        <button class="wk-chip" type="button" data-sky="rain" aria-pressed="false">Rain</button>
+        <button class="wk-chip" type="button" data-sky="storm" aria-pressed="false">Storm</button>
       </div>
     </div>
     <p class="wk-help" id="wkHelp">W A S D or the arrow keys to walk · Shift to run · Space to jump · drag to look round · scroll to step back</p>
@@ -122,6 +131,16 @@ import { withBase } from '../lib/base'
     hourIn.addEventListener('change', () => { dragging = false })
     pauseBtn.addEventListener('click', () => { const on = walk.clock(); walk.setClock(!on); pauseBtn.setAttribute('aria-pressed', String(on)); pauseBtn.textContent = on ? 'Play' : 'Pause' })
     for (const b of timePanel.querySelectorAll<HTMLButtonElement>('[data-hour]')) b.addEventListener('click', () => { walk.setTime(+b.dataset.hour!); show() })
+    // The weather: left to change by itself, or one chosen.
+    const skyOut = document.getElementById('wkSkyOut')!, skyBtns = [...timePanel.querySelectorAll<HTMLButtonElement>('[data-sky]')]
+    const NAMES: Record<string, string> = { clear: 'Clear', cloudy: 'Cloudy', overcast: 'Overcast', rain: 'Rain', storm: 'Storm' }
+    const showSky = () => {
+      const w = walk.weather()
+      skyOut.textContent = (w.auto ? 'Changing · ' : '') + NAMES[w.kind]
+      for (const b of skyBtns) b.setAttribute('aria-pressed', String(w.auto ? b.dataset.sky === 'auto' : b.dataset.sky === w.kind))
+    }
+    for (const b of skyBtns) b.addEventListener('click', () => { walk.setWeather(b.dataset.sky as Parameters<typeof walk.setWeather>[0]); showSky() })
+    showSky(); setInterval(showSky, 1000)
   }).catch((e) => { console.error(e); load.textContent = 'The island could not be built here (this browser needs WebGL).' })
 </script>
 
@@ -177,6 +196,8 @@ import { withBase } from '../lib/base'
   .wk-time-row { display: flex; flex-wrap: wrap; gap: 5px; }
   .wk-chip { border: 0; border-radius: 999px; padding: 7px 10px; background: #e8eefb; color: #0f1730; font: 600 12px/1 var(--font-ui, system-ui, sans-serif); cursor: pointer; }
   .wk-chip:hover { background: #d8e3fa; }
+  .wk-chip[aria-pressed='true'] { background: #2f6df6; color: #fff; }
+  #wkSkyLabel { margin: 4px 0 0; }
   .wk-chip:focus-visible { outline: 3px solid #4fe3c1; outline-offset: 2px; }
   .wk-load { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: #eef3ff; font: 600 16px/1.4 var(--font-ui, system-ui, sans-serif); }
   .wk-drive { border: 0; cursor: pointer; background: #eaf1ff; }
