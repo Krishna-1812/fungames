@@ -252,7 +252,7 @@ export function toys(scene: Scene, o: {
     }
   }
   const knocks: { kind: PropKind; at: Vector3; hard: number }[] = []
-  let idle = false, skipped = 0
+  let idle = false, skipped = 0, acc = 0
   // The things themselves.
   for (const b of bodies) {
     const c = new CBody({ mass: b.mass, collisionFilterGroup: PROP, collisionFilterMask: WORLD | PROP | YOU | CAR, allowSleep: true, sleepSpeedLimit: 0.08, sleepTimeLimit: 0.6 })
@@ -340,7 +340,10 @@ export function toys(scene: Scene, o: {
         cb.applyForce(new Vec3(0, (9.8 * cb.mass / b.floats) * sub, 0))
         cb.velocity.scale(1 - Math.min(1, 1.6 * sub * h), cb.velocity); cb.angularVelocity.scale(1 - Math.min(1, 2 * sub * h), cb.angularVelocity)
       }
-      world.step(1 / 120, h, 6)
+      // Fixed steps of 1/120 s, as many as the frame took (six at most). (Not world.step's own sub-stepping: it stops early
+      // when the machine is busy, so the same push would come out differently on a slow frame.)
+      acc = Math.min(acc + h, 6 / 120)
+      while (acc >= 1 / 120 - 1e-9) { world.step(1 / 120); acc -= 1 / 120 }
       // Off the edge of the ground the physics knows: the island's own ground, simply.
       for (const b of bodies) {
         const cb = b.c!
