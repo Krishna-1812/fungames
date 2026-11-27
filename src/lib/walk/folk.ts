@@ -10,7 +10,9 @@
  * They step round lamp posts and bins, round one another (each to their own
  * right when they meet; behind someone slower, out and past), and round you;
  * now and then one stops to look at a phone, or for nothing much. A few stand
- * in pairs on corners, talking, hands going. Fewer are out after dark.
+ * in pairs on corners, talking, hands going; some sit on the benches. At a
+ * junction with traffic lights (street.ts) they cross only while the traffic
+ * they cross has red. Fewer are out after dark.
  *
  * Each is somebody: a height from 1.55 to 1.92 m, slighter or broader, a skin
  * tone, hair (short, long, none; dark, fair, grey), a T-shirt or a long-
@@ -164,7 +166,7 @@ type Person = {
   x: number; z: number; lat: number; latT: number; px: number; pz: number; py: number; yaw: number
   v: number; phase: number; breathe: number; stuck: number
   /** What they are doing: walking, standing a while (looking at a phone, or not), waiting to cross, talking. */
-  mode: 'walk' | 'pause' | 'wait' | 'talk'; timer: number; phone: boolean; gesture: number
+  mode: 'walk' | 'pause' | 'wait' | 'talk' | 'sit'; timer: number; phone: boolean; gesture: number
   /** Holding an umbrella up (it is raining, and they have one). */
   brolly: boolean
   shown: boolean; out: boolean
@@ -174,7 +176,13 @@ type Person = {
 
 export type Folk = ReturnType<typeof folk>
 
-export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: number, z: number): number; boxes: Box[]; seed?: number; count?: number }) {
+export function folk(scene: Scene, o: {
+  roads: [number, number][]; heightAt(x: number, z: number): number; boxes: Box[]; seed?: number; count?: number
+  /** Benches to sit on (where, facing which way). */
+  seats?: { x: number; z: number; y: number; yaw: number }[]
+  /** At traffic lights: whether someone may cross a junction's road whose traffic runs one way (it has red). */
+  mayCross?: (i: number, j: number, axis: 'ns' | 'ew') => boolean
+}) {
   const rnd = seeded(o.seed ?? 7)
   const roads = new Set(o.roads.map(([i, j]) => key(i, j)))
   const R_ = (i: number, j: number) => roads.has(key(i, j))
@@ -290,6 +298,20 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
     p.yaw = Math.atan2(DX[din], DZ[din])
     people.push(p)
   }
+  // Some sitting on the benches: one or two to a bench, at either end of it.
+  for (const [n, s] of (o.seats ?? []).entries()) {
+    if (rnd() > 0.45) continue
+    for (const end of rnd() < 0.3 ? [-1, 1] : [rnd() < 0.5 ? -1 : 1]) {
+      const along = end * 0.45 * METRE, back = -0.1 * METRE
+      const px = s.x + Math.cos(s.yaw) * along + Math.sin(s.yaw) * back, pz = s.z - Math.sin(s.yaw) * along + Math.cos(s.yaw) * back
+      const look = someone(rnd, 300 + n * 2 + (end > 0 ? 1 : 0)); look.carry = rnd() < 0.25 ? 1 : 0; look.jog = false
+      people.push({
+        look, ti: Math.floor(pz), tj: Math.floor(px), din: 0, dout: 0, side: 1, ax: px, az: pz, bx: px, bz: pz, x: px, z: pz, lat: 0, latT: 0,
+        px, pz, py: s.y, yaw: s.yaw, v: 0, phase: 0, breathe: rnd() * 10, stuck: 0, mode: 'sit', timer: 0, phone: rnd() < 0.3, gesture: rnd() * 6,
+        shown: true, out: true, brolly: false, a: new Float32Array(20),
+      })
+    }
+  }
   // A few in pairs on corners, talking: on a junction's corner square, facing each other.
   const corners: [number, number][] = []
   for (const [i, j] of o.roads) {
@@ -365,6 +387,13 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
       tgt[2] = Math.sin(p.phase) * 0.09 * walkK
       // (A bag's strap holds that arm a little still.)
       if (Lk.carry === 1) { tgt[14] *= 0.4; tgt[15] = -0.5 }
+    } else if (p.mode === 'sit') {
+      // Sat on a bench: hips on the seat, thighs along it, shins down; leaning back, hands in the lap (or a phone).
+      tgt[0] = 0.5 + 0.003 * Math.sin(p.breathe * 0.7); tgt[1] = -0.12
+      tgt[5] = tgt[8] = -1.5; tgt[6] = tgt[9] = 1.45; tgt[7] = tgt[10] = 0.05
+      tgt[11] = tgt[14] = -0.45; tgt[12] = tgt[15] = -0.75; tgt[13] = 0.1; tgt[16] = -0.1
+      tgt[3] = 0.5 * Math.sin(p.breathe * 0.17 + p.gesture); tgt[4] = 0.05
+      if (p.phone) { tgt[4] = 0.55; tgt[3] = 0; tgt[11] = tgt[14] = -0.6; tgt[12] = tgt[15] = -1.4 }
     } else {
       // Standing: breathing, weight on one foot and then the other.
       tgt[0] += 0.004 * Math.sin(p.breathe * 0.7)
@@ -409,10 +438,12 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
     if (Lk.hairStyle === 1) put('hairS', J.head, Lk.hair); else if (Lk.hairStyle === 2) put('hairL', J.head, Lk.hair)
     for (const sd of [0, 1]) {
       put('sleeve', J.sh + sd, top); put('upper', J.sh + sd, Lk.topStyle === 1 ? top : skin); put('fore', J.el + sd, Lk.topStyle === 1 ? top : skin); put('hand', J.el + sd, skin)
-      put('thighHi', J.hip + sd, Lk.legStyle === 2 ? skin : legs); put('thighLo', J.hip + sd, Lk.legStyle === 0 ? legs : skin); put('shin', J.knee + sd, Lk.legStyle === 0 ? legs : skin)
+      // (Sat down, a skirt lies over the thighs.)
+      const skirtCol = Lk.topStyle === 2 ? top : legs, seated = p.mode === 'sit' && Lk.legStyle === 2
+      put('thighHi', J.hip + sd, seated ? skirtCol : Lk.legStyle === 2 ? skin : legs); put('thighLo', J.hip + sd, seated ? skirtCol : Lk.legStyle === 0 ? legs : skin); put('shin', J.knee + sd, Lk.legStyle === 0 ? legs : skin)
       put('shoe', J.ank + sd, Lk.feet)
     }
-    if (Lk.legStyle === 2) put('skirt', J.hips, Lk.topStyle === 2 ? top : legs)
+    if (Lk.legStyle === 2 && p.mode !== 'sit') put('skirt', J.hips, Lk.topStyle === 2 ? top : legs)
     if (Lk.carry === 1) put('bag', J.torso, Lk.bag); else if (Lk.carry === 2) put('pack', J.torso, Lk.bag)
     // (Only once the arm is up.)
     if (p.brolly && Lk.brolly && a[15] < -1.2) put('brolly', J.el + 1, Lk.brolly)
@@ -438,11 +469,11 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
       thin = (thin + 1) % 8
       people.forEach((p, n) => {
         const camD = Math.hypot(p.px - c.cam.x, p.pz - c.cam.z)
-        if (n % 8 === thin && camD > 5) p.out = p.mode === 'talk' ? c.day > 0.25 : n < wanted
+        if (n % 8 === thin && camD > 5) p.out = p.mode === 'talk' || p.mode === 'sit' ? c.day > 0.25 && rain < (p.mode === 'sit' ? 0.2 : 0.6) : n < wanted
         if (!p.out) return
         const Lk = p.look
         p.brolly = !!Lk.brolly && rain > 0.15
-        if (p.mode !== 'talk') {
+        if (p.mode !== 'talk' && p.mode !== 'sit') {
           // Along the path: towards the turning point, then on round it.
           let dx = p.ax - p.bx, dz = p.az - p.bz
           const len = Math.hypot(dx, dz) || 1; dx /= len; dz /= len
@@ -483,7 +514,10 @@ export function folk(scene: Scene, o: { roads: [number, number][]; heightAt(x: n
           const nx = p.x + dx * 0.07, nz = p.z + dz * 0.07
           const road = !onFoot(nx, nz)
           if (road && onFoot(p.px, p.pz) && p.mode === 'walk') {
-            const coming = c.cars.some((k2) => { const ox = nx - k2.x, oz = nz - k2.z, d = Math.hypot(ox, oz); return d < 0.25 + k2.hl || (d < 1.3 && k2.v > 0.05 && (ox * k2.hx + oz * k2.hz) / d > 0.6) })
+            // (At traffic lights, only while the traffic being crossed has red.)
+            const ni = Math.floor(nz), nj = Math.floor(nx)
+            const red = !o.mayCross || o.mayCross(ni, nj, Math.abs(dx) > Math.abs(dz) ? 'ns' : 'ew')
+            const coming = !red || c.cars.some((k2) => { const ox = nx - k2.x, oz = nz - k2.z, d = Math.hypot(ox, oz); return d < 0.25 + k2.hl || (d < 1.3 && k2.v > 0.05 && (ox * k2.hx + oz * k2.hz) / d > 0.6) })
             if (coming) { p.mode = 'wait'; p.timer = 0.6 }
           }
           if (p.mode === 'wait') { want = 0; if ((p.timer -= dt) <= 0) p.mode = 'walk' }
