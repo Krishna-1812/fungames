@@ -116,9 +116,10 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
       grade.uniforms.uRes.value.set(w * pr, h * pr)
     },
     /** How light it is (0 night, 1 day): at night the lamps and the lit windows glow, and the shadows need no cooling. */
-    setDaylight(d: number) {
+    setDaylight(d: number, mist = 0) {
       const L = (a: number, b: number) => a + (b - a) * d
-      bloom.strength = L(0.3, 0.12); bloom.threshold = L(1.4, 9); bloom.radius = L(0.35, 0.2)
+      // (In rain, the lights haze over a little wider.)
+      bloom.strength = L(0.15, 0.12) + 0.06 * mist; bloom.threshold = L(1.8, 9); bloom.radius = L(0.22, 0.2) + 0.1 * mist
       grade.uniforms.uCool.value = d
       if (ao) ao.blendIntensity = L(0.6, 1)
     },

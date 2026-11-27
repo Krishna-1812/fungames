@@ -19,9 +19,15 @@
  *   - the town: the street lamps switching on at dusk and off at dawn, the
  *     windows lighting one by one as it gets dark and most of them going
  *     out after midnight, a few early risers' before dawn.
+ *
+ * And the weather (weather.ts) on top: cloud takes the sun out of the light
+ * (only an overcast sky does it everywhere at once; scattered clouds cast
+ * their own shadows) and lets the sky's grey fill it instead, the haze
+ * greys, the sky that lights the world carries the clouds, lightning lights
+ * everything for a moment.
  */
 import {
-  AmbientLight, BackSide, BufferGeometry, ShaderMaterial, Color, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight, MathUtils, Mesh, MeshBasicMaterial, PMREMGenerator,
+  AmbientLight, BackSide, type Object3D, BufferGeometry, ShaderMaterial, Color, DirectionalLight, Float32BufferAttribute, Fog, HemisphereLight, MathUtils, Mesh, MeshBasicMaterial, PMREMGenerator,
   Points, PointsMaterial, Scene, SphereGeometry, Vector3, type WebGLRenderTarget, type WebGLRenderer,
 } from 'three'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
@@ -73,7 +79,7 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
   const envScene = new Scene(), envSky = new Sky()
   envSky.material = sky.material; envSky.scale.setScalar(1000); envScene.add(envSky)
   const nightEnv = new Scene(); nightEnv.background = new Color('#1b2a52')
-  let envRT: WebGLRenderTarget | null = null, envAt = -999, envNight: boolean | null = null
+  let envRT: WebGLRenderTarget | null = null, envAt = -999, envNight: boolean | null = null, envCover = -1
 
   // The stars: a few thousand, on a sphere that turns about the pole once a day.
   const starPos: number[] = []
@@ -125,7 +131,7 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
   const C = (h: string) => new Color(h)
   const SUN_HIGH = C('#fff4e8'), SUN_LOW = C('#ffcfaa'), MOON = C('#c3cde8')
   const FOG_DAY = C('#c9dbe8'), FOG_GOLD = C('#ddd0cc'), FOG_DUSK = C('#56617f'), FOG_NIGHT = C('#0d1424')
-  const HEMI_DAY = C('#bcd4f0'), HEMI_NIGHT = C('#3d4866'), GROUND_DAY = C('#7d8a6a'), GROUND_NIGHT = C('#1a1e28')
+  const HEMI_DAY = C('#bcd4f0'), HEMI_NIGHT = C('#3d4866'), GROUND_DAY = C('#7d8a6a'), GROUND_NIGHT = C('#1a1e28'), HEMI_GREY = C('#c2cad3'), FOG_GREY = C('#a7b1bb'), NIGHT_ENV = C('#1b2a52')
 
   const state = {
     hour: 16.5,
@@ -138,6 +144,10 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
     gold: 0,
     lamps: false, lampGlow: 0, homes: 0,
     exposure: 0.55,
+    /** The weather's say (weather.ts): how much of the sky is cloud, how hard it rains, a lightning flash. */
+    cover: 0, rain: 0, flash: 0,
+    /** The clouds' colours: lit by the sun (or the moon), and in their own shade. */
+    cloudLit: new Color(), cloudShade: new Color(),
   }
 
   const set = (hour: number) => {
@@ -150,8 +160,9 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
     const day = smooth(-9, 5, e), gold = smooth(-2, 3, e) * (1 - smooth(6, 22, e))
     state.day = day; state.gold = gold
     // The light: the sun's, warmer and weaker low down; the moon's, cool and faint, once the sun is well down.
-    const sunI = 2.7 * smooth(-0.5, 8, e) * (0.62 + 0.38 * smooth(6, 40, e))
-    const moonI = 0.42 * smooth(-2, -9, e) * smooth(-2, 10, m.el)
+    const cv = state.cover, dim = 1 - 0.86 * smooth(0.55, 1, cv)
+    const sunI = 2.7 * smooth(-0.5, 8, e) * (0.62 + 0.38 * smooth(6, 40, e)) * dim
+    const moonI = 0.42 * smooth(-2, -9, e) * smooth(-2, 10, m.el) * dim
     if (sunI >= moonI) {
       light.intensity = sunI; light.color.copy(SUN_LOW).lerp(SUN_HIGH, smooth(3, 30, e)); state.lightDir.copy(state.sunDir)
     } else {
@@ -159,7 +170,7 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
     }
     // The sky: scattering more, and redder, through more air at sunrise and sunset; the night's dark under it.
     const low = 1 - smooth(4, 25, e)
-    su.turbidity.value = 4 + 2 * low; su.rayleigh.value = 1.6 + 1.0 * low
+    su.turbidity.value = 4 + 2 * low + 8 * cv; su.rayleigh.value = (1.6 + 1.0 * low) * (1 - 0.5 * cv)
     su.sunPosition.value.copy(state.sunDir)
     sky.visible = e > -11
     scene.background = sky.visible ? null : nightBg
@@ -171,23 +182,30 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
     dm.uOpacity.value = smooth(5, -4, e) * (0.55 + 0.45 * smooth(0, -4, e))
     dome.visible = dm.uOpacity.value > 0.001
     // The stars come out as it gets dark, and turn about the pole (tilted by the latitude).
-    starMat.opacity = 0.9 * smooth(-3, -12, e)
+    starMat.opacity = 0.9 * smooth(-3, -12, e) * (1 - smooth(0.3, 0.85, state.cover))
     stars.visible = starMat.opacity > 0.01
     stars.rotation.set(-(Math.PI / 2 - LAT), 0, 0); stars.rotateY((state.hour / 24) * Math.PI * 2)
-    moonMat.opacity = smooth(-4, 3, m.el) * (0.35 + 0.65 * (1 - day))
+    moonMat.opacity = smooth(-4, 3, m.el) * (0.35 + 0.65 * (1 - day)) * (1 - 0.85 * smooth(0.6, 1, state.cover))
     moon.visible = moonMat.opacity > 0.01
-    hemi.intensity = 0.2 + 0.4 * day; hemi.color.copy(HEMI_NIGHT).lerp(HEMI_DAY, day); hemi.groundColor.copy(GROUND_NIGHT).lerp(GROUND_DAY, day)
-    fog.color.copy(FOG_NIGHT).lerp(FOG_DUSK, smooth(-10, -3, e)).lerp(FOG_DAY, day).lerp(FOG_GOLD, gold * 0.6)
+    // (Under cloud the sky's grey light is most of what there is.)
+    hemi.intensity = (0.2 + 0.4 * day) * (1 + 0.45 * cv * day) + 2.2 * state.flash; hemi.color.copy(HEMI_NIGHT).lerp(HEMI_DAY, day).lerp(HEMI_GREY, cv * 0.75 * day); hemi.groundColor.copy(GROUND_NIGHT).lerp(GROUND_DAY, day)
+    amb.intensity = 0.12 + 1.2 * state.flash
+    fog.color.copy(FOG_NIGHT).lerp(FOG_DUSK, smooth(-10, -3, e)).lerp(FOG_DAY, day).lerp(FOG_GOLD, gold * 0.6 * (1 - cv)).lerp(FOG_GREY.clone().multiplyScalar(0.35 + 0.65 * day), cv * 0.7)
+    fog.color.multiplyScalar(1 - 0.25 * state.rain)
+    // The clouds' colours: the light's own where it reaches them, a grey of the sky's in their shade; dark at night.
+    state.cloudLit.copy(light.color).multiplyScalar((sunI >= moonI ? 2.3 * smooth(-3, 10, e) + 0.3 * smooth(-12, -2, e) : 0.07) * (1 - 0.5 * cv))
+    state.cloudShade.copy(hemi.color).multiplyScalar((0.12 + 1.0 * day) * (1 - 0.35 * cv) * (1 - 0.35 * state.rain))
     // The eye opens to the dark, and a little to the low light of the golden hour.
-    state.exposure = 0.95 - 0.46 * day + 0.06 * gold
+    state.exposure = 0.95 - 0.46 * day + 0.06 * gold + 0.16 * cv * day
     // Street lamps: on as the sun goes down, off once it is up (a little apart, as their switches are).
     if (e < 1.5) state.lamps = true
     else if (e > 4) state.lamps = false
     state.homes = smooth(7, -4, e) * homesLit(state.hour)
     // The sky's light on the world, made again as the sun moves (or for the night, once).
     const nightNow = e < -9
-    if (nightNow !== envNight || (!nightNow && Math.abs(e - envAt) > 1.2)) {
-      envNight = nightNow; envAt = e
+    if (nightNow !== envNight || (!nightNow && Math.abs(e - envAt) > 1.2) || Math.abs(cv - envCover) > 0.06) {
+      envNight = nightNow; envAt = e; envCover = cv
+      nightEnv.background = NIGHT_ENV.clone().multiplyScalar(1 - 0.5 * cv)
       envRT?.dispose(); envRT = pmrem.fromScene(nightNow ? nightEnv : envScene)
       scene.environment = envRT.texture
     }
@@ -199,6 +217,8 @@ export function daylight(scene: Scene, renderer: WebGLRenderer, opts: { shadowSi
   return {
     state, light, sky, stars, moon,
     set,
+    /** Something more for the sky that lights the world to carry (the clouds). */
+    addToSky(o: Object3D) { envScene.add(o); envAt = -999 },
     /** Each frame: the stars and the moon stay at infinity round the camera; the lamps fade on or off. */
     follow(camera: Vector3, dt: number) {
       stars.position.copy(camera); dome.position.copy(camera)
