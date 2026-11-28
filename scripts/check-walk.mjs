@@ -24,6 +24,10 @@
  *   - what grows: every tree the map plants is grown, with leaves, and its
  *     trunk is solid; grass grows on the lawns — thousands of tufts — and
  *     never on a street or inside anything built;
+ *   - the eye: no surface's albedo past what fresh white paint gives back,
+ *     the streets' paints in real ranges, the sun set against the sky by real
+ *     daylight, the steadying's offsets within half a pixel, and the shadow
+ *     cascades and the albedo rule finding their places in three's shaders;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -38,6 +42,10 @@
  *
  *   node scripts/check-walk.mjs
  */
+// The same dice every run (a fixed seed for Math.random): the weather's spells, the clouds' drift and the rest come out
+// the same each time, so a check passes or fails on the code, not on the roll (a cloudy sky caught in a gap, an hour
+// that happened to stay clear).
+{ let seed = 0x2f6b1d; Math.random = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
 const { register } = await import('node:module')
 register('./resolve-ts.mjs', import.meta.url)
 const { listedGames } = await import('../src/data/games.ts')
@@ -403,13 +411,16 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   const wx = weather(scene, { light, phone: false, still: false, start: 'clear' })
   const cam = new Vector3(15, 0.5, 15), up = new Vector3(), col = new Color()
   const ctx = { cam, groundAt: (x, z) => world.heightAt(x, z), sunDir: new Vector3(0.3, 0.8, 0.2).normalize(), lightDir: new Vector3(0.3, 0.8, 0.2).normalize(), lightTarget: new Vector3(15, 0, 15), litColor: col, shadeColor: col, haze: col, day: 1, lampGlow: 0 }
-  // How much of the sky overhead is cloud, for a spell (looking up at 300 points of the sky).
-  const sky = () => { let n = 0, c = 0; for (let a = 0; a < 20; a++) for (let b = 0; b < 15; b++) { const el = 0.35 + (b / 15) * 1.1, az = (a / 20) * Math.PI * 2; up.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); c += wx.cloudToward(cam, up); n++ } return c / n }
+  // How much of the sky overhead is cloud, for a spell (looking up at 300 points of the sky, from five places across
+  // the island: broken cloud over one spot can be mostly gap, as it can over a real town).
+  const spots = [[15, 15], [6, 8], [24, 7], [8, 24], [23, 23]], here = new Vector3()
+  const sky = () => { let n = 0, c = 0; for (const [x, z] of spots) { here.set(x, 0.5, z); for (let a = 0; a < 20; a++) for (let b = 0; b < 15; b++) { const el = 0.35 + (b / 15) * 1.1, az = (a / 20) * Math.PI * 2; up.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); c += wx.cloudToward(here, up); n++ } } return c / n }
   const settle = (kind, s) => { wx.set(kind); for (let k = 0; k < 30 * s; k++) wx.update(1 / 30, ctx) }
   settle('clear', 60); const clear = sky()
-  // (Cloudy is broken cloud drifting over: looked at six times, five seconds apart, not once, which can catch a gap.)
+  // (Cloudy is broken cloud drifting over: looked at six times a minute apart — the length of a spell — not once, which
+  // can catch a gap.)
   settle('cloudy', 60); let cloudy = 0
-  for (let n = 0; n < 6; n++) { for (let k = 0; k < 150; k++) wx.update(1 / 30, ctx); cloudy += sky() / 6 }
+  for (let n = 0; n < 6; n++) { for (let k = 0; k < 1800; k++) wx.update(1 / 30, ctx); cloudy += sky() / 6 }
   settle('rain', 60); const rainy = sky(), raining = wx.state.rain, soaked = wetness.wet.value
   check(clear < 0.2 && cloudy > 0.2 && cloudy < 0.75 && rainy > 0.9, `the sky is as cloudy as the weather says: clear ${(clear * 100).toFixed(0)}%, cloudy ${(cloudy * 100).toFixed(0)}%, rain ${(rainy * 100).toFixed(0)}% cloud`)
   check(raining > 0.5 && soaked > 0.6, `choose rain and it rains within a minute (${raining.toFixed(2)}), and the streets are soaked (${soaked.toFixed(2)})`)
@@ -566,6 +577,35 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   }
   const storm = strikes(false), calm = strikes(true)
   check(storm.n >= 10 && storm.most <= 2 && calm.n === 0, `a storm's lightning: ${storm.n} flashes in five minutes, at most ${storm.most} in any second (three can bring on a seizure); none with less motion`)
+}
+
+// The eye (round two, phase 1: lens.ts, albedo.ts, daylight.ts): every surface's albedo held to real ones (the
+// streets' own paints measured from the ground's shader); the sun set against the sky by real daylight; the
+// steadying's sub-pixel offsets; and the two shader patches still finding the text in three they replace (an upgrade
+// of three that moved it would leave one cascade, or no albedo rule, silently).
+{
+  const { governed, governAlbedo, KNEE, CEILING, FLOOR } = await import('../src/lib/walk/albedo.ts')
+  const { sunToSky, cascadeShadows } = await import('../src/lib/walk/daylight.ts')
+  const { ShaderChunk } = await import('three')
+  const xs = Array.from({ length: 101 }, (_, k) => k / 100), g = xs.map(governed)
+  check(g.every((v, k) => k === 0 || v >= g[k - 1]) && g.every((v) => v < CEILING) && governed(0.5) === 0.5 && governed(1) > 0.75,
+    `albedo: left alone up to ${KNEE}, eased above it (pure white gives back ${governed(1).toFixed(2)}), never past ${CEILING}, never darker than ${FLOOR}`)
+  // The ground's own paints (terrain.ts), as linear albedo: within what real streets, pavements, sand and soil give back.
+  const src = (await import('node:fs')).readFileSync(new URL('../src/lib/walk/terrain.ts', import.meta.url), 'utf8')
+  const lum = (name) => { const m = src.match(new RegExp(`vec3 ${name} = SRGB\\(([^)]+)\\)`)); if (!m) return NaN; const [r, gg, b] = m[1].split(',').map((v) => Math.pow(Number(v), 2.2)); return 0.2126 * r + 0.7152 * gg + 0.0722 * b }
+  const real = { asphalt: [0.04, 0.12], pave: [0.2, 0.42], sand: [0.3, 0.5], dirt: [0.15, 0.35] }
+  const got = Object.fromEntries(Object.keys(real).map((k) => [k, lum(k)]))
+  check(Object.entries(real).every(([k, [lo, hi]]) => got[k] >= lo && got[k] <= hi), `the ground's albedo: asphalt ${got.asphalt.toFixed(2)}, pavement ${got.pave.toFixed(2)}, sand ${got.sand.toFixed(2)}, soil ${got.dirt.toFixed(2)} (real: 0.04–0.12, 0.2–0.42, 0.3–0.5, 0.15–0.35)`)
+  const r = [0, 3, 10, 20, 45, 70, 90].map(sunToSky)
+  check(r[0] === 0 && r.every((v, k) => k === 0 || v > r[k - 1]) && r[3] > 2 && r[3] < 4 && r[5] > 5 && r[5] < 8,
+    `the sun against the whole sky on level ground: nothing at the horizon, ${r[1].toFixed(2)} at 3°, ${r[3].toFixed(1)} at 20°, ${r[5].toFixed(1)} at 70°`)
+  const { jitterCycle } = await import('../src/lib/walk/lens.ts')
+  const mx = jitterCycle.reduce((a, [x, y]) => a + x, 0) / jitterCycle.length, my = jitterCycle.reduce((a, [x, y]) => a + y, 0) / jitterCycle.length
+  check(jitterCycle.length >= 8 && jitterCycle.every(([x, y]) => Math.abs(x) <= 0.5 && Math.abs(y) <= 0.5) && Math.hypot(mx, my) < 0.08,
+    `the steadying's ${jitterCycle.length} sub-pixel offsets lie within half a pixel and average out (${Math.hypot(mx, my).toFixed(3)} px)`)
+  cascadeShadows(); governAlbedo()
+  check(ShaderChunk.lights_fragment_begin.includes('NUM_DIR_LIGHT_SHADOWS > 1') && ShaderChunk.lights_physical_fragment.includes('walkAlbedo0'),
+    'the shadow cascades and the albedo rule found their places in three\'s shaders')
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
