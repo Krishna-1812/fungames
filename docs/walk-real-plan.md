@@ -112,7 +112,24 @@ before:
 
 ---
 
-## Phase 1: The eye (exposure, light and the lens)
+## Phase 1: The eye (exposure, light and the lens) — done 28 Nov 2026
+
+**Done as planned:** calibrated albedo (with the albedo view and its
+check), AgX tone mapping, metered exposure (plus highlight protection, added
+when a dusk sky burned out over a dark street), the light in proportion
+(hemisphere and ambient gone, the sky's light measured, the ground's bounce
+in the environment), temporal anti-aliasing, two shadow cascades, contact
+shadows, occlusion from the main drawing, and the lens's glow, fall-off,
+fringing and grain.
+
+**Not done, and moved:**
+- Soft shadows that grow with distance from the caster (PCSS) need the
+  shadow map's raw depth. three r185 reads it only through hardware
+  compare, so the penumbra is held to the sun's average instead.
+- The reversed depth buffer would break the occlusion's and the steadying's
+  depth reconstruction for little gain, since nothing flickers at present.
+- Spreading environment rebuilds over frames: the sky's light is rebuilt
+  whole in Phase 2.
 
 **New point of view:** a cinematographer's real camera, not a renderer's
 defaults. Light in physical proportion, metered and graded like film.

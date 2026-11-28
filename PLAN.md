@@ -3281,6 +3281,28 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
     cars, life, weather, the street, sound, the camera and HUD, every
     device. Each phase is planned in full in docs/walk-real-plan.md and is
     marked done here as it lands.
+    1. ~~*The eye*~~ **done** — the light in proportion: the sky lights the
+       shade (its own environment, measured as a white card lying flat
+       receives it, with the ground's bounce below the horizon) and the sun is
+       set against it from real clear-sky daylight (about seven times the sky
+       at noon, three at 20°, a third at 3°); the hemisphere and ambient
+       fudges gone. The eye meters the picture each frame on the graphics card
+       (log average, the middle weighted, highlights protected) and adapts —
+       a second into the light, three into the dark — told by the hour to
+       keep a sunset gold and the night dark, and never to open past a
+       moonlit street. AgX tone mapping and a print's contrast. Every
+       surface's albedo held to real ones (nothing past fresh white paint's
+       0.86, nothing under 0.03; the pavements 0.32, asphalt 0.08, sand 0.47),
+       with an albedo view to see it. Temporal anti-aliasing (Halton jitter,
+       reprojection from depth, YCoCg clipping) in place of SMAA. Two shadow
+       cascades — sharp over the 55 m round you, wide over the whole island —
+       blended in three's shared light loop, softness held to the sun's
+       penumbra. Contact shadows from the depth. The occlusion reads the
+       scene's own depth instead of drawing everything twice (draw calls a
+       frame 421 → 232, triangles 2.6 M → 1.4 M). A glow only above white,
+       a cos⁴ fall-off, colour fringing at the corners, grain in the mid
+       tones. check-walk's dice are seeded now, so a check passes or fails on
+       the code, not the roll.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
