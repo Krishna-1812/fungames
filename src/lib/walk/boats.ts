@@ -25,6 +25,7 @@
  * port, green to starboard, white at the masthead and the stern. A swimmer is
  * kept out of their hulls.
  */
+import { OVER_WATER_LAYER } from './water'
 import {
   CanvasTexture, Color, CylinderGeometry, DoubleSide, Euler, Float32BufferAttribute, Group, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, RepeatWrapping,
   SphereGeometry, BufferGeometry, TorusGeometry, Vector3, type Scene,
@@ -370,7 +371,7 @@ export function boats(scene: Scene, o: {
     g.setAttribute('color', new Float32BufferAttribute(new Float32Array(n * 2 * 4), 4))
     const idx: number[] = []; for (let k = 0; k < n - 1; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2)
     g.setIndex(idx)
-    const mesh = new Mesh(g, wakeMat); mesh.frustumCulled = false; mesh.renderOrder = 3; scene.add(mesh)
+    const mesh = new Mesh(g, wakeMat); mesh.frustumCulled = false; mesh.renderOrder = 3; mesh.layers.set(OVER_WATER_LAYER); scene.add(mesh)
     b.wake = { pts: [], mesh, tick: 0 }
   }
 

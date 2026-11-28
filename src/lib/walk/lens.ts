@@ -50,7 +50,7 @@
  * instead, only where ?taa=0 asks).
  */
 import {
-  type Camera, DataUtils, DepthTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, Matrix4, NearestFilter,
+  AlwaysDepth, type Camera, DataUtils, DepthTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, Matrix4, NearestFilter,
   type PerspectiveCamera, type Scene, ShaderMaterial, type Texture, Vector2, Vector3, type WebGLRenderer, WebGLRenderTarget,
 } from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -152,22 +152,60 @@ type Shared = { depth: Texture | null; inv: Matrix4; invJ: Matrix4; prev: Matrix
  */
 class ScenePass extends Pass {
   scene: Scene; camera: Camera; shared: Shared; rt: WebGLRenderTarget; quad: FullScreenQuad; copy: ShaderMaterial
+  /**
+   * The water (water.ts) is drawn after everything solid, so it can see what lies under it: the solid world into
+   * this.rt; then this.wet seeded with its colour and depth; then the water (and what floats over it) into this.wet,
+   * reading this.rt (never the buffer it draws into). Its layers, and what it is told of the solid picture first.
+   */
+  water: { mask: number; before: (colour: Texture, depth: Texture) => void } | null = null
+  wet: WebGLRenderTarget | null = null; seed: ShaderMaterial | null = null; seedQuad: FullScreenQuad | null = null
   constructor(scene: Scene, camera: Camera, shared: Shared, samples: number) {
     super(); this.scene = scene; this.camera = camera; this.shared = shared; this.needsSwap = false
     this.rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples })
     // (The scene's depth kept as a texture, in full floating point: the camera's near plane is a centimetre.)
-    if (!samples) { this.rt.depthTexture = new DepthTexture(1, 1); this.rt.depthTexture.type = FloatType }
+    if (!samples) {
+      this.rt.depthTexture = new DepthTexture(1, 1); this.rt.depthTexture.type = FloatType
+      this.wet = new WebGLRenderTarget(1, 1, { type: HalfFloatType })
+      this.wet.depthTexture = new DepthTexture(1, 1); this.wet.depthTexture.type = FloatType
+      // (Colour and depth carried over in one quad: the depth written as the fragment's own.)
+      this.seed = new ShaderMaterial({
+        uniforms: { tDiffuse: { value: null }, tDepth: { value: null } }, vertexShader: VERT,
+        fragmentShader: 'uniform sampler2D tDiffuse, tDepth; varying vec2 vUv; void main() { gl_FragColor = texture2D(tDiffuse, vUv); gl_FragDepth = texture2D(tDepth, vUv).x; }',
+        depthTest: true, depthWrite: true, depthFunc: AlwaysDepth,
+      })
+      this.seedQuad = new FullScreenQuad(this.seed)
+    }
     this.copy = new ShaderMaterial({ uniforms: { tDiffuse: { value: null } }, vertexShader: VERT, fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main() { gl_FragColor = texture2D(tDiffuse, vUv); }' })
     this.quad = new FullScreenQuad(this.copy)
   }
   render(renderer: WebGLRenderer, _w: WebGLRenderTarget, read: WebGLRenderTarget) {
-    renderer.setRenderTarget(this.rt); renderer.clear(); renderer.render(this.scene, this.camera)
-    this.shared.depth = this.rt.depthTexture
-    this.copy.uniforms.tDiffuse.value = this.rt.texture
+    const cam = this.camera, w = this.water, mask = cam.layers.mask
+    if (w && this.wet && this.seed && this.seedQuad && this.rt.depthTexture) {
+      cam.layers.mask = mask & ~w.mask
+      renderer.setRenderTarget(this.rt); renderer.clear(); renderer.render(this.scene, cam)
+      this.seed.uniforms.tDiffuse.value = this.rt.texture; this.seed.uniforms.tDepth.value = this.rt.depthTexture
+      renderer.setRenderTarget(this.wet); renderer.clear(); this.seedQuad.render(renderer)
+      w.before(this.rt.texture, this.rt.depthTexture)
+      // (The water's own draw: nothing cleared, the shadows not drawn again.)
+      const ac = renderer.autoClear, su = renderer.shadowMap.autoUpdate
+      renderer.autoClear = false; renderer.shadowMap.autoUpdate = false
+      cam.layers.mask = w.mask
+      renderer.render(this.scene, cam)
+      renderer.autoClear = ac; renderer.shadowMap.autoUpdate = su; cam.layers.mask = mask
+      this.shared.depth = this.wet.depthTexture
+      this.copy.uniforms.tDiffuse.value = this.wet.texture
+    } else {
+      // (No depth to read — multisampling asked for — or no water: everything at once.)
+      if (w) cam.layers.mask = mask | w.mask
+      renderer.setRenderTarget(this.rt); renderer.clear(); renderer.render(this.scene, cam)
+      cam.layers.mask = mask
+      this.shared.depth = this.rt.depthTexture
+      this.copy.uniforms.tDiffuse.value = this.rt.texture
+    }
     renderer.setRenderTarget(read); this.quad.render(renderer)
   }
-  setSize(w: number, h: number) { this.rt.setSize(w, h) }
-  dispose() { this.rt.dispose(); this.copy.dispose(); this.quad.dispose() }
+  setSize(w: number, h: number) { this.rt.setSize(w, h); this.wet?.setSize(w, h) }
+  dispose() { this.rt.dispose(); this.wet?.dispose(); this.seed?.dispose(); this.seedQuad?.dispose(); this.copy.dispose(); this.quad.dispose() }
 }
 
 /** Contact shadows: marched a short way towards the sun through the depth; where something is in the way, darker. */
@@ -237,10 +275,11 @@ class AirPass extends Pass {
       uniforms: {
         tDiffuse: { value: null }, tDepth: { value: null }, tAP: { value: null }, uApMax: { value: 6 }, uE: { value: 80 }, uInvP: { value: new Matrix4() }, uCamW: { value: new Matrix4() },
         uCam: { value: new Vector3() }, uMist: { value: 0 }, uMistH: { value: 4 }, uSea: { value: 0 }, uMistCol: { value: new Vector3() },
+        uUnder: { value: 0 }, uWSigma: { value: new Vector3() }, uWIn: { value: new Vector3() },
       },
       vertexShader: VERT,
       fragmentShader: AP_GLSL + /* glsl */ `
-        uniform sampler2D tDiffuse, tDepth; uniform float uE, uMist, uMistH, uSea; uniform mat4 uInvP, uCamW; uniform vec3 uCam, uMistCol;
+        uniform sampler2D tDiffuse, tDepth; uniform float uE, uMist, uMistH, uSea, uUnder; uniform mat4 uInvP, uCamW; uniform vec3 uCam, uMistCol, uWSigma, uWIn;
         varying vec2 vUv;
         void main() {
           vec4 c = texture2D(tDiffuse, vUv);
@@ -250,6 +289,13 @@ class AirPass extends Pass {
           // (The sky already has the air in it: only the mist is laid over it, as if at the far plane.)
           float dist = d < 1.0 ? length(pv.xyz) : 600.0;
           vec3 P = (uCamW * vec4(dir * dist, 1.0)).xyz;
+          if (uUnder > 0.5) {
+            // Under the water: everything seen through it — dimmed per colour by the path (red first), filled in by the
+            // water's own scattered light; the surface overhead is as far as the water goes.
+            vec3 T = exp(-uWSigma * min(dist, 60.0));
+            c.rgb = c.rgb * T + uWIn * (1.0 - T);
+            gl_FragColor = c; return;
+          }
           if (d < 1.0) { vec4 ap = apAt(vUv, dist * ${UNIT_KM.toFixed(7)}); c.rgb = c.rgb * ap.a + ap.rgb * uE; }
           if (uMist > 0.0) {
             // An exponential height fog, worked out along the line of sight exactly.
@@ -628,12 +674,21 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
       const u = air.mat.uniforms
       u.tAP.value = o.ap; u.uApMax.value = o.apMax; u.uE.value = o.skyE; u.uMist.value = o.mist; u.uMistH.value = o.mistH; u.uSea.value = o.sea; u.uMistCol.value.copy(o.mistColour)
     },
+    /** Under the water (or not): its extinction per world unit, and the light its own scattering fills in. */
+    setUnder(on: boolean, sigma?: Vector3, inscatter?: Vector3) {
+      const u = air.mat.uniforms; u.uUnder.value = on ? 1 : 0
+      if (sigma) u.uWSigma.value.copy(sigma); if (inscatter) u.uWIn.value.copy(inscatter)
+    },
     /** The volumetric clouds (null: none, the flat ones stand in). */
     setClouds(look: CloudLook | null) { clouds.look = look; clouds.enabled = !!look && !!scenePass.rt.depthTexture },
     /** Light shafts from the sun at a place in the picture (0–1), by a strength (0 none), in its light's colour. */
     setShafts(u: number, v: number, strength: number, colour: Vector3) {
       shafts.sun.set(u, v); shafts.strength = strength; shafts.colour.copy(colour); shafts.enabled = strength > 0.001 && !!scenePass.rt.depthTexture
     },
+    /** The water (water.ts): its layers, drawn after the solid world, told of that picture first. */
+    setWater(w: { mask: number; before: (colour: Texture, depth: Texture) => void } | null) { scenePass.water = w },
+    /** Whether the water can see the picture under it (a depth to read). */
+    canRefract: () => !!scenePass.wet,
     /** Contact shadows, or none. */
     setContactOn(on: boolean) { contact.enabled = on && !!scenePass.rt.depthTexture },
     /** The glow round bright lights, or none. */

@@ -59,7 +59,8 @@ import { folk, type CarNear, type Folk } from './folk'
 import { gulls } from './birds'
 import { fishes } from './fish'
 import { boats } from './boats'
-import { WAVES } from './water'
+import { WAVES, WATER_MASK, waterView, WATER_ABSORB, WATER_SCATTER, sideScatter } from './water'
+import { wakes } from './wake'
 import { weather, type WeatherKind } from './weather'
 import { wetness } from './wet'
 import { soundscape, type Surface } from './sound'
@@ -265,6 +266,16 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const waterAt = (x: number, z: number, ground: number) => world.poolAt(x, z) ?? (ground < seaY + 0.06 ? world.seaAt(x, z) : null)
   let inWater = false, waterDepth = 0, rippleTick = 0
   const water = splashes(scene)
+  // The ripples round you (wake.ts): a ring on the water near you goes into them (and spreads as water does); further
+  // off, the drawn ring stands in.
+  const ripples = wakes(renderer)
+  {
+    const drawn = water.ring.bind(water)
+    water.ring = (x: number, y: number, z: number, size = 1, life = 1.4) => {
+      if (ripples.covers(x, z)) ripples.poke({ x, z, r: 0.025 + 0.012 * size, amount: Math.min(3, size) })
+      else drawn(x, y, z, size, life)
+    }
+  }
 
   // Set down in the town square, facing into it.
   const start = data.road[Math.floor(data.road.length / 2)] ?? [15, 15]
@@ -417,7 +428,22 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   }
   post = lens(renderer, scene, camera, { phone, still, ao: Q.has('noao') ? 'off' : TIERS[tier].ao, samples: Q.has('msaa') ? Number(Q.get('msaa')) : undefined, bloom: !Q.has('nobloom') && TIERS[tier].bloom, taa: Q.get('taa') !== '0' })
   post.setDaylight(dl.state.day)
+  // The water is drawn after everything solid, told first what lies under it (water.ts).
+  post.setWater({
+    mask: WATER_MASK,
+    before(colour, depth) {
+      const v = waterView
+      v.tScene.value = colour; v.tSceneDepth.value = depth; v.uRefract.value = 1
+      v.uProj.value.copy(camera.projectionMatrix); v.uInvProj.value.copy(camera.projectionMatrixInverse)
+      v.uNF.value.set(camera.near, camera.far)
+      v.uRes.value.set(Math.round((canvas.clientWidth || innerWidth) * renderer.getPixelRatio()), Math.round((canvas.clientHeight || innerHeight) * renderer.getPixelRatio()))
+    },
+  })
+  const wSigma = new Vector3(...WATER_ABSORB.map((a, k) => (a + WATER_SCATTER[k]) / METRE)), wIn = new Vector3()
+  let fallTick = 0
+  const sideK = sideScatter(WATER_ABSORB, WATER_SCATTER)
   if (Q.has('debug')) (window as unknown as { __lens: typeof post }).__lens = post
+  if (Q.has('debug')) (window as unknown as { __sea: unknown }).__sea = { sea: world.sea.uniforms, ground: world.ground, caustics: world.caustics, view: waterView }
   /** Everything the level sets: shadows, occlusion, glow, grass, people, rain, and the pixels. */
   const applyTier = () => {
     const t = TIERS[tier]
@@ -425,6 +451,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     post!.setAO(Q.has('noao') ? 'off' : t.ao); post!.setBloom(!Q.has('nobloom') && t.bloom); post!.setContactOn(!Q.has('nocontact') && t.contact)
     world.flora.lawn.reach.value = t.grass; grassTick = 0
     world.ground.uGQ.value = Q.has('ground') ? Number(Q.get('ground')) : t.ground
+    waterView.uSSR.value = Q.has('ssr') ? Number(Q.get('ssr')) : t.ssr
     people.setDensity(t.people); sky.setDensity(t.rain * (still ? 0.6 : 1))
     fit()
   }
@@ -506,7 +533,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   }
   const UP = new Vector3(0, 1, 0), lightRight = new Vector3(), lightUp = new Vector3(), snapped = new Vector3(), farSnap = new Vector3()
   let farTick = 0
-  let lampTick = 0
+  let lampTick = 0, underNow = false
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop)
     const t0 = performance.now()
@@ -786,7 +813,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       knockT -= dt
       const knock = mv && mv.s.hit > 1.5 && knockT <= 0 ? (knockT = 0.4, mv.s.hit) : 0
       ears.update(dt, {
-        cam: camera.position, forward: fwd, up: UP, shore, inWater: inWater && driving === null, swimming,
+        cam: camera.position, forward: fwd, up: UP, shore, inWater: inWater && driving === null, swimming, under: underNow,
         wind: sky.state.wind, gust: sky.state.gust, rain: sky.state.rain, flash: sky.state.flash, day: dl.state.day, wet: wetness.wet.value, town, green,
         cars: ts.map((c, k) => ({ x: c.j, y: world.heightAt(c.j, c.i), z: c.i, v: c.v / METRE, bus: kinds[k].model === 'bus' })),
         mine: mv ? { x: mv.s.x, y: mv.s.y, z: mv.s.z, v: mv.s.u, throttle: Math.abs(fz), slide: Math.abs(mv.s.vl), hit: knock, flooded: mv.s.flooded } : null,
@@ -806,6 +833,32 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // The air: the sky from where the camera is, the haze through the picture, the sky's light on the world (daylight.ts).
     camera.updateMatrixWorld()
     dl.frame(camera, dt, { still, time: now / 1000, pixels: renderer.getPixelRatio() })
+    // The sea: the wind's own waves, the light in the water and the sun through it, the boats under way, the ripples.
+    {
+      const su = world.sea.uniforms, lc0 = dl.light.color, sc = dl.state.sunCard, kc = dl.state.skyCard
+      world.sea.update(dt, sky.state.wind)
+      su.uWaterLight.value.set(lc0.r * sc + kc * 0.72, lc0.g * sc + kc * 0.86, lc0.b * sc + kc * 1.08)
+      su.uSunDir.value.copy(dl.state.sunDir); su.uSunCol.value.set(lc0.r, lc0.g, lc0.b).multiplyScalar(sc)
+      su.uSkyUp.value.set(0.62, 0.8, 1.1).multiplyScalar(kc * 1.4)
+      let nb = 0
+      for (const b of harbour.state()) if (b.visible && b.v > 0.01 && nb < 6) su.uBoats.value[nb++].set(b.x, b.z, b.yaw, b.v)
+      su.uBoatN.value = nb
+      for (const b of harbour.state()) if (b.visible && b.v > 0.01 && ripples.covers(b.x, b.z)) ripples.poke({ x: b.x + Math.sin(b.yaw) * 0.25, z: b.z + Math.cos(b.yaw) * 0.25, r: 0.05, amount: Math.min(2, b.v * 4) * dt * 30 })
+      ripples.update(dt, driving !== null ? { x: own[driving].s.x, z: own[driving].s.z } : pos, { on: !photo, rain: sky.state.rain * (still ? 0 : 1) })
+      su.tWake.value = ripples.texture(); su.uWake.value.copy(ripples.uniform.value)
+      // Under the water (the camera below the sea's surface, over the sea or in a stream).
+      const cx = camera.position.x, cz = camera.position.z
+      const surfaceHere = world.poolAt(cx, cz) ?? (world.depthAt(cx, cz) > 0 ? world.seaAt(cx, cz) : -99)
+      const under = camera.position.y < surfaceHere - 0.002
+      wIn.copy(su.uWaterLight.value).multiply(sideK)
+      post!.setUnder(under, wSigma, wIn)
+      underNow = under
+      // Spray and mist at the foot of each fall near you.
+      if ((fallTick -= dt) <= 0) {
+        fallTick = 0.18
+        for (const f of world.falls) if (Math.hypot(f.x - cx, f.z - cz) < 3) water.burst(f.x, seaY, f.z, 4, 0.5, [0, 0])
+      }
+    }
     // The mist low over the sea and the ground in the morning (and the rain's), lit by the sky and the sun.
     const lc = dl.light.color, li = dl.state.sunCard
     mistColour.set(lc.r, lc.g, lc.b).multiplyScalar(0.45 * li).addScalar(1.05 * dl.state.skyCard)
@@ -881,7 +934,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     }
     // Contact shadows: as strong as the direct light is against the sky's (none under an overcast or at night but the moon's).
     post!.setContact(Q.has('nocontact') ? 0 : MathUtils.clamp(dl.state.sunCard / (dl.state.sunCard + dl.state.skyCard + 1e-6), 0, 1) * 0.7, sunDir)
-    if (albedoView) { const f = scene.fog; scene.fog = null; renderer.toneMapping = NoToneMapping; camera.clearViewOffset(); renderer.setRenderTarget(null); renderer.render(scene, camera); scene.fog = f }
+    if (albedoView) { const f = scene.fog; scene.fog = null; renderer.toneMapping = NoToneMapping; camera.clearViewOffset(); camera.layers.mask |= WATER_MASK; renderer.setRenderTarget(null); renderer.render(scene, camera); camera.layers.mask &= ~WATER_MASK; scene.fog = f }
     else post!.render(realDt)
     // A picture asked for: taken from what was just drawn, before the browser clears it.
     if (snapWant) { const done = snapWant; snapWant = null; canvas.toBlob((b) => done(b), 'image/png') }
@@ -988,7 +1041,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
       removeEventListener('pointermove', pm); removeEventListener('pointerup', pu); removeEventListener('pointercancel', pu)
-      groundTex.dispose(); prints.dispose()
+      groundTex.dispose(); prints.dispose(); ripples.dispose()
       dl.dispose(); sky.dispose(); ears.dispose(); things.dispose(); removeEventListener('keydown', startSound); removeEventListener('pointerdown', startSound); post?.dispose(); renderer.dispose()
     },
   }

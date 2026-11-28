@@ -25,6 +25,7 @@
  *     its swell higher, the clouds and the rain go with it; it veers slowly;
  *   - in a storm, lightning: the clouds and the town lit white for a moment.
  */
+import { OVER_WATER_LAYER } from './water'
 import {
   AdditiveBlending, BackSide, BufferGeometry, CanvasTexture, Color, DirectionalLight, Float32BufferAttribute, Mesh, MeshDepthMaterial, PlaneGeometry, Points, PointsMaterial,
   RGBADepthPacking, ShaderMaterial, SphereGeometry, Vector3, type Scene, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, WebGLRenderTarget, type WebGLRenderer,
@@ -240,6 +241,8 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
   const rainMesh = new Mesh(rainGeo, rainMat)
   rainMesh.frustumCulled = false; rainMesh.renderOrder = 4; rainMesh.name = 'rain'
   rainMesh.userData.noAO = true
+  // (Rain and its splashes are drawn with the water, after it, so the sea does not hide the rain falling on it.)
+  rainMesh.layers.set(OVER_WATER_LAYER)
   scene.add(rainMesh)
 
   /* ---- splashes where it lands ---- */
@@ -257,6 +260,7 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
   const splMat = new PointsMaterial({ color: '#dfe7ee', size: 0.009, map: dot, transparent: true, depthWrite: false, opacity: 0, blending: AdditiveBlending })
   const splashes = new Points(splGeo, splMat)
   splashes.frustumCulled = false; splashes.userData.noAO = true
+  splashes.layers.set(OVER_WATER_LAYER)
   scene.add(splashes)
   const splAge = new Float32Array(SPL).map(() => Math.random() * 0.25)
 

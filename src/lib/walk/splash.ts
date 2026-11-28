@@ -6,6 +6,7 @@
  * drops flung up and out that gravity brings back down into the water (a drop
  * is gone when it falls back through the surface it left).
  */
+import { OVER_WATER_LAYER } from './water'
 import { BufferAttribute, BufferGeometry, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, Points, PointsMaterial, RingGeometry, type Scene } from 'three'
 
 const RINGS = 16, DROPS = 220, G = 9.8 * 0.11
@@ -14,7 +15,8 @@ export function splashes(scene: Scene) {
   const ringGeo = new RingGeometry(0.93, 1, 56).rotateX(-Math.PI / 2)
   const rings = Array.from({ length: RINGS }, () => {
     const m = new Mesh(ringGeo, new MeshBasicMaterial({ color: '#eef6fb', transparent: true, opacity: 0, depthWrite: false }))
-    m.visible = false; m.renderOrder = 2; scene.add(m)
+    // (Drawn with the water, over it: lens.ts.)
+    m.visible = false; m.renderOrder = 2; m.layers.set(OVER_WATER_LAYER); scene.add(m)
     return { m, age: 0, life: 1, grow: 0.3, start: 0.03, peak: 0.4 }
   })
   let nextRing = 0
@@ -28,7 +30,7 @@ export function splashes(scene: Scene) {
   }
   const dot = new DataTexture(px, D, D); dot.magFilter = dot.minFilter = LinearFilter; dot.needsUpdate = true
   const spray = new Points(geo, new PointsMaterial({ color: '#f4f9ff', map: dot, size: 0.012, transparent: true, opacity: 0.9, depthWrite: false }))
-  spray.frustumCulled = false; scene.add(spray)
+  spray.frustumCulled = false; spray.layers.set(OVER_WATER_LAYER); scene.add(spray)
   let nextDrop = 0
 
   return {

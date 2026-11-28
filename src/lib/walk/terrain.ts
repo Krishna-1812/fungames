@@ -29,7 +29,7 @@
  * and driftwood lie on the beaches and at the cliffs' feet; footprints and tyre tracks press into sand and snow
  * (foot.ts).
  */
-import { BufferGeometry, ClampToEdgeWrapping, Color, DataTexture, Float32BufferAttribute, LinearFilter, Mesh, MeshStandardMaterial, RGBAFormat, type Texture, Uint32BufferAttribute, Vector3, Vector4 } from 'three'
+import { BufferGeometry, ClampToEdgeWrapping, Color, DataTexture, Float32BufferAttribute, LinearFilter, Mesh, MeshStandardMaterial, RGBAFormat, type Texture, Uint32BufferAttribute, Vector2, Vector3, Vector4 } from 'three'
 import { wetness, RIPPLES_GLSL } from './wet'
 import { PX_H, Y, type WorldData } from './build3d'
 import { GROUND } from './groundset'
@@ -706,6 +706,8 @@ export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
     tGC: { value: null as Texture | null }, tGD: { value: null as Texture | null }, uGQ: { value: 2 },
     tFoot: { value: null as Texture | null }, uFoot: { value: new Vector4(0, 0, 1, 0) },
     tMacro: { value: macro as Texture }, uMacro: { value: new Vector4(M, M, 1 / span, 0) },
+    /** The caustics the sea's waves cast on the floor (water.ts hands over its baked net and how its waves drift). */
+    tCaus: { value: null as Texture | null }, uCausDet: { value: new Vector2(1, 1) }, uCausDrift: { value: new Vector4() },
   }
   const causticK = { value: 1 }
   const mesh = new Mesh(geo.geometry(), groundMaterial(seaY, time, causticK, ground))
@@ -728,6 +730,9 @@ uniform float uWet;
 uniform float uRain;
 uniform float uTime;
 uniform float uCaustic;
+uniform sampler2D tCaus;
+uniform vec2 uCausDet;
+uniform vec4 uCausDrift;
 uniform sampler2DArray tGC, tGD;
 uniform float uGS[NL];
 uniform float uGH[NL];
@@ -1085,7 +1090,7 @@ const GROUND_BODY = /* glsl */ `
     float rip = sin(dot(p, vec2(0.6, 0.8)) * 28.0 + n2 * 5.0 + n1 * 3.0);
     float under = smoothstep(0.0, -0.06, wetY);
     bh += rip * 0.5 * under;
-    { float mk = smoothstep(0.72, 0.85, mac.a) * under; if (mk > 0.0) gMix(g, gLay(L_ROCK_SEA, p, px, py), mk, 0.0); }
+    { float mk = smoothstep(0.8, 0.9, mac.a + (n1 - 0.5) * 0.1) * smoothstep(0.08, 0.3, -wetY); if (mk > 0.0) gMix(g, gLay(L_ROCK_SEA, p, px, py), mk, 0.0); }
     float depth = clamp((-wetY - 0.02) / 0.6, 0.0, 1.0);
     g.c = mix(g.c, SRGB(0.047, 0.227, 0.333), pow(depth, 0.8));
     g.c = mix(g.c, g.c * SRGB(0.6, 0.75, 0.55), smoothstep(0.62, 0.8, n1) * under * (1.0 - depth) * 0.6);
@@ -1105,14 +1110,17 @@ const GROUND_BODY = /* glsl */ `
   }
   // The island's own large-scale variation: no two stretches of the same ground quite alike.
   g.c *= 0.9 + 0.2 * mac.r;
-  // Under the water, the sun's light comes through its ripples in a moving net of bright lines.
+  // Under the water, the sun's light comes through the waves above in a moving net of bright lines: the caustics the
+  // sea's own small waves cast (seatex.ts: traced through them, so the net is the one those waves make), drifting as
+  // they drift. They only move the light about (their mean is one), sharpest a metre or two down, gone in the deep.
   if (wetY < 0.0 && uCaustic > 0.0) {
-    vec2 cp = p * 4.2 + vec2(tNoise(p * 1.6 + uTime * 0.21), tNoise(p * 1.6 - uTime * 0.17 + 5.0)) * 1.1;
-    float c1 = tCells(cp + vec2(uTime * 0.12, uTime * 0.08));
-    float c2 = tCells(cp * 1.63 + vec2(-uTime * 0.1, uTime * 0.14) + 7.3);
-    float caus = pow(1.0 - smoothstep(0.0, 0.075, c1), 2.0) * 0.55 + pow(1.0 - smoothstep(0.0, 0.055, c2), 2.0) * 0.4;
-    caus *= smoothstep(0.0, 0.04, -wetY) * (1.0 - smoothstep(0.12, 0.7, -wetY)) * uCaustic * wn.y * (1.0 - 0.6 * smoothstep(5.0, 18.0, dist));
-    g.c += g.c * caus * 0.85;
+    float cA = texture2D(tCaus, p * uCausDet.x + uCausDrift.xy).r * 4.0, cB = texture2D(tCaus, p * uCausDet.y + uCausDrift.zw).g * 4.0;
+    // (Barely focused in the first hand's breadth of water, sharpest a metre or two down, gone in the deep.)
+    float focus = smoothstep(0.0, 0.18, -wetY) * (1.0 - smoothstep(0.3, 1.0, -wetY));
+    // (Only the bright lines are laid over the floor: between them the light is much as it would be anyway.)
+    float lines = max(cA * 0.6 + cB * 0.4 - 1.15, 0.0);
+    float k = smoothstep(0.0, 0.02, -wetY) * uCaustic * max(wn.y, 0.0) * (1.0 - 0.6 * smoothstep(5.0, 25.0, dist));
+    g.c *= 1.0 + min(lines, 2.0) * 0.9 * focus * k;
   }
   // Rain: what is porous darkens as it soaks it up, everything shines; puddles gather in the low places of the
   // street, the paving and the rock (the photograph's own hollows first), mirrors with rings in them while it rains.
@@ -1144,7 +1152,7 @@ const GROUND_BODY = /* glsl */ `
 /** The grass's own mean green (linear), which each district's grass colour is set against. */
 const GRASS_REF = (() => { const c = new Color(0, 0, 0), all = Object.values(GRASS).filter((_, k) => Object.keys(GRASS)[k] !== 'badlands'); for (const h of all) c.add(new Color(h)); return c.multiplyScalar(1 / all.length) })()
 
-type GroundUniforms = { tGC: { value: Texture | null }; tGD: { value: Texture | null }; uGQ: { value: number }; tFoot: { value: Texture | null }; uFoot: { value: Vector4 }; tMacro: { value: Texture }; uMacro: { value: Vector4 } }
+type GroundUniforms = { tGC: { value: Texture | null }; tGD: { value: Texture | null }; uGQ: { value: number }; tFoot: { value: Texture | null }; uFoot: { value: Vector4 }; tMacro: { value: Texture }; uMacro: { value: Vector4 }; tCaus: { value: Texture | null }; uCausDet: { value: Vector2 }; uCausDrift: { value: Vector4 } }
 function groundMaterial(seaY: number, time: { value: number }, caustics: { value: number }, gu: GroundUniforms) {
   const m = new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
   m.onBeforeCompile = (sh) => {

@@ -31,6 +31,8 @@ export type Hearing = {
   /** How near the shore is (world units) and which way (x, z), or null if far. */
   shore: { d: number; x: number; z: number } | null
   inWater: boolean; swimming: boolean
+  /** The camera under water: everything muffled, as through water. */
+  under?: boolean
   wind: number; gust: number; rain: number; flash: number; day: number; wet: number
   /** Out among the streets (people, traffic), or out of town. */
   town: number
@@ -47,6 +49,7 @@ export type Surface = 'hard' | 'grass' | 'sand' | 'wood' | 'puddle' | 'water'
 export function soundscape() {
   let ctx: AudioContext | null = null
   let master: GainNode | null = null
+  let muffle: BiquadFilterNode | null = null
   let on = true, started = false
   let noise: AudioBuffer | null = null
   const beds: Record<string, { g: GainNode; f?: BiquadFilterNode; f2?: BiquadFilterNode; p?: StereoPannerNode }> = {}
@@ -63,7 +66,9 @@ export function soundscape() {
     ctx = new AC()
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4
     master = ctx.createGain(); master.gain.value = on ? 0.9 : 0
-    master.connect(comp).connect(ctx.destination)
+    // (Under water, everything comes through low and dull.)
+    muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 18000; muffle.Q.value = 0.5
+    master.connect(muffle).connect(comp).connect(ctx.destination)
     // White noise, two seconds of it, looped under everything.
     noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
     const d = noise.getChannelData(0)
@@ -203,6 +208,7 @@ export function soundscape() {
       if (!ctx || !master || ctx.state !== 'running') return
       t += dt
       const L = ctx.listener, now = ctx.currentTime
+      muffle?.frequency.setTargetAtTime(h.under ? 520 : 18000, now, 0.08)
       if (L.positionX) {
         L.positionX.setTargetAtTime(h.cam.x, now, 0.02); L.positionY.setTargetAtTime(h.cam.y, now, 0.02); L.positionZ.setTargetAtTime(h.cam.z, now, 0.02)
         L.forwardX.setTargetAtTime(h.forward.x, now, 0.02); L.forwardY.setTargetAtTime(h.forward.y, now, 0.02); L.forwardZ.setTargetAtTime(h.forward.z, now, 0.02)

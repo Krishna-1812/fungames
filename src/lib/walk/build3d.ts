@@ -19,7 +19,7 @@
  * night), one for what grows.
  */
 import { terrain } from './terrain'
-import { buildSea, poolMaterial } from './water'
+import { buildSea, poolMaterial, WATER_LAYER } from './water'
 import { flora } from './flora'
 import { ACROSS, FACING, GlassBag, Hy, MAT, PrintBag, Px, atlas, facadeMaterial, glassMaterial, type Print } from './facade'
 import {
@@ -576,19 +576,23 @@ export function buildWorld(d: WorldData, opts: { phone?: boolean } = {}) {
   // The sea (water.ts): it knows its depth everywhere, so it is clear in the shallows and deep blue
   // beyond, breaks in foam on every shore, and lifts in a long swell that calms to nothing at the edge.
   // Under it, far out past the floor the island stands on, the open ocean's dark.
-  const deep = new Mesh(new PlaneGeometry(6000, 6000, 1, 1), new MeshStandardMaterial({ color: DEEP_SEA, roughness: 1 }))
+  const deep = new Mesh(new PlaneGeometry(1200, 1200, 1, 1), new MeshStandardMaterial({ color: DEEP_SEA, roughness: 1 }))
   deep.rotation.x = -Math.PI / 2
   deep.position.set(d.grid / 2, Y(d.sea) - 1.6, d.grid / 2)
   root.add(deep)
   const sea = buildSea({ grid: d.grid, margin: 8, seaY: Y(d.sea), heightAt: gr.heightAt, rocks: gr.rocks, falls: gr.falls, time })
   root.add(...sea.meshes)
+  // (The floor's caustics are the ones the sea's own waves cast, drifting as they drift.)
+  gr.ground.tCaus.value = sea.caustics; gr.ground.uCausDet = sea.uniforms.uDet; gr.ground.uCausDrift = sea.uniforms.uDrift
   // The stream and the pond: running water, its falls, and the still pond.
-  root.add(new Mesh(gr.poolGeo, poolMaterial(time)))
+  const pools = new Mesh(gr.poolGeo, poolMaterial(time, sea.uniforms))
+  pools.layers.set(WATER_LAYER)
+  root.add(pools)
   return {
     root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes, ...fl.solids], flora: fl,
     ground: gr.ground, scattered: gr.scattered,
     windows: sol.windows, bulbs: sol.bulbMat, boards: pics.material, made: sol.made, lamps: sol.lamps, time,
     /** Water: the sea's surface (swell and all) and depth, the stream's surface and which way it runs, and how bright the light under it is. */
-    seaAt: sea.surfaceAt, depthAt: sea.depthAt, poolAt: gr.poolAt, flowAt: gr.flowAt, caustics: gr.caustics, falls: gr.falls, swell: sea.uniforms.uLift,
+    seaAt: sea.surfaceAt, depthAt: sea.depthAt, poolAt: gr.poolAt, flowAt: gr.flowAt, caustics: gr.caustics, falls: gr.falls, swell: sea.uniforms.uLift, sea,
   }
 }
