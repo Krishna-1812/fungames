@@ -32,6 +32,10 @@
  *     noon and red at the horizon, the moon later each day and full at
  *     midnight, the stars where the real ones are, the clouds' pattern
  *     repeating exactly;
+ *   - the ground: every surface it carries has its photographed material, every layer is drawn and built, at a
+ *     real albedo, within the first-load budget; hex-tiling has no seams; the pavements stand a kerb's height
+ *     over the road and drop at the crossings; stones and driftwood lie about, but never on a street or in a
+ *     building; leaf litter lies under the trees, and footprints settle away;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -98,7 +102,8 @@ check(verts > 50_000 && nan === 0, `it builds: ${verts.toLocaleString()} vertice
 const start = data.road[Math.floor(data.road.length / 2)]
 check(start && world.kind(start[0], start[1]) === '1', `you start on land, on a road (${start})`)
 
-// The ground: joined edges meet exactly; the walls are where they are not.
+// The ground: joined edges meet exactly; the walls are where they are not. (The ground itself, under the pavements a
+// street's kerbs lift: those steps are built, with their faces, and checked on their own below.)
 {
   let seams = 0, worst = 0, walls = 0
   const N = data.grid, e = 1e-5
@@ -107,7 +112,8 @@ check(start && world.kind(start[0], start[1]) === '1', `you start on land, on a 
     for (let s = 0.02; s < 1; s += 0.08) {
       // A point on the edge, from either side.
       const [x, z] = di ? [j + s, i2] : [j2, i + s]
-      const a = di ? world.heightAt(x, z - e) : world.heightAt(x - e, z), b = di ? world.heightAt(x, z + e) : world.heightAt(x + e, z)
+      const at = (x, z) => Y(world.siteAt(x, z))
+      const a = di ? at(x, z - e) : at(x - e, z), b = di ? at(x, z + e) : at(x + e, z)
       if (world.joined(i, j, i2, j2)) { seams++; worst = Math.max(worst, Math.abs(a - b)) } else if (Math.abs(a - b) > 0.01) walls++
     }
   }
@@ -594,12 +600,13 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   const xs = Array.from({ length: 101 }, (_, k) => k / 100), g = xs.map(governed)
   check(g.every((v, k) => k === 0 || v >= g[k - 1]) && g.every((v) => v < CEILING) && governed(0.5) === 0.5 && governed(1) > 0.75,
     `albedo: left alone up to ${KNEE}, eased above it (pure white gives back ${governed(1).toFixed(2)}), never past ${CEILING}, never darker than ${FLOOR}`)
-  // The ground's own paints (terrain.ts), as linear albedo: within what real streets, pavements, sand and soil give back.
-  const src = (await import('node:fs')).readFileSync(new URL('../src/lib/walk/terrain.ts', import.meta.url), 'utf8')
-  const lum = (name) => { const m = src.match(new RegExp(`vec3 ${name} = SRGB\\(([^)]+)\\)`)); if (!m) return NaN; const [r, gg, b] = m[1].split(',').map((v) => Math.pow(Number(v), 2.2)); return 0.2126 * r + 0.7152 * gg + 0.0722 * b }
-  const real = { asphalt: [0.04, 0.12], pave: [0.2, 0.42], sand: [0.3, 0.5], dirt: [0.15, 0.35] }
+  // The ground's photographs (groundset.ts, as the build measured them in public/walk-ground/ground.json), as linear
+  // albedo: within what real streets, pavements, sand and soil give back.
+  const built = JSON.parse((await import('node:fs')).readFileSync(new URL('../public/walk-ground/ground.json', import.meta.url), 'utf8'))
+  const lum = (key) => built.layers.find((l) => l.key === key)?.albedo ?? NaN
+  const real = { 'asphalt-worn': [0.04, 0.12], paving: [0.2, 0.42], sand: [0.3, 0.5], soil: [0.15, 0.35] }
   const got = Object.fromEntries(Object.keys(real).map((k) => [k, lum(k)]))
-  check(Object.entries(real).every(([k, [lo, hi]]) => got[k] >= lo && got[k] <= hi), `the ground's albedo: asphalt ${got.asphalt.toFixed(2)}, pavement ${got.pave.toFixed(2)}, sand ${got.sand.toFixed(2)}, soil ${got.dirt.toFixed(2)} (real: 0.04–0.12, 0.2–0.42, 0.3–0.5, 0.15–0.35)`)
+  check(Object.entries(real).every(([k, [lo, hi]]) => got[k] >= lo && got[k] <= hi), `the ground's albedo: asphalt ${got['asphalt-worn'].toFixed(2)}, pavement ${got.paving.toFixed(2)}, sand ${got.sand.toFixed(2)}, soil ${got.soil.toFixed(2)} (real: 0.04–0.12, 0.2–0.42, 0.3–0.5, 0.15–0.35)`)
   const r = [0, 3, 10, 20, 45, 70, 90].map(sunToSky)
   check(r[0] === 0 && r.every((v, k) => k === 0 || v > r[k - 1]) && r[3] > 2 && r[3] < 4 && r[5] > 5 && r[5] < 8,
     `the sun against the whole sky on level ground: nothing at the horizon, ${r[1].toFixed(2)} at 3°, ${r[3].toFixed(1)} at 20°, ${r[5].toFixed(1)} at 70°`)
@@ -638,6 +645,82 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   check(pols.every((p) => Math.abs(p.el - 24) < 1.2 && p.north > 0.99), `Polaris stands ${pols.map((p) => p.el.toFixed(1)).join('°, ')}° up over the north as the sky turns (the island is at 24° north)`)
   const reps = [[3.3, 7.1], [40.2, 12.9], [-5.5, 61.7]].map(([x, y]) => Math.abs(fbm(x, y) - fbm(x + PERIOD, y)) + Math.abs(fbm(x, y) - fbm(x, y - PERIOD)))
   check(reps.every((d) => d < 1e-9), `the clouds' pattern repeats exactly every ${PERIOD} of its units (one texture serves the flat clouds, their shadows and the 3D ones)`)
+}
+
+// The ground (round two, phase 3): photographed materials, laid by a road crew.
+{
+  const fs = await import('node:fs')
+  const { GROUND, GROUND_BUDGET_MB } = await import('../src/lib/walk/groundset.ts')
+  const { SURF, liftAt, roadMask, KERB, PAVE } = await import('../src/lib/walk/terrain.ts')
+  const { FOOT_LIFE } = await import('../src/lib/walk/foot.ts')
+  const { METRE } = await import('../src/lib/walk/body.ts')
+  const src = fs.readFileSync(new URL('../src/lib/walk/terrain.ts', import.meta.url), 'utf8')
+  const body = src.slice(src.indexOf('const GROUND_BODY'))
+  const dir = new URL('../public/walk-ground/', import.meta.url)
+  const built = JSON.parse(fs.readFileSync(new URL('ground.json', dir), 'utf8'))
+  // Every surface the mesh carries is one the shader paints; every layer is drawn somewhere, and was built.
+  const mesh = world.root.children.find((o) => o.geometry?.getAttribute?.('aSurf'))
+  const ids = new Set(), sa = mesh.geometry.getAttribute('aSurf')
+  for (let k = 0; k < sa.count; k++) ids.add(Math.round(sa.getX(k)))
+  const painted = new Set(Object.values(SURF))
+  const unused = GROUND.filter((g) => !body.includes(`L_${g.key.toUpperCase().replace(/-/g, '_')}`)).map((g) => g.key)
+  const missing = GROUND.filter((g) => !['c', 'd'].every((s) => fs.existsSync(new URL(`${g.key}-${s}.ktx2`, dir)))).map((g) => g.key)
+  check([...ids].every((i) => painted.has(i)) && unused.length === 0 && missing.length === 0 && built.layers.length === GROUND.length,
+    `every surface has its material: the mesh carries surfaces ${[...ids].sort((a, b) => a - b).join(', ')}, all painted; all ${GROUND.length} photographed layers drawn${unused.length ? ` (unused: ${unused})` : ''} and built${missing.length ? ` (missing: ${missing})` : ''}`)
+  // Each layer held to a real albedo (within the albedo rule's range), clipped nowhere much.
+  const bad = built.layers.filter((l) => l.albedo < 0.03 || l.albedo > 0.86 || l.clipped > 0.02)
+  check(bad.length === 0, `the photographs' albedo: ${built.layers.map((l) => `${l.key} ${l.albedo.toFixed(2)}`).join(', ')}${bad.length ? ` — out of range: ${bad.map((l) => l.key)}` : ''}`)
+  // The first-load budget: every layer, both maps, and the transcoder.
+  let bytes = 0
+  for (const f of fs.readdirSync(dir)) if (f.endsWith('.ktx2')) bytes += fs.statSync(new URL(f, dir)).size
+  for (const f of fs.readdirSync(new URL('basis/', dir))) bytes += fs.statSync(new URL(`basis/${f}`, dir)).size
+  check(bytes / 1048576 <= GROUND_BUDGET_MB, `the ground's photographs load in ${(bytes / 1048576).toFixed(2)} MB (budget ${GROUND_BUDGET_MB} MB, the transcoder included)`)
+  // No tile seams: hex-tiling's three copies (the shader's own sums, in JS) hand over smoothly everywhere — each copy's
+  // weight goes to nothing at the edge of the triangle it belongs to, so nowhere does the picture jump.
+  const hexW = (x, y) => {
+    const st = [x * 3.4641016, y * 3.4641016], sk = [st[0] - 0.57735027 * st[1], 1.15470054 * st[1]]
+    const b = [Math.floor(sk[0]), Math.floor(sk[1])], t = [sk[0] - b[0], sk[1] - b[1]], tz = 1 - t[0] - t[1]
+    const s = tz < 0 ? 1 : 0, s2 = 2 * s - 1, w = [-tz * s2, s - t[1] * s2, s - t[0] * s2]
+    const v = [[b[0] + s, b[1] + s], [b[0] + s, b[1] + 1 - s], [b[0] + 1 - s, b[1] + s]], m = new Map()
+    v.forEach((q, k) => m.set(q.join(','), (m.get(q.join(',')) ?? 0) + w[k]))
+    return m
+  }
+  let jump = 0, sums = 0
+  for (let k = 0; k < 20000; k++) {
+    const x = Math.random() * 40 - 20, y = Math.random() * 40 - 20, a = hexW(x, y), b = hexW(x + 1e-6, y + 1e-6)
+    sums = Math.max(sums, Math.abs([...a.values()].reduce((p, q) => p + q, 0) - 1))
+    let d = 0; for (const key of new Set([...a.keys(), ...b.keys()])) d += Math.abs((a.get(key) ?? 0) - (b.get(key) ?? 0))
+    jump = Math.max(jump, d)
+  }
+  check(sums < 1e-6 && jump < 1e-4, `no tile seams: hex-tiling's weights sum to one (off by ${sums.toExponential(1)}) and never jump (at most ${jump.toExponential(1)} over a micron) across 20,000 points`)
+  // The kerbs: every pavement stands a kerb's height (12 cm) over its road, a step you take and a car's wheels ride;
+  // at each crossing the kerb is dropped to a lip.
+  let raised = 0, flat = 0, drops = 0, crossings = 0
+  const isRoad = (i, j) => data.road.some(([a, b]) => a === i && b === j)
+  for (const [i, j] of data.road) {
+    const m = roadMask(isRoad, i, j)
+    for (const [u, v, side] of [[0.5, PAVE / 2, 1], [0.5, 1 - PAVE / 2, 2], [PAVE / 2, 0.5, 4], [1 - PAVE / 2, 0.5, 8]]) {
+      if (Math.floor(m / side) % 2) continue
+      const pave = world.heightAt(j + u, i + v), road = world.heightAt(j + 0.5, i + 0.5)
+      if (Math.abs(pave - road - KERB) < 1e-6) raised++; else flat++
+    }
+    for (const [bit, u, v] of [[256, PAVE - 0.004, PAVE / 2 + 0.02], [512, PAVE - 0.004, 1 - PAVE / 2 - 0.02], [1024, PAVE / 2 + 0.02, PAVE - 0.004], [2048, 1 - PAVE / 2 - 0.02, PAVE - 0.004]]) {
+      if (!(Math.floor(m / bit) % 2)) continue
+      crossings++
+      if (liftAt(m, u, v) < KERB * 0.3) drops++
+    }
+  }
+  check(raised > 50 && flat === 0 && crossings > 0 && drops === crossings && KERB < 0.35 * METRE,
+    `the kerbs: ${raised} pavement sides stand ${(KERB / METRE * 100).toFixed(0)} cm over their road (none flush), a step under the walker's 35 cm; all ${crossings} crossings' kerbs dropped to a lip`)
+  // What lies about: boulders and pebbles on the beaches and at the cliffs' feet, driftwood at the tide line; none on a
+  // street or in a building.
+  const sc = world.scattered, onRoad = sc.filter((q) => isRoad(Math.floor(q.z), Math.floor(q.x)))
+  const inBuilt = sc.filter((q) => data.buildings.some((b) => q.x > b.j && q.x < b.j + b.d && q.z > b.i && q.z < b.i + b.w))
+  check(sc.length > 150 && onRoad.length === 0 && inBuilt.length === 0, `${sc.length} stones and logs lie about (${sc.filter((q) => q.r > 0.05).length} boulders), none on a street (${onRoad.length}) or in a building (${inBuilt.length})`)
+  // Leaf litter under the trees; footprints that settle away in about a minute.
+  const lit = world.ground.tMacro.value.image.data
+  let litter = 0; for (let k = 2; k < lit.length; k += 4) if (lit[k] > 128) litter++
+  check(litter > 200 && FOOT_LIFE > 30 && FOOT_LIFE < 180, `leaf litter under the trees (${litter} texels of the ground's map), and prints settle away to a third in ${FOOT_LIFE} s`)
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
