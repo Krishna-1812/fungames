@@ -1,0 +1,273 @@
+{
+ "size": 1024,
+ "detail": 512,
+ "bytes": 11477343,
+ "layers": [
+  {
+   "key": "asphalt",
+   "layer": 0,
+   "source": "clean_asphalt",
+   "albedo": 0.075,
+   "mean": [
+    76,
+    78,
+    78
+   ],
+   "clipped": 0,
+   "colourKB": 295,
+   "detailKB": 145
+  },
+  {
+   "key": "asphalt-worn",
+   "layer": 1,
+   "source": "asphalt_02",
+   "albedo": 0.11,
+   "mean": [
+    94,
+    93,
+    90
+   ],
+   "clipped": 0,
+   "colourKB": 329,
+   "detailKB": 298
+  },
+  {
+   "key": "paving",
+   "layer": 2,
+   "source": "concrete_pavement",
+   "albedo": 0.27,
+   "mean": [
+    151,
+    140,
+    128
+   ],
+   "clipped": 0,
+   "colourKB": 320,
+   "detailKB": 206
+  },
+  {
+   "key": "cobbles",
+   "layer": 3,
+   "source": "cobblestone_floor_08",
+   "albedo": 0.17,
+   "mean": [
+    118,
+    114,
+    108
+   ],
+   "clipped": 0,
+   "colourKB": 312,
+   "detailKB": 266
+  },
+  {
+   "key": "granite",
+   "layer": 4,
+   "source": "granite_tile_04",
+   "albedo": 0.26,
+   "mean": [
+    146,
+    138,
+    129
+   ],
+   "clipped": 0,
+   "colourKB": 299,
+   "detailKB": 152
+  },
+  {
+   "key": "sand",
+   "layer": 5,
+   "source": "sand_01",
+   "albedo": 0.42,
+   "mean": [
+    188,
+    172,
+    137
+   ],
+   "clipped": 0.00002,
+   "colourKB": 311,
+   "detailKB": 277
+  },
+  {
+   "key": "sand-wet",
+   "layer": 6,
+   "source": "damp_beach_sand",
+   "albedo": 0.19,
+   "mean": [
+    137,
+    118,
+    89
+   ],
+   "clipped": 0,
+   "colourKB": 294,
+   "detailKB": 174
+  },
+  {
+   "key": "grass",
+   "layer": 7,
+   "source": "sparse_grass",
+   "albedo": 0.13,
+   "mean": [
+    103,
+    105,
+    3
+   ],
+   "clipped": 0,
+   "colourKB": 355,
+   "detailKB": 306
+  },
+  {
+   "key": "soil",
+   "layer": 8,
+   "source": "dirt_floor",
+   "albedo": 0.17,
+   "mean": [
+    136,
+    110,
+    88
+   ],
+   "clipped": 0,
+   "colourKB": 334,
+   "detailKB": 266
+  },
+  {
+   "key": "mud",
+   "layer": 9,
+   "source": "brown_mud_02",
+   "albedo": 0.085,
+   "mean": [
+    91,
+    81,
+    66
+   ],
+   "clipped": 0,
+   "colourKB": 329,
+   "detailKB": 317
+  },
+  {
+   "key": "rock",
+   "layer": 10,
+   "source": "rock_face",
+   "albedo": 0.19,
+   "mean": [
+    132,
+    118,
+    111
+   ],
+   "clipped": 0.00003,
+   "colourKB": 303,
+   "detailKB": 269
+  },
+  {
+   "key": "rock-sea",
+   "layer": 11,
+   "source": "seaside_rock",
+   "albedo": 0.13,
+   "mean": [
+    105,
+    100,
+    93
+   ],
+   "clipped": 0.00001,
+   "colourKB": 348,
+   "detailKB": 275
+  },
+  {
+   "key": "gravel",
+   "layer": 12,
+   "source": "gravel_floor_03",
+   "albedo": 0.2,
+   "mean": [
+    127,
+    123,
+    118
+   ],
+   "clipped": 0,
+   "colourKB": 328,
+   "detailKB": 303
+  },
+  {
+   "key": "field",
+   "layer": 13,
+   "source": "farm_soil",
+   "albedo": 0.11,
+   "mean": [
+    115,
+    88,
+    64
+   ],
+   "clipped": 0,
+   "colourKB": 344,
+   "detailKB": 315
+  },
+  {
+   "key": "snow",
+   "layer": 14,
+   "source": "snow_02",
+   "albedo": 0.78,
+   "mean": [
+    228,
+    228,
+    230
+   ],
+   "clipped": 0.00013,
+   "colourKB": 258,
+   "detailKB": 274
+  },
+  {
+   "key": "badland",
+   "layer": 15,
+   "source": "dry_ground_rocks",
+   "albedo": 0.2598,
+   "mean": [
+    165,
+    134,
+    101
+   ],
+   "clipped": 0.00414,
+   "colourKB": 358,
+   "detailKB": 307
+  },
+  {
+   "key": "pebbles",
+   "layer": 16,
+   "source": "river_small_rocks",
+   "albedo": 0.17,
+   "mean": [
+    122,
+    113,
+    102
+   ],
+   "clipped": 0,
+   "colourKB": 337,
+   "detailKB": 319
+  },
+  {
+   "key": "stone",
+   "layer": 17,
+   "source": "stone_wall",
+   "albedo": 0.26,
+   "mean": [
+    148,
+    138,
+    126
+   ],
+   "clipped": 0,
+   "colourKB": 320,
+   "detailKB": 294
+  },
+  {
+   "key": "leaves",
+   "layer": 18,
+   "source": "forest_leaves_02",
+   "albedo": 0.1,
+   "mean": [
+    108,
+    85,
+    48
+   ],
+   "clipped": 0,
+   "colourKB": 345,
+   "detailKB": 325
+  }
+ ]
+}

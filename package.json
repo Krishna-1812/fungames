@@ -30,6 +30,7 @@
     "web-vitals": "^6.2.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8"
+    "@electric-sql/pglite": "^0.5.8",
+    "ktx2-encoder": "^0.6.0"
   }
 }
