@@ -211,7 +211,25 @@ defaults. Light in physical proportion, metered and graded like film.
 
 ---
 
-## Phase 2: The sky and the air
+## Phase 2: The sky and the air — done 28 Nov 2026
+
+**Done:**
+- The physical sky with its four tables, and the haze over everything
+  (the linear fog is gone).
+- The light in the shade and in reflections, taken from the same sky.
+- Volumetric clouds, shadowing the ground from the same cloud field.
+- Light shafts and the morning mist.
+- The real star field, the Milky Way, airglow and the town's glow.
+- The moon in its phase.
+- Twilight from the physics.
+- Each day's air a little different.
+
+**Moved:**
+- The light-probe grid for bounce light goes to Phase 5, where the
+  buildings it bounces off get real materials.
+- The clouds' own reprojection (updating a sixteenth of the pixels each
+  frame) was not needed: a quarter-size march smoothed by the steadying
+  holds up.
 
 **New point of view:** one atmosphere (Bauer's lesson from RDR2). The sky,
 the haze on distant things, the clouds, the light in shade and the

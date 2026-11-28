@@ -3303,6 +3303,28 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        a cos⁴ fall-off, colour fringing at the corners, grain in the mid
        tones. check-walk's dice are seeded now, so a check passes or fails on
        the code, not the roll.
+    2. ~~*The sky and the air*~~ **done** — one physically based atmosphere
+       (Hillaire's 2020 model, as tables on the graphics card) gives the sky,
+       the sun's colour (85% of its light gets through at noon, nearly white;
+       2% at 2°, red; none below the Earth's edge), the haze on everything far
+       off (by distance and direction, laid over the picture from the scene's
+       depth) and, blurred, the light in the shade — the old sky, its blue-hour
+       dome and the linear fog gone. The island's air is humid sea haze (an
+       aerosol depth of about 0.12, twenty times the textbook clear sky's),
+       which is what makes the sun-to-sky ratio come out of the physics at 6.8
+       at noon against 6.2 measured on real clear days. Twilight as it is: the
+       pink belt and the Earth's shadow opposite a sunset, the blue hour.
+       Clouds in three dimensions, raymarched through the weather's own cloud
+       field (so a cloud overhead is the shadow beneath it): flat-bottomed,
+       rounded over the top as high as the cover is thick, billowing at the
+       edges, lit through themselves towards the sun, silver-lined, hazed with
+       distance; flat ones on Low. Light shafts when the sun is low. A morning
+       mist over the sea and the low ground, burning off by nine. The 92
+       brightest real stars where they are (Polaris 24° up over the north),
+       thousands of fainter ones crowding to the Milky Way — dust lanes and all
+       on a moonless night — twinkling low down; airglow, and the town's glow
+       low in the sky; the moon in its phase, lit from where the sun is,
+       fifty minutes later each day. Each day's air a little different.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
