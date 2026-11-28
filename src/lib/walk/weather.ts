@@ -27,9 +27,10 @@
  */
 import {
   AdditiveBlending, BackSide, BufferGeometry, CanvasTexture, Color, DirectionalLight, Float32BufferAttribute, Mesh, MeshDepthMaterial, PlaneGeometry, Points, PointsMaterial,
-  RGBADepthPacking, ShaderMaterial, SphereGeometry, Vector3, type Scene,
+  RGBADepthPacking, ShaderMaterial, SphereGeometry, Vector3, type Scene, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, WebGLRenderTarget, type WebGLRenderer,
 } from 'three'
 import { wetness } from './wet'
+import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js'
 
 export type WeatherKind = 'clear' | 'cloudy' | 'overcast' | 'rain' | 'storm'
 /** What each spell brings: how much of the sky is cloud, how hard it rains, how hard the wind blows (0 to 1). */
@@ -51,39 +52,65 @@ const NEXT: Record<WeatherKind, [WeatherKind, number][]> = {
 }
 
 /** The cloud layer's height (world units: about five hundred metres), and its pattern's scale. */
-const H = 55, SCALE = 0.022
+export const H = 55, SCALE = 0.022
+/** The clouds' pattern repeats every so many of its own units (far wider than anything seen at once), so it can be one texture. */
+export const PERIOD = 64
 
-/** The clouds' pattern, as the shaders and the page both work it out: value noise in five octaves, thresholded by the cover. */
+/**
+ * The clouds' pattern, as the shaders and the page both work it out: value noise in five octaves, repeating every
+ * PERIOD, thresholded by the cover. Made once into a texture (cloudField) that everything cloudy reads: the flat
+ * clouds, their shadows on the ground and the volumetric ones (clouds.ts); the processor works out the same pattern
+ * (for the sun's glare behind a cloud, and the checks).
+ */
 const hash = (x: number, y: number) => { const a = (x * 127.1 + y * 311.7), s = Math.sin(a) * 43758.5453; return s - Math.floor(s) }
-const vnoise = (x: number, y: number) => {
+const wrap = (v: number, p: number) => ((v % p) + p) % p
+const vnoise = (x: number, y: number, per: number) => {
   const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy)
-  const a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1)
+  const x0 = wrap(ix, per), x1 = wrap(ix + 1, per), y0 = wrap(iy, per), y1 = wrap(iy + 1, per)
+  const a = hash(x0, y0), b = hash(x1, y0), c = hash(x0, y1), d = hash(x1, y1)
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
 }
-const fbm = (x: number, y: number) => { let v = 0, a = 0.5, f = 1; for (let k = 0; k < 5; k++) { v += a * vnoise(x * f + k * 7.3, y * f + k * 3.1); f *= 2.03; a *= 0.5 } return v / 0.96875 }
-const thresh = (cover: number) => 0.78 - 0.66 * cover
+export const fbm = (x: number, y: number) => { let v = 0, a = 0.5, f = 1; for (let k = 0; k < 5; k++) { v += a * vnoise(x * f + k * 7, y * f + k * 3, PERIOD * f); f *= 2; a *= 0.5 } return v / 0.96875 }
+export const thresh = (cover: number) => 0.78 - 0.66 * cover
+
+/** The pattern, made into a texture on the graphics card (once): PERIOD of its units across, sixteen texels to one. */
+export const FIELD_GLSL = /* glsl */ `
+  float cHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float cNoise(vec2 p, float per) {
+    vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+    vec2 i0 = mod(i, per), i1 = mod(i + 1.0, per);
+    float a = cHash(i0), b = cHash(vec2(i1.x, i0.y)), c = cHash(vec2(i0.x, i1.y)), d = cHash(i1);
+    return a + (b - a) * u.x + (c - a) * u.y + (a - b - c + d) * u.x * u.y;
+  }
+  float cFbm(vec2 p) { float v = 0.0, a = 0.5, f = 1.0; for (int k = 0; k < 5; k++) { v += a * cNoise(p * f + vec2(float(k) * 7.0, float(k) * 3.0), ${PERIOD.toFixed(1)} * f); f *= 2.0; a *= 0.5; } return v / 0.96875; }
+`
+export function cloudField(renderer: WebGLRenderer) {
+  const rt = new WebGLRenderTarget(1024, 1024, { type: HalfFloatType, wrapS: RepeatWrapping, wrapT: RepeatWrapping, generateMipmaps: true, minFilter: LinearMipmapLinearFilter, magFilter: LinearFilter, depthBuffer: false })
+  const m = new ShaderMaterial({
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: FIELD_GLSL + `varying vec2 vUv; void main() { gl_FragColor = vec4(cFbm((vUv - 0.5 / 1024.0) * ${PERIOD.toFixed(1)}), 0.0, 0.0, 1.0); }`,
+  })
+  const q = new FullScreenQuad(m), was = renderer.getRenderTarget()
+  renderer.setRenderTarget(rt); q.render(renderer); renderer.setRenderTarget(was)
+  q.dispose(); m.dispose()
+  return rt
+}
 
 export const CLOUD_GLSL = /* glsl */ `
 uniform float uCover;
 uniform vec3 uDrift;
-float cHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float cNoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
-  float a = cHash(i), b = cHash(i + vec2(1.0, 0.0)), c = cHash(i + vec2(0.0, 1.0)), d = cHash(i + vec2(1.0, 1.0));
-  return a + (b - a) * u.x + (c - a) * u.y + (a - b - c + d) * u.x * u.y;
-}
-float cFbm(vec2 p) { float v = 0.0, a = 0.5, f = 1.0; for (int k = 0; k < 5; k++) { v += a * cNoise(p * f + vec2(float(k) * 7.3, float(k) * 3.1)); f *= 2.03; a *= 0.5; } return v / 0.96875; }
+uniform sampler2D tCloudField;
 /** How much cloud is over a point of the world (0 clear sky, 1 thick). */
+float cloudField(vec2 w) { return texture2D(tCloudField, (w * ${SCALE.toFixed(4)} + uDrift.xy) / ${PERIOD.toFixed(1)}).r; }
 float cloudAt(vec2 w) {
-  float n = cFbm(w * ${SCALE.toFixed(4)} + uDrift.xy);
   float th = 0.78 - 0.66 * uCover;
-  return smoothstep(th, th + 0.2, n);
+  return smoothstep(th, th + 0.2, cloudField(w));
 }
 `
 
 export type Weather = ReturnType<typeof weather>
 
-export function weather(scene: Scene, o: { light: DirectionalLight; phone: boolean; still: boolean; start?: string | null }) {
+export function weather(scene: Scene, o: { light: DirectionalLight; phone: boolean; still: boolean; start?: string | null; renderer?: WebGLRenderer }) {
   const state = {
     kind: 'clear' as WeatherKind, auto: true,
     cover: 0.12, rain: 0, wind: 0.3,
@@ -99,11 +126,14 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
   let still = o.still, density = 1
   const cover = { value: state.cover }
   const driftUv = { value: new Vector3(Math.random() * 50, Math.random() * 50, 0) }
+  // The clouds' pattern as a texture (none in the checks, which have no graphics card).
+  const field = o.renderer ? cloudField(o.renderer) : null
+  const fieldTex = { value: field?.texture ?? null }
 
   /* ---- the clouds: a dome round the camera, each ray meeting the layer overhead ---- */
   const cloudMat = new ShaderMaterial({
     uniforms: {
-      uCover: cover, uDrift: { value: driftUv.value }, uCam: { value: new Vector3() }, uSun: { value: new Vector3(0, 1, 0) },
+      uCover: cover, uDrift: { value: driftUv.value }, tCloudField: fieldTex, uCam: { value: new Vector3() }, uSun: { value: new Vector3(0, 1, 0) },
       uLit: { value: new Color() }, uShade: { value: new Color() }, uHaze: { value: new Color() }, uFlash: { value: 0 },
     },
     vertexShader: 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
@@ -149,7 +179,7 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
   const shadeMat = new MeshDepthMaterial({ depthPacking: RGBADepthPacking })
   const shift = { value: new Vector3() }
   shadeMat.onBeforeCompile = (sh) => {
-    sh.uniforms.uCover = cover; sh.uniforms.uDrift = { value: driftUv.value }; sh.uniforms.uShift = shift
+    sh.uniforms.uCover = cover; sh.uniforms.uDrift = { value: driftUv.value }; sh.uniforms.uShift = shift; sh.uniforms.tCloudField = fieldTex
     sh.vertexShader = 'varying vec2 vCW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vCW = (modelMatrix * vec4(transformed, 1.0)).xz;')
     sh.fragmentShader = CLOUD_GLSL + 'uniform vec3 uShift;\nvarying vec2 vCW;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n  if (cloudAt(vCW + uShift.xz) < 0.5) discard;')
   }
@@ -241,6 +271,10 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
 
   return {
     state, dome: envDome,
+    /** The flat cloud layer in the picture (shown only where the volumetric clouds are not: the lowest level). */
+    flat: dome,
+    /** What the volumetric clouds read (clouds.ts): the pattern, how much of the sky is cloud, the drift. */
+    field: fieldTex, cover, drift: driftUv,
     /** Choose the weather (or 'auto', to let it change by itself). */
     set(kind: WeatherKind | 'auto') {
       if (kind === 'auto') { state.auto = true; spell = 120 }
@@ -331,7 +365,7 @@ export function weather(scene: Scene, o: { light: DirectionalLight; phone: boole
     setDensity(f: number) { density = Math.max(0.1, Math.min(1, f)) },
     dispose() {
       for (const m of [dome, envDome, sheet, rainMesh]) { scene.remove(m); m.geometry.dispose() }
-      scene.remove(splashes); splGeo.dispose(); splMat.dispose(); dot?.dispose(); cloudMat.dispose(); rainMat.dispose(); shadeMat.dispose()
+      scene.remove(splashes); splGeo.dispose(); splMat.dispose(); dot?.dispose(); cloudMat.dispose(); rainMat.dispose(); shadeMat.dispose(); field?.dispose()
     },
   }
 }
