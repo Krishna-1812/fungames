@@ -43,7 +43,7 @@
  */
 import {
   AdditiveBlending, CylinderGeometry, DoubleSide, Mesh, MeshBasicMaterial, RingGeometry, ShaderMaterial,
-  AgXToneMapping, Fog, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
+  AgXToneMapping, Color, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
   Scene, SRGBColorSpace, Vector3, WebGLRenderer, WebGLRenderTarget, MathUtils, NoToneMapping,
 } from 'three'
 import { buildWorld, Y, type WorldData } from './build3d'
@@ -51,6 +51,7 @@ import { createTraffic } from '../island/traffic'
 import { splashes } from './splash'
 import { lens } from './lens'
 import { daylight } from './daylight'
+import { SUN_E } from './atmosphere'
 import { figure, METRE } from './body'
 import { fleet, MODELS, parkingSpots, type ModelName, type Pose } from './cars'
 import { vehicle, type Ground, type Vehicle } from './drive'
@@ -171,7 +172,10 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   dl.far.shadow.camera.layers.enable(1)
   const sun = dl.light, sunDir = dl.state.lightDir
   // The weather (weather.ts): clouds and their shadows, rain, wet, wind; ?w=rain to start in it.
-  const sky = weather(scene, { light: sun, phone, still, start: Q.get('w') })
+  const sky = weather(scene, { light: sun, phone, still, start: Q.get('w'), renderer })
+  /** The billows' drift with the wind (world units), for the volumetric clouds. */
+  const windOff = new Vector3(), cloudLook = { field: sky.field, cover: sky.cover, drift: sky.drift, toLight: new Vector3(), light: new Color(), skyView: dl.air.view.texture, skyE: SUN_E, haze: 22, flash: 0, wind: windOff, steps: 32 }
+  const mistColour = new Vector3(), shaftColour = new Vector3()
   dl.addToSky(sky.dome)
   const windNow: [number, number] = [WAVES[0].x, WAVES[0].z]
   // Light from the lamps nearest you (a handful of real lights, moved to whichever lamps are close).
@@ -768,13 +772,24 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // The weather has its say in the light, then the light in the weather.
     dl.state.cover = sky.state.cover; dl.state.rain = sky.state.rain; dl.state.flash = sky.state.flash
     applyTime()
-    const fog = scene.fog as Fog
-    fog.near = 14 * (1 - 0.6 * sky.state.rain); fog.far = (aerial ? 160 : 70) * (1 - 0.5 * sky.state.rain)
     // The wind in the trees and the grass, and in the sea's swell.
     if (!still) { world.flora.wind.value = 0.45 + 1.6 * sky.state.wind * (0.7 + 0.3 * sky.state.gust); world.swell.value = 0.75 + 0.6 * sky.state.wind }
     else { world.flora.wind.value = 0.25; world.swell.value = 0 }
     windNow[0] = sky.state.dir.x; windNow[1] = sky.state.dir.z
-    dl.follow(camera.position, dt)
+    // The air: the sky from where the camera is, the haze through the picture, the sky's light on the world (daylight.ts).
+    camera.updateMatrixWorld()
+    dl.frame(camera, dt, { still, time: now / 1000, pixels: renderer.getPixelRatio() })
+    // The mist low over the sea and the ground in the morning (and the rain's), lit by the sky and the sun.
+    const lc = dl.light.color, li = dl.state.sunCard
+    mistColour.set(lc.r, lc.g, lc.b).multiplyScalar(0.45 * li).addScalar(1.05 * dl.state.skyCard)
+    post!.setAir({ ap: dl.air.ap.texture, apMax: 6, skyE: SUN_E, mist: 0.035 * dl.state.mist + 0.006 * sky.state.rain, mistH: 3.5 + 12 * sky.state.rain, sea: seaY, mistColour })
+    // The clouds: raymarched where the level runs to it, else the flat ones.
+    const steps = TIERS[tier].clouds
+    if (steps > 0 && !Q.has('flatclouds')) {
+      windOff.addScaledVector(sky.state.dir, dt * (0.6 + 1.4 * sky.state.wind) * 1.1)
+      cloudLook.toLight.copy(sunDir); cloudLook.light.copy(dl.state.lightAtClouds); cloudLook.haze = dl.air.haze.value; cloudLook.flash = sky.state.flash; cloudLook.steps = steps
+      post!.setClouds(cloudLook); sky.flat.visible = false
+    } else { post!.setClouds(null); sky.flat.visible = true }
     // The grass near you is drawn; further off, the ground's own green does.
     if ((grassTick -= dt) <= 0) { grassTick = 0.25; world.flora.lawn.near(camera.position.x, camera.position.z) }
     // (Bright enough to read as a lamp, not so bright it flares round itself.)
@@ -800,7 +815,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       dl.far.position.copy(farSnap).addScaledVector(sunDir, 45); dl.far.target.position.copy(farSnap)
       if (++farTick >= ({ low: 8, medium: 4, high: 3, ultra: 2 } as const)[tier]) { farTick = 0; dl.far.shadow.needsUpdate = true }
     }
-    sky.update(dt, { cam: camera.position, groundAt: (x, z) => groundAt(x, z, 99), sunDir: dl.state.sunDir, lightDir: sunDir, lightTarget: snapped, litColor: dl.state.cloudLit, shadeColor: dl.state.cloudShade, haze: (scene.fog as Fog).color, day: dl.state.day, lampGlow: dl.state.lampGlow })
+    sky.update(dt, { cam: camera.position, groundAt: (x, z) => groundAt(x, z, 99), sunDir: dl.state.sunDir, lightDir: sunDir, lightTarget: snapped, litColor: dl.state.cloudLit, shadeColor: dl.state.cloudShade, haze: dl.fog.color, day: dl.state.day, lampGlow: dl.state.lampGlow })
     // A game's building near: it offers to take you in (not while you drive).
     let best: typeof near = null, bd = 0.45
     if (driving === null) for (const b of data.buildings) {
@@ -830,6 +845,13 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       sunVis += ((sunAt.z < 1 ? sunSeen * facing * veiled : 0) - sunVis) * Math.min(1, dt * 6)
     } else sunVis = 0
     post!.sun(sunAt.x * 0.5 + 0.5, sunAt.y * 0.5 + 0.5, sunVis)
+    // Light shafts when the sun is low and in or near the picture, through hazy air.
+    {
+      const near = sunAt.z < 1 && dl.state.sunEl > -1 && !aerial ? MathUtils.smoothstep(1.6, 0.6, Math.hypot(sunAt.x, sunAt.y)) : 0
+      const low = 1 - MathUtils.smoothstep(dl.state.sunEl, 8, 35)
+      shaftColour.set(lc.r, lc.g, lc.b)
+      post!.setShafts(sunAt.x * 0.5 + 0.5, sunAt.y * 0.5 + 0.5, Q.has('noshafts') ? 0 : 0.11 * near * low * Math.min(2, dl.air.haze.value / 22) * (1 - 0.8 * sky.state.cover), shaftColour)
+    }
     // Contact shadows: as strong as the direct light is against the sky's (none under an overcast or at night but the moon's).
     post!.setContact(Q.has('nocontact') ? 0 : MathUtils.clamp(dl.state.sunCard / (dl.state.sunCard + dl.state.skyCard + 1e-6), 0, 1) * 0.7, sunDir)
     if (albedoView) { const f = scene.fog; scene.fog = null; renderer.toneMapping = NoToneMapping; camera.clearViewOffset(); renderer.setRenderTarget(null); renderer.render(scene, camera); scene.fog = f }

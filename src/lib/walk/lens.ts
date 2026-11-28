@@ -13,6 +13,15 @@
  *   - contact shadows: the sun's shadow in the last few centimetres, where the
  *     shadow map is too coarse — a shoe on the pavement, a cone on the kerb —
  *     found by stepping towards the sun through the depth;
+ *   - the clouds (clouds.ts), marched through the sky at a quarter size and
+ *     laid over it;
+ *   - the air (atmosphere.ts): everything seen through the haze between it and
+ *     you — the light the air adds and what it takes away, by distance and
+ *     direction, from the same atmosphere as the sky (the far hills blue, the
+ *     far side of the bay soft); and the morning mist, thick near the sea and
+ *     the low ground and thin above, lit by the sky and the sun;
+ *   - light shafts: when the sun is low and in or near the picture, the haze
+ *     lit along the lines from it, cut by whatever stands in the way;
  *   - the eye: each frame the picture's brightness is measured (the average of
  *     its log luminance, the middle counting most) and the exposure eases
  *     towards it, quicker into the light than into the dark, as eyes adapt;
@@ -51,6 +60,8 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js'
+import { AP_GLSL, UNIT_KM } from './atmosphere'
+import { CloudPass, type CloudLook } from './clouds'
 
 const VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`
 const LUMA = /* glsl */ `float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }`
@@ -217,6 +228,102 @@ class ContactPass extends Pass {
   dispose() { this.mat.dispose(); this.quad.dispose() }
 }
 
+/** The air over the picture: the atmosphere's haze by distance, and the morning mist low down. */
+class AirPass extends Pass {
+  mat: ShaderMaterial; quad: FullScreenQuad; camera: PerspectiveCamera; shared: Shared
+  constructor(camera: PerspectiveCamera, shared: Shared) {
+    super(); this.camera = camera; this.shared = shared
+    this.mat = new ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: null }, tDepth: { value: null }, tAP: { value: null }, uApMax: { value: 6 }, uE: { value: 80 }, uInvP: { value: new Matrix4() }, uCamW: { value: new Matrix4() },
+        uCam: { value: new Vector3() }, uMist: { value: 0 }, uMistH: { value: 4 }, uSea: { value: 0 }, uMistCol: { value: new Vector3() },
+      },
+      vertexShader: VERT,
+      fragmentShader: AP_GLSL + /* glsl */ `
+        uniform sampler2D tDiffuse, tDepth; uniform float uE, uMist, uMistH, uSea; uniform mat4 uInvP, uCamW; uniform vec3 uCam, uMistCol;
+        varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          float d = texture2D(tDepth, vUv).x;
+          vec4 pv = uInvP * vec4(vUv * 2.0 - 1.0, min(d, 0.999999) * 2.0 - 1.0, 1.0); pv /= pv.w;
+          vec3 dir = normalize(pv.xyz);
+          // (The sky already has the air in it: only the mist is laid over it, as if at the far plane.)
+          float dist = d < 1.0 ? length(pv.xyz) : 600.0;
+          vec3 P = (uCamW * vec4(dir * dist, 1.0)).xyz;
+          if (d < 1.0) { vec4 ap = apAt(vUv, dist * ${UNIT_KM.toFixed(7)}); c.rgb = c.rgb * ap.a + ap.rgb * uE; }
+          if (uMist > 0.0) {
+            // An exponential height fog, worked out along the line of sight exactly.
+            float H = uMistH, y0 = uCam.y - uSea, dy = P.y - uCam.y;
+            float k = abs(dy) > 1e-3 ? (1.0 - exp(-dy / H)) / (dy / H) : 1.0;
+            float od = uMist * exp(-y0 / H) * dist * k;
+            float T = exp(-od);
+            c.rgb = c.rgb * T + uMistCol * (1.0 - T);
+          }
+          gl_FragColor = c;
+        }`,
+    })
+    this.quad = new FullScreenQuad(this.mat)
+  }
+  render(renderer: WebGLRenderer, write: WebGLRenderTarget, read: WebGLRenderTarget) {
+    const u = this.mat.uniforms
+    u.tDiffuse.value = read.texture; u.tDepth.value = this.shared.depth
+    u.uInvP.value.copy(this.camera.projectionMatrixInverse); u.uCamW.value.copy(this.camera.matrixWorld); u.uCam.value.copy(this.camera.position)
+    renderer.setRenderTarget(this.renderToScreen ? null : write); this.quad.render(renderer)
+  }
+  dispose() { this.mat.dispose(); this.quad.dispose() }
+}
+
+/** Light shafts: the bright sky round the sun, smeared outwards from it a quarter size, cut by what stands in front. */
+class ShaftPass extends Pass {
+  rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false })
+  march: ShaderMaterial; lay: ShaderMaterial; quad = new FullScreenQuad(); shared: Shared
+  sun = new Vector2(0.5, 0.5); strength = 0; colour = new Vector3()
+  constructor(shared: Shared) {
+    super(); this.shared = shared
+    this.march = new ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, uSun: { value: new Vector2() }, uFrame: { value: 0 } },
+      vertexShader: VERT,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse, tDepth; uniform vec2 uSun; uniform float uFrame; varying vec2 vUv;
+        float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+        void main() {
+          float acc = 0.0, w = 1.0, sum = 0.0, j = ign(gl_FragCoord.xy + uFrame * 5.588238);
+          for (int i = 0; i < 28; i++) {
+            vec2 uv = mix(vUv, uSun, (float(i) + j) / 28.0 * 0.92);
+            float sky = step(0.99999, texture2D(tDepth, uv).x);
+            // (How bright the sky is there: a cloud in front dims it.)
+            vec3 c = texture2D(tDiffuse, uv).rgb;
+            acc += sky * min(dot(c, vec3(0.3333)), 40.0) * w; sum += w; w *= 0.965;
+          }
+          gl_FragColor = vec4(vec3(acc / sum), 1.0);
+        }`,
+    })
+    this.lay = new ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, tShafts: { value: null }, uStrength: { value: 0 }, uColour: { value: new Vector3() }, uSun: { value: new Vector2() }, uAsp: { value: 1 } },
+      vertexShader: VERT,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse, tShafts; uniform float uStrength, uAsp; uniform vec3 uColour; uniform vec2 uSun; varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          float r = length((vUv - uSun) * vec2(uAsp, 1.0));
+          // (Fading with distance from the sun across the picture, as the haze's forward scattering does.)
+          float s = texture2D(tShafts, vUv).r * exp(-r * 1.6);
+          gl_FragColor = vec4(c.rgb + uColour * s * uStrength, c.a);
+        }`,
+    })
+  }
+  render(renderer: WebGLRenderer, write: WebGLRenderTarget, read: WebGLRenderTarget) {
+    const m = this.march.uniforms
+    m.tDiffuse.value = read.texture; m.tDepth.value = this.shared.depth; m.uSun.value.copy(this.sun); m.uFrame.value = (m.uFrame.value + 1) % 64
+    this.quad.material = this.march; renderer.setRenderTarget(this.rt); this.quad.render(renderer)
+    const l = this.lay.uniforms
+    l.tDiffuse.value = read.texture; l.tShafts.value = this.rt.texture; l.uStrength.value = this.strength; l.uColour.value.copy(this.colour); l.uSun.value.copy(this.sun)
+    this.quad.material = this.lay; renderer.setRenderTarget(this.renderToScreen ? null : write); this.quad.render(renderer)
+  }
+  setSize(w: number, h: number) { this.rt.setSize(Math.max(1, Math.ceil(w / 4)), Math.max(1, Math.ceil(h / 4))); this.lay.uniforms.uAsp.value = w / Math.max(h, 1) }
+  dispose() { this.rt.dispose(); this.march.dispose(); this.lay.dispose(); this.quad.dispose() }
+}
+
 /**
  * The eye: meters the picture (log luminance, the middle weighted) into a small buffer whose mipmaps average it,
  * eases the adaptation towards that (in a 1×1 buffer, kept from frame to frame), and exposes the picture by it.
@@ -243,7 +350,7 @@ class EyePass extends Pass {
             vec2 o = (vec2(float(k / 2), float(k - (k / 2) * 2)) - 0.5) / 128.0;
             float L = luma(texture2D(tDiffuse, vUv + o).rgb);
             L = L > 1e-5 && L < 1e6 ? L : 1e-5;
-            s += log2(L); lin += L;
+            s += log2(L); lin += min(L, 200.0);
           }
           // The middle counts most (and the sky at the top a little less: a camera's centre-weighted metering).
           vec2 c = vUv - vec2(0.5, 0.45);
@@ -419,6 +526,15 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
   const contact = new ContactPass(camera, shared)
   contact.enabled = !!scenePass.rt.depthTexture
   composer.addPass(contact)
+  const clouds = new CloudPass(camera, () => shared.depth)
+  clouds.enabled = false
+  composer.addPass(clouds)
+  const air = new AirPass(camera, shared)
+  air.enabled = !!scenePass.rt.depthTexture
+  composer.addPass(air)
+  const shafts = new ShaftPass(shared)
+  shafts.enabled = false
+  composer.addPass(shafts)
   const eye = new EyePass()
   composer.addPass(eye)
   const steady = taa ? new SteadyPass(shared) : null
@@ -507,6 +623,17 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
     },
     /** The occlusion: none, at half size, at full size. */
     setAO,
+    /** The air over the picture: the atmosphere's haze table (and how far it reaches, km), the sun's strength; the mist. */
+    setAir(o: { ap: Texture; apMax: number; skyE: number; mist: number; mistH: number; sea: number; mistColour: Vector3 }) {
+      const u = air.mat.uniforms
+      u.tAP.value = o.ap; u.uApMax.value = o.apMax; u.uE.value = o.skyE; u.uMist.value = o.mist; u.uMistH.value = o.mistH; u.uSea.value = o.sea; u.uMistCol.value.copy(o.mistColour)
+    },
+    /** The volumetric clouds (null: none, the flat ones stand in). */
+    setClouds(look: CloudLook | null) { clouds.look = look; clouds.enabled = !!look && !!scenePass.rt.depthTexture },
+    /** Light shafts from the sun at a place in the picture (0–1), by a strength (0 none), in its light's colour. */
+    setShafts(u: number, v: number, strength: number, colour: Vector3) {
+      shafts.sun.set(u, v); shafts.strength = strength; shafts.colour.copy(colour); shafts.enabled = strength > 0.001 && !!scenePass.rt.depthTexture
+    },
     /** Contact shadows, or none. */
     setContactOn(on: boolean) { contact.enabled = on && !!scenePass.rt.depthTexture },
     /** The glow round bright lights, or none. */
@@ -514,11 +641,11 @@ export function lens(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveC
     /** For less motion: the film grain holds still. */
     setStill(on: boolean) { still = on },
     /** What it is doing (for the checks and the settings). */
-    state: () => ({ ao: ao?.enabled ? (aoHalf ? 'half' : 'full') : 'off', bloom: bloom.enabled, taa: !!steady, contact: contact.enabled }),
+    state: () => ({ ao: ao?.enabled ? (aoHalf ? 'half' : 'full') : 'off', bloom: bloom.enabled, taa: !!steady, contact: contact.enabled, clouds: clouds.enabled, shafts: shafts.enabled }),
     /** The eye: adapted and metered log2 luminance (a read back from the graphics card: for the checks only). */
     eye: () => eye.read(renderer),
     dispose() {
-      composer.dispose(); target.dispose(); scenePass.dispose(); ao?.dispose(); contact.dispose(); eye.dispose(); steady?.dispose()
+      composer.dispose(); target.dispose(); scenePass.dispose(); ao?.dispose(); contact.dispose(); clouds.dispose(); air.dispose(); shafts.dispose(); eye.dispose(); steady?.dispose()
       camera.clearViewOffset()
     },
   }
