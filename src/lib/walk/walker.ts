@@ -43,8 +43,8 @@
  */
 import {
   AdditiveBlending, CylinderGeometry, DoubleSide, Mesh, MeshBasicMaterial, RingGeometry, ShaderMaterial,
-  ACESFilmicToneMapping, Fog, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
-  Scene, SRGBColorSpace, Vector3, WebGLRenderer, MathUtils,
+  AgXToneMapping, Fog, Group, PCFShadowMap, PerspectiveCamera, PointLight, SpotLight,
+  Scene, SRGBColorSpace, Vector3, WebGLRenderer, WebGLRenderTarget, MathUtils, NoToneMapping,
 } from 'three'
 import { buildWorld, Y, type WorldData } from './build3d'
 import { createTraffic } from '../island/traffic'
@@ -66,6 +66,7 @@ import { toys } from './props'
 import { street } from './street'
 import { autoStep, guessTier, pixelsFor, TIER_ORDER, TIERS, type Tier } from './tiers'
 import { boxGrid } from './grid'
+import { governAlbedo } from './albedo'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -95,6 +96,10 @@ export type Walk = { dispose(): void
   /** The quality: a level, or 'auto'; and less motion (or not). */
   setQuality(q: 'auto' | Tier): void; setMotion(still: boolean): void
   /** How it is running: frames a second, the processor's milliseconds a frame, the level (and what was chosen), the pixels to a point, draw calls. */
+  /** The eye (lens.ts): adapted and metered log2 luminance, the day's compensation and floor, the sky's and the sun's light on level ground (for the checks). */
+  /** With ?debug=albedo: how much of the picture had its albedo brought down, how much is darker than anything real, the mean of the rest. */
+  albedo(): { over: number; dark: number; mean: number }
+  eye(): { adapted: number; metered: number; comp: number; floor: number; skyCard: number; sunCard: number; taa: boolean }
   perf(): { fps: number; cpu: number; tier: Tier; choice: 'auto' | Tier; sharp: number; pixels: number; calls: number; triangles: number; still: boolean; shadow: number; ao: string; bloom: boolean; grass: number }
   scene: Scene }
 
@@ -120,15 +125,20 @@ const PAINTS = ['#8e1622', '#e8ebee', '#1c5c66', '#9ea6b0', '#1b2b4c', '#26292e'
 const YOURS: { model: ModelName; paint: string }[] = [{ model: 'saloon', paint: '#1f3f94' }, { model: 'hatch', paint: '#a3121f' }, { model: 'suv', paint: '#eef0f2' }]
 
 export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNear(g: { title: string } | null): void; move?: () => [number, number]; onCar?(c: CarInfo): void; quality?: 'auto' | Tier; still?: boolean }): Walk {
-  const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
+  // (No multisampling on the canvas: the picture is made in the lens's own buffers, and steadied there.)
+  const renderer = new WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
   renderer.outputColorSpace = SRGBColorSpace
-  renderer.toneMapping = ACESFilmicToneMapping
-  renderer.toneMappingExposure = 0.55
+  // AgX: brights roll off to white as film's do, without the hue skew; the exposure is the lens's own (metered, lens.ts).
+  renderer.toneMapping = AgXToneMapping
+  renderer.toneMappingExposure = 1
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = PCFShadowMap // (soft-edged by the light's shadow.radius)
   // (Draw calls and triangles counted over the whole frame, every pass, not just the last.)
   renderer.info.autoReset = false
   const Q = new URLSearchParams(location.search)
+  // Every surface's albedo held to what real ones give back (albedo.ts); ?debug=albedo shows it, unlit.
+  const albedoView = Q.get('debug') === 'albedo'
+  governAlbedo(albedoView)
   const phone = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600
   // Less motion: as the device asks, unless chosen on the page.
   let still = ui.still ?? matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -151,9 +161,14 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   if (still) { world.swell.value = 0; world.flora.wind.value = 0.25 }
 
   /* ---- the day: sun, moon, stars, sky and air (daylight.ts) ---- */
-  // Shadows soft-edged, cast across the thirteen tiles round you (more than you can make out the shadows past).
-  const SHADOW = Number(Q.get('shadow')) || TIERS[tier].shadow, REACH = 13
-  const dl = daylight(scene, renderer, { shadowSize: SHADOW, reach: REACH, soft: Q.has('soft') ? Number(Q.get('soft')) : undefined })
+  // Shadows in two cascades (daylight.ts): a sharp map over the six tiles round you (55 m each way: a few centimetres
+  // to a texel), and a wide one over the whole island and the sea round it, 236 m each way, made every few frames.
+  const SHADOW = Number(Q.get('shadow')) || TIERS[tier].shadow, REACH = 6, FAR = 26
+  /** The sharp map's softness, in its own texels: about the sun's half-degree penumbra a few metres from what casts it. */
+  const softFor = (size: number) => (Q.has('soft') ? Number(Q.get('soft')) : Math.max(1, Math.min(3, (3 * size) / 4096)))
+  const dl = daylight(scene, renderer, { shadowSize: SHADOW, reach: REACH, soft: softFor(SHADOW), farReach: Q.get('cascade') === '0' ? 0 : FAR, farSize: 2048 })
+  // (The wide map sees the clouds' shadow sheet too.)
+  dl.far.shadow.camera.layers.enable(1)
   const sun = dl.light, sunDir = dl.state.lightDir
   // The weather (weather.ts): clouds and their shadows, rain, wet, wind; ?w=rain to start in it.
   const sky = weather(scene, { light: sun, phone, still, start: Q.get('w') })
@@ -180,6 +195,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     // The sun's light under the water is a bright net; the moon's, a faint one.
     world.caustics.value = Math.max(0.12, dl.state.day) * (1 - 0.8 * dl.state.cover)
     post?.setDaylight(dl.state.day, dl.state.rain)
+    post?.setEye(dl.state.comp, dl.state.floor)
   }
   applyTime()
 
@@ -386,13 +402,14 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     post?.setSize(w, h, pr)
     camera.aspect = w / h; camera.updateProjectionMatrix()
   }
-  post = lens(renderer, scene, camera, { phone, still, ao: Q.has('noao') ? 'off' : TIERS[tier].ao, samples: Q.has('msaa') ? Number(Q.get('msaa')) : undefined, bloom: !Q.has('nobloom') && TIERS[tier].bloom })
+  post = lens(renderer, scene, camera, { phone, still, ao: Q.has('noao') ? 'off' : TIERS[tier].ao, samples: Q.has('msaa') ? Number(Q.get('msaa')) : undefined, bloom: !Q.has('nobloom') && TIERS[tier].bloom, taa: Q.get('taa') !== '0' })
   post.setDaylight(dl.state.day)
+  if (Q.has('debug')) (window as unknown as { __lens: typeof post }).__lens = post
   /** Everything the level sets: shadows, occlusion, glow, grass, people, rain, and the pixels. */
   const applyTier = () => {
     const t = TIERS[tier]
-    if (!Q.has('shadow') && sun.shadow.mapSize.x !== t.shadow) { sun.shadow.mapSize.setScalar(t.shadow); sun.shadow.map?.dispose(); sun.shadow.map = null }
-    post!.setAO(Q.has('noao') ? 'off' : t.ao); post!.setBloom(!Q.has('nobloom') && t.bloom)
+    if (!Q.has('shadow') && sun.shadow.mapSize.x !== t.shadow) { sun.shadow.mapSize.setScalar(t.shadow); sun.shadow.radius = softFor(t.shadow); sun.shadow.map?.dispose(); sun.shadow.map = null }
+    post!.setAO(Q.has('noao') ? 'off' : t.ao); post!.setBloom(!Q.has('nobloom') && t.bloom); post!.setContactOn(!Q.has('nocontact') && t.contact)
     world.flora.lawn.reach.value = t.grass; grassTick = 0
     people.setDensity(t.people); sky.setDensity(t.rain * (still ? 0.6 : 1))
     fit()
@@ -473,7 +490,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     }
     return true
   }
-  const UP = new Vector3(0, 1, 0), lightRight = new Vector3(), lightUp = new Vector3(), snapped = new Vector3()
+  const UP = new Vector3(0, 1, 0), lightRight = new Vector3(), lightUp = new Vector3(), snapped = new Vector3(), farSnap = new Vector3()
+  let farTick = 0
   let lampTick = 0
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop)
@@ -775,6 +793,13 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     const pr = Math.round(pos.dot(lightRight) / texel) * texel, pu = Math.round(pos.dot(lightUp) / texel) * texel, pa = pos.dot(sunDir)
     snapped.copy(lightRight).multiplyScalar(pr).addScaledVector(lightUp, pu).addScaledVector(sunDir, pa)
     sun.position.copy(snapped).addScaledVector(sunDir, 35); sun.target.position.copy(snapped)
+    // The wide cascade, likewise held to its own texels, and made again every few frames (fewer, the lower the level).
+    if (dl.far.castShadow) {
+      const ft = (2 * FAR) / dl.far.shadow.mapSize.x
+      farSnap.copy(lightRight).multiplyScalar(Math.round(pos.dot(lightRight) / ft) * ft).addScaledVector(lightUp, Math.round(pos.dot(lightUp) / ft) * ft).addScaledVector(sunDir, pa)
+      dl.far.position.copy(farSnap).addScaledVector(sunDir, 45); dl.far.target.position.copy(farSnap)
+      if (++farTick >= ({ low: 8, medium: 4, high: 3, ultra: 2 } as const)[tier]) { farTick = 0; dl.far.shadow.needsUpdate = true }
+    }
     sky.update(dt, { cam: camera.position, groundAt: (x, z) => groundAt(x, z, 99), sunDir: dl.state.sunDir, lightDir: sunDir, lightTarget: snapped, litColor: dl.state.cloudLit, shadeColor: dl.state.cloudShade, haze: (scene.fog as Fog).color, day: dl.state.day, lampGlow: dl.state.lampGlow })
     // A game's building near: it offers to take you in (not while you drive).
     let best: typeof near = null, bd = 0.45
@@ -805,7 +830,10 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       sunVis += ((sunAt.z < 1 ? sunSeen * facing * veiled : 0) - sunVis) * Math.min(1, dt * 6)
     } else sunVis = 0
     post!.sun(sunAt.x * 0.5 + 0.5, sunAt.y * 0.5 + 0.5, sunVis)
-    post!.render(realDt)
+    // Contact shadows: as strong as the direct light is against the sky's (none under an overcast or at night but the moon's).
+    post!.setContact(Q.has('nocontact') ? 0 : MathUtils.clamp(dl.state.sunCard / (dl.state.sunCard + dl.state.skyCard + 1e-6), 0, 1) * 0.7, sunDir)
+    if (albedoView) { const f = scene.fog; scene.fog = null; renderer.toneMapping = NoToneMapping; camera.clearViewOffset(); renderer.setRenderTarget(null); renderer.render(scene, camera); scene.fog = f }
+    else post!.render(realDt)
     // A picture asked for: taken from what was just drawn, before the browser clears it.
     if (snapWant) { const done = snapWant; snapWant = null; canvas.toBlob((b) => done(b), 'image/png') }
     // How it is running: the frames a second (over three seconds or so) and the processor's share of a frame.
@@ -858,6 +886,22 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       applyTier()
     },
     setMotion(on) { still = on; applyMotion() },
+    albedo: () => {
+      // (The albedo view, drawn small into a buffer of its own and counted: what was brought down, what is too dark.)
+      const rt = new WebGLRenderTarget(256, 160), px = new Uint8Array(256 * 160 * 4)
+      const f = scene.fog; scene.fog = null
+      renderer.setRenderTarget(rt); renderer.render(scene, camera); scene.fog = f; renderer.readRenderTargetPixels(rt, 0, 0, 256, 160, px); renderer.setRenderTarget(null); rt.dispose()
+      let over = 0, dark = 0, n = 0, sum = 0
+      for (let k = 0; k < px.length; k += 4) {
+        const r = px[k] / 255, g = px[k + 1] / 255, b = px[k + 2] / 255
+        n++
+        if (r > 0.45 && b > 0.45 && g < r - 0.2) over++
+        else if (b > 0.9 && r < 0.05) dark++
+        else sum += g
+      }
+      return { over: over / n, dark: dark / n, mean: sum / Math.max(1, n - over - dark) }
+    },
+    eye: () => ({ ...post!.eye(), comp: dl.state.comp, floor: dl.state.floor, skyCard: dl.state.skyCard, sunCard: dl.state.sunCard, taa: post!.state().taa }),
     perf: () => {
       const lp = post!.state()
       return {

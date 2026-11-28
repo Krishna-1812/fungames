@@ -2,8 +2,8 @@
  * How much the picture asks of the machine: four levels, and Auto.
  *
  *   Low     a phone or an old laptop: the screen's pixels at most one to a point,
- *           small soft shadows, no occlusion or glow, grass only close by, fewer
- *           people out and lighter rain.
+ *           small soft shadows, no occlusion, contact shadows or glow, grass only
+ *           close by, fewer people out and lighter rain.
  *   Medium  most phones and small laptops: up to one and a half pixels to a point,
  *           2048 shadows, the glow, more grass and people.
  *   High    a desktop or a good laptop: the screen's own pixels (up to two to a
@@ -36,6 +36,8 @@ export type TierSpec = {
   ao: 'off' | 'half' | 'full'
   /** The glow round bright lights. */
   bloom: boolean
+  /** Contact shadows (lens.ts): the sun's shadow in the last few centimetres. */
+  contact: boolean
   /** How far the grass is drawn (tiles). */
   grass: number
   /** How many of the island's people are out (of all of them). */
@@ -45,10 +47,10 @@ export type TierSpec = {
 }
 
 export const TIERS: Record<Tier, TierSpec> = {
-  low: { maxPixels: 1, minPixels: 0.75, shadow: 1024, ao: 'off', bloom: false, grass: 4, people: 0.45, rain: 0.35 },
-  medium: { maxPixels: 1.5, minPixels: 0.75, shadow: 2048, ao: 'off', bloom: true, grass: 6, people: 0.7, rain: 0.6 },
-  high: { maxPixels: 2, minPixels: 1, shadow: 4096, ao: 'half', bloom: true, grass: 9, people: 1, rain: 1 },
-  ultra: { maxPixels: 2.5, minPixels: 1.5, shadow: 4096, ao: 'full', bloom: true, grass: 12, people: 1, rain: 1 },
+  low: { maxPixels: 1, minPixels: 0.75, shadow: 1024, ao: 'off', bloom: false, contact: false, grass: 4, people: 0.45, rain: 0.35 },
+  medium: { maxPixels: 1.5, minPixels: 0.75, shadow: 2048, ao: 'off', bloom: true, contact: true, grass: 6, people: 0.7, rain: 0.6 },
+  high: { maxPixels: 2, minPixels: 1, shadow: 4096, ao: 'half', bloom: true, contact: true, grass: 9, people: 1, rain: 1 },
+  ultra: { maxPixels: 2.5, minPixels: 1.5, shadow: 4096, ao: 'full', bloom: true, contact: true, grass: 12, people: 1, rain: 1 },
 }
 
 /** The pixels to a point a level draws at, on a screen with so many of its own. */

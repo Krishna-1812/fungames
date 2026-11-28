@@ -652,7 +652,7 @@ export function fleet(scene: Scene, list: { model: ModelName; paint: string }[])
       }
       // The pool of light ahead, and the shadow under it.
       tmp.compose(v.set((S.len / 2 + 5) * METRE, 0.04 * METRE, 0), q.identity(), v.clone().set(10 * METRE, 1, 7 * METRE)).premultiply(base)
-      pools.setMatrixAt(k, p.head > 0.01 ? tmp : none); pools.setColorAt(k, col.setRGB(0.9, 0.93, 1).multiplyScalar(0.3 * p.head))
+      pools.setMatrixAt(k, p.head > 0.01 ? tmp : none); pools.setColorAt(k, col.setRGB(0.9, 0.93, 1).multiplyScalar(0.07 * p.head))
       if (p.head > 0.01) lit = true
       tmp.compose(v.set(0, 0.03 * METRE, 0), q.identity(), v.clone().set((S.len + 0.7) * METRE, 1, (S.wid + 0.6) * METRE)).premultiply(base)
       blobs.setMatrixAt(k, tmp)
