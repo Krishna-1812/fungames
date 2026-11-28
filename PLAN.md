@@ -3272,6 +3272,15 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        second. On a phone: the top bar's words go (its buttons stay), two
        fingers pinch to go nearer or further, and in photo mode the stick
        moves the camera.
+71. **The walk, round two: toward filmed.** The same fifteen areas again,
+    looked at for what a camera would see that gives them away (light that
+    clips, materials that are noise, nothing reflecting, edges that shimmer,
+    movement without weight), in an order where each builds on the last:
+    the eye (exposure, light, lens), the sky and the air, the ground, the
+    water, buildings, what grows, one physics engine for everything, you,
+    cars, life, weather, the street, sound, the camera and HUD, every
+    device. Each phase is planned in full in docs/walk-real-plan.md and is
+    marked done here as it lands.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every
