@@ -36,6 +36,10 @@
  *     real albedo, within the first-load budget; hex-tiling has no seams; the pavements stand a kerb's height
  *     over the road and drop at the crossings; stones and driftwood lie about, but never on a street or in a
  *     building; leaf litter lies under the trees, and footprints settle away;
+ *   - the water: every wave at its real speed and the shaders drawing the same ones, a real JONSWAP wind sea and swell,
+ *     crests that never fold, the swimmer on the drawn surface, water that takes red first and sends back the open
+ *     sea's dark blue, small waves that tile and caustics that only move the light, stable ripples, a cheap disc of sea
+ *     to the horizon, and rocks along the sea cliffs' feet;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -721,6 +725,52 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   const lit = world.ground.tMacro.value.image.data
   let litter = 0; for (let k = 2; k < lit.length; k += 4) if (lit[k] > 128) litter++
   check(litter > 200 && FOOT_LIFE > 30 && FOOT_LIFE < 180, `leaf litter under the trees (${litter} texels of the ground's map), and prints settle away to a third in ${FOOT_LIFE} s`)
+}
+
+// The water (round two, phase 4): a real sea, seen through.
+{
+  const S = await import('../src/lib/walk/sea.ts')
+  const T = await import('../src/lib/walk/seatex.ts')
+  const { wakeStable } = await import('../src/lib/walk/wake.ts')
+  const Wt = await import('../src/lib/walk/water.ts')
+  const { METRE } = await import('../src/lib/walk/body.ts')
+  const M = METRE
+  // Every wave at deep water's own speed for its length (ω² = g k), and the shaders given the very same waves.
+  const speedOff = Math.max(...S.SEA_WAVES.map((v) => Math.abs(v.w * v.w - S.G_WORLD * v.k) / (S.G_WORLD * v.k)))
+  const inGlsl = S.SEA_WAVES.every((v) => S.SEA_GLSL.includes(v.k.toFixed(6)) && S.SEA_GLSL.includes(v.w.toFixed(6)) && S.SEA_GLSL.includes(v.a.toFixed(6)))
+  check(speedOff < 1e-9 && inGlsl && S.SEA_WAVES.length >= 10, `the sea's ${S.SEA_WAVES.length} waves each travel at deep water's speed for their length (ω² = gk), and the shaders draw the very same ones`)
+  // The wind sea a real one: JONSWAP for a 7 m/s trade wind over 20 km peaks near 3 s with about 0.6 m significant
+  // height; the swell's trains 7 and 9 s; together a moderate tropical sea.
+  const ws = S.significantHeight({ wind: 1, swell: 0 }) / M, sw = S.significantHeight({ wind: 0, swell: 1 }) / M, Tp = (2 * Math.PI) / S.jonswapPeak(7, 20000)
+  const swellT = S.SEA_WAVES.filter((v) => v.swell).map((v) => (2 * Math.PI) / v.w)
+  check(ws > 0.4 && ws < 0.9 && Tp > 2.5 && Tp < 4 && swellT.every((t) => t >= 7 && t <= 9) && sw > 0.5 && sw < 1.2,
+    `a real sea: the wind sea (JONSWAP, 7 m/s over 20 km) peaks at ${Tp.toFixed(1)} s with Hs ${ws.toFixed(2)} m; a swell of ${swellT.map((t) => t.toFixed(0)).join(' and ')} s trains, Hs ${sw.toFixed(2)} m`)
+  // Crests sharpen but never fold over themselves, even in a near gale; the swimmer rides the surface that is drawn.
+  const gale = { wind: S.windSea(1), swell: 1 }
+  const fold = S.SEA_WAVES.reduce((t, v) => t + v.q * v.k * v.a * (v.swell ? gale.swell : gale.wind), 0)
+  let worst = 0
+  for (let k = 0; k < 2000; k++) { const x = Math.random() * 40 - 5, z = Math.random() * 40 - 5, t = Math.random() * 300; const [ox, oy, oz] = S.gerstner(x, z, t); worst = Math.max(worst, Math.abs(S.waveAt(x + ox, z + oz, t, 5) - oy)) }
+  check(fold < 1 && worst < 0.005 * M, `the crests sharpen without folding (Σ Qka ${fold.toFixed(2)} in a near gale, under 1), and the surface you swim on is the one drawn, to ${(worst / M * 1000).toFixed(2)} mm`)
+  // The water's optics: red goes first, then green, blue last; deep water sends back a few percent of blue and almost
+  // no red (the open sea's dark blue); a metre of it lets most blue through and takes a third of the red.
+  const sig = Wt.WATER_ABSORB.map((a, k) => a + Wt.WATER_SCATTER[k]), back = Wt.backscatter(Wt.WATER_ABSORB, Wt.WATER_SCATTER, 0.05)
+  const t1 = sig.map((x) => Math.exp(-x))
+  check(sig[0] > sig[1] && sig[1] > sig[2] && back.z > 0.01 && back.z < 0.06 && back.x < 0.005 && t1[2] > 0.9 && t1[0] < 0.7,
+    `water as an optical material: through a metre, ${t1.map((v) => (v * 100).toFixed(0) + '%').join(' / ')} of red / green / blue gets through; deep water sends back ${(back.x * 100).toFixed(2)} / ${(back.y * 100).toFixed(1)} / ${(back.z * 100).toFixed(1)}% (the open sea's dark blue)`)
+  // The small waves tile without a seam, and their caustics only move the light about (their mean is one).
+  const A = T.bakeCascade(64, 0xa11, 0.94, 0.34, 0.9, 0.006), N = 64
+  let seam = 0, inner = 0
+  for (let x = 0; x < N; x++) { seam += Math.abs(A.height[x] - A.height[(N - 1) * N + x]); inner += Math.abs(A.height[N + x] - A.height[x]) }
+  const cau = T.bakeCaustics(A, 64, 32); let mean = 0, peak = 0; for (const v of cau) { mean += v / cau.length; peak = Math.max(peak, v) }
+  check(seam < inner * 1.6 && Math.abs(mean - 1) < 0.01 && peak > 2, `the small waves tile without a seam (a step across the join ${(seam / N).toFixed(3)}, within ${(inner / N).toFixed(3)}); their caustics keep the floor's light (mean ${mean.toFixed(3)}) and focus it ${peak.toFixed(1)}× in their brightest lines`)
+  // The ripples round you are stable at any frame rate the walk runs at; the sea's disc is far cheaper than the old sheet
+  // and reaches the horizon.
+  const disc = world.sea.meshes[0].geometry, tris = disc.index.count / 3
+  let reach = 0; const dp = disc.getAttribute('position'); for (let k = 0; k < dp.count; k++) reach = Math.max(reach, Math.hypot(dp.getX(k), dp.getZ(k)))
+  check(wakeStable(1 / 30) && wakeStable(1 / 60) && tris < 50000 && reach > 400, `the ripples' wave equation is stable at 30 and 60 frames a second; the sea is ${tris.toLocaleString()} triangles (the old sheet 139,000) out to ${reach.toFixed(0)} world units`)
+  // The sea cliffs: rocks stand in the sea along their foot, so the coast is not a block's edge.
+  const coast = world.rockCount ?? 0
+  check(coast > 40, `${coast} rocks stand in the sea along the sea cliffs' feet and off their corners`)
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
