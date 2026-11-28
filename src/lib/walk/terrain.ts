@@ -566,7 +566,7 @@ const GROUND_BODY = /* glsl */ `
     bh = clump * 0.9 + n3 * 0.8 + n4 * 0.6;
     // Earth, dry and cracked, in the badlands.
     float dw = smoothstep(0.4, 0.6, vTBlend.z + (n1 - 0.5) * 0.4);
-    vec3 dirt = SRGB(0.71, 0.56, 0.42) * (0.78 + 0.44 * n0) * (0.86 + 0.28 * n2) * (0.9 + 0.2 * n4);
+    vec3 dirt = SRGB(0.64, 0.5, 0.37) * (0.78 + 0.44 * n0) * (0.86 + 0.28 * n2) * (0.9 + 0.2 * n4);
     float plates = dw > 0.01 ? smoothstep(0.0, 0.09, tCells(p * 5.0 + (n2 - 0.5) * 0.3)) : 1.0;
     plates = mix(1.0, plates, fade);
     dirt *= mix(0.5, 1.0, plates);
@@ -574,7 +574,7 @@ const GROUND_BODY = /* glsl */ `
     // Sand: grains and the wind's ripples.
     float sw = smoothstep(0.45, 0.55, vTBlend.x + (n1 - 0.5) * 0.36 + (n3 - 0.5) * 0.14);
     float rip = sin(dot(p, vec2(0.8, 0.6)) * 34.0 + n2 * 6.0 + n1 * 4.0);
-    vec3 sand = SRGB(0.86, 0.78, 0.62) * (0.88 + 0.24 * n0) * (0.9 + 0.2 * n4) * (0.96 + 0.04 * rip);
+    vec3 sand = SRGB(0.78, 0.7, 0.55) * (0.88 + 0.24 * n0) * (0.9 + 0.2 * n4) * (0.96 + 0.04 * rip);
     g = mix(g, sand, sw); bh = mix(bh, rip * 0.4 + n4 * 0.4, sw);
     // A stream's bed: pebbles.
     if (id > 7.5) { float pb = tNoise(p * 26.0); g = SRGB(0.5, 0.47, 0.41) * (0.6 + 0.7 * pb) * (0.85 + 0.3 * n2); bh = pb * 1.4; }
@@ -599,7 +599,7 @@ const GROUND_BODY = /* glsl */ `
     float inN = step(dN, W), inS = step(dS, W), inW = step(dW, W), inE = step(dE, W);
     float walk = max(max((1.0 - cN) * inN, (1.0 - cS) * inS), max((1.0 - cW) * inW, (1.0 - cE) * inE));
     walk = max(walk, max(max(inN * inW * (1.0 - qNW), inN * inE * (1.0 - qNE)), max(inS * inW * (1.0 - qSW), inS * inE * (1.0 - qSE))));
-    vec3 asphalt = SRGB(0.27, 0.28, 0.3) * (0.8 + 0.4 * n1) * (0.86 + 0.28 * n4) * (0.92 + 0.16 * n3);
+    vec3 asphalt = SRGB(0.31, 0.315, 0.33) * (0.8 + 0.4 * n1) * (0.86 + 0.28 * n4) * (0.92 + 0.16 * n3);
     // Patches where it was mended, darker, and the paler wear of tyres in each lane.
     asphalt = mix(asphalt, SRGB(0.2, 0.205, 0.22), smoothstep(0.64, 0.7, tNoise(p * 2.3 + 5.0)) * 0.7);
     float lane = cW * cE * (1.0 - cN) * (1.0 - cS) > 0.5 ? l.y : cN * cS * (1.0 - cW) * (1.0 - cE) > 0.5 ? l.x : -1.0;
@@ -619,9 +619,9 @@ const GROUND_BODY = /* glsl */ `
     // Pavement: square slabs, each a shade of its own, a kerb of long stones at its edge.
     vec2 slab = fract(p / 0.16);
     float joint = smoothstep(0.0, 0.045, min(min(slab.x, 1.0 - slab.x), min(slab.y, 1.0 - slab.y)));
-    vec3 pave = SRGB(0.7, 0.7, 0.69) * (0.86 + 0.18 * n2) * (0.92 + 0.16 * tHash(floor(p / 0.16))) * (0.94 + 0.12 * n4) * mix(0.72, 1.0, joint);
+    vec3 pave = SRGB(0.6, 0.6, 0.585) * (0.86 + 0.18 * n2) * (0.92 + 0.16 * tHash(floor(p / 0.16))) * (0.94 + 0.12 * n4) * mix(0.72, 1.0, joint);
     float edge = min(min(mix(1.0, abs(dN - W), 1.0 - cN), mix(1.0, abs(dS - W), 1.0 - cS)), min(mix(1.0, abs(dW - W), 1.0 - cW), mix(1.0, abs(dE - W), 1.0 - cE)));
-    pave = mix(SRGB(0.78, 0.78, 0.77) * (0.9 + 0.1 * n3), pave, smoothstep(0.014, 0.022, edge));
+    pave = mix(SRGB(0.64, 0.64, 0.63) * (0.9 + 0.1 * n3), pave, smoothstep(0.014, 0.022, edge));
     col = mix(road, pave, walk);
     // The gutter by the kerb holds a little grime.
     col *= 1.0 - (1.0 - walk) * 0.25 * smoothstep(0.05, 0.0, edge - 0.0);
