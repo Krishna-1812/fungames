@@ -3325,6 +3325,18 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        on a moonless night — twinkling low down; airglow, and the town's glow
        low in the sky; the moon in its phase, lit from where the sun is,
        fifty minutes later each day. Each day's air a little different.
+    3. ~~*The ground*~~ **done** — photographed, and laid by a road crew. Nineteen CC0 photograph sets (Poly
+       Haven) built into compressed textures (Basis KTX2: colour and height, normal, roughness and occlusion; 11.5 MB
+       in all, under the 12 MB budget), each held to its real albedo (asphalt 0.07–0.11, paving 0.27, sand 0.42,
+       grass 0.13, snow 0.78), streamed in after the island first draws. Laid without a visible repeat: hex-tiling
+       on High (three turned copies, the proudest winning), a larger turned copy under each on Medium, a macro map
+       over the island; blended by height (sand in the joints, snow in the hollows first); rock from all three
+       sides with its strata. Cobbles in the old town. The pavements stand a real kerb's height (12 cm) behind
+       granite kerbs, dropped at every crossing, felt by you, the people and the cars. Gutters of granite setts with
+       a drain each, manholes, resurfaced patches, sealed cracks, worn paint, tyre polish and oil, all in the
+       ground's own shader; parallax on cobbles and paving up close. Boulders, pebbles and driftwood on the beaches
+       and at the cliffs' feet (never on a street), leaf litter under the trees, scree below the rock, and
+       footprints and tyre tracks in the sand and snow that settle away in about a minute.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

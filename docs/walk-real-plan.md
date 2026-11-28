@@ -284,7 +284,51 @@ reflections all come from one scattering model, so they can never disagree.
 
 ---
 
-## Phase 3: The ground
+## Phase 3: The ground — done 28 Nov 2026
+
+**Done:**
+- The texture pipeline: `scripts/build-ground.mjs` turns 19 CC0 Poly Haven sets into Basis KTX2 files in
+  `public/walk-ground/` (allowlisted): colour and height in one ETC1S layer (1K), normal, roughness and occlusion in
+  one UASTC layer (512, half the colour's size). The page (`ground.ts`) transcodes them with three's own transcoder
+  and stacks them into two compressed array textures; until they arrive, each layer is a single texel of its
+  measured mean. 11.5 MB in all, the transcoder included (budget 12).
+- Every layer's albedo held, in the build, to the real surface's (asphalt 0.07–0.11, paving 0.27, sand 0.42, grass
+  0.13, snow 0.78 …), so all of them sit inside the albedo rule's range before any light touches them.
+- The sets: fresh and worn asphalt, paving slabs, cobbles (the old town's streets), granite (kerbs and gutters),
+  dry and wet sand, grass, soil, mud, cliff rock, sea-worn rock, gravel (scree at the foot of the rock), field soil,
+  snow, the badlands' dry ground, a stream's pebbles, cut stone (the retaining walls) and leaf litter.
+- No visible tiling: hex-tiling (Mikkelsen 2022: three turned copies over a triangular grid, weighted by height so
+  detail stays sharp) on High and Ultra for every natural surface; a second, larger, turned copy under each on
+  Medium; plain on Low. Anything laid in rows (paving, cobbles, granite, cut stone) is never hex-tiled. A macro map
+  over the island varies brightness, wears grass to earth, picks resurfaced lanes and lays leaf litter under each
+  tree. Layers blend by height (sand settles into the paving's joints, snow fills hollows first).
+- Rock from all three sides at once (triplanar), with strata; sea-worn and darker where the sea reaches.
+- The street as geometry: every pavement stands a kerb's height (12 cm) above the road behind a granite kerb face,
+  dropped to a 2 cm lip at each of the 39 crossings; `heightAt()` includes it, so you, the people and the cars all
+  feel it (a step under the walker's 35 cm; under a car's 32 cm kerb).
+- Batched into the ground's own shader (no extra draw calls): granite-sett gutters with a cast-iron drain each
+  tile, manholes, resurfaced patches with sealed seams, sealed and open cracks, the paint worn through in the wheel
+  paths and on the aggregate's high points, tyre polish, oil where cars wait, sand blown onto the promenade.
+- Parallax occlusion on cobbles and paving within a few metres of the camera (High and Ultra).
+- Two bugs found on the way: the cars' lamp lenses had never compiled (headlights, tail and brake lamps drew nothing;
+  `?glcheck` now turns three's shader checks on), and cast iron set fully metallic drew black.
+- Boulders, pebbles and driftwood: 514 pieces on the beaches, at the cliffs' feet and at the tide line, kept off the
+  streets and out of buildings (checked), the big ones solid.
+- Footprints and tyre tracks (`foot.ts`): a 4 m square round you, 256² texels, each step on sand or snow pressing a
+  print and each wheel a track, settling away over about a minute.
+- The occlusion now dims the sky's light (indirect) and only a little of the sun's, as it should.
+
+**Moved:**
+- Finer slopes and normals from a baked high-resolution height map: the ground's normals are already worked out
+  from its exact surface at every vertex, so the gain was small for the triangles it costs; it goes to Phase 15,
+  where the island is split into districts with levels of detail.
+- Rounded kerb corners and kerb bevels (the corners are square): Phase 12, with the street's furniture.
+- Skid marks at junctions: Phase 9, laid by the cars' own tyres.
+- A separate rippled-sand photograph: the ripples under the shallows are drawn in the shader instead.
+- Contact occlusion baked round posts and furniture: the depth-based occlusion and contact shadows (Phase 1) do it.
+- The sea cliffs' outline: their faces now have rock, strata and half a metre of relief, but the island's tiles still
+  give them straight tops and square corners, so from the sea they read as blocks. Reshaping the coastline goes to
+  Phase 4, with the shore it meets.
 
 **New point of view:** photographed materials, laid by a road crew and worn
 by use. A road is asphalt with aggregate, patches, cracks, oil, worn paint
