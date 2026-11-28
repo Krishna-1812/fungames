@@ -542,7 +542,7 @@ function lampMaterial(color: string) {
   m.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <color_fragment>', '')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_COLOR\n  totalEmissiveRadiance += vColor;\n#endif')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_COLOR\n  totalEmissiveRadiance += vColor.rgb;\n#endif')
   }
   // (The fragment stage knows an instance colour only as USE_COLOR.)
   m.customProgramCacheKey = () => 'car-lamp'

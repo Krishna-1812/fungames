@@ -152,7 +152,8 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   let tier: Tier = choice === 'auto' ? autoStart() : choice
   let auto = { slow: 0, easy: 0, triedUp: false }
   let post: ReturnType<typeof lens> | null = null
-  renderer.debug.checkShaderErrors = false
+  // (Shaders are not checked as they compile — it stalls every first draw — unless ?glcheck asks.)
+  renderer.debug.checkShaderErrors = Q.has('glcheck')
 
   const scene = new Scene()
   const world = buildWorld(data, { phone })
