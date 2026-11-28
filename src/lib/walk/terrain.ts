@@ -454,10 +454,14 @@ export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
         tops.push(Y(shapeAt(T, u, v))); bots.push(Y(U.soft ? islesAt(j2 + u2, i2 + v2, shapeAt(U, u2, v2)) : shapeAt(U, u2, v2)))
       }
       if (tops.every((t, q) => t <= bots[q] + 0.004)) continue
-      const rows = Math.max(1, Math.min(8, Math.ceil(Math.max(...tops.map((t, q) => t - bots[q])) / 0.09)))
+      const tall = Math.max(...tops.map((t, q) => t - bots[q]))
+      // (Rock in finer rows, to carry its relief; cut stone stays plain.)
+      const rows = Math.max(1, Math.min(cut ? 8 : 18, Math.ceil(tall / (cut ? 0.09 : 0.04))))
       const [ox, oz] = S.out
-      // Rock bulges out a little, a hand's breadth here and there; cut stone stays straight.
-      const bulge = (wx: number, wy: number, wz: number) => (cut ? 0 : (noise3(wx * 9, wy * 9, wz * 9) - 0.5) * 0.05 + (noise3(wx * 23, wy * 23, wz * 23) - 0.5) * 0.02)
+      // Rock stands out in buttresses and falls back in gullies, more the taller the cliff (half a metre on a sea cliff), with
+      // ledges and knobs on that; cut stone stays straight.
+      const relief = Math.min(1.2, Math.max(0.3, tall / 0.4))
+      const bulge = (wx: number, wy: number, wz: number) => (cut ? 0 : ((noise3(wx * 3.1, wy * 2.2, wz * 3.1) - 0.5) * 0.11 + (noise3(wx * 9, wy * 9, wz * 9) - 0.5) * 0.045) * relief + (noise3(wx * 23, wy * 23, wz * 23) - 0.5) * 0.018)
       const grid: number[][] = []
       for (let q = 0; q <= R; q++) {
         const s = q / R, [u, v] = S.at(s), x0 = j + u, z0 = i + v
@@ -851,13 +855,16 @@ void gMix(inout G a, G b, float m, float inv) {
 G gTri(float L, vec3 P, vec3 N, vec3 Px, vec3 Py, out vec3 nW) {
   vec3 w = pow(abs(N), vec3(4.0)); w /= w.x + w.y + w.z;
   G g; g.c = vec3(0.0); g.h = 0.0; g.n = vec2(0.0); g.r = 0.0; g.ao = 0.0; nW = vec3(0.0);
-  if (w.x > 0.02) { G s = gLayH(L, P.zy, Px.zy, Py.zy, false); g.c += s.c * w.x; g.h += s.h * w.x; g.r += s.r * w.x; g.ao += s.ao * w.x; nW += vec3(0.0, s.n.y, s.n.x * sign(N.x)) * w.x; }
-  if (w.y > 0.02) { G s = gLayH(L, P.xz, Px.xz, Py.xz, false); g.c += s.c * w.y; g.h += s.h * w.y; g.r += s.r * w.y; g.ao += s.ao * w.y; nW += vec3(s.n.x, 0.0, -s.n.y) * w.y; }
-  if (w.z > 0.02) { G s = gLayH(L, P.xy, Px.xy, Py.xy, false); g.c += s.c * w.z; g.h += s.h * w.z; g.r += s.r * w.z; g.ao += s.ao * w.z; nW += vec3(s.n.x * sign(N.z), s.n.y, 0.0) * w.z; }
+  // (Under each, the same photograph six times larger, for the light and dark of a whole cliff face.)
+  float meanL = max(dot(textureLod(tGC, vec3(0.5, 0.5, L), 12.0).rgb, vec3(0.333)), 0.01);
+  #define BIG(q, qx, qy) mix(1.0, dot(textureGrad(tGC, vec3((q) * uGS[int(L + 0.5)] * 0.17 + 0.31, L), (qx) * uGS[int(L + 0.5)] * 0.17, (qy) * uGS[int(L + 0.5)] * 0.17).rgb, vec3(0.333)) / meanL, 0.6)
+  if (w.x > 0.02) { G s = gLayH(L, P.zy, Px.zy, Py.zy, false); s.c *= BIG(P.zy, Px.zy, Py.zy); g.c += s.c * w.x; g.h += s.h * w.x; g.r += s.r * w.x; g.ao += s.ao * w.x; nW += vec3(0.0, s.n.y, s.n.x * sign(N.x)) * w.x; }
+  if (w.y > 0.02) { G s = gLayH(L, P.xz, Px.xz, Py.xz, false); s.c *= BIG(P.xz, Px.xz, Py.xz); g.c += s.c * w.y; g.h += s.h * w.y; g.r += s.r * w.y; g.ao += s.ao * w.y; nW += vec3(s.n.x, 0.0, -s.n.y) * w.y; }
+  if (w.z > 0.02) { G s = gLayH(L, P.xy, Px.xy, Py.xy, false); s.c *= BIG(P.xy, Px.xy, Py.xy); g.c += s.c * w.z; g.h += s.h * w.z; g.r += s.r * w.z; g.ao += s.ao * w.z; nW += vec3(s.n.x * sign(N.z), s.n.y, 0.0) * w.z; }
   return g;
 }
 ${'' /* rock strata: the cliffs' layering, laid over the photograph */}
-float gStrata(float y, vec2 q) { return 0.9 + 0.1 * sin(y * 58.0 + tFbm(q * 2.4) * 5.0); }
+float gStrata(float y, vec2 q) { float b = sin(y * 58.0 + tFbm(q * 2.4) * 5.0); return 0.84 + 0.16 * b * abs(b) + 0.06 * sin(y * 163.0 + tFbm(q * 5.0) * 3.0); }
 `
 
 const GROUND_BODY = /* glsl */ `
@@ -1040,16 +1047,20 @@ const GROUND_BODY = /* glsl */ `
         float ga = abs(along - 0.5), gw = kd;
         if (ga < 0.027 && gw > 0.003) {
           float slot = step(0.5, fract(along * 300.0));
-          g.c = mix(SRGB(0.16, 0.16, 0.17), vec3(0.008), slot); g.r = 0.55; metal = 1.0 - slot; g.ao = mix(1.0, 0.2, slot); nW = vec3(0.0);
+          // (Weathered cast iron: dark grey, rough, only partly metallic — a metal's colour is what it reflects, and
+          // a fully metallic dark one draws black.)
+          g.c = mix(vec3(0.1, 0.1, 0.105), vec3(0.008), slot); g.r = 0.6; metal = 0.35 * (1.0 - slot); g.ao = mix(1.0, 0.2, slot); nW = vec3(0.0);
         }
       }
       vec2 mc = vec2(0.5, 0.5 + (tHash(floor(p) + 3.3) - 0.5) * 0.4);
       float mr = length(l - mc);
       if (tHash(floor(p) + 9.1) > 0.7 && !cobbled && mr < 0.042) {
         float ring = smoothstep(0.036, 0.038, mr);
-        float grid = step(0.5, fract((l.x - mc.x) * 160.0)) * step(0.5, fract((l.y - mc.y) * 160.0));
-        g.c = mix(SRGB(0.2, 0.19, 0.18) * (0.75 + 0.25 * grid), SRGB(0.25, 0.24, 0.23), ring); g.r = 0.5 - 0.15 * ring; metal = 0.8; nW = vec3(0.0);
-        bh += grid * 0.15 * (1.0 - ring);
+        // (Its cast pattern in the colour only, and smooth: a hard-edged pattern this fine would alias, and as a bump
+        // it turned the surface's normal under itself and drew the cover black.)
+        vec2 gq = (l - mc) * 6.2832 * 80.0;
+        float grid = mix(0.5, 0.5 + 0.5 * sin(gq.x) * sin(gq.y), fade);
+        g.c = mix(vec3(0.1, 0.095, 0.09) * (0.8 + 0.4 * grid), vec3(0.14, 0.135, 0.13), ring); g.r = 0.62 - 0.17 * ring; metal = 0.4; nW = vec3(0.0);
       }
     }
   } else if (id < 3.5 || id > 8.5) {
