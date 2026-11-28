@@ -590,7 +590,7 @@ export function buildWorld(d: WorldData, opts: { phone?: boolean } = {}) {
   root.add(pools)
   return {
     root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes, ...fl.solids], flora: fl,
-    ground: gr.ground, scattered: gr.scattered,
+    ground: gr.ground, scattered: gr.scattered, rockCount: gr.rocks.length - d.seaRocks.length,
     windows: sol.windows, bulbs: sol.bulbMat, boards: pics.material, made: sol.made, lamps: sol.lamps, time,
     /** Water: the sea's surface (swell and all) and depth, the stream's surface and which way it runs, and how bright the light under it is. */
     seaAt: sea.surfaceAt, depthAt: sea.depthAt, poolAt: gr.poolAt, flowAt: gr.flowAt, caustics: gr.caustics, falls: gr.falls, swell: sea.uniforms.uLift, sea,

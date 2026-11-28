@@ -478,7 +478,9 @@ export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
           // (Along the edge is x on a north or south edge, z on a west or east one.)
           Nn.set(ox + (oz ? -dS : 0), -dY, oz + (ox ? -dS : 0)).normalize()
           const ao = 0.55 + 0.45 * smoothstep(0, 0.3, y - bots[q])
-          col.push(geo.v(P, Nn, tint, surf, [0, 0, 0, ao]))
+          // (A stream's or the pond's wall, wet up to just above its water.)
+          const wetTo = isWet(i, j) ? Y(top(i, j) - 1) : isWet(i2, j2) ? Y(top(i2, j2) - 1) : -99
+          col.push(geo.v(P, Nn, tint, surf, [1 - smoothstep(wetTo + 0.004, wetTo + 0.02, y), 0, 0, ao]))
         }
         grid.push(col)
       }
@@ -528,10 +530,13 @@ export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
   let seed = 0x51ed
   const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
   const scattered: { x: number; z: number; r: number }[] = []
+  const coastRocks: { x: number; z: number; r: number }[] = []
   /** Room for a stone (or a log) at a point: not on a street, not in or against anything built, not in the stream. */
   const room = (x: number, z: number, r: number) => {
     const i = Math.floor(z), j = Math.floor(x)
     for (const [a, b] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) { const ii = Math.floor(z + b), jj = Math.floor(x + a); if (roads.has(key(ii, jj)) || isWet(ii, jj)) return false }
+    // (Nor anywhere on a building's plot: its forecourt is swept.)
+    if (d.buildings.some((b) => x > b.j - r && x < b.j + b.d + r && z > b.i - r && z < b.i + b.w + r)) return false
     return !(boxAt.get(key(i, j)) ?? []).some((bx) => x > bx.j0 - r - 0.02 && x < bx.j1 + r + 0.02 && z > bx.i0 - r - 0.02 && z < bx.i1 + r + 0.02)
   }
   /** A stone lying on the ground, sunk a third into it: a lumpy, flattened ball. */
@@ -591,7 +596,27 @@ export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
         const x = j + rnd(), z = i + rnd(), h = heightAt(x, z)
         if (h > seaY + 0.01 && h < seaY + 0.05 && rnd() < 0.22) { driftwood(x, z, (1.2 + rnd() * 1.6) * METRE, rnd() * Math.PI); break }
       }
-    } else if (k === '1' && !roads.has(key(i, j)) && !isWet(i, j)) {
+    }
+    if (k === '1') {
+      // A sea cliff: rocks standing in the sea along its foot, a bigger one off each corner — the coast is not a
+      // block's edge (the sea foams round them, and they are solid).
+      const sea = [[-1, 0], [1, 0], [0, -1], [0, 1]].filter(([a, b]) => kind(i + a, j + b) === '0' && !joined(i, j, i + a, j + b))
+      for (const [a, b] of sea) {
+        const n = 1 + (rnd() < 0.5 ? 1 : 0)
+        for (let q = 0; q < n; q++) {
+          const along = 0.15 + rnd() * 0.7, out = 0.03 + rnd() * 0.07
+          const x = j + (b === 0 ? along : b > 0 ? 1 + out : -out), z = i + (a === 0 ? along : a > 0 ? 1 + out : -out)
+          const rx = 0.11 + rnd() * 0.14
+          rock(x, z, rx, 0.06 + rnd() * 0.12, rnd() * 50); coastRocks.push({ x, z, r: rx })
+        }
+      }
+      for (const [a, b] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+        if (!sea.some(([p1, q1]) => p1 === a && q1 === 0) || !sea.some(([p1, q1]) => p1 === 0 && q1 === b)) continue
+        const x = j + (b > 0 ? 1.04 : -0.04), z = i + (a > 0 ? 1.04 : -0.04), rx = 0.2 + rnd() * 0.12
+        rock(x, z, rx, 0.12 + rnd() * 0.14, rnd() * 50); coastRocks.push({ x, z, r: rx })
+      }
+    }
+    if (k === '1' && !roads.has(key(i, j)) && !isWet(i, j)) {
       // The foot of a cliff or a rock wall: fallen stones.
       for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
         if (joined(i, j, i + a, j + b) || pinned.has(key(i, j)) || pinned.has(key(i + a, j + b))) continue
@@ -655,7 +680,7 @@ export function terrain(d: WorldData, boxes: Box[], time: { value: number }) {
   const flowAt = (x: number, z: number) => flows.get(tileKey(x, z)) ?? null
   /** The stream's or the pond's surface at a point, if there is one. */
   const poolAt = (x: number, z: number) => levels.get(tileKey(x, z)) ?? null
-  const rocks = d.seaRocks.map(([i, j, k]) => ({ x: j + 0.5, z: i + 0.5, r: 0.34 * k }))
+  const rocks = [...d.seaRocks.map(([i, j, k]) => ({ x: j + 0.5, z: i + 0.5, r: 0.34 * k })), ...coastRocks]
 
   /**
    * Whether grass grows at a point, and its green (flora.ts plants tufts by it): on land, not a street, a field,
@@ -1074,11 +1099,14 @@ const GROUND_BODY = /* glsl */ `
       vec2 fc = an.x > an.z ? vTW.zy : vTW.xy, fx = an.x > an.z ? Px.zy : Px.xy, fy = an.x > an.z ? Py.zy : Py.xy;
       g = gLay(L_STONE, fc, fx, fy);
       g.c *= base / SRGB(0.54, 0.518, 0.482) * (0.85 + 0.15 * smoothstep(0.0, 0.2, mac.r));
+      g.c *= 1.0 - 0.45 * vTBlend.x; g.r = mix(g.r, 0.18, vTBlend.x);
       nW = an.x > an.z ? vec3(0.0, g.n.y, g.n.x * sign(wn.x)) : vec3(g.n.x * sign(wn.z), g.n.y, 0.0);
     } else {
       // Rock: the cliffs and crags, from every side, layered; sea-worn and darker where the sea reaches.
       g = gTri(L_ROCK, vTW, wn, Px, Py, nW);
       g.c *= gStrata(vTW.y, p) * base / SRGB(0.525, 0.502, 0.478);
+      // (Wet where a stream or the pond runs along it.)
+      g.c *= 1.0 - 0.45 * vTBlend.x; g.r = mix(g.r, 0.18, vTBlend.x);
       float sea = 1.0 - smoothstep(0.05, 0.35, wetY);
       if (sea > 0.0) { vec3 sn; G s = gTri(L_ROCK_SEA, vTW, wn, Px, Py, sn); g.c = mix(g.c, s.c, sea); g.h = mix(g.h, s.h, sea); g.r = mix(g.r, s.r, sea); nW = mix(nW, sn, sea); }
     }
