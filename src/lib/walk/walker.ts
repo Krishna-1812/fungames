@@ -68,6 +68,8 @@ import { street } from './street'
 import { autoStep, guessTier, pixelsFor, TIER_ORDER, TIERS, type Tier } from './tiers'
 import { boxGrid } from './grid'
 import { governAlbedo } from './albedo'
+import { groundTextures } from './ground'
+import { footprints } from './foot'
 
 export type Walk = { dispose(): void
   /** Jump to the night (half past nine) or to the morning (ten). */
@@ -101,7 +103,7 @@ export type Walk = { dispose(): void
   /** With ?debug=albedo: how much of the picture had its albedo brought down, how much is darker than anything real, the mean of the rest. */
   albedo(): { over: number; dark: number; mean: number }
   eye(): { adapted: number; metered: number; comp: number; floor: number; skyCard: number; sunCard: number; taa: boolean }
-  perf(): { fps: number; cpu: number; tier: Tier; choice: 'auto' | Tier; sharp: number; pixels: number; calls: number; triangles: number; still: boolean; shadow: number; ao: string; bloom: boolean; grass: number }
+  perf(): { fps: number; cpu: number; tier: Tier; choice: 'auto' | Tier; sharp: number; pixels: number; calls: number; triangles: number; still: boolean; shadow: number; ao: string; bloom: boolean; grass: number; ground: boolean; groundLevel: number }
   scene: Scene }
 
 /** What the page shows about cars: one to get into near you, the one you drive (its speed in km/h, and its gear). */
@@ -158,6 +160,12 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
   const scene = new Scene()
   const world = buildWorld(data, { phone })
   scene.add(world.root)
+  // The ground's photographs (ground.ts), streamed in once the island is up; plain until they come.
+  const groundTex = groundTextures(renderer, { base: import.meta.env.BASE_URL, small: phone || tier === 'low', aniso: Math.min(8, renderer.capabilities.getMaxAnisotropy()), colour: world.ground.tGC, detail: world.ground.tGD })
+  // Footprints and tyre tracks in the sand and snow round you (foot.ts).
+  const prints = footprints(renderer)
+  let footSide = 1
+  const wheelWas: ([number, number] | null)[] = [null, null, null, null]
   // Asked for less motion: the sea lies flat (no swell rocking you, or the camera, as you swim).
   // (And the wind barely stirs the trees and the grass.)
   if (still) { world.swell.value = 0; world.flora.wind.value = 0.25 }
@@ -416,6 +424,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
     if (!Q.has('shadow') && sun.shadow.mapSize.x !== t.shadow) { sun.shadow.mapSize.setScalar(t.shadow); sun.shadow.radius = softFor(t.shadow); sun.shadow.map?.dispose(); sun.shadow.map = null }
     post!.setAO(Q.has('noao') ? 'off' : t.ao); post!.setBloom(!Q.has('nobloom') && t.bloom); post!.setContactOn(!Q.has('nocontact') && t.contact)
     world.flora.lawn.reach.value = t.grass; grassTick = 0
+    world.ground.uGQ.value = Q.has('ground') ? Number(Q.get('ground')) : t.ground
     people.setDensity(t.people); sky.setDensity(t.rain * (still ? 0.6 : 1))
     fit()
   }
@@ -675,13 +684,30 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       if (onFoot && sp > 0.02) {
         stepGone += sp * dt
         const half = (sp > WALK * 1.4 ? 1.25 : 0.75) * METRE
-        if (stepGone > half) { stepGone -= half; ears.step(surfaceAt(pos.x, pos.z, pos.y), sp > WALK * 1.4) }
+        if (stepGone > half) {
+          stepGone -= half; ears.step(surfaceAt(pos.x, pos.z, pos.y), sp > WALK * 1.4)
+          // A print where the foot came down (the ground keeps it only in sand or snow), left and right in turn.
+          const yw = Math.atan2(vel.z, vel.x), side = (footSide = -footSide) * 0.09 * METRE
+          prints.press({ x: pos.x - Math.sin(yw) * side, z: pos.z + Math.cos(yw) * side, yaw: yw, len: 0.28 * METRE, wid: 0.11 * METRE, depth: sp > WALK * 1.4 ? 1 : 0.75 })
+        }
       }
       if (onFoot && wasAir && airVy < -0.25) ears.land(-airVy / 1.2)
       wasAir = !onGround && !swimming; if (wasAir) airVy = vel.y
       if (swimming && sp > 0.03 && (strokeT -= dt) <= 0) { strokeT = 0.75; ears.stroke() }
     }
     water.update(dt)
+    // The car's tyres, rolling through sand or snow: a track from where each wheel was to where it is.
+    if (driving !== null) {
+      const v = own[driving], S = v.spec
+      const wheels = [[S.front, 1], [S.front, -1], [S.rear, 1], [S.rear, -1]].map(([a, c]) => v.toWorld(a, c * S.wid * 0.42))
+      wheels.forEach(([x, z], k) => {
+        const was = wheelWas[k]
+        if (was && v.speed() > 0.3) { const dx = x - was[0], dz = z - was[1], len = Math.hypot(dx, dz); if (len > 0.004) { prints.press({ x: (x + was[0]) / 2, z: (z + was[1]) / 2, yaw: Math.atan2(dz, dx), len: len + 0.2 * METRE, wid: 0.2 * METRE, depth: 0.6 }); wheelWas[k] = [x, z] } }
+        else wheelWas[k] = [x, z]
+      })
+    } else wheelWas.fill(null)
+    prints.update(dt, driving !== null ? { x: own[driving].s.x, z: own[driving].s.z } : pos, !photo)
+    world.ground.tFoot.value = prints.texture(); world.ground.uFoot.value.copy(prints.uniform.value)
     // Your headlights: on after dark while you drive, thrown down the road ahead.
     if (driving !== null && glow > 0.02) {
       const v = own[driving], S = MODELS[mine[driving].model]
@@ -929,7 +955,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       const lp = post!.state()
       return {
         fps: Math.round(fpsNow * 10) / 10, cpu: Math.round(cpuNow * 100) / 100, tier, choice, sharp, pixels: renderer.getPixelRatio(),
-        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, still, shadow: sun.shadow.mapSize.x, ao: lp.ao, bloom: lp.bloom, grass: world.flora.lawn.reach.value,
+        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, still, shadow: sun.shadow.mapSize.x, ao: lp.ao, bloom: lp.bloom, grass: world.flora.lawn.reach.value, ground: groundTex.ready(), groundLevel: world.ground.uGQ.value,
       }
     },
     sound: () => ({ on: ears.on, running: ears.running, levels: ears.levels() }),
@@ -962,6 +988,7 @@ export function startWalk(canvas: HTMLCanvasElement, data: WorldData, ui: { onNe
       cancelAnimationFrame(raf)
       removeEventListener('resize', fit); removeEventListener('keydown', kd); removeEventListener('keyup', ku)
       removeEventListener('pointermove', pm); removeEventListener('pointerup', pu); removeEventListener('pointercancel', pu)
+      groundTex.dispose(); prints.dispose()
       dl.dispose(); sky.dispose(); ears.dispose(); things.dispose(); removeEventListener('keydown', startSound); removeEventListener('pointerdown', startSound); post?.dispose(); renderer.dispose()
     },
   }

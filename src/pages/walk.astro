@@ -60,6 +60,7 @@ import { withBase } from '../lib/base'
       </div>
       <p class="wk-set-note">Calm: the sea lies flat, the trees barely stir, lighter rain, no lightning or flashes.</p>
       <div class="wk-time-row"><button class="wk-chip" type="button" id="wkFps" aria-pressed="false">Show frame rate</button></div>
+      <p class="wk-set-note wk-credit">The ground is photographed: CC0 sets from <a href="https://polyhaven.com/" rel="noopener" target="_blank">Poly Haven</a>.</p>
     </div>
     <p class="wk-fps" id="wkFpsOut" hidden aria-hidden="true"></p>
     <p class="wk-help" id="wkHelp">W A S D or the arrow keys to walk · Shift to run · Space to jump · drag to look round · scroll to step back</p>
@@ -350,6 +351,8 @@ import { withBase } from '../lib/base'
   .wk-flash::after { content: ''; position: absolute; inset: 0; background: #fff; opacity: 0.6; pointer-events: none; animation: wk-flash 0.22s ease-out forwards; }
   @keyframes wk-flash { to { opacity: 0; } }
   .wk-set-note { margin: 2px 0 8px; color: #4a5672; font-size: 12px; }
+  .wk-credit { margin-top: 10px; }
+  .wk-credit a { color: #2f5bd3; }
   .wk-set .wk-time-row + .wk-time-label { margin-top: 6px; }
   .wk-fps { position: absolute; left: 14px; top: 62px; margin: 0; padding: 6px 10px; border-radius: 999px; background: rgb(10 16 30 / 0.66); color: #eef3ff; font: 600 12px/1 ui-monospace, monospace; pointer-events: none; font-variant-numeric: tabular-nums; }
   .wk-fps[hidden] { display: none; }

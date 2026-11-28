@@ -40,6 +40,8 @@ export type TierSpec = {
   contact: boolean
   /** The volumetric clouds' steps through the sky (clouds.ts); none: the flat clouds stand in. */
   clouds: number
+  /** How the ground's photographs are laid (terrain.ts): 0 plainly, 1 with a larger turned copy under each, 2 hex-tiled with parallax up close. */
+  ground: number
   /** How far the grass is drawn (tiles). */
   grass: number
   /** How many of the island's people are out (of all of them). */
@@ -49,10 +51,10 @@ export type TierSpec = {
 }
 
 export const TIERS: Record<Tier, TierSpec> = {
-  low: { maxPixels: 1, minPixels: 0.75, shadow: 1024, ao: 'off', bloom: false, contact: false, clouds: 0, grass: 4, people: 0.45, rain: 0.35 },
-  medium: { maxPixels: 1.5, minPixels: 0.75, shadow: 2048, ao: 'off', bloom: true, contact: true, clouds: 24, grass: 6, people: 0.7, rain: 0.6 },
-  high: { maxPixels: 2, minPixels: 1, shadow: 4096, ao: 'half', bloom: true, contact: true, clouds: 36, grass: 9, people: 1, rain: 1 },
-  ultra: { maxPixels: 2.5, minPixels: 1.5, shadow: 4096, ao: 'full', bloom: true, contact: true, clouds: 48, grass: 12, people: 1, rain: 1 },
+  low: { maxPixels: 1, minPixels: 0.75, shadow: 1024, ao: 'off', bloom: false, contact: false, clouds: 0, ground: 0, grass: 4, people: 0.45, rain: 0.35 },
+  medium: { maxPixels: 1.5, minPixels: 0.75, shadow: 2048, ao: 'off', bloom: true, contact: true, clouds: 24, ground: 1, grass: 6, people: 0.7, rain: 0.6 },
+  high: { maxPixels: 2, minPixels: 1, shadow: 4096, ao: 'half', bloom: true, contact: true, clouds: 36, ground: 2, grass: 9, people: 1, rain: 1 },
+  ultra: { maxPixels: 2.5, minPixels: 1.5, shadow: 4096, ao: 'full', bloom: true, contact: true, clouds: 48, ground: 2, grass: 12, people: 1, rain: 1 },
 }
 
 /** The pixels to a point a level draws at, on a screen with so many of its own. */

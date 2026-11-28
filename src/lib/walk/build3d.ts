@@ -571,6 +571,8 @@ export function buildWorld(d: WorldData, opts: { phone?: boolean } = {}) {
   // What grows (flora.ts): trees, palms, cacti, rocks, the grass and its flowers, in the wind.
   const fl = flora(d, { siteAt: gr.siteAt, heightAt: gr.heightAt, meadow: gr.meadow, boxes: sol.boxes, time, phone: !!opts.phone })
   root.add(fl.group)
+  // (Leaf litter on the ground under them.)
+  gr.litter(fl.litter)
   // The sea (water.ts): it knows its depth everywhere, so it is clear in the shallows and deep blue
   // beyond, breaks in foam on every shore, and lifts in a long swell that calms to nothing at the edge.
   // Under it, far out past the floor the island stands on, the open ocean's dark.
@@ -584,6 +586,7 @@ export function buildWorld(d: WorldData, opts: { phone?: boolean } = {}) {
   root.add(new Mesh(gr.poolGeo, poolMaterial(time)))
   return {
     root, top: gr.top, kind: gr.kind, heightAt: gr.heightAt, siteAt: gr.siteAt, joined: gr.joined, boxes: [...sol.boxes, ...gr.rockBoxes, ...fl.solids], flora: fl,
+    ground: gr.ground, scattered: gr.scattered,
     windows: sol.windows, bulbs: sol.bulbMat, boards: pics.material, made: sol.made, lamps: sol.lamps, time,
     /** Water: the sea's surface (swell and all) and depth, the stream's surface and which way it runs, and how bright the light under it is. */
     seaAt: sea.surfaceAt, depthAt: sea.depthAt, poolAt: gr.poolAt, flowAt: gr.flowAt, caustics: gr.caustics, falls: gr.falls, swell: sea.uniforms.uLift,

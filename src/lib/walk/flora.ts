@@ -232,12 +232,15 @@ export function flora(d: WorldData, opts: { siteAt: (x: number, z: number) => nu
     }
   }
   const solid = (c: Vector3, r: number, h: number) => solids.push({ i0: c.z - r, i1: c.z + r, j0: c.x - r, j1: c.x + r, z0: c.y - 0.05, z1: c.y + h })
+  /** Where leaves fall (terrain.ts lays litter there): under each broadleaf tree and pine, as wide as its crown. */
+  const litter: { x: number; z: number; r: number }[] = []
 
   for (const [name, x, y, z0, k] of d.plants) {
     const gz = opts.siteAt(y, x), z = Math.abs(z0 - gz) < 14 ? gz - 0.6 : z0
     const kind = name.replace(/[0-9]+$/, '').split('-')[0]
     const B = W(x, y, z), r = rng(x * 31.7 + y * 7.3 + k)
     const lean = new Vector3((r() - 0.5) * 0.12, 1, (r() - 0.5) * 0.12).normalize()
+    if (kind === 'round' || kind === 'blossom' || kind === 'pine' || kind === 'cypress') litter.push({ x: B.x, z: B.z, r: (kind === 'cypress' ? 0.12 : 0.23) * k })
     if (kind === 'round' || kind === 'blossom') {
       const th = Y(8 * k) * 1.35, R = 0.2 * k * 1.15, Rv = R * 0.85
       const top = B.clone().addScaledVector(lean, th * 1.05), c = B.clone().addScaledVector(lean, th).add(new Vector3(0, Rv * 0.75, 0))
@@ -373,7 +376,7 @@ export function flora(d: WorldData, opts: { siteAt: (x: number, z: number) => nu
   group.add(woodMesh, leafMesh)
   const lawn = grass(opts, w, opts.phone ? 70 : 140)
   group.add(lawn.group)
-  return { group, solids, wind, lawn, grown: { wood: wood.pos.length / 9, leaves: leaves.pos.length / 18 } }
+  return { group, solids, litter, wind, lawn, grown: { wood: wood.pos.length / 9, leaves: leaves.pos.length / 18 } }
 }
 
 /* ---- grass -------------------------------------------------------------------- */
