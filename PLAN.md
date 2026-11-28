@@ -3337,6 +3337,16 @@ Wiki Spy is *possible* (Wikipedia's API is free) but is a different kind of proj
        ground's own shader; parallax on cobbles and paving up close. Boulders, pebbles and driftwood on the beaches
        and at the cliffs' feet (never on a street), leaf litter under the trees, scree below the rock, and
        footprints and tyre tracks in the sand and snow that settle away in about a minute.
+    4. ~~*The water*~~ **done** — a real sea, seen through. Two ocean swells and the trade wind's own sea from a JONSWAP
+       spectrum (peak 3.2 s, Hs 0.64 m), twelve Gerstner waves at their real speeds, small waves by FFT drifting over
+       them; you, the boats and the gulls ride the drawn surface. The water is drawn after everything solid, so it
+       refracts the floor, absorbs red first along the true path (clear over sand, turquoise, then the open sea's dark
+       blue from its own backscatter), reflects by Fresnel the sky and, on High, the island and the boats round it.
+       Surf breaking off every beach with its swash running up the sand, whitecaps in a wind, foam as a lace that
+       thins; ripples round you from a real wave equation (strokes, splashes, rain, boats), each boat's Kelvin wake;
+       caustics traced through the waves onto the floor; Snell's window from under the surface, with the sound
+       muffled; the stream flowing along its course, wet walls, spray at its falls. The sea is 38,544 triangles where
+       it was 139,000. Rocks stand along the sea cliffs' feet. On the way: the cars' lamps, which had never compiled.
 
 **Where that leaves it.** Fourteen new games, fourteen checkers
 (eighteen, counting Constellation Draw's own four). The pattern that worked every

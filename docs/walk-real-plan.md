@@ -388,7 +388,47 @@ and drains, not a dark-blue noise.
 
 ---
 
-## Phase 4: The water
+## Phase 4: The water — done 28 Nov 2026
+
+**Done:**
+- A real sea (`sea.ts`): two swell trains (9 and 7 s) and a wind sea from a JONSWAP spectrum for a 7 m/s trade wind
+  over 20 km (peak 3.2 s, Hs 0.64 m), twelve Gerstner waves each at deep water's own speed for its length, crests
+  sharpening without folding, the wind sea growing and easing with the weather's wind. The swimmer, the boats and the
+  gulls ride the very surface that is drawn (to half a millimetre); it calms to nothing at the water's edge as before.
+- Two drifting cascades of small waves (6 m and 1.6 m repeats) by inverse FFT of a wind spectrum (`seatex.ts`), made
+  on the device in milliseconds, tiling without a seam.
+- Water as an optical material (`water.ts`): drawn after everything solid (`lens.ts` draws the solid world, seeds a
+  second buffer with its colour and depth, then the water reads the first while drawing into the second), so it
+  refracts what lies under it; Beer–Lambert absorption per colour along the true path (red first: clear over sand,
+  turquoise, then dark), what deep water sends back of its own light from its backscatter (the open sea's dark blue,
+  about 4% in blue and almost none in red), Schlick's Fresnel for water's index 1.33, the sun glowing through crests
+  stood against it.
+- Reflections: the sky, and on High and Ultra what stands round the water — the island, the piers, a boat — by marching
+  the reflected ray through the picture's depth.
+- Surf: waves standing up and breaking in a band off every beach, foam behind them in patches and streaks, the swash
+  running up the sand and draining back with its foaming edge; the shore's lap; whitecaps on the steepest crests in a
+  wind; the foam laid from a baked lace that thins from its finest threads first.
+- Ripples round you (`wake.ts`): the wave equation on 256² cells over 22 m, following you — strokes, wading, splashes,
+  rain and passing boats disturb it, the rings spread at 0.8 m/s, cross and die away. Each boat under way drags a
+  Kelvin wake (the transverse waves and the 19.5° wedge) and a churned white track.
+- Caustics traced through the small waves themselves onto the sea floor (only their bright lines laid over it,
+  strongest a metre or two down).
+- Under the water: everything seen through it (dimmed red first, filled with its own blue-green light), the surface
+  overhead as Snell's window with the deep mirrored beyond it, and the sound muffled.
+- The stream and the pond: flow-mapped (two phases of the small waves carried downstream), seen through to their beds,
+  their walls wet to just above the water, spray at the foot of every fall near you.
+- A cheaper sea: a disc round the camera, fine near it and coarse to the horizon — 38,544 triangles where the old
+  fixed sheet was 139,000.
+- From Phase 3: rocks along the foot of every sea cliff and off its corners (91), so the coast is not a block's edge.
+
+**Moved:**
+- A planar reflection (a second drawing of the world, mirrored): the reflections march through the picture instead,
+  which costs no second drawing but cannot show what is off the screen (the sky stands in). It goes to Phase 15,
+  if the frame budget leaves room.
+- Light shafts under the water: Phase 11, with the storm light and the mist.
+- Waves that refract round headlands and change length as they shoal (the surf is drawn by the distance to the shore,
+  not simulated): out of reach in a browser at this budget.
+- The cliffs' tops are still straight: the rocks at their feet break the line from the sea, not the island's tiles.
 
 **New point of view:** water as an optical material, which absorbs,
 refracts, reflects by Fresnel and scatters, moved by a real wave spectrum.
