@@ -28,6 +28,10 @@
  *     the streets' paints in real ranges, the sun set against the sky by real
  *     daylight, the steadying's offsets within half a pixel, and the shadow
  *     cascades and the albedo rule finding their places in three's shaders;
+ *   - the sky and the air: the sun's light through the island's air white at
+ *     noon and red at the horizon, the moon later each day and full at
+ *     midnight, the stars where the real ones are, the clouds' pattern
+ *     repeating exactly;
  *   - every game's building can be got to from the start — walked, climbed
  *     or swum, by the walker's own rules — close enough for its play prompt;
  *   - the walls you collide with are real boxes, and there are lamps to
@@ -606,6 +610,34 @@ check(world.lamps.length >= 12, `${world.lamps.length} street lamps to light the
   cascadeShadows(); governAlbedo()
   check(ShaderChunk.lights_fragment_begin.includes('NUM_DIR_LIGHT_SHADOWS > 1') && ShaderChunk.lights_physical_fragment.includes('walkAlbedo0'),
     'the shadow cascades and the albedo rule found their places in three\'s shaders')
+}
+
+// The sky and the air (round two, phase 2: atmosphere.ts, stars.ts, daylight.ts, weather.ts): the sun's light through
+// the air — white high up, red at the horizon, nothing below it; the moon rising later each day and full at midnight;
+// the stars where the real ones are (Polaris standing at the island's latitude over the north, whatever the hour) and
+// in their colours; the clouds' pattern repeating exactly, so it can be one texture.
+{
+  const { transmittance } = await import('../src/lib/walk/atmosphere.ts')
+  const { moonPhase, moonTransit, moonPlace, skyTurn } = await import('../src/lib/walk/daylight.ts')
+  const { BRIGHT, starColour, equatorial } = await import('../src/lib/walk/stars.ts')
+  const { fbm, PERIOD } = await import('../src/lib/walk/weather.ts')
+  const { Vector3 } = await import('three')
+  const T = (el) => transmittance(0.002, Math.sin((el * Math.PI) / 180), 22)
+  const hi = T(81), low = T(2), gone = T(-2), els = [-2, 0.5, 2, 5, 10, 30, 60, 81].map((e) => T(e)[1])
+  check(hi[2] / hi[0] > 0.75 && low[2] / low[0] < 0.35 && gone[0] === 0 && els.every((v, k) => k === 0 || v >= els[k - 1]),
+    `the sun through the island's air: ${hi.map((v) => v.toFixed(2)).join('/')} of its light at noon (nearly white), ${low.map((v) => v.toFixed(2)).join('/')} at 2° (red), none below the horizon`)
+  // (Searched noon to noon: a transit just after midnight belongs to the night before.)
+  const transits = [0, 1, 2, 3].map((d) => { let best = 0, el = -99; for (let h = 12; h < 36; h += 0.01) { const p = moonPlace(d + Math.floor(h / 24), h % 24); if (p.el > el) { el = p.el; best = h } } return best })
+  const later = transits.slice(1).map((t, k) => (((t - transits[k]) % 24) + 24) % 24 * 60)
+  check(later.every((m) => m > 40 && m < 60) && Math.abs(moonTransit(0.5)) < 1e-9 && moonPhase(0, 0).lit > 0.5 && moonPhase(0, 0).lit < 0.9,
+    `the moon crosses the south ${later.map((m) => Math.round(m)).join(", ")} minutes later each day (transits ${transits.map((t) => t.toFixed(2)).join(", ")}), at midnight when full; it starts a waxing gibbous (${Math.round(moonPhase(0, 0).lit * 100)}% lit)`)
+  const sirius = BRIGHT.reduce((a, b) => (b[2] < a[2] ? b : a)), rigel = starColour(-0.03), betel = starColour(1.85)
+  check(BRIGHT.length >= 90 && sirius[0] === 6.752 && rigel.b > rigel.r && betel.r > betel.b * 1.5, `${BRIGHT.length} bright stars where they are, Sirius the brightest, Rigel blue-white and Betelgeuse red`)
+  const pol = new Vector3(), m = equatorial(2.53, 89.26)
+  const pols = [0, 6, 13, 20].map((lst) => { pol.copy(m).applyMatrix3(skyTurn(lst)); return { el: (Math.asin(pol.y) * 180) / Math.PI, north: -pol.z / Math.hypot(pol.x, pol.z) } })
+  check(pols.every((p) => Math.abs(p.el - 24) < 1.2 && p.north > 0.99), `Polaris stands ${pols.map((p) => p.el.toFixed(1)).join('°, ')}° up over the north as the sky turns (the island is at 24° north)`)
+  const reps = [[3.3, 7.1], [40.2, 12.9], [-5.5, 61.7]].map(([x, y]) => Math.abs(fbm(x, y) - fbm(x + PERIOD, y)) + Math.abs(fbm(x, y) - fbm(x, y - PERIOD)))
+  check(reps.every((d) => d < 1e-9), `the clouds' pattern repeats exactly every ${PERIOD} of its units (one texture serves the flat clouds, their shadows and the 3D ones)`)
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nThe walk checks out.')
